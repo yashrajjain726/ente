@@ -1,17 +1,15 @@
 import { EnteDrawer } from "@/base/components/EnteDrawer";
-import { MenuItemGroup, MenuSectionTitle } from "@/base/components/Menu";
+import { MenuItemGroup } from "@/base/components/Menu";
+import type { NestedDrawerVisibilityProps } from "@/base/components/mui";
+import { ActivityIndicator } from "@/base/components/mui/ActivityIndicator";
 import { Titlebar } from "@/base/components/Titlebar";
-import { pt, ut } from "@/base/i18n";
-import log from "@/base/log";
 import {
     disableML,
     enableML,
     mlStatusSnapshot,
     mlStatusSubscribe,
-    wipClusterEnable,
     type MLStatus,
 } from "@/new/photos/services/ml";
-import EnteSpinner from "@ente/shared/components/EnteSpinner";
 import { EnteMenuItem } from "@ente/shared/components/Menu/EnteMenuItem";
 import {
     Box,
@@ -27,36 +25,17 @@ import {
     type DialogProps,
 } from "@mui/material";
 import { t } from "i18next";
-import { useRouter } from "next/router";
 import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { Trans } from "react-i18next";
-import type { NewAppContextPhotos } from "../types/context";
+import { useAppContext } from "../types/context";
 import { openURL } from "../utils/web";
+import { useWrapAsyncOperation } from "./use-wrap-async";
 
-interface MLSettingsProps {
-    /** If `true`, then this drawer page is shown. */
-    open: boolean;
-    /** Called when the user wants to go back from this drawer page. */
-    onClose: () => void;
-    /** Called when the user wants to close the entire stack of drawers. */
-    onRootClose: () => void;
-    /** See: [Note: Migrating components that need the app context]. */
-    appContext: NewAppContextPhotos;
-}
-
-export const MLSettings: React.FC<MLSettingsProps> = ({
+export const MLSettings: React.FC<NestedDrawerVisibilityProps> = ({
     open,
     onClose,
     onRootClose,
-    appContext,
 }) => {
-    const {
-        startLoading,
-        finishLoading,
-        setDialogBoxAttributesV2,
-        somethingWentWrong,
-    } = appContext;
-
     const mlStatus = useSyncExternalStore(mlStatusSubscribe, mlStatusSnapshot);
     const [openFaceConsent, setOpenFaceConsent] = useState(false);
 
@@ -72,31 +51,13 @@ export const MLSettings: React.FC<MLSettingsProps> = ({
 
     const handleEnableML = () => setOpenFaceConsent(true);
 
-    const handleConsent = async () => {
-        startLoading();
-        try {
-            await enableML();
-            // Close the FaceConsent drawer, come back to ourselves.
-            setOpenFaceConsent(false);
-        } catch (e) {
-            log.error("Failed to enable ML", e);
-            somethingWentWrong();
-        } finally {
-            finishLoading();
-        }
-    };
+    const handleConsent = useWrapAsyncOperation(async () => {
+        await enableML();
+        // Close the FaceConsent drawer, come back to ourselves.
+        setOpenFaceConsent(false);
+    });
 
-    const handleDisableML = async () => {
-        startLoading();
-        try {
-            await disableML();
-        } catch (e) {
-            log.error("Failed to disable ML", e);
-            somethingWentWrong();
-        } finally {
-            finishLoading();
-        }
-    };
+    const handleDisableML = useWrapAsyncOperation(disableML);
 
     let component: React.ReactNode;
     if (!mlStatus) {
@@ -105,10 +66,7 @@ export const MLSettings: React.FC<MLSettingsProps> = ({
         component = <EnableML onEnable={handleEnableML} />;
     } else {
         component = (
-            <ManageML
-                {...{ mlStatus, setDialogBoxAttributesV2 }}
-                onDisableML={handleDisableML}
-            />
+            <ManageML {...{ mlStatus }} onDisableML={handleDisableML} />
         );
     }
 
@@ -146,7 +104,7 @@ export const MLSettings: React.FC<MLSettingsProps> = ({
 const Loading: React.FC = () => {
     return (
         <Box textAlign="center" pt={4}>
-            <EnteSpinner />
+            <ActivityIndicator />
         </Box>
     );
 };
@@ -181,7 +139,7 @@ const EnableML: React.FC<EnableMLProps> = ({ onEnable }) => {
     );
 };
 
-type FaceConsentProps = Omit<MLSettingsProps, "appContext"> & {
+type FaceConsentProps = NestedDrawerVisibilityProps & {
     /** Called when the user provides their consent. */
     onConsent: () => void;
 };
@@ -289,19 +247,12 @@ interface ManageMLProps {
     mlStatus: Exclude<MLStatus, { phase: "disabled" }>;
     /** Called when the user wants to disable ML. */
     onDisableML: () => void;
-    /** Subset of appContext. */
-    setDialogBoxAttributesV2: NewAppContextPhotos["setDialogBoxAttributesV2"];
 }
 
-const ManageML: React.FC<ManageMLProps> = ({
-    mlStatus,
-    onDisableML,
-    setDialogBoxAttributesV2,
-}) => {
-    const [showClusterOpt, setShowClusterOpt] = useState(false);
-    const { phase, nSyncedFiles, nTotalFiles } = mlStatus;
+const ManageML: React.FC<ManageMLProps> = ({ mlStatus, onDisableML }) => {
+    const { showMiniDialog } = useAppContext();
 
-    useEffect(() => void wipClusterEnable().then(setShowClusterOpt), []);
+    const { phase, nSyncedFiles, nTotalFiles } = mlStatus;
 
     let status: string;
     switch (phase) {
@@ -315,32 +266,31 @@ const ManageML: React.FC<ManageMLProps> = ({
             status = t("indexing_status_running");
             break;
         case "clustering":
-            // TODO-Cluster
-            status = pt("Grouping faces");
+            status = t("people");
             break;
         default:
             status = t("indexing_status_done");
             break;
     }
-    const processed = `${nSyncedFiles} / ${nTotalFiles}`;
 
-    const confirmDisableML = () => {
-        setDialogBoxAttributesV2({
+    // When clustering, show the progress as a percentage instead of the
+    // potentially confusing total counts during incremental updates.
+    const processed =
+        phase == "clustering"
+            ? `${Math.round((100 * nSyncedFiles) / nTotalFiles)}%`
+            : `${nSyncedFiles} / ${nTotalFiles}`;
+
+    const confirmDisableML = () =>
+        showMiniDialog({
             title: t("ml_search_disable"),
-            content: t("ml_search_disable_confirm"),
-            close: { text: t("cancel") },
-            proceed: {
-                variant: "critical",
+            message: t("ml_search_disable_confirm"),
+            continue: {
                 text: t("disable"),
+                color: "critical",
                 action: onDisableML,
             },
             buttonDirection: "row",
         });
-    };
-
-    // TODO-Cluster
-    const router = useRouter();
-    const wipClusterDebug = () => router.push("/cluster-debug");
 
     return (
         <Stack px={"16px"} py={"20px"} gap={4}>
@@ -385,23 +335,6 @@ const ManageML: React.FC<ManageMLProps> = ({
                     </Stack>
                 </Stack>
             </Paper>
-            {showClusterOpt && (
-                <Box>
-                    <MenuItemGroup>
-                        <EnteMenuItem
-                            label={ut(
-                                "Create clusters   • internal only option",
-                            )}
-                            onClick={wipClusterDebug}
-                        />
-                    </MenuItemGroup>
-                    <MenuSectionTitle
-                        title={ut(
-                            "Create and show in-memory clusters (not saved or synced). You can also view them in the search dropdown later.",
-                        )}
-                    />
-                </Box>
-            )}
         </Stack>
     );
 };

@@ -1,4 +1,5 @@
 import log from "@/base/log";
+import { AppContext } from "@/new/photos/types/context";
 import { bytesInGB, formattedStorageByteSize } from "@/new/photos/utils/units";
 import { openURL } from "@/new/photos/utils/web";
 import {
@@ -26,7 +27,6 @@ import {
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { t } from "i18next";
-import { AppContext } from "pages/_app";
 import { GalleryContext } from "pages/gallery";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { Trans } from "react-i18next";
@@ -161,8 +161,8 @@ function PlanSelectorCard(props: PlanSelectorCardProps) {
                 props.closeModal();
                 appContext.setDialogMessage({
                     title: t("OPEN_PLAN_SELECTOR_MODAL_FAILED"),
-                    content: t("UNKNOWN_ERROR"),
-                    close: { text: t("CLOSE"), variant: "secondary" },
+                    content: t("generic_error_retry"),
+                    close: { text: t("close"), variant: "secondary" },
                     proceed: {
                         text: t("REOPEN_PLAN_SELECTOR_MODAL"),
                         variant: "accent",
@@ -185,7 +185,7 @@ function PlanSelectorCard(props: PlanSelectorCardProps) {
                 } catch (e) {
                     props.setLoading(false);
                     appContext.setDialogMessage({
-                        title: t("ERROR"),
+                        title: t("error"),
                         content: t("SUBSCRIPTION_PURCHASE_FAILED"),
                         close: { variant: "critical" },
                     });
@@ -695,8 +695,8 @@ function ManageSubscription({
         } catch (e) {
             log.error("Could not redirect to family portal", e);
             setDialogMessage({
-                title: t("ERROR"),
-                content: t("UNKNOWN_ERROR"),
+                title: t("error"),
+                content: t("generic_error_retry"),
                 close: { variant: "critical" },
             });
         }

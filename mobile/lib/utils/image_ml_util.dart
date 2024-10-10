@@ -1,11 +1,11 @@
 import "dart:async";
 import "dart:io" show File, Platform;
-import "dart:math" show exp, max, min, pi;
+import "dart:math" show exp, min, pi;
 import "dart:typed_data" show Float32List, Uint8List;
 import "dart:ui";
 
 import 'package:flutter/painting.dart' as paint show decodeImageFromList;
-import "package:heif_converter/heif_converter.dart";
+import "package:flutter_image_compress/flutter_image_compress.dart";
 import "package:logging/logging.dart";
 import 'package:ml_linalg/linalg.dart';
 import "package:photos/models/ml/face/box.dart";
@@ -40,27 +40,29 @@ Future<(Image, Uint8List)> decodeImageFromPath(String imagePath) async {
     return (image, rawRgbaBytes);
   } catch (e, s) {
     final format = imagePath.split('.').last;
-    if (Platform.isAndroid) {
-      _logger.info('Cannot decode $format, converting to JPG on Android');
-      final String? jpgPath =
-          await HeifConverter.convert(imagePath, format: 'jpg');
-      if (jpgPath != null) {
-        _logger.info('Conversion successful, decoding JPG');
-        final imageData = await File(jpgPath).readAsBytes();
-        final image = await decodeImageFromData(imageData);
-        final rawRgbaBytes = await _getRawRgbaBytes(image);
-        return (image, rawRgbaBytes);
-      }
-      _logger.info('Unable to convert $format to JPG');
+    _logger.info(
+      'Cannot decode $format on ${Platform.isAndroid ? "Android" : "iOS"}, converting to jpeg',
+    );
+    try {
+      final Uint8List? convertedData =
+          await FlutterImageCompress.compressWithFile(
+        imagePath,
+        format: CompressFormat.jpeg,
+      );
+      final image = await decodeImageFromData(convertedData!);
+      final rawRgbaBytes = await _getRawRgbaBytes(image);
+      _logger.info('Conversion successful, jpeg decoded');
+      return (image, rawRgbaBytes);
+    } catch (e) {
+      _logger.severe(
+        'Error decoding image of format $format on ${Platform.isAndroid ? "Android" : "iOS"}',
+        e,
+        s,
+      );
+      throw Exception(
+        'InvalidImageFormatException: Error decoding image of format $format',
+      );
     }
-    _logger.severe(
-      'Error decoding image of format $format (Android: ${Platform.isAndroid})',
-      e,
-      s,
-    );
-    throw Exception(
-      'InvalidImageFormatException: Error decoding image of format $format',
-    );
   }
 }
 
@@ -229,44 +231,6 @@ Future<(Float32List, Dimensions)> preprocessImageToFloat32ChannelsFirst(
   }
 
   return (processedBytes, Dimensions(width: scaledWidth, height: scaledHeight));
-}
-
-Future<Float32List> preprocessImageClip(
-  Image image,
-  Uint8List rawRgbaBytes,
-) async {
-  const int requiredWidth = 256;
-  const int requiredHeight = 256;
-  const int requiredSize = 3 * requiredWidth * requiredHeight;
-  final scale = max(requiredWidth / image.width, requiredHeight / image.height);
-  final bool useAntiAlias = scale < 0.8;
-  final scaledWidth = (image.width * scale).round();
-  final scaledHeight = (image.height * scale).round();
-  final widthOffset = max(0, scaledWidth - requiredWidth) / 2;
-  final heightOffset = max(0, scaledHeight - requiredHeight) / 2;
-
-  final processedBytes = Float32List(requiredSize);
-  final buffer = Float32List.view(processedBytes.buffer);
-  int pixelIndex = 0;
-  const int greenOff = requiredHeight * requiredWidth;
-  const int blueOff = 2 * requiredHeight * requiredWidth;
-  for (var h = 0 + heightOffset; h < scaledHeight - heightOffset; h++) {
-    for (var w = 0 + widthOffset; w < scaledWidth - widthOffset; w++) {
-      final RGB pixel = _getPixelBilinear(
-        w / scale,
-        h / scale,
-        image,
-        rawRgbaBytes,
-        antiAlias: useAntiAlias,
-      );
-      buffer[pixelIndex] = pixel.$1 / 255;
-      buffer[pixelIndex + greenOff] = pixel.$2 / 255;
-      buffer[pixelIndex + blueOff] = pixel.$3 / 255;
-      pixelIndex++;
-    }
-  }
-
-  return processedBytes;
 }
 
 Future<(Float32List, List<AlignmentResult>, List<bool>, List<double>, Size)>

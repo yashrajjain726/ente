@@ -16,6 +16,7 @@
   "codeIssuerHint": "Utfärdare",
   "codeSecretKeyHint": "Secret Key",
   "all": "Alla",
+  "notes": "Anteckningar",
   "codeAccountHint": "Konto (du@domän.com)",
   "codeTagHint": "Tagg",
   "sessionExpired": "Sessionen har gått ut",
@@ -77,6 +78,7 @@
   "cancel": "Avbryt",
   "yes": "Ja",
   "no": "Nej",
+  "support": "Support",
   "settings": "Inställningar",
   "pleaseTryAgain": "Försök igen",
   "existingUser": "Befintlig användare",
@@ -88,6 +90,7 @@
   "faq": "FAQ",
   "scan": "Skanna",
   "twoFactorAuthTitle": "Tvåfaktorsautentisering",
+  "verifyPasskey": "Verifiera nyckel",
   "enterRecoveryKeyHint": "Ange din återställningsnyckel",
   "invalidQRCode": "Ogiltig QR-kod",
   "noRecoveryKeyTitle": "Ingen återställningsnyckel?",
@@ -167,6 +170,7 @@
   "about": "Om",
   "terms": "Villkor",
   "warning": "Varning",
+  "authToExportCodes": "Autentisera för att exportera dina koder",
   "importSuccessDesc": "Du har importerat {count} koder!",
   "@importSuccessDesc": {
     "placeholders": {
@@ -182,9 +186,11 @@
   "incorrectCode": "Felaktig kod",
   "incorrectRecoveryKey": "Felaktig återställningsnyckel",
   "enterPassword": "Ange lösenord",
+  "selectExportFormat": "Välj exportformat",
   "export": "Exportera",
   "signInToBackup": "Logga in för att säkerhetskopiera dina koder",
   "singIn": "Logga in",
+  "showLargeIcons": "Visa stora ikoner",
   "shouldHideCode": "Dölj koder",
   "editCodeAuthMessage": "Autentisera för att redigera kod",
   "deleteCodeAuthMessage": "Autentisera för att radera kod",
@@ -200,7 +206,9 @@
   "noInternetConnection": "Ingen internetanslutning",
   "pleaseCheckYourInternetConnectionAndTryAgain": "Kontrollera din internetanslutning och försök igen.",
   "signOutOtherDevices": "Logga ut andra enheter",
+  "passkey": "Nyckel",
   "loginSessionExpiredDetails": "Din session har upphört. Logga in igen.",
+  "developerSettings": "Utvecklarinställningar",
   "tags": "Taggar",
   "createNewTag": "Skapa ny tagg",
   "tag": "Tagg",
@@ -217,5 +225,6 @@
   "deviceLock": "Enhetslås",
   "hideContent": "Dölj innehåll",
   "enterPin": "Ange PIN-kod",
-  "setNewPin": "Ställ in ny PIN-kod"
+  "setNewPin": "Ställ in ny PIN-kod",
+  "authToViewPasskey": "Autentisera för att visa nyckel"
 }

@@ -177,9 +177,11 @@ class SearchService {
     return searchResults;
   }
 
-  Future<List<GenericSearchResult>> getMagicSectionResutls() async {
-    if (localSettings.isMLIndexingEnabled && flagService.internalUser) {
-      return MagicCacheService.instance.getMagicGenericSearchResult();
+  Future<List<GenericSearchResult>> getMagicSectionResults(
+    BuildContext context,
+  ) async {
+    if (localSettings.isMLIndexingEnabled) {
+      return MagicCacheService.instance.getMagicGenericSearchResult(context);
     } else {
       return <GenericSearchResult>[];
     }
@@ -1039,6 +1041,7 @@ class SearchService {
               MagicResultScreen(
                 files,
                 name: query,
+                enableGrouping: false,
                 heroTag: GenericSearchResult(ResultType.magic, query, files)
                     .heroTag(),
               ),

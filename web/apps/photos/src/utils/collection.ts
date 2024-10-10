@@ -31,7 +31,6 @@ import {
     updatePublicCollectionMagicMetadata,
     updateSharedCollectionMagicMetadata,
 } from "services/collectionService";
-import { CollectionSummaries, CollectionSummaryType } from "types/collection";
 import { SetFilesDownloadProgressAttributes } from "types/gallery";
 import { downloadFilesWithProgress } from "utils/file";
 import { isArchivedCollection, updateMagicMetadata } from "utils/magicMetadata";
@@ -41,72 +40,6 @@ export const TRASH_SECTION = -2;
 export const DUMMY_UNCATEGORIZED_COLLECTION = -3;
 export const HIDDEN_ITEMS_SECTION = -4;
 export const ALL_SECTION = 0;
-
-export enum COLLECTION_LIST_SORT_BY {
-    NAME,
-    CREATION_TIME_ASCENDING,
-    UPDATION_TIME_DESCENDING,
-}
-
-export const COLLECTION_SORT_ORDER = new Map([
-    [CollectionSummaryType.all, 0],
-    [CollectionSummaryType.hiddenItems, 0],
-    [CollectionSummaryType.uncategorized, 1],
-    [CollectionSummaryType.favorites, 2],
-    [CollectionSummaryType.pinned, 3],
-    [CollectionSummaryType.album, 4],
-    [CollectionSummaryType.folder, 4],
-    [CollectionSummaryType.incomingShareViewer, 4],
-    [CollectionSummaryType.incomingShareCollaborator, 4],
-    [CollectionSummaryType.outgoingShare, 4],
-    [CollectionSummaryType.sharedOnlyViaLink, 4],
-    [CollectionSummaryType.archived, 4],
-    [CollectionSummaryType.archive, 5],
-    [CollectionSummaryType.trash, 6],
-    [CollectionSummaryType.defaultHidden, 7],
-]);
-
-const SYSTEM_COLLECTION_TYPES = new Set([
-    CollectionSummaryType.all,
-    CollectionSummaryType.archive,
-    CollectionSummaryType.trash,
-    CollectionSummaryType.uncategorized,
-    CollectionSummaryType.hiddenItems,
-    CollectionSummaryType.defaultHidden,
-]);
-
-const ADD_TO_NOT_ALLOWED_COLLECTION = new Set([
-    CollectionSummaryType.all,
-    CollectionSummaryType.archive,
-    CollectionSummaryType.incomingShareViewer,
-    CollectionSummaryType.trash,
-    CollectionSummaryType.uncategorized,
-    CollectionSummaryType.defaultHidden,
-    CollectionSummaryType.hiddenItems,
-]);
-
-const MOVE_TO_NOT_ALLOWED_COLLECTION = new Set([
-    CollectionSummaryType.all,
-    CollectionSummaryType.archive,
-    CollectionSummaryType.incomingShareViewer,
-    CollectionSummaryType.incomingShareCollaborator,
-    CollectionSummaryType.trash,
-    CollectionSummaryType.uncategorized,
-    CollectionSummaryType.defaultHidden,
-    CollectionSummaryType.hiddenItems,
-]);
-
-const OPTIONS_NOT_HAVING_COLLECTION_TYPES = new Set([
-    CollectionSummaryType.all,
-    CollectionSummaryType.archive,
-]);
-
-const HIDE_FROM_COLLECTION_BAR_TYPES = new Set([
-    CollectionSummaryType.trash,
-    CollectionSummaryType.archive,
-    CollectionSummaryType.uncategorized,
-    CollectionSummaryType.defaultHidden,
-]);
 
 export enum COLLECTION_OPS_TYPE {
     ADD,
@@ -409,64 +342,6 @@ export const getDefaultHiddenCollectionIDs = (collections: Collection[]) => {
             .filter(isDefaultHiddenCollection)
             .map((collection) => collection.id),
     );
-};
-
-export const hasNonSystemCollections = (
-    collectionSummaries: CollectionSummaries,
-) => {
-    for (const collectionSummary of collectionSummaries.values()) {
-        if (!isSystemCollection(collectionSummary.type)) return true;
-    }
-    return false;
-};
-
-export const isMoveToAllowedCollection = (type: CollectionSummaryType) => {
-    return !MOVE_TO_NOT_ALLOWED_COLLECTION.has(type);
-};
-
-export const isAddToAllowedCollection = (type: CollectionSummaryType) => {
-    return !ADD_TO_NOT_ALLOWED_COLLECTION.has(type);
-};
-
-export const isSystemCollection = (type: CollectionSummaryType) => {
-    return SYSTEM_COLLECTION_TYPES.has(type);
-};
-
-export const shouldShowOptions = (type: CollectionSummaryType) => {
-    return !OPTIONS_NOT_HAVING_COLLECTION_TYPES.has(type);
-};
-export const showEmptyTrashQuickOption = (type: CollectionSummaryType) => {
-    return type === CollectionSummaryType.trash;
-};
-export const showDownloadQuickOption = (type: CollectionSummaryType) => {
-    return (
-        type === CollectionSummaryType.folder ||
-        type === CollectionSummaryType.favorites ||
-        type === CollectionSummaryType.album ||
-        type === CollectionSummaryType.uncategorized ||
-        type === CollectionSummaryType.hiddenItems ||
-        type === CollectionSummaryType.incomingShareViewer ||
-        type === CollectionSummaryType.incomingShareCollaborator ||
-        type === CollectionSummaryType.outgoingShare ||
-        type === CollectionSummaryType.sharedOnlyViaLink ||
-        type === CollectionSummaryType.archived ||
-        type === CollectionSummaryType.pinned
-    );
-};
-export const showShareQuickOption = (type: CollectionSummaryType) => {
-    return (
-        type === CollectionSummaryType.folder ||
-        type === CollectionSummaryType.album ||
-        type === CollectionSummaryType.outgoingShare ||
-        type === CollectionSummaryType.sharedOnlyViaLink ||
-        type === CollectionSummaryType.archived ||
-        type === CollectionSummaryType.incomingShareViewer ||
-        type === CollectionSummaryType.incomingShareCollaborator ||
-        type === CollectionSummaryType.pinned
-    );
-};
-export const shouldBeShownOnCollectionBar = (type: CollectionSummaryType) => {
-    return !HIDE_FROM_COLLECTION_BAR_TYPES.has(type);
 };
 
 export const getUserOwnedCollections = (collections: Collection[]) => {

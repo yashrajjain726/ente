@@ -1,7 +1,8 @@
 import { stashRedirect } from "@/accounts/services/redirect";
+import { ActivityIndicator } from "@/base/components/mui/ActivityIndicator";
 import { getLocalFiles } from "@/new/photos/services/files";
+import { AppContext } from "@/new/photos/types/context";
 import { VerticallyCentered } from "@ente/shared/components/Container";
-import EnteSpinner from "@ente/shared/components/EnteSpinner";
 import { PHOTOS_PAGES as PAGES } from "@ente/shared/constants/pages";
 import { ApiError } from "@ente/shared/error";
 import useMemoSingleThreaded from "@ente/shared/hooks/useMemoSingleThreaded";
@@ -13,7 +14,6 @@ import DeduplicateOptions from "components/pages/dedupe/SelectedFileOptions";
 import PhotoFrame from "components/PhotoFrame";
 import { t } from "i18next";
 import { default as Router, default as router } from "next/router";
-import { AppContext } from "pages/_app";
 import { createContext, useContext, useEffect, useState } from "react";
 import {
     getAllLatestCollections,
@@ -49,6 +49,7 @@ export default function Deduplicate() {
         count: 0,
         collectionID: 0,
         ownCount: 0,
+        context: undefined,
     });
     const closeDeduplication = function () {
         Router.push(PAGES.GALLERY);
@@ -97,6 +98,7 @@ export default function Deduplicate() {
             count: count,
             ownCount: count,
             collectionID: ALL_SECTION,
+            context: undefined,
         };
         for (const fileID of toSelectFileIDs) {
             selectedFiles[fileID] = true;
@@ -137,17 +139,17 @@ export default function Deduplicate() {
                 e.httpStatusCode === HttpStatusCode.Forbidden
             ) {
                 setDialogMessage({
-                    title: t("ERROR"),
+                    title: t("error"),
 
                     close: { variant: "critical" },
                     content: t("NOT_FILE_OWNER"),
                 });
             } else {
                 setDialogMessage({
-                    title: t("ERROR"),
+                    title: t("error"),
 
                     close: { variant: "critical" },
-                    content: t("UNKNOWN_ERROR"),
+                    content: t("generic_error_retry"),
                 });
             }
         } finally {
@@ -157,13 +159,18 @@ export default function Deduplicate() {
     };
 
     const clearSelection = function () {
-        setSelected({ count: 0, collectionID: 0, ownCount: 0 });
+        setSelected({
+            count: 0,
+            collectionID: 0,
+            ownCount: 0,
+            context: undefined,
+        });
     };
 
     if (!duplicates) {
         return (
             <VerticallyCentered>
-                <EnteSpinner />
+                <ActivityIndicator />
             </VerticallyCentered>
         );
     }
@@ -196,6 +203,7 @@ export default function Deduplicate() {
                     activeCollectionID={ALL_SECTION}
                     fileToCollectionsMap={fileToCollectionsMap}
                     collectionNameMap={collectionNameMap}
+                    selectable={true}
                 />
             )}
             <DeduplicateOptions

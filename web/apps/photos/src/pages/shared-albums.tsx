@@ -1,18 +1,25 @@
+import { EnteLogoSVG } from "@/base/components/EnteLogo";
+import { ActivityIndicator } from "@/base/components/mui/ActivityIndicator";
 import { NavbarBase, SelectionBar } from "@/base/components/Navbar";
 import { sharedCryptoWorker } from "@/base/crypto";
 import { useIsMobileWidth, useIsTouchscreen } from "@/base/hooks";
 import log from "@/base/log";
 import type { Collection } from "@/media/collection";
+import {
+    GalleryItemsHeaderAdapter,
+    GalleryItemsSummary,
+} from "@/new/photos/components/gallery/ListHeader";
+import { SpaceBetweenFlex } from "@/new/photos/components/mui";
 import downloadManager from "@/new/photos/services/download";
+import { sortFiles } from "@/new/photos/services/files";
+import { AppContext } from "@/new/photos/types/context";
 import { EnteFile } from "@/new/photos/types/file";
 import { mergeMetadata } from "@/new/photos/utils/file";
 import {
     CenteredFlex,
     FluidContainer,
-    SpaceBetweenFlex,
     VerticallyCentered,
 } from "@ente/shared/components/Container";
-import EnteSpinner from "@ente/shared/components/EnteSpinner";
 import FormPaper from "@ente/shared/components/Form/FormPaper";
 import FormPaperTitle from "@ente/shared/components/Form/FormPaper/Title";
 import OverflowMenu from "@ente/shared/components/OverflowMenu/menu";
@@ -29,12 +36,9 @@ import DownloadIcon from "@mui/icons-material/Download";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import MoreHoriz from "@mui/icons-material/MoreHoriz";
 import type { ButtonProps, IconButtonProps } from "@mui/material";
-import { Box, Button, IconButton, Stack, Tooltip } from "@mui/material";
+import { Box, Button, IconButton, Stack, styled, Tooltip } from "@mui/material";
 import Typography from "@mui/material/Typography";
 import bs58 from "bs58";
-import { CollectionInfo } from "components/Collections/CollectionInfo";
-import { CollectionInfoBarWrapper } from "components/Collections/styledComponents";
-import { EnteLogo } from "components/EnteLogo";
 import {
     FilesDownloadProgress,
     FilesDownloadProgressAttributes,
@@ -47,7 +51,6 @@ import Uploader from "components/Upload/Uploader";
 import { UploadSelectorInputs } from "components/UploadSelectorInputs";
 import { t } from "i18next";
 import { useRouter } from "next/router";
-import { AppContext } from "pages/_app";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {
@@ -74,7 +77,7 @@ import {
     downloadCollectionFiles,
     isHiddenCollection,
 } from "utils/collection";
-import { downloadSelectedFiles, getSelectedFiles, sortFiles } from "utils/file";
+import { downloadSelectedFiles, getSelectedFiles } from "utils/file";
 import { formatNumber } from "utils/number/format";
 import { PublicCollectionGalleryContext } from "utils/publicCollectionGallery";
 
@@ -107,6 +110,7 @@ export default function PublicCollectionGallery() {
         ownCount: 0,
         count: 0,
         collectionID: 0,
+        context: undefined,
     });
 
     const {
@@ -273,60 +277,21 @@ export default function PublicCollectionGallery() {
         main();
     }, []);
 
-    const downloadEnabled = useMemo(
-        () => publicCollection?.publicURLs?.[0]?.enableDownload ?? true,
-        [publicCollection],
-    );
-
-    const downloadAllFiles = async () => {
-        try {
-            if (!downloadEnabled) {
-                return;
-            }
-            const setFilesDownloadProgressAttributes =
-                setFilesDownloadProgressAttributesCreator(
-                    publicCollection.name,
-                    publicCollection.id,
-                    isHiddenCollection(publicCollection),
-                );
-            await downloadCollectionFiles(
-                publicCollection.name,
-                publicFiles,
-                setFilesDownloadProgressAttributes,
-            );
-        } catch (e) {
-            log.error("failed to downloads shared album all files", e);
-        }
-    };
+    const downloadEnabled =
+        publicCollection?.publicURLs?.[0]?.enableDownload ?? true;
 
     useEffect(() => {
         publicCollection &&
             publicFiles &&
             setPhotoListHeader({
                 item: (
-                    <CollectionInfoBarWrapper>
-                        <SpaceBetweenFlex>
-                            <CollectionInfo
-                                name={publicCollection.name}
-                                fileCount={publicFiles.length}
-                            />
-                            {downloadEnabled ? (
-                                <OverflowMenu
-                                    ariaControls={"collection-options"}
-                                    triggerButtonIcon={<MoreHoriz />}
-                                >
-                                    <OverflowMenuOption
-                                        startIcon={<FileDownloadOutlinedIcon />}
-                                        onClick={downloadAllFiles}
-                                    >
-                                        {t("DOWNLOAD_COLLECTION")}
-                                    </OverflowMenuOption>
-                                </OverflowMenu>
-                            ) : (
-                                <div />
-                            )}
-                        </SpaceBetweenFlex>
-                    </CollectionInfoBarWrapper>
+                    <ListHeader
+                        {...{
+                            publicCollection,
+                            publicFiles,
+                            setFilesDownloadProgressAttributesCreator,
+                        }}
+                    />
                 ),
                 itemType: ITEM_TYPE.HEADER,
                 height: 68,
@@ -439,7 +404,7 @@ export default function PublicCollectionGallery() {
                 );
             } catch (e) {
                 log.error("failed to derive key for verifyLinkPassword", e);
-                setFieldError(`${t("UNKNOWN_ERROR")} ${e.message}`);
+                setFieldError(`${t("generic_error_retry")} ${e.message}`);
                 return;
             }
             const collectionUID = getPublicCollectionUID(token.current);
@@ -466,7 +431,7 @@ export default function PublicCollectionGallery() {
             appContext.finishLoading();
         } catch (e) {
             log.error("failed to verifyLinkPassword", e);
-            setFieldError(`${t("UNKNOWN_ERROR")} ${e.message}`);
+            setFieldError(`${t("generic_error_retry")} ${e.message}`);
         }
     };
 
@@ -474,7 +439,7 @@ export default function PublicCollectionGallery() {
         if (!publicFiles) {
             return (
                 <VerticallyCentered>
-                    <EnteSpinner />
+                    <ActivityIndicator />
                 </VerticallyCentered>
             );
         }
@@ -509,7 +474,12 @@ export default function PublicCollectionGallery() {
         if (!selected?.count) {
             return;
         }
-        setSelected({ ownCount: 0, count: 0, collectionID: 0 });
+        setSelected({
+            ownCount: 0,
+            count: 0,
+            collectionID: 0,
+            context: undefined,
+        });
     };
 
     const downloadFilesHelper = async () => {
@@ -562,10 +532,11 @@ export default function PublicCollectionGallery() {
                     setFilesDownloadProgressAttributesCreator={
                         setFilesDownloadProgressAttributesCreator
                     }
+                    selectable={downloadEnabled}
                 />
                 {blockingLoad && (
                     <LoadingOverlay>
-                        <EnteSpinner />
+                        <ActivityIndicator />
                     </LoadingOverlay>
                 )}
                 <Uploader
@@ -610,39 +581,25 @@ interface SharedAlbumNavbarProps {
 }
 const SharedAlbumNavbar: React.FC<SharedAlbumNavbarProps> = ({
     onAddPhotos,
-}) => {
-    return (
-        <NavbarBase>
-            <FluidContainer>
-                <EnteLinkLogo />
-            </FluidContainer>
-            {onAddPhotos ? (
-                <AddPhotosButton onClick={onAddPhotos} />
-            ) : (
-                <GoToEnte />
-            )}
-        </NavbarBase>
-    );
-};
+}) => (
+    <NavbarBase>
+        <FluidContainer>
+            <EnteLogoLink href="https://ente.io">
+                <EnteLogoSVG height={15} />
+            </EnteLogoLink>
+        </FluidContainer>
+        {onAddPhotos ? <AddPhotosButton onClick={onAddPhotos} /> : <GoToEnte />}
+    </NavbarBase>
+);
 
-const EnteLinkLogo: React.FC = () => {
-    return (
-        <a href="https://ente.io">
-            <Box
-                sx={(theme) => ({
-                    ":hover": {
-                        cursor: "pointer",
-                        svg: {
-                            fill: theme.colors.text.faint,
-                        },
-                    },
-                })}
-            >
-                <EnteLogo />
-            </Box>
-        </a>
-    );
-};
+const EnteLogoLink = styled("a")(({ theme }) => ({
+    // Remove the excess space at the top.
+    svg: { verticalAlign: "middle" },
+    color: theme.colors.text.base,
+    ":hover": {
+        color: theme.palette.accent.main,
+    },
+}));
 
 const AddPhotosButton: React.FC<ButtonProps & IconButtonProps> = (props) => {
     const disabled = !uploadManager.shouldAllowNewUpload();
@@ -723,12 +680,65 @@ const SelectedFileOptions: React.FC<SelectedFileOptionsProps> = ({
                 </Box>
             </FluidContainer>
             <Stack spacing={2} direction="row" mr={2}>
-                <Tooltip title={t("DOWNLOAD")}>
+                <Tooltip title={t("download")}>
                     <IconButton onClick={downloadFilesHelper}>
                         <DownloadIcon />
                     </IconButton>
                 </Tooltip>
             </Stack>
         </SelectionBar>
+    );
+};
+
+interface ListHeaderProps {
+    publicCollection: Collection;
+    publicFiles: EnteFile[];
+    setFilesDownloadProgressAttributesCreator: SetFilesDownloadProgressAttributesCreator;
+}
+
+const ListHeader: React.FC<ListHeaderProps> = ({
+    publicCollection,
+    publicFiles,
+    setFilesDownloadProgressAttributesCreator,
+}) => {
+    const downloadEnabled =
+        publicCollection.publicURLs?.[0]?.enableDownload ?? true;
+
+    const downloadAllFiles = async () => {
+        const setFilesDownloadProgressAttributes =
+            setFilesDownloadProgressAttributesCreator(
+                publicCollection.name,
+                publicCollection.id,
+                isHiddenCollection(publicCollection),
+            );
+        await downloadCollectionFiles(
+            publicCollection.name,
+            publicFiles,
+            setFilesDownloadProgressAttributes,
+        );
+    };
+
+    return (
+        <GalleryItemsHeaderAdapter>
+            <SpaceBetweenFlex>
+                <GalleryItemsSummary
+                    name={publicCollection.name}
+                    fileCount={publicFiles.length}
+                />
+                {downloadEnabled && (
+                    <OverflowMenu
+                        ariaControls={"collection-options"}
+                        triggerButtonIcon={<MoreHoriz />}
+                    >
+                        <OverflowMenuOption
+                            startIcon={<FileDownloadOutlinedIcon />}
+                            onClick={downloadAllFiles}
+                        >
+                            {t("download_album")}
+                        </OverflowMenuOption>
+                    </OverflowMenu>
+                )}
+            </SpaceBetweenFlex>
+        </GalleryItemsHeaderAdapter>
     );
 };

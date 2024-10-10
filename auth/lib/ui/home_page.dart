@@ -338,8 +338,8 @@ class _HomePageState extends State<HomePage> {
                       _searchText = _textController.text;
 
                       // Request focus on the search box
-                      // For Windows only for now. "Platform.isWindows" can be removed if other platforms has been tested.
-                      if (Platform.isWindows) {
+                      // For Windows and macOS only for now. This if statement can be removed if other platforms has been tested.
+                      if (Platform.isWindows || Platform.isMacOS) {
                         searchBoxFocusNode.requestFocus();
                       }
                     }
@@ -461,7 +461,7 @@ class _HomePageState extends State<HomePage> {
 
                   return ClipRect(
                     child: CodeWidget(
-                      key: ValueKey(code.hashCode),
+                      key: ValueKey('${code.hashCode}_$newIndex'),
                       code,
                       isCompactMode: isCompactMode,
                     ),
@@ -493,6 +493,7 @@ class _HomePageState extends State<HomePage> {
                         itemBuilder: ((context, index) {
                           final codeState = _filteredCodes[index];
                           return CodeWidget(
+                            key: ValueKey('${codeState.hashCode}_$index'),
                             codeState,
                             isCompactMode: isCompactMode,
                           );
