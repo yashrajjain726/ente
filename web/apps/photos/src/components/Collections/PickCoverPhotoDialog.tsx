@@ -1,4 +1,5 @@
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import CloseIcon from "@mui/icons-material/Close";
 import {
     Box,
     Dialog,
@@ -10,7 +11,6 @@ import {
     Typography,
 } from "@mui/material";
 import type { LocalUser } from "ente-accounts/services/user";
-import { DialogCloseIconButton } from "ente-base/components/mui/DialogCloseIconButton";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { useIsSmallWidth } from "ente-base/components/utils/hooks";
 import { isSameDay } from "ente-base/date";
@@ -127,6 +127,22 @@ export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
         ? { flex: 1, minHeight: "44px" }
         : { minHeight: "44px" };
     const helperText = ut("Only images can be used as cover photos.");
+    const headerIconButtonSx = {
+        width: "46px",
+        height: "46px",
+        borderRadius: "50%",
+        color: "fixed.white",
+        backgroundColor: "fill.faint",
+        transition: "background-color 150ms ease",
+        "& > svg": {
+            opacity: 0.72,
+            transition: "opacity 150ms ease",
+        },
+        "&:hover": {
+            backgroundColor: "fill.faintHover",
+            "& > svg": { opacity: 1 },
+        },
+    };
 
     return (
         <Dialog
@@ -142,6 +158,7 @@ export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
                         ? {
                               width: "min(980px, calc(100vw - 64px))",
                               height: "min(760px, calc(100vh - 64px))",
+                              borderRadius: "12px",
                           }
                         : undefined,
                 },
@@ -155,7 +172,7 @@ export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
                     sx={{
                         px: 2,
                         pt: 2,
-                        pb: 1,
+                        pb: 2,
                         gap: 1,
                         borderBottom: 1,
                         borderColor: "divider",
@@ -181,9 +198,32 @@ export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
                                 {collection.name}
                             </Typography>
                         </Box>
-                        {!isSubmitting && (
-                            <DialogCloseIconButton onClose={onClose} />
-                        )}
+                        <Stack
+                            direction="row"
+                            sx={{ alignItems: "center", gap: 1 }}
+                        >
+                            <Tooltip
+                                title={helperText}
+                                placement="bottom-end"
+                                arrow
+                            >
+                                <IconButton
+                                    aria-label={helperText}
+                                    sx={headerIconButtonSx}
+                                >
+                                    <InfoOutlinedIcon fontSize="medium" />
+                                </IconButton>
+                            </Tooltip>
+                            {!isSubmitting && (
+                                <IconButton
+                                    aria-label={t("close")}
+                                    onClick={onClose}
+                                    sx={headerIconButtonSx}
+                                >
+                                    <CloseIcon fontSize="medium" />
+                                </IconButton>
+                            )}
+                        </Stack>
                     </Stack>
                 </Stack>
 
@@ -232,44 +272,21 @@ export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
                         justifyContent: "flex-end",
                     }}
                 >
-                    <Tooltip title={helperText} placement="top-start" arrow>
-                        <IconButton
-                            aria-label={helperText}
-                            size="small"
-                            sx={{
-                                width: "38px",
-                                height: "38px",
-                                color: "text.muted",
-                                opacity: 0.55,
-                                backgroundColor: "transparent",
-                                transition:
-                                    "opacity 150ms ease, background-color 150ms ease",
-                                "&:hover": {
-                                    opacity: 0.9,
-                                    backgroundColor: "fill.fainter",
-                                },
-                            }}
-                        >
-                            <InfoOutlinedIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
                     {!isFullScreen && <Box sx={{ flex: 1 }} />}
-                    <LoadingButton
-                        color={canResetToDefault ? "secondary" : "inherit"}
-                        onClick={
-                            canResetToDefault ? handleResetToDefault : onClose
-                        }
-                        loading={submittingAction === "reset-to-default"}
-                        disabled={
-                            isSubmitting &&
-                            submittingAction !== "reset-to-default"
-                        }
-                        sx={actionButtonSx}
-                    >
-                        {canResetToDefault
-                            ? t("reset_to_default")
-                            : t("cancel")}
-                    </LoadingButton>
+                    {canResetToDefault && (
+                        <LoadingButton
+                            color="secondary"
+                            onClick={handleResetToDefault}
+                            loading={submittingAction === "reset-to-default"}
+                            disabled={
+                                isSubmitting &&
+                                submittingAction !== "reset-to-default"
+                            }
+                            sx={actionButtonSx}
+                        >
+                            {t("reset_to_default")}
+                        </LoadingButton>
+                    )}
                     <LoadingButton
                         variant="contained"
                         color="primary"
