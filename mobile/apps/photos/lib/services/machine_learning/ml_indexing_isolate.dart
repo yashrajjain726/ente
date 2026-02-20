@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:flutter/foundation.dart" show debugPrint;
 import "package:logging/logging.dart";
+import "package:photos/service_locator.dart" show flagService;
 import 'package:photos/services/machine_learning/face_ml/face_detection/face_detection_service.dart';
 import 'package:photos/services/machine_learning/face_ml/face_embedding/face_embedding_service.dart';
 import "package:photos/services/machine_learning/ml_models_overview.dart";
@@ -66,12 +67,34 @@ class MLIndexingIsolate extends SuperIsolate {
     late MLResult result;
 
     try {
+      final useRustMl = _shouldUseRustMl;
+      String? faceDetectionModelPath;
+      String? faceEmbeddingModelPath;
+      String? clipImageModelPath;
+      if (useRustMl) {
+        final faceDetection =
+            await FaceDetectionService.instance.getModelNameAndPath();
+        faceDetectionModelPath = faceDetection.$2;
+        final faceEmbedding =
+            await FaceEmbeddingService.instance.getModelNameAndPath();
+        faceEmbeddingModelPath = faceEmbedding.$2;
+        final clipImage = await ClipImageEncoder.instance.getModelNameAndPath();
+        clipImageModelPath = clipImage.$2;
+      }
+
       final resultJsonString =
           await runInIsolate(IsolateOperation.analyzeImage, {
         "enteFileID": instruction.fileKey,
         "filePath": filePath,
+        "useRustMl": useRustMl,
         "runFaces": instruction.shouldRunFaces,
         "runClip": instruction.shouldRunClip,
+        "faceDetectionModelPath": faceDetectionModelPath,
+        "faceEmbeddingModelPath": faceEmbeddingModelPath,
+        "clipImageModelPath": clipImageModelPath,
+        "preferCoreml": true,
+        "preferNnapi": true,
+        "allowCpuFallback": true,
         "faceDetectionAddress": FaceDetectionService.instance.sessionAddress,
         "faceEmbeddingAddress": FaceEmbeddingService.instance.sessionAddress,
         "clipImageAddress": ClipImageEncoder.instance.sessionAddress,
@@ -97,6 +120,8 @@ class MLIndexingIsolate extends SuperIsolate {
 
     return result;
   }
+
+  bool get _shouldUseRustMl => flagService.useRustForML;
 
   void triggerModelsDownload() {
     if (!areModelsDownloaded && !_downloadModelLock.locked) {
@@ -133,6 +158,9 @@ class MLIndexingIsolate extends SuperIsolate {
   }
 
   Future<void> ensureLoadedModels(FileMLInstruction instruction) async {
+    if (_shouldUseRustMl) {
+      return;
+    }
     return _initModelLock.synchronized(() async {
       final faceDetectionLoaded = FaceDetectionService.instance.isInitialized;
       final faceEmbeddingLoaded = FaceEmbeddingService.instance.isInitialized;

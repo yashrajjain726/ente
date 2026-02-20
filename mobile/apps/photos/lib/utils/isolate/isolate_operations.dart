@@ -12,6 +12,7 @@ import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/services/machine_learning/semantic_search/clip/clip_text_encoder.dart";
 import "package:photos/services/machine_learning/semantic_search/clip/clip_text_tokenizer.dart";
 import "package:photos/services/machine_learning/semantic_search/query_result.dart";
+import "package:photos/src/rust/api/ml_indexing_api.dart" as rust_ml;
 import "package:photos/src/rust/frb_generated.dart" show EntePhotosRust;
 import "package:photos/utils/image_ml_util.dart";
 import "package:photos/utils/ml_util.dart";
@@ -92,7 +93,13 @@ Future<dynamic> isolateFunction(
 
     /// MLIndexingIsolate
     case IsolateOperation.analyzeImage:
-      final MLResult result = await analyzeImageStatic(args);
+      final bool useRustMl = args["useRustMl"] as bool? ?? false;
+      if (useRustMl) {
+        await _ensureRustLoaded();
+      }
+      final MLResult result = useRustMl
+          ? await analyzeImageRust(args)
+          : await analyzeImageStatic(args);
       return result.toJsonString();
 
     /// MLIndexingIsolate
@@ -213,7 +220,7 @@ Future<dynamic> isolateFunction(
 
     /// Caching
     case IsolateOperation.clearAllIsolateCache:
-      _ensureRustDisposed();
+      await _ensureRustDisposed();
       _isolateCache.clear();
       return true;
 
@@ -229,9 +236,14 @@ Future<void> _ensureRustLoaded() async {
   }
 }
 
-void _ensureRustDisposed() {
+Future<void> _ensureRustDisposed() async {
   final bool loaded = _isolateCache["rustLibLoaded"] as bool? ?? false;
   if (loaded) {
+    try {
+      await rust_ml.releaseMlRuntime();
+    } catch (_) {
+      // no-op: runtime release is best-effort before process-wide bridge dispose.
+    }
     EntePhotosRust.dispose();
     _isolateCache.remove("rustLibLoaded");
   }

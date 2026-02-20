@@ -12,16 +12,20 @@ import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/ml/clip.dart";
+import "package:photos/models/ml/face/dimension.dart";
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/ml_versions.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/filedata/model/file_data.dart";
+import "package:photos/services/machine_learning/face_ml/face_alignment/alignment_result.dart";
+import "package:photos/services/machine_learning/face_ml/face_detection/detection.dart";
 import "package:photos/services/machine_learning/face_ml/face_recognition_service.dart";
 import "package:photos/services/machine_learning/ml_exceptions.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/services/machine_learning/semantic_search/semantic_search_service.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/services/sync/local_sync_service.dart";
+import "package:photos/src/rust/api/ml_indexing_api.dart" as rust_ml;
 import "package:photos/utils/file_util.dart";
 import "package:photos/utils/image_ml_util.dart";
 import "package:photos/utils/network_util.dart";
@@ -586,6 +590,115 @@ Future<MLResult> analyzeImageStatic(Map args) async {
     return result;
   } catch (e, s) {
     _logger.severe("Could not analyze image", e, s);
+    rethrow;
+  }
+}
+
+Future<MLResult> analyzeImageRust(Map args) async {
+  try {
+    final int enteFileID = args["enteFileID"] as int;
+    final String imagePath = args["filePath"] as String;
+    final bool runFaces = args["runFaces"] as bool;
+    final bool runClip = args["runClip"] as bool;
+    final String? faceDetectionModelPath =
+        args["faceDetectionModelPath"] as String?;
+    final String? faceEmbeddingModelPath =
+        args["faceEmbeddingModelPath"] as String?;
+    final String? clipImageModelPath = args["clipImageModelPath"] as String?;
+    final bool preferCoreml = args["preferCoreml"] as bool? ?? true;
+    final bool preferNnapi = args["preferNnapi"] as bool? ?? true;
+    final bool allowCpuFallback = args["allowCpuFallback"] as bool? ?? true;
+
+    if (runFaces || runClip) {
+      if (faceDetectionModelPath == null ||
+          faceEmbeddingModelPath == null ||
+          clipImageModelPath == null) {
+        throw Exception(
+          "RustMLMissingModelPath: Expected all model paths to be provided",
+        );
+      }
+    }
+
+    final providerPolicy = rust_ml.RustExecutionProviderPolicy(
+      preferCoreml: preferCoreml,
+      preferNnapi: preferNnapi,
+      allowCpuFallback: allowCpuFallback,
+    );
+    await rust_ml.initMlRuntime(
+      config: rust_ml.RustMlRuntimeConfig(
+        modelPaths: rust_ml.RustModelPaths(
+          faceDetection: faceDetectionModelPath ?? "",
+          faceEmbedding: faceEmbeddingModelPath ?? "",
+          clipImage: clipImageModelPath ?? "",
+        ),
+        providerPolicy: providerPolicy,
+      ),
+    );
+
+    final rustResult = await rust_ml.analyzeImageRust(
+      req: rust_ml.AnalyzeImageRequest(
+        fileId: enteFileID,
+        imagePath: imagePath,
+        runFaces: runFaces,
+        runClip: runClip,
+        modelPaths: rust_ml.RustModelPaths(
+          faceDetection: faceDetectionModelPath ?? "",
+          faceEmbedding: faceEmbeddingModelPath ?? "",
+          clipImage: clipImageModelPath ?? "",
+        ),
+        providerPolicy: providerPolicy,
+      ),
+    );
+
+    final result = MLResult.fromEnteFileID(enteFileID);
+    result.decodedImageSize = Dimensions(
+      width: rustResult.decodedImageSize.width,
+      height: rustResult.decodedImageSize.height,
+    );
+
+    if (runFaces) {
+      final rustFaces = rustResult.faces ?? const <rust_ml.RustFaceResult>[];
+      result.faces = rustFaces.map((face) {
+        final detection = FaceDetectionRelative(
+          score: face.detection.score,
+          box: face.detection.boxXyxy.toList(growable: false),
+          allKeypoints: face.detection.allKeypoints
+              .map((point) => point.toList(growable: false))
+              .toList(growable: false),
+        );
+        final alignment = AlignmentResult(
+          affineMatrix: face.alignment.affineMatrix
+              .map((row) => row.toList(growable: false))
+              .toList(growable: false),
+          center: face.alignment.center.toList(growable: false),
+          size: face.alignment.size,
+          rotation: face.alignment.rotation,
+        );
+        return FaceResult(
+          fileId: enteFileID,
+          faceId: face.faceId,
+          detection: detection,
+          blurValue: face.blurValue,
+          alignment: alignment,
+          embedding: face.embedding.toList(growable: false),
+        );
+      }).toList(growable: false);
+    }
+
+    if (runClip) {
+      final rustClip = rustResult.clip;
+      if (rustClip == null) {
+        throw Exception("RustMLMissingClipOutput: clip output was null");
+      }
+      result.clip = ClipResult(
+        fileID: enteFileID,
+        embedding: rustClip.embedding.toList(growable: false),
+      );
+    }
+
+    return result;
+  } catch (e, s) {
+    _logger.severe("Could not analyze image with Rust pipeline", e, s);
     rethrow;
   }
 }
