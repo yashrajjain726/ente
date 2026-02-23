@@ -1,7 +1,7 @@
 use std::{io::Cursor, path::Path};
 
 use exif::{In, Reader as ExifReader, Tag};
-use image::{DynamicImage, RgbImage};
+use image::{DynamicImage, ImageReader, RgbImage};
 
 use crate::ml::{
     error::{MlError, MlResult},
@@ -22,11 +22,13 @@ pub fn decode_image_from_path(image_path: &str) -> MlResult<DecodedImage> {
         .map_err(|e| MlError::Decode(format!("failed to read image file '{image_path}': {e}")))?;
     let exif_orientation = read_exif_orientation(&file_bytes);
 
-    let decoded_rgb = if HEIF_EXTENSIONS.contains(&ext.as_str()) {
-        decode_heif_from_path(image_path)?
-    } else {
-        image::load_from_memory(&file_bytes)?.to_rgb8()
-    };
+    if HEIF_EXTENSIONS.contains(&ext.as_str()) {
+        return Err(MlError::Decode(
+            "HEIC/HEIF decoding is currently unsupported in Rust indexing".to_string(),
+        ));
+    }
+
+    let decoded_rgb = decode_with_image_crate(&file_bytes)?;
     let oriented =
         apply_exif_orientation(DynamicImage::ImageRgb8(decoded_rgb), exif_orientation).to_rgb8();
 
@@ -37,6 +39,14 @@ pub fn decode_image_from_path(image_path: &str) -> MlResult<DecodedImage> {
         },
         rgb: oriented.into_raw(),
     })
+}
+
+fn decode_with_image_crate(file_bytes: &[u8]) -> MlResult<RgbImage> {
+    let reader = ImageReader::new(Cursor::new(file_bytes))
+        .with_guessed_format()
+        .map_err(|e| MlError::Decode(format!("failed to guess image format: {e}")))?;
+    let dynamic = reader.decode()?;
+    Ok(dynamic.to_rgb8())
 }
 
 fn read_exif_orientation(image_data: &[u8]) -> u32 {
@@ -62,48 +72,4 @@ fn apply_exif_orientation(image: DynamicImage, orientation: u32) -> DynamicImage
         8 => image.rotate270(),
         _ => image,
     }
-}
-
-#[cfg(feature = "heif")]
-fn decode_heif_from_path(image_path: &str) -> MlResult<RgbImage> {
-    use image::{ImageBuffer, Rgb};
-    use libheif_rs::{ColorSpace, HeifContext, LibHeif, RgbChroma};
-
-    let context = HeifContext::read_from_file(image_path)
-        .map_err(|e| MlError::Decode(format!("failed to open HEIF file '{image_path}': {e}")))?;
-    let handle = context
-        .primary_image_handle()
-        .map_err(|e| MlError::Decode(format!("failed to read HEIF primary handle: {e}")))?;
-    let decoder = LibHeif::new();
-    let image = decoder
-        .decode(&handle, ColorSpace::Rgb(RgbChroma::Rgb), None)
-        .map_err(|e| MlError::Decode(format!("failed to decode HEIF image: {e}")))?;
-
-    let width = image.width();
-    let height = image.height();
-    let plane = image
-        .planes()
-        .interleaved
-        .ok_or_else(|| MlError::Decode("HEIF image has no interleaved RGB plane".to_string()))?;
-
-    let row_stride = plane.stride;
-    let row_width = width as usize * 3;
-    let mut rgb = vec![0u8; width as usize * height as usize * 3];
-    for y in 0..height as usize {
-        let src_start = y * row_stride;
-        let src_end = src_start + row_width;
-        let dst_start = y * row_width;
-        rgb[dst_start..(dst_start + row_width)].copy_from_slice(&plane.data[src_start..src_end]);
-    }
-
-    ImageBuffer::<Rgb<u8>, _>::from_raw(width as u32, height as u32, rgb)
-        .ok_or_else(|| MlError::Decode("failed to construct RGB image from HEIF plane".to_string()))
-}
-
-#[cfg(not(feature = "heif"))]
-fn decode_heif_from_path(image_path: &str) -> MlResult<RgbImage> {
-    let _ = image_path;
-    Err(MlError::Decode(
-        "HEIF decoding is unavailable because the `heif` cargo feature is disabled".to_string(),
-    ))
 }

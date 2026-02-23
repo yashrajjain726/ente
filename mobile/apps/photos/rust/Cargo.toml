@@ -14,7 +14,6 @@ fast_image_resize = { version = "5.5.0", features = ["image", "rayon"] }
 image = { version = "0.25.5", default-features = true }
 imageproc = "0.25.0"
 kamadak-exif = "0.6.1"
-libheif-rs = { version = "1.0.2", optional = true }
 nalgebra = "0.33.2"
 ndarray = "0.16.1"
 once_cell = "1.20.2"
@@ -26,4 +25,3 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
 
 [features]
 default = []
-heif = ["dep:libheif-rs"]
