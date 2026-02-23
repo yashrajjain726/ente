@@ -1,4 +1,5 @@
 import "dart:async";
+import "dart:io" show Platform;
 
 import "package:flutter/foundation.dart" show debugPrint;
 import "package:logging/logging.dart";
