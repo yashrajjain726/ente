@@ -189,6 +189,8 @@ const Page: React.FC = () => {
 
     const [isFirstLoad, setIsFirstLoad] = useState(false);
     const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
+    const [suppressContextSelectionBar, setSuppressContextSelectionBar] =
+        useState(false);
     const [selected, setSelected] = useState<SelectedState>({
         ownCount: 0,
         count: 0,
@@ -949,8 +951,12 @@ const Page: React.FC = () => {
         [createOnSelectForCollectionOp, remotePull],
     );
 
-    const createFileOpHandler = (op: FileOp) => () => {
+    const createFileOpHandler =
+        (op: FileOp, options?: { suppressSelectionBar?: boolean }) => () => {
         void (async () => {
+            if (options?.suppressSelectionBar) {
+                setSuppressContextSelectionBar(true);
+            }
             showLoadingBar();
             try {
                 if (op == "sendLink") {
@@ -1043,6 +1049,9 @@ const Page: React.FC = () => {
             } catch (e) {
                 onGenericError(e);
             } finally {
+                if (options?.suppressSelectionBar) {
+                    setSuppressContextSelectionBar(false);
+                }
                 hideLoadingBar();
             }
         })();
@@ -1379,33 +1388,54 @@ const Page: React.FC = () => {
      * and selects an action from the context menu.
      */
     const handleContextMenuAction = useCallback(
-        (action: FileContextAction) => {
+        (
+            action: FileContextAction,
+            _targetFile?: EnteFile,
+            meta?: { isEphemeralSingleSelection: boolean },
+        ) => {
+            const suppressSelectionBar = !!meta?.isEphemeralSingleSelection;
             // The selection should already be set by FileList's handleContextMenu
             // We just need to invoke the appropriate action handler
             switch (action) {
                 case "sendLink":
-                    createFileOpHandler("sendLink")();
+                    createFileOpHandler("sendLink", {
+                        suppressSelectionBar,
+                    })();
                     break;
                 case "download":
-                    createFileOpHandler("download")();
+                    createFileOpHandler("download", {
+                        suppressSelectionBar,
+                    })();
                     break;
                 case "favorite":
-                    createFileOpHandler("favorite")();
+                    createFileOpHandler("favorite", {
+                        suppressSelectionBar,
+                    })();
                     break;
                 case "unfavorite":
-                    createFileOpHandler("unfavorite")();
+                    createFileOpHandler("unfavorite", {
+                        suppressSelectionBar,
+                    })();
                     break;
                 case "archive":
-                    createFileOpHandler("archive")();
+                    createFileOpHandler("archive", {
+                        suppressSelectionBar,
+                    })();
                     break;
                 case "unarchive":
-                    createFileOpHandler("unarchive")();
+                    createFileOpHandler("unarchive", {
+                        suppressSelectionBar,
+                    })();
                     break;
                 case "hide":
-                    createFileOpHandler("hide")();
+                    createFileOpHandler("hide", {
+                        suppressSelectionBar,
+                    })();
                     break;
                 case "fixTime":
-                    createFileOpHandler("fixTime")();
+                    createFileOpHandler("fixTime", {
+                        suppressSelectionBar,
+                    })();
                     break;
                 case "trash":
                     showMiniDialog({
@@ -1414,7 +1444,9 @@ const Page: React.FC = () => {
                         continue: {
                             text: t("move_to_trash"),
                             color: "critical",
-                            action: createFileOpHandler("trash"),
+                            action: createFileOpHandler("trash", {
+                                suppressSelectionBar,
+                            }),
                         },
                     });
                     break;
@@ -1425,7 +1457,9 @@ const Page: React.FC = () => {
                         continue: {
                             text: t("delete"),
                             color: "critical",
-                            action: createFileOpHandler("deletePermanently"),
+                            action: createFileOpHandler("deletePermanently", {
+                                suppressSelectionBar,
+                            }),
                         },
                     });
                     break;
@@ -1632,6 +1666,7 @@ const Page: React.FC = () => {
     const showSelectionBar =
         selected.count > 0 &&
         selected.collectionID === activeCollectionID &&
+        !suppressContextSelectionBar &&
         !(isContextMenuOpen && selected.count === 1);
 
     if (!user) {
@@ -1863,6 +1898,7 @@ const Page: React.FC = () => {
                     isInHiddenSection={barMode == "hidden-albums"}
                     onContextMenuAction={handleContextMenuAction}
                     onContextMenuOpenChange={setIsContextMenuOpen}
+                    suppressSelectionUI={suppressContextSelectionBar}
                     showAddPersonAction={showAddPersonAction}
                     showEditLocationAction={selected.ownCount > 0}
                     {...{
