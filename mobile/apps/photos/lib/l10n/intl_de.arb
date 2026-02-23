@@ -1189,7 +1189,7 @@
   "didYouKnow": "Schon gewusst?",
   "loadingMessage": "Fotos werden geladen...",
   "loadMessage1": "Du kannst dein Abonnement mit deiner Familie teilen",
-  "loadMessage2": "Wir haben bereits über 200 Millionen Erinnerungen bewahrt",
+  "loadMessage2": "Wir haben bereits über {memoriesCountInMillions} Millionen Erinnerungen bewahrt",
   "loadMessage3": "Wir behalten 3 Kopien Ihrer Daten, eine in einem unterirdischen Schutzbunker",
   "loadMessage4": "Alle unsere Apps sind Open-Source",
   "loadMessage5": "Unser Quellcode und unsere Kryptografie wurden extern geprüft",

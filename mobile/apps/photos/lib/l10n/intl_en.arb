@@ -1189,7 +1189,14 @@
   "didYouKnow": "Did you know?",
   "loadingMessage": "Loading your photos...",
   "loadMessage1": "You can share your subscription with your family",
-  "loadMessage2": "We have preserved over 500 million memories so far",
+  "loadMessage2": "We have preserved over {memoriesCountInMillions} million memories so far",
+  "@loadMessage2": {
+    "placeholders": {
+      "memoriesCountInMillions": {
+        "type": "int"
+      }
+    }
+  },
   "loadMessage3": "We keep 3 copies of your data, one in an underground fallout shelter",
   "loadMessage4": "All our apps are open source",
   "loadMessage5": "Our source code and cryptography have been externally audited",
