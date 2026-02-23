@@ -270,9 +270,7 @@ export interface FileListProps {
     onContextMenuAction?: (
         action: FileContextAction,
         targetFile?: EnteFile,
-        meta?: {
-            isEphemeralSingleSelection: boolean;
-        },
+        meta?: { isEphemeralSingleSelection: boolean },
     ) => void;
     /**
      * Whether to show the "Add Person" action in the context menu.
@@ -861,8 +859,7 @@ export const FileList: React.FC<FileListProps> = ({
                                         }
                                         selectOnClick={haveSelection}
                                         isRangeSelectActive={
-                                            isShiftKeyPressed &&
-                                            haveSelection
+                                            isShiftKeyPressed && haveSelection
                                         }
                                         isInSelectRange={
                                             rangeStartIndex !== undefined &&

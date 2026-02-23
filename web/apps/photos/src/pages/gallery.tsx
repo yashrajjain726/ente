@@ -953,109 +953,111 @@ const Page: React.FC = () => {
 
     const createFileOpHandler =
         (op: FileOp, options?: { suppressSelectionBar?: boolean }) => () => {
-        void (async () => {
-            if (options?.suppressSelectionBar) {
-                setSuppressContextSelectionBar(true);
-            }
-            showLoadingBar();
-            try {
-                if (op == "sendLink") {
-                    const selectedFiles = getSelectedFiles(
-                        selected,
-                        filteredFiles,
-                    );
-                    const ownedSelectedFiles = selectedFiles.filter(
-                        // There'll be a user if files are being selected.
-                        (file) => file.ownerID == user!.id,
-                    );
-                    if (!ownedSelectedFiles.length) return;
-                    if (ownedSelectedFiles.length != selectedFiles.length) {
-                        showMiniDialog(notifyOthersFilesDialogAttributes());
+            void (async () => {
+                if (options?.suppressSelectionBar) {
+                    setSuppressContextSelectionBar(true);
+                }
+                showLoadingBar();
+                try {
+                    if (op == "sendLink") {
+                        const selectedFiles = getSelectedFiles(
+                            selected,
+                            filteredFiles,
+                        );
+                        const ownedSelectedFiles = selectedFiles.filter(
+                            // There'll be a user if files are being selected.
+                            (file) => file.ownerID == user!.id,
+                        );
+                        if (!ownedSelectedFiles.length) return;
+                        if (ownedSelectedFiles.length != selectedFiles.length) {
+                            showMiniDialog(notifyOthersFilesDialogAttributes());
+                        }
+
+                        const quickLinkCollection =
+                            await createQuickLinkCollection(
+                                quickLinkNameForFiles(ownedSelectedFiles),
+                            );
+                        await addToCollection(
+                            quickLinkCollection,
+                            ownedSelectedFiles,
+                        );
+                        const publicURL = await createPublicURL(
+                            quickLinkCollection.id,
+                            { enableJoin: false },
+                        );
+                        const resolvedURL = await resolveQuickLinkURL(
+                            publicURL.url,
+                            quickLinkCollection.key,
+                            customDomain,
+                        );
+                        setPublicLinkToast({ open: true, url: resolvedURL });
+
+                        clearSelection();
+                        await remotePull({ silent: true });
+                        return;
                     }
 
-                    const quickLinkCollection = await createQuickLinkCollection(
-                        quickLinkNameForFiles(ownedSelectedFiles),
-                    );
-                    await addToCollection(
-                        quickLinkCollection,
-                        ownedSelectedFiles,
-                    );
-                    const publicURL = await createPublicURL(
-                        quickLinkCollection.id,
-                        { enableJoin: false },
-                    );
-                    const resolvedURL = await resolveQuickLinkURL(
-                        publicURL.url,
-                        quickLinkCollection.key,
-                        customDomain,
-                    );
-                    setPublicLinkToast({ open: true, url: resolvedURL });
-
+                    // When hiding use all non-hidden files instead of the filtered
+                    // files since we want to move all files copies to the hidden
+                    // collection.
+                    const opFiles =
+                        op == "hide"
+                            ? state.collectionFiles.filter(
+                                  (f) => !state.hiddenFileIDs.has(f.id),
+                              )
+                            : filteredFiles;
+                    const selectedFiles = getSelectedFiles(selected, opFiles);
+                    const ownedSelectedFiles =
+                        op == "download"
+                            ? selectedFiles
+                            : selectedFiles.filter(
+                                  // There'll be a user if files are being selected.
+                                  (file) => file.ownerID == user!.id,
+                              );
+                    const toProcessFiles =
+                        op == "unfavorite"
+                            ? ownedSelectedFiles.filter((file) =>
+                                  favoriteFileIDs.has(file.id),
+                              )
+                            : ownedSelectedFiles;
+                    if (toProcessFiles.length > 0) {
+                        await performFileOp(
+                            op,
+                            toProcessFiles,
+                            onAddSaveGroup,
+                            handleMarkTempDeleted,
+                            () => dispatch({ type: "clearTempDeleted" }),
+                            (files) =>
+                                dispatch({ type: "markTempHidden", files }),
+                            () => dispatch({ type: "clearTempHidden" }),
+                            (files) => {
+                                setFixCreationTimeFiles(files);
+                                showFixCreationTime();
+                            },
+                        );
+                    }
+                    // Apart from download, the other operations currently only work
+                    // on the user's own files.
+                    //
+                    // See: [Note: Add and move of non-user files].
+                    if (
+                        op != "download" &&
+                        ownedSelectedFiles.length != selectedFiles.length
+                    ) {
+                        showMiniDialog(notifyOthersFilesDialogAttributes());
+                    }
                     clearSelection();
                     await remotePull({ silent: true });
-                    return;
+                } catch (e) {
+                    onGenericError(e);
+                } finally {
+                    if (options?.suppressSelectionBar) {
+                        setSuppressContextSelectionBar(false);
+                    }
+                    hideLoadingBar();
                 }
-
-                // When hiding use all non-hidden files instead of the filtered
-                // files since we want to move all files copies to the hidden
-                // collection.
-                const opFiles =
-                    op == "hide"
-                        ? state.collectionFiles.filter(
-                              (f) => !state.hiddenFileIDs.has(f.id),
-                          )
-                        : filteredFiles;
-                const selectedFiles = getSelectedFiles(selected, opFiles);
-                const ownedSelectedFiles =
-                    op == "download"
-                        ? selectedFiles
-                        : selectedFiles.filter(
-                              // There'll be a user if files are being selected.
-                              (file) => file.ownerID == user!.id,
-                          );
-                const toProcessFiles =
-                    op == "unfavorite"
-                        ? ownedSelectedFiles.filter((file) =>
-                              favoriteFileIDs.has(file.id),
-                          )
-                        : ownedSelectedFiles;
-                if (toProcessFiles.length > 0) {
-                    await performFileOp(
-                        op,
-                        toProcessFiles,
-                        onAddSaveGroup,
-                        handleMarkTempDeleted,
-                        () => dispatch({ type: "clearTempDeleted" }),
-                        (files) => dispatch({ type: "markTempHidden", files }),
-                        () => dispatch({ type: "clearTempHidden" }),
-                        (files) => {
-                            setFixCreationTimeFiles(files);
-                            showFixCreationTime();
-                        },
-                    );
-                }
-                // Apart from download, the other operations currently only work
-                // on the user's own files.
-                //
-                // See: [Note: Add and move of non-user files].
-                if (
-                    op != "download" &&
-                    ownedSelectedFiles.length != selectedFiles.length
-                ) {
-                    showMiniDialog(notifyOthersFilesDialogAttributes());
-                }
-                clearSelection();
-                await remotePull({ silent: true });
-            } catch (e) {
-                onGenericError(e);
-            } finally {
-                if (options?.suppressSelectionBar) {
-                    setSuppressContextSelectionBar(false);
-                }
-                hideLoadingBar();
-            }
-        })();
-    };
+            })();
+        };
 
     const handleAddPersonToSelectedFiles = useCallback(
         async (personID: string) => {
@@ -1398,19 +1400,13 @@ const Page: React.FC = () => {
             // We just need to invoke the appropriate action handler
             switch (action) {
                 case "sendLink":
-                    createFileOpHandler("sendLink", {
-                        suppressSelectionBar,
-                    })();
+                    createFileOpHandler("sendLink", { suppressSelectionBar })();
                     break;
                 case "download":
-                    createFileOpHandler("download", {
-                        suppressSelectionBar,
-                    })();
+                    createFileOpHandler("download", { suppressSelectionBar })();
                     break;
                 case "favorite":
-                    createFileOpHandler("favorite", {
-                        suppressSelectionBar,
-                    })();
+                    createFileOpHandler("favorite", { suppressSelectionBar })();
                     break;
                 case "unfavorite":
                     createFileOpHandler("unfavorite", {
@@ -1418,9 +1414,7 @@ const Page: React.FC = () => {
                     })();
                     break;
                 case "archive":
-                    createFileOpHandler("archive", {
-                        suppressSelectionBar,
-                    })();
+                    createFileOpHandler("archive", { suppressSelectionBar })();
                     break;
                 case "unarchive":
                     createFileOpHandler("unarchive", {
@@ -1428,14 +1422,10 @@ const Page: React.FC = () => {
                     })();
                     break;
                 case "hide":
-                    createFileOpHandler("hide", {
-                        suppressSelectionBar,
-                    })();
+                    createFileOpHandler("hide", { suppressSelectionBar })();
                     break;
                 case "fixTime":
-                    createFileOpHandler("fixTime", {
-                        suppressSelectionBar,
-                    })();
+                    createFileOpHandler("fixTime", { suppressSelectionBar })();
                     break;
                 case "trash":
                     showMiniDialog({
