@@ -34,9 +34,14 @@ pub fn build_session(model_path: &str, policy: &ExecutionProviderPolicy) -> MlRe
         providers.push(CPUExecutionProvider::default().build());
     }
 
-    if !providers.is_empty() {
-        builder = builder.with_execution_providers(providers)?;
+    if providers.is_empty() {
+        return Err(MlError::InvalidRequest(
+            "no supported execution provider selected for this platform while CPU fallback is disabled"
+                .to_string(),
+        ));
     }
+
+    builder = builder.with_execution_providers(providers)?;
 
     let session = builder.commit_from_file(model_path)?;
     Ok(session)
