@@ -1,5 +1,6 @@
 use ort::{
     CPUExecutionProvider, ExecutionProviderDispatch, GraphOptimizationLevel, Session, Tensor,
+    XNNPACKExecutionProvider,
 };
 
 #[cfg(target_vendor = "apple")]
@@ -27,11 +28,14 @@ pub fn build_session(model_path: &str, policy: &ExecutionProviderPolicy) -> MlRe
 
     #[cfg(target_os = "android")]
     if policy.prefer_nnapi {
-        providers.push(NNAPIExecutionProvider::default().build());
+        // Prefer NNAPI accelerators and let ORT handle CPU fallback via XNNPACK/CPU EP.
+        providers.push(NNAPIExecutionProvider::default().with_disable_cpu().build());
     }
 
     if policy.allow_cpu_fallback {
-        providers.push(CPUExecutionProvider::default().build());
+        // XNNPACK is generally a faster CPU path on mobile; keep plain CPU EP as last fallback.
+        providers.push(XNNPACKExecutionProvider::default().build());
+        providers.push(CPUExecutionProvider::default().with_arena_allocator().build());
     }
 
     if providers.is_empty() {
