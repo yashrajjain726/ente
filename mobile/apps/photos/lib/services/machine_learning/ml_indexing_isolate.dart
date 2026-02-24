@@ -83,7 +83,7 @@ class MLIndexingIsolate extends SuperIsolate {
         clipImageModelPath = clipImage.$2;
       }
       _logger.info(
-        "Analyzing image ${instruction.fileKey} via rust of legacy: ${useRustMl ? "Rust ML path" : "legacy model path"}",
+        "Analyzing image ${instruction.fileKey} via rust or legacy: ${useRustMl ? "RUST" : "LEGACY"}",
       );
 
       final resultJsonString =
