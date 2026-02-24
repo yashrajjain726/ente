@@ -14,7 +14,8 @@ pub fn run_face_detection(
     runtime: &mut MlRuntime,
     decoded: &DecodedImage,
 ) -> MlResult<Vec<FaceDetection>> {
-    let (input, scaled_width, scaled_height) = preprocess::preprocess_yolo(decoded)?;
+    let (input, scaled_width, scaled_height, pad_left, pad_top) =
+        preprocess::preprocess_yolo(decoded)?;
     let face_detection = runtime.face_detection_session_mut()?;
     let (output_shape, output_data) = onnx::run_f32(
         face_detection,
@@ -63,6 +64,8 @@ pub fn run_face_detection(
             &mut keypoints,
             scaled_width,
             scaled_height,
+            pad_left,
+            pad_top,
         );
 
         detections.push(FaceDetection {
@@ -81,22 +84,35 @@ fn correct_for_maintained_aspect_ratio(
     keypoints: &mut [[f32; 2]; 5],
     scaled_width: usize,
     scaled_height: usize,
+    pad_left: usize,
+    pad_top: usize,
 ) {
-    if scaled_width == INPUT_WIDTH as usize && scaled_height == INPUT_HEIGHT as usize {
+    if scaled_width == INPUT_WIDTH as usize
+        && scaled_height == INPUT_HEIGHT as usize
+        && pad_left == 0
+        && pad_top == 0
+    {
         return;
     }
 
-    let scale_x = INPUT_WIDTH / scaled_width as f32;
-    let scale_y = INPUT_HEIGHT / scaled_height as f32;
+    let scaled_width = scaled_width as f32;
+    let scaled_height = scaled_height as f32;
+    let pad_left = pad_left as f32;
+    let pad_top = pad_top as f32;
 
-    box_xyxy[0] = (box_xyxy[0] * scale_x).clamp(0.0, 1.0);
-    box_xyxy[1] = (box_xyxy[1] * scale_y).clamp(0.0, 1.0);
-    box_xyxy[2] = (box_xyxy[2] * scale_x).clamp(0.0, 1.0);
-    box_xyxy[3] = (box_xyxy[3] * scale_y).clamp(0.0, 1.0);
+    let transform_x =
+        |x: f32| -> f32 { ((x * INPUT_WIDTH - pad_left) / scaled_width).clamp(0.0, 1.0) };
+    let transform_y =
+        |y: f32| -> f32 { ((y * INPUT_HEIGHT - pad_top) / scaled_height).clamp(0.0, 1.0) };
+
+    box_xyxy[0] = transform_x(box_xyxy[0]);
+    box_xyxy[1] = transform_y(box_xyxy[1]);
+    box_xyxy[2] = transform_x(box_xyxy[2]);
+    box_xyxy[3] = transform_y(box_xyxy[3]);
 
     for point in keypoints.iter_mut() {
-        point[0] = (point[0] * scale_x).clamp(0.0, 1.0);
-        point[1] = (point[1] * scale_y).clamp(0.0, 1.0);
+        point[0] = transform_x(point[0]);
+        point[1] = transform_y(point[1]);
     }
 }
 
