@@ -855,11 +855,16 @@ class _HomeWidgetState extends State<HomeWidget> {
     final bool offlineMode = isOfflineMode;
     if (!Configuration.instance.hasConfiguredAccount()) {
       _closeDrawerIfOpen(context);
+      final shouldBootstrapOfflineEntryFlow =
+          widget.startWithoutAccount && !offlineMode;
       final isOfflineEntryFlowEnabled =
           widget.startWithoutAccount && offlineMode;
       final hasPersistedOfflineMode = localSettings.isAppModeSet && offlineMode;
       final canResumePersistedOfflineMode =
           hasPersistedOfflineMode && permissionService.hasGrantedPermissions();
+      if (shouldBootstrapOfflineEntryFlow) {
+        return const GrantPermissionsWidget(startWithoutAccount: true);
+      }
       if (isOfflineEntryFlowEnabled || canResumePersistedOfflineMode) {
         if (_shouldShowPermissionWidget()) {
           return const GrantPermissionsWidget(startWithoutAccount: true);

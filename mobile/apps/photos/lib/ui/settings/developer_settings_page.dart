@@ -18,13 +18,11 @@ Future<AppMode?> _maybeChangeAppMode(
 }) async {
   if (input == "offline") {
     await settings.setShowOfflineModeOption(true);
-    await settings.setAppMode(AppMode.offline);
     return AppMode.offline;
   }
 
   if (input == "online") {
     await settings.setShowOfflineModeOption(false);
-    await settings.setAppMode(AppMode.online);
     return AppMode.online;
   }
 
@@ -83,8 +81,8 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                   showToast(
                     context,
                     appMode == AppMode.offline
-                        ? "App mode set to offline"
-                        : "App mode set to online",
+                        ? "Offline mode option enabled"
+                        : "Offline mode option disabled",
                   );
                   Navigator.of(context).pop();
                   return;
