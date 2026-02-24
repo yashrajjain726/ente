@@ -39,6 +39,7 @@ class MLIndexingIsolate extends SuperIsolate {
   final _rustRuntimeLock = Lock();
 
   bool areModelsDownloaded = false;
+  Map<String, dynamic>? _cachedRustRuntimeArgs;
 
   @override
   Future<void> onDispose() async {
@@ -70,8 +71,9 @@ class MLIndexingIsolate extends SuperIsolate {
 
     try {
       final useRustMl = _shouldUseRustMl;
-      final rustRuntimeArgs =
-          useRustMl ? await _buildRustRuntimeArgs() : const <String, dynamic>{};
+      final rustRuntimeArgs = useRustMl
+          ? await _getCachedRustRuntimeArgs()
+          : const <String, dynamic>{};
       _logger.info(
         "Analyzing image ${instruction.fileKey} via rust or legacy: ${useRustMl ? "RUST" : "LEGACY"}",
       );
@@ -118,18 +120,22 @@ class MLIndexingIsolate extends SuperIsolate {
     }
     return _rustRuntimeLock.synchronized(() async {
       final rustRuntimeArgs = await _buildRustRuntimeArgs();
+      _cachedRustRuntimeArgs =
+          Map<String, dynamic>.unmodifiable(rustRuntimeArgs);
       await runInIsolate(
         IsolateOperation.prepareRustMlRuntime,
-        rustRuntimeArgs,
+        _cachedRustRuntimeArgs!,
       );
     });
   }
 
   Future<void> releaseRustRuntime() async {
     if (!isIsolateSpawned) {
+      _cachedRustRuntimeArgs = null;
       return;
     }
     return _rustRuntimeLock.synchronized(() async {
+      _cachedRustRuntimeArgs = null;
       if (!isIsolateSpawned) {
         return;
       }
@@ -338,5 +344,16 @@ class MLIndexingIsolate extends SuperIsolate {
       "preferNnapi": Platform.isAndroid,
       "allowCpuFallback": true,
     };
+  }
+
+  Future<Map<String, dynamic>> _getCachedRustRuntimeArgs() async {
+    final cachedArgs = _cachedRustRuntimeArgs;
+    if (cachedArgs != null) {
+      return cachedArgs;
+    }
+    final rustRuntimeArgs = await _buildRustRuntimeArgs();
+    final frozenArgs = Map<String, dynamic>.unmodifiable(rustRuntimeArgs);
+    _cachedRustRuntimeArgs ??= frozenArgs;
+    return _cachedRustRuntimeArgs!;
   }
 }
