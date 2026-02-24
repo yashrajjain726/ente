@@ -249,8 +249,5 @@ func (c *MailingListsController) listmonkUnsubscribe(email string) error {
 }
 
 func (c *MailingListsController) notifyListmonkFailure(message string) {
-	if c.discordController == nil {
-		return
-	}
 	c.discordController.Notify(message)
 }
