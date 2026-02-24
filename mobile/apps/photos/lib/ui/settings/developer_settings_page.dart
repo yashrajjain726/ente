@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
+import "package:photos/app_mode.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/core/network/network.dart";
@@ -9,6 +10,27 @@ import "package:photos/service_locator.dart";
 import "package:photos/ui/common/gradient_button.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/utils/dialog_util.dart";
+import "package:photos/utils/local_settings.dart";
+
+@visibleForTesting
+Future<AppMode?> maybeApplyDeveloperAppModeInput(
+  String input, {
+  required LocalSettings settings,
+}) async {
+  if (input == "offline") {
+    await settings.setShowOfflineModeOption(true);
+    await settings.setAppMode(AppMode.offline);
+    return AppMode.offline;
+  }
+
+  if (input == "online") {
+    await settings.setShowOfflineModeOption(false);
+    await settings.setAppMode(AppMode.online);
+    return AppMode.online;
+  }
+
+  return null;
+}
 
 class DeveloperSettingsPage extends StatefulWidget {
   const DeveloperSettingsPage({super.key});
@@ -53,17 +75,18 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
               onTap: () async {
                 final url = _urlController.text.trim();
                 _logger.info("Entered endpoint: $url");
-                if (url == "offline") {
-                  await localSettings.setShowOfflineModeOption(true);
+                final appMode = await maybeApplyDeveloperAppModeInput(
+                  url,
+                  settings: localSettings,
+                );
+                if (appMode != null) {
                   Bus.instance.fire(AppModeChangedEvent());
-                  showToast(context, "App mode set to offline");
-                  Navigator.of(context).pop();
-                  return;
-                }
-                if (url == "online") {
-                  await localSettings.setShowOfflineModeOption(false);
-                  Bus.instance.fire(AppModeChangedEvent());
-                  showToast(context, "App mode set to online");
+                  showToast(
+                    context,
+                    appMode == AppMode.offline
+                        ? "App mode set to offline"
+                        : "App mode set to online",
+                  );
                   Navigator.of(context).pop();
                   return;
                 }
