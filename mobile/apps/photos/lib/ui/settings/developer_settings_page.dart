@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
-import "package:photos/app_mode.dart";
 import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/core/network/network.dart";
@@ -12,18 +11,18 @@ import "package:photos/ui/notification/toast.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/local_settings.dart";
 
-Future<AppMode?> _maybeChangeAppMode(
+Future<bool?> _maybeChangeAppMode(
   String input, {
   required LocalSettings settings,
 }) async {
   if (input == "offline") {
     await settings.setShowOfflineModeOption(true);
-    return AppMode.offline;
+    return true;
   }
 
   if (input == "online") {
     await settings.setShowOfflineModeOption(false);
-    return AppMode.online;
+    return false;
   }
 
   return null;
@@ -80,7 +79,7 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                   Bus.instance.fire(AppModeChangedEvent());
                   showToast(
                     context,
-                    appMode == AppMode.offline
+                    appMode
                         ? "Offline mode option enabled"
                         : "Offline mode option disabled",
                   );
