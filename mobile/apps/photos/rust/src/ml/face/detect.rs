@@ -15,8 +15,9 @@ pub fn run_face_detection(
     decoded: &DecodedImage,
 ) -> MlResult<Vec<FaceDetection>> {
     let (input, scaled_width, scaled_height) = preprocess::preprocess_yolo(decoded)?;
+    let face_detection = runtime.face_detection_session_mut()?;
     let (output_shape, output_data) = onnx::run_f32(
-        &mut runtime.face_detection,
+        face_detection,
         input,
         vec![1, 3, INPUT_HEIGHT as i64, INPUT_WIDTH as i64],
     )?;

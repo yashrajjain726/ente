@@ -40,9 +40,9 @@ pub struct MlRuntimeConfig {
 
 #[derive(Debug)]
 pub struct MlRuntime {
-    pub face_detection: Session,
-    pub face_embedding: Session,
-    pub clip_image: Session,
+    face_detection: Option<Session>,
+    face_embedding: Option<Session>,
+    clip_image: Option<Session>,
 }
 
 #[derive(Debug)]
@@ -55,15 +55,55 @@ static GLOBAL_RUNTIME: Lazy<Mutex<Option<RuntimeState>>> = Lazy::new(|| Mutex::n
 
 fn create_runtime(config: &MlRuntimeConfig) -> MlResult<MlRuntime> {
     let face_detection =
-        onnx::build_session(&config.model_paths.face_detection, &config.provider_policy)?;
+        build_optional_session(&config.model_paths.face_detection, &config.provider_policy)?;
     let face_embedding =
-        onnx::build_session(&config.model_paths.face_embedding, &config.provider_policy)?;
-    let clip_image = onnx::build_session(&config.model_paths.clip_image, &config.provider_policy)?;
+        build_optional_session(&config.model_paths.face_embedding, &config.provider_policy)?;
+    let clip_image =
+        build_optional_session(&config.model_paths.clip_image, &config.provider_policy)?;
     Ok(MlRuntime {
         face_detection,
         face_embedding,
         clip_image,
     })
+}
+
+fn build_optional_session(
+    model_path: &str,
+    provider_policy: &ExecutionProviderPolicy,
+) -> MlResult<Option<Session>> {
+    if model_path.trim().is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(onnx::build_session(model_path, provider_policy)?))
+}
+
+impl MlRuntime {
+    pub fn face_detection_session_mut(&mut self) -> MlResult<&mut Session> {
+        self.face_detection.as_mut().ok_or_else(|| {
+            MlError::InvalidRequest(
+                "missing model path: faceDetectionModelPath is required when runFaces is true"
+                    .to_string(),
+            )
+        })
+    }
+
+    pub fn face_embedding_session_mut(&mut self) -> MlResult<&mut Session> {
+        self.face_embedding.as_mut().ok_or_else(|| {
+            MlError::InvalidRequest(
+                "missing model path: faceEmbeddingModelPath is required when runFaces is true"
+                    .to_string(),
+            )
+        })
+    }
+
+    pub fn clip_image_session_mut(&mut self) -> MlResult<&mut Session> {
+        self.clip_image.as_mut().ok_or_else(|| {
+            MlError::InvalidRequest(
+                "missing model path: clipImageModelPath is required when runClip is true"
+                    .to_string(),
+            )
+        })
+    }
 }
 
 fn lock_runtime() -> std::sync::MutexGuard<'static, Option<RuntimeState>> {

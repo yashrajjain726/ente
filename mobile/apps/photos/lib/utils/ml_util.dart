@@ -609,16 +609,31 @@ Future<MLResult> analyzeImageRust(Map args) async {
     final bool preferNnapi = args["preferNnapi"] as bool? ?? true;
     final bool allowCpuFallback = args["allowCpuFallback"] as bool? ?? true;
 
-    if (runFaces || runClip) {
-      if (faceDetectionModelPath == null ||
-          faceEmbeddingModelPath == null ||
-          clipImageModelPath == null) {
-        throw Exception(
-          "RustMLMissingModelPath: Expected all model paths to be provided",
-        );
+    bool isMissingModelPath(String? path) =>
+        path == null || path.trim().isEmpty;
+    final missingModelPaths = <String>[];
+    if (runFaces) {
+      if (isMissingModelPath(faceDetectionModelPath)) {
+        missingModelPaths.add("faceDetectionModelPath");
+      }
+      if (isMissingModelPath(faceEmbeddingModelPath)) {
+        missingModelPaths.add("faceEmbeddingModelPath");
       }
     }
+    if (runClip && isMissingModelPath(clipImageModelPath)) {
+      missingModelPaths.add("clipImageModelPath");
+    }
+    if (missingModelPaths.isNotEmpty) {
+      throw Exception(
+        "RustMLMissingModelPath: Missing required model paths: ${missingModelPaths.join(', ')}",
+      );
+    }
 
+    final modelPaths = rust_ml.RustModelPaths(
+      faceDetection: faceDetectionModelPath ?? "",
+      faceEmbedding: faceEmbeddingModelPath ?? "",
+      clipImage: clipImageModelPath ?? "",
+    );
     final providerPolicy = rust_ml.RustExecutionProviderPolicy(
       preferCoreml: preferCoreml,
       preferNnapi: preferNnapi,
@@ -626,11 +641,7 @@ Future<MLResult> analyzeImageRust(Map args) async {
     );
     await rust_ml.initMlRuntime(
       config: rust_ml.RustMlRuntimeConfig(
-        modelPaths: rust_ml.RustModelPaths(
-          faceDetection: faceDetectionModelPath ?? "",
-          faceEmbedding: faceEmbeddingModelPath ?? "",
-          clipImage: clipImageModelPath ?? "",
-        ),
+        modelPaths: modelPaths,
         providerPolicy: providerPolicy,
       ),
     );
@@ -641,11 +652,7 @@ Future<MLResult> analyzeImageRust(Map args) async {
         imagePath: imagePath,
         runFaces: runFaces,
         runClip: runClip,
-        modelPaths: rust_ml.RustModelPaths(
-          faceDetection: faceDetectionModelPath ?? "",
-          faceEmbedding: faceEmbeddingModelPath ?? "",
-          clipImage: clipImageModelPath ?? "",
-        ),
+        modelPaths: modelPaths,
         providerPolicy: providerPolicy,
       ),
     );

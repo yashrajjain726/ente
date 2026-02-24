@@ -1,7 +1,7 @@
 use crate::ml::{
     clip::image::run_clip_image,
     decode::decode_image_from_path,
-    error::MlResult,
+    error::{MlError, MlResult},
     face::{align::run_face_alignment, detect::run_face_detection, embed::run_face_embedding},
     runtime::{self, ExecutionProviderPolicy, MlRuntimeConfig, ModelPaths},
 };
@@ -102,6 +102,8 @@ pub fn analyze_image_rust(req: AnalyzeImageRequest) -> Result<AnalyzeImageResult
 }
 
 fn analyze_image_rust_inner(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
+    validate_request_model_paths(&req)?;
+
     let runtime_config = MlRuntimeConfig {
         model_paths: to_model_paths(&req.model_paths),
         provider_policy: to_provider_policy(&req.provider_policy),
@@ -144,6 +146,29 @@ fn analyze_image_rust_inner(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageRe
             clip,
         })
     })
+}
+
+fn validate_request_model_paths(req: &AnalyzeImageRequest) -> MlResult<()> {
+    let mut missing = Vec::new();
+    if req.run_faces {
+        if req.model_paths.face_detection.trim().is_empty() {
+            missing.push("faceDetectionModelPath");
+        }
+        if req.model_paths.face_embedding.trim().is_empty() {
+            missing.push("faceEmbeddingModelPath");
+        }
+    }
+    if req.run_clip && req.model_paths.clip_image.trim().is_empty() {
+        missing.push("clipImageModelPath");
+    }
+    if missing.is_empty() {
+        return Ok(());
+    }
+
+    Err(MlError::InvalidRequest(format!(
+        "missing required model paths: {}",
+        missing.join(", ")
+    )))
 }
 
 fn to_runtime_config(config: &RustMlRuntimeConfig) -> MlRuntimeConfig {
