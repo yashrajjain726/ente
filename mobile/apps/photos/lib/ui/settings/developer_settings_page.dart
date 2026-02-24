@@ -12,7 +12,7 @@ import "package:photos/ui/notification/toast.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/local_settings.dart";
 
-Future<AppMode?> _maybeApplyDeveloperAppModeInput(
+Future<AppMode?> _maybeChangeAppMode(
   String input, {
   required LocalSettings settings,
 }) async {
@@ -74,7 +74,7 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
               onTap: () async {
                 final url = _urlController.text.trim();
                 _logger.info("Entered endpoint: $url");
-                final appMode = await _maybeApplyDeveloperAppModeInput(
+                final appMode = await _maybeChangeAppMode(
                   url,
                   settings: localSettings,
                 );
