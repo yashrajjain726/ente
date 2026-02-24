@@ -9,24 +9,6 @@ import "package:photos/service_locator.dart";
 import "package:photos/ui/common/gradient_button.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/utils/dialog_util.dart";
-import "package:photos/utils/local_settings.dart";
-
-Future<bool?> _maybeChangeAppMode(
-  String input, {
-  required LocalSettings settings,
-}) async {
-  if (input == "offline") {
-    await settings.setShowOfflineModeOption(true);
-    return true;
-  }
-
-  if (input == "online") {
-    await settings.setShowOfflineModeOption(false);
-    return false;
-  }
-
-  return null;
-}
 
 class DeveloperSettingsPage extends StatefulWidget {
   const DeveloperSettingsPage({super.key});
@@ -71,18 +53,11 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
               onTap: () async {
                 final url = _urlController.text.trim();
                 _logger.info("Entered endpoint: $url");
-                final appMode = await _maybeChangeAppMode(
-                  url,
-                  settings: localSettings,
-                );
-                if (appMode != null) {
+                final modeToggleMessage =
+                    await _maybeToggleOfflineModeOption(url);
+                if (modeToggleMessage != null) {
                   Bus.instance.fire(AppModeChangedEvent());
-                  showToast(
-                    context,
-                    appMode
-                        ? "Offline mode option enabled"
-                        : "Offline mode option disabled",
-                  );
+                  showToast(context, modeToggleMessage);
                   Navigator.of(context).pop();
                   return;
                 }
@@ -127,6 +102,19 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
       }
     } catch (e) {
       throw Exception('Error occurred: $e');
+    }
+  }
+
+  Future<String?> _maybeToggleOfflineModeOption(String input) async {
+    switch (input) {
+      case "offline":
+        await localSettings.setShowOfflineModeOption(true);
+        return "Offline mode option enabled";
+      case "online":
+        await localSettings.setShowOfflineModeOption(false);
+        return "Offline mode option disabled";
+      default:
+        return null;
     }
   }
 }
