@@ -639,12 +639,6 @@ Future<MLResult> analyzeImageRust(Map args) async {
       preferNnapi: preferNnapi,
       allowCpuFallback: allowCpuFallback,
     );
-    await rust_ml.initMlRuntime(
-      config: rust_ml.RustMlRuntimeConfig(
-        modelPaths: modelPaths,
-        providerPolicy: providerPolicy,
-      ),
-    );
 
     final rustResult = await rust_ml.analyzeImageRust(
       req: rust_ml.AnalyzeImageRequest(

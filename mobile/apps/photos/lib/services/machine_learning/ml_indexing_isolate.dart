@@ -36,6 +36,7 @@ class MLIndexingIsolate extends SuperIsolate {
 
   final _initModelLock = Lock();
   final _downloadModelLock = Lock();
+  final _rustRuntimeLock = Lock();
 
   bool areModelsDownloaded = false;
 
@@ -69,19 +70,8 @@ class MLIndexingIsolate extends SuperIsolate {
 
     try {
       final useRustMl = _shouldUseRustMl;
-      String? faceDetectionModelPath;
-      String? faceEmbeddingModelPath;
-      String? clipImageModelPath;
-      if (useRustMl) {
-        final faceDetection =
-            await FaceDetectionService.instance.getModelNameAndPath();
-        faceDetectionModelPath = faceDetection.$2;
-        final faceEmbedding =
-            await FaceEmbeddingService.instance.getModelNameAndPath();
-        faceEmbeddingModelPath = faceEmbedding.$2;
-        final clipImage = await ClipImageEncoder.instance.getModelNameAndPath();
-        clipImageModelPath = clipImage.$2;
-      }
+      final rustRuntimeArgs =
+          useRustMl ? await _buildRustRuntimeArgs() : const <String, dynamic>{};
       _logger.info(
         "Analyzing image ${instruction.fileKey} via rust or legacy: ${useRustMl ? "RUST" : "LEGACY"}",
       );
@@ -93,12 +83,7 @@ class MLIndexingIsolate extends SuperIsolate {
         "useRustMl": useRustMl,
         "runFaces": instruction.shouldRunFaces,
         "runClip": instruction.shouldRunClip,
-        "faceDetectionModelPath": faceDetectionModelPath,
-        "faceEmbeddingModelPath": faceEmbeddingModelPath,
-        "clipImageModelPath": clipImageModelPath,
-        "preferCoreml": Platform.isIOS,
-        "preferNnapi": Platform.isAndroid,
-        "allowCpuFallback": true,
+        ...rustRuntimeArgs,
         "faceDetectionAddress": FaceDetectionService.instance.sessionAddress,
         "faceEmbeddingAddress": FaceEmbeddingService.instance.sessionAddress,
         "clipImageAddress": ClipImageEncoder.instance.sessionAddress,
@@ -126,6 +111,35 @@ class MLIndexingIsolate extends SuperIsolate {
   }
 
   bool get _shouldUseRustMl => flagService.useRustForML;
+
+  Future<void> prepareRustRuntime() async {
+    if (!_shouldUseRustMl) {
+      return;
+    }
+    return _rustRuntimeLock.synchronized(() async {
+      final rustRuntimeArgs = await _buildRustRuntimeArgs();
+      await runInIsolate(
+        IsolateOperation.prepareRustMlRuntime,
+        rustRuntimeArgs,
+      );
+    });
+  }
+
+  Future<void> releaseRustRuntime() async {
+    if (!isIsolateSpawned) {
+      return;
+    }
+    return _rustRuntimeLock.synchronized(() async {
+      if (!isIsolateSpawned) {
+        return;
+      }
+      try {
+        await runInIsolate(IsolateOperation.releaseRustMlRuntime, {});
+      } catch (e, s) {
+        _logger.warning("Could not release rust runtime in isolate", e, s);
+      }
+    });
+  }
 
   void triggerModelsDownload() {
     if (!areModelsDownloaded && !_downloadModelLock.locked) {
@@ -257,6 +271,7 @@ class MLIndexingIsolate extends SuperIsolate {
   }
 
   Future<void> cleanupLocalIndexingModels({bool delete = false}) async {
+    await releaseRustRuntime();
     if (!areModelsDownloaded) return;
     await _releaseModels();
 
@@ -307,5 +322,21 @@ class MLIndexingIsolate extends SuperIsolate {
       _logger.severe("Could not release models in MLIndexingIsolate", e, s);
       rethrow;
     }
+  }
+
+  Future<Map<String, dynamic>> _buildRustRuntimeArgs() async {
+    final faceDetection =
+        await FaceDetectionService.instance.getModelNameAndPath();
+    final faceEmbedding =
+        await FaceEmbeddingService.instance.getModelNameAndPath();
+    final clipImage = await ClipImageEncoder.instance.getModelNameAndPath();
+    return {
+      "faceDetectionModelPath": faceDetection.$2,
+      "faceEmbeddingModelPath": faceEmbedding.$2,
+      "clipImageModelPath": clipImage.$2,
+      "preferCoreml": Platform.isIOS,
+      "preferNnapi": Platform.isAndroid,
+      "allowCpuFallback": true,
+    };
   }
 }
