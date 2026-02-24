@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
-use ort::session::Session;
+use ort::Session;
 
 use crate::ml::{
     error::{MlError, MlResult},
@@ -66,20 +66,30 @@ fn create_runtime(config: &MlRuntimeConfig) -> MlResult<MlRuntime> {
     })
 }
 
-fn lock_runtime() -> MlResult<std::sync::MutexGuard<'static, Option<RuntimeState>>> {
-    GLOBAL_RUNTIME
-        .lock()
-        .map_err(|e| MlError::Runtime(format!("runtime mutex poisoned: {e}")))
+fn lock_runtime() -> std::sync::MutexGuard<'static, Option<RuntimeState>> {
+    match GLOBAL_RUNTIME.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            // Recover from a previous panic by clearing runtime state.
+            let mut guard = poisoned.into_inner();
+            *guard = None;
+            guard
+        }
+    }
 }
 
 pub fn ensure_runtime(config: &MlRuntimeConfig) -> MlResult<()> {
-    let mut guard = lock_runtime()?;
-    let should_rebuild = match guard.as_ref() {
-        Some(existing) => existing.config != *config,
-        None => true,
+    let should_rebuild = {
+        let guard = lock_runtime();
+        match guard.as_ref() {
+            Some(existing) => existing.config != *config,
+            None => true,
+        }
     };
+
     if should_rebuild {
         let runtime = create_runtime(config)?;
+        let mut guard = lock_runtime();
         *guard = Some(RuntimeState {
             config: config.clone(),
             runtime,
@@ -93,7 +103,7 @@ where
     F: FnOnce(&mut MlRuntime) -> MlResult<R>,
 {
     ensure_runtime(config)?;
-    let mut guard = lock_runtime()?;
+    let mut guard = lock_runtime();
     let state = guard
         .as_mut()
         .ok_or_else(|| MlError::Runtime("runtime is not initialized".to_string()))?;
@@ -101,7 +111,7 @@ where
 }
 
 pub fn release_runtime() -> MlResult<()> {
-    let mut guard = lock_runtime()?;
+    let mut guard = lock_runtime();
     *guard = None;
     Ok(())
 }
