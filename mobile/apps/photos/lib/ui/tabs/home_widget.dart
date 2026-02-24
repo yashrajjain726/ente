@@ -61,6 +61,7 @@ import "package:photos/ui/extents_page_view.dart";
 import "package:photos/ui/home/christmas/christmas_pull_animation.dart";
 import "package:photos/ui/home/christmas/christmas_utils.dart";
 import "package:photos/ui/home/christmas/snow_fall_overlay.dart";
+import "package:photos/ui/home/gallery_download_banner.dart";
 import "package:photos/ui/home/grant_permissions_widget.dart";
 import "package:photos/ui/home/header_widget.dart";
 import "package:photos/ui/home/home_bottom_nav_bar.dart";
@@ -826,12 +827,18 @@ class _HomeWidgetState extends State<HomeWidget> {
                     final isOnLandingPage =
                         !Configuration.instance.hasConfiguredAccount() &&
                             !isOfflineMode;
+                    final isOnOnlineGrantPermissionScreen =
+                        Configuration.instance.hasConfiguredAccount() &&
+                            !isOfflineMode &&
+                            _shouldShowPermissionWidget();
                     return AppBar(
                       backgroundColor: isOnLandingPage
                           ? colorScheme.greenBase
                           : isSearchResults
                               ? resultsBackground
-                              : colorScheme.backgroundBase,
+                              : isOnOnlineGrantPermissionScreen
+                                  ? colorScheme.backgroundColour
+                                  : colorScheme.backgroundBase,
                     );
                   },
                 );
@@ -848,14 +855,21 @@ class _HomeWidgetState extends State<HomeWidget> {
     final bool offlineMode = isOfflineMode;
     if (!Configuration.instance.hasConfiguredAccount()) {
       _closeDrawerIfOpen(context);
-      final isOfflineEntryFlowEnabled =
-          widget.startWithoutAccount && localSettings.showOfflineModeOption;
+      final shouldBootstrapOfflineEntryFlow =
+          widget.startWithoutAccount && !offlineMode;
       final hasPersistedOfflineMode = localSettings.isAppModeSet && offlineMode;
-      if (isOfflineEntryFlowEnabled || hasPersistedOfflineMode) {
-        if (_shouldShowPermissionWidget()) {
-          return const GrantPermissionsWidget(startWithoutAccount: true);
-        }
-      } else {
+      final canResumePersistedOfflineMode =
+          hasPersistedOfflineMode && permissionService.hasGrantedPermissions();
+      final shouldUseOfflineEntryFlow =
+          widget.startWithoutAccount || canResumePersistedOfflineMode;
+
+      if (shouldBootstrapOfflineEntryFlow) {
+        return const GrantPermissionsWidget(startWithoutAccount: true);
+      }
+      if (shouldUseOfflineEntryFlow && _shouldShowPermissionWidget()) {
+        return const GrantPermissionsWidget(startWithoutAccount: true);
+      }
+      if (!shouldUseOfflineEntryFlow) {
         return const LandingPageWidget();
       }
     }
@@ -971,10 +985,16 @@ class _HomeWidgetState extends State<HomeWidget> {
           child: ValueListenableBuilder(
             valueListenable: isOnSearchTabNotifier,
             builder: (context, value, child) {
-              return HomeBottomNavigationBar(
-                _selectedFiles,
-                _selectedAlbums,
-                selectedTabIndex: _selectedTabIndex,
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (flagService.internalUser) const GalleryDownloadBanner(),
+                  HomeBottomNavigationBar(
+                    _selectedFiles,
+                    _selectedAlbums,
+                    selectedTabIndex: _selectedTabIndex,
+                  ),
+                ],
               );
             },
           ),

@@ -384,13 +384,23 @@ private struct OnlineStorePreparation {
 @MainActor
 final class ChatViewModel: ObservableObject {
     private static let defaultTemperature: Float = 0.5
-    private static let systemPrompt = "You are a helpful assistant. Use Markdown **bold** to emphasize important terms and key points. For math equations, put $$ on its own line (never inline). Example:\n$$\nx^2 + y^2 = z^2\n$$"
+    private static let systemPromptBody = "Use Markdown **bold** to emphasize important terms and key points. For math equations, put $$ on its own line (never inline). Example:\n$$\nx^2 + y^2 = z^2\n$$"
+    private static let systemPromptDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss z"
+        return formatter
+    }()
     private static let overflowSafetyTokens = 128
     private static let imageTokenEstimate = 768
     private nonisolated static let sessionTitleMaxLength = 40
     private static let sessionSummaryMaxWords = 7
     private static let sessionSummaryStoreKey = "ensu.session_summaries"
     private static let sessionSummarySystemPrompt = "You create concise chat titles. Given the provided message, summarize the user's goal in 5-7 words. Use plain words. Don't use markdown characters in the title. No quotes, no emojis, no trailing punctuation, and output only the title."
+
+    private static func systemPrompt() -> String {
+        let dateAndTime = systemPromptDateFormatter.string(from: Date())
+        return "Your name is ensu and you're a friendly ai assistant created by ente.io. ente.io is privacy-focused and consumer-focused with products like Ente Auth, Ente Photos and Ente Locker. Current Date and time is: \(dateAndTime). \(systemPromptBody)"
+    }
 
     private let logger = EnsuLogging.shared.logger("ChatViewModel")
 
@@ -1389,7 +1399,7 @@ final class ChatViewModel: ObservableObject {
             }
 
             let history = historySelection.messages
-            let systemMessage = InferenceMessage(text: Self.systemPrompt, role: .system, hasAttachments: false)
+            let systemMessage = InferenceMessage(text: Self.systemPrompt(), role: .system, hasAttachments: false)
             let messages = [systemMessage] + history + [InferenceMessage(text: prompt.text, role: .user, hasAttachments: !userNode.attachments.isEmpty)]
 
             let bufferLock = NSLock()
@@ -1491,32 +1501,53 @@ final class ChatViewModel: ObservableObject {
                 return Double(tokenCount) / (Double(totalTimeMs) / 1000.0)
             }()
 
-            let meta: [AttachmentMeta] = []
-            if let inserted = try? chatDb.insertMessage(
-                sessionUuid: parent.sessionId.uuidString,
-                sender: .other,
-                text: trimmed,
-                parentMessageUuid: parent.id.uuidString,
-                attachments: meta
-            ), let assistantId = UUID(uuidString: inserted.uuid) {
-                logger.info("Message created", details: "id=\(assistantId.uuidString) session=\(parent.sessionId.uuidString) role=assistant")
-                let timestamp = Date(timeIntervalSince1970: Double(inserted.createdAtUs) / 1_000_000.0)
-                let assistant = MessageNode(
-                    id: assistantId,
-                    sessionId: parent.sessionId,
-                    parentId: parent.id,
-                    role: .assistant,
-                    text: trimmed,
-                    timestamp: timestamp,
-                    attachments: [],
-                    isInterrupted: interrupted,
-                    tokensPerSecond: tokensPerSecond
-                )
+            if isActiveGeneration {
+                let meta: [AttachmentMeta] = []
+                do {
+                    let inserted = try chatDb.insertMessage(
+                        sessionUuid: parent.sessionId.uuidString,
+                        sender: .other,
+                        text: trimmed,
+                        parentMessageUuid: parent.id.uuidString,
+                        attachments: meta
+                    )
 
-                messageStore[parent.sessionId, default: []].append(assistant)
-                invalidateChildrenCache(for: parent.sessionId)
-                updateSelection(for: parent.sessionId, parentId: parent.id, childId: assistant.id)
-                updateSessionPreview(sessionId: parent.sessionId, preview: trimmed, date: assistant.timestamp)
+                    if let assistantId = UUID(uuidString: inserted.uuid) {
+                        logger.info("Message created", details: "id=\(assistantId.uuidString) session=\(parent.sessionId.uuidString) role=assistant")
+                        let timestamp = Date(timeIntervalSince1970: Double(inserted.createdAtUs) / 1_000_000.0)
+                        let assistant = MessageNode(
+                            id: assistantId,
+                            sessionId: parent.sessionId,
+                            parentId: parent.id,
+                            role: .assistant,
+                            text: trimmed,
+                            timestamp: timestamp,
+                            attachments: [],
+                            isInterrupted: interrupted,
+                            tokensPerSecond: tokensPerSecond
+                        )
+
+                        messageStore[parent.sessionId, default: []].append(assistant)
+                        invalidateChildrenCache(for: parent.sessionId)
+                        updateSelection(for: parent.sessionId, parentId: parent.id, childId: assistant.id)
+                        updateSessionPreview(sessionId: parent.sessionId, preview: trimmed, date: assistant.timestamp)
+                    } else {
+                        logger.warning(
+                            "Skipping assistant message persistence",
+                            details: "session=\(parent.sessionId.uuidString) parent=\(parent.id.uuidString) interrupted=\(interrupted) reason=invalid_uuid"
+                        )
+                    }
+                } catch {
+                    logger.warning(
+                        "Skipping assistant message persistence",
+                        details: "session=\(parent.sessionId.uuidString) parent=\(parent.id.uuidString) interrupted=\(interrupted) error=\(error)"
+                    )
+                }
+            } else {
+                logger.info(
+                    "Dropped stale generation response",
+                    details: "session=\(parent.sessionId.uuidString) parent=\(parent.id.uuidString) interrupted=\(interrupted)"
+                )
             }
         }
 
@@ -2321,7 +2352,7 @@ final class ChatViewModel: ObservableObject {
         let contextSize: Int = target.contextLength ?? 4096
         let maxTokens: Int = target.maxTokens ?? 1024
         let inputBudget = max(0, contextSize - maxTokens - Self.overflowSafetyTokens)
-        let systemTokens = estimateTokens(Self.systemPrompt)
+        let systemTokens = estimateTokens(Self.systemPrompt())
         let promptTokens = estimatePromptTokens(promptText: promptText, imageCount: promptImageCount)
         let historyTokens = historyMessages.reduce(0) { total, node in
             total + estimateTokens(historyText(node))

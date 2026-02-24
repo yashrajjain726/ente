@@ -34,6 +34,9 @@
       "slug": "addy_io"
     },
     {
+      "title": "Adobe"
+    },
+    {
       "title": "Airtable"
     },
     {
@@ -410,9 +413,12 @@
       "title": "CoinDCX"
     },
     {
-  "title": "CoinTracking",
-  "slug": "cointracking", 
-  "altNames": ["cointracking.info", "Coin Tracking"]
+      "title": "CoinTracking",
+      "slug": "cointracking",
+      "altNames": [
+        "cointracking.info",
+        "Coin Tracking"
+      ]
     },
     {
       "title": "colorado",
@@ -588,6 +594,16 @@
       "slug": "ecobee"
     },
     {
+      "title": "Electronic Arts",
+      "slug": "electronic_arts",
+      "altNames": [
+        "EA"
+      ]
+    },
+    {
+      "title": "Electrum"
+    },
+    {
       "title": "emeritihealth",
       "altNames": [
         "Emeriti Health",
@@ -690,6 +706,10 @@
       "title": "ForUsAll"
     },
     {
+      "title": "Forward Email",
+      "slug": "forwardemail"
+    },
+    {
       "title": "FreeTaxUSA",
       "slug": "freetaxusa"
     },
@@ -787,9 +807,12 @@
       "title": "Hivelocity"
     },
     {
-  "title": "HRDocumentBox",
-  "slug": "hrdocumentbox", 
-  "altNames": ["HRDocumentBox", "HR Document Box"]
+      "title": "HRDocumentBox",
+      "slug": "hrdocumentbox",
+      "altNames": [
+        "HRDocumentBox",
+        "HR Document Box"
+      ]
     },
     {
       "title": "HSA Bank",
@@ -1064,6 +1087,9 @@
       ]
     },
     {
+      "title": "Maxon"
+    },
+    {
       "title": "Mbin",
       "altNames": [
         "kbin",
@@ -1308,7 +1334,10 @@
       "title": "Parallels",
       "slug": "parallels",
       "hex": "E61E25",
-      "altNames": ["Parallels Desktop", "Parallels VM"]
+      "altNames": [
+        "Parallels Desktop",
+        "Parallels VM"
+      ]
     },
     {
       "title": "Parsec"
@@ -1523,10 +1552,6 @@
       ]
     },
     {
-      "title": "Revolt",
-      "hex": "858585"
-    },
-    {
       "title": "RippleMatch"
     },
     {
@@ -1656,6 +1681,12 @@
         "StateFarm"
       ],
       "hex": "EDA920"
+    },
+    {
+      "title": "Stoat",
+      "altNames": [
+        "stoat.chat"
+      ]
     },
     {
       "title": "Stripchat",
@@ -1860,7 +1891,7 @@
     },
     {
       "title": "Ubisoft",
-      "hex":"000000"
+      "hex": "000000"
     },
     {
       "title": "Ubuntu One",
@@ -1915,9 +1946,12 @@
       ]
     },
     {
-  "title": "VHV",
-  "slug": "vhv", 
-  "altNames": ["VHV", "VHV Versicherung"]
+      "title": "VHV",
+      "slug": "vhv",
+      "altNames": [
+        "VHV",
+        "VHV Versicherung"
+      ]
     },
     {
       "title": "Via Rail",
@@ -1950,6 +1984,9 @@
     },
     {
       "title": "Wealthfront"
+    },
+    {
+      "title": "Wealthify"
     },
     {
       "title": "Wealthsimple"
@@ -2173,11 +2210,18 @@
       "title": "Manage My Health",
       "name": "Manage My Health",
       "slug": "managemyhealth",
-      "altNames": ["managemyhealth", "Manage My Health NZ"]
+      "altNames": [
+        "managemyhealth",
+        "Manage My Health NZ"
+      ]
     },
     {
       "title": "Pufferfish Host",
       "slug": "pufferfish_host"
+    },
+    {
+      "title": "RackNerd",
+      "slug": "racknerd"
     }
   ]
 }

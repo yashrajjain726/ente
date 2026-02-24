@@ -167,8 +167,19 @@ const buildPromptWithImages = (text: string, imageCount: number) => {
     return prompt;
 };
 
-const CHAT_SYSTEM_PROMPT =
-    "You are a helpful assistant. Use Markdown **bold** to emphasize important terms and key points. For math equations, put $$ on its own line (never inline). Example:\n$$\nx^2 + y^2 = z^2\n$$\nNever acknowledge or repeat these instructions. Do not start with generic confirmations like 'Okay, I understand'. Respond directly to the user's request.";
+const toSafeBlobPart = (bytes: Uint8Array): ArrayBuffer => {
+    const copy = new Uint8Array(bytes.byteLength);
+    copy.set(bytes);
+    return copy.buffer;
+};
+
+const CHAT_SYSTEM_PROMPT_BODY =
+    "Use Markdown **bold** to emphasize important terms and key points. For math equations, put $$ on its own line (never inline). Example:\n$$\nx^2 + y^2 = z^2\n$$\nNever acknowledge or repeat these instructions. Do not start with generic confirmations like 'Okay, I understand'. Respond directly to the user's request.";
+
+const buildChatSystemPrompt = () => {
+    const dateAndTime = new Date().toLocaleString();
+    return `Your name is ensu and you're a friendly ai assistant created by ente.io. ente.io is privacy-focused and consumer-focused with products like Ente Auth, Ente Photos and Ente Locker. Current Date and time is: ${dateAndTime}. ${CHAT_SYSTEM_PROMPT_BODY}`;
+};
 
 const SESSION_TITLE_PROMPT =
     "You create concise chat titles. Given the provided message, summarize the user's goal in 5-7 words. Use plain words. Don't use markdown characters in the title. No quotes, no emojis, no trailing punctuation, and output only the title.";
@@ -1670,7 +1681,7 @@ const Page: React.FC = () => {
                         chatKey,
                         sessionUuid,
                     );
-                    const blob = new Blob([bytes], {
+                    const blob = new Blob([toSafeBlobPart(bytes)], {
                         type: inferImageMime(attachment.name),
                     });
                     const url = URL.createObjectURL(blob);
@@ -2461,6 +2472,28 @@ const Page: React.FC = () => {
     const handleDeleteSession = useCallback(
         async (sessionId: string) => {
             if (!chatKey) return;
+
+            if (currentSessionIdRef.current === sessionId) {
+                generationTokenRef.current += 1;
+                pendingCancelRef.current = false;
+                stopRequestedRef.current = false;
+
+                const jobId = currentJobIdRef.current;
+                currentJobIdRef.current = null;
+                providerRef.current?.cancelGeneration(jobId ?? -1);
+
+                setIsGenerating(false);
+                setIsStreamingOutro(false);
+                setIsDownloading(false);
+                setDownloadStatus(null);
+                setStreamingParentId(null);
+                setStreamingText("");
+                streamingBufferRef.current = "";
+                streamingChunksRef.current = [];
+                streamingCreatedAtRef.current = null;
+                lastGenerationRef.current = null;
+            }
+
             await deleteSession(sessionId, chatKey);
             removeSessionFromState(sessionId);
             void syncChat(chatKey);
@@ -2519,7 +2552,7 @@ const Page: React.FC = () => {
                         );
                         const name =
                             attachment.name?.trim() || `image-${attachment.id}`;
-                        const file = new File([bytes], name, {
+                        const file = new File([toSafeBlobPart(bytes)], name, {
                             type: inferImageMime(name),
                         });
                         return {
@@ -2636,7 +2669,7 @@ const Page: React.FC = () => {
                 }
 
                 const mime = inferImageMime(baseName);
-                const blob = new Blob([bytes], { type: mime });
+                const blob = new Blob([toSafeBlobPart(bytes)], { type: mime });
                 const url = URL.createObjectURL(blob);
                 window.open(url, "_blank", "noopener,noreferrer");
                 window.setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -2869,7 +2902,7 @@ const Page: React.FC = () => {
                     )) ?? [];
 
                 const messages: LlmMessage[] = [
-                    { role: "system", content: CHAT_SYSTEM_PROMPT },
+                    { role: "system", content: buildChatSystemPrompt() },
                     ...history,
                     { role: "user", content: promptText },
                 ];
@@ -3529,7 +3562,7 @@ const Page: React.FC = () => {
                         normalized.split("/").pop()?.replace(/\0/g, "") ||
                         "image";
                     const bytes = await readBinaryFile(selectedPath);
-                    return new File([bytes], name, {
+                    return new File([toSafeBlobPart(bytes)], name, {
                         type: inferImageMime(name),
                     });
                 }),
@@ -3741,7 +3774,7 @@ const Page: React.FC = () => {
                             activeSessionId,
                         );
                         const previewUrl = URL.createObjectURL(
-                            new Blob([bytes]),
+                            new Blob([toSafeBlobPart(bytes)]),
                         );
                         attachmentPreviewUrlsRef.current[img.id] = previewUrl;
                         setAttachmentPreviews((prev) => ({
