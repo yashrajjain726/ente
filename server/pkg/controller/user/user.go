@@ -268,8 +268,7 @@ func (c *UserController) HandleAccountDeletion(ctx *gin.Context, userID int64, l
 	// See also: Do not block on mailing list errors
 	go func() {
 		if err := c.MailingListsController.Unsubscribe(email); err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"req_id":  ctx.GetString("req_id"),
+			logger.WithError(err).WithFields(logrus.Fields{
 				"user_id": userID,
 				"email":   email,
 			}).Error("mailing list unsubscribe failed")
