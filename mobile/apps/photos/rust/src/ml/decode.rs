@@ -123,8 +123,9 @@ fn heif_primary_transforms_include_orientation(image_data: &[u8]) -> bool {
     primary_transforms.transforms.iter().any(|transform| {
         matches!(
             transform,
-            PrimaryItemTransformProperty::Rotation(_) | PrimaryItemTransformProperty::Mirror(_)
-        )
+            PrimaryItemTransformProperty::Rotation(rotation)
+                if rotation.rotation_ccw_degrees % 360 != 0
+        ) || matches!(transform, PrimaryItemTransformProperty::Mirror(_))
     })
 }
 
