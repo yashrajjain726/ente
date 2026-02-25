@@ -254,6 +254,8 @@ export const GalleryBarAndListHeader: React.FC<
         collectionNameByID,
         onSelectCollection,
         onSelectPerson,
+        canSetAlbumCover,
+        onSetAlbumCover,
         // TODO: Cluster
         // This causes a loop since it is an array dep
         // people,

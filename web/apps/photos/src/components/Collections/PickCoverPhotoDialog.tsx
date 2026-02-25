@@ -96,9 +96,9 @@ export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
         (index: number) => {
             const file = annotatedFiles[index]?.file;
             if (!file) return;
-            setSelected(createSingleSelection(file, collection.id));
+            setSelected(createSingleSelection(file, collection.id, user.id));
         },
-        [annotatedFiles, collection.id],
+        [annotatedFiles, collection.id, user.id],
     );
 
     const handleUseSelectedPhoto = useCallback(async () => {
@@ -318,11 +318,12 @@ const createEmptySelection = (collectionID: number): SelectedState => ({
 const createSingleSelection = (
     file: EnteFile,
     collectionID: number,
+    userID: number,
 ): SelectedState =>
     ({
         [file.id]: true,
-        ownCount: 0,
-        count: 0,
+        ownCount: file.ownerID === userID ? 1 : 0,
+        count: 1,
         collectionID,
         context: { mode: "albums", collectionID },
     }) as SelectedState;
