@@ -1564,10 +1564,16 @@ const EnablePublicShareOptions: React.FC<EnablePublicShareOptionsProps> = ({
                 const normalizedLayout = normalizedLayoutValue(
                     collection.pubMagicMetadata?.data.layout,
                 );
-                if (collection.pubMagicMetadata?.data.layout !== normalizedLayout) {
+                if (
+                    collection.pubMagicMetadata?.data.layout !==
+                    normalizedLayout
+                ) {
                     await updateCollectionLayout(collection, normalizedLayout);
                 }
-                const publicURL = await createPublicURL(collection.id, attributes);
+                const publicURL = await createPublicURL(
+                    collection.id,
+                    attributes,
+                );
                 setPending("");
                 setPublicURL(publicURL);
                 onLinkCreated();
@@ -2396,8 +2402,8 @@ const ManageLayout: React.FC<ManageLayoutProps> = ({
 
 const layoutOptions = () => [
     { label: layoutLabel("masonry"), value: "masonry" },
-    { label: t("grouped"), value: "grouped" },
     { label: t("trip"), value: "trip" },
+    { label: t("grouped"), value: "grouped" },
 ];
 
 const normalizedLayoutValue = (layout: string | undefined) => {

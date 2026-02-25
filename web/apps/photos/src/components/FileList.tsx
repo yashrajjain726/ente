@@ -1082,8 +1082,9 @@ export const FileList: React.FC<FileListProps> = ({
         }
 
         const columnHeights = Array.from({ length: masonryColumns }, () => 0);
-        const columns = Array.from({ length: masonryColumns }, () =>
-            new Array<MasonryLayoutItem>(),
+        const columns = Array.from(
+            { length: masonryColumns },
+            () => new Array<MasonryLayoutItem>(),
         );
         const items: MasonryLayoutItem[] = [];
 
@@ -1136,30 +1137,27 @@ export const FileList: React.FC<FileListProps> = ({
     );
     const masonryViewportBottom = masonryViewportTop + height;
     const masonryOverscan = Math.max(height, 800);
-    const masonryVisibleItems = useMemo(
-        () => {
-            const minTop = masonryViewportTop - masonryOverscan;
-            const maxTop = masonryViewportBottom + masonryOverscan;
-            const visible = new Array<MasonryLayoutItem>();
+    const masonryVisibleItems = useMemo(() => {
+        const minTop = masonryViewportTop - masonryOverscan;
+        const maxTop = masonryViewportBottom + masonryOverscan;
+        const visible = new Array<MasonryLayoutItem>();
 
-            for (const column of masonryLayout.columns) {
-                const startIndex = firstVisibleIndexForColumn(column, minTop);
-                for (let i = startIndex; i < column.length; i += 1) {
-                    const item = column[i]!;
-                    if (item.top > maxTop) break;
-                    visible.push(item);
-                }
+        for (const column of masonryLayout.columns) {
+            const startIndex = firstVisibleIndexForColumn(column, minTop);
+            for (let i = startIndex; i < column.length; i += 1) {
+                const item = column[i]!;
+                if (item.top > maxTop) break;
+                visible.push(item);
             }
+        }
 
-            return visible;
-        },
-        [
-            masonryLayout.columns,
-            masonryOverscan,
-            masonryViewportBottom,
-            masonryViewportTop,
-        ],
-    );
+        return visible;
+    }, [
+        masonryLayout.columns,
+        masonryOverscan,
+        masonryViewportBottom,
+        masonryViewportTop,
+    ]);
 
     const handleMasonryScroll: React.UIEventHandler<HTMLDivElement> =
         useCallback(
