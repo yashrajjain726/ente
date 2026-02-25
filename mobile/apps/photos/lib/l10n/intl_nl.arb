@@ -1530,7 +1530,6 @@
   "legacyPageDesc2": "Vertrouwde contacten kunnen accountherstel starten, en indien deze niet binnen 30 dagen wordt geblokkeerd, je wachtwoord resetten en toegang krijgen tot je account.",
   "legacyAccounts": "Legacy accounts",
   "trustedContacts": "Vertrouwde contacten",
-  "addTrustedContact": "Vertrouwd contact toevoegen",
   "removeInvite": "Verwijder uitnodiging",
   "recoveryWarning": "Een vertrouwd contact probeert toegang te krijgen tot je account",
   "rejectRecovery": "Herstel weigeren",
@@ -1801,7 +1800,7 @@
   "font": "Lettertype",
   "background": "Achtergrond",
   "align": "Uitlijnen",
-  "addedToAlbums": "{count, plural, =1{Succesvol toegevoegd aan 1 album} other{Succesvol toegevoegd aan {count} albums}}",
+  "addedToAlbums": "{count, plural, one {}=1{Succesvol toegevoegd aan 1 album} other{Succesvol toegevoegd aan {count} albums}}",
   "@addedToAlbums": {
     "description": "Message shown when items are added to albums",
     "placeholders": {

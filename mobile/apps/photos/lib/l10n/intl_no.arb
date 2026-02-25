@@ -1511,7 +1511,6 @@
   "legacyPageDesc2": "Betrodde kontakter kan starte gjenoppretting av kontoen, og hvis de ikke blir blokkert innen 30 dager, tilbakestille passordet ditt og få tilgang til kontoen din.",
   "legacyAccounts": "Eldre kontoer",
   "trustedContacts": "Betrodde kontakter",
-  "addTrustedContact": "Legg til betrodd kontakt",
   "removeInvite": "Fjern invitasjon",
   "recoveryWarning": "En betrodd kontakt prøver å få tilgang til kontoen din",
   "rejectRecovery": "Avslå gjenoppretting",

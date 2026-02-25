@@ -1627,7 +1627,6 @@
   "legacyPageDesc2": "Güvenilir kişiler hesap kurtarma işlemini başlatabilir ve 30 gün içinde engellenmezse şifrenizi sıfırlayabilir ve hesabınıza erişebilir.",
   "legacyAccounts": "Geleneksel hesaplar",
   "trustedContacts": "Güvenilir kişiler",
-  "addTrustedContact": "Güvenilir kişi ekle",
   "removeInvite": "Davetiyeyi kaldır",
   "recoveryWarning": "Güvenilir bir kişi hesabınıza erişmeye çalışıyor",
   "rejectRecovery": "Kurtarmayı reddet",
