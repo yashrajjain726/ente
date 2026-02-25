@@ -405,7 +405,12 @@ const Page: React.FC = () => {
      * the below function is used to conditionallay render the setCover option in the dropdown
      */
     const isOwnedAlbumEligibleForCover = useMemo(() => {
-        if (!activeCollection || !activeCollectionSummary || !user)
+        if (
+            isInSearchMode ||
+            !activeCollection ||
+            !activeCollectionSummary ||
+            !user
+        )
             return false;
 
         if (activeCollection.owner.id != user.id) return false;
@@ -420,18 +425,12 @@ const Page: React.FC = () => {
             activeCollectionSummary.attributes.has("album") ||
             activeCollectionSummary.attributes.has("folder")
         );
-    }, [activeCollection, activeCollectionSummary, user]);
+    }, [isInSearchMode, activeCollection, activeCollectionSummary, user]);
 
     const activeCollectionFiles = useMemo(() => {
         if (!activeCollection) return [];
 
-        const filesInCollection = isInSearchMode
-            ? state.collectionFiles.filter(
-                  ({ collectionID }) => collectionID === activeCollection.id,
-              )
-            : filteredFiles;
-
-        return filesInCollection.filter(({ id, magicMetadata }) => {
+        return filteredFiles.filter(({ id, magicMetadata }) => {
             const visibility = magicMetadata?.data.visibility;
             const isVisible =
                 visibility === undefined ||
@@ -446,8 +445,6 @@ const Page: React.FC = () => {
         });
     }, [
         activeCollection,
-        isInSearchMode,
-        state.collectionFiles,
         filteredFiles,
         hiddenFileIDs,
         tempDeletedFileIDs,
