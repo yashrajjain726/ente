@@ -1562,7 +1562,6 @@
   "legacyPageDesc2": "Zaufane kontakty mogą rozpocząć odzyskiwanie konta, a jeśli nie zostaną zablokowane w ciągu 30 dni, zresetować Twoje hasło i uzyskać dostęp do Twojego konta.",
   "legacyAccounts": "Odziedziczone konta",
   "trustedContacts": "Zaufane kontakty",
-  "addTrustedContact": "Dodaj Zaufany Kontakt",
   "removeInvite": "Usuń zaproszenie",
   "recoveryWarning": "Zaufany kontakt próbuje uzyskać dostęp do Twojego konta",
   "rejectRecovery": "Odrzuć odzyskiwanie",

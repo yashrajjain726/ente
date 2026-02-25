@@ -9,6 +9,7 @@
   "cancel": "Annuler",
   "verify": "Vérifier",
   "invalidEmailAddress": "Adresse e-mail invalide",
+  "validEmailAddress": "Adresse e-mail validée",
   "enterValidEmail": "Veuillez entrer une adresse email valide.",
   "deleteAccount": "Supprimer mon compte",
   "deleteAccountWarning": "Ceci supprimera votre compte Ente Auth, Ente Photos et Ente Locker.",
@@ -133,6 +134,8 @@
   "changeEmail": "Modifier l'e-mail",
   "enterYourPassword": "Entrez votre mot de passe",
   "welcomeBack": "Bienvenue !",
+  "readyToBackupTitle": "Prêt pour la sauvegarde",
+  "readyToBackupSubtitle": "Vos photos seront synchronisées en arrière-plan. La première sauvegarde peut prendre un certain temps.",
   "contactSupport": "Contacter l'assistance",
   "locationPickerTip": "Vous pouvez également ajouter un lieu centré à partir d'une photo depuis l'écran d'information de la photo",
   "@locationPickerTip": {
@@ -526,6 +529,8 @@
   "clearIndexes": "Effacer les index",
   "selectFoldersForBackup": "Dossiers à sauvegarder",
   "selectFolders": "Sélectionnez les dossiers",
+  "backupToEnte": "Sauvegarder sur Ente",
+  "selectAlbumsToBackUpToEnte": "Sélectionnez les albums à sauvegarder sur Ente",
   "selectedFoldersWillBeEncryptedAndBackedUp": "Les dossiers sélectionnés seront chiffrés et sauvegardés",
   "unselectAll": "Désélectionner tout",
   "selectAll": "Tout sélectionner",
@@ -790,6 +795,26 @@
   "youAreOnAFamilyPlan": "Vous êtes sur un plan familial !",
   "contactFamilyAdmin": "Veuillez contacter <green>{familyAdminEmail}</green> pour gérer votre abonnement",
   "leaveFamily": "Quitter le plan familial",
+  "youAreOnAFamilyPlanSubtitle": "Vous êtes avec un plan famille.",
+  "@youAreOnAFamilyPlanSubtitle": {
+    "description": "Subtitle shown on family member subscription screen",
+    "type": "text"
+  },
+  "familyAdminManagesPlanSuffix": " Gère ce plan. Les changements seront accompagnés",
+  "@familyAdminManagesPlanSuffix": {
+    "description": "Text shown after family admin email on family member subscription screen",
+    "type": "text"
+  },
+  "leaveFamilyPlan": "Quitter le plan famille",
+  "@leaveFamilyPlan": {
+    "description": "Button label for leaving family plan",
+    "type": "text"
+  },
+  "needHelpContact": "Besoin d'aide ? Contactez-nous",
+  "@needHelpContact": {
+    "description": "Prefix text before support email on family member subscription screen",
+    "type": "text"
+  },
   "areYouSureThatYouWantToLeaveTheFamily": "Êtes-vous certains de vouloir quitter le plan familial?",
   "leave": "Quitter",
   "rateTheApp": "Évaluer l'application",
@@ -1816,9 +1841,93 @@
   "legacyAccounts": "Comptes hérités",
   "trustedContacts": "Contacts de confiance",
   "addTrustedContact": "Ajouter un contact de confiance",
+  "chooseFromAnExistingContact": "Choisir parmi un contact existant",
+  "chooseARecoveryTime": "Choisir une période de récupération",
+  "addContact": "Ajouter un contact",
   "removeInvite": "Supprimer l’Invitation",
   "recoveryWarning": "Un contact de confiance tente d'accéder à votre compte",
   "rejectRecovery": "Rejeter la récupération",
+  "cannotUpdateRecoveryTime": "Impossible de mettre à jour la période de récupération",
+  "cannotUpdateRecoveryTimeMessage": "L'horaire de restauration ne peut pas être modifié tant qu'il y a une session de récupération active. Veuillez rejeter ou attendre que la récupération soit terminée.",
+  "updateTime": "Date de mise à jour",
+  "revokeInvite": "Révoquer l'invitation",
+  "trustedContactInvitePending": "Vous avez invité {email} à être un contact de confiance. Il doit encore accepter votre invitation.",
+  "@trustedContactInvitePending": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "trustedContactAccepted": "Vous avez invité {email} à être un contact de confiance. Il doit encore accepter votre invitation.",
+  "@trustedContactAccepted": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "cancelInvite": "Annuler l'invitation",
+  "cancelInviteDesc": "Si vous supprimez cette invitation, vous devrez en envoyer une nouvelle si vous changez d'avis.",
+  "removeContactDesc": "Si vous supprimez ce contact, vous devrez envoyer une nouvelle invitation, et le contact devra l'accepter à nouveau.",
+  "removeContact": "Supprimer le contact",
+  "letsTryThatAgain": "Réessayons",
+  "removeYourselfDesc": "Si vous vous retirez en tant que contact de confiance, vous perdrez l'accès au compte de {email}après leur période d'inactivité.",
+  "@removeYourselfDesc": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "cancelRecovery": "Annuler la récupération",
+  "cancelRecoveryDesc": "Êtes-vous sûr de vouloir annuler la récupération du compte de {email}?",
+  "@cancelRecoveryDesc": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "startRecovery": "Démarrer la récupération",
+  "startRecoveryDesc": "Êtes-vous sûr de vouloir annuler la récupération du compte de {email}?",
+  "@startRecoveryDesc": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "recoverAccountDesc": "Vous pouvez restaurer le compte de {email} pendant {days} jours après avoir démarré le processus de récupération.",
+  "@recoverAccountDesc": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      },
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "recoverAccountAfter": "Vous pouvez récupérer le compte de {email}après {time}.",
+  "@recoverAccountAfter": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "orRemoveYourself": "Ou vosu retirer en tant que contact fiable de {email}",
+  "@orRemoveYourself": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "recoveryInitiated": "Récupération initiée",
   "recoveryInitiatedDesc": "Vous pourrez accéder au compte d'ici {days} jours. Une notification sera envoyée à {email}.",
   "@recoveryInitiatedDesc": {
@@ -1857,6 +1966,19 @@
       "email": {
         "type": "String",
         "example": "me@example.com"
+      },
+      "numOfDays": {
+        "type": "int",
+        "example": "30"
+      }
+    }
+  },
+  "confirmAddingTrustedContacts": "Vous êtes sur le point d'ajouter {count} en tant que contacts de confiance. Ils pourront récupérer votre compte si vous êtes absent pendant {numOfDays} jours.",
+  "@confirmAddingTrustedContacts": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
       },
       "numOfDays": {
         "type": "int",

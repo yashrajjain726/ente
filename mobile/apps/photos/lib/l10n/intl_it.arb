@@ -1535,7 +1535,6 @@
   "legacyPageDesc2": "I contatti fidati possono avviare il recupero dell'account e, se non sono bloccati entro 30 giorni, reimpostare la password e accedere al tuo account.",
   "legacyAccounts": "Account Legacy",
   "trustedContacts": "Contatti fidati",
-  "addTrustedContact": "Aggiungi contatto fidato",
   "removeInvite": "Rimuovi invito",
   "recoveryWarning": "Un contatto fidato sta tentando di accedere al tuo account",
   "rejectRecovery": "Rifiuta il recupero",

@@ -1686,7 +1686,6 @@
   "legacyPageDesc2": "可信联系人可以启动账户恢复，如果 30 天内没有被阻止，则可以重置密码并访问您的账户。",
   "legacyAccounts": "遗产账户",
   "trustedContacts": "可信联系人",
-  "addTrustedContact": "添加可信联系人",
   "removeInvite": "移除邀请",
   "recoveryWarning": "一位可信联系人正在尝试访问您的账户",
   "rejectRecovery": "拒绝恢复",
