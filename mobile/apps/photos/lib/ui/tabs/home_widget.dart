@@ -355,8 +355,11 @@ class _HomeWidgetState extends State<HomeWidget> {
       }
       _linkedPublicAlbums[uri] = (isInitialStream, currentTime);
 
-      final Collection collection = await CollectionsService.instance
+      final Collection? collection = await CollectionsService.instance
           .getCollectionFromPublicLink(context, uri);
+      if (collection == null) {
+        return;
+      }
 
       final existingCollection =
           CollectionsService.instance.getCollectionByID(collection.id);
@@ -855,16 +858,21 @@ class _HomeWidgetState extends State<HomeWidget> {
     final bool offlineMode = isOfflineMode;
     if (!Configuration.instance.hasConfiguredAccount()) {
       _closeDrawerIfOpen(context);
-      final isOfflineEntryFlowEnabled =
-          widget.startWithoutAccount && offlineMode;
+      final shouldBootstrapOfflineEntryFlow =
+          widget.startWithoutAccount && !offlineMode;
       final hasPersistedOfflineMode = localSettings.isAppModeSet && offlineMode;
       final canResumePersistedOfflineMode =
           hasPersistedOfflineMode && permissionService.hasGrantedPermissions();
-      if (isOfflineEntryFlowEnabled || canResumePersistedOfflineMode) {
-        if (_shouldShowPermissionWidget()) {
-          return const GrantPermissionsWidget(startWithoutAccount: true);
-        }
-      } else {
+      final shouldUseOfflineEntryFlow =
+          widget.startWithoutAccount || canResumePersistedOfflineMode;
+
+      if (shouldBootstrapOfflineEntryFlow) {
+        return const GrantPermissionsWidget(startWithoutAccount: true);
+      }
+      if (shouldUseOfflineEntryFlow && _shouldShowPermissionWidget()) {
+        return const GrantPermissionsWidget(startWithoutAccount: true);
+      }
+      if (!shouldUseOfflineEntryFlow) {
         return const LandingPageWidget();
       }
     }

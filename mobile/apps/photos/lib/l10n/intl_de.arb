@@ -1841,9 +1841,93 @@
   "legacyAccounts": "Digital geerbte Konten",
   "trustedContacts": "Vertrauenswürdige Kontakte",
   "addTrustedContact": "Vertrauenswürdigen Kontakt hinzufügen",
+  "chooseFromAnExistingContact": "Einen existierenden Kontakt wählen",
+  "chooseARecoveryTime": "Wiederherstellungszeit auswählen",
+  "addContact": "Kontakt hinzufügen",
   "removeInvite": "Einladung entfernen",
   "recoveryWarning": "Ein vertrauenswürdiger Kontakt versucht, auf dein Konto zuzugreifen",
   "rejectRecovery": "Wiederherstellung ablehnen",
+  "cannotUpdateRecoveryTime": "Wiederherstellungszeit kann nicht aktualisiert werden",
+  "cannotUpdateRecoveryTimeMessage": "Wiederherstellungszeit kann nicht geändert werden, während eine aktive Wiederherstellungssitzung existiert. Bitte ablehnen oder warten, bis die Wiederherstellung abgeschlossen ist.",
+  "updateTime": "Zeit aktualisieren",
+  "revokeInvite": "Einladung widerrufen",
+  "trustedContactInvitePending": "Du hast {email} eingeladen, ein vertrauenswürdiger Kontakt zu werden. Die Einladung wurde noch nicht angenommen.",
+  "@trustedContactInvitePending": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "trustedContactAccepted": "Du hast {email} eingeladen, ein vertrauenswürdiger Kontakt zu werden. Die Einladung wurde angenommen.",
+  "@trustedContactAccepted": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "cancelInvite": "Einladung zurücknehmen",
+  "cancelInviteDesc": "Wenn du diese Einladung löschst, musst du eine neue schicken, wenn du deine Meinung änderst.",
+  "removeContactDesc": "Wenn du diesen Kontakt löschst, musst du eine neue Einladung senden und der Kontakt muss sie erneut akzeptieren.",
+  "removeContact": "Kontakt entfernen",
+  "letsTryThatAgain": "Versuchen wir es noch einmal",
+  "removeYourselfDesc": "Wenn du dich selbst als vertrauenswürdigen Kontakt entfernst, verlierst du Zugriff auf das Konto von {email} nach dem Inaktivitätszeitraum.",
+  "@removeYourselfDesc": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "cancelRecovery": "Wiederherstellung abbrechen",
+  "cancelRecoveryDesc": "Bist du sicher, dass du die Wiederherstellung des Kontos von {email} abbrechen möchtest?",
+  "@cancelRecoveryDesc": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "startRecovery": "Wiederherstellung starten",
+  "startRecoveryDesc": "Bist du sicher, dass du die Wiederherstellung des Kontos von {email} starten möchtest?",
+  "@startRecoveryDesc": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "recoverAccountDesc": "Du kannst das Konto von {email} in {days} Tagen nach Start des Prozesses wiederherstellen.",
+  "@recoverAccountDesc": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      },
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "recoverAccountAfter": "Du kannst das Konto von {email} nach {time} wiederherstellen.",
+  "@recoverAccountAfter": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "orRemoveYourself": "Oder entferne dich als vertrauenswürdigen Kontakt von {email}",
+  "@orRemoveYourself": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "recoveryInitiated": "Wiederherstellung gestartet",
   "recoveryInitiatedDesc": "Du kannst nach {days} Tagen auf das Konto zugreifen. Eine Benachrichtigung wird an {email} versendet.",
   "@recoveryInitiatedDesc": {
@@ -1882,6 +1966,19 @@
       "email": {
         "type": "String",
         "example": "me@example.com"
+      },
+      "numOfDays": {
+        "type": "int",
+        "example": "30"
+      }
+    }
+  },
+  "confirmAddingTrustedContacts": "Du bist dabei, {count} vertrauenswürdige Kontakte hinzuzufügen. Sie werden in der Lage sein, dein Konto wiederherzustellen, wenn du {numOfDays} Tage abwesend bist.",
+  "@confirmAddingTrustedContacts": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
       },
       "numOfDays": {
         "type": "int",

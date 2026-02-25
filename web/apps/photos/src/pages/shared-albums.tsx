@@ -22,6 +22,7 @@ import { FeedIcon } from "components/Collections/CollectionHeader";
 import { DownloadStatusNotifications } from "components/DownloadStatusNotifications";
 import { type FileListHeaderOrFooter } from "components/FileList";
 import { FileListWithViewer } from "components/FileListWithViewer";
+import { PublicAlbumSingleFileViewer } from "components/PublicAlbumSingleFileViewer";
 import { TripLayout } from "components/TripLayout";
 import { Upload } from "components/Upload";
 import {
@@ -75,7 +76,7 @@ import { updateShouldDisableCFUploadProxy } from "ente-gallery/services/upload";
 import { sortFiles } from "ente-gallery/utils/file";
 import type { Collection } from "ente-media/collection";
 import { type EnteFile } from "ente-media/file";
-import { fileCreationTime, fileFileName } from "ente-media/file-metadata";
+import { fileFileName } from "ente-media/file-metadata";
 import { FileType } from "ente-media/file-type";
 import {
     removePublicCollectionAccessTokenJWT,
@@ -106,7 +107,7 @@ import { type FileWithPath } from "react-dropzone";
 import { uploadManager } from "services/upload-manager";
 import { getSelectedFiles, type SelectedState } from "utils/file";
 import { getEnteURL } from "utils/public-album";
-import { quickLinkDateRangeForCreationTimes } from "utils/quick-link";
+import { quickLinkDateRangeForFiles } from "utils/quick-link";
 
 export default function PublicCollectionGallery() {
     const { showMiniDialog, onGenericError } = useBaseContext();
@@ -582,6 +583,38 @@ export default function PublicCollectionGallery() {
     }
 
     const layout = publicCollection?.pubMagicMetadata?.data.layout || "grouped";
+    const quickLinkDateRange = quickLinkDateRangeForFiles(publicFiles);
+    const isQuickLinkAlbum =
+        quickLinkDateRange !== undefined &&
+        publicCollection?.name === quickLinkDateRange;
+    const isSingleFileAlbum = publicFiles.length === 1;
+    const shouldShowSingleFileViewer =
+        isQuickLinkAlbum &&
+        isSingleFileAlbum &&
+        (layout === "grouped" || layout === "continuous");
+
+    if (shouldShowSingleFileViewer) {
+        return (
+            <>
+                <PublicAlbumSingleFileViewer
+                    file={publicFiles[0]!}
+                    publicAlbumsCredentials={credentials.current}
+                    collectionKey={collectionKey.current!}
+                    enableDownload={downloadEnabled}
+                    enableComment={commentsEnabled}
+                    enableJoin={publicCollection.publicURLs[0]?.enableJoin}
+                    onJoinAlbum={handleJoinAlbum}
+                    onVisualFeedback={handleVisualFeedback}
+                    onAddSaveGroup={onAddSaveGroup}
+                />
+                {blockingLoad && <TranslucentLoadingOverlay />}
+                <DownloadStatusNotifications
+                    {...{ saveGroups, onRemoveSaveGroup }}
+                    fullWidthOnMobile
+                />
+            </>
+        );
+    }
 
     return (
         <FullScreenDropZone
@@ -940,19 +973,12 @@ const FileListHeader: React.FC<FileListHeaderProps> = ({
     const addPhotosDisabled = uploadManager.isUploadInProgress();
 
     const memoriesDateRange = useMemo(() => {
-        if (!publicFiles.length) return undefined;
-
-        // publicFiles is already creation-time sorted, so the ends hold min/max.
-        const firstCreationTime = fileCreationTime(publicFiles[0]!);
-        const lastCreationTime = fileCreationTime(
-            publicFiles[publicFiles.length - 1]!,
-        );
-
-        return quickLinkDateRangeForCreationTimes(
-            Math.min(firstCreationTime, lastCreationTime),
-            Math.max(firstCreationTime, lastCreationTime),
-        );
+        return quickLinkDateRangeForFiles(publicFiles);
     }, [publicFiles]);
+
+    const isQuickLinkAlbum =
+        memoriesDateRange !== undefined &&
+        publicCollection.name === memoriesDateRange;
 
     const downloadAllFiles = () =>
         downloadAndSaveCollectionFiles(
@@ -1010,7 +1036,7 @@ const FileListHeader: React.FC<FileListHeaderProps> = ({
                             name={publicCollection.name}
                             fileCount={publicFiles.length}
                             endIcon={
-                                memoriesDateRange ? (
+                                !isQuickLinkAlbum && memoriesDateRange ? (
                                     <Typography
                                         variant="small"
                                         sx={{ color: "text.muted", ml: "-6px" }}
