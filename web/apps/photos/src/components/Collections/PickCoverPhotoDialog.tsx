@@ -211,15 +211,14 @@ export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
                                     <InfoOutlinedIcon fontSize="medium" />
                                 </IconButton>
                             </Tooltip>
-                            {!isSubmitting && (
-                                <IconButton
-                                    aria-label={t("close")}
-                                    onClick={onClose}
-                                    sx={headerIconButtonSx}
-                                >
-                                    <CloseIcon fontSize="medium" />
-                                </IconButton>
-                            )}
+                            <IconButton
+                                aria-label={t("close")}
+                                onClick={onClose}
+                                disabled={isSubmitting}
+                                sx={headerIconButtonSx}
+                            >
+                                <CloseIcon fontSize="medium" />
+                            </IconButton>
                         </Stack>
                     </Stack>
                 </Stack>
