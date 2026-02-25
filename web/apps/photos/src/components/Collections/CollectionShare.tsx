@@ -1561,9 +1561,7 @@ const EnablePublicShareOptions: React.FC<EnablePublicShareOptionsProps> = ({
 
         void (async () => {
             try {
-                const normalizedLayout = normalizedLayoutValue(
-                    collection.pubMagicMetadata?.data.layout,
-                );
+                const normalizedLayout = "masonry";
                 if (
                     collection.pubMagicMetadata?.data.layout !==
                     normalizedLayout
