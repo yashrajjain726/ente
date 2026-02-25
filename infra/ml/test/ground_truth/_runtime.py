@@ -27,6 +27,16 @@ except Exception:
 DEFAULT_MODEL_BASE_URL: Final[str] = "https://models.ente.io/"
 DEFAULT_PADDING_RGB: Final[tuple[int, int, int]] = (114, 114, 114)
 ALLOW_OPENCV_FALLBACK_ENV: Final[str] = "ML_PARITY_ALLOW_OPENCV_DECODE_FALLBACK"
+EXIF_ORIENTATION_TAG: Final[int] = 274
+ORIENTATION_TRANSPOSE_METHODS: Final[dict[int, Image.Transpose]] = {
+    2: Image.Transpose.FLIP_LEFT_RIGHT,
+    3: Image.Transpose.ROTATE_180,
+    4: Image.Transpose.FLIP_TOP_BOTTOM,
+    5: Image.Transpose.TRANSPOSE,
+    6: Image.Transpose.ROTATE_270,
+    7: Image.Transpose.TRANSVERSE,
+    8: Image.Transpose.ROTATE_90,
+}
 
 
 @dataclass(frozen=True)
@@ -114,12 +124,36 @@ def l2_normalize_rows(values: np.ndarray) -> np.ndarray:
     return values / norms
 
 
+def _parse_orientation(value: object) -> int | None:
+    try:
+        orientation = int(value)
+    except (TypeError, ValueError):
+        return None
+    return orientation if 1 <= orientation <= 8 else None
+
+
+def _correct_image_orientation(image: Image.Image) -> Image.Image:
+    exif_orientation = _parse_orientation(image.getexif().get(EXIF_ORIENTATION_TAG, 1)) or 1
+    # pillow-heif can normalize EXIF orientation to 1 while preserving the original
+    # value in `image.info["original_orientation"]`.
+    original_orientation = _parse_orientation(image.info.get("original_orientation"))
+
+    corrected = ImageOps.exif_transpose(image)
+    if exif_orientation != 1:
+        return corrected
+
+    manual_method = ORIENTATION_TRANSPOSE_METHODS.get(original_orientation)
+    if manual_method is None:
+        return corrected
+    return corrected.transpose(manual_method)
+
+
 def decode_image_rgb(source_path: Path) -> np.ndarray:
     source_path = source_path.expanduser().resolve()
 
     try:
         with Image.open(source_path) as image:
-            image = ImageOps.exif_transpose(image)
+            image = _correct_image_orientation(image)
             image = image.convert("RGB")
             pixels = np.array(image, dtype=np.uint8, copy=True)
             return np.ascontiguousarray(pixels)
