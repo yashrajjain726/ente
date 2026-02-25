@@ -66,11 +66,11 @@ Public links support powerful customization, security, and control features:
 
 Choose how recipients view your public links with these layout options:
 
-**Grouped** (default): Photos are organized by date, making it easy to browse chronologically.
-
-**Continuous**: Photos appear in a single continuous stream.
+**Masonry** (default): A dynamic layout that adapts to each photo's aspect ratio.
 
 **Trip**: Photos appear on an interactive map and timeline, perfect for travel and location-based albums.
+
+**Grouped**: Photos are organized by date, making it easy to browse chronologically.
 
 > [!NOTE]
 >
