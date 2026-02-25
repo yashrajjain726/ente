@@ -53,7 +53,7 @@ import { useSaveGroups } from "ente-gallery/components/utils/save-groups";
 import { type FileViewerInitialSidebar } from "ente-gallery/components/viewer/FileViewer";
 import { CollectionSubType, type Collection } from "ente-media/collection";
 import { type EnteFile } from "ente-media/file";
-import { type ItemVisibility } from "ente-media/file-metadata";
+import { ItemVisibility } from "ente-media/file-metadata";
 import {
     hasPendingAlbumToJoin,
     processPendingAlbumJoin,
@@ -376,6 +376,9 @@ const Page: React.FC = () => {
         collectionNameByID,
         fileNormalCollectionIDs,
         normalCollectionSummaries,
+        hiddenFileIDs,
+        tempDeletedFileIDs,
+        tempHiddenFileIDs,
         pendingFavoriteUpdates,
         pendingVisibilityUpdates,
         isInSearchMode,
@@ -397,6 +400,10 @@ const Page: React.FC = () => {
     const activePerson =
         state.view?.type == "people" ? state.view.activePerson : undefined;
     const activePersonID = activePerson?.id;
+
+    /**
+     * the below function is used to conditionallay render the setCover option in the dropdown
+     */
     const isOwnedAlbumEligibleForCover = useMemo(() => {
         if (!activeCollection || !activeCollectionSummary || !user)
             return false;
@@ -414,23 +421,38 @@ const Page: React.FC = () => {
             activeCollectionSummary.attributes.has("folder")
         );
     }, [activeCollection, activeCollectionSummary, user]);
-    const activeCollectionFiles = useMemo(
-        () =>
-            !activeCollection
-                ? []
-                : isInSearchMode
-                  ? state.collectionFiles.filter(
-                        ({ collectionID }) =>
-                            collectionID === activeCollection.id,
-                    )
-                  : filteredFiles,
-        [
-            activeCollection,
-            isInSearchMode,
-            state.collectionFiles,
-            filteredFiles,
-        ],
-    );
+
+    const activeCollectionFiles = useMemo(() => {
+        if (!activeCollection) return [];
+
+        const filesInCollection = isInSearchMode
+            ? state.collectionFiles.filter(
+                  ({ collectionID }) => collectionID === activeCollection.id,
+              )
+            : filteredFiles;
+
+        return filesInCollection.filter(({ id, magicMetadata }) => {
+            const visibility = magicMetadata?.data.visibility;
+            const isVisible =
+                visibility === undefined ||
+                visibility === ItemVisibility.visible;
+
+            return (
+                isVisible &&
+                !hiddenFileIDs.has(id) &&
+                !tempDeletedFileIDs.has(id) &&
+                !tempHiddenFileIDs.has(id)
+            );
+        });
+    }, [
+        activeCollection,
+        isInSearchMode,
+        state.collectionFiles,
+        filteredFiles,
+        hiddenFileIDs,
+        tempDeletedFileIDs,
+        tempHiddenFileIDs,
+    ]);
     const selectedFilesInView = useMemo(
         () => getSelectedFiles(selected, filteredFiles),
         [selected, filteredFiles],
