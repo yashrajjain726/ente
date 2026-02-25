@@ -180,6 +180,13 @@ abstract class UploaderPageState<T extends UploaderPage> extends State<T> {
   }
 
   Future<void> _showUploadFailureError(Object error) async {
+    if (error is NoActiveSubscriptionError) {
+      await _showUploadErrorSheet(
+        context.l10n.uploadSubscriptionExpiredErrorTitle,
+        context.l10n.uploadSubscriptionExpiredErrorBody,
+      );
+      return;
+    }
     if (error is StorageLimitExceededError) {
       await _showUploadErrorSheet(
         context.l10n.uploadStorageLimitErrorTitle,

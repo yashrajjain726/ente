@@ -1165,6 +1165,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'You\'ve run out of storage space. Free up space to continue uploading.';
 
   @override
+  String get uploadSubscriptionExpiredErrorTitle => 'Subscription expired';
+
+  @override
+  String get uploadSubscriptionExpiredErrorBody =>
+      'Your Ente Photos subscription has expired. Renew your subscription to continue uploading.';
+
+  @override
   String get uploadFileCountLimitErrorTitle => 'File limit reached';
 
   @override
