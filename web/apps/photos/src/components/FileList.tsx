@@ -356,9 +356,13 @@ export const FileList: React.FC<FileListProps> = ({
     const [hoverIndex, setHoverIndex] = useState<number | undefined>(undefined);
     const [isShiftKeyPressed, setIsShiftKeyPressed] = useState(false);
     const [masonryScrollTop, setMasonryScrollTop] = useState(0);
+    const [masonryIsScrolling, setMasonryIsScrolling] = useState(false);
     const [masonryDimensionsByFileID, setMasonryDimensionsByFileID] = useState<
         Map<number, Dimensions>
     >(new Map());
+    const masonryScrollIdleTimeoutRef = useRef<
+        ReturnType<typeof setTimeout> | undefined
+    >(undefined);
     // Timeline date strings for which all photos have been selected.
     //
     // See: [Note: Timeline date string]
@@ -1166,13 +1170,35 @@ export const FileList: React.FC<FileListProps> = ({
                 onScroll?.(scrollOffset);
                 setShowBackToTop(scrollOffset > 500);
                 setMasonryScrollTop(scrollOffset);
+                setMasonryIsScrolling(true);
+                if (masonryScrollIdleTimeoutRef.current) {
+                    clearTimeout(masonryScrollIdleTimeoutRef.current);
+                }
+                masonryScrollIdleTimeoutRef.current = setTimeout(() => {
+                    setMasonryIsScrolling(false);
+                    masonryScrollIdleTimeoutRef.current = undefined;
+                }, masonryScrollIdleMs);
             },
             [onScroll],
         );
 
+    useEffect(
+        () => () => {
+            if (masonryScrollIdleTimeoutRef.current) {
+                clearTimeout(masonryScrollIdleTimeoutRef.current);
+            }
+        },
+        [],
+    );
+
     useEffect(() => {
         if (!shouldUseMasonry) {
             setMasonryScrollTop(0);
+            setMasonryIsScrolling(false);
+            if (masonryScrollIdleTimeoutRef.current) {
+                clearTimeout(masonryScrollIdleTimeoutRef.current);
+                masonryScrollIdleTimeoutRef.current = undefined;
+            }
         }
     }, [shouldUseMasonry]);
 
@@ -1206,7 +1232,17 @@ export const FileList: React.FC<FileListProps> = ({
     ]);
 
     const renderMasonryItem = useCallback(
-        ({ file, fileIndex, top, left, width, height }: MasonryLayoutItem) => {
+        ({
+            file,
+            fileIndex,
+            top,
+            left,
+            width,
+            height,
+            bottom,
+        }: MasonryLayoutItem) => {
+            const isInViewport =
+                bottom > masonryViewportTop && top < masonryViewportBottom;
             return (
                 <Box
                     key={`masonry-photo-${file.id}-${fileIndex}`}
@@ -1233,7 +1269,7 @@ export const FileList: React.FC<FileListProps> = ({
                                     fileIndex <= rangeStartIndex))
                         }
                         activeCollectionID={activeCollectionID}
-                        showPlaceholder={false}
+                        showPlaceholder={masonryIsScrolling && !isInViewport}
                         isFav={!!favoriteFileIDs?.has(file.id)}
                         onClick={() => onItemClick(fileIndex)}
                         onSelect={handleSelect(file, fileIndex)}
@@ -1265,6 +1301,9 @@ export const FileList: React.FC<FileListProps> = ({
             hoverIndex,
             isFileSelected,
             isShiftKeyPressed,
+            masonryIsScrolling,
+            masonryViewportBottom,
+            masonryViewportTop,
             onContextMenuAction,
             onItemClick,
             rangeStartIndex,
@@ -1477,6 +1516,8 @@ const fileMasonryDimensions = (
 
     return { width: 4, height: 3 };
 };
+
+const masonryScrollIdleMs = 120;
 
 const preferredMasonryColumns = (containerWidth: number) => {
     if (containerWidth < 560) return 2;
