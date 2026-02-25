@@ -2130,6 +2130,18 @@ abstract class AppLocalizations {
   /// **'You\'ve run out of storage space. Free up space to continue uploading.'**
   String get uploadStorageLimitErrorBody;
 
+  /// Title shown when uploads fail because the Photos subscription is expired
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription expired'**
+  String get uploadSubscriptionExpiredErrorTitle;
+
+  /// Body shown when uploads fail because the Photos subscription is expired
+  ///
+  /// In en, this message translates to:
+  /// **'Your Ente Photos subscription has expired. Renew your subscription to continue uploading.'**
+  String get uploadSubscriptionExpiredErrorBody;
+
   /// Title shown when uploads fail because the locker already has the maximum file count
   ///
   /// In en, this message translates to:

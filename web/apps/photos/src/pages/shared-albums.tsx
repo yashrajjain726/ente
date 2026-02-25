@@ -76,7 +76,7 @@ import { updateShouldDisableCFUploadProxy } from "ente-gallery/services/upload";
 import { sortFiles } from "ente-gallery/utils/file";
 import type { Collection } from "ente-media/collection";
 import { type EnteFile } from "ente-media/file";
-import { fileCreationTime, fileFileName } from "ente-media/file-metadata";
+import { fileFileName } from "ente-media/file-metadata";
 import { FileType } from "ente-media/file-type";
 import {
     removePublicCollectionAccessTokenJWT,
@@ -107,7 +107,7 @@ import { type FileWithPath } from "react-dropzone";
 import { uploadManager } from "services/upload-manager";
 import { getSelectedFiles, type SelectedState } from "utils/file";
 import { getEnteURL } from "utils/public-album";
-import { quickLinkDateRangeForCreationTimes } from "utils/quick-link";
+import { quickLinkDateRangeForFiles } from "utils/quick-link";
 
 export default function PublicCollectionGallery() {
     const { showMiniDialog, onGenericError } = useBaseContext();
@@ -583,9 +583,15 @@ export default function PublicCollectionGallery() {
     }
 
     const layout = publicCollection?.pubMagicMetadata?.data.layout || "grouped";
+    const quickLinkDateRange = quickLinkDateRangeForFiles(publicFiles);
+    const isQuickLinkAlbum =
+        quickLinkDateRange !== undefined &&
+        publicCollection?.name === quickLinkDateRange;
     const isSingleFileAlbum = publicFiles.length === 1;
     const shouldShowSingleFileViewer =
-        isSingleFileAlbum && (layout === "grouped" || layout === "continuous");
+        isQuickLinkAlbum &&
+        isSingleFileAlbum &&
+        (layout === "grouped" || layout === "continuous");
 
     if (shouldShowSingleFileViewer) {
         return (
@@ -596,7 +602,7 @@ export default function PublicCollectionGallery() {
                     collectionKey={collectionKey.current!}
                     enableDownload={downloadEnabled}
                     enableComment={commentsEnabled}
-                    enableJoin={publicCollection?.publicURLs[0]?.enableJoin}
+                    enableJoin={publicCollection.publicURLs[0]?.enableJoin}
                     onJoinAlbum={handleJoinAlbum}
                     onVisualFeedback={handleVisualFeedback}
                     onAddSaveGroup={onAddSaveGroup}
@@ -967,18 +973,7 @@ const FileListHeader: React.FC<FileListHeaderProps> = ({
     const addPhotosDisabled = uploadManager.isUploadInProgress();
 
     const memoriesDateRange = useMemo(() => {
-        if (!publicFiles.length) return undefined;
-
-        // publicFiles is already creation-time sorted, so the ends hold min/max.
-        const firstCreationTime = fileCreationTime(publicFiles[0]!);
-        const lastCreationTime = fileCreationTime(
-            publicFiles[publicFiles.length - 1]!,
-        );
-
-        return quickLinkDateRangeForCreationTimes(
-            Math.min(firstCreationTime, lastCreationTime),
-            Math.max(firstCreationTime, lastCreationTime),
-        );
+        return quickLinkDateRangeForFiles(publicFiles);
     }, [publicFiles]);
 
     const isQuickLinkAlbum =
