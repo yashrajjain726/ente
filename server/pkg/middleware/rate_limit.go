@@ -24,6 +24,7 @@ type RateLimitMiddleware struct {
 	reset             time.Duration
 	ticker            *time.Ticker
 	limit10ReqPerMin  *limiter.Limiter
+	limit300ReqPerMin *limiter.Limiter
 	limit200ReqPerMin *limiter.Limiter
 	limit200ReqPerSec *limiter.Limiter
 	discordCtrl       *discord.DiscordController
@@ -32,6 +33,7 @@ type RateLimitMiddleware struct {
 func NewRateLimitMiddleware(discordCtrl *discord.DiscordController, limit int64, reset time.Duration) *RateLimitMiddleware {
 	rl := &RateLimitMiddleware{
 		limit10ReqPerMin:  util.NewRateLimiter("10-M"),
+		limit300ReqPerMin: util.NewRateLimiter("300-M"),
 		limit200ReqPerMin: util.NewRateLimiter("200-M"),
 		limit200ReqPerSec: util.NewRateLimiter("200-S"),
 		discordCtrl:       discordCtrl,
@@ -79,6 +81,24 @@ func (r *RateLimitMiddleware) GlobalRateLimiter() gin.HandlerFunc {
 func (r *RateLimitMiddleware) APIRateLimitMiddleware(urlSanitizer func(_ *gin.Context) string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestPath := urlSanitizer(c)
+
+		globalRateLimiter := r.getGlobalLimiter(requestPath, c.Request.Method)
+		if globalRateLimiter != nil {
+			limitContext, err := globalRateLimiter.Get(c, requestPath)
+			if err != nil {
+				log.Error("Failed to check global rate limit", err)
+				c.Next() // assume that limit hasn't reached
+				return
+			}
+			if limitContext.Reached {
+				msg := fmt.Sprintf("Global rate limit breached %s", requestPath)
+				go r.discordCtrl.NotifyPotentialAbuse(msg)
+				log.Error(msg)
+				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "Rate limit breached, try later"})
+				return
+			}
+		}
+
 		rateLimiter := r.getLimiter(requestPath, c.Request.Method)
 		if rateLimiter != nil {
 			key := fmt.Sprintf("%s-%s", network.GetClientIP(c), requestPath)
@@ -128,6 +148,16 @@ func (r *RateLimitMiddleware) APIRateLimitForUserMiddleware(urlSanitizer func(_ 
 		}
 		c.Next()
 	}
+}
+
+// getGlobalLimiter, based on reqPath & reqMethod, returns a limiter that should
+// be applied globally for requests matching the route. It returns nil if no
+// global route-specific limit should be applied.
+func (r *RateLimitMiddleware) getGlobalLimiter(reqPath string, reqMethod string) *limiter.Limiter {
+	if reqPath == "/paste/create" || reqPath == "/paste/guard" || reqPath == "/paste/consume" {
+		return r.limit300ReqPerMin
+	}
+	return nil
 }
 
 // getLimiter, based on reqPath & reqMethod, return instance of limiter.Limiter which needs to

@@ -3,6 +3,7 @@ package public
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -20,7 +21,9 @@ import (
 
 const (
 	pasteAccessTokenLength = 10
-	maxCiphertextBytes     = 64 * 1024
+	// For 4k input, worst case is 32040 bytes after JSON escaping (up to 6x),
+	// secretstream overhead (+17), and base64 encoding. Keep a small margin.
+	maxCiphertextBytes     = 32256
 	pasteTTL               = 24 * time.Hour
 	guardTTL               = 2 * time.Minute
 	guardCookieName        = "paste_guard"
@@ -159,6 +162,9 @@ func (c *PasteController) validateGuard(ctx *gin.Context, accessToken string) er
 	}
 
 	parsedToken, err := jwt.ParseWithClaims(guardToken, &enteJWT.PasteGuardClaim{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
 		return c.JwtSecret, nil
 	})
 	if err != nil {

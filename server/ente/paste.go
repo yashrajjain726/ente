@@ -11,6 +11,9 @@ const (
 	pasteKdfNonceMaxLength        = 64
 	pasteKdfMemLimitInteractive   = 64 * 1024 * 1024
 	pasteKdfOpsLimitInteractive   = 2
+	pasteDecryptionHeaderMaxLength = 128
+	pasteEncryptedPasteKeyMaxLength = 256
+	pasteEncryptedPasteKeyNonceMaxLength = 128
 )
 
 type CreatePasteRequest struct {
@@ -27,7 +30,7 @@ func (r *CreatePasteRequest) Validate(maxCiphertextBytes int) error {
 	if strings.TrimSpace(r.EncryptedData) == "" || strings.TrimSpace(r.DecryptionHeader) == "" {
 		return NewBadRequestWithMessage("invalid encrypted payload")
 	}
-	if len(r.EncryptedData) > maxCiphertextBytes || len(r.DecryptionHeader) > maxCiphertextBytes {
+	if len(r.EncryptedData) > maxCiphertextBytes || len(r.DecryptionHeader) > pasteDecryptionHeaderMaxLength {
 		return NewBadRequestWithMessage("encrypted payload too large")
 	}
 
@@ -36,7 +39,7 @@ func (r *CreatePasteRequest) Validate(maxCiphertextBytes int) error {
 		strings.TrimSpace(r.KdfNonce) == "" {
 		return NewBadRequestWithMessage("invalid key material")
 	}
-	if len(r.EncryptedPasteKey) > maxCiphertextBytes || len(r.EncryptedPasteKeyNonce) > maxCiphertextBytes {
+	if len(r.EncryptedPasteKey) > pasteEncryptedPasteKeyMaxLength || len(r.EncryptedPasteKeyNonce) > pasteEncryptedPasteKeyNonceMaxLength {
 		return NewBadRequestWithMessage("key material too large")
 	}
 	if len(r.KdfNonce) > pasteKdfNonceMaxLength {

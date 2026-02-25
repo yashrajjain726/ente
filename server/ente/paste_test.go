@@ -25,6 +25,42 @@ func TestCreatePasteRequestValidate_Valid(t *testing.T) {
 	}
 }
 
+func TestCreatePasteRequestValidate_RejectsOversizedEncryptedPayload(t *testing.T) {
+	req := newValidPasteRequest()
+	req.EncryptedData = strings.Repeat("a", 1025)
+
+	if err := req.Validate(1024); err == nil {
+		t.Fatal("expected oversized encrypted payload to be rejected")
+	}
+}
+
+func TestCreatePasteRequestValidate_RejectsOversizedDecryptionHeader(t *testing.T) {
+	req := newValidPasteRequest()
+	req.DecryptionHeader = strings.Repeat("a", pasteDecryptionHeaderMaxLength+1)
+
+	if err := req.Validate(1024); err == nil {
+		t.Fatal("expected oversized decryption header to be rejected")
+	}
+}
+
+func TestCreatePasteRequestValidate_RejectsOversizedEncryptedPasteKey(t *testing.T) {
+	req := newValidPasteRequest()
+	req.EncryptedPasteKey = strings.Repeat("a", pasteEncryptedPasteKeyMaxLength+1)
+
+	if err := req.Validate(1024); err == nil {
+		t.Fatal("expected oversized encrypted paste key to be rejected")
+	}
+}
+
+func TestCreatePasteRequestValidate_RejectsOversizedEncryptedPasteKeyNonce(t *testing.T) {
+	req := newValidPasteRequest()
+	req.EncryptedPasteKeyNonce = strings.Repeat("a", pasteEncryptedPasteKeyNonceMaxLength+1)
+
+	if err := req.Validate(1024); err == nil {
+		t.Fatal("expected oversized encrypted paste key nonce to be rejected")
+	}
+}
+
 func TestCreatePasteRequestValidate_RejectsOversizedKdfNonce(t *testing.T) {
 	req := newValidPasteRequest()
 	req.KdfNonce = strings.Repeat("a", pasteKdfNonceMaxLength+1)

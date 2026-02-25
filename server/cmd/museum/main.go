@@ -1097,6 +1097,9 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 		_ = castDb.DeleteOldSessions(context.Background(), timeUtil.MicrosecondsBeforeDays(7))
 		_ = collectionLinkRepo.CleanupAccessHistory(context.Background())
 		_ = fileLinkRepo.CleanupAccessHistory(context.Background())
+	})
+
+	schedule(c, "@every 30m", func() {
 		_ = pasteRepo.CleanupExpired(context.Background())
 	})
 
