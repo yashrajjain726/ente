@@ -66,7 +66,7 @@ class _CreationTimeItemState extends State<CreationTimeItem> {
 
   DateTime _dateTimeForDisplay(EnteFile file) {
     final editedTime = file.pubMagicMetadata?.editedTime;
-    if (editedTime != null && editedTime > 0) {
+    if (editedTime != null && editedTime != 0) {
       return DateTime.fromMicrosecondsSinceEpoch(editedTime, isUtc: true)
           .toLocal();
     }
