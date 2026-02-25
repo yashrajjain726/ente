@@ -3,7 +3,9 @@ use std::{ffi::OsStr, io::Cursor, sync::Once};
 use exif::{In, Reader as ExifReader, Tag};
 use image::{DynamicImage, ImageReader, RgbImage, hooks::decoding_hook_registered};
 use libheic_rs::{
-    DecodeGuardrails, image_integration::register_image_decoder_hooks_with_guardrails,
+    DecodeGuardrails,
+    image_integration::register_image_decoder_hooks_with_guardrails,
+    isobmff::{PrimaryItemTransformProperty, parse_primary_item_transform_properties},
 };
 
 use crate::ml::{
@@ -17,10 +19,17 @@ pub fn decode_image_from_path(image_path: &str) -> MlResult<DecodedImage> {
     let file_bytes = std::fs::read(image_path)
         .map_err(|e| MlError::Decode(format!("failed to read image file '{image_path}': {e}")))?;
     let exif_orientation = read_exif_orientation(&file_bytes);
+    let should_apply_exif_orientation =
+        should_apply_exif_orientation(&file_bytes, exif_orientation);
 
     let decoded_rgb = decode_with_image_crate(&file_bytes)?;
-    let oriented =
-        apply_exif_orientation(DynamicImage::ImageRgb8(decoded_rgb), exif_orientation).to_rgb8();
+    let decoded_dynamic = DynamicImage::ImageRgb8(decoded_rgb);
+    let oriented = if should_apply_exif_orientation {
+        apply_exif_orientation(decoded_dynamic, exif_orientation)
+    } else {
+        decoded_dynamic
+    }
+    .to_rgb8();
 
     Ok(DecodedImage {
         dimensions: Dimensions {
@@ -94,6 +103,29 @@ fn read_exif_orientation(image_data: &[u8]) -> u32 {
                 .and_then(|field| field.value.get_uint(0))
         })
         .unwrap_or(1)
+}
+
+fn should_apply_exif_orientation(image_data: &[u8], exif_orientation: u32) -> bool {
+    if exif_orientation == 1 {
+        return false;
+    }
+
+    // HEIF decode already applies primary transforms (irot/imir). Applying Exif orientation again
+    // can double-rotate mirrored/rotated files.
+    !heif_primary_transforms_include_orientation(image_data)
+}
+
+fn heif_primary_transforms_include_orientation(image_data: &[u8]) -> bool {
+    let Ok(primary_transforms) = parse_primary_item_transform_properties(image_data) else {
+        return false;
+    };
+
+    primary_transforms.transforms.iter().any(|transform| {
+        matches!(
+            transform,
+            PrimaryItemTransformProperty::Rotation(_) | PrimaryItemTransformProperty::Mirror(_)
+        )
+    })
 }
 
 fn apply_exif_orientation(image: DynamicImage, orientation: u32) -> DynamicImage {
