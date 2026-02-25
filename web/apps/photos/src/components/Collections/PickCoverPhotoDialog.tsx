@@ -1,5 +1,5 @@
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CloseIcon from "@mui/icons-material/Close";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import {
     Box,
     Dialog,
@@ -134,10 +134,7 @@ export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
         color: "fixed.white",
         backgroundColor: "fill.faint",
         transition: "background-color 150ms ease",
-        "& > svg": {
-            opacity: 0.72,
-            transition: "opacity 150ms ease",
-        },
+        "& > svg": { opacity: 0.72, transition: "opacity 150ms ease" },
         "&:hover": {
             backgroundColor: "fill.faintHover",
             "& > svg": { opacity: 1 },
@@ -300,7 +297,7 @@ export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
                         autoFocus={Boolean(selectedFile)}
                         sx={actionButtonSx}
                     >
-                        {t("use_selected_photo")}
+                        {ut("Confirm")}
                     </LoadingButton>
                 </DialogActions>
             </Stack>
