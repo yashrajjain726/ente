@@ -608,6 +608,7 @@ Future<MLResult> analyzeImageRust(Map args) async {
     final String? clipImageModelPath = args["clipImageModelPath"] as String?;
     final bool preferCoreml = args["preferCoreml"] as bool? ?? true;
     final bool preferNnapi = args["preferNnapi"] as bool? ?? true;
+    final bool preferXnnpack = args["preferXnnpack"] as bool? ?? false;
     final bool allowCpuFallback = args["allowCpuFallback"] as bool? ?? true;
 
     bool isMissingModelPath(String? path) =>
@@ -638,6 +639,7 @@ Future<MLResult> analyzeImageRust(Map args) async {
     final providerPolicy = rust_ml.RustExecutionProviderPolicy(
       preferCoreml: preferCoreml,
       preferNnapi: preferNnapi,
+      preferXnnpack: preferXnnpack,
       allowCpuFallback: allowCpuFallback,
     );
 

@@ -273,6 +273,7 @@ Future<void> _ensureRustRuntimePrepared(Map<String, dynamic> args) async {
   final providerPolicy = rust_ml.RustExecutionProviderPolicy(
     preferCoreml: args["preferCoreml"] as bool? ?? true,
     preferNnapi: args["preferNnapi"] as bool? ?? true,
+    preferXnnpack: args["preferXnnpack"] as bool? ?? false,
     allowCpuFallback: args["allowCpuFallback"] as bool? ?? true,
   );
   final runtimeConfigKey = _runtimeConfigCacheKey(modelPaths, providerPolicy);
@@ -330,6 +331,7 @@ String _runtimeConfigCacheKey(
     modelPaths.clipImage,
     providerPolicy.preferCoreml,
     providerPolicy.preferNnapi,
+    providerPolicy.preferXnnpack,
     providerPolicy.allowCpuFallback,
   ].join("|");
 }

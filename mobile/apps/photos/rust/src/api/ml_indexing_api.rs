@@ -10,6 +10,7 @@ use crate::ml::{
 pub struct RustExecutionProviderPolicy {
     pub prefer_coreml: bool,
     pub prefer_nnapi: bool,
+    pub prefer_xnnpack: bool,
     pub allow_cpu_fallback: bool,
 }
 
@@ -18,6 +19,7 @@ impl Default for RustExecutionProviderPolicy {
         Self {
             prefer_coreml: true,
             prefer_nnapi: true,
+            prefer_xnnpack: false,
             allow_cpu_fallback: true,
         }
     }
@@ -141,7 +143,7 @@ fn analyze_image_rust_inner(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageRe
 
         Ok(AnalyzeImageResult {
             file_id: req.file_id,
-            decoded_image_size: dims,
+            decoded_image_size: dims.clone(),
             faces,
             clip,
         })
@@ -190,6 +192,7 @@ fn to_provider_policy(policy: &RustExecutionProviderPolicy) -> ExecutionProvider
     ExecutionProviderPolicy {
         prefer_coreml: policy.prefer_coreml,
         prefer_nnapi: policy.prefer_nnapi,
+        prefer_xnnpack: policy.prefer_xnnpack,
         allow_cpu_fallback: policy.allow_cpu_fallback,
     }
 }

@@ -504,6 +504,7 @@ Future<MLResult> _analyzeImage({
       "clipImageModelPath": clipImageModelPath,
       "preferCoreml": Platform.isIOS,
       "preferNnapi": Platform.isAndroid,
+      "preferXnnpack": Platform.isAndroid,
       "allowCpuFallback": true,
     });
   } else {

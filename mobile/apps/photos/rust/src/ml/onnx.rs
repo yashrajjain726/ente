@@ -14,11 +14,54 @@ use crate::ml::{
 };
 
 pub fn build_session(model_path: &str, policy: &ExecutionProviderPolicy) -> MlResult<Session> {
-    let mut builder = Session::builder()?
-        .with_optimization_level(GraphOptimizationLevel::Level3)?
-        .with_intra_threads(1)?
-        .with_inter_threads(1)?;
+    let primary_providers = providers_for_policy(policy, true);
+    let mut attempts = vec![primary_providers];
 
+    if policy.allow_cpu_fallback && policy.prefer_xnnpack {
+        let providers_without_xnnpack = providers_for_policy(policy, false);
+        attempts.push(providers_without_xnnpack);
+    }
+
+    if policy.allow_cpu_fallback {
+        let cpu_only_policy = ExecutionProviderPolicy {
+            prefer_coreml: false,
+            prefer_nnapi: false,
+            prefer_xnnpack: false,
+            allow_cpu_fallback: true,
+        };
+        let cpu_only_providers = providers_for_policy(&cpu_only_policy, false);
+        attempts.push(cpu_only_providers);
+    }
+
+    let mut errors = Vec::new();
+    for providers in attempts {
+        if providers.is_empty() {
+            continue;
+        }
+
+        match build_session_with_providers(model_path, providers) {
+            Ok(session) => return Ok(session),
+            Err(error) => errors.push(format!("{error}")),
+        }
+    }
+
+    if errors.is_empty() {
+        return Err(MlError::InvalidRequest(
+            "no supported execution provider selected for this platform while CPU fallback is disabled"
+                .to_string(),
+        ));
+    }
+
+    Err(MlError::Ort(format!(
+        "failed to create ONNX session for model '{model_path}' across EP fallbacks: {}",
+        errors.join(" | ")
+    )))
+}
+
+fn providers_for_policy(
+    policy: &ExecutionProviderPolicy,
+    include_xnnpack: bool,
+) -> Vec<ExecutionProviderDispatch> {
     let mut providers: Vec<ExecutionProviderDispatch> = Vec::new();
 
     #[cfg(target_vendor = "apple")]
@@ -28,22 +71,32 @@ pub fn build_session(model_path: &str, policy: &ExecutionProviderPolicy) -> MlRe
 
     #[cfg(target_os = "android")]
     if policy.prefer_nnapi {
-        // Prefer NNAPI accelerators and let ORT handle CPU fallback via XNNPACK/CPU EP.
+        // Prefer NNAPI accelerators and let ORT handle CPU fallback via the added CPU EP.
         providers.push(NNAPIExecutionProvider::default().with_disable_cpu().build());
     }
 
     if policy.allow_cpu_fallback {
-        // XNNPACK is generally a faster CPU path on mobile; keep plain CPU EP as last fallback.
-        providers.push(XNNPACKExecutionProvider::default().build());
-        providers.push(CPUExecutionProvider::default().with_arena_allocator().build());
+        if include_xnnpack && policy.prefer_xnnpack {
+            providers.push(XNNPACKExecutionProvider::default().build());
+        }
+        providers.push(
+            CPUExecutionProvider::default()
+                .with_arena_allocator()
+                .build(),
+        );
     }
 
-    if providers.is_empty() {
-        return Err(MlError::InvalidRequest(
-            "no supported execution provider selected for this platform while CPU fallback is disabled"
-                .to_string(),
-        ));
-    }
+    providers
+}
+
+fn build_session_with_providers(
+    model_path: &str,
+    providers: Vec<ExecutionProviderDispatch>,
+) -> MlResult<Session> {
+    let mut builder = Session::builder()?
+        .with_optimization_level(GraphOptimizationLevel::Level3)?
+        .with_intra_threads(1)?
+        .with_inter_threads(1)?;
 
     builder = builder.with_execution_providers(providers)?;
 

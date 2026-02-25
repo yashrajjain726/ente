@@ -12,6 +12,7 @@ use crate::ml::{
 pub struct ExecutionProviderPolicy {
     pub prefer_coreml: bool,
     pub prefer_nnapi: bool,
+    pub prefer_xnnpack: bool,
     pub allow_cpu_fallback: bool,
 }
 
@@ -20,6 +21,7 @@ impl Default for ExecutionProviderPolicy {
         Self {
             prefer_coreml: true,
             prefer_nnapi: true,
+            prefer_xnnpack: false,
             allow_cpu_fallback: true,
         }
     }
@@ -140,14 +142,88 @@ pub fn ensure_runtime(config: &MlRuntimeConfig) -> MlResult<()> {
 
 pub fn with_runtime_mut<F, R>(config: &MlRuntimeConfig, func: F) -> MlResult<R>
 where
-    F: FnOnce(&mut MlRuntime) -> MlResult<R>,
+    F: FnMut(&mut MlRuntime) -> MlResult<R>,
+{
+    with_runtime_mut_inner(config, func)
+}
+
+fn with_runtime_mut_inner<F, R>(config: &MlRuntimeConfig, mut func: F) -> MlResult<R>
+where
+    F: FnMut(&mut MlRuntime) -> MlResult<R>,
 {
     ensure_runtime(config)?;
-    let mut guard = lock_runtime();
-    let state = guard
-        .as_mut()
-        .ok_or_else(|| MlError::Runtime("runtime is not initialized".to_string()))?;
-    func(&mut state.runtime)
+
+    let first_result = {
+        let mut guard = lock_runtime();
+        let state = guard
+            .as_mut()
+            .ok_or_else(|| MlError::Runtime("runtime is not initialized".to_string()))?;
+        func(&mut state.runtime)
+    };
+
+    match first_result {
+        Ok(result) => Ok(result),
+        Err(first_error) => {
+            if !should_retry_with_cpu_only_runtime(config, &first_error) {
+                return Err(first_error);
+            }
+
+            let fallback_config = cpu_only_runtime_config(config);
+            eprintln!(
+                "[ml][runtime] execution provider failed, retrying with CPU-only runtime: {first_error}"
+            );
+            ensure_runtime(&fallback_config)?;
+            let retry_result = {
+                let mut guard = lock_runtime();
+                let state = guard
+                    .as_mut()
+                    .ok_or_else(|| MlError::Runtime("runtime is not initialized".to_string()))?;
+                func(&mut state.runtime)
+            };
+
+            if retry_result.is_ok() {
+                let mut guard = lock_runtime();
+                if let Some(state) = guard.as_mut() {
+                    // Keep the recovered runtime hot for this requested config to avoid
+                    // repeatedly attempting the failing EP combination on every image.
+                    state.config = config.clone();
+                }
+            }
+
+            retry_result
+        }
+    }
+}
+
+fn should_retry_with_cpu_only_runtime(config: &MlRuntimeConfig, error: &MlError) -> bool {
+    if !config.provider_policy.allow_cpu_fallback {
+        return false;
+    }
+    if !is_execution_provider_failure(error) {
+        return false;
+    }
+    cpu_only_runtime_config(config) != *config
+}
+
+fn cpu_only_runtime_config(config: &MlRuntimeConfig) -> MlRuntimeConfig {
+    let mut fallback = config.clone();
+    fallback.provider_policy.prefer_coreml = false;
+    fallback.provider_policy.prefer_nnapi = false;
+    fallback.provider_policy.prefer_xnnpack = false;
+    fallback
+}
+
+fn is_execution_provider_failure(error: &MlError) -> bool {
+    let MlError::Ort(message) = error else {
+        return false;
+    };
+    let normalized = message.to_ascii_lowercase();
+    normalized.contains("executionprovider")
+        || normalized.contains("unknown allocation device")
+        || normalized.contains("xnnpackexecutionprovider")
+        || normalized.contains("nnapiexecutionprovider")
+        || normalized.contains("coremlexecutionprovider")
+        || normalized.contains("ep error")
 }
 
 pub fn release_runtime() -> MlResult<()> {

@@ -343,6 +343,7 @@ class MLIndexingIsolate extends SuperIsolate {
       "clipImageModelPath": clipImage.$2,
       "preferCoreml": Platform.isIOS,
       "preferNnapi": Platform.isAndroid,
+      "preferXnnpack": Platform.isAndroid,
       "allowCpuFallback": true,
     };
   }
