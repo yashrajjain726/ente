@@ -548,7 +548,13 @@ export default function PublicCollectionGallery() {
     } else if (errorMessage) {
         return (
             <Stack100vhCenter>
-                <Typography sx={{ color: "critical.main" }}>
+                <Typography
+                    sx={{
+                        color: "critical.main",
+                        px: { xs: 2, sm: 0 },
+                        textAlign: { xs: "center", sm: "inherit" },
+                    }}
+                >
                     {errorMessage}
                 </Typography>
             </Stack100vhCenter>
@@ -582,16 +588,15 @@ export default function PublicCollectionGallery() {
         );
     }
 
-    const layout = publicCollection?.pubMagicMetadata?.data.layout || "grouped";
+    const layout = normalizedPublicAlbumLayout(
+        publicCollection?.pubMagicMetadata?.data.layout,
+    );
     const quickLinkDateRange = quickLinkDateRangeForFiles(publicFiles);
     const isQuickLinkAlbum =
         quickLinkDateRange !== undefined &&
         publicCollection?.name === quickLinkDateRange;
     const isSingleFileAlbum = publicFiles.length === 1;
-    const shouldShowSingleFileViewer =
-        isQuickLinkAlbum &&
-        isSingleFileAlbum &&
-        (layout === "grouped" || layout === "continuous");
+    const shouldShowSingleFileViewer = isQuickLinkAlbum && isSingleFileAlbum;
 
     if (shouldShowSingleFileViewer) {
         return (
@@ -688,6 +693,7 @@ export default function PublicCollectionGallery() {
                     </NavbarBase>
                     <FileListWithViewer
                         files={publicFiles}
+                        layout={layout === "masonry" ? "masonry" : "grid"}
                         header={fileListHeader}
                         footer={fileListFooter}
                         enableDownload={downloadEnabled}
@@ -695,7 +701,7 @@ export default function PublicCollectionGallery() {
                         selected={selected}
                         setSelected={setSelected}
                         activeCollectionID={PseudoCollectionID.all}
-                        disableGrouping={layout === "continuous"}
+                        disableGrouping={false}
                         onRemotePull={publicAlbumsRemotePull}
                         onVisualFeedback={handleVisualFeedback}
                         onAddSaveGroup={onAddSaveGroup}
@@ -752,6 +758,13 @@ export default function PublicCollectionGallery() {
  */
 const sortFilesForCollection = (files: EnteFile[], collection?: Collection) =>
     sortFiles(files, collection?.pubMagicMetadata?.data.asc ?? false);
+
+const normalizedPublicAlbumLayout = (layout: string | undefined) => {
+    if (layout === "grouped" || layout === "trip" || layout === "masonry") {
+        return layout;
+    }
+    return "masonry";
+};
 
 const EnteLogoLink = styled("a")(({ theme }) => ({
     // Remove the excess space at the top.

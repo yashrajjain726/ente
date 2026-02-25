@@ -167,6 +167,27 @@ export type EnteTrashFile = EnteFile & {
     deleteBy?: number;
 };
 
+interface MasonryLayoutItem {
+    file: EnteFile;
+    fileIndex: number;
+    left: number;
+    top: number;
+    bottom: number;
+    width: number;
+    height: number;
+}
+
+interface MasonryLayout {
+    items: MasonryLayoutItem[];
+    columns: MasonryLayoutItem[][];
+    totalHeight: number;
+}
+
+interface Dimensions {
+    width: number;
+    height: number;
+}
+
 export interface FileListProps {
     /** The height we should occupy (needed since the list is virtualized). */
     height: number;
@@ -188,6 +209,10 @@ export interface FileListProps {
      * another mode in which the gallery operates.
      */
     modePlus?: GalleryBarMode | "search";
+    /**
+     * The visual layout used to render the file listing.
+     */
+    layout?: "grid" | "masonry";
     /**
      * An optional component shown before all the items in the list.
      *
@@ -299,6 +324,7 @@ export const FileList: React.FC<FileListProps> = ({
     listBorderRadius,
     mode,
     modePlus,
+    layout = "grid",
     header,
     footer,
     user,
@@ -329,6 +355,10 @@ export const FileList: React.FC<FileListProps> = ({
     );
     const [hoverIndex, setHoverIndex] = useState<number | undefined>(undefined);
     const [isShiftKeyPressed, setIsShiftKeyPressed] = useState(false);
+    const [masonryScrollTop, setMasonryScrollTop] = useState(0);
+    const [masonryDimensionsByFileID, setMasonryDimensionsByFileID] = useState<
+        Map<number, Dimensions>
+    >(new Map());
     // Timeline date strings for which all photos have been selected.
     //
     // See: [Note: Timeline date string]
@@ -363,8 +393,14 @@ export const FileList: React.FC<FileListProps> = ({
         () => computeThumbnailGridLayoutParams(width),
         [width],
     );
+    const shouldUseMasonry = layout === "masonry";
 
     useEffect(() => {
+        if (shouldUseMasonry) {
+            setItems([]);
+            return;
+        }
+
         // Since width and height are dependencies, there might be too many
         // updates to the list during a resize. The list computation too, while
         // fast, is non-trivial.
@@ -512,6 +548,7 @@ export const FileList: React.FC<FileListProps> = ({
         footer,
         annotatedFiles,
         disableGrouping,
+        shouldUseMasonry,
         layoutParams,
     ]);
 
@@ -599,6 +636,25 @@ export const FileList: React.FC<FileListProps> = ({
             ),
         [setSelected, mode, user?.id, activeCollectionID, activePersonID],
     );
+
+    const isSelectionContextMatching = useMemo(() => {
+        if (!mode) return selected.collectionID === activeCollectionID;
+        if (mode !== selected.context?.mode) return false;
+        if (selected.context.mode === "people") {
+            return selected.context.personID === activePersonID;
+        }
+        return selected.context.collectionID === activeCollectionID;
+    }, [activeCollectionID, activePersonID, mode, selected]);
+
+    const isFileSelected = useCallback(
+        (file: EnteFile) => {
+            if (suppressSelectionUI) return false;
+            return isSelectionContextMatching && !!selected[file.id];
+        },
+        [isSelectionContextMatching, selected, suppressSelectionUI],
+    );
+
+    const haveSelection = !suppressSelectionUI && selected.count > 0;
 
     const handleRangeSelect = useCallback(
         (index: number) => {
@@ -794,7 +850,6 @@ export const FileList: React.FC<FileListProps> = ({
 
     const renderListItem = useCallback(
         (item: FileListItem, isScrolling: boolean) => {
-            const haveSelection = !suppressSelectionUI && selected.count > 0;
             const showGroupCheckbox =
                 haveSelection && !(contextMenu && selected.count === 1);
             switch (item.type) {
@@ -840,23 +895,7 @@ export const FileList: React.FC<FileListProps> = ({
                                                 !suppressSelectionUI,
                                         }}
                                         file={file}
-                                        selected={
-                                            !suppressSelectionUI &&
-                                            (!mode
-                                                ? selected.collectionID ===
-                                                  activeCollectionID
-                                                : mode ==
-                                                      selected.context?.mode &&
-                                                  (selected.context.mode ==
-                                                  "people"
-                                                      ? selected.context
-                                                            .personID ==
-                                                        activePersonID
-                                                      : selected.context
-                                                            .collectionID ==
-                                                        activeCollectionID)) &&
-                                            !!selected[file.id]
-                                        }
+                                        selected={isFileSelected(file)}
                                         selectOnClick={haveSelection}
                                         isRangeSelectActive={
                                             isShiftKeyPressed && haveSelection
@@ -901,24 +940,24 @@ export const FileList: React.FC<FileListProps> = ({
         },
         [
             activeCollectionID,
-            activePersonID,
             checkedTimelineDateStrings,
             contextMenu,
             emailByUserID,
             favoriteFileIDs,
+            haveSelection,
             handleContextMenu,
             handleRangeSelect,
             handleSelect,
             hoverIndex,
             isShiftKeyPressed,
-            mode,
+            isFileSelected,
             onChangeSelectAllCheckBox,
             onContextMenuAction,
             onItemClick,
             rangeStartIndex,
             enableSelect,
-            suppressSelectionUI,
             selected,
+            suppressSelectionUI,
             user,
         ],
     );
@@ -981,9 +1020,345 @@ export const FileList: React.FC<FileListProps> = ({
         [onScroll, onVisibleDateChange, items],
     );
 
+    useEffect(() => {
+        if (!shouldUseMasonry) {
+            setMasonryDimensionsByFileID(new Map());
+            return;
+        }
+
+        const validFileIDs = new Set(annotatedFiles.map(({ file }) => file.id));
+        setMasonryDimensionsByFileID((prev) => {
+            if (prev.size === 0) return prev;
+            const next = new Map(prev);
+            for (const fileID of next.keys()) {
+                if (!validFileIDs.has(fileID)) next.delete(fileID);
+            }
+            return next.size === prev.size ? prev : next;
+        });
+    }, [annotatedFiles, shouldUseMasonry]);
+
+    const updateMasonryDimensions = useCallback(
+        (fileID: number, dimensions: Dimensions) => {
+            if (dimensions.width <= 0 || dimensions.height <= 0) return;
+            setMasonryDimensionsByFileID((prev) => {
+                const existing = prev.get(fileID);
+                if (
+                    existing &&
+                    existing.width === dimensions.width &&
+                    existing.height === dimensions.height
+                ) {
+                    return prev;
+                }
+                const next = new Map(prev);
+                next.set(fileID, dimensions);
+                return next;
+            });
+        },
+        [],
+    );
+
+    const masonryColumns = useMemo(
+        () => preferredMasonryColumns(layoutParams.containerWidth),
+        [layoutParams.containerWidth],
+    );
+    const masonryInnerWidth = useMemo(
+        () => Math.max(0, width - 2 * layoutParams.paddingInline),
+        [layoutParams.paddingInline, width],
+    );
+    const masonryItemWidth = useMemo(() => {
+        if (masonryColumns < 1) return 0;
+        return (
+            (masonryInnerWidth - (masonryColumns - 1) * layoutParams.gap) /
+            masonryColumns
+        );
+    }, [layoutParams.gap, masonryColumns, masonryInnerWidth]);
+    const masonryLayout = useMemo<MasonryLayout>(() => {
+        if (
+            !shouldUseMasonry ||
+            masonryItemWidth <= 0 ||
+            !annotatedFiles.length
+        ) {
+            return { items: [], columns: [], totalHeight: 0 };
+        }
+
+        const columnHeights = Array.from({ length: masonryColumns }, () => 0);
+        const columns = Array.from({ length: masonryColumns }, () =>
+            new Array<MasonryLayoutItem>(),
+        );
+        const items: MasonryLayoutItem[] = [];
+
+        for (const [fileIndex, { file }] of annotatedFiles.entries()) {
+            const dimensions = fileMasonryDimensions(
+                file,
+                masonryDimensionsByFileID.get(file.id),
+            );
+            const itemHeight = Math.max(
+                1,
+                (masonryItemWidth * dimensions.height) / dimensions.width,
+            );
+            const targetColumn = shortestColumnIndex(columnHeights);
+            const top = columnHeights[targetColumn]!;
+            const bottom = top + itemHeight;
+            const left = targetColumn * (masonryItemWidth + layoutParams.gap);
+
+            const item = {
+                file,
+                fileIndex,
+                top,
+                bottom,
+                left,
+                width: masonryItemWidth,
+                height: itemHeight,
+            } satisfies MasonryLayoutItem;
+            items.push(item);
+            columns[targetColumn]!.push(item);
+
+            columnHeights[targetColumn] = top + itemHeight + layoutParams.gap;
+        }
+
+        const totalHeight = Math.max(
+            0,
+            Math.max(...columnHeights) - layoutParams.gap,
+        );
+        return { items, columns, totalHeight };
+    }, [
+        annotatedFiles,
+        layoutParams.gap,
+        masonryColumns,
+        masonryDimensionsByFileID,
+        masonryItemWidth,
+        shouldUseMasonry,
+    ]);
+    const masonryHeaderHeight = header?.height ?? 0;
+    const masonryViewportTop = Math.max(
+        0,
+        masonryScrollTop - masonryHeaderHeight,
+    );
+    const masonryViewportBottom = masonryViewportTop + height;
+    const masonryOverscan = Math.max(height, 800);
+    const masonryVisibleItems = useMemo(
+        () => {
+            const minTop = masonryViewportTop - masonryOverscan;
+            const maxTop = masonryViewportBottom + masonryOverscan;
+            const visible = new Array<MasonryLayoutItem>();
+
+            for (const column of masonryLayout.columns) {
+                const startIndex = firstVisibleIndexForColumn(column, minTop);
+                for (let i = startIndex; i < column.length; i += 1) {
+                    const item = column[i]!;
+                    if (item.top > maxTop) break;
+                    visible.push(item);
+                }
+            }
+
+            return visible;
+        },
+        [
+            masonryLayout.columns,
+            masonryOverscan,
+            masonryViewportBottom,
+            masonryViewportTop,
+        ],
+    );
+
+    const handleMasonryScroll: React.UIEventHandler<HTMLDivElement> =
+        useCallback(
+            (event) => {
+                const scrollOffset = event.currentTarget.scrollTop;
+                onScroll?.(scrollOffset);
+                setShowBackToTop(scrollOffset > 500);
+                setMasonryScrollTop(scrollOffset);
+            },
+            [onScroll],
+        );
+
+    useEffect(() => {
+        if (!shouldUseMasonry) {
+            setMasonryScrollTop(0);
+        }
+    }, [shouldUseMasonry]);
+
+    useEffect(() => {
+        if (!shouldUseMasonry || !onVisibleDateChange) return;
+        const topVisibleItem = masonryVisibleItems.reduce<
+            MasonryLayoutItem | undefined
+        >(
+            (best, item) =>
+                item.bottom > masonryViewportTop &&
+                (!best || item.top < best.top)
+                    ? item
+                    : best,
+            undefined,
+        );
+        const visibleDate =
+            topVisibleItem &&
+            annotatedFiles[topVisibleItem.fileIndex]?.timelineDateString;
+        const currentDate =
+            visibleDate ?? annotatedFiles[0]?.timelineDateString;
+        if (currentDate !== lastVisibleDateRef.current) {
+            lastVisibleDateRef.current = currentDate;
+            onVisibleDateChange(currentDate);
+        }
+    }, [
+        annotatedFiles,
+        masonryVisibleItems,
+        masonryViewportTop,
+        onVisibleDateChange,
+        shouldUseMasonry,
+    ]);
+
+    const renderMasonryItem = useCallback(
+        ({ file, fileIndex, top, left, width, height }: MasonryLayoutItem) => {
+            return (
+                <Box
+                    key={`masonry-photo-${file.id}-${fileIndex}`}
+                    sx={{ position: "absolute", top, left, width, height }}
+                >
+                    <FileThumbnail
+                        key={`tile-${file.id}-selected-${selected[file.id] ?? false}`}
+                        {...{
+                            user,
+                            emailByUserID,
+                            enableSelect:
+                                !!enableSelect && !suppressSelectionUI,
+                        }}
+                        file={file}
+                        selected={isFileSelected(file)}
+                        selectOnClick={haveSelection}
+                        isRangeSelectActive={isShiftKeyPressed && haveSelection}
+                        isInSelectRange={
+                            rangeStartIndex !== undefined &&
+                            hoverIndex !== undefined &&
+                            ((fileIndex >= rangeStartIndex &&
+                                fileIndex <= hoverIndex) ||
+                                (fileIndex >= hoverIndex &&
+                                    fileIndex <= rangeStartIndex))
+                        }
+                        activeCollectionID={activeCollectionID}
+                        showPlaceholder={false}
+                        isFav={!!favoriteFileIDs?.has(file.id)}
+                        onClick={() => onItemClick(fileIndex)}
+                        onSelect={handleSelect(file, fileIndex)}
+                        onHover={() => setHoverIndex(fileIndex)}
+                        onRangeSelect={() => handleRangeSelect(fileIndex)}
+                        onContextMenu={
+                            onContextMenuAction
+                                ? (e) => handleContextMenu(e, file, fileIndex)
+                                : undefined
+                        }
+                        onImageDimensions={(dimensions) =>
+                            updateMasonryDimensions(file.id, dimensions)
+                        }
+                        isMasonry
+                        style={{ width: "100%", height: "100%" }}
+                    />
+                </Box>
+            );
+        },
+        [
+            activeCollectionID,
+            emailByUserID,
+            enableSelect,
+            favoriteFileIDs,
+            handleContextMenu,
+            handleRangeSelect,
+            handleSelect,
+            haveSelection,
+            hoverIndex,
+            isFileSelected,
+            isShiftKeyPressed,
+            onContextMenuAction,
+            onItemClick,
+            rangeStartIndex,
+            selected,
+            suppressSelectionUI,
+            updateMasonryDimensions,
+            user,
+        ],
+    );
+
     const handleScrollToTop = useCallback(() => {
         outerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     }, []);
+
+    if (shouldUseMasonry) {
+        return (
+            <Box sx={{ position: "relative", width, height }}>
+                <Box
+                    ref={outerRef}
+                    sx={{
+                        width: "100%",
+                        height: "100%",
+                        overflowY: "auto",
+                        ...(listBorderRadius && {
+                            borderRadius: listBorderRadius,
+                        }),
+                    }}
+                    onScroll={handleMasonryScroll}
+                >
+                    {header && (
+                        <Box
+                            sx={{
+                                px: header.extendToInlineEdges
+                                    ? 0
+                                    : `${layoutParams.paddingInline}px`,
+                            }}
+                        >
+                            {header.component}
+                        </Box>
+                    )}
+                    {masonryLayout.items.length > 0 ? (
+                        <Box sx={{ px: `${layoutParams.paddingInline}px` }}>
+                            <Box
+                                sx={{
+                                    width: masonryInnerWidth,
+                                    position: "relative",
+                                    height: masonryLayout.totalHeight,
+                                }}
+                            >
+                                {masonryVisibleItems.map(renderMasonryItem)}
+                            </Box>
+                        </Box>
+                    ) : (
+                        <NoFilesListItem sx={{ minHeight: "100%" }}>
+                            <Typography sx={{ color: "text.faint" }}>
+                                {t("nothing_here")}
+                            </Typography>
+                        </NoFilesListItem>
+                    )}
+                    {footer && (
+                        <Box
+                            sx={{
+                                px: footer.extendToInlineEdges
+                                    ? 0
+                                    : `${layoutParams.paddingInline}px`,
+                            }}
+                        >
+                            {footer.component}
+                        </Box>
+                    )}
+                </Box>
+                {showBackToTop && (
+                    <BackToTopButton
+                        size="small"
+                        aria-label="scroll to top"
+                        onClick={handleScrollToTop}
+                    >
+                        <KeyboardArrowUpIcon />
+                    </BackToTopButton>
+                )}
+                {onContextMenuAction && (
+                    <FileContextMenu
+                        open={contextMenu !== null}
+                        anchorPosition={contextMenu?.position}
+                        onClose={handleContextMenuClose}
+                        actions={contextMenuActions}
+                        onAction={handleContextMenuActionWithTracking}
+                    />
+                )}
+            </Box>
+        );
+    }
 
     if (!items.length) {
         return <></>;
@@ -1061,6 +1436,57 @@ const splitByDate = (annotatedFiles: FileListAnnotatedFile[]) =>
         ),
         new Array<FileListAnnotatedFile[]>(),
     );
+
+const shortestColumnIndex = (columnHeights: number[]) =>
+    columnHeights.reduce(
+        (minColumn, height, index) =>
+            height < columnHeights[minColumn]! ? index : minColumn,
+        0,
+    );
+
+const firstVisibleIndexForColumn = (
+    column: MasonryLayoutItem[],
+    minTop: number,
+) => {
+    let low = 0;
+    let high = column.length;
+    while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+        if (column[mid]!.bottom < minTop) {
+            low = mid + 1;
+        } else {
+            high = mid;
+        }
+    }
+    return low;
+};
+
+const fileMasonryDimensions = (
+    file: EnteFile,
+    inferredDimensions?: Dimensions,
+) => {
+    if (inferredDimensions) return inferredDimensions;
+
+    const width = file.pubMagicMetadata?.data.w;
+    const height = file.pubMagicMetadata?.data.h;
+    if (width && height && width > 0 && height > 0) {
+        return { width, height };
+    }
+
+    if (file.metadata.fileType === FileType.video) {
+        return { width: 16, height: 9 };
+    }
+
+    return { width: 4, height: 3 };
+};
+
+const preferredMasonryColumns = (containerWidth: number) => {
+    if (containerWidth < 560) return 2;
+    if (containerWidth < 900) return 3;
+    if (containerWidth < 1280) return 4;
+    if (containerWidth < 1800) return 5;
+    return 6;
+};
 
 /**
  * For each element of {@link xs}, obtain an array by applying {@link f},
@@ -1208,6 +1634,9 @@ type FileThumbnailProps = {
     onHover: () => void;
     onRangeSelect: () => void;
     onContextMenu?: (event: React.MouseEvent) => void;
+    onImageDimensions?: (dimensions: Dimensions) => void;
+    isMasonry?: boolean;
+    style?: React.CSSProperties;
 } & Pick<FileListProps, "user" | "emailByUserID" | "enableSelect">;
 
 const FileThumbnail: React.FC<FileThumbnailProps> = ({
@@ -1227,6 +1656,9 @@ const FileThumbnail: React.FC<FileThumbnailProps> = ({
     onHover,
     onRangeSelect,
     onContextMenu,
+    onImageDimensions,
+    isMasonry,
+    style,
 }) => {
     const [imageURL, setImageURL] = useState<string | undefined>(undefined);
     const [isLongPressing, setIsLongPressing] = useState(false);
@@ -1306,6 +1738,8 @@ const FileThumbnail: React.FC<FileThumbnailProps> = ({
             onContextMenu={onContextMenu}
             onMouseEnter={handleHover}
             disabled={!imageURL}
+            $disableBottomMargin={!!isMasonry}
+            style={style}
             {...(enableSelect && longPressHandlers)}
         >
             {enableSelect && (
@@ -1320,7 +1754,17 @@ const FileThumbnail: React.FC<FileThumbnailProps> = ({
             {file.metadata.hasStaticThumbnail ? (
                 <StaticThumbnail fileType={file.metadata.fileType} />
             ) : imageURL ? (
-                <img src={imageURL} />
+                <img
+                    src={imageURL}
+                    onLoad={(event) => {
+                        const { naturalWidth, naturalHeight } =
+                            event.currentTarget;
+                        onImageDimensions?.({
+                            width: naturalWidth,
+                            height: naturalHeight,
+                        });
+                    }}
+                />
             ) : (
                 <LoadingThumbnail />
             )}
@@ -1362,10 +1806,14 @@ const FileThumbnail: React.FC<FileThumbnailProps> = ({
     );
 };
 
-const FileThumbnail_ = styled("div")<{ disabled: boolean }>`
+const FileThumbnail_ = styled("div")<{
+    disabled: boolean;
+    $disableBottomMargin: boolean;
+}>`
     display: flex;
     width: fit-content;
-    margin-bottom: ${thumbnailGap}px;
+    margin-bottom: ${({ $disableBottomMargin }) =>
+        $disableBottomMargin ? "0px" : `${thumbnailGap}px`};
     min-width: 100%;
     overflow: hidden;
     position: relative;
