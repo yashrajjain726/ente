@@ -829,7 +829,8 @@ class _HomeWidgetState extends State<HomeWidget> {
                         isOnSearchTab && IndexOfStackNotifier().index == 1;
                     final isOnLandingPage =
                         !Configuration.instance.hasConfiguredAccount() &&
-                            !isOfflineMode;
+                            !isOfflineMode &&
+                            !widget.startWithoutAccount;
                     final isOnOnlineGrantPermissionScreen =
                         Configuration.instance.hasConfiguredAccount() &&
                             !isOfflineMode &&
