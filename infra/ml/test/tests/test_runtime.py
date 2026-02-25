@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import numpy as np
 from PIL import Image
+from pathlib import Path
 
-from ground_truth._runtime import _correct_image_orientation
+import ground_truth._runtime as runtime
 
 
 def _sample_image() -> Image.Image:
@@ -24,7 +25,7 @@ def test_correct_image_orientation_applies_standard_exif_orientation() -> None:
     exif[274] = 6
     image.info["exif"] = exif.tobytes()
 
-    corrected = _correct_image_orientation(image)
+    corrected = runtime._correct_image_orientation(image)
 
     assert corrected.size == (2, 3)
 
@@ -36,7 +37,7 @@ def test_correct_image_orientation_uses_original_orientation_when_exif_is_normal
     image.info["exif"] = exif.tobytes()
     image.info["original_orientation"] = 6
 
-    corrected = _correct_image_orientation(image)
+    corrected = runtime._correct_image_orientation(image)
 
     assert corrected.size == (2, 3)
 
@@ -44,6 +45,29 @@ def test_correct_image_orientation_uses_original_orientation_when_exif_is_normal
 def test_correct_image_orientation_leaves_image_unchanged_without_orientation_metadata() -> None:
     image = _sample_image()
 
-    corrected = _correct_image_orientation(image)
+    corrected = runtime._correct_image_orientation(image)
+
+    assert corrected.size == image.size
+
+
+def test_correct_image_orientation_skips_original_orientation_for_heif_with_primary_transform(
+    monkeypatch,
+) -> None:
+    image = _sample_image()
+    exif = image.getexif()
+    exif[274] = 1
+    image.info["exif"] = exif.tobytes()
+    image.info["original_orientation"] = 6
+
+    monkeypatch.setattr(
+        runtime,
+        "_heif_primary_item_has_orientation_transform",
+        lambda _: True,
+    )
+
+    corrected = runtime._correct_image_orientation(
+        image,
+        source_path=Path("/tmp/example.HEIC"),
+    )
 
     assert corrected.size == image.size
