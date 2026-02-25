@@ -696,6 +696,7 @@ const Page: React.FC = () => {
             exportVisibilityProps.open ||
             authenticateUserVisibilityProps.open ||
             albumNameInputVisibilityProps.open ||
+            pickCoverPhotoDialogVisibilityProps.open ||
             isFileViewerOpen
         ) {
             return;
