@@ -40,8 +40,8 @@ export const quickLinkDateRangeForCreationTimes = (
     return `${shortMonths[endTime.getMonth() + 1]} ${endTime.getDate()}, ${endTime.getFullYear()}`;
 };
 
-export const quickLinkNameForFiles = (files: EnteFile[]) => {
-    if (!files.length) return "Quick link";
+export const quickLinkDateRangeForFiles = (files: EnteFile[]) => {
+    if (!files.length) return undefined;
 
     let minCreationTime = Number.POSITIVE_INFINITY;
     let maxCreationTime = Number.NEGATIVE_INFINITY;
@@ -53,6 +53,9 @@ export const quickLinkNameForFiles = (files: EnteFile[]) => {
 
     return quickLinkDateRangeForCreationTimes(minCreationTime, maxCreationTime);
 };
+
+export const quickLinkNameForFiles = (files: EnteFile[]) =>
+    quickLinkDateRangeForFiles(files) ?? "Quick link";
 
 const substituteCustomDomainIfNeeded = (
     url: string,
