@@ -1,8 +1,9 @@
-import "dart:io" show File, Platform;
+import "dart:io" show Directory, File, Platform;
 import "dart:math" as math show sqrt, min, max;
 
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/services.dart" show PlatformException;
+import "package:flutter_image_compress/flutter_image_compress.dart";
 import "package:logging/logging.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
@@ -640,16 +641,67 @@ Future<MLResult> analyzeImageRust(Map args) async {
       allowCpuFallback: allowCpuFallback,
     );
 
-    final rustResult = await rust_ml.analyzeImageRust(
-      req: rust_ml.AnalyzeImageRequest(
-        fileId: enteFileID,
-        imagePath: imagePath,
-        runFaces: runFaces,
-        runClip: runClip,
-        modelPaths: modelPaths,
-        providerPolicy: providerPolicy,
-      ),
-    );
+    Future<rust_ml.AnalyzeImageResult> runRustAnalyzeForPath(
+      String analyzePath,
+    ) {
+      return rust_ml.analyzeImageRust(
+        req: rust_ml.AnalyzeImageRequest(
+          fileId: enteFileID,
+          imagePath: analyzePath,
+          runFaces: runFaces,
+          runClip: runClip,
+          modelPaths: modelPaths,
+          providerPolicy: providerPolicy,
+        ),
+      );
+    }
+
+    final fileFormat = getExtension(imagePath);
+    rust_ml.AnalyzeImageResult rustResult;
+    try {
+      rustResult = await runRustAnalyzeForPath(imagePath);
+    } catch (e, s) {
+      if (!_isRustDecodeIssue(e)) {
+        _logger.severe(
+          "Rust pipeline failed (non-decode) for fileID $enteFileID (format: $fileFormat)",
+          e,
+          s,
+        );
+        rethrow;
+      }
+
+      _logger.warning(
+        "Rust decode failed for fileID $enteFileID (format: $fileFormat), retrying with JPEG fallback",
+        e,
+        s,
+      );
+      final fallback =
+          await _createJpegDecodeFallbackFile(imagePath: imagePath);
+      if (fallback == null) {
+        _logger.severe(
+          "JPEG fallback conversion returned null/empty bytes for fileID $enteFileID (format: $fileFormat)",
+          e,
+          s,
+        );
+        rethrow;
+      }
+
+      try {
+        rustResult = await runRustAnalyzeForPath(fallback.file.path);
+        _logger.info(
+          "Rust decode fallback succeeded for fileID $enteFileID (original format: $fileFormat)",
+        );
+      } catch (retryError, retryStack) {
+        _logger.severe(
+          "Rust decode fallback retry failed for fileID $enteFileID (original format: $fileFormat)",
+          retryError,
+          retryStack,
+        );
+        rethrow;
+      } finally {
+        await _cleanupDecodeFallback(fallback);
+      }
+    }
 
     final result = MLResult.fromEnteFileID(enteFileID);
     result.decodedImageSize = Dimensions(
@@ -701,5 +753,54 @@ Future<MLResult> analyzeImageRust(Map args) async {
   } catch (e, s) {
     _logger.severe("Could not analyze image with Rust pipeline", e, s);
     rethrow;
+  }
+}
+
+bool _isRustDecodeIssue(Object error) {
+  final message = error.toString().toLowerCase();
+  return message.contains("decode error");
+}
+
+class _DecodeFallbackFile {
+  final File file;
+  final Directory directory;
+
+  const _DecodeFallbackFile({
+    required this.file,
+    required this.directory,
+  });
+}
+
+Future<_DecodeFallbackFile?> _createJpegDecodeFallbackFile({
+  required String imagePath,
+}) async {
+  final convertedData = await FlutterImageCompress.compressWithFile(
+    imagePath,
+    format: CompressFormat.jpeg,
+    minWidth: 20000,
+    minHeight: 20000,
+  );
+  if (convertedData == null || convertedData.isEmpty) {
+    return null;
+  }
+
+  final tempDirectory = await Directory.systemTemp.createTemp(
+    "ente_ml_decode_fallback_",
+  );
+  final fallbackFile = File("${tempDirectory.path}/ml_decode_retry.jpg");
+  await fallbackFile.writeAsBytes(convertedData, flush: true);
+  return _DecodeFallbackFile(file: fallbackFile, directory: tempDirectory);
+}
+
+Future<void> _cleanupDecodeFallback(_DecodeFallbackFile fallback) async {
+  try {
+    if (await fallback.file.exists()) {
+      await fallback.file.delete();
+    }
+    if (await fallback.directory.exists()) {
+      await fallback.directory.delete(recursive: true);
+    }
+  } catch (e, s) {
+    _logger.warning("Could not cleanup decode fallback file", e, s);
   }
 }
