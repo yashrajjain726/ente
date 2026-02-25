@@ -111,7 +111,7 @@ pub fn run_f32(
 ) -> MlResult<(Vec<i64>, Vec<f32>)> {
     let input_tensor = Tensor::<f32>::from_array((input_shape, input))?;
     let outputs = session.run(ort::inputs![input_tensor]?)?;
-    if outputs.len() == 0 {
+    if outputs.is_empty() {
         return Err(MlError::Ort("missing first output tensor".to_string()));
     }
     let output = &outputs[0];
