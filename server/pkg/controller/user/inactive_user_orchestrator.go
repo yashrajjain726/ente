@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -83,6 +84,7 @@ type InactiveUserOrchestrator struct {
 	NotificationHistoryRepo *repo.NotificationHistoryRepository
 	LockController          *lock.LockController
 	DiscordController       *discord.DiscordController
+	UserController          *UserController
 }
 
 func NewInactiveUserOrchestrator(
@@ -90,12 +92,14 @@ func NewInactiveUserOrchestrator(
 	notificationHistoryRepo *repo.NotificationHistoryRepository,
 	lockController *lock.LockController,
 	discordController *discord.DiscordController,
+	userController *UserController,
 ) *InactiveUserOrchestrator {
 	return &InactiveUserOrchestrator{
 		UserRepo:                userRepo,
 		NotificationHistoryRepo: notificationHistoryRepo,
 		LockController:          lockController,
 		DiscordController:       discordController,
+		UserController:          userController,
 	}
 }
 
@@ -169,6 +173,19 @@ func (c *InactiveUserOrchestrator) processCandidate(candidate repo.UserInactivit
 		return false, nil
 	}
 
+	if config.IsFinal {
+		if c.UserController == nil {
+			return false, fmt.Errorf("inactive user deletion requires user controller")
+		}
+		deleteLogger := log.WithFields(log.Fields{
+			"user_id": user.ID,
+			"req_ctx": "inactive_account_deletion",
+		})
+		if _, err := c.UserController.HandleAutomatedAccountDeletion(context.Background(), user.ID, deleteLogger); err != nil {
+			return false, err
+		}
+	}
+
 	templateData := map[string]interface{}{
 		"Email":        user.Email,
 		"DeletionDate": formatDeletionDate(candidate.LastActivity),
@@ -197,7 +214,7 @@ func (c *InactiveUserOrchestrator) processCandidate(candidate repo.UserInactivit
 
 	if config.IsFinal {
 		c.DiscordController.NotifyAdminAction(
-			fmt.Sprintf("Inactive user %d (%s) reached 12 months inactivity and was sent final warning for manual deletion review",
+			fmt.Sprintf("Inactive user %d (%s) reached 12 months inactivity and account deletion was initiated",
 				user.ID, user.Email))
 	}
 

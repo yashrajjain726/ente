@@ -419,6 +419,7 @@ func main() {
 		notificationHistoryRepo,
 		lockController,
 		discordController,
+		userController,
 	)
 	fileLinkCtrl := &publicCtrl.FileLinkController{
 		FileController: fileController,
