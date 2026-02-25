@@ -120,12 +120,13 @@ class MLIndexingIsolate extends SuperIsolate {
     }
     return _rustRuntimeLock.synchronized(() async {
       final rustRuntimeArgs = await _buildRustRuntimeArgs();
-      _cachedRustRuntimeArgs =
+      final frozenRuntimeArgs =
           Map<String, dynamic>.unmodifiable(rustRuntimeArgs);
       await runInIsolate(
         IsolateOperation.prepareRustMlRuntime,
-        _cachedRustRuntimeArgs!,
+        frozenRuntimeArgs,
       );
+      _cachedRustRuntimeArgs = frozenRuntimeArgs;
     });
   }
 
