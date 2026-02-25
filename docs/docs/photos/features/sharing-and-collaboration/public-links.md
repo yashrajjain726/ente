@@ -66,11 +66,11 @@ Public links support powerful customization, security, and control features:
 
 Choose how recipients view your public links with these layout options:
 
-**Masonry** (default): A dynamic layout that adapts to each photo's aspect ratio.
+**Masonry** (default): A dynamic grid that adapts to each photo’s size for a seamless layout.
 
-**Trip**: Photos appear on an interactive map and timeline, perfect for travel and location-based albums.
+**Trip**: Explore photos on an interactive map and timeline, perfect for travel and location-based albums.
 
-**Grouped**: Photos are organized by date, making it easy to browse chronologically.
+**Grouped**: Photos are organized by date, making it easy to browse memories chronologically.
 
 > [!NOTE]
 >
