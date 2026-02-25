@@ -94,6 +94,21 @@ import {
 } from "./photoswipe";
 import { PublicLikeModal } from "./PublicLikeModal";
 
+const fileViewerBackStateKey = "__enteFileViewerBackState";
+
+const addFileViewerBackStateMarker = (state: unknown, marker: string) =>
+    state && typeof state == "object"
+        ? {
+              ...(state as Record<string, unknown>),
+              [fileViewerBackStateKey]: marker,
+          }
+        : { [fileViewerBackStateKey]: marker };
+
+const hasFileViewerBackStateMarker = (state: unknown, marker: string) =>
+    !!state &&
+    typeof state == "object" &&
+    (state as Record<string, unknown>)[fileViewerBackStateKey] == marker;
+
 /**
  * Derived data for a file that is needed to display the file viewer controls
  * etc associated with the file.
@@ -345,6 +360,18 @@ export type FileViewerProps = ModalVisibilityProps & {
      */
     publicAlbumsCredentials?: PublicAlbumsCredentials;
     /**
+     * If set, overrides whether browser back should be consumed to close the
+     * viewer.
+     *
+     * By default this is enabled in public album context, and disabled
+     * otherwise.
+     */
+    shouldCloseOnBrowserBack?: boolean;
+    /**
+     * If `true`, disables closing the viewer with the Escape key.
+     */
+    disableEscapeClose?: boolean;
+    /**
      * The decrypted collection key (base64 encoded) for encrypting reactions.
      * Required when viewing a public album (no logged in user).
      */
@@ -417,6 +444,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     onAddFileToCollection,
     activeCollectionID,
     publicAlbumsCredentials,
+    shouldCloseOnBrowserBack: shouldCloseOnBrowserBackOverride,
+    disableEscapeClose = false,
     collectionKey,
     onJoinAlbum,
     enableComment = true,
@@ -424,6 +453,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     enableJoin = true,
 }) => {
     const { onGenericError } = useBaseContext();
+    const shouldCloseOnBrowserBack =
+        shouldCloseOnBrowserBackOverride ?? !!publicAlbumsCredentials;
 
     // There are 3 things involved in this dance:
     //
@@ -445,6 +476,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     // We also need to maintain a ref to the currently displayed dialog since we
     // might need to ask it to refresh its contents.
     const psRef = useRef<FileViewerPhotoSwipe | undefined>(undefined);
+    const handleCloseRef = useRef<() => void>(() => undefined);
+    const browserBackStateRef = useRef<string | undefined>(undefined);
 
     // Whenever we get a callback from our custom PhotoSwipe instance, we also
     // get the active file on which that action was performed as an argument. We
@@ -631,6 +664,10 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         onClose();
     }, [onTriggerRemotePull, onClose]);
 
+    // Keep the latest close callback available to non-react event handlers
+    // without forcing effects that register handlers to re-run.
+    handleCloseRef.current = handleClose;
+
     const handleViewInfo = useCallback(
         (annotatedFile: FileViewerAnnotatedFile) => {
             setActiveFileExif(
@@ -755,15 +792,13 @@ export const FileViewer: React.FC<FileViewerProps> = ({
     const activeAnnotatedFileRef = useRef(activeAnnotatedFile);
     activeAnnotatedFileRef.current = activeAnnotatedFile;
 
+    const isPublicAlbum = shouldOnlyServeAlbumsApp || !!publicAlbumsCredentials;
+
     // Called when the like button (heart) is clicked.
     // - If public album: toggle like (unlike if already liked, else show modal)
     // - If gallery view: show album selector (like) OR unlike selector/direct delete
     // - If collection view: toggle like in that collection
     const handleLikeClick = useCallback(() => {
-        // Detect public album: albums-only build OR we have public album credentials
-        const isPublicAlbum =
-            shouldOnlyServeAlbumsApp || !!publicAlbumsCredentials;
-
         if (isPublicAlbum) {
             const file = activeAnnotatedFileRef.current?.file;
             if (!file || !publicAlbumsCredentials) {
@@ -1052,6 +1087,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         activeCollectionID,
         getUserFileReactions,
         user?.id,
+        isPublicAlbum,
         publicAlbumsCredentials,
         collectionKey,
     ]);
@@ -2462,9 +2498,11 @@ export const FileViewer: React.FC<FileViewerProps> = ({
             const pswp = new FileViewerPhotoSwipe({
                 initialIndex,
                 haveUser,
+                isPublicAlbum,
                 showSocialButtons,
                 enableComment,
                 showFullscreenButton,
+                disableEscapeClose,
                 delegate: delegateRef.current!,
                 onClose: () => {
                     if (psRef.current) handleClose();
@@ -2506,7 +2544,9 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         initialIndex,
         disableDownload,
         showFullscreenButton,
+        disableEscapeClose,
         haveUser,
+        isPublicAlbum,
         handleClose,
         handleAnnotate,
         handleViewInfo,
@@ -2516,6 +2556,41 @@ export const FileViewer: React.FC<FileViewerProps> = ({
         handleDownloadBarAction,
         handleMore,
     ]);
+
+    useEffect(() => {
+        if (!open || !shouldCloseOnBrowserBack) return;
+
+        // In public albums, consume one browser-back action to close the
+        // viewer overlay instead of navigating away from the shared link.
+        const stateMarker = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        browserBackStateRef.current = stateMarker;
+
+        const currentState: unknown = window.history.state;
+        const viewerState = addFileViewerBackStateMarker(
+            currentState,
+            stateMarker,
+        );
+        window.history.pushState(viewerState, "", window.location.href);
+
+        const handlePopState = () => {
+            if (browserBackStateRef.current != stateMarker) return;
+            browserBackStateRef.current = undefined;
+            handleCloseRef.current();
+        };
+
+        window.addEventListener("popstate", handlePopState);
+
+        return () => {
+            window.removeEventListener("popstate", handlePopState);
+            if (browserBackStateRef.current != stateMarker) return;
+            browserBackStateRef.current = undefined;
+
+            const latestHistoryState: unknown = window.history.state;
+            if (hasFileViewerBackStateMarker(latestHistoryState, stateMarker)) {
+                window.history.back();
+            }
+        };
+    }, [open, shouldCloseOnBrowserBack]);
 
     const handleFileMetadataUpdate = useMemo(() => {
         return onRemoteFilesPull

@@ -330,8 +330,18 @@ func (c *UserController) UpdateEmail(ctx *gin.Context, userID int64, email strin
 	//
 	// See also: Do not block on mailing list errors
 	go func() {
-		_ = c.MailingListsController.Unsubscribe(oldEmail)
-		_ = c.MailingListsController.Subscribe(email)
+		if err := c.MailingListsController.Unsubscribe(oldEmail); err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"user_id": userID,
+				"email":   oldEmail,
+			}).Error("mailing list unsubscribe failed")
+		}
+		if err := c.MailingListsController.Subscribe(email); err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"user_id": userID,
+				"email":   email,
+			}).Error("mailing list subscribe failed")
+		}
 	}()
 
 	return nil

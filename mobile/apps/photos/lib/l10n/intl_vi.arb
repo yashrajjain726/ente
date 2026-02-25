@@ -134,6 +134,8 @@
   "changeEmail": "Đổi email",
   "enterYourPassword": "Nhập mật khẩu của bạn",
   "welcomeBack": "Chào mừng trở lại!",
+  "readyToBackupTitle": "Sẵn sàng sao lưu",
+  "readyToBackupSubtitle": "Ảnh của bạn sẽ được đồng bộ trong nền. Lần sao lưu đầu tiên có thể hơi lâu.",
   "contactSupport": "Liên hệ hỗ trợ",
   "locationPickerTip": "Bạn cũng có thể thêm vị trí tập trung vào ảnh từ phần thông tin của ảnh",
   "@locationPickerTip": {
@@ -527,6 +529,8 @@
   "clearIndexes": "Xóa chỉ mục",
   "selectFoldersForBackup": "Chọn thư mục để sao lưu",
   "selectFolders": "Chọn nhiều thư mục",
+  "backupToEnte": "Sao lưu lên Ente",
+  "selectAlbumsToBackUpToEnte": "Chọn những album sẽ sao lưu lên Ente",
   "selectedFoldersWillBeEncryptedAndBackedUp": "Các thư mục đã chọn sẽ được mã hóa và sao lưu",
   "unselectAll": "Bỏ chọn tất cả",
   "selectAll": "Chọn tất cả",
@@ -791,6 +795,26 @@
   "youAreOnAFamilyPlan": "Bạn đang dùng gói gia đình!",
   "contactFamilyAdmin": "Vui lòng liên hệ <green>{familyAdminEmail}</green> để quản lý gói của bạn",
   "leaveFamily": "Rời khỏi gia đình",
+  "youAreOnAFamilyPlanSubtitle": "Bạn đang trong một gói gia đình.",
+  "@youAreOnAFamilyPlanSubtitle": {
+    "description": "Subtitle shown on family member subscription screen",
+    "type": "text"
+  },
+  "familyAdminManagesPlanSuffix": " quản lý gói này.\nLiên hệ họ nếu có thay đổi.",
+  "@familyAdminManagesPlanSuffix": {
+    "description": "Text shown after family admin email on family member subscription screen",
+    "type": "text"
+  },
+  "leaveFamilyPlan": "Rời gói gia đình",
+  "@leaveFamilyPlan": {
+    "description": "Button label for leaving family plan",
+    "type": "text"
+  },
+  "needHelpContact": "Cần trợ giúp? Liên hệ ",
+  "@needHelpContact": {
+    "description": "Prefix text before support email on family member subscription screen",
+    "type": "text"
+  },
   "areYouSureThatYouWantToLeaveTheFamily": "Bạn có chắc muốn rời khỏi gói gia đình không?",
   "leave": "Rời",
   "rateTheApp": "Đánh giá ứng dụng",
@@ -1817,9 +1841,93 @@
   "legacyAccounts": "Tài khoản thừa kế",
   "trustedContacts": "Liên hệ tin cậy",
   "addTrustedContact": "Thêm liên hệ tin cậy",
+  "chooseFromAnExistingContact": "Chọn từ danh bạ hiện có",
+  "chooseARecoveryTime": "Chọn thời điểm khôi phục",
+  "addContact": "Thêm liên hệ",
   "removeInvite": "Gỡ bỏ lời mời",
   "recoveryWarning": "Một liên hệ tin cậy đang cố gắng truy cập tài khoản của bạn",
   "rejectRecovery": "Từ chối khôi phục",
+  "cannotUpdateRecoveryTime": "Không thể cập nhật thời gian khôi phục",
+  "cannotUpdateRecoveryTimeMessage": "Thời gian khôi phục không thể thay đổi khi đang trong một phiên khôi phục hoạt động. Vui lòng từ chối hoặc đợi khôi phục hoàn tất.",
+  "updateTime": "Cập nhật thời gian",
+  "revokeInvite": "Gỡ lời mời",
+  "trustedContactInvitePending": "Bạn đã mời {email} làm một liên hệ tin cậy. Họ chưa chấp nhận lời mời của bạn.",
+  "@trustedContactInvitePending": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "trustedContactAccepted": "Bạn đã mời {email} làm một liên hệ tin cậy. Họ đã chấp nhận lời mời của bạn.",
+  "@trustedContactAccepted": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "cancelInvite": "Hủy lời mời",
+  "cancelInviteDesc": "Nếu bạn xóa lời mời này, bạn sẽ phải gửi một lời mời mới nếu bạn đổi ý.",
+  "removeContactDesc": "Nếu bạn xóa lời mời này, bạn sẽ phải gửi một lời mời mới, và liên hệ cũng cần chấp nhận lại.",
+  "removeContact": "Gỡ liên hệ",
+  "letsTryThatAgain": "Hãy thử lại",
+  "removeYourselfDesc": "Nếu bạn tự gỡ bạn khỏi liên hệ tin cậy, bạn sẽ mất quyền truy cập tài khoản {email} sau chu kỳ họ không hoạt động.",
+  "@removeYourselfDesc": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "cancelRecovery": "Hủy khôi phục",
+  "cancelRecoveryDesc": "Bạn có chắc muốn hủy khôi phục tài khoản {email}?",
+  "@cancelRecoveryDesc": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "startRecovery": "Bắt đầu khôi phục",
+  "startRecoveryDesc": "Bạn có chắc muốn bắt đầu khôi phục tài khoản {email}?",
+  "@startRecoveryDesc": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "recoverAccountDesc": "Bạn có thể khôi phục tài khoản {email} trong {days} ngày sau khi bắt đầu quá trình khôi phục.",
+  "@recoverAccountDesc": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      },
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "recoverAccountAfter": "Bạn có thể khôi phục tài khoản {email} sau {time}.",
+  "@recoverAccountAfter": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "orRemoveYourself": "Hoặc gỡ bạn khỏi vai trò liên hệ tin cậy của {email}",
+  "@orRemoveYourself": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "recoveryInitiated": "Quá trình khôi phục đã được khởi động",
   "recoveryInitiatedDesc": "Bạn có thể truy cập tài khoản sau {days} ngày. Một thông báo sẽ được gửi đến {email}.",
   "@recoveryInitiatedDesc": {
@@ -1858,6 +1966,19 @@
       "email": {
         "type": "String",
         "example": "me@example.com"
+      },
+      "numOfDays": {
+        "type": "int",
+        "example": "30"
+      }
+    }
+  },
+  "confirmAddingTrustedContacts": "Bạn sắp thêm {count} liên hệ tin cậy. Họ sẽ có thể khôi phục tài khoản của bạn nếu bạn vắng mặt {numOfDays} ngày.",
+  "@confirmAddingTrustedContacts": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
       },
       "numOfDays": {
         "type": "int",

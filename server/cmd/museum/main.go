@@ -231,7 +231,7 @@ func main() {
 	}
 
 	pushController := controller.NewPushController(pushRepo, taskLockingRepo, hostName)
-	mailingListsController := controller.NewMailingListsController()
+	mailingListsController := controller.NewMailingListsController(discordController)
 
 	storageBonusCtrl := &storagebonus.Controller{
 		UserRepo:                    userRepo,
@@ -416,7 +416,6 @@ func main() {
 		FileController: fileController,
 		FileLinkRepo:   fileLinkRepo,
 		FileRepo:       fileRepo,
-		BillingCtrl:    billingController,
 		JwtSecret:      jwtSecretBytes,
 	}
 

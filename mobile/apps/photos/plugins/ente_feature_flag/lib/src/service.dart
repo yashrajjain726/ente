@@ -51,6 +51,8 @@ class FlagService {
     return (flags.internalUser || kDebugMode) && !isDisabled;
   }
 
+  bool get cloudflareUploadWorker => internalUser;
+
   bool get betaUser => flags.betaUser;
 
   bool get internalOrBetaUser => internalUser || betaUser;
@@ -71,7 +73,9 @@ class FlagService {
 
   bool get enableVectorDb => hasGrantedMLConsent;
 
-  bool get usearchForSearch => internalUser;
+  bool get usearchForSearch => true;
+
+  bool get usearchForSuggestions => internalUser;
 
   String get castUrl => flags.castUrl;
 

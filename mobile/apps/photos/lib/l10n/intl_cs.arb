@@ -9,6 +9,7 @@
   "cancel": "Zrušit",
   "verify": "Ověřit",
   "invalidEmailAddress": "Neplatná e-mailová adresa",
+  "validEmailAddress": "Platná e-mailová adresa",
   "enterValidEmail": "Prosím, zadejte platnou e-mailovou adresu.",
   "deleteAccount": "Smazat účet",
   "deleteAccountWarning": "Tímto smažete Váš účet Ente Auth, Ente Photos a Ente Locker.",
@@ -59,6 +60,7 @@
   "incorrectRecoveryKeyBody": "Vámi zadaný obnovovací klíč je nesprávný",
   "forgotPassword": "Zapomenuté heslo",
   "enterYourRecoveryKey": "Zadejte svůj obnovovací klíč",
+  "noRecoveryKey": "Zapomněli jste obnovovací klíč?",
   "sorry": "Omlouváme se",
   "noRecoveryKeyNoDecryption": "Vzhledem k povaze našeho protokolu koncového šifrování nemohou být Vaše data dešifrována bez Vašeho hesla nebo obnovovacího klíče",
   "verifyEmail": "Ověřit e-mail",
@@ -66,9 +68,21 @@
   "checkInboxAndSpamFolder": "Zkontrolujte prosím svou doručenou poštu (a spam) pro dokončení ověření",
   "tapToEnterCode": "Klepněte pro zadání kódu",
   "resendEmail": "Znovu odeslat e-mail",
+  "resendCode": "Odeslat kód znovu",
   "weHaveSendEmailTo": "Poslali jsme Vám e-mail na <green>{email}</green>",
   "@weHaveSendEmailTo": {
     "description": "Text to indicate that we have sent a mail to the user",
+    "placeholders": {
+      "email": {
+        "description": "The email address of the user",
+        "type": "String",
+        "example": "example@ente.io"
+      }
+    }
+  },
+  "weHaveSentCodeTo": "Poslali jsme Vám kód na {email}",
+  "@weHaveSentCodeTo": {
+    "description": "Text to indicate that we have sent a verification code to the user's email",
     "placeholders": {
       "email": {
         "description": "The email address of the user",
@@ -87,6 +101,10 @@
   "weakStrength": "Slabé",
   "strongStrength": "Silné",
   "moderateStrength": "Střední",
+  "strongPassword": "Silné heslo",
+  "passwordRequirements": "Použijte 9+ znaků, velké písmeno a zvláštní znak",
+  "passwordsMatch": "Hesla se shodují",
+  "passwordsDontMatch": "Hesla se neshodují",
   "passwordStrength": "Síla hesla: {passwordStrengthValue}",
   "@passwordStrength": {
     "description": "Text to indicate the password strength",
@@ -116,6 +134,8 @@
   "changeEmail": "Změnit e-mail",
   "enterYourPassword": "Zadejte své heslo",
   "welcomeBack": "Vítejte zpět!",
+  "readyToBackupTitle": "Připraveno k zálohování",
+  "readyToBackupSubtitle": "Vaše fotografie se budou synchronizovat na pozadí. První záloha může chvíli trvat.",
   "contactSupport": "Kontaktovat podporu",
   "locationPickerTip": "Můžete také přidat polohu zaměřenou na fotografii z informační obrazovky fotografie",
   "@locationPickerTip": {
@@ -129,8 +149,10 @@
   "verifyPassword": "Ověřit heslo",
   "recoveryKey": "Obnovovací klíč",
   "recoveryKeyOnForgotPassword": "Pokud zapomenete své heslo, jediný způsob jak obnovit Vaše data je pomocí tohoto klíče.",
+  "recoveryKeySaveDescription": "Prosím uložte si tento klíč na bezpečném místě.",
   "doThisLater": "Udělat později",
   "saveKey": "Uložit klíč",
+  "shareKey": "Sdílet klíč",
   "recoveryKeyCopiedToClipboard": "Obnovovací klíč zkopírován do schránky",
   "recoverAccount": "Obnovit účet",
   "recover": "Obnovit",
@@ -151,6 +173,7 @@
   "copypasteThisCodentoYourAuthenticatorApp": "Zkopírujte tento kód\ndo vaší ověřovací aplikace",
   "tapToCopy": "klepnutím zkopírovat",
   "scanThisBarcodeWithnyourAuthenticatorApp": "Naskenujte tento QR kód \ns vaší ověřovací aplikací",
+  "twoFAVerification": "2FA ověření",
   "enterThe6digitCodeFromnyourAuthenticatorApp": "Zadejte 6-místný kód\nz vaší ověřovací aplikace",
   "confirm": "Potvrdit",
   "setupComplete": "Nastavení dokončeno",
@@ -506,6 +529,8 @@
   "clearIndexes": "Smazat indexy",
   "selectFoldersForBackup": "Vyberte složky pro zálohování",
   "selectFolders": "Vybrat složky",
+  "backupToEnte": "Zálohování na Ente",
+  "selectAlbumsToBackUpToEnte": "Vyberte alba pro zálohování do Ente",
   "selectedFoldersWillBeEncryptedAndBackedUp": "Vybrané složky budou šifrovány a zálohovány",
   "unselectAll": "Zrušit výběr",
   "selectAll": "Vybrat vše",
@@ -588,6 +613,11 @@
   "backedUpFolders": "Zálohované složky",
   "backup": "Zálohování",
   "freeUpDeviceSpace": "Uvolnit místo na zařízení",
+  "freeUpDeviceSpaceDesc": "Uvolněte místo ve svém zařízení vymazáním souborů, které již byly zálohovány.",
+  "freeUpDeviceSpaceDescICloud": "Soubory v iCloud sdílených albech nelze vymazat.",
+  "@freeUpDeviceSpaceDescICloud": {
+    "description": "Here 'cleared' means 'deleted' from the device"
+  },
   "allClear": "✨ Vše v pořádku",
   "noDeviceThatCanBeDeleted": "Na tomto zařízení nemáte žádné soubory, které by mohly být odstraněny",
   "removeDuplicates": "Odstranit duplikáty",
@@ -637,6 +667,8 @@
   "notifications": "Oznámení",
   "sharedPhotoNotifications": "Nové sdílené fotky",
   "sharedPhotoNotificationsExplanation": "Dostávejte oznámení, když někdo přidá fotografii do sdíleného alba, jehož jste členem",
+  "socialNotifications": "Líbí se a komentáře",
+  "socialNotificationsExplanation": "Přijímat oznámení pro líbí se u Vašich fotek a komentáře na albech, kterých jste součástí",
   "advanced": "Pokročilé",
   "general": "Obecné",
   "security": "Zabezpečení",
@@ -763,6 +795,26 @@
   "youAreOnAFamilyPlan": "Máte rodinný plán!",
   "contactFamilyAdmin": "Pro správu předplatného kontaktujte <green>{familyAdminEmail}</green>",
   "leaveFamily": "Odejít z rodiny",
+  "youAreOnAFamilyPlanSubtitle": "Máte rodinný plán.",
+  "@youAreOnAFamilyPlanSubtitle": {
+    "description": "Subtitle shown on family member subscription screen",
+    "type": "text"
+  },
+  "familyAdminManagesPlanSuffix": " spravuje tento plán.\nKontaktujte je pro provedení změn.",
+  "@familyAdminManagesPlanSuffix": {
+    "description": "Text shown after family admin email on family member subscription screen",
+    "type": "text"
+  },
+  "leaveFamilyPlan": "Opustit rodinný plán",
+  "@leaveFamilyPlan": {
+    "description": "Button label for leaving family plan",
+    "type": "text"
+  },
+  "needHelpContact": "Potřebujete pomoc? Kontaktujte ",
+  "@needHelpContact": {
+    "description": "Prefix text before support email on family member subscription screen",
+    "type": "text"
+  },
   "areYouSureThatYouWantToLeaveTheFamily": "Opravdu chcete opustit rodinný plán?",
   "leave": "Odejít",
   "rateTheApp": "Ohodnotit aplikaci",
@@ -776,6 +828,10 @@
   "selectMorePhotos": "Vybrat více fotografií",
   "existingUser": "Existující uživatel",
   "newToEnte": "Nový uživatel Ente",
+  "createAnEnteAccount": "Vytvořit účet Ente",
+  "continueWithoutAccount": "Pokračovat bez účtu",
+  "loginToExistingAccount": "Přihlásit se k existujícímu účtu",
+  "shareTheMoment": "Sdílet okamžik",
   "pleaseLoginAgain": "Prosím, přihlaste se znovu",
   "autoLogoutMessage": "Z technických důvodů jste byli odhlášeni. Omlouváme se za způsobené nepříjemnosti.",
   "yourSubscriptionHasExpired": "Vaše předplatné vypršelo",
@@ -1747,7 +1803,6 @@
   "legacyPageDesc2": "Důvěryhodné kontakty mohou zahájit obnovení účtu a pokud nebude do 30 dnů zablokováno, mohou resetovat Vaše heslo a získat přístup k Vašemu účtu.",
   "legacyAccounts": "Účty pro dědictví",
   "trustedContacts": "Důvěryhodné kontakty",
-  "addTrustedContact": "Přidat důvěryhodný kontakt",
   "removeInvite": "Odstranit pozvání",
   "recoveryWarning": "Důvěryhodný kontakt se snaží získat přístup k Vašemu účtu",
   "rejectRecovery": "Odmítnout obnovu",
