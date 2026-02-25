@@ -614,6 +614,14 @@
   "@uploadStorageLimitErrorBody": {
     "description": "Body shown when uploads fail due to running out of storage"
   },
+  "uploadSubscriptionExpiredErrorTitle": "Subscription expired",
+  "@uploadSubscriptionExpiredErrorTitle": {
+    "description": "Title shown when uploads fail because the Photos subscription is expired"
+  },
+  "uploadSubscriptionExpiredErrorBody": "Your Ente Photos subscription has expired. Renew your subscription to continue uploading.",
+  "@uploadSubscriptionExpiredErrorBody": {
+    "description": "Body shown when uploads fail because the Photos subscription is expired"
+  },
   "uploadFileCountLimitErrorTitle": "File limit reached",
   "@uploadFileCountLimitErrorTitle": {
     "description": "Title shown when uploads fail because the locker already has the maximum file count"
