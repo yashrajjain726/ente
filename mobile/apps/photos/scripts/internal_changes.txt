@@ -3,3 +3,4 @@
 - Laurens: (I) Use cloudflare worker for upload for internal users
 - Neeraj: (I) Add internal-only resumable gallery download queue with persistence/restart fixes and completion banner updates
 - Neeraj: (i) Improve public album link 429/device-limit error handling
+- Neeraj: File details: hide timezone in creation time and prefer editedTime over public metadata dateTime, falling back to creationTime
