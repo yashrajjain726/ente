@@ -106,7 +106,6 @@ import {
     createQuickLinkCollection,
     removeFromCollection,
     removeFromFavoritesCollection,
-    updateCollectionLayout,
 } from "ente-new/photos/services/collection";
 import {
     haveOnlySystemCollections,
@@ -982,10 +981,6 @@ const Page: React.FC = () => {
                             quickLinkCollection,
                             ownedSelectedFiles,
                         );
-                        await updateCollectionLayout(
-                            quickLinkCollection,
-                            "masonry",
-                        );
                         const publicURL = await createPublicURL(
                             quickLinkCollection.id,
                             { enableJoin: false },
@@ -1319,7 +1314,6 @@ const Page: React.FC = () => {
                     quickLinkNameForFiles([file]),
                 );
                 await addToCollection(quickLinkCollection, [file]);
-                await updateCollectionLayout(quickLinkCollection, "masonry");
                 const publicURL = await createPublicURL(
                     quickLinkCollection.id,
                     { enableJoin: false },

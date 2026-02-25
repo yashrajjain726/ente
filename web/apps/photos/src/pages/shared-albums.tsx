@@ -760,6 +760,9 @@ const sortFilesForCollection = (files: EnteFile[], collection?: Collection) =>
     sortFiles(files, collection?.pubMagicMetadata?.data.asc ?? false);
 
 const normalizedPublicAlbumLayout = (layout: string | undefined) => {
+    if (layout === "continuous") {
+        return "masonry";
+    }
     if (layout === "grouped" || layout === "trip" || layout === "masonry") {
         return layout;
     }

@@ -1561,13 +1561,6 @@ const EnablePublicShareOptions: React.FC<EnablePublicShareOptionsProps> = ({
 
         void (async () => {
             try {
-                const normalizedLayout = "masonry";
-                if (
-                    collection.pubMagicMetadata?.data.layout !==
-                    normalizedLayout
-                ) {
-                    await updateCollectionLayout(collection, normalizedLayout);
-                }
                 const publicURL = await createPublicURL(
                     collection.id,
                     attributes,
@@ -2405,6 +2398,9 @@ const layoutOptions = () => [
 ];
 
 const normalizedLayoutValue = (layout: string | undefined) => {
+    if (layout === "continuous") {
+        return "masonry";
+    }
     if (layout === "grouped" || layout === "trip" || layout === "masonry") {
         return layout;
     }
