@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	stdtime "time"
 
 	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/pkg/controller/discord"
@@ -32,10 +33,10 @@ const (
 	inactiveUserDeletionWarn12m1dTemplate = "inactive-user-deletion/warn_12m_1d.html"
 	inactiveUserDeletionFinalTemplate     = "inactive-user-deletion/confirm_12m.html"
 
-	inactiveUserDeletionWarn11mSubject   = "Your Ente account has been inactive"
-	inactiveUserDeletionWarn12m7dSubject = "Reminder: your Ente account is still inactive"
-	inactiveUserDeletionWarn12m1dSubject = "Final reminder: your Ente account is inactive"
-	inactiveUserDeletionFinalSubject     = "Your Ente account is marked for manual deletion review"
+	inactiveUserDeletionWarn11mSubject   = "Your Ente account is scheduled for deletion due to inactivity"
+	inactiveUserDeletionWarn12m7dSubject = "Reminder: Your Ente account will be deleted in 7 days due to inactivity"
+	inactiveUserDeletionWarn12m1dSubject = "REMINDER: Your Ente account will be deleted tomorrow due to inactivity"
+	inactiveUserDeletionFinalSubject     = "Your Ente account has been deleted"
 )
 
 const (
@@ -169,7 +170,8 @@ func (c *InactiveUserOrchestrator) processCandidate(candidate repo.UserInactivit
 	}
 
 	templateData := map[string]interface{}{
-		"Email": user.Email,
+		"Email":        user.Email,
+		"DeletionDate": formatDeletionDate(candidate.LastActivity),
 	}
 	if err := emailUtil.SendTemplatedEmailV2(
 		[]string{user.Email},
@@ -281,4 +283,9 @@ func inactivityStageConfig(stage inactivityEmailStage) inactivityEmailStageConfi
 
 func isEnteDomainRolloutUser(email string) bool {
 	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(email)), "@ente.io")
+}
+
+func formatDeletionDate(lastActivity int64) string {
+	deletionTime := stdtime.UnixMicro(lastActivity + inactiveUserTwelveMonthsInMicroSeconds).UTC()
+	return deletionTime.Format("02 Jan 2006")
 }
