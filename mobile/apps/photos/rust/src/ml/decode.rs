@@ -1,7 +1,7 @@
-use std::{io::Cursor, sync::Once};
+use std::{ffi::OsStr, io::Cursor, sync::Once};
 
 use exif::{In, Reader as ExifReader, Tag};
-use image::{DynamicImage, ImageReader, RgbImage};
+use image::{DynamicImage, ImageReader, RgbImage, hooks::decoding_hook_registered};
 use libheic_rs::{
     DecodeGuardrails, image_integration::register_image_decoder_hooks_with_guardrails,
 };
@@ -50,9 +50,36 @@ fn init_image_decoders() {
             temp_spool_directory: None,
         });
 
+        let heic_hook_active = decoding_hook_registered(OsStr::new("heic"));
+        let heif_hook_active = decoding_hook_registered(OsStr::new("heif"));
+        let avif_hook_active = decoding_hook_registered(OsStr::new("avif"));
+        let has_heif_family_support = heic_hook_active || heif_hook_active;
+
+        if !has_heif_family_support {
+            eprintln!(
+                "[ml][decode] failed to activate HEIF/HEIC decoder hooks; registration_result=(heic:{}, heif:{}, avif:{}), active_hooks=(heic:{}, heif:{}, avif:{})",
+                registration.heic_decoder_hook_registered,
+                registration.heif_decoder_hook_registered,
+                registration.avif_decoder_hook_registered,
+                heic_hook_active,
+                heif_hook_active,
+                avif_hook_active,
+            );
+        } else if !registration.all_decoder_hooks_registered() {
+            eprintln!(
+                "[ml][decode] libheic-rs decoder hooks only partially registered (usually because another initializer registered first); registration_result=(heic:{}, heif:{}, avif:{}), active_hooks=(heic:{}, heif:{}, avif:{})",
+                registration.heic_decoder_hook_registered,
+                registration.heif_decoder_hook_registered,
+                registration.avif_decoder_hook_registered,
+                heic_hook_active,
+                heif_hook_active,
+                avif_hook_active,
+            );
+        }
+
         debug_assert!(
-            registration.any_decoder_hook_registered(),
-            "failed to register any libheic-rs image decoder hooks"
+            heic_hook_active || heif_hook_active || avif_hook_active,
+            "no libheic-rs image decoder hooks are active"
         );
     });
 }
