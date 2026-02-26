@@ -242,6 +242,7 @@
     "description": "Text to indicate that there is limit on number of devices"
   },
   "albumLayout": "Album layout",
+  "layoutMasonry": "Masonry",
   "layoutGrouped": "Grouped",
   "layoutContinuous": "Continuous",
   "layoutTrip": "Trip",
