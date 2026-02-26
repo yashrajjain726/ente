@@ -176,6 +176,20 @@ func (repo *UserRepository) GetActiveUsersByLastActivityBefore(beforeTime int64,
 	return result, nil
 }
 
+// GetLatestTokenActivity returns the latest known token activity for a user.
+// The second return value is false when no token row exists for the user.
+func (repo *UserRepository) GetLatestTokenActivity(userID int64) (int64, bool, error) {
+	var lastActivity sql.NullInt64
+	err := repo.DB.QueryRow(`SELECT MAX(last_used_at) FROM tokens WHERE user_id = $1`, userID).Scan(&lastActivity)
+	if err != nil {
+		return 0, false, stacktrace.Propagate(err, "failed to fetch latest token activity")
+	}
+	if !lastActivity.Valid {
+		return 0, false, nil
+	}
+	return lastActivity.Int64, true, nil
+}
+
 // GetUserUsageWithSubData will return current storage usage & basic information about subscription for given list
 // of users. It's primarily used for fetching storage utilisation for a family/group of users
 func (repo *UserRepository) GetUserUsageWithSubData(ctx context.Context, userIds []int64) ([]ente.UserUsageWithSubData, error) {

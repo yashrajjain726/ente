@@ -160,7 +160,16 @@ func (c *InactiveUserOrchestrator) processCandidate(candidate repo.UserInactivit
 		return false, nil
 	}
 
-	stage, err := c.resolveNextStage(user.ID, candidate.LastActivity, now)
+	lastActivity, found, err := c.UserRepo.GetLatestTokenActivity(user.ID)
+	if err != nil {
+		return false, err
+	}
+	if !found {
+		// Tokens are the source of truth for this workflow; skip if activity is no longer available.
+		return false, nil
+	}
+
+	stage, err := c.resolveNextStage(user.ID, lastActivity, now)
 	if err != nil {
 		return false, err
 	}
@@ -177,6 +186,25 @@ func (c *InactiveUserOrchestrator) processCandidate(candidate repo.UserInactivit
 		if c.UserController == nil {
 			return false, fmt.Errorf("inactive user deletion requires user controller")
 		}
+
+		// Re-check right before deletion to avoid deleting users who became active
+		// after earlier reads in long processing runs.
+		latestActivity, latestFound, err := c.UserRepo.GetLatestTokenActivity(user.ID)
+		if err != nil {
+			return false, err
+		}
+		if !latestFound {
+			return false, nil
+		}
+		latestStage, err := c.resolveNextStage(user.ID, latestActivity, now)
+		if err != nil {
+			return false, err
+		}
+		if latestStage != inactivityEmailStageFinal {
+			log.WithField("user_id", user.ID).Info("Skipping inactive user deletion because user is no longer in final stage")
+			return false, nil
+		}
+
 		deleteLogger := log.WithFields(log.Fields{
 			"user_id": user.ID,
 			"req_ctx": "inactive_account_deletion",
