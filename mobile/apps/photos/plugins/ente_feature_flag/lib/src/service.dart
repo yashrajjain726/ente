@@ -102,6 +102,8 @@ class FlagService {
   bool get isSocialEnabled =>
       internalUser || _isServerFlagEnabled(_commentsFlag);
 
+  bool get useRustForML => internalUser;
+
   Future<void> tryRefreshFlags() async {
     try {
       await _fetch();

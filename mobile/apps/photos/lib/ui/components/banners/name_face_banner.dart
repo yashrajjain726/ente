@@ -81,8 +81,8 @@ class _NameFaceBannerState extends State<NameFaceBanner> {
                 style: TextStyle(
                   fontFamily: "Inter",
                   fontWeight: FontWeight.w500,
-                  fontSize: 10,
-                  height: 16 / 10,
+                  fontSize: 12,
+                  height: 16 / 12,
                   color: colorScheme.contentLight,
                 ),
               ),

@@ -290,6 +290,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
         [setWatchFolderView],
     );
 
+    const handleShowExport = useCallback(() => {
+        if (!isDesktop) {
+            showMiniDialog(downloadAppDialogAttributes());
+            return;
+        }
+
+        void (async () => {
+            try {
+                await onAuthenticateUser();
+                onShowExport();
+            } catch {
+                // User cancelled reauthentication.
+            }
+        })();
+    }, [onAuthenticateUser, onShowExport, showMiniDialog]);
+
     const performSidebarAction = useCallback(
         async (actionID: SidebarActionID) =>
             performSidebarRegistryAction(actionID, {
@@ -300,7 +316,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 showPreferences,
                 showHelp,
                 showFreeUpSpace,
-                onShowExport,
+                onShowExport: handleShowExport,
                 onLogout: handleLogout,
                 onShowWatchFolder: handleOpenWatchFolder,
                 pseudoIDs: {
@@ -328,7 +344,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClose,
             onShowCollectionSummary,
             onShowPlanSelector,
-            onShowExport,
+            handleShowExport,
             showAccount,
             showFreeUpSpace,
             showHelp,
@@ -376,7 +392,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <UtilitySection
                     onCloseSidebar={onClose}
                     {...{
-                        onShowExport,
+                        onShowExport: handleShowExport,
                         onAuthenticateUser,
                         showAccount,
                         accountVisibilityProps,
@@ -831,13 +847,6 @@ const UtilitySection: React.FC<UtilitySectionProps> = ({
     pendingFreeUpSpaceAction,
     onFreeUpSpaceActionHandled,
 }) => {
-    const { showMiniDialog } = useBaseContext();
-
-    const handleExport = () =>
-        isDesktop
-            ? onShowExport()
-            : showMiniDialog(downloadAppDialogAttributes());
-
     return (
         <>
             <RowButton
@@ -875,7 +884,7 @@ const UtilitySection: React.FC<UtilitySectionProps> = ({
                         <RowButtonEndActivityIndicator />
                     )
                 }
-                onClick={handleExport}
+                onClick={onShowExport}
             />
             <Help
                 {...helpVisibilityProps}
