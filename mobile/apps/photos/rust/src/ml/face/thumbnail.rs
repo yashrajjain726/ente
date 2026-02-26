@@ -4,7 +4,7 @@ use fast_image_resize::{
 };
 
 use crate::image::image_compression::{
-    EncodedImageFormat, FACE_THUMBNAIL_JPEG_QUALITY, encode_rgb,
+    EncodedImageFormat, FACE_THUMBNAIL_JPEG_QUALITY, FACE_THUMBNAIL_MIN_DIMENSION, encode_rgb,
 };
 use crate::ml::{
     error::{MlError, MlResult},
@@ -55,11 +55,14 @@ pub fn generate_face_thumbnails(
         let crop = compute_crop_rect(face_box, image_width, image_height).map_err(|e| {
             MlError::InvalidRequest(format!("invalid face box at index {index}: {e}",))
         })?;
-        let resized = resize_crop_with_fir(&source, &crop, &mut resizer)?;
+        let (target_width, target_height) =
+            dimensions_with_min_side(crop.output_width, crop.output_height)?;
+        let resized =
+            resize_crop_with_fir(&source, &crop, target_width, target_height, &mut resizer)?;
         let compressed = encode_rgb(
             resized.buffer(),
-            crop.output_width,
-            crop.output_height,
+            target_width,
+            target_height,
             EncodedImageFormat::Jpeg {
                 quality: FACE_THUMBNAIL_JPEG_QUALITY,
             },
@@ -148,10 +151,12 @@ fn float_to_output_dimension(value: f64) -> Option<u32> {
 fn resize_crop_with_fir(
     source: &impl IntoImageView,
     crop: &CropRect,
+    target_width: u32,
+    target_height: u32,
     resizer: &mut Resizer,
 ) -> MlResult<FirImage<'static>> {
-    let mut resized = FirImage::new(crop.output_width, crop.output_height, PixelType::U8x3);
-    let filter = select_resize_filter(crop);
+    let mut resized = FirImage::new(target_width, target_height, PixelType::U8x3);
+    let filter = select_resize_filter(crop, target_width, target_height);
     let options = ResizeOptions::new()
         .crop(crop.x, crop.y, crop.width, crop.height)
         .resize_alg(ResizeAlg::Convolution(filter));
@@ -161,9 +166,9 @@ fn resize_crop_with_fir(
     Ok(resized)
 }
 
-fn select_resize_filter(crop: &CropRect) -> FilterType {
-    let scale_x = crop.width / f64::from(crop.output_width);
-    let scale_y = crop.height / f64::from(crop.output_height);
+fn select_resize_filter(crop: &CropRect, target_width: u32, target_height: u32) -> FilterType {
+    let scale_x = crop.width / f64::from(target_width);
+    let scale_y = crop.height / f64::from(target_height);
     let max_scale = scale_x.max(scale_y);
 
     if max_scale <= 1.15 {
@@ -178,12 +183,42 @@ fn select_resize_filter(crop: &CropRect) -> FilterType {
     }
 }
 
+fn dimensions_with_min_side(width: u32, height: u32) -> MlResult<(u32, u32)> {
+    if width == 0 || height == 0 {
+        return Err(MlError::Postprocess(
+            "cannot compute resize dimensions for zero-sized crop".to_string(),
+        ));
+    }
+
+    let min_side = width.min(height);
+    let scale = f64::from(FACE_THUMBNAIL_MIN_DIMENSION) / f64::from(min_side);
+    let target_width = (f64::from(width) * scale).round();
+    let target_height = (f64::from(height) * scale).round();
+
+    if !target_width.is_finite()
+        || !target_height.is_finite()
+        || target_width < 1.0
+        || target_height < 1.0
+        || target_width > f64::from(u32::MAX)
+        || target_height > f64::from(u32::MAX)
+    {
+        return Err(MlError::Postprocess(format!(
+            "invalid resize dimensions computed from {width}x{height}",
+        )));
+    }
+
+    Ok((target_width as u32, target_height as u32))
+}
+
 #[cfg(test)]
 mod tests {
     use fast_image_resize::FilterType;
     use image::ImageFormat;
 
-    use super::{FaceBox, compute_crop_rect, generate_face_thumbnails, select_resize_filter};
+    use super::{
+        FaceBox, compute_crop_rect, dimensions_with_min_side, generate_face_thumbnails,
+        select_resize_filter,
+    };
     use crate::ml::types::{DecodedImage, Dimensions};
 
     #[test]
@@ -277,7 +312,10 @@ mod tests {
             output_width: 100,
             output_height: 100,
         };
-        assert_eq!(select_resize_filter(&mild_crop), FilterType::Bilinear);
+        assert_eq!(
+            select_resize_filter(&mild_crop, 100, 100),
+            FilterType::Bilinear
+        );
 
         let moderate_crop = super::CropRect {
             x: 0.0,
@@ -287,7 +325,10 @@ mod tests {
             output_width: 100,
             output_height: 100,
         };
-        assert_eq!(select_resize_filter(&moderate_crop), FilterType::Mitchell);
+        assert_eq!(
+            select_resize_filter(&moderate_crop, 100, 100),
+            FilterType::Mitchell
+        );
 
         let heavy_crop = super::CropRect {
             x: 0.0,
@@ -297,7 +338,41 @@ mod tests {
             output_width: 100,
             output_height: 100,
         };
-        assert_eq!(select_resize_filter(&heavy_crop), FilterType::Lanczos3);
+        assert_eq!(
+            select_resize_filter(&heavy_crop, 100, 100),
+            FilterType::Lanczos3
+        );
+    }
+
+    #[test]
+    fn dimensions_with_min_side_keeps_aspect_ratio_and_sets_short_side_to_512() {
+        let (w1, h1) = dimensions_with_min_side(100, 200).expect("resize should succeed");
+        assert_eq!(w1, 512);
+        assert_eq!(h1, 1024);
+
+        let (w2, h2) = dimensions_with_min_side(300, 120).expect("resize should succeed");
+        assert_eq!(w2, 1280);
+        assert_eq!(h2, 512);
+    }
+
+    #[test]
+    fn generate_face_thumbnails_outputs_min_side_512() {
+        let decoded = synthetic_decoded_image(100, 200);
+        let face_boxes = vec![FaceBox {
+            x: 0.0,
+            y: 0.0,
+            width: 1.0,
+            height: 1.0,
+        }];
+
+        let thumbnails =
+            generate_face_thumbnails(&decoded, &face_boxes).expect("thumbnails should generate");
+        assert_eq!(thumbnails.len(), 1);
+
+        let decoded_jpeg = image::load_from_memory_with_format(&thumbnails[0], ImageFormat::Jpeg)
+            .expect("thumbnail bytes should decode as JPEG");
+        let short_side = decoded_jpeg.width().min(decoded_jpeg.height());
+        assert_eq!(short_side, 512);
     }
 
     fn synthetic_decoded_image(width: u32, height: u32) -> DecodedImage {

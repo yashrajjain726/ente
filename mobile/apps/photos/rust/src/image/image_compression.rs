@@ -6,6 +6,7 @@ use image::{
 use crate::ml::error::{MlError, MlResult};
 
 pub const FACE_THUMBNAIL_JPEG_QUALITY: u8 = 90;
+pub const FACE_THUMBNAIL_MIN_DIMENSION: u32 = 512;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EncodedImageFormat {
