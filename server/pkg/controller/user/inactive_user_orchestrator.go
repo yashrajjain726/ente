@@ -186,9 +186,10 @@ func (c *InactiveUserOrchestrator) processCandidate(candidate repo.UserInactivit
 		}
 	}
 
+	deletionDate := formatDeletionDateForStage(stage, now)
 	templateData := map[string]interface{}{
 		"Email":        user.Email,
-		"DeletionDate": formatDeletionDate(candidate.LastActivity),
+		"DeletionDate": deletionDate,
 	}
 	if err := emailUtil.SendTemplatedEmailV2(
 		[]string{user.Email},
@@ -208,8 +209,10 @@ func (c *InactiveUserOrchestrator) processCandidate(candidate repo.UserInactivit
 	}
 
 	log.WithFields(log.Fields{
-		"user_id":     user.ID,
-		"template_id": config.TemplateID,
+		"user_id":       user.ID,
+		"email":         user.Email,
+		"template_id":   config.TemplateID,
+		"deletion_date": deletionDate,
 	}).Info("Sent inactive user email")
 
 	if config.IsFinal {
@@ -302,7 +305,18 @@ func isEnteDomainRolloutUser(email string) bool {
 	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(email)), "@ente.io")
 }
 
-func formatDeletionDate(lastActivity int64) string {
-	deletionTime := stdtime.UnixMicro(lastActivity + inactiveUserTwelveMonthsInMicroSeconds).UTC()
+func formatDeletionDateForStage(stage inactivityEmailStage, now int64) string {
+	var daysUntilDeletion int64
+	switch stage {
+	case inactivityEmailStageWarn11m:
+		daysUntilDeletion = 30
+	case inactivityEmailStageWarn12m7d:
+		daysUntilDeletion = 7
+	case inactivityEmailStageWarn12m1d:
+		daysUntilDeletion = 1
+	case inactivityEmailStageFinal:
+		daysUntilDeletion = 0
+	}
+	deletionTime := stdtime.UnixMicro(now + daysUntilDeletion*inactiveUserOneDayInMicroSeconds).UTC()
 	return deletionTime.Format("02 Jan 2006")
 }
