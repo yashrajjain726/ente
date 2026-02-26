@@ -429,6 +429,7 @@ const Page: React.FC = () => {
 
     const activeCollectionFiles = useMemo(() => {
         if (!activeCollection) return [];
+        if (barMode == "hidden-albums") return filteredFiles;
 
         return filteredFiles.filter(({ id, magicMetadata }) => {
             const visibility = magicMetadata?.data.visibility;
@@ -445,6 +446,7 @@ const Page: React.FC = () => {
         });
     }, [
         activeCollection,
+        barMode,
         filteredFiles,
         hiddenFileIDs,
         tempDeletedFileIDs,
