@@ -1,4 +1,7 @@
-use image::{ColorType, ImageBuffer, ImageEncoder, Rgb, RgbImage, codecs::png::PngEncoder};
+use fast_image_resize::{
+    FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer, images::Image as FirImage,
+};
+use image::{ColorType, ImageEncoder, codecs::png::PngEncoder};
 
 use crate::ml::{
     error::{MlError, MlResult},
@@ -39,7 +42,8 @@ pub fn generate_face_thumbnails(
         ));
     }
 
-    let source = rgb_image_from_decoded(decoded)?;
+    let source = fir_image_from_decoded(decoded)?;
+    let mut resizer = Resizer::new();
     let image_width = decoded.dimensions.width as f64;
     let image_height = decoded.dimensions.height as f64;
     let mut results = Vec::with_capacity(face_boxes.len());
@@ -48,20 +52,22 @@ pub fn generate_face_thumbnails(
         let crop = compute_crop_rect(face_box, image_width, image_height).map_err(|e| {
             MlError::InvalidRequest(format!("invalid face box at index {index}: {e}",))
         })?;
-        let png_bytes = crop_and_encode_png(&source, &crop)?;
+        let resized = resize_crop_with_fir(&source, &crop, &mut resizer)?;
+        let png_bytes = encode_png(resized.buffer(), crop.output_width, crop.output_height)?;
         results.push(png_bytes);
     }
 
     Ok(results)
 }
 
-fn rgb_image_from_decoded(decoded: &DecodedImage) -> MlResult<RgbImage> {
-    ImageBuffer::<Rgb<u8>, _>::from_raw(
+fn fir_image_from_decoded(decoded: &DecodedImage) -> MlResult<FirImage<'static>> {
+    FirImage::from_vec_u8(
         decoded.dimensions.width,
         decoded.dimensions.height,
         decoded.rgb.clone(),
+        PixelType::U8x3,
     )
-    .ok_or_else(|| MlError::Decode("invalid decoded RGB buffer".to_string()))
+    .map_err(|e| MlError::Decode(format!("invalid decoded RGB buffer: {e}")))
 }
 
 fn compute_crop_rect(
@@ -129,67 +135,27 @@ fn float_to_output_dimension(value: f64) -> Option<u32> {
     Some(truncated as u32)
 }
 
-fn crop_and_encode_png(source: &RgbImage, crop: &CropRect) -> MlResult<Vec<u8>> {
-    let mut cropped = ImageBuffer::<Rgb<u8>, Vec<u8>>::new(crop.output_width, crop.output_height);
-
-    let scale_x = crop.width / f64::from(crop.output_width);
-    let scale_y = crop.height / f64::from(crop.output_height);
-
-    for y in 0..crop.output_height {
-        for x in 0..crop.output_width {
-            let source_x = crop.x + (f64::from(x) + 0.5) * scale_x - 0.5;
-            let source_y = crop.y + (f64::from(y) + 0.5) * scale_y - 0.5;
-            let rgb = sample_bilinear(source, source_x, source_y);
-            cropped.put_pixel(x, y, Rgb(rgb));
-        }
-    }
-
-    let mut png_bytes = Vec::new();
-    PngEncoder::new(&mut png_bytes)
-        .write_image(
-            cropped.as_raw(),
-            crop.output_width,
-            crop.output_height,
-            ColorType::Rgb8.into(),
-        )
-        .map_err(|e| MlError::Postprocess(format!("failed to encode PNG thumbnail: {e}")))?;
-    Ok(png_bytes)
+fn resize_crop_with_fir(
+    source: &FirImage<'_>,
+    crop: &CropRect,
+    resizer: &mut Resizer,
+) -> MlResult<FirImage<'static>> {
+    let mut resized = FirImage::new(crop.output_width, crop.output_height, PixelType::U8x3);
+    let options = ResizeOptions::new()
+        .crop(crop.x, crop.y, crop.width, crop.height)
+        .resize_alg(ResizeAlg::Convolution(FilterType::CatmullRom));
+    resizer
+        .resize(source, &mut resized, Some(&options))
+        .map_err(|e| MlError::Postprocess(format!("failed to resize face thumbnail crop: {e}")))?;
+    Ok(resized)
 }
 
-fn sample_bilinear(image: &RgbImage, x: f64, y: f64) -> [u8; 3] {
-    let max_x = image.width().saturating_sub(1) as f64;
-    let max_y = image.height().saturating_sub(1) as f64;
-    let fx = x.clamp(0.0, max_x);
-    let fy = y.clamp(0.0, max_y);
-
-    let x0 = fx.floor() as u32;
-    let x1 = fx.ceil() as u32;
-    let y0 = fy.floor() as u32;
-    let y1 = fy.ceil() as u32;
-
-    let dx = fx - f64::from(x0);
-    let dy = fy - f64::from(y0);
-    let dx1 = 1.0 - dx;
-    let dy1 = 1.0 - dy;
-
-    let p1 = image.get_pixel(x0, y0).0;
-    let p2 = image.get_pixel(x1, y0).0;
-    let p3 = image.get_pixel(x0, y1).0;
-    let p4 = image.get_pixel(x1, y1).0;
-
-    let bilinear = |c1: u8, c2: u8, c3: u8, c4: u8| -> u8 {
-        let value = f64::from(c1) * dx1 * dy1
-            + f64::from(c2) * dx * dy1
-            + f64::from(c3) * dx1 * dy
-            + f64::from(c4) * dx * dy;
-        value.round().clamp(0.0, 255.0) as u8
-    };
-
-    [
-        bilinear(p1[0], p2[0], p3[0], p4[0]),
-        bilinear(p1[1], p2[1], p3[1], p4[1]),
-        bilinear(p1[2], p2[2], p3[2], p4[2]),
-    ]
+fn encode_png(rgb_bytes: &[u8], width: u32, height: u32) -> MlResult<Vec<u8>> {
+    let mut png_bytes = Vec::new();
+    PngEncoder::new(&mut png_bytes)
+        .write_image(rgb_bytes, width, height, ColorType::Rgb8.into())
+        .map_err(|e| MlError::Postprocess(format!("failed to encode PNG thumbnail: {e}")))?;
+    Ok(png_bytes)
 }
 
 #[cfg(test)]
