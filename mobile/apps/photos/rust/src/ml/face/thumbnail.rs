@@ -3,7 +3,7 @@ use fast_image_resize::{
     images::{Image as FirImage, ImageRef as FirImageRef},
 };
 
-use crate::image_processing::image_compression::{
+use crate::image::image_compression::{
     EncodedImageFormat, FACE_THUMBNAIL_JPEG_QUALITY, encode_rgb,
 };
 use crate::ml::{

@@ -1,6 +1,6 @@
-use crate::ml::{
-    decode::decode_image_from_path,
-    face::thumbnail::{FaceBox, generate_face_thumbnails as generate_face_thumbnails_impl},
+use crate::{
+    image::decode::decode_image_from_path,
+    ml::face::thumbnail::{FaceBox, generate_face_thumbnails as generate_face_thumbnails_impl},
 };
 
 #[derive(Clone, Debug)]
