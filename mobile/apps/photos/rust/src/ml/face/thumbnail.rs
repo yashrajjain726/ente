@@ -1,5 +1,6 @@
 use fast_image_resize::{
-    FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer, images::Image as FirImage,
+    FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
+    images::{Image as FirImage, ImageRef as FirImageRef},
 };
 use image::{ColorType, ImageEncoder, codecs::png::PngEncoder};
 
@@ -42,7 +43,7 @@ pub fn generate_face_thumbnails(
         ));
     }
 
-    let source = fir_image_from_decoded(decoded)?;
+    let source = fir_image_ref_from_decoded(decoded)?;
     let mut resizer = Resizer::new();
     let image_width = decoded.dimensions.width as f64;
     let image_height = decoded.dimensions.height as f64;
@@ -60,11 +61,11 @@ pub fn generate_face_thumbnails(
     Ok(results)
 }
 
-fn fir_image_from_decoded(decoded: &DecodedImage) -> MlResult<FirImage<'static>> {
-    FirImage::from_vec_u8(
+fn fir_image_ref_from_decoded(decoded: &DecodedImage) -> MlResult<FirImageRef<'_>> {
+    FirImageRef::new(
         decoded.dimensions.width,
         decoded.dimensions.height,
-        decoded.rgb.clone(),
+        decoded.rgb.as_slice(),
         PixelType::U8x3,
     )
     .map_err(|e| MlError::Decode(format!("invalid decoded RGB buffer: {e}")))
@@ -136,18 +137,36 @@ fn float_to_output_dimension(value: f64) -> Option<u32> {
 }
 
 fn resize_crop_with_fir(
-    source: &FirImage<'_>,
+    source: &impl IntoImageView,
     crop: &CropRect,
     resizer: &mut Resizer,
 ) -> MlResult<FirImage<'static>> {
     let mut resized = FirImage::new(crop.output_width, crop.output_height, PixelType::U8x3);
+    let filter = select_resize_filter(crop);
     let options = ResizeOptions::new()
         .crop(crop.x, crop.y, crop.width, crop.height)
-        .resize_alg(ResizeAlg::Convolution(FilterType::CatmullRom));
+        .resize_alg(ResizeAlg::Convolution(filter));
     resizer
         .resize(source, &mut resized, Some(&options))
         .map_err(|e| MlError::Postprocess(format!("failed to resize face thumbnail crop: {e}")))?;
     Ok(resized)
+}
+
+fn select_resize_filter(crop: &CropRect) -> FilterType {
+    let scale_x = crop.width / f64::from(crop.output_width);
+    let scale_y = crop.height / f64::from(crop.output_height);
+    let max_scale = scale_x.max(scale_y);
+
+    if max_scale <= 1.15 {
+        // Mild downscale: bilinear keeps results close to legacy canvas behavior.
+        FilterType::Bilinear
+    } else if max_scale <= 1.5 {
+        // Moderate downscale: Mitchell gives stronger antialiasing with low ringing.
+        FilterType::Mitchell
+    } else {
+        // Heavy downscale: Lanczos3 preserves detail best.
+        FilterType::Lanczos3
+    }
 }
 
 fn encode_png(rgb_bytes: &[u8], width: u32, height: u32) -> MlResult<Vec<u8>> {
@@ -160,9 +179,10 @@ fn encode_png(rgb_bytes: &[u8], width: u32, height: u32) -> MlResult<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
+    use fast_image_resize::FilterType;
     use image::ImageFormat;
 
-    use super::{FaceBox, compute_crop_rect, generate_face_thumbnails};
+    use super::{FaceBox, compute_crop_rect, generate_face_thumbnails, select_resize_filter};
     use crate::ml::types::{DecodedImage, Dimensions};
 
     #[test]
@@ -244,6 +264,39 @@ mod tests {
         let result = generate_face_thumbnails(&decoded, &face_boxes);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn select_resize_filter_is_scale_aware() {
+        let mild_crop = super::CropRect {
+            x: 0.0,
+            y: 0.0,
+            width: 100.9,
+            height: 100.0,
+            output_width: 100,
+            output_height: 100,
+        };
+        assert_eq!(select_resize_filter(&mild_crop), FilterType::Bilinear);
+
+        let moderate_crop = super::CropRect {
+            x: 0.0,
+            y: 0.0,
+            width: 149.0,
+            height: 120.0,
+            output_width: 100,
+            output_height: 100,
+        };
+        assert_eq!(select_resize_filter(&moderate_crop), FilterType::Mitchell);
+
+        let heavy_crop = super::CropRect {
+            x: 0.0,
+            y: 0.0,
+            width: 180.0,
+            height: 160.0,
+            output_width: 100,
+            output_height: 100,
+        };
+        assert_eq!(select_resize_filter(&heavy_crop), FilterType::Lanczos3);
     }
 
     fn synthetic_decoded_image(width: u32, height: u32) -> DecodedImage {
