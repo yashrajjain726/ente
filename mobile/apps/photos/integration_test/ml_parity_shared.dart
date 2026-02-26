@@ -21,6 +21,8 @@ const _codeRevision =
     String.fromEnvironment("ML_PARITY_CODE_REVISION", defaultValue: "local");
 const _localMirrorBaseUrl =
     String.fromEnvironment("ML_PARITY_LOCAL_MIRROR_BASE_URL");
+const _internalUserRoute =
+    bool.fromEnvironment("ML_PARITY_INTERNAL_USER", defaultValue: false);
 const _localModelMirrorRelativeDir = ".cache/local_model_mirror";
 
 const _parityReportDataKey = "ml_parity_results_json";
@@ -82,6 +84,7 @@ void runMLParityIntegrationTest({required String expectedPlatform}) {
         final modelSpecs = _modelSpecs();
         final loadedModels = await _downloadAndLoadModels(
           modelSpecs: modelSpecs,
+          skipModelLoad: _internalUserRoute,
         );
 
         final runtime = Platform.isAndroid
@@ -201,22 +204,26 @@ class _LoadedModels {
   final List<String> modelNames;
   final List<int> modelAddresses;
   final Map<String, String> modelMetadata;
+  final Map<String, String> modelPathsBySchema;
 
   const _LoadedModels({
     required this.modelNames,
     required this.modelAddresses,
     required this.modelMetadata,
+    required this.modelPathsBySchema,
   });
 }
 
 Future<_LoadedModels> _downloadAndLoadModels({
   required List<_ModelSpec> modelSpecs,
+  required bool skipModelLoad,
 }) async {
   await _ensureModelNetworkContext();
 
   final modelNames = <String>[];
   final modelPaths = <String>[];
   final modelMetadata = <String, String>{};
+  final modelPathsBySchema = <String, String>{};
 
   for (final modelSpec in modelSpecs) {
     final (modelName, modelPath) = await modelSpec.model.getModelNameAndPath();
@@ -229,9 +236,19 @@ Future<_LoadedModels> _downloadAndLoadModels({
 
     modelNames.add(modelName);
     modelPaths.add(modelFile.path);
+    modelPathsBySchema[modelSpec.schemaName] = modelFile.path;
     final modelSHA256 = await _sha256HexOfFile(modelFile);
     modelMetadata[modelSpec.schemaName] =
         "${modelFile.uri.pathSegments.last}:$modelSHA256";
+  }
+
+  if (skipModelLoad) {
+    return _LoadedModels(
+      modelNames: modelNames,
+      modelAddresses: const <int>[],
+      modelMetadata: modelMetadata,
+      modelPathsBySchema: modelPathsBySchema,
+    );
   }
 
   final loadedAddressesRaw = await MLIndexingIsolate.instance.runInIsolate(
@@ -255,6 +272,7 @@ Future<_LoadedModels> _downloadAndLoadModels({
     modelNames: modelNames,
     modelAddresses: modelAddresses,
     modelMetadata: modelMetadata,
+    modelPathsBySchema: modelPathsBySchema,
   );
 }
 
@@ -272,6 +290,9 @@ Future<void> _ensureModelNetworkContext() async {
 }
 
 Future<void> _releaseModels(_LoadedModels loadedModels) async {
+  if (loadedModels.modelAddresses.isEmpty) {
+    return;
+  }
   await MLIndexingIsolate.instance.runInIsolate(
     IsolateOperation.releaseIndexingModels,
     {
@@ -455,21 +476,56 @@ Future<MLResult> _analyzeImage({
   required String filePath,
   required _LoadedModels loadedModels,
 }) async {
-  final faceDetectionAddress = loadedModels.modelAddresses[0];
-  final faceEmbeddingAddress = loadedModels.modelAddresses[1];
-  final clipAddress = loadedModels.modelAddresses[2];
+  const useRustMl = _internalUserRoute;
+  final args = <String, dynamic>{
+    "enteFileID": fileID,
+    "filePath": filePath,
+    "runFaces": true,
+    "runClip": true,
+    "useRustMl": useRustMl,
+  };
 
-  final resultJSONString = await MLIndexingIsolate.instance.runInIsolate(
-    IsolateOperation.analyzeImage,
-    {
-      "enteFileID": fileID,
-      "filePath": filePath,
-      "runFaces": true,
-      "runClip": true,
+  if (useRustMl) {
+    final faceDetectionModelPath =
+        loadedModels.modelPathsBySchema["face_detection"];
+    final faceEmbeddingModelPath =
+        loadedModels.modelPathsBySchema["face_embedding"];
+    final clipImageModelPath = loadedModels.modelPathsBySchema["clip"];
+    if (faceDetectionModelPath == null ||
+        faceEmbeddingModelPath == null ||
+        clipImageModelPath == null) {
+      throw StateError(
+        "Missing model paths for Rust ML parity route: face_detection/face_embedding/clip",
+      );
+    }
+    args.addAll({
+      "faceDetectionModelPath": faceDetectionModelPath,
+      "faceEmbeddingModelPath": faceEmbeddingModelPath,
+      "clipImageModelPath": clipImageModelPath,
+      "preferCoreml": Platform.isIOS,
+      "preferNnapi": Platform.isAndroid,
+      "preferXnnpack": Platform.isAndroid,
+      "allowCpuFallback": true,
+    });
+  } else {
+    if (loadedModels.modelAddresses.length < 3) {
+      throw StateError(
+        "Missing loaded model addresses for static parity route",
+      );
+    }
+    final faceDetectionAddress = loadedModels.modelAddresses[0];
+    final faceEmbeddingAddress = loadedModels.modelAddresses[1];
+    final clipAddress = loadedModels.modelAddresses[2];
+    args.addAll({
       "faceDetectionAddress": faceDetectionAddress,
       "faceEmbeddingAddress": faceEmbeddingAddress,
       "clipImageAddress": clipAddress,
-    },
+    });
+  }
+
+  final resultJSONString = await MLIndexingIsolate.instance.runInIsolate(
+    IsolateOperation.analyzeImage,
+    args,
   ) as String;
   return MLResult.fromJsonString(resultJSONString);
 }
