@@ -3,6 +3,7 @@ import 'dart:typed_data' show Uint8List;
 
 import "package:logging/logging.dart";
 import "package:photos/models/ml/face/box.dart";
+import "package:photos/service_locator.dart";
 import "package:photos/utils/image_ml_util.dart";
 import "package:photos/utils/isolate/isolate_operations.dart";
 import "package:photos/utils/isolate/super_isolate.dart";
@@ -14,7 +15,7 @@ class FaceThumbnailGenerator extends SuperIsolate {
   final _logger = Logger('FaceThumbnailGenerator');
 
   @override
-  bool get isDartUiIsolate => true;
+  bool get isDartUiIsolate => !flagService.useRustForFaceThumbnails;
 
   @override
   String get isolateName => "FaceThumbnailGenerator";
@@ -46,6 +47,7 @@ class FaceThumbnailGenerator extends SuperIsolate {
         {
           'imagePath': imagePath,
           'faceBoxesList': faceBoxesJson,
+          'useRustForFaceThumbnails': flagService.useRustForFaceThumbnails,
         },
       ).then((value) => value.cast<Uint8List>());
       _logger.info("Generated face thumbnails");
