@@ -37,6 +37,7 @@ class FaceThumbnailGenerator extends SuperIsolate {
     List<FaceBox> faceBoxes,
   ) async {
     try {
+      final useRustForFaceThumbnails = flagService.useRustForFaceThumbnails;
       _logger.info(
         "Generating face thumbnails for ${faceBoxes.length} face boxes in $imagePath",
       );
@@ -47,10 +48,14 @@ class FaceThumbnailGenerator extends SuperIsolate {
         {
           'imagePath': imagePath,
           'faceBoxesList': faceBoxesJson,
-          'useRustForFaceThumbnails': flagService.useRustForFaceThumbnails,
+          'useRustForFaceThumbnails': useRustForFaceThumbnails,
         },
       ).then((value) => value.cast<Uint8List>());
       _logger.info("Generated face thumbnails");
+      if (useRustForFaceThumbnails) {
+        // Rust path already emits compressed JPEG bytes.
+        return faces;
+      }
       final compressedFaces =
           await compressFaceThumbnails({'listPngBytes': faces});
       _logger.fine(

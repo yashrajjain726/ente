@@ -2,8 +2,10 @@ use fast_image_resize::{
     FilterType, IntoImageView, PixelType, ResizeAlg, ResizeOptions, Resizer,
     images::{Image as FirImage, ImageRef as FirImageRef},
 };
-use image::{ColorType, ImageEncoder, codecs::png::PngEncoder};
 
+use crate::image_processing::image_compression::{
+    EncodedImageFormat, FACE_THUMBNAIL_JPEG_QUALITY, encode_rgb,
+};
 use crate::ml::{
     error::{MlError, MlResult},
     types::DecodedImage,
@@ -54,8 +56,15 @@ pub fn generate_face_thumbnails(
             MlError::InvalidRequest(format!("invalid face box at index {index}: {e}",))
         })?;
         let resized = resize_crop_with_fir(&source, &crop, &mut resizer)?;
-        let png_bytes = encode_png(resized.buffer(), crop.output_width, crop.output_height)?;
-        results.push(png_bytes);
+        let compressed = encode_rgb(
+            resized.buffer(),
+            crop.output_width,
+            crop.output_height,
+            EncodedImageFormat::Jpeg {
+                quality: FACE_THUMBNAIL_JPEG_QUALITY,
+            },
+        )?;
+        results.push(compressed);
     }
 
     Ok(results)
@@ -169,14 +178,6 @@ fn select_resize_filter(crop: &CropRect) -> FilterType {
     }
 }
 
-fn encode_png(rgb_bytes: &[u8], width: u32, height: u32) -> MlResult<Vec<u8>> {
-    let mut png_bytes = Vec::new();
-    PngEncoder::new(&mut png_bytes)
-        .write_image(rgb_bytes, width, height, ColorType::Rgb8.into())
-        .map_err(|e| MlError::Postprocess(format!("failed to encode PNG thumbnail: {e}")))?;
-    Ok(png_bytes)
-}
-
 #[cfg(test)]
 mod tests {
     use fast_image_resize::FilterType;
@@ -221,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    fn generate_face_thumbnails_returns_png_per_input_face() {
+    fn generate_face_thumbnails_returns_jpeg_per_input_face() {
         let decoded = synthetic_decoded_image(16, 16);
         let face_boxes = vec![
             FaceBox {
@@ -244,10 +245,10 @@ mod tests {
         assert_eq!(thumbnails.len(), 2);
         for bytes in thumbnails {
             assert!(!bytes.is_empty());
-            let decoded_png = image::load_from_memory_with_format(&bytes, ImageFormat::Png)
-                .expect("thumbnail bytes should decode as PNG");
-            assert!(decoded_png.width() > 0);
-            assert!(decoded_png.height() > 0);
+            let decoded_jpeg = image::load_from_memory_with_format(&bytes, ImageFormat::Jpeg)
+                .expect("thumbnail bytes should decode as JPEG");
+            assert!(decoded_jpeg.width() > 0);
+            assert!(decoded_jpeg.height() > 0);
         }
     }
 
