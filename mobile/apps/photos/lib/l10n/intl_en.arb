@@ -242,6 +242,7 @@
     "description": "Text to indicate that there is limit on number of devices"
   },
   "albumLayout": "Album layout",
+  "layoutMasonry": "Masonry",
   "layoutGrouped": "Grouped",
   "layoutContinuous": "Continuous",
   "layoutTrip": "Trip",
@@ -290,6 +291,7 @@
   "copyLink": "Copy link",
   "copyEmbedHtml": "Copy embed HTML",
   "linkHasExpired": "Link has expired",
+  "linkRequestLimitExceeded": "This album has been viewed on too many devices",
   "publicLinkEnabled": "Public link enabled",
   "shareALink": "Share a link",
   "sharedAlbumSectionDescription": "Create shared and collaborative albums with other Ente users, including users on free plans.",

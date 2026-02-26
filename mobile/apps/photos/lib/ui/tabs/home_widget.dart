@@ -355,8 +355,11 @@ class _HomeWidgetState extends State<HomeWidget> {
       }
       _linkedPublicAlbums[uri] = (isInitialStream, currentTime);
 
-      final Collection collection = await CollectionsService.instance
+      final Collection? collection = await CollectionsService.instance
           .getCollectionFromPublicLink(context, uri);
+      if (collection == null) {
+        return;
+      }
 
       final existingCollection =
           CollectionsService.instance.getCollectionByID(collection.id);
@@ -826,7 +829,8 @@ class _HomeWidgetState extends State<HomeWidget> {
                         isOnSearchTab && IndexOfStackNotifier().index == 1;
                     final isOnLandingPage =
                         !Configuration.instance.hasConfiguredAccount() &&
-                            !isOfflineMode;
+                            !isOfflineMode &&
+                            !widget.startWithoutAccount;
                     final isOnOnlineGrantPermissionScreen =
                         Configuration.instance.hasConfiguredAccount() &&
                             !isOfflineMode &&

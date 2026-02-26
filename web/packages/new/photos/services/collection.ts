@@ -1133,7 +1133,7 @@ export const updateCollectionCover = async (
  *
  * @param collection The collection whose layout we want to change.
  *
- * @param layout The layout type ("grouped", "continuous", "trip").
+ * @param layout The layout type ("masonry", "grouped", "continuous", "trip").
  */
 export const updateCollectionLayout = async (
     collection: Collection,

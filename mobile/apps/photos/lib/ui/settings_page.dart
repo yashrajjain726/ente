@@ -87,7 +87,10 @@ class _SettingsBody extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildTitleBar(context, colorScheme),
-                _buildEmailHeaderSection(context, colorScheme, textTheme),
+                if (hasLoggedIn)
+                  _buildEmailHeaderSection(context, colorScheme, textTheme)
+                else
+                  const SizedBox(height: 8),
                 if (showLoginEntry) ...[
                   OfflineSettingsBanner(
                     onGetStarted: () {

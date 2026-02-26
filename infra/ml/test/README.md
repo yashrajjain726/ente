@@ -70,6 +70,27 @@ Useful optional filters:
 - `--file-id <fixture_name>` (repeatable)
 - `--output-dir <custom_dir>`
 
+## Ground-Truth Decode Visualizer
+
+Render the exact Python ground-truth decode output (including EXIF orientation handling)
+for every manifest fixture, then review the generated gallery.
+
+```bash
+uv run --project infra/ml --no-sync --with pillow-heif \
+  python infra/ml/test/tools/visualize_ground_truth_decodes.py \
+  --manifest infra/ml/test/ground_truth/manifest.json \
+  --output-dir infra/ml/test/out/parity/python_decode_preview \
+  --open
+```
+
+This script calls `ground_truth._runtime.decode_image_rgb` directly, so it tracks
+decode/orientation behavior changes in the Python reference pipeline.
+
+Outputs:
+
+- `infra/ml/test/out/parity/python_decode_preview/index.html`
+- `infra/ml/test/out/parity/python_decode_preview/decoded/*.png`
+
 ## Golden Update / Maintenance
 
 Goldens are runtime artifacts and are not committed.

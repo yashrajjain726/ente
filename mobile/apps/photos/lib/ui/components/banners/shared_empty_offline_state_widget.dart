@@ -9,7 +9,6 @@ class SharedEmptyOfflineStateWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
     final l10n = AppLocalizations.of(context);
 
     return Center(
@@ -39,7 +38,11 @@ class SharedEmptyOfflineStateWidget extends StatelessWidget {
             Text(
               l10n.offlineEnableSharingDesc,
               textAlign: TextAlign.center,
-              style: textTheme.body.copyWith(
+              style: TextStyle(
+                fontFamily: "Inter",
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                height: 20 / 14,
                 color: colorScheme.textMuted,
               ),
             ),
