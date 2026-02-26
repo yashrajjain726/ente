@@ -263,16 +263,11 @@ void shareSelected(
 
 Future<void> shareAlbumLink(
   BuildContext context,
-  Collection collection,
   String url,
   GlobalKey key,
 ) async {
-  final description =
-      'Check out, comment and react on photos from "${collection.displayName}" privately with Ente\'s end to end encryption';
-
   await shareLinkWithDescription(
     url,
-    description: description,
     context: context,
     key: key,
   );

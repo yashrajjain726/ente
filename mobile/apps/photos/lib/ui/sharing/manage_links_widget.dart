@@ -391,7 +391,6 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                       onTap: () async {
                         await shareAlbumLink(
                           context,
-                          widget.collection!,
                           urlValue,
                           sendLinkButtonKey,
                         );
