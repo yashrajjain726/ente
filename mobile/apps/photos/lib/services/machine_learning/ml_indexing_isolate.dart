@@ -23,7 +23,7 @@ class MLIndexingIsolate extends SuperIsolate {
   final _logger = Logger("MLIndexingIsolate");
 
   @override
-  bool get isDartUiIsolate => true;
+  bool get isDartUiIsolate => !_shouldUseRustMl;
 
   @override
   String get isolateName => "MLIndexingIsolate";
