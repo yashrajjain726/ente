@@ -81,10 +81,7 @@ export const fetchPublicAlbumsUploadURLWithMetadata = async (
     {
         contentLength,
         contentMd5,
-    }: {
-        contentLength: number;
-        contentMd5: string;
-    },
+    }: { contentLength: number; contentMd5: string },
     credentials: PublicAlbumsCredentials,
 ) => {
     const headers = new Headers(
@@ -134,11 +131,7 @@ export const fetchPublicAlbumsMultipartUploadURLsWithMetadata = async (
         contentLength,
         partLength,
         partMd5s,
-    }: {
-        contentLength: number;
-        partLength: number;
-        partMd5s: string[];
-    },
+    }: { contentLength: number; partLength: number; partMd5s: string[] },
     credentials: PublicAlbumsCredentials,
 ) => {
     const headers = new Headers(

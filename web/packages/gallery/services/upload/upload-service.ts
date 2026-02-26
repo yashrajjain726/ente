@@ -218,7 +218,9 @@ class UploadService {
 
     private async _refillUploadURLs() {
         if (this.publicAlbumsCredentials) {
-            throw new Error("Public uploads should request metadata upload URLs");
+            throw new Error(
+                "Public uploads should request metadata upload URLs",
+            );
         }
         let urls: ObjectUploadURL[];
         try {
@@ -249,7 +251,9 @@ class UploadService {
                     this.publicAlbumsCredentials,
                 );
             }
-            throw new Error("Public multipart uploads require content metadata");
+            throw new Error(
+                "Public multipart uploads require content metadata",
+            );
         }
         if (
             metadata &&
