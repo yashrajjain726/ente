@@ -160,6 +160,15 @@ func (c *InactiveUserOrchestrator) processCandidate(candidate repo.UserInactivit
 		return false, nil
 	}
 
+	hasActivePaidEntitlement, err := c.hasActivePaidEntitlement(user.ID)
+	if err != nil {
+		return false, err
+	}
+	if hasActivePaidEntitlement {
+		log.WithField("user_id", user.ID).Info("Skipping inactive user processing because user has active paid entitlement")
+		return false, nil
+	}
+
 	lastActivity, found, err := c.UserRepo.GetLatestTokenActivity(user.ID)
 	if err != nil {
 		return false, err
@@ -185,6 +194,14 @@ func (c *InactiveUserOrchestrator) processCandidate(candidate repo.UserInactivit
 	if config.IsFinal {
 		if c.UserController == nil {
 			return false, fmt.Errorf("inactive user deletion requires user controller")
+		}
+		hasActivePaidEntitlement, err := c.hasActivePaidEntitlement(user.ID)
+		if err != nil {
+			return false, err
+		}
+		if hasActivePaidEntitlement {
+			log.WithField("user_id", user.ID).Info("Skipping inactive user deletion because user has active paid entitlement")
+			return false, nil
 		}
 
 		// Re-check right before deletion to avoid deleting users who became active
@@ -250,6 +267,17 @@ func (c *InactiveUserOrchestrator) processCandidate(candidate repo.UserInactivit
 	}
 
 	return true, nil
+}
+
+func (c *InactiveUserOrchestrator) hasActivePaidEntitlement(userID int64) (bool, error) {
+	err := c.UserController.BillingController.HasActiveSelfOrFamilySubscription(userID, true)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, ente.ErrNoActiveSubscription) || errors.Is(err, ente.ErrSharingDisabledForFreeAccounts) {
+		return false, nil
+	}
+	return false, err
 }
 
 func (c *InactiveUserOrchestrator) resolveNextStage(userID int64, lastActivity int64, now int64) (inactivityEmailStage, error) {
