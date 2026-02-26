@@ -716,6 +716,7 @@ func main() {
 	publicCollectionAPI.GET("/upload-urls", publicCollectionHandler.GetUploadUrls)
 	publicCollectionAPI.POST("/upload-url", publicCollectionHandler.GetUploadURLV2)
 	publicCollectionAPI.GET("/multipart-upload-urls", publicCollectionHandler.GetMultipartUploadURLs)
+	publicCollectionAPI.POST("/multipart-upload-url", publicCollectionHandler.GetMultipartUploadURLV2)
 	publicCollectionAPI.POST("/file", publicCollectionHandler.CreateFile)
 	publicCollectionAPI.POST("/verify-password", publicCollectionHandler.VerifyPassword)
 	publicCollectionAPI.GET("/social/diff", publicSocialHandler.SocialDiff)
