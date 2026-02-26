@@ -1,5 +1,4 @@
 import CloseIcon from "@mui/icons-material/Close";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import {
     Box,
     Dialog,
@@ -7,7 +6,6 @@ import {
     DialogContent,
     IconButton,
     Stack,
-    Tooltip,
     Typography,
 } from "@mui/material";
 import type { LocalUser } from "ente-accounts/services/user";
@@ -126,7 +124,6 @@ export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
     const actionButtonSx = isFullScreen
         ? { flex: 1, minHeight: "44px" }
         : { minHeight: "44px" };
-    const helperText = ut("Only images can be used as cover photos.");
     const headerIconButtonSx = {
         width: "46px",
         height: "46px",
@@ -199,18 +196,6 @@ export const PickCoverPhotoDialog: React.FC<PickCoverPhotoDialogProps> = ({
                             direction="row"
                             sx={{ alignItems: "center", gap: 1 }}
                         >
-                            <Tooltip
-                                title={helperText}
-                                placement="bottom-end"
-                                arrow
-                            >
-                                <IconButton
-                                    aria-label={helperText}
-                                    sx={headerIconButtonSx}
-                                >
-                                    <InfoOutlinedIcon fontSize="medium" />
-                                </IconButton>
-                            </Tooltip>
                             <IconButton
                                 aria-label={t("close")}
                                 onClick={onClose}
