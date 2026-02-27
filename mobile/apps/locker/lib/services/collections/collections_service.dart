@@ -952,6 +952,7 @@ class CollectionService {
 
   void clearCache() {
     _collectionIDToCollections.clear();
+    _defaultSetupInFlight = null;
   }
 
   // Methods for managing collection cache
