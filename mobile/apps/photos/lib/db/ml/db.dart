@@ -22,11 +22,13 @@ import "package:photos/models/ml/face/face_with_embedding.dart";
 import "package:photos/models/ml/ml_versions.dart";
 import "package:photos/models/ml/vector.dart";
 import "package:photos/service_locator.dart";
+import "package:photos/services/machine_learning/compute_controller.dart";
 import "package:photos/services/machine_learning/face_ml/face_clustering/face_db_info_for_clustering.dart";
 import 'package:photos/services/machine_learning/face_ml/face_filtering/face_filtering_constants.dart';
 import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/utils/ml_util.dart";
 import 'package:sqlite_async/sqlite_async.dart';
+import "package:synchronized/synchronized.dart";
 
 /// Stores all data for the ML related features. The database can be accessed by `MLDataDB.instance.database`.
 ///
@@ -54,6 +56,9 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   final ClusterCentroidVectorDB _clusterCentroidVectorDB;
   final List<String> _migrationScripts;
   int _clusterSummaryMutationVersion = 0;
+  Future<void>? _clipVectorDbRecoveryFuture;
+  final Lock _clipVectorRecoveryLock = Lock();
+  final Lock _clipVectorMigrationLock = Lock();
 
   MLDataDB._privateConstructor({
     String databaseName = "ente.ml.db",
@@ -1683,137 +1688,216 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   }
 
   Future<void> checkMigrateFillClipVectorDB({bool force = false}) async {
-    final migrationDone = await _clipVectorDB.checkIfMigrationDone();
-    if (migrationDone && !force) {
-      _logger.info("ClipVectorDB migration not needed, already done");
-      return;
-    }
-    _logger.info("Starting ClipVectorDB migration");
+    await _clipVectorMigrationLock.synchronized(() async {
+      final migrationDone = await _clipVectorDB.checkIfMigrationDone();
+      if (migrationDone && !force) {
+        _logger.info("ClipVectorDB migration not needed, already done");
+        return;
+      }
+      _logger.info("Starting ClipVectorDB migration");
 
-    // Get total count first to track progress
-    _logger.info("Getting total count of clip embeddings");
-    final db = await asyncDB;
-    final countResult =
-        await db.getAll('SELECT COUNT($fileIDColumn) as total FROM $clipTable');
-    final totalCount = countResult.first['total'] as int;
-    if (totalCount == 0) {
-      _logger.info("No clip embeddings to migrate");
-      await _clipVectorDB.deleteAllEmbeddings();
-      await _clipVectorDB.setMigrationDone();
-      return;
-    }
-    _logger.info("Total count of clip embeddings: $totalCount");
+      // Get total count first to track progress
+      _logger.info("Getting total count of clip embeddings");
+      final db = await asyncDB;
+      final countResult = await db.getAll(
+        'SELECT COUNT($fileIDColumn) as total FROM $clipTable',
+      );
+      final totalCount = countResult.first['total'] as int;
+      if (totalCount == 0) {
+        _logger.info("No clip embeddings to migrate");
+        await _clipVectorDB.deleteAllEmbeddings();
+        await _clipVectorDB.setMigrationDone();
+        return;
+      }
+      _logger.info("Total count of clip embeddings: $totalCount");
 
-    _logger.info("First time referencing ClipVectorDB rust index in migration");
-    final clipVectorDB = _clipVectorDB;
-    await clipVectorDB.deleteAllEmbeddings();
-    _logger.info("ClipVectorDB rust index referenced");
-    _logger.info("ClipVectorDB all embeddings cleared");
+      _logger.info(
+        "First time referencing ClipVectorDB rust index in migration",
+      );
+      final clipVectorDB = _clipVectorDB;
+      await clipVectorDB.deleteAllEmbeddings();
+      _logger.info("ClipVectorDB rust index referenced");
+      _logger.info("ClipVectorDB all embeddings cleared");
 
-    _logger
-        .info("Starting migration of $totalCount clip embeddings to vector DB");
-    const batchSize = 5000;
-    int offset = 0;
-    int processedCount = 0;
-    int weirdCount = 0;
-    int whileCount = 0;
-    const String migrationKey = "clip_vector_db_migration_in_progress";
-    final stopwatch = Stopwatch()..start();
-    try {
-      // Make sure no other heavy compute is running
-      computeController.blockCompute(blocker: migrationKey);
-      while (true) {
-        whileCount++;
-        _logger.info("$whileCount st round of while loop");
-        // Allow some time for any GC to finish
-        await Future.delayed(const Duration(milliseconds: 100));
+      _logger.info(
+        "Starting migration of $totalCount clip embeddings to vector DB",
+      );
+      const batchSize = 5000;
+      int offset = 0;
+      int processedCount = 0;
+      int weirdCount = 0;
+      int whileCount = 0;
+      const String migrationKey = "clip_vector_db_migration_in_progress";
+      final stopwatch = Stopwatch()..start();
+      try {
+        // Make sure no other heavy compute is running
+        computeController.blockCompute(blocker: migrationKey);
+        while (true) {
+          whileCount++;
+          _logger.info("$whileCount st round of while loop");
+          // Allow some time for any GC to finish
+          await Future.delayed(const Duration(milliseconds: 100));
 
-        _logger.info("Reading $batchSize rows from DB");
-        final List<Map<String, dynamic>> results = await db.getAll('''
+          _logger.info("Reading $batchSize rows from DB");
+          final List<Map<String, dynamic>> results = await db.getAll('''
         SELECT $fileIDColumn, $embeddingColumn
         FROM $clipTable
         ORDER BY $fileIDColumn DESC
         LIMIT $batchSize OFFSET $offset
       ''');
-        _logger.info("Got ${results.length} results from DB");
-        if (results.isEmpty) {
-          _logger.info("No more results, breaking out of while loop");
-          break;
+          _logger.info("Got ${results.length} results from DB");
+          if (results.isEmpty) {
+            _logger.info("No more results, breaking out of while loop");
+            break;
+          }
+          _logger.info("Processing ${results.length} results");
+          final List<int> fileIDs = [];
+          final List<Float32List> embeddings = [];
+          for (final result in results) {
+            final embedding =
+                Float32List.view((result[embeddingColumn] as Uint8List).buffer);
+            if (embedding.length == 512) {
+              fileIDs.add(result[fileIDColumn] as int);
+              embeddings.add(Float32List.view(result[embeddingColumn].buffer));
+            } else {
+              weirdCount++;
+              _logger.warning(
+                "Weird clip embedding length ${embedding.length} for fileID ${result[fileIDColumn]}, skipping",
+              );
+            }
+          }
+          _logger.info(
+            "Got ${fileIDs.length} valid embeddings, $weirdCount weird embeddings",
+          );
+
+          await _clipVectorDB.bulkInsertEmbeddings(
+            fileIDs: fileIDs,
+            embeddings: embeddings,
+          );
+          _logger.info("Inserted ${fileIDs.length} embeddings to ClipVectorDB");
+          processedCount += fileIDs.length;
+          offset += batchSize;
+          _logger.info(
+            "migrated $processedCount/$totalCount embeddings to ClipVectorDB",
+          );
+          if (processedCount >= totalCount) {
+            _logger.info("All embeddings migrated, breaking out of while loop");
+            break;
+          }
+          // Allow some time for any GC to finish
+          _logger.info("Waiting for 100ms out of precaution, for GC to finish");
+          await Future.delayed(const Duration(milliseconds: 100));
         }
-        _logger.info("Processing ${results.length} results");
-        final List<int> fileIDs = [];
-        final List<Float32List> embeddings = [];
-        for (final result in results) {
-          final embedding =
-              Float32List.view((result[embeddingColumn] as Uint8List).buffer);
-          if (embedding.length == 512) {
-            fileIDs.add(result[fileIDColumn] as int);
-            embeddings.add(Float32List.view(result[embeddingColumn].buffer));
-          } else {
-            weirdCount++;
+        _logger.info(
+          "migrated all $totalCount embeddings to ClipVectorDB in ${stopwatch.elapsed.inMilliseconds} ms, with $weirdCount weird embeddings not migrated",
+        );
+        await _clipVectorDB.setMigrationDone();
+        _logger.info("ClipVectorDB migration done");
+        try {
+          final latestClipCount = await getClipIndexedFileCount();
+          final vectorStats = await _clipVectorDB.getIndexStats();
+          if (vectorStats.size != latestClipCount) {
             _logger.warning(
-              "Weird clip embedding length ${embedding.length} for fileID ${result[fileIDColumn]}, skipping",
+              "ClipVectorDB size mismatch: vectorDb=${vectorStats.size}, clipTableLatest=$latestClipCount",
+            );
+          } else {
+            _logger.info(
+              "ClipVectorDB size match: vectorDb=${vectorStats.size}, clipTableLatest=$latestClipCount",
             );
           }
-        }
-        _logger.info(
-          "Got ${fileIDs.length} valid embeddings, $weirdCount weird embeddings",
-        );
-
-        await _clipVectorDB.bulkInsertEmbeddings(
-          fileIDs: fileIDs,
-          embeddings: embeddings,
-        );
-        _logger.info("Inserted ${fileIDs.length} embeddings to ClipVectorDB");
-        processedCount += fileIDs.length;
-        offset += batchSize;
-        _logger.info(
-          "migrated $processedCount/$totalCount embeddings to ClipVectorDB",
-        );
-        if (processedCount >= totalCount) {
-          _logger.info("All embeddings migrated, breaking out of while loop");
-          break;
-        }
-        // Allow some time for any GC to finish
-        _logger.info("Waiting for 100ms out of precaution, for GC to finish");
-        await Future.delayed(const Duration(milliseconds: 100));
-      }
-      _logger.info(
-        "migrated all $totalCount embeddings to ClipVectorDB in ${stopwatch.elapsed.inMilliseconds} ms, with $weirdCount weird embeddings not migrated",
-      );
-      await _clipVectorDB.setMigrationDone();
-      _logger.info("ClipVectorDB migration done");
-      try {
-        final latestClipCount = await getClipIndexedFileCount();
-        final vectorStats = await _clipVectorDB.getIndexStats();
-        if (vectorStats.size != latestClipCount) {
+        } catch (e, s) {
           _logger.warning(
-            "ClipVectorDB size mismatch: vectorDb=${vectorStats.size}, clipTableLatest=$latestClipCount",
-          );
-        } else {
-          _logger.info(
-            "ClipVectorDB size match: vectorDb=${vectorStats.size}, clipTableLatest=$latestClipCount",
+            "Failed to log ClipVectorDB size after migration",
+            e,
+            s,
           );
         }
       } catch (e, s) {
-        _logger.warning(
-          "Failed to log ClipVectorDB size after migration",
+        _logger.severe(
+          "Error migrating ClipVectorDB after ${stopwatch.elapsed.inMilliseconds} ms, clearing out DB again",
           e,
           s,
         );
+        await clipVectorDB.deleteAllEmbeddings();
+        rethrow;
+      } finally {
+        stopwatch.stop();
+        // Make sure compute can run again
+        computeController.unblockCompute(blocker: migrationKey);
       }
+    });
+  }
+
+  Future<void> _withClipVectorWriteRecovery({
+    required String operation,
+    required Future<void> Function() writeOperation,
+  }) async {
+    try {
+      await writeOperation();
     } catch (e, s) {
-      _logger.severe(
-        "Error migrating ClipVectorDB after ${stopwatch.elapsed.inMilliseconds} ms, clearing out DB again",
-        e,
-        s,
+      await _handleClipVectorWriteFailure(
+        operation: operation,
+        error: e,
+        stackTrace: s,
       );
-      await clipVectorDB.deleteAllEmbeddings();
       rethrow;
+    }
+  }
+
+  Future<void> _handleClipVectorWriteFailure({
+    required String operation,
+    required Object error,
+    required StackTrace stackTrace,
+  }) async {
+    _logger.severe(
+      "ClipVectorDB write failed during `$operation`. Marking migration stale and scheduling rebuild.",
+      error,
+      stackTrace,
+    );
+    try {
+      await _clipVectorDB.invalidateMigrationState();
+    } catch (invalidateError, invalidateStackTrace) {
+      _logger.severe(
+        "Failed to invalidate ClipVectorDB migration state after `$operation` failure",
+        invalidateError,
+        invalidateStackTrace,
+      );
+    }
+    unawaited(_scheduleClipVectorDbRecovery());
+  }
+
+  Future<void> _scheduleClipVectorDbRecovery() async {
+    await _clipVectorRecoveryLock.synchronized(() async {
+      if (_clipVectorDbRecoveryFuture != null) {
+        return;
+      }
+      _clipVectorDbRecoveryFuture = _recoverClipVectorDbFromSqlite();
+    });
+    final recoveryFuture = _clipVectorDbRecoveryFuture;
+    if (recoveryFuture != null) {
+      await recoveryFuture;
+    }
+  }
+
+  Future<void> _recoverClipVectorDbFromSqlite() async {
+    const idlePollDelay = Duration(seconds: 5);
+    try {
+      _logger.info(
+        "Queued ClipVectorDB rebuild from SQLite after index write failure",
+      );
+      while (computeController.computeState != ComputeRunState.idle) {
+        _logger.info(
+          "Waiting for compute to become idle before ClipVectorDB rebuild (current state: ${computeController.computeState})",
+        );
+        await Future.delayed(idlePollDelay);
+      }
+      _logger.info("Starting ClipVectorDB rebuild from SQLite");
+      await checkMigrateFillClipVectorDB(force: true);
+      _logger.info("ClipVectorDB rebuild from SQLite completed");
+    } catch (e, s) {
+      _logger.severe("ClipVectorDB rebuild from SQLite failed", e, s);
     } finally {
-      stopwatch.stop();
-      // Make sure compute can run again
-      computeController.unblockCompute(blocker: migrationKey);
+      _clipVectorDbRecoveryFuture = null;
     }
   }
 
@@ -1852,9 +1936,14 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
       );
       if (flagService.enableVectorDb &&
           await _clipVectorDB.checkIfMigrationDone()) {
-        await _clipVectorDB.insertEmbedding(
-          fileID: embeddings.first.fileID,
-          embedding: embeddings.first.embedding,
+        await _withClipVectorWriteRecovery(
+          operation: "putClip(single)",
+          writeOperation: () async {
+            await _clipVectorDB.insertEmbedding(
+              fileID: embeddings.first.fileID,
+              embedding: embeddings.first.embedding,
+            );
+          },
         );
       }
     } else {
@@ -1865,10 +1954,16 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
       );
       if (flagService.enableVectorDb &&
           await _clipVectorDB.checkIfMigrationDone()) {
-        await _clipVectorDB.bulkInsertEmbeddings(
-          fileIDs: embeddings.map((e) => e.fileID).toList(),
-          embeddings:
-              embeddings.map((e) => Float32List.fromList(e.embedding)).toList(),
+        await _withClipVectorWriteRecovery(
+          operation: "putClip(bulk)",
+          writeOperation: () async {
+            await _clipVectorDB.bulkInsertEmbeddings(
+              fileIDs: embeddings.map((e) => e.fileID).toList(),
+              embeddings: embeddings
+                  .map((e) => Float32List.fromList(e.embedding))
+                  .toList(),
+            );
+          },
         );
       }
     }
@@ -1933,7 +2028,12 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
     );
     if (flagService.enableVectorDb &&
         await _clipVectorDB.checkIfMigrationDone()) {
-      await _clipVectorDB.deleteEmbeddings(fileIDs);
+      await _withClipVectorWriteRecovery(
+        operation: "deleteClipEmbeddings",
+        writeOperation: () async {
+          await _clipVectorDB.deleteEmbeddings(fileIDs);
+        },
+      );
     }
     Bus.instance.fire(EmbeddingUpdatedEvent());
   }
@@ -1944,7 +2044,12 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
     await db.execute('DELETE FROM $clipTable');
     if (flagService.enableVectorDb &&
         await _clipVectorDB.checkIfMigrationDone()) {
-      await _clipVectorDB.deleteAllEmbeddings();
+      await _withClipVectorWriteRecovery(
+        operation: "deleteClipIndexes",
+        writeOperation: () async {
+          await _clipVectorDB.deleteAllEmbeddings();
+        },
+      );
     }
     Bus.instance.fire(EmbeddingUpdatedEvent());
   }

@@ -3,8 +3,10 @@ use usearch::{Index, IndexOptions, MetricKind, ScalarKind};
 
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 const FAST_SEARCH_STEP_COUNTS: [usize; 5] = [200, 500, 2000, 5000, 10000];
+static INDEX_SAVE_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[frb(opaque)]
 pub struct VectorDB {
@@ -54,7 +56,14 @@ impl VectorDB {
         }
 
         // Use atomic write: save to temp file first, then rename
-        let temp_path = self.path.with_extension("tmp");
+        // Use a unique temp path per save so concurrent saves can never race
+        // by clobbering the same temporary file.
+        let save_sequence = INDEX_SAVE_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let temp_path = self.path.with_extension(format!(
+            "tmp.{}.{}",
+            std::process::id(),
+            save_sequence
+        ));
         let temp_path_str = temp_path.to_str().expect("Invalid temp path");
 
         // Save to temporary file
@@ -95,9 +104,11 @@ impl VectorDB {
         }
     }
 
-    pub fn add_vector(&self, key: u64, vector: &[f32]) {
+    pub fn add_vector(&mut self, key: u64, vector: &[f32]) {
         if self.contains_vector(key) {
-            self.remove_vector(key);
+            self.index
+                .remove(key)
+                .expect("Failed to remove existing vector before add");
         } else {
             self.ensure_capacity(1);
         }
@@ -105,11 +116,13 @@ impl VectorDB {
         self.save_index();
     }
 
-    pub fn bulk_add_vectors(&self, keys: Vec<u64>, vectors: &[Vec<f32>]) {
+    pub fn bulk_add_vectors(&mut self, keys: Vec<u64>, vectors: &[Vec<f32>]) {
         self.ensure_capacity(keys.len());
         for (key, vector) in keys.iter().zip(vectors.iter()) {
             if self.contains_vector(*key) {
-                self.remove_vector(*key);
+                self.index
+                    .remove(*key)
+                    .expect("Failed to remove existing vector before bulk add");
             }
             self.index
                 .add(*key, vector)
@@ -386,13 +399,13 @@ impl VectorDB {
         vectors
     }
 
-    pub fn remove_vector(&self, key: u64) -> usize {
+    pub fn remove_vector(&mut self, key: u64) -> usize {
         let removed_count = self.index.remove(key).expect("Failed to remove vector");
         self.save_index();
         removed_count
     }
 
-    pub fn bulk_remove_vectors(&self, keys: Vec<u64>) -> usize {
+    pub fn bulk_remove_vectors(&mut self, keys: Vec<u64>) -> usize {
         let mut removed_count = 0;
         for key in keys {
             removed_count += self
@@ -404,7 +417,7 @@ impl VectorDB {
         removed_count
     }
 
-    pub fn reset_index(&self) {
+    pub fn reset_index(&mut self) {
         self.index.reset().expect("Failed to reset index");
         self.index
             .reserve(1000)
