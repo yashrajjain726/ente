@@ -59,6 +59,9 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   Future<void>? _clipVectorDbRecoveryFuture;
   final Lock _clipVectorRecoveryLock = Lock();
   final Lock _clipVectorMigrationLock = Lock();
+  Future<void>? _clusterCentroidVectorDbRecoveryFuture;
+  final Lock _clusterCentroidVectorRecoveryLock = Lock();
+  final Lock _clusterCentroidVectorMigrationLock = Lock();
 
   MLDataDB._privateConstructor({
     String databaseName = "ente.ml.db",
@@ -1251,12 +1254,11 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
         );
       }
     } catch (e, s) {
-      _logger.warning(
-        "Failed to sync cluster summaries to cluster centroid vector DB. Invalidating migration state for a safe fallback.",
-        e,
-        s,
+      await _handleClusterCentroidVectorWriteFailure(
+        operation: "clusterSummaryUpdate",
+        error: e,
+        stackTrace: s,
       );
-      await _clusterCentroidVectorDB.invalidateMigrationState();
     }
   }
 
@@ -1285,12 +1287,11 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
       }
       await deleteClusterCentroidVectorIdMapping(clusterID);
     } catch (e, s) {
-      _logger.warning(
-        "Failed to remove cluster summary from cluster centroid vector DB. Invalidating migration state for a safe fallback.",
-        e,
-        s,
+      await _handleClusterCentroidVectorWriteFailure(
+        operation: "deleteClusterSummary",
+        error: e,
+        stackTrace: s,
       );
-      await _clusterCentroidVectorDB.invalidateMigrationState();
     }
   }
 
@@ -1375,7 +1376,12 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
       _markClusterSummaryMutated();
 
       if (await _clusterCentroidVectorDB.checkIfMigrationDone()) {
-        await _clusterCentroidVectorDB.deleteAllCentroids();
+        await _withClusterCentroidVectorWriteRecovery(
+          operation: "dropClustersAndPersonTable",
+          writeOperation: () async {
+            await _clusterCentroidVectorDB.deleteAllCentroids();
+          },
+        );
       }
     } catch (e, s) {
       _logger.severe('Error dropping clusters and person table', e, s);
@@ -1487,48 +1493,129 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   Future<void> checkMigrateFillClusterCentroidVectorDB({
     bool force = false,
   }) async {
-    final migrationDone = await _clusterCentroidVectorDB.checkIfMigrationDone();
-    if (migrationDone && !force) {
-      _logger
-          .info("ClusterCentroidVectorDB migration not needed, already done");
-      return;
-    }
-    _logger.info("Starting ClusterCentroidVectorDB migration");
-
-    const maxStableAttempts = 3;
-    for (int attempt = 1; attempt <= maxStableAttempts; attempt++) {
-      final startMutationVersion = _clusterSummaryMutationSnapshot();
-      _logger.info(
-        "ClusterCentroidVectorDB migration attempt $attempt/$maxStableAttempts from mutationVersion=$startMutationVersion",
-      );
-
-      await _runClusterCentroidMigrationPass();
-
-      final endMutationVersion = _clusterSummaryMutationSnapshot();
-      if (endMutationVersion != startMutationVersion) {
-        _logger.info(
-          "Cluster summaries changed during migration attempt $attempt (mutationVersion=$startMutationVersion->$endMutationVersion), retrying full migration",
-        );
-        continue;
-      }
-
-      await _clusterCentroidVectorDB.setMigrationDone();
-      final finalizedMutationVersion = _clusterSummaryMutationSnapshot();
-      if (finalizedMutationVersion == endMutationVersion) {
-        _logger.info("ClusterCentroidVectorDB migration done");
+    await _clusterCentroidVectorMigrationLock.synchronized(() async {
+      final migrationDone =
+          await _clusterCentroidVectorDB.checkIfMigrationDone();
+      if (migrationDone && !force) {
+        _logger
+            .info("ClusterCentroidVectorDB migration not needed, already done");
         return;
       }
+      _logger.info("Starting ClusterCentroidVectorDB migration");
 
-      _logger.info(
-        "Cluster summaries changed while finalizing migration attempt $attempt (mutationVersion=$endMutationVersion->$finalizedMutationVersion), retrying full migration",
+      const maxStableAttempts = 3;
+      for (int attempt = 1; attempt <= maxStableAttempts; attempt++) {
+        final startMutationVersion = _clusterSummaryMutationSnapshot();
+        _logger.info(
+          "ClusterCentroidVectorDB migration attempt $attempt/$maxStableAttempts from mutationVersion=$startMutationVersion",
+        );
+
+        await _runClusterCentroidMigrationPass();
+
+        final endMutationVersion = _clusterSummaryMutationSnapshot();
+        if (endMutationVersion != startMutationVersion) {
+          _logger.info(
+            "Cluster summaries changed during migration attempt $attempt (mutationVersion=$startMutationVersion->$endMutationVersion), retrying full migration",
+          );
+          continue;
+        }
+
+        await _clusterCentroidVectorDB.setMigrationDone();
+        final finalizedMutationVersion = _clusterSummaryMutationSnapshot();
+        if (finalizedMutationVersion == endMutationVersion) {
+          _logger.info("ClusterCentroidVectorDB migration done");
+          return;
+        }
+
+        _logger.info(
+          "Cluster summaries changed while finalizing migration attempt $attempt (mutationVersion=$endMutationVersion->$finalizedMutationVersion), retrying full migration",
+        );
+        await _clusterCentroidVectorDB.invalidateMigrationState();
+      }
+
+      _logger.severe(
+        "ClusterCentroidVectorDB migration did not reach a stable snapshot after $maxStableAttempts attempts. Leaving migration state invalidated for safe fallback.",
       );
       await _clusterCentroidVectorDB.invalidateMigrationState();
-    }
+    });
+  }
 
+  Future<void> _withClusterCentroidVectorWriteRecovery({
+    required String operation,
+    required Future<void> Function() writeOperation,
+  }) async {
+    try {
+      await writeOperation();
+    } catch (e, s) {
+      await _handleClusterCentroidVectorWriteFailure(
+        operation: operation,
+        error: e,
+        stackTrace: s,
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> _handleClusterCentroidVectorWriteFailure({
+    required String operation,
+    required Object error,
+    required StackTrace stackTrace,
+  }) async {
     _logger.severe(
-      "ClusterCentroidVectorDB migration did not reach a stable snapshot after $maxStableAttempts attempts. Leaving migration state invalidated for safe fallback.",
+      "ClusterCentroidVectorDB write failed during `$operation`. Marking migration stale and scheduling rebuild.",
+      error,
+      stackTrace,
     );
-    await _clusterCentroidVectorDB.invalidateMigrationState();
+    try {
+      await _clusterCentroidVectorDB.invalidateMigrationState();
+    } catch (invalidateError, invalidateStackTrace) {
+      _logger.severe(
+        "Failed to invalidate ClusterCentroidVectorDB migration state after `$operation` failure",
+        invalidateError,
+        invalidateStackTrace,
+      );
+    }
+    unawaited(_scheduleClusterCentroidVectorDbRecovery());
+  }
+
+  Future<void> _scheduleClusterCentroidVectorDbRecovery() async {
+    await _clusterCentroidVectorRecoveryLock.synchronized(() async {
+      if (_clusterCentroidVectorDbRecoveryFuture != null) {
+        return;
+      }
+      _clusterCentroidVectorDbRecoveryFuture =
+          _recoverClusterCentroidVectorDbFromSqlite();
+    });
+    final recoveryFuture = _clusterCentroidVectorDbRecoveryFuture;
+    if (recoveryFuture != null) {
+      await recoveryFuture;
+    }
+  }
+
+  Future<void> _recoverClusterCentroidVectorDbFromSqlite() async {
+    const idlePollDelay = Duration(seconds: 5);
+    try {
+      _logger.info(
+        "Queued ClusterCentroidVectorDB rebuild from SQLite after index write failure",
+      );
+      while (computeController.computeState != ComputeRunState.idle) {
+        _logger.info(
+          "Waiting for compute to become idle before ClusterCentroidVectorDB rebuild (current state: ${computeController.computeState})",
+        );
+        await Future.delayed(idlePollDelay);
+      }
+      _logger.info("Starting ClusterCentroidVectorDB rebuild from SQLite");
+      await checkMigrateFillClusterCentroidVectorDB(force: true);
+      _logger.info("ClusterCentroidVectorDB rebuild from SQLite completed");
+    } catch (e, s) {
+      _logger.severe(
+        "ClusterCentroidVectorDB rebuild from SQLite failed",
+        e,
+        s,
+      );
+    } finally {
+      _clusterCentroidVectorDbRecoveryFuture = null;
+    }
   }
 
   Future<void> _runClusterCentroidMigrationPass() async {
