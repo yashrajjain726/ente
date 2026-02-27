@@ -9,6 +9,7 @@ import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/compute_control_event.dart";
 import "package:photos/events/device_health_changed_event.dart";
+import "package:photos/utils/local_settings.dart";
 import "package:thermal/thermal.dart";
 
 enum ComputeRunState {
@@ -24,6 +25,7 @@ class ComputeController {
   static const kMinimumBatteryLevel = 20; // 20%
   final kDefaultInteractionTimeout = Duration(seconds: Platform.isIOS ? 5 : 15);
   static const kUnhealthyStates = ["over_heat", "over_voltage", "dead"];
+  final LocalSettings _localSettings;
 
   static final _thermal = Thermal();
   IosBatteryInfo? _iosLastBatteryInfo;
@@ -33,9 +35,12 @@ class ComputeController {
   bool _isDeviceHealthy = true;
   bool _isUserInteracting = true;
   bool _canRunCompute = false;
+  bool _temporaryInteractionOverride = false;
+  bool _debugInteractionOverride = false;
 
   /// If true, user interaction is ignored and compute tasks can run regardless of user activity.
-  bool interactionOverride = false;
+  bool get interactionOverride =>
+      _temporaryInteractionOverride || _debugInteractionOverride;
 
   /// If true, compute tasks are paused regardless of device health or user activity.
   bool get computeBlocked => _computeBlocks.isNotEmpty;
@@ -54,7 +59,7 @@ class ComputeController {
     Bus.instance.fire(DeviceHealthChangedEvent(healthy));
   }
 
-  ComputeController() {
+  ComputeController(this._localSettings) {
     _logger.info('ComputeController constructor');
     init();
     _logger.info('init done ');
@@ -62,8 +67,13 @@ class ComputeController {
 
   // Directly assign the values + Attach listener for compute controller
   Future<void> init() async {
-    // Interaction Timer
+    // Initialize interaction tracking before any await to avoid first-tap races.
     _startInteractionTimer(kDefaultInteractionTimeout);
+
+    await setMLDebugInteractionOverride(
+      turnOn: _localSettings.runMLDuringInteractionOverride,
+      persist: false,
+    );
 
     // Thermal related
     _onThermalStateUpdate(await _thermal.thermalStatus);
@@ -112,9 +122,15 @@ class ComputeController {
       _logger.info("Device not healthy, denying request.");
       return false;
     }
-    if (!bypassInteractionCheck && !_canRunGivenUserInteraction()) {
-      _logger.info("User interacting, denying request.");
-      return false;
+    if (!bypassInteractionCheck) {
+      if (ml && !_canRunMLGivenUserInteraction()) {
+        _logger.info("User interacting, denying ML request.");
+        return false;
+      }
+      if (stream && !_canRunStreamGivenUserInteraction()) {
+        _logger.info("User interacting, denying stream request.");
+        return false;
+      }
     }
     if (computeBlocked) {
       _logger.info("Compute is blocked by: $_computeBlocks, denying request.");
@@ -190,13 +206,29 @@ class ComputeController {
     _resetTimer();
   }
 
-  bool _canRunGivenUserInteraction() {
+  bool _canRunMLGivenUserInteraction() {
     return !_isUserInteracting || interactionOverride;
+  }
+
+  bool _canRunStreamGivenUserInteraction() {
+    return !_isUserInteracting;
   }
 
   void forceOverrideML({required bool turnOn}) {
     _logger.info("Forcing to turn on ML: $turnOn");
-    interactionOverride = turnOn;
+    _temporaryInteractionOverride = turnOn;
+    _fireControlEvent();
+  }
+
+  Future<void> setMLDebugInteractionOverride({
+    required bool turnOn,
+    bool persist = true,
+  }) async {
+    if (persist) {
+      await _localSettings.setRunMLDuringInteractionOverride(turnOn);
+    }
+    _debugInteractionOverride = turnOn;
+    _logger.info("ML debug interaction override set to: $turnOn");
     _fireControlEvent();
   }
 
@@ -214,7 +246,7 @@ class ComputeController {
 
   void _fireControlEvent() {
     final shouldRunCompute =
-        _isDeviceHealthy && _canRunGivenUserInteraction() && !computeBlocked;
+        _isDeviceHealthy && _canRunMLGivenUserInteraction() && !computeBlocked;
     if (shouldRunCompute != _canRunCompute) {
       _canRunCompute = shouldRunCompute;
       _logger.info(
