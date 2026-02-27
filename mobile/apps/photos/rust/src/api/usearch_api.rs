@@ -8,6 +8,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 const FAST_SEARCH_STEP_COUNTS: [usize; 5] = [200, 500, 2000, 5000, 10000];
 static INDEX_SAVE_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+type SearchMatch = (Vec<u64>, Vec<f32>);
+type BulkSearchMatch = (Vec<Vec<u64>>, Vec<Vec<f32>>);
+type BulkSearchByKeyMatch = (Vec<u64>, Vec<Vec<u64>>, Vec<Vec<f32>>);
+
 #[frb(opaque)]
 pub struct VectorDB {
     index: Index,
@@ -18,9 +22,12 @@ impl VectorDB {
     #[frb(sync)]
     pub fn new(file_path: &str, dimensions: usize) -> Result<Self, String> {
         let path = PathBuf::from(file_path);
-        let file_exists = path
-            .try_exists()
-            .map_err(|e| format!("Failed to check index file existence at {}: {e}", path.display()))?;
+        let file_exists = path.try_exists().map_err(|e| {
+            format!(
+                "Failed to check index file existence at {}: {e}",
+                path.display()
+            )
+        })?;
 
         let mut options = IndexOptions::default();
         options.dimensions = dimensions;
@@ -68,11 +75,9 @@ impl VectorDB {
         // Use a unique temp path per save so concurrent saves can never race
         // by clobbering the same temporary file.
         let save_sequence = INDEX_SAVE_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let temp_path = self.path.with_extension(format!(
-            "tmp.{}.{}",
-            std::process::id(),
-            save_sequence
-        ));
+        let temp_path =
+            self.path
+                .with_extension(format!("tmp.{}.{}", std::process::id(), save_sequence));
         let temp_path_str = temp_path
             .to_str()
             .ok_or_else(|| format!("Invalid temp path: {}", temp_path.display()))?;
@@ -148,7 +153,7 @@ impl VectorDB {
         query: &[f32],
         count: usize,
         exact: bool,
-    ) -> Result<(Vec<u64>, Vec<f32>), String> {
+    ) -> Result<SearchMatch, String> {
         let matches = if exact {
             self.index
                 .exact_search(query, count)
@@ -165,7 +170,7 @@ impl VectorDB {
         &self,
         query: &[f32],
         minimum_similarity: f32,
-    ) -> Result<(Vec<u64>, Vec<f32>), String> {
+    ) -> Result<SearchMatch, String> {
         let index_size = self.index.size();
         if index_size == 0 || !minimum_similarity.is_finite() {
             return Ok((Vec::new(), Vec::new()));
@@ -185,7 +190,7 @@ impl VectorDB {
         allowed_keys: &[u64],
         count: usize,
         max_distance: f32,
-    ) -> Result<(Vec<u64>, Vec<f32>), String> {
+    ) -> Result<SearchMatch, String> {
         let index_size = self.index.size();
         if index_size == 0 || count == 0 || allowed_keys.is_empty() {
             return Ok((Vec::new(), Vec::new()));
@@ -218,7 +223,7 @@ impl VectorDB {
         allowed_keys: &[u64],
         count: usize,
         max_distance: f32,
-    ) -> Result<(Vec<Vec<u64>>, Vec<Vec<f32>>), String> {
+    ) -> Result<BulkSearchMatch, String> {
         let query_count = queries.len();
         if query_count == 0 {
             return Ok((Vec::new(), Vec::new()));
@@ -270,7 +275,7 @@ impl VectorDB {
         &self,
         query: &[f32],
         max_distance: f32,
-    ) -> Result<(Vec<u64>, Vec<f32>), String> {
+    ) -> Result<SearchMatch, String> {
         let index_size = self.index.size();
         if index_size == 0 {
             return Ok((Vec::new(), Vec::new()));
@@ -325,7 +330,7 @@ impl VectorDB {
         mut keys: Vec<u64>,
         mut distances: Vec<f32>,
         max_distance: f32,
-    ) -> (Vec<u64>, Vec<f32>) {
+    ) -> SearchMatch {
         let aligned_len = keys.len().min(distances.len());
         keys.truncate(aligned_len);
         distances.truncate(aligned_len);
@@ -341,7 +346,7 @@ impl VectorDB {
         queries: &Vec<Vec<f32>>,
         count: usize,
         exact: bool,
-    ) -> Result<(Vec<Vec<u64>>, Vec<Vec<f32>>), String> {
+    ) -> Result<BulkSearchMatch, String> {
         let mut keys = Vec::new();
         let mut distances = Vec::new();
 
@@ -358,7 +363,7 @@ impl VectorDB {
         potential_keys: &Vec<u64>,
         count: usize,
         exact: bool,
-    ) -> Result<(Vec<u64>, Vec<Vec<u64>>, Vec<Vec<f32>>), String> {
+    ) -> Result<BulkSearchByKeyMatch, String> {
         let dimensions = self.index.dimensions();
         let mut embedding_data = vec![0.0f32; potential_keys.len() * dimensions];
         let mut contained_keys = Vec::with_capacity(potential_keys.len());
@@ -453,12 +458,8 @@ impl VectorDB {
 
     pub fn delete_index(self) -> Result<(), String> {
         if self.path.exists() {
-            std::fs::remove_file(&self.path).map_err(|e| {
-                format!(
-                    "Failed to delete index file {}: {e}",
-                    self.path.display()
-                )
-            })?;
+            std::fs::remove_file(&self.path)
+                .map_err(|e| format!("Failed to delete index file {}: {e}", self.path.display()))?;
         } else {
             println!("Index file does not exist.");
         }
