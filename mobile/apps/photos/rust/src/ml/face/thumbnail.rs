@@ -171,8 +171,12 @@ fn select_resize_filter(crop: &CropRect, target_width: u32, target_height: u32) 
     let scale_y = crop.height / f64::from(target_height);
     let max_scale = scale_x.max(scale_y);
 
-    if max_scale <= 1.15 {
-        // Mild downscale: bilinear keeps results close to legacy canvas behavior.
+    if max_scale < 1.0 {
+        // Upscaling: CatmullRom gives sharper results than bilinear while keeping
+        // artifacts reasonably controlled for faces.
+        FilterType::CatmullRom
+    } else if max_scale <= 1.15 {
+        // Mild downscale: bilinear stays closer to legacy canvas behavior.
         FilterType::Bilinear
     } else if max_scale <= 1.5 {
         // Moderate downscale: Mitchell gives stronger antialiasing with low ringing.
@@ -190,24 +194,37 @@ fn dimensions_with_min_side(width: u32, height: u32) -> MlResult<(u32, u32)> {
         ));
     }
 
-    let min_side = width.min(height);
-    let scale = f64::from(FACE_THUMBNAIL_MIN_DIMENSION) / f64::from(min_side);
-    let target_width = (f64::from(width) * scale).round();
-    let target_height = (f64::from(height) * scale).round();
+    if width <= height {
+        Ok((
+            FACE_THUMBNAIL_MIN_DIMENSION,
+            scaled_long_side(height, width)?,
+        ))
+    } else {
+        Ok((
+            scaled_long_side(width, height)?,
+            FACE_THUMBNAIL_MIN_DIMENSION,
+        ))
+    }
+}
 
-    if !target_width.is_finite()
-        || !target_height.is_finite()
-        || target_width < 1.0
-        || target_height < 1.0
-        || target_width > f64::from(u32::MAX)
-        || target_height > f64::from(u32::MAX)
-    {
+fn scaled_long_side(long_side: u32, short_side: u32) -> MlResult<u32> {
+    if short_side == 0 {
+        return Err(MlError::Postprocess(
+            "cannot scale with zero short side".to_string(),
+        ));
+    }
+
+    let numerator = u128::from(long_side) * u128::from(FACE_THUMBNAIL_MIN_DIMENSION);
+    let denominator = u128::from(short_side);
+    let rounded = (numerator + (denominator / 2)) / denominator;
+
+    if rounded == 0 || rounded > u128::from(u32::MAX) {
         return Err(MlError::Postprocess(format!(
-            "invalid resize dimensions computed from {width}x{height}",
+            "invalid scaled dimension computed from long={long_side}, short={short_side}",
         )));
     }
 
-    Ok((target_width as u32, target_height as u32))
+    Ok(rounded as u32)
 }
 
 #[cfg(test)]
@@ -304,6 +321,19 @@ mod tests {
 
     #[test]
     fn select_resize_filter_is_scale_aware() {
+        let upscale_crop = super::CropRect {
+            x: 0.0,
+            y: 0.0,
+            width: 80.0,
+            height: 80.0,
+            output_width: 100,
+            output_height: 100,
+        };
+        assert_eq!(
+            select_resize_filter(&upscale_crop, 100, 100),
+            FilterType::CatmullRom
+        );
+
         let mild_crop = super::CropRect {
             x: 0.0,
             y: 0.0,
