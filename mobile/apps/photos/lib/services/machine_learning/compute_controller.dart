@@ -35,6 +35,7 @@ class ComputeController {
   bool _isDeviceHealthy = true;
   bool _isUserInteracting = true;
   bool _canRunCompute = false;
+  bool _hasCompletedInitialHealthChecks = false;
   bool _temporaryInteractionOverride = false;
   bool _debugInteractionOverride = false;
 
@@ -107,6 +108,9 @@ class ComputeController {
         _onAndroidBatteryStateUpdate(batteryInfo);
       });
     }
+
+    _hasCompletedInitialHealthChecks = true;
+    _fireControlEvent();
   }
 
   bool requestCompute({
@@ -118,6 +122,10 @@ class ComputeController {
     _logger.info(
       "Requesting compute: ml: $ml, stream: $stream, bypassInteraction: $bypassInteractionCheck, bypassMLWaiting: $bypassMLWaiting",
     );
+    if (!_hasCompletedInitialHealthChecks) {
+      _logger.info("Initial health checks are incomplete, denying request.");
+      return false;
+    }
     if (!_isDeviceHealthy) {
       _logger.info("Device not healthy, denying request.");
       return false;
@@ -245,6 +253,12 @@ class ComputeController {
   }
 
   void _fireControlEvent() {
+    if (!_hasCompletedInitialHealthChecks) {
+      _logger.fine(
+        "Skipping control event because initial health checks are incomplete",
+      );
+      return;
+    }
     final shouldRunCompute =
         _isDeviceHealthy && _canRunMLGivenUserInteraction() && !computeBlocked;
     if (shouldRunCompute != _canRunCompute) {
