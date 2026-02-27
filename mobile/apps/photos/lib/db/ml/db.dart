@@ -59,9 +59,11 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   Future<void>? _clipVectorDbRecoveryFuture;
   final Lock _clipVectorRecoveryLock = Lock();
   final Lock _clipVectorMigrationLock = Lock();
+  bool _clipVectorDbRecoveryRequested = false;
   Future<void>? _clusterCentroidVectorDbRecoveryFuture;
   final Lock _clusterCentroidVectorRecoveryLock = Lock();
   final Lock _clusterCentroidVectorMigrationLock = Lock();
+  bool _clusterCentroidVectorDbRecoveryRequested = false;
 
   MLDataDB._privateConstructor({
     String databaseName = "ente.ml.db",
@@ -1579,16 +1581,34 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   }
 
   Future<void> _scheduleClusterCentroidVectorDbRecovery() async {
-    await _clusterCentroidVectorRecoveryLock.synchronized(() async {
-      if (_clusterCentroidVectorDbRecoveryFuture != null) {
+    late Future<void> recoveryFuture;
+    await _clusterCentroidVectorRecoveryLock.synchronized(() {
+      _clusterCentroidVectorDbRecoveryRequested = true;
+      recoveryFuture = _clusterCentroidVectorDbRecoveryFuture ??=
+          _runClusterCentroidVectorDbRecoveryLoop();
+    });
+    await recoveryFuture;
+  }
+
+  Future<void> _runClusterCentroidVectorDbRecoveryLoop() async {
+    while (true) {
+      await _clusterCentroidVectorRecoveryLock.synchronized(() {
+        _clusterCentroidVectorDbRecoveryRequested = false;
+      });
+
+      await _recoverClusterCentroidVectorDbFromSqlite();
+
+      final shouldContinue =
+          await _clusterCentroidVectorRecoveryLock.synchronized(() {
+        if (_clusterCentroidVectorDbRecoveryRequested) {
+          return true;
+        }
+        _clusterCentroidVectorDbRecoveryFuture = null;
+        return false;
+      });
+      if (!shouldContinue) {
         return;
       }
-      _clusterCentroidVectorDbRecoveryFuture =
-          _recoverClusterCentroidVectorDbFromSqlite();
-    });
-    final recoveryFuture = _clusterCentroidVectorDbRecoveryFuture;
-    if (recoveryFuture != null) {
-      await recoveryFuture;
     }
   }
 
@@ -1613,8 +1633,6 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
         e,
         s,
       );
-    } finally {
-      _clusterCentroidVectorDbRecoveryFuture = null;
     }
   }
 
@@ -1954,15 +1972,33 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
   }
 
   Future<void> _scheduleClipVectorDbRecovery() async {
-    await _clipVectorRecoveryLock.synchronized(() async {
-      if (_clipVectorDbRecoveryFuture != null) {
+    late Future<void> recoveryFuture;
+    await _clipVectorRecoveryLock.synchronized(() {
+      _clipVectorDbRecoveryRequested = true;
+      recoveryFuture =
+          _clipVectorDbRecoveryFuture ??= _runClipVectorDbRecoveryLoop();
+    });
+    await recoveryFuture;
+  }
+
+  Future<void> _runClipVectorDbRecoveryLoop() async {
+    while (true) {
+      await _clipVectorRecoveryLock.synchronized(() {
+        _clipVectorDbRecoveryRequested = false;
+      });
+
+      await _recoverClipVectorDbFromSqlite();
+
+      final shouldContinue = await _clipVectorRecoveryLock.synchronized(() {
+        if (_clipVectorDbRecoveryRequested) {
+          return true;
+        }
+        _clipVectorDbRecoveryFuture = null;
+        return false;
+      });
+      if (!shouldContinue) {
         return;
       }
-      _clipVectorDbRecoveryFuture = _recoverClipVectorDbFromSqlite();
-    });
-    final recoveryFuture = _clipVectorDbRecoveryFuture;
-    if (recoveryFuture != null) {
-      await recoveryFuture;
     }
   }
 
@@ -1983,8 +2019,6 @@ class MLDataDB with SqlDbBase implements IMLDataDB<int> {
       _logger.info("ClipVectorDB rebuild from SQLite completed");
     } catch (e, s) {
       _logger.severe("ClipVectorDB rebuild from SQLite failed", e, s);
-    } finally {
-      _clipVectorDbRecoveryFuture = null;
     }
   }
 
