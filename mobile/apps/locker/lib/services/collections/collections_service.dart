@@ -774,6 +774,13 @@ class CollectionService {
       return;
     }
 
+    if (!hasCompletedFirstSync()) {
+      _logger.info(
+        "Skipping default collections setup - first sync not completed yet",
+      );
+      return;
+    }
+
     final inFlight = _defaultSetupInFlight;
     if (inFlight != null) {
       await inFlight;
