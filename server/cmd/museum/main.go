@@ -72,6 +72,9 @@ import (
 	"github.com/ente-io/museum/pkg/utils/config"
 	"github.com/ente-io/museum/pkg/utils/s3config"
 	timeUtil "github.com/ente-io/museum/pkg/utils/time"
+	wallapi "github.com/ente-io/museum/wall/api"
+	wallcontroller "github.com/ente-io/museum/wall/controller"
+	wallrepo "github.com/ente-io/museum/wall/repo"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/requestid"
 	"github.com/gin-contrib/timeout"
@@ -936,6 +939,9 @@ func main() {
 
 	userEntityController := &userEntityCtrl.Controller{Repo: userEntityRepo}
 	userEntityHandler := &api.UserEntityHandler{Controller: userEntityController}
+	wallRepos := wallrepo.NewModule(db, s3Config)
+	wallModule := wallcontroller.NewModule(wallRepos, userAuthRepo)
+	wallHandlers := wallapi.NewHandlers(wallModule)
 
 	privateAPI.POST("/user-entity/key", userEntityHandler.CreateKey)
 	privateAPI.GET("/user-entity/key", userEntityHandler.GetKey)
@@ -943,6 +949,7 @@ func main() {
 	privateAPI.PUT("/user-entity/entity", userEntityHandler.UpdateEntity)
 	privateAPI.DELETE("/user-entity/entity", userEntityHandler.DeleteEntity)
 	privateAPI.GET("/user-entity/entity/diff", userEntityHandler.GetDiff)
+	wallapi.Register(privateAPI, publicAPI, wallHandlers)
 
 	contactController := contactCtrl.New(contactRepository, objectCleanupController, s3Config)
 	contactHandler := &api.ContactHandler{Controller: contactController}
