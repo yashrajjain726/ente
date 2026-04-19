@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::{Engine, engine::general_purpose::URL_SAFE};
@@ -21,6 +23,8 @@ pub struct TestAccount {
     pub user_id: i64,
     pub auth_token: String,
     pub master_key: Vec<u8>,
+    pub secret_key: Vec<u8>,
+    pub public_key: Vec<u8>,
     pub key_attributes: KeyAttributes,
 }
 
@@ -183,10 +187,7 @@ pub async fn fetch_two_factor_status(endpoint: &str, account: &TestAccount) -> C
     fetch_two_factor_status_with_token(endpoint, &account.auth_token).await
 }
 
-async fn fetch_two_factor_status_with_token(
-    endpoint: &str,
-    auth_token: &str,
-) -> CliResult<bool> {
+async fn fetch_two_factor_status_with_token(endpoint: &str, auth_token: &str) -> CliResult<bool> {
     let client = accounts_client(endpoint)?;
     client.set_auth_token(Some(auth_token.to_string()));
     client.get_two_factor_status().await
@@ -212,6 +213,8 @@ pub fn test_account_from_authenticated(
         user_id: authenticated.user_id,
         auth_token: auth_token_from_authenticated(&authenticated),
         master_key: authenticated.secrets.master_key.clone(),
+        secret_key: authenticated.secrets.secret_key.clone(),
+        public_key: authenticated.secrets.public_key.clone(),
         key_attributes: authenticated.key_attributes,
     }
 }

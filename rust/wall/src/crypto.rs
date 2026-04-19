@@ -65,13 +65,13 @@ pub fn encrypt_entity_key(master_key: &[u8], plaintext: &[u8]) -> Result<EntityK
     let (ciphertext, nonce) = encrypt_secretbox_split(master_key, plaintext)?;
     Ok(EntityKeyPayload {
         encrypted_key: encode_b64(&ciphertext),
-        nonce: encode_b64(&nonce),
+        header: encode_b64(&nonce),
     })
 }
 
 pub fn decrypt_entity_key(master_key: &[u8], payload: &EntityKeyPayload) -> Result<Vec<u8>> {
     let ciphertext = decode_b64(&payload.encrypted_key)?;
-    let nonce = decode_b64(&payload.nonce)?;
+    let nonce = decode_b64(&payload.header)?;
     decrypt_secretbox_split(master_key, &ciphertext, &nonce)
 }
 

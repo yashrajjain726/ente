@@ -261,6 +261,7 @@ type PostResponse struct {
 	PostID           int64               `json:"postId"`
 	WallID           string              `json:"wallId"`
 	WallSlug         string              `json:"wallSlug"`
+	OwnerUserID      int64               `json:"ownerUserId"`
 	Author           string              `json:"author"`
 	EncryptedPostKey string              `json:"encryptedPostKey"`
 	CaptionCipher    string              `json:"captionCipher,omitempty"`

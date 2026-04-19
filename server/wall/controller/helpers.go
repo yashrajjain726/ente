@@ -66,6 +66,7 @@ func toPostResponse(post *wallrepo.WallPostRecord, assets []wallrepo.WallPostAss
 		PostID:           post.PostID,
 		WallID:           post.WallID,
 		WallSlug:         post.WallSlug,
+		OwnerUserID:      post.OwnerID,
 		Author:           post.Author,
 		EncryptedPostKey: post.EncryptedPostKey,
 		CaptionCipher:    post.CaptionCipher,

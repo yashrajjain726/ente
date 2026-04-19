@@ -27,7 +27,7 @@ use crate::transport::{
 use ente_core::crypto::{sealed, secretbox};
 use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
 
-const ROOT_WALL_KEY_TYPE: &str = "root_wall_key";
+const ROOT_WALL_KEY_TYPE: &str = "wall";
 const WALL_LINK_AUTH_LABEL: &str = "wall-link-login-v1";
 const WALL_LINK_WRAP_LABEL: &str = "wall-link-view-v1";
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
@@ -40,7 +40,6 @@ struct ResolvedWallAccess {
 
 pub struct AccountWallCtx {
     client: HttpClient,
-    base_url: String,
     master_key: Vec<u8>,
     public_key: Vec<u8>,
     private_key: Vec<u8>,
@@ -49,7 +48,6 @@ pub struct AccountWallCtx {
 
 pub struct WallLinkCtx {
     client: HttpClient,
-    base_url: String,
     owner_handle: String,
     wall_id: String,
     wall_slug: String,
@@ -69,7 +67,6 @@ impl AccountWallCtx {
         let private_key = decrypt_private_key(&input.master_key, input.private_key_source)?;
         Ok(Self {
             client,
-            base_url: input.base_url,
             master_key: input.master_key,
             public_key: input.public_key,
             private_key,
@@ -105,7 +102,7 @@ impl AccountWallCtx {
             .await?;
         Ok(payload.map(|value| EntityKeyPayload {
             encrypted_key: value.encrypted_key,
-            nonce: value.nonce,
+            header: value.header,
         }))
     }
 
@@ -117,13 +114,9 @@ impl AccountWallCtx {
         let request = CreateEntityKeyRequest {
             key_type: key_type.to_owned(),
             encrypted_key: payload.encrypted_key.clone(),
-            nonce: payload.nonce.clone(),
+            header: payload.header.clone(),
         };
-        match self
-            .client
-            .post_json::<StatusResponse, _>("/user-entity/key", &request)
-            .await
-        {
+        match self.client.post_empty("/user-entity/key", &request).await {
             Ok(_) => Ok(()),
             Err(HttpError::Http { status: 409, .. }) => Err(WallError::EntityKeyConflict),
             Err(err) => Err(err.into()),
@@ -990,7 +983,7 @@ impl AccountWallCtx {
 
     pub async fn delete_wall_link(&self, wall_id: &str) -> Result<()> {
         let path = format!("/wall/links/{wall_id}");
-        let _: StatusResponse = self.client.delete_json(&path, &[]).await?;
+        self.client.delete_empty(&path, &[]).await?;
         Ok(())
     }
 
@@ -1094,7 +1087,6 @@ impl WallLinkCtx {
             decrypt_secretbox_packed(&wrap_key, &decode_b64(&response.encrypted_wall_key)?)?;
         Ok(Self {
             client,
-            base_url: input.base_url,
             owner_handle: response.owner,
             wall_id: response.wall_id,
             wall_slug: response.wall_slug,
@@ -1436,7 +1428,7 @@ mod tests {
                 json!({
                     "type": ROOT_WALL_KEY_TYPE,
                     "encryptedKey": payload.encrypted_key,
-                    "nonce": payload.nonce,
+                    "header": payload.header,
                 })
                 .to_string(),
             )
@@ -1483,8 +1475,7 @@ mod tests {
                     "owner": "owner-handle",
                     "keyVersion": 3,
                     "encryptedWallKey": encrypted_wall_key,
-                    "encryptedPublicProfile": "",
-                    "encryptedPrivateProfile": "",
+                    "encryptedProfile": "",
                 })
                 .to_string(),
             )
@@ -1703,7 +1694,7 @@ mod tests {
                 json!({
                     "type": ROOT_WALL_KEY_TYPE,
                     "encryptedKey": entity_payload.encrypted_key,
-                    "nonce": entity_payload.nonce,
+                    "header": entity_payload.header,
                 })
                 .to_string(),
             )
@@ -1718,8 +1709,7 @@ mod tests {
                     "wallId": "wall_owner_gallery",
                     "wallSlug": "owner-gallery",
                     "encryptedWallKey": encode_b64(&encrypt_secretbox_packed(&root_wall_key, &wall_key).expect("wall key wrap")),
-                    "encryptedPublicProfile": "",
-                    "encryptedPrivateProfile": "",
+                    "encryptedProfile": "",
                     "keyVersion": 3
                 }])
                 .to_string(),
@@ -1789,7 +1779,7 @@ mod tests {
                 json!({
                     "type": ROOT_WALL_KEY_TYPE,
                     "encryptedKey": entity_payload.encrypted_key,
-                    "nonce": entity_payload.nonce,
+                    "header": entity_payload.header,
                 })
                 .to_string(),
             )
@@ -1804,8 +1794,7 @@ mod tests {
                     "wallId": "wall_owner_gallery",
                     "wallSlug": "owner-gallery",
                     "encryptedWallKey": encode_b64(&encrypt_secretbox_packed(&root_wall_key, &owned_wall_key).expect("owned wrap")),
-                    "encryptedPublicProfile": "",
-                    "encryptedPrivateProfile": "",
+                    "encryptedProfile": "",
                     "keyVersion": 1
                 }])
                 .to_string(),
@@ -1822,8 +1811,7 @@ mod tests {
                     "wallId": "wall_shared_gallery",
                     "wallSlug": "shared-gallery",
                     "encryptedWallKey": encode_b64(&pack_payload(&sealed_share, &[])),
-                    "encryptedPublicProfile": "",
-                    "encryptedPrivateProfile": "",
+                    "encryptedProfile": "",
                     "keyVersion": 4
                 }])
                 .to_string(),

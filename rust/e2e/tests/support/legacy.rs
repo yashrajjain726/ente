@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use ente_contacts::client::ContactsCtx;
 
 use crate::support::{

@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod contacts;
 pub mod legacy;
+pub mod wall;
 
 use uuid::Uuid;
 

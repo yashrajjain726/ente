@@ -8,7 +8,7 @@ fn is_false(value: &bool) -> bool {
 #[serde(rename_all = "camelCase")]
 pub struct EntityKeyPayload {
     pub encrypted_key: String,
-    pub nonce: String,
+    pub header: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -17,7 +17,7 @@ pub struct EntityKeyResponse {
     #[serde(rename = "type")]
     pub key_type: String,
     pub encrypted_key: String,
-    pub nonce: String,
+    pub header: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -26,7 +26,7 @@ pub struct CreateEntityKeyRequest {
     #[serde(rename = "type")]
     pub key_type: String,
     pub encrypted_key: String,
-    pub nonce: String,
+    pub header: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
