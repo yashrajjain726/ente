@@ -89,6 +89,11 @@ func (r *WallsRepository) UpdateProfile(ctx context.Context, ownerID int64, wall
 	ContentType string
 	Size        int64
 }, removeAvatar bool) (*WallRecord, error) {
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
 	query := `
 		UPDATE walls
 		SET encrypted_profile = $1,
@@ -108,15 +113,23 @@ func (r *WallsRepository) UpdateProfile(ctx context.Context, ownerID int64, wall
 			size = sql.NullInt64{Int64: avatar.Size, Valid: true}
 		}
 	}
-	rec, err := scanWallRecord(r.DB.QueryRowContext(ctx, query, encryptedProfile, removeAvatar, objectKey, contentType, size, ownerID, wallID))
+	rec, err := scanWallRecord(tx.QueryRowContext(ctx, query, encryptedProfile, removeAvatar, objectKey, contentType, size, ownerID, wallID))
 	if err != nil {
 		return nil, err
 	}
-	if _, err := r.DB.ExecContext(ctx, `
+	if avatar != nil {
+		if err := ConsumeTempObjectTx(ctx, tx, ownerID, avatar.ObjectKey, TempObjectPurposeAvatar, &wallID); err != nil {
+			return nil, stacktrace.Propagate(err, "failed to consume staged wall avatar upload")
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `
 		UPDATE wall_key_versions
 		SET encrypted_profile = $1
 		WHERE wall_id = $2 AND version = $3
 	`, encryptedProfile, wallID, rec.CurrentVersion); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return rec, nil

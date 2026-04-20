@@ -77,6 +77,26 @@ CREATE TABLE IF NOT EXISTS wall_post_assets (
 CREATE INDEX IF NOT EXISTS idx_wall_post_assets_post_position
     ON wall_post_assets (post_id, position ASC, asset_id ASC);
 
+CREATE TABLE IF NOT EXISTS wall_temp_objects (
+    object_key      TEXT PRIMARY KEY,
+    owner_id        BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    wall_id         TEXT REFERENCES walls (wall_id) ON DELETE CASCADE,
+    purpose         TEXT NOT NULL,
+    bucket_id       TEXT NOT NULL,
+    content_type    TEXT NOT NULL,
+    expected_size   BIGINT NOT NULL,
+    expires_at      BIGINT NOT NULL,
+    created_at      BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    CONSTRAINT chk_wall_temp_objects_purpose CHECK (purpose IN ('post', 'avatar')),
+    CONSTRAINT chk_wall_temp_objects_expected_size CHECK (expected_size > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wall_temp_objects_expires
+    ON wall_temp_objects (expires_at ASC);
+
+CREATE INDEX IF NOT EXISTS idx_wall_temp_objects_owner_purpose
+    ON wall_temp_objects (owner_id, purpose, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS wall_post_likes (
     post_id      BIGINT NOT NULL REFERENCES wall_posts (post_id) ON DELETE CASCADE,
     user_id      BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,

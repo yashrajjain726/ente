@@ -85,6 +85,18 @@ type WallPostAssetRecord struct {
 	CreatedAt      int64
 }
 
+type WallTempObjectRecord struct {
+	ObjectKey    string
+	OwnerID      int64
+	WallID       sql.NullString
+	Purpose      string
+	BucketID     string
+	ContentType  string
+	ExpectedSize int64
+	ExpiresAt    int64
+	CreatedAt    int64
+}
+
 type WallCommentRecord struct {
 	CommentID       int64
 	PostID          int64

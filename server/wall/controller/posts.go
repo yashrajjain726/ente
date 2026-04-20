@@ -15,6 +15,7 @@ type PostsController struct {
 	PostsRepo  *repo.PostsRepository
 	WallsRepo  *repo.WallsRepository
 	FollowRepo *repo.FollowRepository
+	AssetsRepo *repo.AssetsRepository
 	auth       authDeps
 }
 
@@ -35,10 +36,14 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 		if strings.TrimSpace(object.ObjectKey) == "" {
 			return nil, ente.NewBadRequestWithMessage("objectKey is required for each object")
 		}
+		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, object.ObjectKey, repo.TempObjectPurposePost, nil)
+		if err != nil {
+			return nil, err
+		}
 		assets = append(assets, repo.WallPostAssetRecord{
-			ObjectKey:      object.ObjectKey,
-			ContentType:    sql.NullString{String: object.ContentType, Valid: strings.TrimSpace(object.ContentType) != ""},
-			Size:           sql.NullInt64{Int64: object.Size, Valid: object.Size > 0},
+			ObjectKey:      staged.ObjectKey,
+			ContentType:    sql.NullString{String: staged.ContentType, Valid: strings.TrimSpace(staged.ContentType) != ""},
+			Size:           sql.NullInt64{Int64: staged.ExpectedSize, Valid: staged.ExpectedSize > 0},
 			Position:       object.Position,
 			Variant:        sql.NullString{String: object.Variant, Valid: strings.TrimSpace(object.Variant) != ""},
 			BlurHashCipher: sql.NullString{String: object.BlurHashCipher, Valid: strings.TrimSpace(object.BlurHashCipher) != ""},

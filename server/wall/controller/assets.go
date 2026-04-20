@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,15 +11,18 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/ente/base"
+	timeutil "github.com/ente-io/museum/pkg/utils/time"
 	"github.com/ente-io/museum/wall/models"
 	wallrepo "github.com/ente-io/museum/wall/repo"
 	"github.com/gin-gonic/gin"
 )
 
 const (
-	maxUploadBytes      int64 = 2 * 1024 * 1024
-	uploadURLExpiry           = 15 * time.Minute
-	uploadPurposeAvatar       = "avatar"
+	maxUploadBytes         int64 = 2 * 1024 * 1024
+	uploadURLExpiry              = 15 * time.Minute
+	uploadTempObjectExpiry       = 2 * uploadURLExpiry
+	uploadPurposePost            = wallrepo.TempObjectPurposePost
+	uploadPurposeAvatar          = wallrepo.TempObjectPurposeAvatar
 )
 
 type AssetsController struct {
@@ -39,13 +44,24 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	if req.Size <= 0 || req.Size > maxUploadBytes {
 		return nil, ente.NewBadRequestWithMessage(fmt.Sprintf("size must be between 1 and %d bytes", maxUploadBytes))
 	}
-	if req.Purpose != nil && strings.TrimSpace(*req.Purpose) == uploadPurposeAvatar {
+	purpose := uploadPurposePost
+	if req.Purpose != nil && strings.TrimSpace(*req.Purpose) != "" {
+		purpose = strings.TrimSpace(*req.Purpose)
+	}
+	var wallID sql.NullString
+	switch purpose {
+	case uploadPurposePost:
+	case uploadPurposeAvatar:
 		if req.WallID == nil || strings.TrimSpace(*req.WallID) == "" {
 			return nil, ente.NewBadRequestWithMessage("wallId is required for avatar uploads")
 		}
-		if _, err := c.auth.requireWallOwner(ctx.Request.Context(), userID, strings.TrimSpace(*req.WallID)); err != nil {
+		wallID.String = strings.TrimSpace(*req.WallID)
+		wallID.Valid = true
+		if _, err := c.auth.requireWallOwner(ctx.Request.Context(), userID, wallID.String); err != nil {
 			return nil, err
 		}
+	default:
+		return nil, ente.NewBadRequestWithMessage("invalid upload purpose")
 	}
 
 	bucketID := c.AssetsRepo.S3Config.GetHotDataCenter()
@@ -53,7 +69,7 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	s3Client := c.AssetsRepo.S3Config.GetS3Client(bucketID)
 
 	keyPrefix := fmt.Sprintf("wall/%d/posts", userID)
-	if req.Purpose != nil && strings.TrimSpace(*req.Purpose) == uploadPurposeAvatar {
+	if purpose == uploadPurposeAvatar {
 		keyPrefix = fmt.Sprintf("wall/%d/avatar", userID)
 	}
 	objectKey := fmt.Sprintf("%s/%s", keyPrefix, base.MustNewID("wo"))
@@ -68,6 +84,19 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	if err != nil {
 		return nil, err
 	}
+	err = c.AssetsRepo.AddTempObject(ctx.Request.Context(), wallrepo.WallTempObjectRecord{
+		ObjectKey:    objectKey,
+		OwnerID:      userID,
+		WallID:       wallID,
+		Purpose:      purpose,
+		BucketID:     bucketID,
+		ContentType:  strings.TrimSpace(req.ContentType),
+		ExpectedSize: req.Size,
+		ExpiresAt:    timeutil.Microseconds() + int64(uploadTempObjectExpiry/time.Microsecond),
+	})
+	if err != nil {
+		return nil, err
+	}
 	return &models.PresignUploadResponse{
 		URL:       url,
 		Method:    "PUT",
@@ -75,6 +104,38 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 		ObjectKey: objectKey,
 		ExpiresIn: int(uploadURLExpiry.Seconds()),
 	}, nil
+}
+
+func verifyStagedUpload(ctx *gin.Context, assetsRepo *wallrepo.AssetsRepository, ownerID int64, objectKey, purpose string, wallID *string) (*wallrepo.WallTempObjectRecord, error) {
+	objectKey = strings.TrimSpace(objectKey)
+	if objectKey == "" {
+		return nil, ente.NewBadRequestWithMessage("objectKey is required")
+	}
+	rec, err := assetsRepo.GetTempObject(ctx.Request.Context(), ownerID, objectKey, purpose, wallID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ente.NewBadRequestWithMessage("staged wall upload not found")
+		}
+		return nil, err
+	}
+	if rec.ExpiresAt <= timeutil.Microseconds() {
+		return nil, ente.NewBadRequestWithMessage("staged wall upload expired")
+	}
+	s3Client := assetsRepo.S3Config.GetS3Client(rec.BucketID)
+	head, err := s3Client.HeadObject(&s3.HeadObjectInput{
+		Bucket: assetsRepo.S3Config.GetBucket(rec.BucketID),
+		Key:    aws.String(rec.ObjectKey),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if head.ContentLength == nil || *head.ContentLength != rec.ExpectedSize {
+		return nil, ente.NewBadRequestWithMessage("wall upload size mismatch")
+	}
+	if rec.ContentType != "" && (head.ContentType == nil || strings.TrimSpace(*head.ContentType) != rec.ContentType) {
+		return nil, ente.NewBadRequestWithMessage("wall upload content type mismatch")
+	}
+	return rec, nil
 }
 
 func (c *AssetsController) Redirect(ctx *gin.Context, req models.AssetRedirectRequest) (*models.AssetDownloadResponse, error) {

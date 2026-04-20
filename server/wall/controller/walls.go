@@ -10,8 +10,9 @@ import (
 )
 
 type WallsController struct {
-	WallsRepo *repo.WallsRepository
-	auth      authDeps
+	WallsRepo  *repo.WallsRepository
+	AssetsRepo *repo.AssetsRepository
+	auth       authDeps
 }
 
 func (c *WallsController) List(ctx *gin.Context, _ models.ListWallsRequest) ([]models.WallKeyResponse, error) {
@@ -75,23 +76,34 @@ func (c *WallsController) UpdateProfile(ctx *gin.Context, req models.UpdateWallP
 	if strings.TrimSpace(req.WallID) == "" || strings.TrimSpace(req.EncryptedProfile) == "" {
 		return nil, ente.NewBadRequestWithMessage("wallId and encryptedProfile are required")
 	}
+	if req.RemoveAvatar && req.Avatar != nil {
+		return nil, ente.NewBadRequestWithMessage("avatar and removeAvatar cannot both be set")
+	}
+	wallID := strings.TrimSpace(req.WallID)
+	if _, err := c.auth.requireWallOwner(ctx.Request.Context(), userID, wallID); err != nil {
+		return nil, err
+	}
 	avatar := (*struct {
 		ObjectKey   string
 		ContentType string
 		Size        int64
 	})(nil)
 	if req.Avatar != nil {
+		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, req.Avatar.ObjectKey, repo.TempObjectPurposeAvatar, &wallID)
+		if err != nil {
+			return nil, err
+		}
 		avatar = &struct {
 			ObjectKey   string
 			ContentType string
 			Size        int64
 		}{
-			ObjectKey:   req.Avatar.ObjectKey,
-			ContentType: req.Avatar.ContentType,
-			Size:        req.Avatar.Size,
+			ObjectKey:   staged.ObjectKey,
+			ContentType: staged.ContentType,
+			Size:        staged.ExpectedSize,
 		}
 	}
-	wall, err := c.WallsRepo.UpdateProfile(ctx.Request.Context(), userID, req.WallID, req.EncryptedProfile, avatar, req.RemoveAvatar)
+	wall, err := c.WallsRepo.UpdateProfile(ctx.Request.Context(), userID, wallID, req.EncryptedProfile, avatar, req.RemoveAvatar)
 	if err != nil {
 		return nil, err
 	}

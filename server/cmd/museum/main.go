@@ -1017,7 +1017,7 @@ func main() {
 	adminAPI.POST("/discount/add-coupons", discountCouponHandler.AddCoupons)
 
 	setKnownAPIs(server.Routes())
-	setupAndStartBackgroundJobs(objectCleanupController, replicationController3, fileDataCtrl, contactController)
+	setupAndStartBackgroundJobs(objectCleanupController, replicationController3, fileDataCtrl, contactController, wallModule)
 	setupAndStartCrons(
 		userAuthRepo, collectionLinkRepo, fileLinkRepo, pasteRepo, twoFactorRepo, passkeysRepo, fileController, taskLockingRepo, emailNotificationCtrl,
 		trashController, pushController, objectController, dataCleanupController, storageBonusCtrl, emergencyCtrl,
@@ -1139,6 +1139,7 @@ func setupAndStartBackgroundJobs(
 	replicationController3 *controller.ReplicationController3,
 	fileDataCtrl *filedata.Controller,
 	contactController *contactCtrl.Controller,
+	wallModule *wallcontroller.Module,
 ) {
 	isReplicationEnabled := viper.GetBool("replication.enabled")
 	if isReplicationEnabled {
@@ -1162,6 +1163,7 @@ func setupAndStartBackgroundJobs(
 	contactController.StartDataDeletion()
 	objectCleanupController.StartRemovingUnreportedObjects()
 	objectCleanupController.StartClearingOrphanObjects()
+	wallModule.Cleanup.StartRemovingUnreportedObjects()
 }
 
 func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRepo *public.CollectionLinkRepo,

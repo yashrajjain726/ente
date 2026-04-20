@@ -34,6 +34,9 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, wallID,
 		`, postID, obj.ObjectKey, obj.ContentType, obj.Size, obj.Position, obj.Variant, obj.BlurHashCipher); err != nil {
 			return 0, stacktrace.Propagate(err, "")
 		}
+		if err := ConsumeTempObjectTx(ctx, tx, ownerID, obj.ObjectKey, TempObjectPurposePost, nil); err != nil {
+			return 0, stacktrace.Propagate(err, "failed to consume staged wall post upload")
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return 0, stacktrace.Propagate(err, "")

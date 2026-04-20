@@ -13,6 +13,7 @@ DROP TRIGGER IF EXISTS update_wall_post_comments_updated_at ON wall_post_comment
 DROP TABLE IF EXISTS wall_post_comments;
 
 DROP TABLE IF EXISTS wall_post_likes;
+DROP TABLE IF EXISTS wall_temp_objects;
 DROP TABLE IF EXISTS wall_post_assets;
 
 DROP TRIGGER IF EXISTS update_wall_posts_updated_at ON wall_posts;

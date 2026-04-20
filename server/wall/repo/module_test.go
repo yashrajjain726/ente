@@ -55,6 +55,17 @@ func TestWallModuleLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, listedWalls, 1)
 
+	err = module.Assets.AddTempObject(ctx, WallTempObjectRecord{
+		ObjectKey:    "wall/alice/avatar.jpg",
+		OwnerID:      aliceID,
+		WallID:       sql.NullString{String: aliceWall.WallID, Valid: true},
+		Purpose:      TempObjectPurposeAvatar,
+		BucketID:     "b2-eu-cen",
+		ContentType:  "image/jpeg",
+		ExpectedSize: 111,
+		ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
+	})
+	require.NoError(t, err)
 	updatedWall, err := module.Walls.UpdateProfile(ctx, aliceID, aliceWall.WallID, "alice-profile-v2", &struct {
 		ObjectKey   string
 		ContentType string
@@ -99,6 +110,29 @@ func TestWallModuleLifecycle(t *testing.T) {
 	require.Len(t, followers, 1)
 	require.Equal(t, "bob", followers[0].Username)
 
+	for _, tempObject := range []WallTempObjectRecord{
+		{
+			ObjectKey:    "wall/alice/post1/full",
+			OwnerID:      aliceID,
+			Purpose:      TempObjectPurposePost,
+			BucketID:     "b2-eu-cen",
+			ContentType:  "image/jpeg",
+			ExpectedSize: 123,
+			ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
+		},
+		{
+			ObjectKey:    "wall/alice/post1/thumb",
+			OwnerID:      aliceID,
+			Purpose:      TempObjectPurposePost,
+			BucketID:     "b2-eu-cen",
+			ContentType:  "image/jpeg",
+			ExpectedSize: 45,
+			ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
+		},
+	} {
+		err = module.Assets.AddTempObject(ctx, tempObject)
+		require.NoError(t, err)
+	}
 	postID, err := module.Posts.CreatePost(ctx, aliceID, aliceWall.WallID, "post-key", ptr("caption"), rotatedWall.CurrentVersion, []WallPostAssetRecord{
 		{
 			ObjectKey:      "wall/alice/post1/full",
