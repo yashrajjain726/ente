@@ -241,6 +241,20 @@ async fn wall_bootstrap_posts_follow_share_and_link_suite() {
         link_post.caption_plaintext.as_deref(),
         Some(br#"{"caption":"hello world"}"#.as_slice())
     );
+    let link_comments = link_ctx
+        .list_comments(post_id, None, None)
+        .await
+        .expect("link session should list comments");
+    assert_eq!(link_comments.comments.len(), 1);
+    assert_eq!(link_comments.comments[0].replies.len(), 1);
+    let link_parent = link_ctx
+        .decrypt_comment(&link_post.post_key, &link_comments.comments[0])
+        .expect("link session should decrypt parent comment");
+    let link_reply = link_ctx
+        .decrypt_comment(&link_post.post_key, &link_comments.comments[0].replies[0])
+        .expect("link session should decrypt reply comment");
+    assert_eq!(link_parent.plaintext, b"looks great");
+    assert_eq!(link_reply.plaintext, b"thanks");
 
     owner_ctx
         .delete_wall_link(&owner_wall.wall_id)
