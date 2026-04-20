@@ -62,8 +62,11 @@ func (c *LinksController) Create(ctx *gin.Context, req models.WallLinkCreateRequ
 		return nil, err
 	}
 	authKeyBytes, err := base64.StdEncoding.DecodeString(req.AuthKey)
-	if err != nil || len(authKeyBytes) == 0 {
+	if err != nil || len(authKeyBytes) != 32 {
 		return nil, ente.NewBadRequestWithMessage("invalid authKey encoding")
+	}
+	if req.KeyVersion != wall.CurrentVersion {
+		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current wall version")
 	}
 	sum := sha256.Sum256(authKeyBytes)
 	link, err := c.LinksRepo.UpsertLink(ctx.Request.Context(), wall.WallID, sum[:], req.KeyVersion, req.EncryptedWallKey)
@@ -97,7 +100,7 @@ func (c *LinksController) Login(ctx *gin.Context, req models.WallLinkLoginReques
 		return nil, ente.NewBadRequestWithMessage("wallId and authKey are required")
 	}
 	authKeyBytes, err := base64.StdEncoding.DecodeString(req.AuthKey)
-	if err != nil || len(authKeyBytes) == 0 {
+	if err != nil || len(authKeyBytes) != 32 {
 		return nil, ente.NewBadRequestWithMessage("invalid authKey encoding")
 	}
 	sum := sha256.Sum256(authKeyBytes)

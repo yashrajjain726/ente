@@ -210,13 +210,13 @@ async fn wall_bootstrap_posts_follow_share_and_link_suite() {
     wall::assert_http_status(outsider_ctx.fetch_post_decrypted(post_id).await, 403);
 
     let link = owner_ctx
-        .create_wall_link(&updated_slug, &owner_wall.wall_id)
+        .create_wall_link(&owner_wall.wall_id)
         .await
         .expect("wall link should be created");
     let link_ctx = WallLinkCtx::open(OpenWallLinkCtxInput {
         base_url: endpoint.clone(),
-        wall_id: owner_wall.wall_id.clone(),
-        secret: link.secret.clone(),
+        wall_username: link.wall_username.clone(),
+        access_key: link.access_key.clone(),
         user_agent: Some("ente-e2e".to_string()),
         client_package: Some("io.ente.photos".to_string()),
         client_version: Some("ente-e2e".to_string()),

@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
 use crate::crypto::{
-    decode_b64, decode_b64_url, decrypt_entity_key, decrypt_secretbox_packed, derive_labeled_key,
-    encode_b64, encode_b64_url, encrypt_asset_payload, encrypt_entity_key,
-    encrypt_secretbox_packed, generate_key, pack_payload, unpack_payload,
+    decode_b64, decode_b64_url, decrypt_entity_key, decrypt_secretbox_packed,
+    derive_wall_link_auth_key, derive_wall_link_wrap_key, encode_b64, encode_b64_url,
+    encrypt_asset_payload, encrypt_entity_key, encrypt_secretbox_packed, generate_key,
+    pack_payload, unpack_payload,
 };
 use crate::error::{Result, WallError};
 use crate::models::{
@@ -28,8 +29,6 @@ use ente_core::crypto::{sealed, secretbox};
 use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
 
 const ROOT_WALL_KEY_TYPE: &str = "wall";
-const WALL_LINK_AUTH_LABEL: &str = "wall-link-login-v1";
-const WALL_LINK_WRAP_LABEL: &str = "wall-link-view-v1";
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
 
 #[derive(Debug, Clone)]
@@ -951,20 +950,16 @@ impl AccountWallCtx {
         self.client.get_json(&path, &[]).await.map_err(Into::into)
     }
 
-    pub async fn create_wall_link(
-        &self,
-        owner_handle: &str,
-        wall_id: &str,
-    ) -> Result<CreatedWallLink> {
+    pub async fn create_wall_link(&self, wall_id: &str) -> Result<CreatedWallLink> {
         let access = self
             .resolve_owned_wall_access(wall_id)
             .await?
             .ok_or_else(|| {
                 WallError::InvalidInput(format!("wall {wall_id} is not owned by the account"))
             })?;
-        let secret_bytes = generate_key();
-        let auth_key = derive_labeled_key(&secret_bytes, WALL_LINK_AUTH_LABEL);
-        let wrap_key = derive_labeled_key(&secret_bytes, WALL_LINK_WRAP_LABEL);
+        let access_key = generate_key();
+        let auth_key = derive_wall_link_auth_key(&access_key)?;
+        let wrap_key = derive_wall_link_wrap_key(&access_key)?;
         let request = WallLinkCreateRequest {
             wall_id: wall_id.to_owned(),
             auth_key: encode_b64(&auth_key),
@@ -973,8 +968,8 @@ impl AccountWallCtx {
         };
         let status: WallLinkStatusResponse = self.client.post_json("/wall/links", &request).await?;
         Ok(CreatedWallLink {
-            secret: encode_b64_url(&secret_bytes),
-            owner_handle: owner_handle.to_owned(),
+            access_key: encode_b64_url(&access_key),
+            wall_username: status.wall_slug.clone(),
             wall_id: wall_id.to_owned(),
             wall_slug: status.wall_slug,
             key_version: status.key_version,
@@ -1063,9 +1058,9 @@ fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
 
 impl WallLinkCtx {
     pub async fn open(input: OpenWallLinkCtxInput) -> Result<Self> {
-        let secret_bytes = decode_b64_url(&input.secret)?;
-        let auth_key = derive_labeled_key(&secret_bytes, WALL_LINK_AUTH_LABEL);
-        let wrap_key = derive_labeled_key(&secret_bytes, WALL_LINK_WRAP_LABEL);
+        let access_key = decode_b64_url(&input.access_key)?;
+        let auth_key = derive_wall_link_auth_key(&access_key)?;
+        let wrap_key = derive_wall_link_wrap_key(&access_key)?;
         let client = build_http_client(
             &input.base_url,
             None,
@@ -1073,11 +1068,16 @@ impl WallLinkCtx {
             input.client_package,
             input.client_version,
         )?;
+        let lookup_path = format!(
+            "/wall/public/by-slug/{}",
+            urlencoding::encode(input.wall_username.trim().trim_start_matches('@'))
+        );
+        let lookup: WallLookupResponse = client.get_json(&lookup_path, &[]).await?;
         let response = client
             .post_json::<WallLinkLoginResponse, _>(
                 "/wall/links/session",
                 &WallLinkLoginRequest {
-                    wall_id: input.wall_id.clone(),
+                    wall_id: lookup.wall_id,
                     auth_key: encode_b64(&auth_key),
                 },
             )
@@ -1450,12 +1450,26 @@ mod tests {
     async fn wall_link_open_decrypts_current_wall_key() {
         let mut server = Server::new_async().await;
         let wall_key = generate_key();
-        let secret = generate_key();
-        let auth_key = derive_labeled_key(&secret, WALL_LINK_AUTH_LABEL);
-        let wrap_key = derive_labeled_key(&secret, WALL_LINK_WRAP_LABEL);
+        let access_key = generate_key();
+        let auth_key = derive_wall_link_auth_key(&access_key).expect("auth key");
+        let wrap_key = derive_wall_link_wrap_key(&access_key).expect("wrap key");
         let encrypted_wall_key = encode_b64(
             &encrypt_secretbox_packed(&wrap_key, &wall_key).expect("encrypted wall key"),
         );
+
+        let lookup = server
+            .mock("GET", "/wall/public/by-slug/owner-gallery")
+            .with_status(200)
+            .with_body(
+                json!({
+                    "wallId": "wall_owner_gallery",
+                    "wallSlug": "owner-gallery",
+                    "owner": "owner-gallery",
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
 
         let session = server
             .mock("POST", "/wall/links/session")
@@ -1484,8 +1498,8 @@ mod tests {
 
         let ctx = WallLinkCtx::open(OpenWallLinkCtxInput {
             base_url: server.url(),
-            wall_id: "wall_owner_gallery".to_owned(),
-            secret: encode_b64_url(&secret),
+            wall_username: "@owner-gallery".to_owned(),
+            access_key: encode_b64_url(&access_key),
             user_agent: None,
             client_package: None,
             client_version: None,
@@ -1497,6 +1511,76 @@ mod tests {
         assert_eq!(ctx.wall_slug(), "owner-gallery");
         assert_eq!(ctx.key_version(), 3);
         assert_eq!(ctx.wall_key(), wall_key.as_slice());
+        lookup.assert_async().await;
+        session.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn wall_link_open_rejects_wrong_access_key() {
+        let mut server = Server::new_async().await;
+        let wall_key = generate_key();
+        let correct_access_key = generate_key();
+        let wrong_access_key = generate_key();
+        let wrong_auth_key = derive_wall_link_auth_key(&wrong_access_key).expect("auth key");
+        let correct_wrap_key = derive_wall_link_wrap_key(&correct_access_key).expect("wrap key");
+        let encrypted_wall_key = encode_b64(
+            &encrypt_secretbox_packed(&correct_wrap_key, &wall_key).expect("encrypted wall key"),
+        );
+
+        let lookup = server
+            .mock("GET", "/wall/public/by-slug/owner-gallery")
+            .with_status(200)
+            .with_body(
+                json!({
+                    "wallId": "wall_owner_gallery",
+                    "wallSlug": "owner-gallery",
+                    "owner": "owner-gallery",
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let session = server
+            .mock("POST", "/wall/links/session")
+            .match_body(Matcher::JsonString(
+                json!({
+                    "wallId": "wall_owner_gallery",
+                    "authKey": encode_b64(&wrong_auth_key),
+                })
+                .to_string(),
+            ))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "sessionToken": "wall-link-token",
+                    "wallId": "wall_owner_gallery",
+                    "wallSlug": "owner-gallery",
+                    "owner": "owner-handle",
+                    "keyVersion": 3,
+                    "encryptedWallKey": encrypted_wall_key,
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let err = match WallLinkCtx::open(OpenWallLinkCtxInput {
+            base_url: server.url(),
+            wall_username: "owner-gallery".to_owned(),
+            access_key: encode_b64_url(&wrong_access_key),
+            user_agent: None,
+            client_package: None,
+            client_version: None,
+        })
+        .await
+        {
+            Ok(_) => panic!("wrong access key should not decrypt wall key"),
+            Err(err) => err,
+        };
+
+        assert!(matches!(err, WallError::Crypto(_)));
+        lookup.assert_async().await;
         session.assert_async().await;
     }
 

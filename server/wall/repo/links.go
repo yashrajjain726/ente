@@ -7,7 +7,15 @@ import (
 )
 
 func (r *LinksRepository) UpsertLink(ctx context.Context, wallID string, authKeyHash []byte, keyVersion int, encryptedWallKey string) (*WallLinkRecord, error) {
-	return scanLinkRecord(r.DB.QueryRowContext(ctx, `
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM wall_link_sessions WHERE wall_id = $1`, wallID); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	link, err := scanLinkRecord(tx.QueryRowContext(ctx, `
 		INSERT INTO wall_links (wall_id, auth_key_hash, key_version, encrypted_wall_key, active)
 		VALUES ($1, $2, $3, $4, TRUE)
 		ON CONFLICT (wall_id) DO UPDATE
@@ -18,6 +26,13 @@ func (r *LinksRepository) UpsertLink(ctx context.Context, wallID string, authKey
 		RETURNING wall_id, (SELECT wall_slug FROM walls WHERE wall_id = $1), (SELECT owner_id FROM walls WHERE wall_id = $1),
 		          (SELECT wall_slug FROM walls WHERE wall_id = $1), auth_key_hash, key_version, encrypted_wall_key, active, created_at, updated_at
 	`, wallID, authKeyHash, keyVersion, encryptedWallKey))
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return link, nil
 }
 
 func (r *LinksRepository) GetLink(ctx context.Context, wallID string) (*WallLinkRecord, error) {
@@ -69,7 +84,7 @@ func (r *LinksRepository) GetSession(ctx context.Context, tokenHash []byte) (*Wa
 		JOIN walls w ON w.wall_id = s.wall_id
 		JOIN walls owner_wall ON owner_wall.owner_id = s.owner_id
 		JOIN wall_links l ON l.wall_id = s.wall_id
-		WHERE s.token_hash = $1
+		WHERE s.token_hash = $1 AND l.active = TRUE
 	`, tokenHash)
 	var rec WallLinkSessionRecord
 	if err := row.Scan(&rec.TokenHash, &rec.WallID, &rec.OwnerID, &rec.ExpiresAt, &rec.CreatedAt, &rec.WallSlug, &rec.OwnerSlug, &rec.KeyVersion, &rec.EncryptedWallKey); err != nil {

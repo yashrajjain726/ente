@@ -725,7 +725,6 @@ dependencies = [
  "base64",
  "ente-core",
  "serde",
- "sha2",
  "thiserror 2.0.18",
  "url",
  "urlencoding",

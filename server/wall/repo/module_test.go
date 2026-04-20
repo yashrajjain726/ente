@@ -192,6 +192,13 @@ func TestWallModuleLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, aliceWall.WallID, session.WallID)
 
+	_, err = module.Links.UpsertLink(ctx, aliceWall.WallID, []byte("new-hash"), rotatedWall.CurrentVersion, "new-wall-link-key")
+	require.NoError(t, err)
+	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
+	require.Error(t, err)
+
+	err = module.Links.CreateSession(ctx, []byte("token-hash"), aliceWall.WallID, aliceID, timeutil.NMinFromNow(30))
+	require.NoError(t, err)
 	err = module.Links.DeleteLink(ctx, aliceWall.WallID)
 	require.NoError(t, err)
 

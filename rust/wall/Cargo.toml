@@ -7,7 +7,6 @@ edition = "2024"
 base64 = "0.22"
 ente-core = { path = "../core" }
 serde = { version = "1", features = ["derive"] }
-sha2 = "0.10"
 thiserror = "2"
 url = "2"
 urlencoding = "2"

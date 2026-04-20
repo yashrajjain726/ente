@@ -152,6 +152,11 @@ func (c *WallsController) RotateKey(ctx *gin.Context, req models.RotateWallKeyRe
 	if err != nil {
 		return nil, err
 	}
+	if c.auth.LinksRepo != nil {
+		if err := c.auth.LinksRepo.DeleteLink(ctx.Request.Context(), wall.WallID); err != nil {
+			return nil, err
+		}
+	}
 	return toWallKeyResponse(wall), nil
 }
 

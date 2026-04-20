@@ -2,8 +2,7 @@ use base64::{
     Engine,
     engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
 };
-use ente_core::crypto::{keys, secretbox};
-use sha2::{Digest, Sha256};
+use ente_core::crypto::{kdf, keys, secretbox};
 
 use crate::error::{Result, WallError};
 use crate::transport::EntityKeyPayload;
@@ -30,11 +29,22 @@ pub fn decode_b64_url(value: &str) -> Result<Vec<u8>> {
     Ok(URL_SAFE_NO_PAD.decode(value.trim())?)
 }
 
-pub fn derive_labeled_key(secret: &[u8], label: &str) -> Vec<u8> {
-    let mut hasher = Sha256::new();
-    hasher.update(secret);
-    hasher.update(label.as_bytes());
-    hasher.finalize().to_vec()
+pub fn derive_wall_link_auth_key(access_key: &[u8]) -> Result<Vec<u8>> {
+    Ok(kdf::derive_subkey(
+        access_key,
+        kdf::KEY_BYTES,
+        1,
+        b"wallauth",
+    )?)
+}
+
+pub fn derive_wall_link_wrap_key(access_key: &[u8]) -> Result<Vec<u8>> {
+    Ok(kdf::derive_subkey(
+        access_key,
+        kdf::KEY_BYTES,
+        2,
+        b"wallview",
+    )?)
 }
 
 pub fn encrypt_secretbox_split(key: &[u8], plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
@@ -125,16 +135,26 @@ mod tests {
     }
 
     #[test]
-    fn labeled_key_matches_frontend_ordering() {
-        let secret = b"secret";
-        let derived = derive_labeled_key(secret, "wall-link-login-v1");
-        let expected = {
-            let mut hasher = Sha256::new();
-            hasher.update(secret);
-            hasher.update(b"wall-link-login-v1");
-            hasher.finalize().to_vec()
-        };
-        assert_eq!(derived, expected);
+    fn wall_link_keys_are_domain_separated() {
+        let access_key = generate_key();
+        let auth_key = derive_wall_link_auth_key(&access_key).unwrap();
+        let wrap_key = derive_wall_link_wrap_key(&access_key).unwrap();
+        assert_eq!(auth_key.len(), 32);
+        assert_eq!(wrap_key.len(), 32);
+        assert_ne!(auth_key, wrap_key);
+    }
+
+    #[test]
+    fn wall_link_key_derivation_matches_vector() {
+        let access_key = vec![0; 32];
+        assert_eq!(
+            encode_b64(&derive_wall_link_auth_key(&access_key).unwrap()),
+            "Vj1NGLC2X6YPxt/RpB2Pt2DibpaKwM2iKeoonH2tnxo="
+        );
+        assert_eq!(
+            encode_b64(&derive_wall_link_wrap_key(&access_key).unwrap()),
+            "Ve3f8d1w//hbEJWhVdLtA8fgd47JbBmQARnuZ7lKSj4="
+        );
     }
 
     #[test]

@@ -37,8 +37,8 @@ pub struct OpenAccountWallCtxInput {
 #[derive(Debug, Clone)]
 pub struct OpenWallLinkCtxInput {
     pub base_url: String,
-    pub wall_id: String,
-    pub secret: String,
+    pub wall_username: String,
+    pub access_key: String,
     pub user_agent: Option<String>,
     pub client_package: Option<String>,
     pub client_version: Option<String>,
@@ -56,8 +56,8 @@ pub struct CreatedWall {
 
 #[derive(Debug, Clone)]
 pub struct CreatedWallLink {
-    pub secret: String,
-    pub owner_handle: String,
+    pub access_key: String,
+    pub wall_username: String,
     pub wall_id: String,
     pub wall_slug: String,
     pub key_version: i32,
