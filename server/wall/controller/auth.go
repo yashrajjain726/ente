@@ -36,16 +36,17 @@ func (a authDeps) requireUser(c *gin.Context) (int64, error) {
 }
 
 func (a authDeps) resolveViewer(c *gin.Context) (*viewerAuth, error) {
-	if userID := auth.GetUserID(c.Request.Header); userID > 0 {
-		return &viewerAuth{UserID: userID}, nil
-	}
 	token := auth.GetToken(c)
 	if token == "" {
 		return nil, ente.ErrAuthenticationRequired
 	}
 	if a.UserAuthRepo != nil {
-		if userID, expired, err := a.UserAuthRepo.GetUserIDWithToken(token, auth.GetApp(c)); err == nil && !expired && userID > 0 {
+		userID, expired, err := a.UserAuthRepo.GetUserIDWithToken(token, auth.GetApp(c))
+		if err == nil && !expired && userID > 0 {
 			return &viewerAuth{UserID: userID}, nil
+		}
+		if err != nil && !errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, err
 		}
 	}
 	if a.LinksRepo == nil {
