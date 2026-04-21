@@ -322,13 +322,24 @@ func (c *PostsController) DeleteComment(ctx *gin.Context, postID, commentID stri
 	if err != nil {
 		return err
 	}
-	_, err = strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
-	if err != nil {
+	postIDInt, err := strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
+	if err != nil || postIDInt <= 0 {
 		return ente.NewBadRequestWithMessage("invalid postID")
 	}
 	commentIDInt, err := strconv.ParseInt(strings.TrimSpace(commentID), 10, 64)
 	if err != nil || commentIDInt <= 0 {
 		return ente.NewBadRequestWithMessage("invalid commentID")
 	}
-	return c.PostsRepo.DeleteComment(ctx.Request.Context(), commentIDInt, userID)
+	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), postIDInt, userID)
+	if err != nil {
+		return err
+	}
+	wall, err := c.WallsRepo.GetWallByID(ctx.Request.Context(), post.WallID)
+	if err != nil {
+		return err
+	}
+	if err := c.auth.canViewWall(ctx.Request.Context(), &viewerAuth{UserID: userID}, wall); err != nil {
+		return err
+	}
+	return c.PostsRepo.DeleteComment(ctx.Request.Context(), postIDInt, commentIDInt, userID)
 }

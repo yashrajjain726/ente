@@ -755,6 +755,36 @@ func TestListTopLevelCommentsPaginates(t *testing.T) {
 	require.Empty(t, nextCursor)
 }
 
+func TestDeleteCommentRequiresPostAndAuthorMatch(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+	firstPostID, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-1", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	secondPostID, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-2", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	comment, err := module.Posts.CreateComment(ctx, firstPostID, bobID, "comment", nil)
+	require.NoError(t, err)
+
+	err = module.Posts.DeleteComment(ctx, secondPostID, comment.CommentID, bobID)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+	require.Equal(t, 1, countActivePostComments(t, module, firstPostID))
+
+	err = module.Posts.DeleteComment(ctx, firstPostID, comment.CommentID, aliceID)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+	require.Equal(t, 1, countActivePostComments(t, module, firstPostID))
+
+	err = module.Posts.DeleteComment(ctx, firstPostID, comment.CommentID, bobID)
+	require.NoError(t, err)
+	require.Equal(t, 0, countActivePostComments(t, module, firstPostID))
+}
+
 func ptr(value string) *string {
 	return &value
 }
@@ -765,6 +795,14 @@ func sqlNullInt64(value int64) sql.NullInt64 {
 
 func sqlNullString(value string) sql.NullString {
 	return sql.NullString{String: value, Valid: value != ""}
+}
+
+func countActivePostComments(t *testing.T, module *Module, postID int64) int {
+	t.Helper()
+	var count int
+	err := module.Posts.DB.QueryRow(`SELECT COUNT(*) FROM wall_post_comments WHERE post_id = $1 AND is_deleted = FALSE`, postID).Scan(&count)
+	require.NoError(t, err)
+	return count
 }
 
 func requireQueuedTempObject(t *testing.T, module *Module, objectKey, purpose, bucketID string) {

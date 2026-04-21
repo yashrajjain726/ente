@@ -60,6 +60,14 @@ func countWallComments(t *testing.T, db *sql.DB, postID int64) int {
 	return count
 }
 
+func countActiveWallComments(t *testing.T, db *sql.DB, postID int64) int {
+	t.Helper()
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM wall_post_comments WHERE post_id = $1 AND is_deleted = FALSE`, postID).Scan(&count)
+	require.NoError(t, err)
+	return count
+}
+
 func TestCreateCommentRejectsParentFromAnotherPost(t *testing.T) {
 	posts, repos, ctx := setupPostsControllerTest(t)
 	aliceID := insertWallControllerUser(t, repos, "alice@example.com", "alice-public")
@@ -123,4 +131,38 @@ func TestCreateCommentAcceptsTopLevelParentOnSamePost(t *testing.T) {
 	require.NotNil(t, resp)
 	require.Equal(t, parent.CommentID, *resp.ParentCommentID)
 	require.Equal(t, 2, countWallComments(t, repos.Posts.DB, postID))
+}
+
+func TestDeleteCommentRejectsRoutePostMismatch(t *testing.T) {
+	posts, repos, ctx := setupPostsControllerTest(t)
+	aliceID := insertWallControllerUser(t, repos, "alice@example.com", "alice-public")
+	wall, err := repos.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	firstPostID, err := repos.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-1", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	secondPostID, err := repos.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-2", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	comment, err := repos.Posts.CreateComment(ctx, firstPostID, aliceID, "comment", nil)
+	require.NoError(t, err)
+
+	err = posts.DeleteComment(newWallControllerContext(aliceID), strconv.FormatInt(secondPostID, 10), strconv.FormatInt(comment.CommentID, 10))
+
+	require.ErrorIs(t, err, sql.ErrNoRows)
+	require.Equal(t, 1, countActiveWallComments(t, repos.Posts.DB, firstPostID))
+}
+
+func TestDeleteCommentDeletesOwnCommentOnRoutePost(t *testing.T) {
+	posts, repos, ctx := setupPostsControllerTest(t)
+	aliceID := insertWallControllerUser(t, repos, "alice@example.com", "alice-public")
+	wall, err := repos.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	postID, err := repos.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	comment, err := repos.Posts.CreateComment(ctx, postID, aliceID, "comment", nil)
+	require.NoError(t, err)
+
+	err = posts.DeleteComment(newWallControllerContext(aliceID), strconv.FormatInt(postID, 10), strconv.FormatInt(comment.CommentID, 10))
+
+	require.NoError(t, err)
+	require.Equal(t, 0, countActiveWallComments(t, repos.Posts.DB, postID))
 }

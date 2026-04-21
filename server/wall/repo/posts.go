@@ -377,8 +377,8 @@ func (r *PostsRepository) ListReplies(ctx context.Context, postID, viewerID int6
 	return result, stacktrace.Propagate(rows.Err(), "")
 }
 
-func (r *PostsRepository) DeleteComment(ctx context.Context, commentID, viewerID int64) error {
-	res, err := r.DB.ExecContext(ctx, `UPDATE wall_post_comments SET is_deleted = TRUE WHERE comment_id = $1 AND author_id = $2`, commentID, viewerID)
+func (r *PostsRepository) DeleteComment(ctx context.Context, postID, commentID, viewerID int64) error {
+	res, err := r.DB.ExecContext(ctx, `UPDATE wall_post_comments SET is_deleted = TRUE WHERE post_id = $1 AND comment_id = $2 AND author_id = $3 AND is_deleted = FALSE`, postID, commentID, viewerID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
