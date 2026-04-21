@@ -20,10 +20,10 @@ use crate::transport::{
     LikePostRequest, LikePostResponse, ListCommentsResponse, OutgoingFollowRequestResponse,
     PostObjectPayload, PostResponse, PresignUploadRequest, PresignUploadResponse,
     ProfileAvatarPayload, RefreshFollowSharesRequest, RejectFollowPayload, RotateWallKeyRequest,
-    ShareUpdatePayload, StatusResponse, UpdatePostCaptionRequest, UpdateWallProfileRequest,
-    UpdateWallProfileResponse, UpdateWallSlugRequest, UpdatedCountResponse, WallFollowerResponse,
-    WallKeyResponse, WallKeyVersionResponse, WallLinkCreateRequest, WallLinkLoginRequest,
-    WallLinkLoginResponse, WallLinkStatusResponse, WallLookupResponse, WallProfileResponse,
+    ShareUpdatePayload, UpdatePostCaptionRequest, UpdateWallProfileRequest,
+    UpdateWallProfileResponse, UpdateWallSlugRequest, WallFollowerResponse, WallKeyResponse,
+    WallKeyVersionResponse, WallLinkCreateRequest, WallLinkLoginRequest, WallLinkLoginResponse,
+    WallLinkStatusResponse, WallLookupResponse, WallProfileResponse,
 };
 use ente_core::crypto::{sealed, secretbox};
 use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
@@ -700,8 +700,10 @@ impl AccountWallCtx {
 
     pub async fn delete_post(&self, post_id: i64) -> Result<()> {
         let path = format!("/wall/posts/{post_id}");
-        let _: StatusResponse = self.client.delete_json(&path, &[]).await?;
-        Ok(())
+        self.client
+            .delete_empty(&path, &[])
+            .await
+            .map_err(Into::into)
     }
 
     pub async fn like_post(&self, post_id: i64, like: bool) -> Result<LikePostResponse> {
@@ -764,8 +766,10 @@ impl AccountWallCtx {
 
     pub async fn delete_comment(&self, post_id: i64, comment_id: i64) -> Result<()> {
         let path = format!("/wall/posts/{post_id}/comments/{comment_id}");
-        let _: StatusResponse = self.client.delete_json(&path, &[]).await?;
-        Ok(())
+        self.client
+            .delete_empty(&path, &[])
+            .await
+            .map_err(Into::into)
     }
 
     pub async fn request_follow_by_wall(
@@ -842,32 +846,23 @@ impl AccountWallCtx {
             .map_err(Into::into)
     }
 
-    pub async fn reject_follow_request(
-        &self,
-        request_id: i64,
-    ) -> Result<FollowRequestCreatedResponse> {
+    pub async fn reject_follow_request(&self, request_id: i64) -> Result<()> {
         let payload = RejectFollowPayload { request_id };
         self.client
-            .post_json("/wall/follow/reject", &payload)
+            .post_empty("/wall/follow/reject", &payload)
             .await
             .map_err(Into::into)
     }
 
-    pub async fn cancel_follow_request(
-        &self,
-        request_id: i64,
-    ) -> Result<FollowRequestCreatedResponse> {
+    pub async fn cancel_follow_request(&self, request_id: i64) -> Result<()> {
         let payload = CancelFollowRequestPayload { request_id };
         self.client
-            .post_json("/wall/follow/request/cancel", &payload)
+            .post_empty("/wall/follow/request/cancel", &payload)
             .await
             .map_err(Into::into)
     }
 
-    pub async fn cancel_follow_request_by_wall(
-        &self,
-        wall_id: &str,
-    ) -> Result<FollowRequestCreatedResponse> {
+    pub async fn cancel_follow_request_by_wall(&self, wall_id: &str) -> Result<()> {
         let request = self
             .list_outgoing_follow_requests()
             .await?
@@ -879,28 +874,26 @@ impl AccountWallCtx {
         self.cancel_follow_request(request.request_id).await
     }
 
-    pub async fn unfollow_by_wall(&self, wall_id: &str) -> Result<String> {
+    pub async fn unfollow_by_wall(&self, wall_id: &str) -> Result<()> {
         let request = FollowRequestPayload {
             target_username: None,
             target_wall_id: Some(wall_id.to_owned()),
         };
-        let response: StatusResponse = self
-            .client
-            .post_json("/wall/follow/unfollow", &request)
-            .await?;
-        Ok(response.status)
+        self.client
+            .post_empty("/wall/follow/unfollow", &request)
+            .await
+            .map_err(Into::into)
     }
 
-    pub async fn unfollow_by_username(&self, username: &str) -> Result<String> {
+    pub async fn unfollow_by_username(&self, username: &str) -> Result<()> {
         let request = FollowRequestPayload {
             target_username: Some(username.to_owned()),
             target_wall_id: None,
         };
-        let response: StatusResponse = self
-            .client
-            .post_json("/wall/follow/unfollow", &request)
-            .await?;
-        Ok(response.status)
+        self.client
+            .post_empty("/wall/follow/unfollow", &request)
+            .await
+            .map_err(Into::into)
     }
 
     pub async fn list_wall_followers(&self, wall_id: &str) -> Result<Vec<WallFollowerResponse>> {
@@ -938,11 +931,11 @@ impl AccountWallCtx {
             wall_id: wall_id.to_owned(),
             shares: updates,
         };
-        let response: UpdatedCountResponse = self
-            .client
-            .post_json("/wall/follow/shares/refresh", &payload)
+        let updated = payload.shares.len();
+        self.client
+            .post_empty("/wall/follow/shares/refresh", &payload)
             .await?;
-        Ok(response.updated)
+        Ok(updated)
     }
 
     pub async fn get_wall_link_status(&self, wall_id: &str) -> Result<WallLinkStatusResponse> {
@@ -1673,7 +1666,6 @@ mod tests {
             .match_header("x-auth-token", "token")
             .match_body(Matcher::JsonString(json!({"requestId": 42}).to_string()))
             .with_status(200)
-            .with_body(r#"{"requestId":42,"status":"withdrawn"}"#)
             .expect(2)
             .create_async()
             .await;
@@ -1692,21 +1684,167 @@ mod tests {
         assert_eq!(outgoing_requests.len(), 1);
         assert_eq!(outgoing_requests[0].followee, "owner");
 
-        let direct_cancel = ctx
-            .cancel_follow_request(42)
+        ctx.cancel_follow_request(42)
             .await
             .expect("direct cancel should succeed");
-        assert_eq!(direct_cancel.status, "withdrawn");
 
-        let by_wall_cancel = ctx
-            .cancel_follow_request_by_wall("wall_owner_main")
+        ctx.cancel_follow_request_by_wall("wall_owner_main")
             .await
             .expect("cancel by wall should resolve outgoing request");
-        assert_eq!(by_wall_cancel.request_id, 42);
 
         incoming.assert_async().await;
         outgoing.assert_async().await;
         cancel.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn wall_status_mutations_accept_empty_server_responses() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+
+        let delete_post = server
+            .mock("DELETE", "/wall/posts/42")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .create_async()
+            .await;
+        let delete_comment = server
+            .mock("DELETE", "/wall/posts/42/comments/7")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .create_async()
+            .await;
+        let reject = server
+            .mock("POST", "/wall/follow/reject")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::JsonString(json!({"requestId": 11}).to_string()))
+            .with_status(200)
+            .create_async()
+            .await;
+        let unfollow_wall = server
+            .mock("POST", "/wall/follow/unfollow")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::JsonString(
+                json!({"targetWallId": "wall_owner_main"}).to_string(),
+            ))
+            .with_status(200)
+            .create_async()
+            .await;
+        let unfollow_username = server
+            .mock("POST", "/wall/follow/unfollow")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::JsonString(
+                json!({"targetUsername": "owner"}).to_string(),
+            ))
+            .with_status(200)
+            .create_async()
+            .await;
+
+        ctx.delete_post(42)
+            .await
+            .expect("delete post should accept empty response");
+        ctx.delete_comment(42, 7)
+            .await
+            .expect("delete comment should accept empty response");
+        ctx.reject_follow_request(11)
+            .await
+            .expect("reject should accept empty response");
+        ctx.unfollow_by_wall("wall_owner_main")
+            .await
+            .expect("unfollow by wall should accept empty response");
+        ctx.unfollow_by_username("owner")
+            .await
+            .expect("unfollow by username should accept empty response");
+
+        delete_post.assert_async().await;
+        delete_comment.assert_async().await;
+        reject.assert_async().await;
+        unfollow_wall.assert_async().await;
+        unfollow_username.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn refresh_follow_shares_accepts_empty_server_response() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let root_wall_key = generate_key();
+        let wall_key = generate_key();
+        let (follower_public_key, _) = keys::generate_keypair().expect("valid follower keypair");
+        let entity_payload =
+            encrypt_entity_key(&ctx.master_key, &root_wall_key).expect("root wall entity");
+
+        let entity = server
+            .mock("GET", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "type".into(),
+                ROOT_WALL_KEY_TYPE.into(),
+            ))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "type": ROOT_WALL_KEY_TYPE,
+                    "encryptedKey": entity_payload.encrypted_key,
+                    "header": entity_payload.header,
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let walls = server
+            .mock("GET", "/wall")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "wallId": "wall_owner_main",
+                    "wallSlug": "owner-main",
+                    "encryptedWallKey": encode_b64(&encrypt_secretbox_packed(&root_wall_key, &wall_key).expect("wall key wrap")),
+                    "encryptedProfile": "",
+                    "keyVersion": 3
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let followers = server
+            .mock("GET", "/wall/follow/followers")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "wallId".into(),
+                "wall_owner_main".into(),
+            ))
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "followerId": 7,
+                    "username": "viewer",
+                    "publicKey": encode_b64(&follower_public_key),
+                    "keyVersion": 2,
+                    "createdAt": "2026-04-16T00:00:00Z"
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let refresh = server
+            .mock("POST", "/wall/follow/shares/refresh")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::Regex("\"followerId\":7".into()))
+            .with_status(200)
+            .create_async()
+            .await;
+
+        let updated = ctx
+            .refresh_follow_shares("wall_owner_main")
+            .await
+            .expect("refresh should accept empty response");
+
+        assert_eq!(updated, 1);
+        entity.assert_async().await;
+        walls.assert_async().await;
+        followers.assert_async().await;
+        refresh.assert_async().await;
     }
 
     #[tokio::test]
