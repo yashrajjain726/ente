@@ -593,19 +593,80 @@ func TestListPostsByWallPaginates(t *testing.T) {
 	require.NoError(t, err)
 	third, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-3", nil, wall.CurrentVersion, nil)
 	require.NoError(t, err)
+	setPostCreatedAt(t, module, 1000, first, second, third)
 
 	page, nextCursor, err := module.Posts.ListPostsByWall(ctx, wall.WallID, aliceID, "", 2)
 	require.NoError(t, err)
 	require.Len(t, page, 2)
 	require.Equal(t, third, page[0].PostID)
 	require.Equal(t, second, page[1].PostID)
-	require.Equal(t, strconv.FormatInt(second, 10), nextCursor)
+	require.Equal(t, "1000:"+strconv.FormatInt(second, 10), nextCursor)
 
 	page, nextCursor, err = module.Posts.ListPostsByWall(ctx, wall.WallID, aliceID, nextCursor, 2)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, first, page[0].PostID)
 	require.Empty(t, nextCursor)
+}
+
+func TestListPostsByWallCursorUsesCreatedAtSortOrder(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	first, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-1", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	second, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-2", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	third, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-3", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	setPostCreatedAt(t, module, 3000, first)
+	setPostCreatedAt(t, module, 2000, second)
+	setPostCreatedAt(t, module, 1000, third)
+
+	page, nextCursor, err := module.Posts.ListPostsByWall(ctx, wall.WallID, aliceID, "", 1)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
+	require.Equal(t, first, page[0].PostID)
+	require.Equal(t, "3000:"+strconv.FormatInt(first, 10), nextCursor)
+
+	page, nextCursor, err = module.Posts.ListPostsByWall(ctx, wall.WallID, aliceID, nextCursor, 1)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
+	require.Equal(t, second, page[0].PostID)
+	require.Equal(t, "2000:"+strconv.FormatInt(second, 10), nextCursor)
+}
+
+func TestListFeedCursorUsesCreatedAtSortOrder(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	first, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-1", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	second, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-2", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	third, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-3", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	setPostCreatedAt(t, module, 3000, first)
+	setPostCreatedAt(t, module, 2000, second)
+	setPostCreatedAt(t, module, 1000, third)
+
+	page, nextCursor, err := module.Posts.ListFeed(ctx, aliceID, "", 1)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
+	require.Equal(t, first, page[0].PostID)
+	require.Equal(t, "3000:"+strconv.FormatInt(first, 10), nextCursor)
+
+	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceID, nextCursor, 1)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
+	require.Equal(t, second, page[0].PostID)
+	require.Equal(t, "2000:"+strconv.FormatInt(second, 10), nextCursor)
 }
 
 func TestListTopLevelCommentsPaginates(t *testing.T) {
@@ -664,4 +725,12 @@ func requireQueuedTempObject(t *testing.T, module *Module, objectKey, purpose, b
 	require.Equal(t, purpose, gotPurpose)
 	require.Equal(t, bucketID, gotBucketID)
 	require.True(t, expired)
+}
+
+func setPostCreatedAt(t *testing.T, module *Module, createdAt int64, postIDs ...int64) {
+	t.Helper()
+	for _, postID := range postIDs {
+		_, err := module.Posts.DB.Exec(`UPDATE wall_posts SET created_at = $1 WHERE post_id = $2`, createdAt, postID)
+		require.NoError(t, err)
+	}
 }

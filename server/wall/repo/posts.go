@@ -82,15 +82,13 @@ func (r *PostsRepository) ListPostsByWall(ctx context.Context, wallID string, vi
 		       (SELECT COUNT(*) FROM wall_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
 		       EXISTS (SELECT 1 FROM wall_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $2) AS viewer_liked,
 		       (SELECT COUNT(*) FROM wall_post_comments pc WHERE pc.post_id = p.post_id AND pc.is_deleted = FALSE) AS comments
-		FROM wall_posts p
-		JOIN walls w ON w.wall_id = p.wall_id
-		JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
-		WHERE p.wall_id = $1 AND p.is_deleted = FALSE`
-	if trimmed := strings.TrimSpace(cursor); trimmed != "" {
-		if cursorID, err := strconv.ParseInt(trimmed, 10, 64); err == nil && cursorID > 0 {
-			args = append(args, cursorID)
-			query += ` AND p.post_id < $3`
-		}
+			FROM wall_posts p
+			JOIN walls w ON w.wall_id = p.wall_id
+			JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+			WHERE p.wall_id = $1 AND p.is_deleted = FALSE`
+	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
+		args = append(args, cursorCreatedAt, cursorPostID)
+		query += ` AND (p.created_at, p.post_id) < ($3, $4)`
 	}
 	args = append(args, limit+1)
 	query += ` ORDER BY p.created_at DESC, p.post_id DESC LIMIT $` + strconv.Itoa(len(args))
@@ -112,7 +110,7 @@ func (r *PostsRepository) ListPostsByWall(ctx context.Context, wallID string, vi
 	}
 	nextCursor := ""
 	if len(out) > limit {
-		nextCursor = strconv.FormatInt(out[limit-1].PostID, 10)
+		nextCursor = formatPostCursor(out[limit-1])
 		out = out[:limit]
 	}
 	return out, nextCursor, nil
@@ -140,12 +138,10 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor s
 		      SELECT 1 FROM wall_follow_shares fs
 		      WHERE fs.follower_id = $1 AND fs.wall_id = p.wall_id
 		    )
-		  )`
-	if trimmed := strings.TrimSpace(cursor); trimmed != "" {
-		if cursorID, err := strconv.ParseInt(trimmed, 10, 64); err == nil && cursorID > 0 {
-			args = append(args, cursorID)
-			query += ` AND p.post_id < $2`
-		}
+			  )`
+	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
+		args = append(args, cursorCreatedAt, cursorPostID)
+		query += ` AND (p.created_at, p.post_id) < ($2, $3)`
 	}
 	args = append(args, limit+1)
 	query += ` ORDER BY p.created_at DESC, p.post_id DESC LIMIT $` + strconv.Itoa(len(args))
@@ -167,7 +163,7 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor s
 	}
 	nextCursor := ""
 	if len(out) > limit {
-		nextCursor = strconv.FormatInt(out[limit-1].PostID, 10)
+		nextCursor = formatPostCursor(out[limit-1])
 		out = out[:limit]
 	}
 	return out, nextCursor, nil
@@ -402,6 +398,26 @@ func scanPostRecord(scanner interface{ Scan(dest ...any) error }) (*WallPostReco
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil
+}
+
+func parsePostCursor(cursor string) (int64, int64, bool) {
+	createdAtText, postIDText, ok := strings.Cut(strings.TrimSpace(cursor), ":")
+	if !ok {
+		return 0, 0, false
+	}
+	createdAt, err := strconv.ParseInt(createdAtText, 10, 64)
+	if err != nil || createdAt <= 0 {
+		return 0, 0, false
+	}
+	postID, err := strconv.ParseInt(postIDText, 10, 64)
+	if err != nil || postID <= 0 {
+		return 0, 0, false
+	}
+	return createdAt, postID, true
+}
+
+func formatPostCursor(post WallPostRecord) string {
+	return strconv.FormatInt(post.CreatedAt, 10) + ":" + strconv.FormatInt(post.PostID, 10)
 }
 
 func scanCommentRecord(scanner interface{ Scan(dest ...any) error }) (*WallCommentRecord, error) {
