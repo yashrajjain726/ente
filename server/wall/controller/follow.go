@@ -129,7 +129,13 @@ func (c *FollowController) CancelRequest(ctx *gin.Context, req models.CancelFoll
 	if record.RequesterID != userID {
 		return ente.ErrPermissionDenied
 	}
-	return c.FollowRepo.UpdateRequestStatus(ctx.Request.Context(), req.RequestID, "cancelled")
+	if err := c.FollowRepo.UpdatePendingRequestStatus(ctx.Request.Context(), req.RequestID, "cancelled"); err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return ente.NewBadRequestWithMessage("follow request is not pending")
+		}
+		return err
+	}
+	return nil
 }
 
 func (c *FollowController) Approve(ctx *gin.Context, req models.ApproveFollowPayload) (*models.FollowRequestCreatedResponse, error) {
@@ -170,7 +176,13 @@ func (c *FollowController) Reject(ctx *gin.Context, req models.RejectFollowPaylo
 	if wall.OwnerID != userID {
 		return ente.ErrPermissionDenied
 	}
-	return c.FollowRepo.UpdateRequestStatus(ctx.Request.Context(), req.RequestID, "rejected")
+	if err := c.FollowRepo.UpdatePendingRequestStatus(ctx.Request.Context(), req.RequestID, "rejected"); err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return ente.NewBadRequestWithMessage("follow request is not pending")
+		}
+		return err
+	}
+	return nil
 }
 
 func (c *FollowController) Unfollow(ctx *gin.Context, req models.FollowRequestPayload) error {

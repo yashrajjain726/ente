@@ -369,6 +369,61 @@ func TestApproveRequestRejectsStaleRequestStates(t *testing.T) {
 	}
 }
 
+func TestUpdatePendingRequestStatusOnlyUpdatesPendingRequests(t *testing.T) {
+	for _, status := range []string{"cancelled", "rejected"} {
+		t.Run(status, func(t *testing.T) {
+			ctx := context.Background()
+			module := newWallTestModule(t)
+
+			aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+			bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
+			aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+			require.NoError(t, err)
+			_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
+			require.NoError(t, err)
+			request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
+			require.NoError(t, err)
+
+			err = module.Follow.UpdatePendingRequestStatus(ctx, request.RequestID, status)
+			require.NoError(t, err)
+
+			stored, err := module.Follow.GetRequest(ctx, request.RequestID)
+			require.NoError(t, err)
+			require.Equal(t, status, stored.Status)
+		})
+	}
+}
+
+func TestUpdatePendingRequestStatusRejectsApprovedRequests(t *testing.T) {
+	for _, status := range []string{"cancelled", "rejected"} {
+		t.Run(status, func(t *testing.T) {
+			ctx := context.Background()
+			module := newWallTestModule(t)
+
+			aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+			bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
+			aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+			require.NoError(t, err)
+			_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
+			require.NoError(t, err)
+			request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
+			require.NoError(t, err)
+			_, err = module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "share-key", aliceWall.CurrentVersion)
+			require.NoError(t, err)
+
+			err = module.Follow.UpdatePendingRequestStatus(ctx, request.RequestID, status)
+			require.ErrorIs(t, err, sql.ErrNoRows)
+
+			stored, err := module.Follow.GetRequest(ctx, request.RequestID)
+			require.NoError(t, err)
+			require.Equal(t, "approved", stored.Status)
+			share, err := module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
+			require.NoError(t, err)
+			require.Equal(t, "share-key", share.EncryptedWallKey)
+		})
+	}
+}
+
 func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
 	ctx := context.Background()
 	module := newWallTestModule(t)

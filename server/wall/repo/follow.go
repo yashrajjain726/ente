@@ -72,6 +72,25 @@ func (r *FollowRepository) UpdateRequestStatus(ctx context.Context, requestID in
 	return stacktrace.Propagate(err, "")
 }
 
+func (r *FollowRepository) UpdatePendingRequestStatus(ctx context.Context, requestID int64, status string) error {
+	res, err := r.DB.ExecContext(ctx, `
+		UPDATE wall_follow_requests
+		SET status = $1
+		WHERE request_id = $2 AND status = 'pending'
+	`, status, requestID)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (r *FollowRepository) ListIncomingRequests(ctx context.Context, ownerID int64) ([]WallFollowRequestRecord, error) {
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT r.request_id, r.requester_id, r.target_wall_id, r.status, r.created_at, r.updated_at,
