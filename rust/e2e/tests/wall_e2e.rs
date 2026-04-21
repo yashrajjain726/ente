@@ -97,13 +97,17 @@ async fn wall_bootstrap_posts_follow_share_and_link_suite() {
     assert_eq!(looked_up.wall_id, owner_wall.wall_id);
     assert_eq!(looked_up.wall_slug, updated_slug);
 
-    let object = wall::fake_post_object("post-1");
+    let post_key = owner_ctx.generate_post_key();
+    let object = owner_ctx
+        .upload_post_asset(&post_key, b"wall e2e encrypted post asset", Some(0))
+        .await
+        .expect("post asset upload should succeed");
     let (post_id, post_key) = owner_ctx
         .create_post(
             &owner_wall.wall_id,
             &[object],
             Some(br#"{"caption":"hello world"}"#),
-            None,
+            Some(&post_key),
         )
         .await
         .expect("post creation should succeed");

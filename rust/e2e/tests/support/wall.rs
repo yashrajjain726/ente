@@ -1,8 +1,6 @@
 use ente_core::http::Error as HttpError;
 use ente_rs::models::account::App;
-use ente_wall::{
-    AccountWallCtx, OpenAccountWallCtxInput, PostObjectPayload, PrivateKeySource, WallError,
-};
+use ente_wall::{AccountWallCtx, OpenAccountWallCtxInput, PrivateKeySource, WallError};
 
 use crate::support::auth::TestAccount;
 
@@ -23,16 +21,6 @@ pub fn open_ctx(endpoint: &str, account: &TestAccount) -> AccountWallCtx {
 
 pub fn profile_payload(display_name: &str, bio: &str) -> Vec<u8> {
     format!(r#"{{"displayName":"{display_name}","bio":"{bio}"}}"#).into_bytes()
-}
-
-pub fn fake_post_object(name: &str) -> PostObjectPayload {
-    PostObjectPayload {
-        object_key: format!("wall-e2e/{name}"),
-        size: Some(1),
-        position: Some(0),
-        blur_hash_cipher: None,
-        variant: Some("full".to_string()),
-    }
 }
 
 pub fn assert_http_status<T>(result: Result<T, WallError>, expected_status: u16) {
