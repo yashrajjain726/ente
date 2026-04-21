@@ -267,3 +267,215 @@ async fn wall_bootstrap_posts_follow_share_and_link_suite() {
         .expect("wall link deletion should succeed");
     wall::assert_http_status(link_ctx.get_wall_profile_raw(None).await, 401);
 }
+
+#[tokio::test]
+#[ignore = "requires local Museum at ENTE_E2E_ENDPOINT or http://localhost:8080"]
+async fn wall_rotation_history_refresh_and_link_suite() {
+    let endpoint = support::endpoint();
+    if !support::assert_server_or_skip(&endpoint, "wall rotation e2e suite").await {
+        return;
+    }
+
+    let owner = auth::create_account(
+        &endpoint,
+        support::unique_test_email("wall-rotation-owner"),
+        support::unique_password("WallRotationOwner"),
+    )
+    .await;
+    let follower = auth::create_account(
+        &endpoint,
+        support::unique_test_email("wall-rotation-follower"),
+        support::unique_password("WallRotationFollower"),
+    )
+    .await;
+
+    let owner_ctx = wall::open_ctx(&endpoint, &owner);
+    let follower_ctx = wall::open_ctx(&endpoint, &follower);
+
+    let owner_slug = format!("rotation-owner-{}", owner.user_id);
+    let follower_slug = format!("rotation-follower-{}", follower.user_id);
+    let profile_v1 = wall::profile_payload("Rotation Owner", "Profile v1");
+    let owner_wall = owner_ctx
+        .create_wall(&owner_slug, &profile_v1)
+        .await
+        .expect("owner wall creation failed");
+    follower_ctx
+        .create_wall(
+            &follower_slug,
+            &wall::profile_payload("Rotation Follower", "Follower bio"),
+        )
+        .await
+        .expect("follower wall creation failed");
+
+    let post_key_v1 = owner_ctx.generate_post_key();
+    let object_v1 = owner_ctx
+        .upload_post_asset(&post_key_v1, b"rotation post asset v1", Some(0))
+        .await
+        .expect("v1 post asset upload should succeed");
+    let (post_id_v1, _post_key_v1) = owner_ctx
+        .create_post(
+            &owner_wall.wall_id,
+            &[object_v1],
+            Some(br#"{"caption":"version one"}"#),
+            Some(&post_key_v1),
+        )
+        .await
+        .expect("v1 post creation should succeed");
+
+    follower_ctx
+        .request_follow_by_wall(&owner_wall.wall_id)
+        .await
+        .expect("follow request should succeed");
+    let incoming = owner_ctx
+        .list_incoming_follow_requests()
+        .await
+        .expect("incoming follow requests should load");
+    owner_ctx
+        .approve_follow_request(&incoming[0])
+        .await
+        .expect("follow approval should succeed");
+
+    let follower_profile_v1 = follower_ctx
+        .get_wall_profile_decrypted(&owner_wall.wall_id, Some(owner_wall.key_version))
+        .await
+        .expect("follower should decrypt v1 profile");
+    assert_eq!(follower_profile_v1.profile, profile_v1);
+
+    let profile_v2 = wall::profile_payload("Rotation Owner", "Profile v2");
+    let rotated_wall = owner_ctx
+        .rotate_wall_key(&owner_wall.wall_id, Some(&profile_v2))
+        .await
+        .expect("wall rotation should succeed");
+    assert_eq!(rotated_wall.key_version, owner_wall.key_version + 1);
+
+    let refreshed = owner_ctx
+        .refresh_follow_shares(&owner_wall.wall_id)
+        .await
+        .expect("follow shares should refresh");
+    assert_eq!(refreshed, 1);
+    let refreshed_shares = follower_ctx
+        .list_follow_shares()
+        .await
+        .expect("refreshed follow shares should load");
+    assert_eq!(refreshed_shares.len(), 1);
+    assert_eq!(refreshed_shares[0].key_version, rotated_wall.key_version);
+
+    let post_key_v2 = owner_ctx.generate_post_key();
+    let object_v2 = owner_ctx
+        .upload_post_asset(&post_key_v2, b"rotation post asset v2", Some(0))
+        .await
+        .expect("v2 post asset upload should succeed");
+    let (post_id_v2, _post_key_v2) = owner_ctx
+        .create_post(
+            &owner_wall.wall_id,
+            &[object_v2],
+            Some(br#"{"caption":"version two"}"#),
+            Some(&post_key_v2),
+        )
+        .await
+        .expect("v2 post creation should succeed");
+
+    let owner_profile_v1 = owner_ctx
+        .get_wall_profile_decrypted(&owner_wall.wall_id, Some(owner_wall.key_version))
+        .await
+        .expect("owner should decrypt historical profile");
+    assert_eq!(owner_profile_v1.profile, profile_v1);
+    let owner_profile_v2 = owner_ctx
+        .get_wall_profile_decrypted(&owner_wall.wall_id, None)
+        .await
+        .expect("owner should decrypt current profile");
+    assert_eq!(owner_profile_v2.profile, profile_v2);
+    let follower_profile_v2 = follower_ctx
+        .get_wall_profile_decrypted(&owner_wall.wall_id, None)
+        .await
+        .expect("follower should decrypt current profile");
+    assert_eq!(follower_profile_v2.profile, profile_v2);
+
+    let feed = follower_ctx
+        .list_feed(None, Some(10))
+        .await
+        .expect("feed should load after rotation");
+    let feed_v1 = feed
+        .items
+        .iter()
+        .find(|item| item.post_id == post_id_v1)
+        .expect("v1 post should remain in follower feed");
+    let feed_v2 = feed
+        .items
+        .iter()
+        .find(|item| item.post_id == post_id_v2)
+        .expect("v2 post should appear in follower feed");
+    let follower_post_v1 = follower_ctx
+        .decrypt_feed_item(feed_v1)
+        .await
+        .expect("follower should decrypt v1 post after rotation");
+    assert_eq!(
+        follower_post_v1.caption_plaintext.as_deref(),
+        Some(br#"{"caption":"version one"}"#.as_slice())
+    );
+    let follower_post_v2 = follower_ctx
+        .decrypt_feed_item(feed_v2)
+        .await
+        .expect("follower should decrypt v2 post after rotation");
+    assert_eq!(
+        follower_post_v2.caption_plaintext.as_deref(),
+        Some(br#"{"caption":"version two"}"#.as_slice())
+    );
+
+    let link = owner_ctx
+        .create_wall_link(&owner_wall.wall_id)
+        .await
+        .expect("wall link should be created after rotation");
+    let link_ctx = WallLinkCtx::open(OpenWallLinkCtxInput {
+        base_url: endpoint.clone(),
+        wall_username: link.wall_username.clone(),
+        access_key: link.access_key.clone(),
+        user_agent: Some("ente-e2e".to_string()),
+        client_package: Some("io.ente.photos".to_string()),
+        client_version: Some("ente-e2e".to_string()),
+    })
+    .await
+    .expect("wall link should open after rotation");
+
+    let link_profile_v1 = link_ctx
+        .get_wall_profile_decrypted(Some(owner_wall.key_version))
+        .await
+        .expect("link should decrypt historical profile");
+    assert_eq!(link_profile_v1.profile, profile_v1);
+    let link_profile_v2 = link_ctx
+        .get_wall_profile_decrypted(None)
+        .await
+        .expect("link should decrypt current profile");
+    assert_eq!(link_profile_v2.profile, profile_v2);
+
+    let link_posts = link_ctx
+        .list_posts(None, Some(10))
+        .await
+        .expect("link should list posts after rotation");
+    let link_post_v1 = link_posts
+        .items
+        .iter()
+        .find(|item| item.post_id == post_id_v1)
+        .expect("link should list v1 post");
+    let link_post_v2 = link_posts
+        .items
+        .iter()
+        .find(|item| item.post_id == post_id_v2)
+        .expect("link should list v2 post");
+    let link_decrypted_v1 = link_ctx
+        .decrypt_post(link_post_v1)
+        .await
+        .expect("link should decrypt v1 post after rotation");
+    assert_eq!(
+        link_decrypted_v1.caption_plaintext.as_deref(),
+        Some(br#"{"caption":"version one"}"#.as_slice())
+    );
+    let link_decrypted_v2 = link_ctx
+        .decrypt_post(link_post_v2)
+        .await
+        .expect("link should decrypt v2 post after rotation");
+    assert_eq!(
+        link_decrypted_v2.caption_plaintext.as_deref(),
+        Some(br#"{"caption":"version two"}"#.as_slice())
+    );
+}
