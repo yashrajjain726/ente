@@ -163,6 +163,7 @@ func (r *WallsRepository) RotateKey(ctx context.Context, ownerID int64, wallID, 
 		       avatar_object_key, avatar_bucket_id, avatar_size, created_at, updated_at
 		FROM walls
 		WHERE owner_id = $1 AND wall_id = $2
+		FOR UPDATE
 	`, ownerID, wallID))
 	if err != nil {
 		return nil, err

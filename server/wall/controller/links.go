@@ -2,7 +2,9 @@ package controller
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
+	"errors"
 	"strings"
 
 	"github.com/ente-io/museum/ente"
@@ -71,6 +73,9 @@ func (c *LinksController) Create(ctx *gin.Context, req models.WallLinkCreateRequ
 	sum := sha256.Sum256(authKeyBytes)
 	link, err := c.LinksRepo.UpsertLink(ctx.Request.Context(), wall.WallID, sum[:], req.KeyVersion, req.EncryptedWallKey)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current wall version")
+		}
 		return nil, err
 	}
 	return &models.WallLinkStatusResponse{

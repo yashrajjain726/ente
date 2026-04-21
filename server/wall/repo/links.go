@@ -13,6 +13,20 @@ func (r *LinksRepository) UpsertLink(ctx context.Context, wallID string, authKey
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
+	var ownerID int64
+	var wallSlug string
+	var currentVersion int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT owner_id, wall_slug, current_version
+		FROM walls
+		WHERE wall_id = $1
+		FOR UPDATE
+	`, wallID).Scan(&ownerID, &wallSlug, &currentVersion); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if currentVersion != keyVersion {
+		return nil, sql.ErrNoRows
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM wall_link_sessions WHERE wall_id = $1`, wallID); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
@@ -24,9 +38,8 @@ func (r *LinksRepository) UpsertLink(ctx context.Context, wallID string, authKey
 		    key_version = EXCLUDED.key_version,
 		    encrypted_wall_key = EXCLUDED.encrypted_wall_key,
 		    active = TRUE
-		RETURNING wall_id, (SELECT wall_slug FROM walls WHERE wall_id = $1), (SELECT owner_id FROM walls WHERE wall_id = $1),
-		          (SELECT wall_slug FROM walls WHERE wall_id = $1), auth_key_hash, key_version, encrypted_wall_key, active, created_at, updated_at
-	`, wallID, authKeyHash, keyVersion, encryptedWallKey))
+		RETURNING wall_id, $5::text, $6::bigint, $5::text, auth_key_hash, key_version, encrypted_wall_key, active, created_at, updated_at
+	`, wallID, authKeyHash, keyVersion, encryptedWallKey, wallSlug, ownerID))
 	if err != nil {
 		return nil, err
 	}

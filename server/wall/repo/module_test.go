@@ -326,7 +326,9 @@ func TestGetSessionRejectsStaleLinkMetadata(t *testing.T) {
 	_, err = module.Links.GetSession(ctx, []byte("stale-auth-token"))
 	require.Error(t, err)
 
-	reusedHashLink, err := module.Links.UpsertLink(ctx, wall.WallID, oldLink.AuthKeyHash, wall.CurrentVersion+1, "reused-hash-new-version-key")
+	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	require.NoError(t, err)
+	reusedHashLink, err := module.Links.UpsertLink(ctx, wall.WallID, oldLink.AuthKeyHash, rotatedWall.CurrentVersion, "reused-hash-new-version-key")
 	require.NoError(t, err)
 	_, err = module.Links.DB.Exec(`
 		INSERT INTO wall_link_sessions (token_hash, wall_id, owner_id, auth_key_hash, key_version, expires_at)
@@ -334,6 +336,25 @@ func TestGetSessionRejectsStaleLinkMetadata(t *testing.T) {
 	`, []byte("stale-version-token"), reusedHashLink.WallID, reusedHashLink.OwnerID, reusedHashLink.AuthKeyHash, wall.CurrentVersion, timeutil.NMinFromNow(30))
 	require.NoError(t, err)
 	_, err = module.Links.GetSession(ctx, []byte("stale-version-token"))
+	require.Error(t, err)
+}
+
+func TestUpsertLinkRejectsStaleKeyVersion(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+
+	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	require.NoError(t, err)
+	require.Equal(t, wall.CurrentVersion+1, rotatedWall.CurrentVersion)
+
+	_, err = module.Links.UpsertLink(ctx, wall.WallID, []byte("stale-hash"), wall.CurrentVersion, "stale-wall-link-key")
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
+	_, err = module.Links.GetLink(ctx, wall.WallID)
 	require.Error(t, err)
 }
 
