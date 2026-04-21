@@ -243,7 +243,10 @@ func (c *FollowController) RefreshShares(ctx *gin.Context, req models.RefreshFol
 		if share.FollowerID == 0 || strings.TrimSpace(share.EncryptedWallKey) == "" {
 			return ente.NewBadRequestWithMessage("followerId and encryptedWallKey are required for each share")
 		}
-		if err := c.FollowRepo.UpsertShare(ctx.Request.Context(), wall.WallID, share.FollowerID, share.EncryptedWallKey, wall.CurrentVersion); err != nil {
+		if err := c.FollowRepo.UpdateShare(ctx.Request.Context(), wall.WallID, share.FollowerID, share.EncryptedWallKey, wall.CurrentVersion); err != nil {
+			if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+				return ente.NewBadRequestWithMessage("follow share does not exist")
+			}
 			return err
 		}
 	}

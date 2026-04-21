@@ -139,6 +139,26 @@ func (r *FollowRepository) UpsertShare(ctx context.Context, wallID string, follo
 	return stacktrace.Propagate(err, "")
 }
 
+func (r *FollowRepository) UpdateShare(ctx context.Context, wallID string, followerID int64, encryptedWallKey string, keyVersion int) error {
+	res, err := r.DB.ExecContext(ctx, `
+		UPDATE wall_follow_shares
+		SET encrypted_wall_key = $3,
+		    key_version = $4
+		WHERE wall_id = $1 AND follower_id = $2
+	`, wallID, followerID, encryptedWallKey, keyVersion)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (r *FollowRepository) ApproveRequest(ctx context.Context, requestID int64, wallID string, encryptedWallKey string, keyVersion int) (*WallFollowRequestRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {

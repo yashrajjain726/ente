@@ -369,6 +369,36 @@ func TestApproveRequestRejectsStaleRequestStates(t *testing.T) {
 	}
 }
 
+func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+
+	err = module.Follow.UpsertShare(ctx, aliceWall.WallID, bobID, "share-key-v1", aliceWall.CurrentVersion)
+	require.NoError(t, err)
+
+	err = module.Follow.UpdateShare(ctx, aliceWall.WallID, bobID, "share-key-v2", aliceWall.CurrentVersion+1)
+	require.NoError(t, err)
+	share, err := module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
+	require.NoError(t, err)
+	require.Equal(t, "share-key-v2", share.EncryptedWallKey)
+	require.Equal(t, aliceWall.CurrentVersion+1, share.KeyVersion)
+
+	err = module.Follow.DeleteShareByWallAndFollower(ctx, aliceWall.WallID, bobID)
+	require.NoError(t, err)
+	err = module.Follow.UpdateShare(ctx, aliceWall.WallID, bobID, "stale-share-key", aliceWall.CurrentVersion+2)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
+	_, err = module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+}
+
 func TestRotateKeyRevokesWallLinks(t *testing.T) {
 	ctx := context.Background()
 	module := newWallTestModule(t)
