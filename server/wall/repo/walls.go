@@ -31,7 +31,7 @@ func (r *WallsRepository) CreateWall(ctx context.Context, ownerID int64, wallSlu
 	}
 	rec, err := scanWallRecord(tx.QueryRowContext(ctx, `
 		SELECT wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version,
-		       avatar_object_key, avatar_content_type, avatar_size, created_at, updated_at
+		       avatar_object_key, avatar_bucket_id, avatar_size, created_at, updated_at
 		FROM walls WHERE wall_id = $1
 	`, wallID))
 	if err != nil {
@@ -46,7 +46,7 @@ func (r *WallsRepository) CreateWall(ctx context.Context, ownerID int64, wallSlu
 func (r *WallsRepository) ListWallsByOwner(ctx context.Context, ownerID int64) ([]WallRecord, error) {
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version,
-		       avatar_object_key, avatar_content_type, avatar_size, created_at, updated_at
+		       avatar_object_key, avatar_bucket_id, avatar_size, created_at, updated_at
 		FROM walls
 		WHERE owner_id = $1
 		ORDER BY created_at ASC
@@ -69,7 +69,7 @@ func (r *WallsRepository) ListWallsByOwner(ctx context.Context, ownerID int64) (
 func (r *WallsRepository) GetWallByID(ctx context.Context, wallID string) (*WallRecord, error) {
 	return scanWallRecord(r.DB.QueryRowContext(ctx, `
 		SELECT wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version,
-		       avatar_object_key, avatar_content_type, avatar_size, created_at, updated_at
+		       avatar_object_key, avatar_bucket_id, avatar_size, created_at, updated_at
 		FROM walls
 		WHERE wall_id = $1
 	`, wallID))
@@ -78,16 +78,16 @@ func (r *WallsRepository) GetWallByID(ctx context.Context, wallID string) (*Wall
 func (r *WallsRepository) GetWallBySlug(ctx context.Context, wallSlug string) (*WallRecord, error) {
 	return scanWallRecord(r.DB.QueryRowContext(ctx, `
 		SELECT wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version,
-		       avatar_object_key, avatar_content_type, avatar_size, created_at, updated_at
+		       avatar_object_key, avatar_bucket_id, avatar_size, created_at, updated_at
 		FROM walls
 		WHERE wall_slug = $1
 	`, normalizeSlug(wallSlug)))
 }
 
 func (r *WallsRepository) UpdateProfile(ctx context.Context, ownerID int64, wallID, encryptedProfile string, avatar *struct {
-	ObjectKey   string
-	ContentType string
-	Size        int64
+	ObjectKey string
+	BucketID  string
+	Size      int64
 }, removeAvatar bool) (*WallRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -98,22 +98,22 @@ func (r *WallsRepository) UpdateProfile(ctx context.Context, ownerID int64, wall
 		UPDATE walls
 		SET encrypted_profile = $1,
 		    avatar_object_key = CASE WHEN $2 THEN NULL ELSE COALESCE($3, avatar_object_key) END,
-		    avatar_content_type = CASE WHEN $2 THEN NULL ELSE COALESCE($4, avatar_content_type) END,
+		    avatar_bucket_id = CASE WHEN $2 THEN NULL ELSE COALESCE($4, avatar_bucket_id) END,
 		    avatar_size = CASE WHEN $2 THEN NULL ELSE COALESCE($5, avatar_size) END
 		WHERE owner_id = $6 AND wall_id = $7
 		RETURNING wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version,
-		          avatar_object_key, avatar_content_type, avatar_size, created_at, updated_at
+		          avatar_object_key, avatar_bucket_id, avatar_size, created_at, updated_at
 	`
-	var objectKey, contentType sql.NullString
+	var objectKey, bucketID sql.NullString
 	var size sql.NullInt64
 	if avatar != nil {
 		objectKey = nullString(avatar.ObjectKey)
-		contentType = nullString(avatar.ContentType)
+		bucketID = nullString(avatar.BucketID)
 		if avatar.Size > 0 {
 			size = sql.NullInt64{Int64: avatar.Size, Valid: true}
 		}
 	}
-	rec, err := scanWallRecord(tx.QueryRowContext(ctx, query, encryptedProfile, removeAvatar, objectKey, contentType, size, ownerID, wallID))
+	rec, err := scanWallRecord(tx.QueryRowContext(ctx, query, encryptedProfile, removeAvatar, objectKey, bucketID, size, ownerID, wallID))
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (r *WallsRepository) UpdateSlug(ctx context.Context, ownerID int64, wallID,
 		SET wall_slug = $1
 		WHERE owner_id = $2 AND wall_id = $3
 		RETURNING wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version,
-		          avatar_object_key, avatar_content_type, avatar_size, created_at, updated_at
+		          avatar_object_key, avatar_bucket_id, avatar_size, created_at, updated_at
 	`, normalizeSlug(wallSlug), ownerID, wallID))
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "duplicate key value") {
@@ -160,7 +160,7 @@ func (r *WallsRepository) RotateKey(ctx context.Context, ownerID int64, wallID, 
 	defer tx.Rollback()
 	current, err := scanWallRecord(tx.QueryRowContext(ctx, `
 		SELECT wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version,
-		       avatar_object_key, avatar_content_type, avatar_size, created_at, updated_at
+		       avatar_object_key, avatar_bucket_id, avatar_size, created_at, updated_at
 		FROM walls
 		WHERE owner_id = $1 AND wall_id = $2
 	`, ownerID, wallID))
@@ -183,7 +183,7 @@ func (r *WallsRepository) RotateKey(ctx context.Context, ownerID int64, wallID, 
 		SET encrypted_wall_key = $1, encrypted_profile = $2, current_version = $3
 		WHERE owner_id = $4 AND wall_id = $5
 		RETURNING wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version,
-		          avatar_object_key, avatar_content_type, avatar_size, created_at, updated_at
+		          avatar_object_key, avatar_bucket_id, avatar_size, created_at, updated_at
 	`, encryptedWallKey, newProfile, newVersion, ownerID, wallID))
 	if err != nil {
 		return nil, err
@@ -226,7 +226,7 @@ func scanWallRecord(scanner interface{ Scan(dest ...any) error }) (*WallRecord, 
 		&rec.EncryptedProfile,
 		&rec.CurrentVersion,
 		&rec.AvatarObjectKey,
-		&rec.AvatarContentType,
+		&rec.AvatarBucketID,
 		&rec.AvatarSize,
 		&rec.CreatedAt,
 		&rec.UpdatedAt,

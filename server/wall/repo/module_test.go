@@ -61,23 +61,23 @@ func TestWallModuleLifecycle(t *testing.T) {
 		WallID:       sql.NullString{String: aliceWall.WallID, Valid: true},
 		Purpose:      TempObjectPurposeAvatar,
 		BucketID:     "b2-eu-cen",
-		ContentType:  "image/jpeg",
 		ExpectedSize: 111,
 		ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
 	})
 	require.NoError(t, err)
 	updatedWall, err := module.Walls.UpdateProfile(ctx, aliceID, aliceWall.WallID, "alice-profile-v2", &struct {
-		ObjectKey   string
-		ContentType string
-		Size        int64
+		ObjectKey string
+		BucketID  string
+		Size      int64
 	}{
-		ObjectKey:   "wall/alice/avatar.jpg",
-		ContentType: "image/jpeg",
-		Size:        111,
+		ObjectKey: "wall/alice/avatar.jpg",
+		BucketID:  "b2-eu-cen",
+		Size:      111,
 	}, false)
 	require.NoError(t, err)
 	require.Equal(t, "alice-profile-v2", updatedWall.EncryptedProfile)
 	require.Equal(t, "wall/alice/avatar.jpg", updatedWall.AvatarObjectKey.String)
+	require.Equal(t, "b2-eu-cen", updatedWall.AvatarBucketID.String)
 
 	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
@@ -116,7 +116,6 @@ func TestWallModuleLifecycle(t *testing.T) {
 			OwnerID:      aliceID,
 			Purpose:      TempObjectPurposePost,
 			BucketID:     "b2-eu-cen",
-			ContentType:  "image/jpeg",
 			ExpectedSize: 123,
 			ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
 		},
@@ -125,7 +124,6 @@ func TestWallModuleLifecycle(t *testing.T) {
 			OwnerID:      aliceID,
 			Purpose:      TempObjectPurposePost,
 			BucketID:     "b2-eu-cen",
-			ContentType:  "image/jpeg",
 			ExpectedSize: 45,
 			ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
 		},
@@ -136,7 +134,7 @@ func TestWallModuleLifecycle(t *testing.T) {
 	postID, err := module.Posts.CreatePost(ctx, aliceID, aliceWall.WallID, "post-key", ptr("caption"), rotatedWall.CurrentVersion, []WallPostAssetRecord{
 		{
 			ObjectKey:      "wall/alice/post1/full",
-			ContentType:    nullString("image/jpeg"),
+			BucketID:       "b2-eu-cen",
 			Size:           sqlNullInt64(123),
 			Position:       0,
 			Variant:        nullString("full"),
@@ -144,7 +142,7 @@ func TestWallModuleLifecycle(t *testing.T) {
 		},
 		{
 			ObjectKey:      "wall/alice/post1/thumb",
-			ContentType:    nullString("image/jpeg"),
+			BucketID:       "b2-eu-cen",
 			Size:           sqlNullInt64(45),
 			Position:       0,
 			Variant:        nullString("thumbnail"),
@@ -176,10 +174,51 @@ func TestWallModuleLifecycle(t *testing.T) {
 	assets, err := module.Posts.ListAssetsByPostIDs(ctx, []int64{postID})
 	require.NoError(t, err)
 	require.Len(t, assets[postID], 2)
+	require.Equal(t, "b2-eu-cen", assets[postID][0].BucketID)
 
 	ok, err := module.Assets.AssetBelongsToWall(ctx, aliceWall.WallID, "wall/alice/post1/full")
 	require.NoError(t, err)
 	require.True(t, ok)
+
+	bucketID, err := module.Assets.GetAssetBucketID(ctx, aliceWall.WallID, "wall/alice/post1/full")
+	require.NoError(t, err)
+	require.Equal(t, "b2-eu-cen", bucketID)
+
+	bucketID, err = module.Assets.GetAssetBucketID(ctx, aliceWall.WallID, "wall/alice/avatar.jpg")
+	require.NoError(t, err)
+	require.Equal(t, "b2-eu-cen", bucketID)
+
+	wallForObject, err := module.Assets.GetWallForObjectKey(ctx, "wall/alice/post1/full")
+	require.NoError(t, err)
+	require.Equal(t, aliceWall.WallID, wallForObject.WallID)
+
+	tx, err := module.Assets.DB.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	referenced, err := IsObjectReferencedTx(ctx, tx, "wall/alice/post1/full")
+	require.NoError(t, err)
+	require.True(t, referenced)
+	require.NoError(t, tx.Rollback())
+
+	deletedKeys, err := module.Posts.DeletePost(ctx, postID, aliceID)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"wall/alice/post1/full", "wall/alice/post1/thumb"}, deletedKeys)
+
+	_, err = module.Posts.GetPost(ctx, postID, bobID)
+	require.Error(t, err)
+
+	ok, err = module.Assets.AssetBelongsToWall(ctx, aliceWall.WallID, "wall/alice/post1/full")
+	require.NoError(t, err)
+	require.False(t, ok)
+
+	_, err = module.Assets.GetWallForObjectKey(ctx, "wall/alice/post1/full")
+	require.Error(t, err)
+
+	tx, err = module.Assets.DB.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	referenced, err = IsObjectReferencedTx(ctx, tx, "wall/alice/post1/full")
+	require.NoError(t, err)
+	require.False(t, referenced)
+	require.NoError(t, tx.Rollback())
 
 	link, err := module.Links.UpsertLink(ctx, aliceWall.WallID, []byte("hash"), rotatedWall.CurrentVersion, "wall-link-key")
 	require.NoError(t, err)

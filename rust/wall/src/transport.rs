@@ -56,7 +56,6 @@ pub struct WallKeyResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PresignUploadRequest {
-    pub content_type: String,
     pub size: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
@@ -85,8 +84,6 @@ pub struct AssetDownloadResponse {
 #[serde(rename_all = "camelCase")]
 pub struct PostObjectPayload {
     pub object_key: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -185,8 +182,6 @@ pub struct ListCommentsResponse {
 pub struct ProfileAvatarPayload {
     pub object_key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub content_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<i64>,
 }
 
@@ -194,8 +189,6 @@ pub struct ProfileAvatarPayload {
 #[serde(rename_all = "camelCase")]
 pub struct ProfileAvatarResponse {
     pub object_key: String,
-    #[serde(default)]
-    pub content_type: String,
     #[serde(default)]
     pub size: i64,
     #[serde(default)]

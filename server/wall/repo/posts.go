@@ -29,9 +29,9 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, wallID,
 	}
 	for _, obj := range objects {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO wall_post_assets (post_id, object_key, content_type, size, position, variant, blur_hash_cipher)
+			INSERT INTO wall_post_assets (post_id, object_key, bucket_id, size, position, variant, blur_hash_cipher)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)
-		`, postID, obj.ObjectKey, obj.ContentType, obj.Size, obj.Position, obj.Variant, obj.BlurHashCipher); err != nil {
+		`, postID, obj.ObjectKey, obj.BucketID, obj.Size, obj.Position, obj.Variant, obj.BlurHashCipher); err != nil {
 			return 0, stacktrace.Propagate(err, "")
 		}
 		if err := ConsumeTempObjectTx(ctx, tx, ownerID, obj.ObjectKey, TempObjectPurposePost, nil); err != nil {
@@ -157,7 +157,7 @@ func (r *PostsRepository) ListAssetsByPostIDs(ctx context.Context, postIDs []int
 	if len(postIDs) == 0 {
 		return map[int64][]WallPostAssetRecord{}, nil
 	}
-	query, args := inClause("SELECT asset_id, post_id, object_key, content_type, size, position, variant, blur_hash_cipher, created_at FROM wall_post_assets WHERE post_id IN (%s) ORDER BY position ASC, asset_id ASC", postIDs, 0)
+	query, args := inClause("SELECT asset_id, post_id, object_key, bucket_id, size, position, variant, blur_hash_cipher, created_at FROM wall_post_assets WHERE post_id IN (%s) ORDER BY position ASC, asset_id ASC", postIDs, 0)
 	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -166,7 +166,7 @@ func (r *PostsRepository) ListAssetsByPostIDs(ctx context.Context, postIDs []int
 	result := make(map[int64][]WallPostAssetRecord, len(postIDs))
 	for rows.Next() {
 		var rec WallPostAssetRecord
-		if err := rows.Scan(&rec.AssetID, &rec.PostID, &rec.ObjectKey, &rec.ContentType, &rec.Size, &rec.Position, &rec.Variant, &rec.BlurHashCipher, &rec.CreatedAt); err != nil {
+		if err := rows.Scan(&rec.AssetID, &rec.PostID, &rec.ObjectKey, &rec.BucketID, &rec.Size, &rec.Position, &rec.Variant, &rec.BlurHashCipher, &rec.CreatedAt); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		result[rec.PostID] = append(result[rec.PostID], rec)

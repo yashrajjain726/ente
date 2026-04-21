@@ -15,16 +15,16 @@ const (
 
 func (r *AssetsRepository) AddTempObject(ctx context.Context, rec WallTempObjectRecord) error {
 	_, err := r.DB.ExecContext(ctx, `
-		INSERT INTO wall_temp_objects (object_key, owner_id, wall_id, purpose, bucket_id, content_type, expected_size, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, rec.ObjectKey, rec.OwnerID, rec.WallID, rec.Purpose, rec.BucketID, rec.ContentType, rec.ExpectedSize, rec.ExpiresAt)
+		INSERT INTO wall_temp_objects (object_key, owner_id, wall_id, purpose, bucket_id, expected_size, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, rec.ObjectKey, rec.OwnerID, rec.WallID, rec.Purpose, rec.BucketID, rec.ExpectedSize, rec.ExpiresAt)
 	return stacktrace.Propagate(err, "")
 }
 
 func (r *AssetsRepository) GetTempObject(ctx context.Context, ownerID int64, objectKey, purpose string, wallID *string) (*WallTempObjectRecord, error) {
 	args := []any{objectKey, ownerID, purpose}
 	query := `
-		SELECT object_key, owner_id, wall_id, purpose, bucket_id, content_type, expected_size, expires_at, created_at
+		SELECT object_key, owner_id, wall_id, purpose, bucket_id, expected_size, expires_at, created_at
 		FROM wall_temp_objects
 		WHERE object_key = $1 AND owner_id = $2 AND purpose = $3`
 	if wallID != nil {
@@ -61,7 +61,7 @@ func (r *AssetsRepository) GetAndLockExpiredTempObjects(ctx context.Context, now
 		return nil, nil, stacktrace.Propagate(err, "")
 	}
 	rows, err := tx.QueryContext(ctx, `
-		SELECT object_key, owner_id, wall_id, purpose, bucket_id, content_type, expected_size, expires_at, created_at
+		SELECT object_key, owner_id, wall_id, purpose, bucket_id, expected_size, expires_at, created_at
 		FROM wall_temp_objects
 		WHERE expires_at <= $1
 		ORDER BY expires_at ASC
@@ -105,7 +105,12 @@ func IsObjectReferencedTx(ctx context.Context, tx *sql.Tx, objectKey string) (bo
 	err := tx.QueryRowContext(ctx, `
 		SELECT (
 			EXISTS (SELECT 1 FROM walls WHERE avatar_object_key = $1) OR
-			EXISTS (SELECT 1 FROM wall_post_assets WHERE object_key = $1)
+			EXISTS (
+				SELECT 1
+				FROM wall_post_assets a
+				JOIN wall_posts p ON p.post_id = a.post_id
+				WHERE a.object_key = $1 AND p.is_deleted = FALSE
+			)
 		)
 	`, objectKey).Scan(&exists)
 	return exists, stacktrace.Propagate(err, "")
@@ -119,7 +124,6 @@ func scanWallTempObject(scanner interface{ Scan(dest ...any) error }) (*WallTemp
 		&rec.WallID,
 		&rec.Purpose,
 		&rec.BucketID,
-		&rec.ContentType,
 		&rec.ExpectedSize,
 		&rec.ExpiresAt,
 		&rec.CreatedAt,

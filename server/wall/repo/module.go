@@ -36,17 +36,17 @@ type AssetsRepository struct {
 }
 
 type WallRecord struct {
-	WallID            string
-	OwnerID           int64
-	WallSlug          string
-	EncryptedWallKey  string
-	EncryptedProfile  string
-	CurrentVersion    int
-	AvatarObjectKey   sql.NullString
-	AvatarContentType sql.NullString
-	AvatarSize        sql.NullInt64
-	CreatedAt         int64
-	UpdatedAt         int64
+	WallID           string
+	OwnerID          int64
+	WallSlug         string
+	EncryptedWallKey string
+	EncryptedProfile string
+	CurrentVersion   int
+	AvatarObjectKey  sql.NullString
+	AvatarBucketID   sql.NullString
+	AvatarSize       sql.NullInt64
+	CreatedAt        int64
+	UpdatedAt        int64
 }
 
 type WallVersionRecord struct {
@@ -77,7 +77,7 @@ type WallPostAssetRecord struct {
 	AssetID        int64
 	PostID         int64
 	ObjectKey      string
-	ContentType    sql.NullString
+	BucketID       string
 	Size           sql.NullInt64
 	Position       int
 	Variant        sql.NullString
@@ -91,7 +91,6 @@ type WallTempObjectRecord struct {
 	WallID       sql.NullString
 	Purpose      string
 	BucketID     string
-	ContentType  string
 	ExpectedSize int64
 	ExpiresAt    int64
 	CreatedAt    int64

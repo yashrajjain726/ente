@@ -42,7 +42,7 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 		}
 		assets = append(assets, repo.WallPostAssetRecord{
 			ObjectKey:      staged.ObjectKey,
-			ContentType:    sql.NullString{String: staged.ContentType, Valid: strings.TrimSpace(staged.ContentType) != ""},
+			BucketID:       staged.BucketID,
 			Size:           sql.NullInt64{Int64: staged.ExpectedSize, Valid: staged.ExpectedSize > 0},
 			Position:       object.Position,
 			Variant:        sql.NullString{String: object.Variant, Valid: strings.TrimSpace(object.Variant) != ""},

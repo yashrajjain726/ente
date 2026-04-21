@@ -84,9 +84,9 @@ func (c *WallsController) UpdateProfile(ctx *gin.Context, req models.UpdateWallP
 		return nil, err
 	}
 	avatar := (*struct {
-		ObjectKey   string
-		ContentType string
-		Size        int64
+		ObjectKey string
+		BucketID  string
+		Size      int64
 	})(nil)
 	if req.Avatar != nil {
 		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, req.Avatar.ObjectKey, repo.TempObjectPurposeAvatar, &wallID)
@@ -94,13 +94,13 @@ func (c *WallsController) UpdateProfile(ctx *gin.Context, req models.UpdateWallP
 			return nil, err
 		}
 		avatar = &struct {
-			ObjectKey   string
-			ContentType string
-			Size        int64
+			ObjectKey string
+			BucketID  string
+			Size      int64
 		}{
-			ObjectKey:   staged.ObjectKey,
-			ContentType: staged.ContentType,
-			Size:        staged.ExpectedSize,
+			ObjectKey: staged.ObjectKey,
+			BucketID:  staged.BucketID,
+			Size:      staged.ExpectedSize,
 		}
 	}
 	wall, err := c.WallsRepo.UpdateProfile(ctx.Request.Context(), userID, wallID, req.EncryptedProfile, avatar, req.RemoveAvatar)

@@ -406,13 +406,8 @@ impl AccountWallCtx {
         })
     }
 
-    pub async fn presign_post_upload(
-        &self,
-        content_type: &str,
-        size: usize,
-    ) -> Result<PresignUploadResponse> {
+    pub async fn presign_post_upload(&self, size: usize) -> Result<PresignUploadResponse> {
         let request = PresignUploadRequest {
-            content_type: content_type.to_owned(),
             size: size as i64,
             purpose: None,
             wall_id: None,
@@ -426,11 +421,9 @@ impl AccountWallCtx {
     pub async fn presign_avatar_upload(
         &self,
         wall_id: &str,
-        content_type: &str,
         size: usize,
     ) -> Result<PresignUploadResponse> {
         let request = PresignUploadRequest {
-            content_type: content_type.to_owned(),
             size: size as i64,
             purpose: Some(UPLOAD_PURPOSE_AVATAR.to_owned()),
             wall_id: Some(wall_id.to_owned()),
@@ -458,17 +451,13 @@ impl AccountWallCtx {
         &self,
         post_key: &[u8],
         plaintext: &[u8],
-        content_type: &str,
         position: Option<i32>,
     ) -> Result<PostObjectPayload> {
         let encrypted = encrypt_asset_payload(post_key, plaintext)?;
-        let presign = self
-            .presign_post_upload(content_type, encrypted.len())
-            .await?;
+        let presign = self.presign_post_upload(encrypted.len()).await?;
         self.upload_bytes(&presign, &encrypted).await?;
         Ok(PostObjectPayload {
             object_key: presign.object_key,
-            content_type: Some(content_type.to_owned()),
             size: Some(encrypted.len() as i64),
             position,
             blur_hash_cipher: None,
@@ -481,16 +470,12 @@ impl AccountWallCtx {
         wall_id: &str,
         wall_key: &[u8],
         plaintext: &[u8],
-        content_type: &str,
     ) -> Result<ProfileAvatarPayload> {
         let encrypted = encrypt_asset_payload(wall_key, plaintext)?;
-        let presign = self
-            .presign_avatar_upload(wall_id, content_type, encrypted.len())
-            .await?;
+        let presign = self.presign_avatar_upload(wall_id, encrypted.len()).await?;
         self.upload_bytes(&presign, &encrypted).await?;
         Ok(ProfileAvatarPayload {
             object_key: presign.object_key,
-            content_type: Some(content_type.to_owned()),
             size: Some(encrypted.len() as i64),
         })
     }
@@ -1585,7 +1570,7 @@ mod tests {
         let presign = server
             .mock("POST", "/wall/uploads/presign")
             .match_header("x-auth-token", "token")
-            .match_body(Matcher::Regex("contentType".into()))
+            .match_body(Matcher::Regex("\"size\"".into()))
             .with_status(200)
             .with_body(
                 json!({
@@ -1609,7 +1594,7 @@ mod tests {
             .await;
 
         let payload = ctx
-            .upload_post_asset(&generate_key(), b"tiny-image", "image/png", Some(0))
+            .upload_post_asset(&generate_key(), b"tiny-image", Some(0))
             .await
             .expect("upload should succeed");
 

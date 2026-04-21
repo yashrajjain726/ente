@@ -28,7 +28,6 @@ pub fn profile_payload(display_name: &str, bio: &str) -> Vec<u8> {
 pub fn fake_post_object(name: &str) -> PostObjectPayload {
     PostObjectPayload {
         object_key: format!("wall-e2e/{name}"),
-        content_type: Some("image/jpeg".to_string()),
         size: Some(1),
         position: Some(0),
         blur_hash_cipher: None,

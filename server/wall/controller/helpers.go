@@ -22,9 +22,6 @@ func toAvatarResponse(wall *wallrepo.WallRecord) *models.ProfileAvatarResponse {
 		ObjectKey: wall.AvatarObjectKey.String,
 		UpdatedAt: formatMicros(wall.UpdatedAt),
 	}
-	if wall.AvatarContentType.Valid {
-		resp.ContentType = wall.AvatarContentType.String
-	}
 	if wall.AvatarSize.Valid {
 		resp.Size = wall.AvatarSize.Int64
 	}
@@ -45,9 +42,6 @@ func toPostObjectPayload(asset wallrepo.WallPostAssetRecord) models.PostObjectPa
 	resp := models.PostObjectPayload{
 		ObjectKey: asset.ObjectKey,
 		Position:  asset.Position,
-	}
-	if asset.ContentType.Valid {
-		resp.ContentType = asset.ContentType.String
 	}
 	if asset.Size.Valid {
 		resp.Size = asset.Size.Int64

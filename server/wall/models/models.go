@@ -44,10 +44,9 @@ type WallKeyResponse struct {
 }
 
 type PresignUploadRequest struct {
-	ContentType string  `json:"contentType" binding:"required"`
-	Size        int64   `json:"size" binding:"required"`
-	Purpose     *string `json:"purpose,omitempty"`
-	WallID      *string `json:"wallId,omitempty"`
+	Size    int64   `json:"size" binding:"required"`
+	Purpose *string `json:"purpose,omitempty"`
+	WallID  *string `json:"wallId,omitempty"`
 }
 
 type PresignUploadResponse struct {
@@ -64,16 +63,14 @@ type AssetDownloadResponse struct {
 }
 
 type ProfileAvatarPayload struct {
-	ObjectKey   string `json:"objectKey"`
-	ContentType string `json:"contentType,omitempty"`
-	Size        int64  `json:"size,omitempty"`
+	ObjectKey string `json:"objectKey"`
+	Size      int64  `json:"size,omitempty"`
 }
 
 type ProfileAvatarResponse struct {
-	ObjectKey   string `json:"objectKey"`
-	ContentType string `json:"contentType,omitempty"`
-	Size        int64  `json:"size,omitempty"`
-	UpdatedAt   string `json:"updatedAt,omitempty"`
+	ObjectKey string `json:"objectKey"`
+	Size      int64  `json:"size,omitempty"`
+	UpdatedAt string `json:"updatedAt,omitempty"`
 }
 
 type WallLinkCreateRequest struct {
@@ -250,7 +247,6 @@ type UpdatePostCaptionRequest struct {
 
 type PostObjectPayload struct {
 	ObjectKey      string `json:"objectKey"`
-	ContentType    string `json:"contentType,omitempty"`
 	Size           int64  `json:"size,omitempty"`
 	Position       int    `json:"position,omitempty"`
 	Variant        string `json:"variant,omitempty"`

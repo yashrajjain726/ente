@@ -23,6 +23,7 @@ const (
 	uploadTempObjectExpiry       = 2 * uploadURLExpiry
 	uploadPurposePost            = wallrepo.TempObjectPurposePost
 	uploadPurposeAvatar          = wallrepo.TempObjectPurposeAvatar
+	uploadContentType            = "application/octet-stream"
 )
 
 type AssetsController struct {
@@ -37,9 +38,6 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	userID, err := c.auth.requireUser(ctx)
 	if err != nil {
 		return nil, err
-	}
-	if strings.TrimSpace(req.ContentType) == "" {
-		return nil, ente.NewBadRequestWithMessage("contentType is required")
 	}
 	if req.Size <= 0 || req.Size > maxUploadBytes {
 		return nil, ente.NewBadRequestWithMessage(fmt.Sprintf("size must be between 1 and %d bytes", maxUploadBytes))
@@ -77,7 +75,7 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 		Bucket:        bucket,
 		Key:           aws.String(objectKey),
 		ContentLength: aws.Int64(req.Size),
-		ContentType:   aws.String(req.ContentType),
+		ContentType:   aws.String(uploadContentType),
 	}
 	putReq, _ := s3Client.PutObjectRequest(input)
 	url, err := putReq.Presign(uploadURLExpiry)
@@ -90,7 +88,6 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 		WallID:       wallID,
 		Purpose:      purpose,
 		BucketID:     bucketID,
-		ContentType:  strings.TrimSpace(req.ContentType),
 		ExpectedSize: req.Size,
 		ExpiresAt:    timeutil.Microseconds() + int64(uploadTempObjectExpiry/time.Microsecond),
 	})
@@ -100,7 +97,7 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	return &models.PresignUploadResponse{
 		URL:       url,
 		Method:    "PUT",
-		Headers:   map[string]string{"Content-Type": req.ContentType},
+		Headers:   map[string]string{"Content-Type": uploadContentType},
 		ObjectKey: objectKey,
 		ExpiresIn: int(uploadURLExpiry.Seconds()),
 	}, nil
@@ -132,9 +129,6 @@ func verifyStagedUpload(ctx *gin.Context, assetsRepo *wallrepo.AssetsRepository,
 	if head.ContentLength == nil || *head.ContentLength != rec.ExpectedSize {
 		return nil, ente.NewBadRequestWithMessage("wall upload size mismatch")
 	}
-	if rec.ContentType != "" && (head.ContentType == nil || strings.TrimSpace(*head.ContentType) != rec.ContentType) {
-		return nil, ente.NewBadRequestWithMessage("wall upload content type mismatch")
-	}
 	return rec, nil
 }
 
@@ -150,14 +144,13 @@ func (c *AssetsController) Redirect(ctx *gin.Context, req models.AssetRedirectRe
 	if err := c.auth.canViewWall(ctx.Request.Context(), viewer, wall); err != nil {
 		return nil, err
 	}
-	ok, err := c.AssetsRepo.AssetBelongsToWall(ctx.Request.Context(), wall.WallID, req.ObjectKey)
+	bucketID, err := c.AssetsRepo.GetAssetBucketID(ctx.Request.Context(), wall.WallID, req.ObjectKey)
 	if err != nil {
-		return nil, err
-	}
-	if !ok {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
 		return nil, ente.ErrNotFound
 	}
-	bucketID := c.AssetsRepo.S3Config.GetHotDataCenter()
 	bucket := c.AssetsRepo.S3Config.GetBucket(bucketID)
 	s3Client := c.AssetsRepo.S3Config.GetS3Client(bucketID)
 	getReq, _ := s3Client.GetObjectRequest(&s3.GetObjectInput{Bucket: bucket, Key: aws.String(req.ObjectKey)})
