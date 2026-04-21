@@ -188,6 +188,9 @@ func (r *WallsRepository) RotateKey(ctx context.Context, ownerID int64, wallID, 
 	if err != nil {
 		return nil, err
 	}
+	if err := deleteLinkTx(ctx, tx, wallID); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

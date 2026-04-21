@@ -248,6 +248,37 @@ func TestWallModuleLifecycle(t *testing.T) {
 	_ = bobWall
 }
 
+func TestRotateKeyRevokesWallLinks(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+
+	link, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("hash"), wall.CurrentVersion, "wall-link-key")
+	require.NoError(t, err)
+	require.Equal(t, "wall-link-key", link.EncryptedWallKey)
+
+	err = module.Links.CreateSession(ctx, []byte("token-hash"), wall.WallID, aliceID, timeutil.NMinFromNow(30))
+	require.NoError(t, err)
+	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
+	require.NoError(t, err)
+
+	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	require.NoError(t, err)
+	require.Equal(t, 2, rotatedWall.CurrentVersion)
+
+	_, err = module.Links.GetLink(ctx, wall.WallID)
+	require.Error(t, err)
+	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
+	require.Error(t, err)
+
+	versions, err := module.Walls.ListVersions(ctx, wall.WallID)
+	require.NoError(t, err)
+	require.Len(t, versions, 2)
+}
+
 func ptr(value string) *string {
 	return &value
 }

@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/ente-io/stacktrace"
 )
@@ -50,13 +51,20 @@ func (r *LinksRepository) DeleteLink(ctx context.Context, wallID string) error {
 		return stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
+	if err := deleteLinkTx(ctx, tx, wallID); err != nil {
+		return err
+	}
+	return stacktrace.Propagate(tx.Commit(), "")
+}
+
+func deleteLinkTx(ctx context.Context, tx *sql.Tx, wallID string) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM wall_link_sessions WHERE wall_id = $1`, wallID); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM wall_links WHERE wall_id = $1`, wallID); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	return stacktrace.Propagate(tx.Commit(), "")
+	return nil
 }
 
 func (r *LinksRepository) GetLinkByAuthHash(ctx context.Context, wallID string, authHash []byte) (*WallLinkRecord, error) {
