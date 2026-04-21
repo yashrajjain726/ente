@@ -204,6 +204,8 @@ func TestWallModuleLifecycle(t *testing.T) {
 	deletedKeys, err := module.Posts.DeletePost(ctx, postID, aliceID)
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{"wall/alice/post1/full", "wall/alice/post1/thumb"}, deletedKeys)
+	requireQueuedTempObject(t, module, "wall/alice/post1/full", TempObjectPurposePost, "b2-eu-cen")
+	requireQueuedTempObject(t, module, "wall/alice/post1/thumb", TempObjectPurposePost, "b2-eu-cen")
 
 	_, err = module.Posts.GetPost(ctx, postID, bobID)
 	require.Error(t, err)
@@ -248,6 +250,61 @@ func TestWallModuleLifecycle(t *testing.T) {
 	require.Equal(t, aliceWall.WallID, lookup.WallID)
 
 	_ = bobWall
+}
+
+func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+
+	for _, rec := range []WallTempObjectRecord{
+		{
+			ObjectKey:    "wall/alice/avatar-old",
+			OwnerID:      aliceID,
+			WallID:       sql.NullString{String: wall.WallID, Valid: true},
+			Purpose:      TempObjectPurposeAvatar,
+			BucketID:     "b2-eu-cen",
+			ExpectedSize: 111,
+			ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
+		},
+		{
+			ObjectKey:    "wall/alice/avatar-new",
+			OwnerID:      aliceID,
+			WallID:       sql.NullString{String: wall.WallID, Valid: true},
+			Purpose:      TempObjectPurposeAvatar,
+			BucketID:     "b2-us-west",
+			ExpectedSize: 222,
+			ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
+		},
+	} {
+		require.NoError(t, module.Assets.AddTempObject(ctx, rec))
+	}
+
+	oldAvatar := &struct {
+		ObjectKey string
+		BucketID  string
+		Size      int64
+	}{ObjectKey: "wall/alice/avatar-old", BucketID: "b2-eu-cen", Size: 111}
+	_, err = module.Walls.UpdateProfile(ctx, aliceID, wall.WallID, "alice-profile-old-avatar", oldAvatar, false)
+	require.NoError(t, err)
+
+	newAvatar := &struct {
+		ObjectKey string
+		BucketID  string
+		Size      int64
+	}{ObjectKey: "wall/alice/avatar-new", BucketID: "b2-us-west", Size: 222}
+	updated, err := module.Walls.UpdateProfile(ctx, aliceID, wall.WallID, "alice-profile-new-avatar", newAvatar, false)
+	require.NoError(t, err)
+	require.Equal(t, "wall/alice/avatar-new", updated.AvatarObjectKey.String)
+	requireQueuedTempObject(t, module, "wall/alice/avatar-old", TempObjectPurposeAvatar, "b2-eu-cen")
+
+	updated, err = module.Walls.UpdateProfile(ctx, aliceID, wall.WallID, "alice-profile-no-avatar", nil, true)
+	require.NoError(t, err)
+	require.False(t, updated.AvatarObjectKey.Valid)
+	requireQueuedTempObject(t, module, "wall/alice/avatar-new", TempObjectPurposeAvatar, "b2-us-west")
 }
 
 func TestRotateKeyRevokesWallLinks(t *testing.T) {
@@ -399,4 +456,19 @@ func sqlNullInt64(value int64) sql.NullInt64 {
 
 func sqlNullString(value string) sql.NullString {
 	return sql.NullString{String: value, Valid: value != ""}
+}
+
+func requireQueuedTempObject(t *testing.T, module *Module, objectKey, purpose, bucketID string) {
+	t.Helper()
+	var gotPurpose, gotBucketID string
+	var expired bool
+	err := module.Assets.DB.QueryRow(`
+		SELECT purpose, bucket_id, expires_at <= now_utc_micro_seconds()
+		FROM wall_temp_objects
+		WHERE object_key = $1
+	`, objectKey).Scan(&gotPurpose, &gotBucketID, &expired)
+	require.NoError(t, err)
+	require.Equal(t, purpose, gotPurpose)
+	require.Equal(t, bucketID, gotBucketID)
+	require.True(t, expired)
 }

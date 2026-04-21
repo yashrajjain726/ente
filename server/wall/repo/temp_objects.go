@@ -21,6 +21,25 @@ func (r *AssetsRepository) AddTempObject(ctx context.Context, rec WallTempObject
 	return stacktrace.Propagate(err, "")
 }
 
+func QueueObjectCleanupTx(ctx context.Context, tx *sql.Tx, rec WallTempObjectRecord) error {
+	expectedSize := rec.ExpectedSize
+	if expectedSize <= 0 {
+		expectedSize = 1
+	}
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO wall_temp_objects (object_key, owner_id, wall_id, purpose, bucket_id, expected_size, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, now_utc_micro_seconds())
+		ON CONFLICT (object_key) DO UPDATE
+		SET owner_id = EXCLUDED.owner_id,
+		    wall_id = EXCLUDED.wall_id,
+		    purpose = EXCLUDED.purpose,
+		    bucket_id = EXCLUDED.bucket_id,
+		    expected_size = EXCLUDED.expected_size,
+		    expires_at = EXCLUDED.expires_at
+	`, rec.ObjectKey, rec.OwnerID, rec.WallID, rec.Purpose, rec.BucketID, expectedSize)
+	return stacktrace.Propagate(err, "")
+}
+
 func (r *AssetsRepository) GetTempObject(ctx context.Context, ownerID int64, objectKey, purpose string, wallID *string) (*WallTempObjectRecord, error) {
 	args := []any{objectKey, ownerID, purpose}
 	query := `

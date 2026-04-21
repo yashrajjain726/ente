@@ -94,6 +94,16 @@ func (r *WallsRepository) UpdateProfile(ctx context.Context, ownerID int64, wall
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
+	previous, err := scanWallRecord(tx.QueryRowContext(ctx, `
+		SELECT wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version,
+		       avatar_object_key, avatar_bucket_id, avatar_size, created_at, updated_at
+		FROM walls
+		WHERE owner_id = $1 AND wall_id = $2
+		FOR UPDATE
+	`, ownerID, wallID))
+	if err != nil {
+		return nil, err
+	}
 	query := `
 		UPDATE walls
 		SET encrypted_profile = $1,
@@ -120,6 +130,22 @@ func (r *WallsRepository) UpdateProfile(ctx context.Context, ownerID int64, wall
 	if avatar != nil {
 		if err := ConsumeTempObjectTx(ctx, tx, ownerID, avatar.ObjectKey, TempObjectPurposeAvatar, &wallID); err != nil {
 			return nil, stacktrace.Propagate(err, "failed to consume staged wall avatar upload")
+		}
+	}
+	if previous.AvatarObjectKey.Valid && previous.AvatarBucketID.Valid && (removeAvatar || (avatar != nil && previous.AvatarObjectKey.String != avatar.ObjectKey)) {
+		size := int64(1)
+		if previous.AvatarSize.Valid && previous.AvatarSize.Int64 > 0 {
+			size = previous.AvatarSize.Int64
+		}
+		if err := QueueObjectCleanupTx(ctx, tx, WallTempObjectRecord{
+			ObjectKey:    previous.AvatarObjectKey.String,
+			OwnerID:      ownerID,
+			WallID:       sql.NullString{String: wallID, Valid: true},
+			Purpose:      TempObjectPurposeAvatar,
+			BucketID:     previous.AvatarBucketID.String,
+			ExpectedSize: size,
+		}); err != nil {
+			return nil, err
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `

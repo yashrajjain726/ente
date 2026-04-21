@@ -180,20 +180,6 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
-	rows, err := tx.QueryContext(ctx, `SELECT object_key FROM wall_post_assets WHERE post_id = $1`, postID)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	var keys []string
-	for rows.Next() {
-		var key string
-		if err := rows.Scan(&key); err != nil {
-			rows.Close()
-			return nil, stacktrace.Propagate(err, "")
-		}
-		keys = append(keys, key)
-	}
-	rows.Close()
 	res, err := tx.ExecContext(ctx, `UPDATE wall_posts SET is_deleted = TRUE WHERE post_id = $1 AND owner_id = $2`, postID, ownerID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -204,6 +190,45 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 	}
 	if affected == 0 {
 		return nil, sql.ErrNoRows
+	}
+	rows, err := tx.QueryContext(ctx, `
+		SELECT a.object_key, a.bucket_id, COALESCE(a.size, 1), p.wall_id
+		FROM wall_post_assets a
+		JOIN wall_posts p ON p.post_id = a.post_id
+		WHERE a.post_id = $1
+	`, postID)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	type cleanupObject struct {
+		key string
+		rec WallTempObjectRecord
+	}
+	var cleanupObjects []cleanupObject
+	for rows.Next() {
+		var key string
+		var rec WallTempObjectRecord
+		if err := rows.Scan(&key, &rec.BucketID, &rec.ExpectedSize, &rec.WallID.String); err != nil {
+			rows.Close()
+			return nil, stacktrace.Propagate(err, "")
+		}
+		rec.ObjectKey = key
+		rec.OwnerID = ownerID
+		rec.WallID.Valid = rec.WallID.String != ""
+		rec.Purpose = TempObjectPurposePost
+		cleanupObjects = append(cleanupObjects, cleanupObject{key: key, rec: rec})
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, stacktrace.Propagate(err, "")
+	}
+	rows.Close()
+	keys := make([]string, 0, len(cleanupObjects))
+	for _, object := range cleanupObjects {
+		if err := QueueObjectCleanupTx(ctx, tx, object.rec); err != nil {
+			return nil, err
+		}
+		keys = append(keys, object.key)
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, stacktrace.Propagate(err, "")
