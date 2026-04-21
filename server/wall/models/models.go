@@ -10,7 +10,8 @@ type ListWallsRequest struct {
 }
 
 type GetWallProfileRequest struct {
-	WallID string `form:"wallId" binding:"required"`
+	WallID  string `form:"wallId" binding:"required"`
+	Version *int   `form:"version"`
 }
 
 type ListPostsRequest struct {

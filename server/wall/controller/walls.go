@@ -58,6 +58,24 @@ func (c *WallsController) GetProfile(ctx *gin.Context, req models.GetWallProfile
 	if err := c.auth.canViewWall(ctx.Request.Context(), viewer, wall); err != nil {
 		return nil, err
 	}
+	if req.Version != nil {
+		if *req.Version <= 0 {
+			return nil, ente.NewBadRequestWithMessage("invalid version")
+		}
+		if *req.Version != wall.CurrentVersion {
+			version, err := c.WallsRepo.GetVersion(ctx.Request.Context(), wall.WallID, *req.Version)
+			if err != nil {
+				return nil, err
+			}
+			return &models.WallProfileResponse{
+				WallID:           wall.WallID,
+				WallSlug:         wall.WallSlug,
+				Version:          version.Version,
+				EncryptedProfile: version.EncryptedProfile,
+				UpdatedAt:        formatMicros(version.CreatedAt),
+			}, nil
+		}
+	}
 	return &models.WallProfileResponse{
 		WallID:           wall.WallID,
 		WallSlug:         wall.WallSlug,

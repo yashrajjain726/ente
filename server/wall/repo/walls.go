@@ -246,6 +246,19 @@ func (r *WallsRepository) ListVersions(ctx context.Context, wallID string) ([]Wa
 	return versions, stacktrace.Propagate(rows.Err(), "")
 }
 
+func (r *WallsRepository) GetVersion(ctx context.Context, wallID string, version int) (*WallVersionRecord, error) {
+	row := r.DB.QueryRowContext(ctx, `
+		SELECT wall_id, version, encrypted_wall_key, encrypted_profile, wrapped_prev_key, created_at
+		FROM wall_key_versions
+		WHERE wall_id = $1 AND version = $2
+	`, wallID, version)
+	var rec WallVersionRecord
+	if err := row.Scan(&rec.WallID, &rec.Version, &rec.EncryptedWallKey, &rec.EncryptedProfile, &rec.WrappedPrevKey, &rec.CreatedAt); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return &rec, nil
+}
+
 func scanWallRecord(scanner interface{ Scan(dest ...any) error }) (*WallRecord, error) {
 	var rec WallRecord
 	if err := scanner.Scan(

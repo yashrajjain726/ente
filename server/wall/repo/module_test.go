@@ -558,6 +558,28 @@ func TestRotateKeyRevokesWallLinks(t *testing.T) {
 	require.Len(t, versions, 2)
 }
 
+func TestGetVersionReturnsHistoricalProfile(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key-v1", "alice-profile-v1")
+	require.NoError(t, err)
+	rotated, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", ptr("alice-profile-v2"))
+	require.NoError(t, err)
+	require.Equal(t, 2, rotated.CurrentVersion)
+
+	v1, err := module.Walls.GetVersion(ctx, wall.WallID, 1)
+	require.NoError(t, err)
+	require.Equal(t, 1, v1.Version)
+	require.Equal(t, "alice-profile-v1", v1.EncryptedProfile)
+
+	v2, err := module.Walls.GetVersion(ctx, wall.WallID, 2)
+	require.NoError(t, err)
+	require.Equal(t, 2, v2.Version)
+	require.Equal(t, "alice-profile-v2", v2.EncryptedProfile)
+}
+
 func TestCreateSessionRejectsStaleLinkAuthHash(t *testing.T) {
 	ctx := context.Background()
 	module := newWallTestModule(t)
