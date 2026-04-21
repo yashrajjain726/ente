@@ -1147,19 +1147,19 @@ impl WallLinkCtx {
             .map_err(Into::into)
     }
 
-    pub fn decrypt_post_key(&self, post: &PostResponse) -> Result<Vec<u8>> {
-        let packed = decode_b64(&post.encrypted_post_key)?;
-        decrypt_secretbox_packed(&self.wall_key, &packed)
-    }
-
-    pub async fn decrypt_post(&self, post: &PostResponse) -> Result<DecryptedPost> {
+    pub async fn decrypt_post_key(&self, post: &PostResponse) -> Result<Vec<u8>> {
         let wall_key = self
             .resolve_wall_key_for_version(Some(post.key_version))
             .await?
             .ok_or_else(|| {
                 WallError::InvalidInput(format!("missing wall key for post {}", post.post_id))
             })?;
-        let post_key = decrypt_secretbox_packed(&wall_key, &decode_b64(&post.encrypted_post_key)?)?;
+        let packed = decode_b64(&post.encrypted_post_key)?;
+        decrypt_secretbox_packed(&wall_key, &packed)
+    }
+
+    pub async fn decrypt_post(&self, post: &PostResponse) -> Result<DecryptedPost> {
+        let post_key = self.decrypt_post_key(post).await?;
         let caption_plaintext = if post.caption_cipher.is_empty() {
             None
         } else {
@@ -1574,6 +1574,76 @@ mod tests {
         assert!(matches!(err, WallError::Crypto(_)));
         lookup.assert_async().await;
         session.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn wall_link_decrypt_post_key_uses_post_version() {
+        let mut server = Server::new_async().await;
+        let current_wall_key = generate_key();
+        let previous_wall_key = generate_key();
+        let post_key = generate_key();
+        let wrapped_previous = encode_b64(
+            &encrypt_secretbox_packed(&current_wall_key, &previous_wall_key)
+                .expect("wrapped previous key"),
+        );
+        let versions = server
+            .mock("GET", "/wall/versions")
+            .match_header("x-auth-token", "link-token")
+            .match_query(Matcher::UrlEncoded(
+                "wallId".into(),
+                "wall_owner_gallery".into(),
+            ))
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "version": 2,
+                    "wrappedPrevKey": wrapped_previous,
+                    "createdAt": "2026-04-16T00:00:00Z"
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let ctx = WallLinkCtx {
+            client: build_http_client(
+                &server.url(),
+                Some("link-token".to_owned()),
+                None,
+                None,
+                None,
+            )
+            .expect("http client"),
+            owner_handle: "owner".to_owned(),
+            wall_id: "wall_owner_gallery".to_owned(),
+            wall_slug: "owner-gallery".to_owned(),
+            wall_key: current_wall_key,
+            key_version: 2,
+        };
+        let post = PostResponse {
+            post_id: 42,
+            wall_id: "wall_owner_gallery".to_owned(),
+            wall_slug: "owner-gallery".to_owned(),
+            author: "owner-gallery".to_owned(),
+            encrypted_post_key: encode_b64(
+                &encrypt_secretbox_packed(&previous_wall_key, &post_key)
+                    .expect("encrypted post key"),
+            ),
+            caption_cipher: String::new(),
+            key_version: 1,
+            objects: Vec::new(),
+            created_at: "2026-04-16T00:00:00Z".to_owned(),
+            likes: 0,
+            viewer_liked: false,
+            comments: 0,
+        };
+
+        let decrypted = ctx
+            .decrypt_post_key(&post)
+            .await
+            .expect("historical post key should decrypt");
+
+        assert_eq!(decrypted, post_key);
+        versions.assert_async().await;
     }
 
     #[tokio::test]
