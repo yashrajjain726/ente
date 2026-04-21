@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"testing"
 
 	"github.com/ente-io/museum/internal/testutil"
@@ -163,9 +164,10 @@ func TestWallModuleLifecycle(t *testing.T) {
 	_, err = module.Posts.CreateComment(ctx, postID, aliceID, "reply-1", &comment.CommentID)
 	require.NoError(t, err)
 
-	comments, err := module.Posts.ListTopLevelComments(ctx, postID, bobID, "", 20)
+	comments, nextCommentsCursor, err := module.Posts.ListTopLevelComments(ctx, postID, bobID, "", 20)
 	require.NoError(t, err)
 	require.Len(t, comments, 1)
+	require.Empty(t, nextCommentsCursor)
 
 	replies, err := module.Posts.ListReplies(ctx, postID, bobID, []int64{comment.CommentID})
 	require.NoError(t, err)
@@ -277,6 +279,37 @@ func TestRotateKeyRevokesWallLinks(t *testing.T) {
 	versions, err := module.Walls.ListVersions(ctx, wall.WallID)
 	require.NoError(t, err)
 	require.Len(t, versions, 2)
+}
+
+func TestListTopLevelCommentsPaginates(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	postID, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+
+	first, err := module.Posts.CreateComment(ctx, postID, aliceID, "comment-1", nil)
+	require.NoError(t, err)
+	second, err := module.Posts.CreateComment(ctx, postID, aliceID, "comment-2", nil)
+	require.NoError(t, err)
+	third, err := module.Posts.CreateComment(ctx, postID, aliceID, "comment-3", nil)
+	require.NoError(t, err)
+
+	page, nextCursor, err := module.Posts.ListTopLevelComments(ctx, postID, aliceID, "", 2)
+	require.NoError(t, err)
+	require.Len(t, page, 2)
+	require.Equal(t, third.CommentID, page[0].CommentID)
+	require.Equal(t, second.CommentID, page[1].CommentID)
+	require.Equal(t, strconv.FormatInt(second.CommentID, 10), nextCursor)
+
+	page, nextCursor, err = module.Posts.ListTopLevelComments(ctx, postID, aliceID, nextCursor, 2)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
+	require.Equal(t, first.CommentID, page[0].CommentID)
+	require.Empty(t, nextCursor)
 }
 
 func ptr(value string) *string {

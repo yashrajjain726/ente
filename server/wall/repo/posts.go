@@ -261,7 +261,7 @@ func (r *PostsRepository) GetComment(ctx context.Context, commentID, viewerID in
 	`, commentID, viewerID))
 }
 
-func (r *PostsRepository) ListTopLevelComments(ctx context.Context, postID, viewerID int64, cursor string, limit int) ([]WallCommentRecord, error) {
+func (r *PostsRepository) ListTopLevelComments(ctx context.Context, postID, viewerID int64, cursor string, limit int) ([]WallCommentRecord, string, error) {
 	limit = optionalInt(limit, 20)
 	if limit > 100 {
 		limit = 100
@@ -279,22 +279,30 @@ func (r *PostsRepository) ListTopLevelComments(ctx context.Context, postID, view
 			query += ` AND c.comment_id < $3`
 		}
 	}
-	args = append(args, limit)
+	args = append(args, limit+1)
 	query += ` ORDER BY c.comment_id DESC LIMIT $` + strconv.Itoa(len(args))
 	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return nil, "", stacktrace.Propagate(err, "")
 	}
 	defer rows.Close()
 	var out []WallCommentRecord
 	for rows.Next() {
 		rec, err := scanCommentRecord(rows)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		out = append(out, *rec)
 	}
-	return out, stacktrace.Propagate(rows.Err(), "")
+	if err := rows.Err(); err != nil {
+		return nil, "", stacktrace.Propagate(err, "")
+	}
+	nextCursor := ""
+	if len(out) > limit {
+		nextCursor = strconv.FormatInt(out[limit-1].CommentID, 10)
+		out = out[:limit]
+	}
+	return out, nextCursor, nil
 }
 
 func (r *PostsRepository) ListReplies(ctx context.Context, postID, viewerID int64, parentIDs []int64) (map[int64][]WallCommentRecord, error) {

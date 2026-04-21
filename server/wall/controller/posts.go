@@ -235,7 +235,8 @@ func (c *PostsController) ListComments(ctx *gin.Context, postID string) (*models
 	if err := c.auth.canViewWall(ctx.Request.Context(), viewer, wall); err != nil {
 		return nil, err
 	}
-	comments, err := c.PostsRepo.ListTopLevelComments(ctx.Request.Context(), id, viewerID, ctx.Query("cursor"), 20)
+	limit, _ := strconv.Atoi(strings.TrimSpace(ctx.Query("limit")))
+	comments, nextCursor, err := c.PostsRepo.ListTopLevelComments(ctx.Request.Context(), id, viewerID, ctx.Query("cursor"), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +257,7 @@ func (c *PostsController) ListComments(ctx *gin.Context, postID string) (*models
 		}
 		resp = append(resp, toCommentResponse(comment, replyResp))
 	}
-	return &models.ListCommentsResponse{Comments: resp}, nil
+	return &models.ListCommentsResponse{Comments: resp, NextCursor: nextCursor}, nil
 }
 
 func (c *PostsController) CreateComment(ctx *gin.Context, postID string, req models.CreateCommentRequest) (*models.CommentResponse, error) {
