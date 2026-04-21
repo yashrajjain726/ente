@@ -58,7 +58,7 @@ func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID in
 	`, postID, viewerID))
 }
 
-func (r *PostsRepository) ListPostsByWall(ctx context.Context, wallID string, viewerID int64, cursor string, limit int) ([]WallPostRecord, error) {
+func (r *PostsRepository) ListPostsByWall(ctx context.Context, wallID string, viewerID int64, cursor string, limit int) ([]WallPostRecord, string, error) {
 	limit = optionalInt(limit, 50)
 	if limit > 100 {
 		limit = 100
@@ -80,22 +80,30 @@ func (r *PostsRepository) ListPostsByWall(ctx context.Context, wallID string, vi
 			query += ` AND p.post_id < $3`
 		}
 	}
-	args = append(args, limit)
+	args = append(args, limit+1)
 	query += ` ORDER BY p.created_at DESC, p.post_id DESC LIMIT $` + strconv.Itoa(len(args))
 	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return nil, "", stacktrace.Propagate(err, "")
 	}
 	defer rows.Close()
 	var out []WallPostRecord
 	for rows.Next() {
 		rec, err := scanPostRecord(rows)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		out = append(out, *rec)
 	}
-	return out, stacktrace.Propagate(rows.Err(), "")
+	if err := rows.Err(); err != nil {
+		return nil, "", stacktrace.Propagate(err, "")
+	}
+	nextCursor := ""
+	if len(out) > limit {
+		nextCursor = strconv.FormatInt(out[limit-1].PostID, 10)
+		out = out[:limit]
+	}
+	return out, nextCursor, nil
 }
 
 func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor string, limit int) ([]WallPostRecord, string, error) {

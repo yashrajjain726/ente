@@ -269,6 +269,11 @@ type PostResponse struct {
 	Comments         int64               `json:"comments"`
 }
 
+type PostPage struct {
+	Items      []PostResponse `json:"items"`
+	NextCursor string         `json:"nextCursor,omitempty"`
+}
+
 type FeedPage struct {
 	Items      []PostResponse `json:"items"`
 	NextCursor string         `json:"nextCursor,omitempty"`

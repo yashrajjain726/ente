@@ -233,12 +233,13 @@ async fn wall_bootstrap_posts_follow_share_and_link_suite() {
         .expect("link session should decrypt profile");
     assert_eq!(link_profile.profile, updated_profile);
     let link_posts = link_ctx
-        .list_posts(None)
+        .list_posts(None, None)
         .await
         .expect("link session should list posts");
-    assert_eq!(link_posts.len(), 1);
+    assert_eq!(link_posts.items.len(), 1);
+    assert!(link_posts.next_cursor.is_empty());
     let link_post = link_ctx
-        .decrypt_post(&link_posts[0])
+        .decrypt_post(&link_posts.items[0])
         .await
         .expect("link session should decrypt post");
     assert_eq!(

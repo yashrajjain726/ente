@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strconv"
 	"strings"
@@ -136,6 +137,62 @@ func (r *FollowRepository) UpsertShare(ctx context.Context, wallID string, follo
 		    key_version = EXCLUDED.key_version
 	`, wallID, followerID, encryptedWallKey, keyVersion)
 	return stacktrace.Propagate(err, "")
+}
+
+func (r *FollowRepository) ApproveRequest(ctx context.Context, requestID int64, wallID string, encryptedWallKey string, keyVersion int) (*WallFollowRequestRecord, error) {
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
+
+	rec, err := scanFollowRequest(tx.QueryRowContext(ctx, `
+		SELECT r.request_id, r.requester_id, r.target_wall_id, r.status, r.created_at, r.updated_at,
+		       requester_wall.wall_slug,
+		       ka.public_key,
+		       target_wall.wall_slug
+		FROM wall_follow_requests r
+		JOIN walls requester_wall ON requester_wall.owner_id = r.requester_id
+		JOIN key_attributes ka ON ka.user_id = r.requester_id
+		JOIN walls target_wall ON target_wall.wall_id = r.target_wall_id
+		WHERE r.request_id = $1 AND r.target_wall_id = $2 AND r.status = 'pending'
+		FOR UPDATE OF r
+	`, requestID, wallID))
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO wall_follow_shares (wall_id, follower_id, encrypted_wall_key, key_version)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (wall_id, follower_id) DO UPDATE
+		SET encrypted_wall_key = EXCLUDED.encrypted_wall_key,
+		    key_version = EXCLUDED.key_version
+	`, wallID, rec.RequesterID, encryptedWallKey, keyVersion); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+
+	res, err := tx.ExecContext(ctx, `
+		UPDATE wall_follow_requests
+		SET status = 'approved'
+		WHERE request_id = $1 AND status = 'pending'
+	`, requestID)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if affected == 0 {
+		return nil, sql.ErrNoRows
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	rec.Status = "approved"
+	return rec, nil
 }
 
 func (r *FollowRepository) DeleteShareByWallAndFollower(ctx context.Context, wallID string, followerID int64) error {

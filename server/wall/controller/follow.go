@@ -1,11 +1,14 @@
 package controller
 
 import (
+	"database/sql"
+	"errors"
 	"strings"
 
 	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/wall/models"
 	"github.com/ente-io/museum/wall/repo"
+	"github.com/ente-io/stacktrace"
 	"github.com/gin-gonic/gin"
 )
 
@@ -134,24 +137,21 @@ func (c *FollowController) Approve(ctx *gin.Context, req models.ApproveFollowPay
 	if err != nil {
 		return nil, err
 	}
-	record, err := c.FollowRepo.GetRequest(ctx.Request.Context(), req.RequestID)
-	if err != nil {
-		return nil, err
+	if req.RequestID <= 0 || strings.TrimSpace(req.WallID) == "" || strings.TrimSpace(req.EncryptedWallKey) == "" {
+		return nil, ente.NewBadRequestWithMessage("requestId, wallId and encryptedWallKey are required")
 	}
 	wall, err := c.auth.requireWallOwner(ctx.Request.Context(), userID, req.WallID)
 	if err != nil {
 		return nil, err
 	}
-	if record.TargetWallID != wall.WallID {
-		return nil, ente.ErrPermissionDenied
-	}
-	if err := c.FollowRepo.UpsertShare(ctx.Request.Context(), wall.WallID, record.RequesterID, req.EncryptedWallKey, wall.CurrentVersion); err != nil {
+	record, err := c.FollowRepo.ApproveRequest(ctx.Request.Context(), req.RequestID, wall.WallID, req.EncryptedWallKey, wall.CurrentVersion)
+	if err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, ente.NewBadRequestWithMessage("follow request is not pending")
+		}
 		return nil, err
 	}
-	if err := c.FollowRepo.UpdateRequestStatus(ctx.Request.Context(), req.RequestID, "approved"); err != nil {
-		return nil, err
-	}
-	return &models.FollowRequestCreatedResponse{RequestID: req.RequestID, Status: "approved"}, nil
+	return &models.FollowRequestCreatedResponse{RequestID: record.RequestID, Status: record.Status}, nil
 }
 
 func (c *FollowController) Reject(ctx *gin.Context, req models.RejectFollowPayload) error {

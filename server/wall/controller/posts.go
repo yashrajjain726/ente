@@ -2,12 +2,14 @@ package controller
 
 import (
 	"database/sql"
+	"errors"
 	"strconv"
 	"strings"
 
 	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/wall/models"
 	"github.com/ente-io/museum/wall/repo"
+	"github.com/ente-io/stacktrace"
 	"github.com/gin-gonic/gin"
 )
 
@@ -56,7 +58,7 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 	return &models.CreatePostResponse{PostID: postID}, nil
 }
 
-func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) ([]models.PostResponse, error) {
+func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*models.PostPage, error) {
 	viewer, err := c.auth.resolveViewer(ctx)
 	if err != nil {
 		return nil, err
@@ -72,7 +74,7 @@ func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) ([
 	if viewer != nil {
 		viewerID = viewer.UserID
 	}
-	posts, err := c.PostsRepo.ListPostsByWall(ctx.Request.Context(), wall.WallID, viewerID, req.Cursor, req.Limit)
+	posts, nextCursor, err := c.PostsRepo.ListPostsByWall(ctx.Request.Context(), wall.WallID, viewerID, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +90,10 @@ func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) ([
 	for _, post := range posts {
 		resp = append(resp, *toPostResponse(&post, assetsByPost[post.PostID]))
 	}
-	return resp, nil
+	return &models.PostPage{
+		Items:      resp,
+		NextCursor: nextCursor,
+	}, nil
 }
 
 func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest) (*models.FeedPage, error) {
@@ -282,6 +287,21 @@ func (c *PostsController) CreateComment(ctx *gin.Context, postID string, req mod
 	}
 	if err := c.auth.canViewWall(ctx.Request.Context(), &viewerAuth{UserID: userID}, wall); err != nil {
 		return nil, err
+	}
+	if req.ParentCommentID != nil {
+		if *req.ParentCommentID <= 0 {
+			return nil, ente.NewBadRequestWithMessage("invalid parentCommentId")
+		}
+		parent, err := c.PostsRepo.GetComment(ctx.Request.Context(), *req.ParentCommentID, userID)
+		if err != nil {
+			if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+				return nil, ente.NewBadRequestWithMessage("invalid parentCommentId")
+			}
+			return nil, err
+		}
+		if parent.PostID != id || parent.ParentCommentID.Valid {
+			return nil, ente.NewBadRequestWithMessage("invalid parentCommentId")
+		}
 	}
 	comment, err := c.PostsRepo.CreateComment(ctx.Request.Context(), id, userID, req.CommentCipher, req.ParentCommentID)
 	if err != nil {

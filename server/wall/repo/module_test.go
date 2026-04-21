@@ -307,6 +307,68 @@ func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
 	requireQueuedTempObject(t, module, "wall/alice/avatar-new", TempObjectPurposeAvatar, "b2-us-west")
 }
 
+func TestApproveRequestCreatesShareAndMarksRequestApproved(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+	request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
+	require.NoError(t, err)
+
+	approved, err := module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "share-key", aliceWall.CurrentVersion)
+	require.NoError(t, err)
+	require.Equal(t, request.RequestID, approved.RequestID)
+	require.Equal(t, "approved", approved.Status)
+
+	share, err := module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
+	require.NoError(t, err)
+	require.Equal(t, "share-key", share.EncryptedWallKey)
+	require.Equal(t, aliceWall.CurrentVersion, share.KeyVersion)
+
+	stored, err := module.Follow.GetRequest(ctx, request.RequestID)
+	require.NoError(t, err)
+	require.Equal(t, "approved", stored.Status)
+}
+
+func TestApproveRequestRejectsStaleRequestStates(t *testing.T) {
+	for _, status := range []string{"cancelled", "rejected", "unfollowed", "approved"} {
+		t.Run(status, func(t *testing.T) {
+			ctx := context.Background()
+			module := newWallTestModule(t)
+
+			aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+			bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
+			aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+			require.NoError(t, err)
+			_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
+			require.NoError(t, err)
+			request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
+			require.NoError(t, err)
+
+			if status == "approved" {
+				_, err = module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "initial-share-key", aliceWall.CurrentVersion)
+				require.NoError(t, err)
+				err = module.Follow.DeleteShareByWallAndFollower(ctx, aliceWall.WallID, bobID)
+				require.NoError(t, err)
+			} else {
+				err = module.Follow.UpdateRequestStatus(ctx, request.RequestID, status)
+				require.NoError(t, err)
+			}
+
+			approved, err := module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "stale-share-key", aliceWall.CurrentVersion)
+			require.Nil(t, approved)
+			require.ErrorIs(t, err, sql.ErrNoRows)
+			_, err = module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
+			require.ErrorIs(t, err, sql.ErrNoRows)
+		})
+	}
+}
+
 func TestRotateKeyRevokesWallLinks(t *testing.T) {
 	ctx := context.Background()
 	module := newWallTestModule(t)
@@ -413,6 +475,34 @@ func TestUpsertLinkRejectsStaleKeyVersion(t *testing.T) {
 
 	_, err = module.Links.GetLink(ctx, wall.WallID)
 	require.Error(t, err)
+}
+
+func TestListPostsByWallPaginates(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	first, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-1", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	second, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-2", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+	third, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-3", nil, wall.CurrentVersion, nil)
+	require.NoError(t, err)
+
+	page, nextCursor, err := module.Posts.ListPostsByWall(ctx, wall.WallID, aliceID, "", 2)
+	require.NoError(t, err)
+	require.Len(t, page, 2)
+	require.Equal(t, third, page[0].PostID)
+	require.Equal(t, second, page[1].PostID)
+	require.Equal(t, strconv.FormatInt(second, 10), nextCursor)
+
+	page, nextCursor, err = module.Posts.ListPostsByWall(ctx, wall.WallID, aliceID, nextCursor, 2)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
+	require.Equal(t, first, page[0].PostID)
+	require.Empty(t, nextCursor)
 }
 
 func TestListTopLevelCommentsPaginates(t *testing.T) {

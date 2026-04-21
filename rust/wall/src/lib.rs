@@ -14,8 +14,8 @@ pub use models::{
 pub use transport::{
     CommentResponse, CommunityResponse, CommunityUserResponse, EntityKeyPayload,
     FollowRequestCreatedResponse, FollowRequestResponse, FollowShareResponse,
-    OutgoingFollowRequestResponse, PostObjectPayload, PostResponse, PresignUploadResponse,
-    ProfileAvatarPayload, ProfileAvatarResponse, WallFollowerResponse, WallKeyResponse,
-    WallKeyVersionResponse, WallLinkLoginResponse, WallLinkStatusResponse, WallLookupResponse,
-    WallProfileResponse,
+    OutgoingFollowRequestResponse, PostObjectPayload, PostPage, PostResponse,
+    PresignUploadResponse, ProfileAvatarPayload, ProfileAvatarResponse, WallFollowerResponse,
+    WallKeyResponse, WallKeyVersionResponse, WallLinkLoginResponse, WallLinkStatusResponse,
+    WallLookupResponse, WallProfileResponse,
 };

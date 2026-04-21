@@ -18,7 +18,7 @@ use crate::transport::{
     CreatePostResponse, CreateWallRequest, EntityKeyPayload, EntityKeyResponse,
     FollowRequestCreatedResponse, FollowRequestPayload, FollowRequestResponse, FollowShareResponse,
     LikePostRequest, LikePostResponse, ListCommentsResponse, OutgoingFollowRequestResponse,
-    PostObjectPayload, PostResponse, PresignUploadRequest, PresignUploadResponse,
+    PostObjectPayload, PostPage, PostResponse, PresignUploadRequest, PresignUploadResponse,
     ProfileAvatarPayload, RefreshFollowSharesRequest, RejectFollowPayload, RotateWallKeyRequest,
     ShareUpdatePayload, UpdatePostCaptionRequest, UpdateWallProfileRequest,
     UpdateWallProfileResponse, UpdateWallSlugRequest, WallFollowerResponse, WallKeyResponse,
@@ -559,8 +559,16 @@ impl AccountWallCtx {
         Ok((response.post_id, post_key_bytes))
     }
 
-    pub async fn list_posts(&self, wall_id: &str, limit: Option<i32>) -> Result<Vec<PostResponse>> {
+    pub async fn list_posts(
+        &self,
+        wall_id: &str,
+        cursor: Option<String>,
+        limit: Option<i32>,
+    ) -> Result<PostPage> {
         let mut query = vec![("wallId", wall_id.to_owned())];
+        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
+            query.push(("cursor", value));
+        }
         if let Some(value) = limit {
             query.push(("limit", value.to_string()));
         }
@@ -1122,8 +1130,11 @@ impl WallLinkCtx {
         decrypt_wall_profile(&profile, &wall_key)
     }
 
-    pub async fn list_posts(&self, limit: Option<i32>) -> Result<Vec<PostResponse>> {
+    pub async fn list_posts(&self, cursor: Option<String>, limit: Option<i32>) -> Result<PostPage> {
         let mut query = vec![("wallId", self.wall_id.clone())];
+        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
+            query.push(("cursor", value));
+        }
         if let Some(value) = limit {
             query.push(("limit", value.to_string()));
         }
@@ -1876,6 +1887,54 @@ mod tests {
         assert_eq!(page.items[0].post_id, 42);
         assert_eq!(page.next_cursor, "cursor-2");
         feed.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn list_posts_uses_wall_posts_page_endpoint() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let posts = server
+            .mock("GET", "/wall/posts")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::AllOf(vec![
+                Matcher::UrlEncoded("wallId".into(), "wall_owner_gallery".into()),
+                Matcher::UrlEncoded("cursor".into(), "42".into()),
+                Matcher::UrlEncoded("limit".into(), "5".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "items": [{
+                        "postId": 41,
+                        "wallId": "wall_owner_gallery",
+                        "wallSlug": "owner-gallery",
+                        "ownerUserId": 7,
+                        "author": "owner-gallery",
+                        "encryptedPostKey": "cGFja2Vk",
+                        "captionCipher": "",
+                        "keyVersion": 3,
+                        "objects": [],
+                        "createdAt": "2026-04-16T00:00:00Z",
+                        "likes": 2,
+                        "viewerLiked": true,
+                        "comments": 1
+                    }],
+                    "nextCursor": "41"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let page = ctx
+            .list_posts("wall_owner_gallery", Some("42".to_owned()), Some(5))
+            .await
+            .expect("post page should load");
+
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].post_id, 41);
+        assert_eq!(page.next_cursor, "41");
+        posts.assert_async().await;
     }
 
     #[tokio::test]

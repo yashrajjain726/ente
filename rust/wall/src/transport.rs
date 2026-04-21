@@ -147,6 +147,14 @@ pub struct PostResponse {
     pub comments: i64,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PostPage {
+    pub items: Vec<PostResponse>,
+    #[serde(default)]
+    pub next_cursor: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateCommentRequest {
