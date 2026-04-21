@@ -140,23 +140,53 @@ func (r *FollowRepository) UpsertShare(ctx context.Context, wallID string, follo
 }
 
 func (r *FollowRepository) UpdateShare(ctx context.Context, wallID string, followerID int64, encryptedWallKey string, keyVersion int) error {
-	res, err := r.DB.ExecContext(ctx, `
+	return r.UpdateShares(ctx, wallID, []WallShareUpdateRecord{
+		{FollowerID: followerID, EncryptedWallKey: encryptedWallKey},
+	}, keyVersion)
+}
+
+func (r *FollowRepository) UpdateShares(ctx context.Context, wallID string, shares []WallShareUpdateRecord, keyVersion int) error {
+	if len(shares) == 0 {
+		return nil
+	}
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
+
+	var currentVersion int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT current_version
+		FROM walls
+		WHERE wall_id = $1
+		FOR UPDATE
+	`, wallID).Scan(&currentVersion); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if currentVersion != keyVersion {
+		return sql.ErrNoRows
+	}
+
+	for _, share := range shares {
+		res, err := tx.ExecContext(ctx, `
 		UPDATE wall_follow_shares
 		SET encrypted_wall_key = $3,
 		    key_version = $4
 		WHERE wall_id = $1 AND follower_id = $2
-	`, wallID, followerID, encryptedWallKey, keyVersion)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
+	`, wallID, share.FollowerID, share.EncryptedWallKey, keyVersion)
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		if affected == 0 {
+			return sql.ErrNoRows
+		}
 	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	if affected == 0 {
-		return sql.ErrNoRows
-	}
-	return nil
+	return stacktrace.Propagate(tx.Commit(), "")
 }
 
 func (r *FollowRepository) ApproveRequest(ctx context.Context, requestID int64, wallID string, encryptedWallKey string, keyVersion int) (*WallFollowRequestRecord, error) {
@@ -166,8 +196,21 @@ func (r *FollowRepository) ApproveRequest(ctx context.Context, requestID int64, 
 	}
 	defer tx.Rollback()
 
+	var currentVersion int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT current_version
+		FROM walls
+		WHERE wall_id = $1
+		FOR UPDATE
+	`, wallID).Scan(&currentVersion); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if currentVersion != keyVersion {
+		return nil, sql.ErrNoRows
+	}
+
 	rec, err := scanFollowRequest(tx.QueryRowContext(ctx, `
-		SELECT r.request_id, r.requester_id, r.target_wall_id, r.status, r.created_at, r.updated_at,
+			SELECT r.request_id, r.requester_id, r.target_wall_id, r.status, r.created_at, r.updated_at,
 		       requester_wall.wall_slug,
 		       ka.public_key,
 		       target_wall.wall_slug

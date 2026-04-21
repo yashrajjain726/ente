@@ -383,20 +383,93 @@ func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
 	err = module.Follow.UpsertShare(ctx, aliceWall.WallID, bobID, "share-key-v1", aliceWall.CurrentVersion)
 	require.NoError(t, err)
 
-	err = module.Follow.UpdateShare(ctx, aliceWall.WallID, bobID, "share-key-v2", aliceWall.CurrentVersion+1)
+	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	require.NoError(t, err)
+
+	err = module.Follow.UpdateShare(ctx, aliceWall.WallID, bobID, "share-key-v2", rotatedWall.CurrentVersion)
 	require.NoError(t, err)
 	share, err := module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
 	require.NoError(t, err)
 	require.Equal(t, "share-key-v2", share.EncryptedWallKey)
-	require.Equal(t, aliceWall.CurrentVersion+1, share.KeyVersion)
+	require.Equal(t, rotatedWall.CurrentVersion, share.KeyVersion)
 
 	err = module.Follow.DeleteShareByWallAndFollower(ctx, aliceWall.WallID, bobID)
 	require.NoError(t, err)
-	err = module.Follow.UpdateShare(ctx, aliceWall.WallID, bobID, "stale-share-key", aliceWall.CurrentVersion+2)
+	err = module.Follow.UpdateShare(ctx, aliceWall.WallID, bobID, "stale-share-key", rotatedWall.CurrentVersion)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
 	_, err = module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
 	require.ErrorIs(t, err, sql.ErrNoRows)
+}
+
+func TestCreatePostRejectsStaleKeyVersion(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	_, err = module.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	require.NoError(t, err)
+
+	postID, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-stale", nil, wall.CurrentVersion, nil)
+	require.Zero(t, postID)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
+	posts, next, err := module.Posts.ListPostsByWall(ctx, wall.WallID, aliceID, "", 20)
+	require.NoError(t, err)
+	require.Empty(t, next)
+	require.Empty(t, posts)
+}
+
+func TestApproveRequestRejectsStaleKeyVersion(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+	request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
+	require.NoError(t, err)
+	_, err = module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	require.NoError(t, err)
+
+	approved, err := module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "stale-share-key", aliceWall.CurrentVersion)
+	require.Nil(t, approved)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
+	stored, err := module.Follow.GetRequest(ctx, request.RequestID)
+	require.NoError(t, err)
+	require.Equal(t, "pending", stored.Status)
+	_, err = module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+}
+
+func TestUpdateShareRejectsStaleKeyVersion(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+	err = module.Follow.UpsertShare(ctx, aliceWall.WallID, bobID, "share-key-v1", aliceWall.CurrentVersion)
+	require.NoError(t, err)
+	_, err = module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	require.NoError(t, err)
+
+	err = module.Follow.UpdateShare(ctx, aliceWall.WallID, bobID, "stale-share-key", aliceWall.CurrentVersion)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
+	share, err := module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
+	require.NoError(t, err)
+	require.Equal(t, "share-key-v1", share.EncryptedWallKey)
+	require.Equal(t, aliceWall.CurrentVersion, share.KeyVersion)
 }
 
 func TestRotateKeyRevokesWallLinks(t *testing.T) {

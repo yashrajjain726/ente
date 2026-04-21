@@ -99,6 +99,7 @@ pub struct PostObjectPayload {
 pub struct CreatePostRequest {
     pub wall_id: String,
     pub encrypted_post_key: String,
+    pub key_version: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub caption_cipher: Option<String>,
     pub objects: Vec<PostObjectPayload>,
@@ -314,6 +315,7 @@ pub struct ApproveFollowPayload {
     pub request_id: i64,
     pub wall_id: String,
     pub encrypted_wall_key: String,
+    pub key_version: i32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -349,6 +351,7 @@ pub struct ShareUpdatePayload {
 #[serde(rename_all = "camelCase")]
 pub struct RefreshFollowSharesRequest {
     pub wall_id: String,
+    pub key_version: i32,
     pub shares: Vec<ShareUpdatePayload>,
 }
 

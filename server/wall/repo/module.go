@@ -130,6 +130,11 @@ type WallShareRecord struct {
 	PublicKey        string
 }
 
+type WallShareUpdateRecord struct {
+	FollowerID       int64
+	EncryptedWallKey string
+}
+
 type WallFollowerRecord struct {
 	FollowerID int64
 	Username   string

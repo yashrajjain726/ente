@@ -15,6 +15,18 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, wallID,
 		return 0, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
+	var currentVersion int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT current_version
+		FROM walls
+		WHERE owner_id = $1 AND wall_id = $2
+		FOR UPDATE
+	`, ownerID, wallID).Scan(&currentVersion); err != nil {
+		return 0, stacktrace.Propagate(err, "")
+	}
+	if currentVersion != keyVersion {
+		return 0, sql.ErrNoRows
+	}
 	caption := ""
 	if captionCipher != nil {
 		caption = *captionCipher

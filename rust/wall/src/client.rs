@@ -549,6 +549,7 @@ impl AccountWallCtx {
                 &access.wall_key,
                 &post_key_bytes,
             )?),
+            key_version: access.key_version,
             caption_cipher,
             objects: objects.to_vec(),
         };
@@ -832,6 +833,7 @@ impl AccountWallCtx {
             request_id: request.request_id,
             wall_id: request.wall_id.clone(),
             encrypted_wall_key: encode_b64(&pack_payload(&sealed_share, &[])),
+            key_version: access.key_version,
         };
         self.client
             .post_json("/wall/follow/approve", &payload)
@@ -922,6 +924,7 @@ impl AccountWallCtx {
         }
         let payload = RefreshFollowSharesRequest {
             wall_id: wall_id.to_owned(),
+            key_version: access.key_version,
             shares: updates,
         };
         let updated = payload.shares.len();
@@ -1617,6 +1620,142 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn create_post_includes_wall_key_version() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let root_wall_key = generate_key();
+        let wall_key = generate_key();
+        let entity_payload =
+            encrypt_entity_key(&ctx.master_key, &root_wall_key).expect("root wall entity");
+
+        let entity = server
+            .mock("GET", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "type".into(),
+                ROOT_WALL_KEY_TYPE.into(),
+            ))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "type": ROOT_WALL_KEY_TYPE,
+                    "encryptedKey": entity_payload.encrypted_key,
+                    "header": entity_payload.header,
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let walls = server
+            .mock("GET", "/wall")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "wallId": "wall_owner_main",
+                    "wallSlug": "owner-main",
+                    "encryptedWallKey": encode_b64(&encrypt_secretbox_packed(&root_wall_key, &wall_key).expect("wall key wrap")),
+                    "encryptedProfile": "",
+                    "keyVersion": 3
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let create = server
+            .mock("POST", "/wall/posts")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::Regex("\"keyVersion\":3".into()))
+            .with_status(200)
+            .with_body(json!({"postId": 42}).to_string())
+            .create_async()
+            .await;
+
+        let (post_id, _) = ctx
+            .create_post("wall_owner_main", &[], None, None)
+            .await
+            .expect("post creation should send key version");
+
+        assert_eq!(post_id, 42);
+        entity.assert_async().await;
+        walls.assert_async().await;
+        create.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn approve_follow_request_includes_wall_key_version() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let root_wall_key = generate_key();
+        let wall_key = generate_key();
+        let (follower_public_key, _) = keys::generate_keypair().expect("valid follower keypair");
+        let entity_payload =
+            encrypt_entity_key(&ctx.master_key, &root_wall_key).expect("root wall entity");
+
+        let entity = server
+            .mock("GET", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "type".into(),
+                ROOT_WALL_KEY_TYPE.into(),
+            ))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "type": ROOT_WALL_KEY_TYPE,
+                    "encryptedKey": entity_payload.encrypted_key,
+                    "header": entity_payload.header,
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let walls = server
+            .mock("GET", "/wall")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "wallId": "wall_owner_main",
+                    "wallSlug": "owner-main",
+                    "encryptedWallKey": encode_b64(&encrypt_secretbox_packed(&root_wall_key, &wall_key).expect("wall key wrap")),
+                    "encryptedProfile": "",
+                    "keyVersion": 3
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let approve = server
+            .mock("POST", "/wall/follow/approve")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::Regex("\"keyVersion\":3".into()))
+            .with_status(200)
+            .with_body(json!({"requestId": 11, "status": "approved"}).to_string())
+            .create_async()
+            .await;
+        let request = FollowRequestResponse {
+            request_id: 11,
+            follower: "viewer".to_owned(),
+            wall_id: "wall_owner_main".to_owned(),
+            wall_slug: "owner-main".to_owned(),
+            follower_public_key: encode_b64(&follower_public_key),
+            status: "pending".to_owned(),
+            created_at: "2026-04-16T00:00:00Z".to_owned(),
+        };
+
+        let response = ctx
+            .approve_follow_request(&request)
+            .await
+            .expect("approval should send key version");
+
+        assert_eq!(response.request_id, 11);
+        entity.assert_async().await;
+        walls.assert_async().await;
+        approve.assert_async().await;
+    }
+
+    #[tokio::test]
     async fn follow_request_helpers_use_explicit_incoming_and_outgoing_routes() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
@@ -1826,7 +1965,10 @@ mod tests {
         let refresh = server
             .mock("POST", "/wall/follow/shares/refresh")
             .match_header("x-auth-token", "token")
-            .match_body(Matcher::Regex("\"followerId\":7".into()))
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"followerId\":7".into()),
+                Matcher::Regex("\"keyVersion\":3".into()),
+            ]))
             .with_status(200)
             .create_async()
             .await;

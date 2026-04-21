@@ -112,6 +112,7 @@ type ApproveFollowPayload struct {
 	RequestID        int64  `json:"requestId"`
 	WallID           string `json:"wallId"`
 	EncryptedWallKey string `json:"encryptedWallKey"`
+	KeyVersion       int    `json:"keyVersion"`
 }
 
 type RejectFollowPayload struct {
@@ -213,8 +214,9 @@ type WallFollowerResponse struct {
 }
 
 type RefreshFollowSharesRequest struct {
-	WallID string               `json:"wallId"`
-	Shares []ShareUpdatePayload `json:"shares"`
+	WallID     string               `json:"wallId"`
+	KeyVersion int                  `json:"keyVersion"`
+	Shares     []ShareUpdatePayload `json:"shares"`
 }
 
 type ShareUpdatePayload struct {
@@ -225,6 +227,7 @@ type ShareUpdatePayload struct {
 type CreatePostRequest struct {
 	WallID           string              `json:"wallId"`
 	EncryptedPostKey string              `json:"encryptedPostKey"`
+	KeyVersion       int                 `json:"keyVersion"`
 	CaptionCipher    *string             `json:"captionCipher,omitempty"`
 	Objects          []PostObjectPayload `json:"objects"`
 }

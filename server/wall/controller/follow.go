@@ -137,17 +137,17 @@ func (c *FollowController) Approve(ctx *gin.Context, req models.ApproveFollowPay
 	if err != nil {
 		return nil, err
 	}
-	if req.RequestID <= 0 || strings.TrimSpace(req.WallID) == "" || strings.TrimSpace(req.EncryptedWallKey) == "" {
-		return nil, ente.NewBadRequestWithMessage("requestId, wallId and encryptedWallKey are required")
+	if req.RequestID <= 0 || strings.TrimSpace(req.WallID) == "" || strings.TrimSpace(req.EncryptedWallKey) == "" || req.KeyVersion <= 0 {
+		return nil, ente.NewBadRequestWithMessage("requestId, wallId, encryptedWallKey and keyVersion are required")
 	}
 	wall, err := c.auth.requireWallOwner(ctx.Request.Context(), userID, req.WallID)
 	if err != nil {
 		return nil, err
 	}
-	record, err := c.FollowRepo.ApproveRequest(ctx.Request.Context(), req.RequestID, wall.WallID, req.EncryptedWallKey, wall.CurrentVersion)
+	record, err := c.FollowRepo.ApproveRequest(ctx.Request.Context(), req.RequestID, wall.WallID, req.EncryptedWallKey, req.KeyVersion)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
-			return nil, ente.NewBadRequestWithMessage("follow request is not pending")
+			return nil, ente.NewBadRequestWithMessage("follow request is not pending or keyVersion does not match current wall version")
 		}
 		return nil, err
 	}
@@ -239,16 +239,24 @@ func (c *FollowController) RefreshShares(ctx *gin.Context, req models.RefreshFol
 	if err != nil {
 		return err
 	}
+	if req.KeyVersion <= 0 {
+		return ente.NewBadRequestWithMessage("keyVersion is required")
+	}
+	updates := make([]repo.WallShareUpdateRecord, 0, len(req.Shares))
 	for _, share := range req.Shares {
 		if share.FollowerID == 0 || strings.TrimSpace(share.EncryptedWallKey) == "" {
 			return ente.NewBadRequestWithMessage("followerId and encryptedWallKey are required for each share")
 		}
-		if err := c.FollowRepo.UpdateShare(ctx.Request.Context(), wall.WallID, share.FollowerID, share.EncryptedWallKey, wall.CurrentVersion); err != nil {
-			if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
-				return ente.NewBadRequestWithMessage("follow share does not exist")
-			}
-			return err
+		updates = append(updates, repo.WallShareUpdateRecord{
+			FollowerID:       share.FollowerID,
+			EncryptedWallKey: share.EncryptedWallKey,
+		})
+	}
+	if err := c.FollowRepo.UpdateShares(ctx.Request.Context(), wall.WallID, updates, req.KeyVersion); err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return ente.NewBadRequestWithMessage("keyVersion does not match current wall version or follow share does not exist")
 		}
+		return err
 	}
 	return nil
 }

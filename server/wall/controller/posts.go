@@ -29,6 +29,9 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 	if strings.TrimSpace(req.WallID) == "" || strings.TrimSpace(req.EncryptedPostKey) == "" || len(req.Objects) == 0 {
 		return nil, ente.NewBadRequestWithMessage("wallId, encryptedPostKey and objects are required")
 	}
+	if req.KeyVersion <= 0 {
+		return nil, ente.NewBadRequestWithMessage("keyVersion is required")
+	}
 	wall, err := c.auth.requireWallOwner(ctx.Request.Context(), userID, req.WallID)
 	if err != nil {
 		return nil, err
@@ -51,8 +54,11 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 			BlurHashCipher: sql.NullString{String: object.BlurHashCipher, Valid: strings.TrimSpace(object.BlurHashCipher) != ""},
 		})
 	}
-	postID, err := c.PostsRepo.CreatePost(ctx.Request.Context(), userID, wall.WallID, req.EncryptedPostKey, req.CaptionCipher, wall.CurrentVersion, assets)
+	postID, err := c.PostsRepo.CreatePost(ctx.Request.Context(), userID, wall.WallID, req.EncryptedPostKey, req.CaptionCipher, req.KeyVersion, assets)
 	if err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current wall version")
+		}
 		return nil, err
 	}
 	return &models.CreatePostResponse{PostID: postID}, nil
