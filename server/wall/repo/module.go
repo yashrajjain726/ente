@@ -155,11 +155,12 @@ type WallLinkSessionRecord struct {
 	TokenHash        []byte
 	WallID           string
 	OwnerID          int64
+	AuthKeyHash      []byte
+	KeyVersion       int
 	ExpiresAt        int64
 	CreatedAt        int64
 	WallSlug         string
 	OwnerSlug        string
-	KeyVersion       int
 	EncryptedWallKey string
 }
 

@@ -113,7 +113,7 @@ func (c *LinksController) Login(ctx *gin.Context, req models.WallLinkLoginReques
 		return nil, err
 	}
 	sessionHash := sha256.Sum256([]byte(sessionToken))
-	if err := c.LinksRepo.CreateSession(ctx.Request.Context(), sessionHash[:], link.WallID, link.OwnerID, timeutil.MicrosecondsAfterMinutes(wallLinkSessionDurationMinutes)); err != nil {
+	if err := c.LinksRepo.CreateSession(ctx.Request.Context(), sessionHash[:], link.WallID, link.AuthKeyHash, link.KeyVersion, timeutil.MicrosecondsAfterMinutes(wallLinkSessionDurationMinutes)); err != nil {
 		return nil, err
 	}
 	return &models.WallLinkLoginResponse{

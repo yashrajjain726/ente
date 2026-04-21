@@ -195,6 +195,8 @@ CREATE TABLE IF NOT EXISTS wall_link_sessions (
     token_hash           BYTEA PRIMARY KEY,
     wall_id              TEXT   NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,
     owner_id             BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    auth_key_hash        BYTEA   NOT NULL,
+    key_version          INTEGER NOT NULL,
     expires_at           BIGINT NOT NULL,
     created_at           BIGINT NOT NULL DEFAULT now_utc_micro_seconds()
 );

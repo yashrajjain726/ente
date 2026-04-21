@@ -76,26 +76,44 @@ func (r *LinksRepository) GetLinkByAuthHash(ctx context.Context, wallID string, 
 	`, wallID, authHash))
 }
 
-func (r *LinksRepository) CreateSession(ctx context.Context, tokenHash []byte, wallID string, ownerID int64, expiresAt int64) error {
-	_, err := r.DB.ExecContext(ctx, `
-		INSERT INTO wall_link_sessions (token_hash, wall_id, owner_id, expires_at)
-		VALUES ($1, $2, $3, $4)
-	`, tokenHash, wallID, ownerID, expiresAt)
-	return stacktrace.Propagate(err, "")
+func (r *LinksRepository) CreateSession(ctx context.Context, tokenHash []byte, wallID string, authKeyHash []byte, keyVersion int, expiresAt int64) error {
+	res, err := r.DB.ExecContext(ctx, `
+		INSERT INTO wall_link_sessions (token_hash, wall_id, owner_id, auth_key_hash, key_version, expires_at)
+		SELECT $1, l.wall_id, w.owner_id, l.auth_key_hash, l.key_version, $5
+		FROM wall_links l
+		JOIN walls w ON w.wall_id = l.wall_id
+		WHERE l.wall_id = $2
+		  AND l.auth_key_hash = $3
+		  AND l.key_version = $4
+		  AND l.active = TRUE
+	`, tokenHash, wallID, authKeyHash, keyVersion, expiresAt)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func (r *LinksRepository) GetSession(ctx context.Context, tokenHash []byte) (*WallLinkSessionRecord, error) {
 	row := r.DB.QueryRowContext(ctx, `
-		SELECT s.token_hash, s.wall_id, s.owner_id, s.expires_at, s.created_at,
-		       w.wall_slug, owner_wall.wall_slug, l.key_version, l.encrypted_wall_key
+		SELECT s.token_hash, s.wall_id, s.owner_id, s.auth_key_hash, s.key_version, s.expires_at, s.created_at,
+		       w.wall_slug, owner_wall.wall_slug, l.encrypted_wall_key
 		FROM wall_link_sessions s
 		JOIN walls w ON w.wall_id = s.wall_id
 		JOIN walls owner_wall ON owner_wall.owner_id = s.owner_id
 		JOIN wall_links l ON l.wall_id = s.wall_id
+		                 AND l.auth_key_hash = s.auth_key_hash
+		                 AND l.key_version = s.key_version
 		WHERE s.token_hash = $1 AND l.active = TRUE
 	`, tokenHash)
 	var rec WallLinkSessionRecord
-	if err := row.Scan(&rec.TokenHash, &rec.WallID, &rec.OwnerID, &rec.ExpiresAt, &rec.CreatedAt, &rec.WallSlug, &rec.OwnerSlug, &rec.KeyVersion, &rec.EncryptedWallKey); err != nil {
+	if err := row.Scan(&rec.TokenHash, &rec.WallID, &rec.OwnerID, &rec.AuthKeyHash, &rec.KeyVersion, &rec.ExpiresAt, &rec.CreatedAt, &rec.WallSlug, &rec.OwnerSlug, &rec.EncryptedWallKey); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil
