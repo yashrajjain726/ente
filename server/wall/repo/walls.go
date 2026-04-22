@@ -84,7 +84,7 @@ func (r *WallsRepository) GetWallBySlug(ctx context.Context, wallSlug string) (*
 	`, normalizeSlug(wallSlug)))
 }
 
-func (r *WallsRepository) UpdateProfile(ctx context.Context, ownerID int64, wallID, encryptedProfile string, avatar *struct {
+func (r *WallsRepository) UpdateProfile(ctx context.Context, ownerID int64, wallID string, keyVersion int, encryptedProfile string, avatar *struct {
 	ObjectKey string
 	BucketID  string
 	Size      int64
@@ -103,6 +103,9 @@ func (r *WallsRepository) UpdateProfile(ctx context.Context, ownerID int64, wall
 	`, ownerID, wallID))
 	if err != nil {
 		return nil, err
+	}
+	if previous.CurrentVersion != keyVersion {
+		return nil, sql.ErrNoRows
 	}
 	query := `
 		UPDATE walls

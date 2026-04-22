@@ -158,6 +158,7 @@ type FollowRequestCreatedResponse struct {
 
 type UpdateWallProfileRequest struct {
 	WallID           string                `json:"wallId"`
+	KeyVersion       int                   `json:"keyVersion"`
 	EncryptedProfile string                `json:"encryptedProfile"`
 	Avatar           *ProfileAvatarPayload `json:"avatar,omitempty"`
 	RemoveAvatar     bool                  `json:"removeAvatar,omitempty"`

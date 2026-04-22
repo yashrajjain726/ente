@@ -94,15 +94,19 @@ func (c *WallsController) UpdateProfile(ctx *gin.Context, req models.UpdateWallP
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.WallID) == "" || strings.TrimSpace(req.EncryptedProfile) == "" {
-		return nil, ente.NewBadRequestWithMessage("wallId and encryptedProfile are required")
+	if strings.TrimSpace(req.WallID) == "" || strings.TrimSpace(req.EncryptedProfile) == "" || req.KeyVersion <= 0 {
+		return nil, ente.NewBadRequestWithMessage("wallId, keyVersion and encryptedProfile are required")
 	}
 	if req.RemoveAvatar && req.Avatar != nil {
 		return nil, ente.NewBadRequestWithMessage("avatar and removeAvatar cannot both be set")
 	}
 	wallID := strings.TrimSpace(req.WallID)
-	if _, err := c.auth.requireWallOwner(ctx.Request.Context(), userID, wallID); err != nil {
+	current, err := c.auth.requireWallOwner(ctx.Request.Context(), userID, wallID)
+	if err != nil {
 		return nil, err
+	}
+	if req.KeyVersion != current.CurrentVersion {
+		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current wall version")
 	}
 	avatar := (*struct {
 		ObjectKey string
@@ -124,8 +128,11 @@ func (c *WallsController) UpdateProfile(ctx *gin.Context, req models.UpdateWallP
 			Size:      staged.ExpectedSize,
 		}
 	}
-	wall, err := c.WallsRepo.UpdateProfile(ctx.Request.Context(), userID, wallID, req.EncryptedProfile, avatar, req.RemoveAvatar)
+	wall, err := c.WallsRepo.UpdateProfile(ctx.Request.Context(), userID, wallID, req.KeyVersion, req.EncryptedProfile, avatar, req.RemoveAvatar)
 	if err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current wall version")
+		}
 		return nil, err
 	}
 	return &models.UpdateWallProfileResponse{

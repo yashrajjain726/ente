@@ -80,3 +80,24 @@ func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
 	require.Equal(t, ente.BadRequest, apiErr.Code)
 	require.Equal(t, "keyVersion does not match current wall version", apiErr.Message)
 }
+
+func TestUpdateProfileRejectsStaleKeyVersion(t *testing.T) {
+	module, repos, _, ctx := setupWallAuthControllerTest(t)
+	aliceID := insertWallControllerUser(t, repos, "alice@example.com", "alice-public")
+	wall, err := repos.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key-v1", "alice-profile-v1")
+	require.NoError(t, err)
+	ginCtx := newPublicWallContext()
+	ginCtx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(aliceID, 10))
+
+	resp, err := module.Walls.UpdateProfile(ginCtx, models.UpdateWallProfileRequest{
+		WallID:           wall.WallID,
+		KeyVersion:       wall.CurrentVersion + 1,
+		EncryptedProfile: "alice-profile-v2",
+	})
+
+	require.Nil(t, resp)
+	var apiErr *ente.ApiError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, ente.BadRequest, apiErr.Code)
+	require.Equal(t, "keyVersion does not match current wall version", apiErr.Message)
+}

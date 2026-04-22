@@ -66,7 +66,7 @@ func TestWallModuleLifecycle(t *testing.T) {
 		ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
 	})
 	require.NoError(t, err)
-	updatedWall, err := module.Walls.UpdateProfile(ctx, aliceID, aliceWall.WallID, "alice-profile-v2", &struct {
+	updatedWall, err := module.Walls.UpdateProfile(ctx, aliceID, aliceWall.WallID, aliceWall.CurrentVersion, "alice-profile-v2", &struct {
 		ObjectKey string
 		BucketID  string
 		Size      int64
@@ -288,7 +288,7 @@ func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
 		BucketID  string
 		Size      int64
 	}{ObjectKey: "wall/alice/avatar-old", BucketID: "b2-eu-cen", Size: 111}
-	_, err = module.Walls.UpdateProfile(ctx, aliceID, wall.WallID, "alice-profile-old-avatar", oldAvatar, false)
+	_, err = module.Walls.UpdateProfile(ctx, aliceID, wall.WallID, wall.CurrentVersion, "alice-profile-old-avatar", oldAvatar, false)
 	require.NoError(t, err)
 
 	newAvatar := &struct {
@@ -296,12 +296,12 @@ func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
 		BucketID  string
 		Size      int64
 	}{ObjectKey: "wall/alice/avatar-new", BucketID: "b2-us-west", Size: 222}
-	updated, err := module.Walls.UpdateProfile(ctx, aliceID, wall.WallID, "alice-profile-new-avatar", newAvatar, false)
+	updated, err := module.Walls.UpdateProfile(ctx, aliceID, wall.WallID, wall.CurrentVersion, "alice-profile-new-avatar", newAvatar, false)
 	require.NoError(t, err)
 	require.Equal(t, "wall/alice/avatar-new", updated.AvatarObjectKey.String)
 	requireQueuedTempObject(t, module, "wall/alice/avatar-old", TempObjectPurposeAvatar, "b2-eu-cen")
 
-	updated, err = module.Walls.UpdateProfile(ctx, aliceID, wall.WallID, "alice-profile-no-avatar", nil, true)
+	updated, err = module.Walls.UpdateProfile(ctx, aliceID, wall.WallID, wall.CurrentVersion, "alice-profile-no-avatar", nil, true)
 	require.NoError(t, err)
 	require.False(t, updated.AvatarObjectKey.Valid)
 	requireQueuedTempObject(t, module, "wall/alice/avatar-new", TempObjectPurposeAvatar, "b2-us-west")
@@ -499,6 +499,27 @@ func TestCreatePostRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, next)
 	require.Empty(t, posts)
+}
+
+func TestUpdateProfileRejectsStaleKeyVersion(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key-v1", "alice-profile-v1")
+	require.NoError(t, err)
+
+	rotated, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, wall.CurrentVersion, "alice-wall-key-v2", "wrapped-prev-key", ptr("alice-profile-v2"))
+	require.NoError(t, err)
+	require.Equal(t, 2, rotated.CurrentVersion)
+
+	_, err = module.Walls.UpdateProfile(ctx, aliceID, wall.WallID, wall.CurrentVersion, "stale-profile", nil, false)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
+	current, err := module.Walls.GetWallByID(ctx, wall.WallID)
+	require.NoError(t, err)
+	require.Equal(t, rotated.CurrentVersion, current.CurrentVersion)
+	require.Equal(t, "alice-profile-v2", current.EncryptedProfile)
 }
 
 func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
