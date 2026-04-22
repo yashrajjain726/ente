@@ -80,7 +80,7 @@ func TestWallModuleLifecycle(t *testing.T) {
 	require.Equal(t, "wall/alice/avatar.jpg", updatedWall.AvatarObjectKey.String)
 	require.Equal(t, "b2-eu-cen", updatedWall.AvatarBucketID.String)
 
-	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, aliceWall.CurrentVersion, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
 	require.Equal(t, 2, rotatedWall.CurrentVersion)
 
@@ -462,7 +462,7 @@ func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
 	err = module.Follow.UpsertShare(ctx, aliceWall.WallID, bobID, "share-key-v1", aliceWall.CurrentVersion)
 	require.NoError(t, err)
 
-	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, aliceWall.CurrentVersion, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
 
 	err = module.Follow.UpdateShare(ctx, aliceWall.WallID, bobID, "share-key-v2", rotatedWall.CurrentVersion)
@@ -488,7 +488,7 @@ func TestCreatePostRejectsStaleKeyVersion(t *testing.T) {
 	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
 	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
 	require.NoError(t, err)
-	_, err = module.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	_, err = module.Walls.RotateKey(ctx, aliceID, wall.WallID, wall.CurrentVersion, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
 
 	postID, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-stale", nil, wall.CurrentVersion, nil)
@@ -499,6 +499,31 @@ func TestCreatePostRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, next)
 	require.Empty(t, posts)
+}
+
+func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key-v1", "alice-profile-v1")
+	require.NoError(t, err)
+
+	rotated, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, wall.CurrentVersion, "alice-wall-key-v2", "wrapped-v1", ptr("alice-profile-v2"))
+	require.NoError(t, err)
+	require.Equal(t, 2, rotated.CurrentVersion)
+
+	_, err = module.Walls.RotateKey(ctx, aliceID, wall.WallID, wall.CurrentVersion, "alice-wall-key-v3", "stale-wrapped-v1", ptr("alice-profile-v3"))
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
+	current, err := module.Walls.GetWallByID(ctx, wall.WallID)
+	require.NoError(t, err)
+	require.Equal(t, 2, current.CurrentVersion)
+	require.Equal(t, "alice-wall-key-v2", current.EncryptedWallKey)
+
+	versions, err := module.Walls.ListVersions(ctx, wall.WallID)
+	require.NoError(t, err)
+	require.Len(t, versions, 2)
 }
 
 func TestApproveRequestRejectsStaleKeyVersion(t *testing.T) {
@@ -513,7 +538,7 @@ func TestApproveRequestRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 	request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
 	require.NoError(t, err)
-	_, err = module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	_, err = module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, aliceWall.CurrentVersion, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
 
 	approved, err := module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "stale-share-key", aliceWall.CurrentVersion)
@@ -539,7 +564,7 @@ func TestUpdateShareRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 	err = module.Follow.UpsertShare(ctx, aliceWall.WallID, bobID, "share-key-v1", aliceWall.CurrentVersion)
 	require.NoError(t, err)
-	_, err = module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	_, err = module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, aliceWall.CurrentVersion, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
 
 	err = module.Follow.UpdateShare(ctx, aliceWall.WallID, bobID, "stale-share-key", aliceWall.CurrentVersion)
@@ -568,7 +593,7 @@ func TestRotateKeyRevokesWallLinks(t *testing.T) {
 	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
 	require.NoError(t, err)
 
-	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, wall.CurrentVersion, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
 	require.Equal(t, 2, rotatedWall.CurrentVersion)
 
@@ -589,7 +614,7 @@ func TestGetVersionReturnsHistoricalProfile(t *testing.T) {
 	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
 	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key-v1", "alice-profile-v1")
 	require.NoError(t, err)
-	rotated, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", ptr("alice-profile-v2"))
+	rotated, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, wall.CurrentVersion, "alice-wall-key-v2", "wrapped-prev-key", ptr("alice-profile-v2"))
 	require.NoError(t, err)
 	require.Equal(t, 2, rotated.CurrentVersion)
 
@@ -649,7 +674,7 @@ func TestGetSessionRejectsStaleLinkMetadata(t *testing.T) {
 	_, err = module.Links.GetSession(ctx, []byte("stale-auth-token"))
 	require.Error(t, err)
 
-	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, wall.CurrentVersion, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
 	reusedHashLink, err := module.Links.UpsertLink(ctx, wall.WallID, oldLink.AuthKeyHash, rotatedWall.CurrentVersion, "reused-hash-new-version-key")
 	require.NoError(t, err)
@@ -670,7 +695,7 @@ func TestUpsertLinkRejectsStaleKeyVersion(t *testing.T) {
 	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
 	require.NoError(t, err)
 
-	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
+	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, wall.CurrentVersion, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
 	require.Equal(t, wall.CurrentVersion+1, rotatedWall.CurrentVersion)
 

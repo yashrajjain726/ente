@@ -178,7 +178,7 @@ func (r *WallsRepository) UpdateSlug(ctx context.Context, ownerID int64, wallID,
 	return rec, nil
 }
 
-func (r *WallsRepository) RotateKey(ctx context.Context, ownerID int64, wallID, encryptedWallKey, wrappedPrevKey string, encryptedProfile *string) (*WallRecord, error) {
+func (r *WallsRepository) RotateKey(ctx context.Context, ownerID int64, wallID string, keyVersion int, encryptedWallKey, wrappedPrevKey string, encryptedProfile *string) (*WallRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -193,6 +193,9 @@ func (r *WallsRepository) RotateKey(ctx context.Context, ownerID int64, wallID, 
 	`, ownerID, wallID))
 	if err != nil {
 		return nil, err
+	}
+	if current.CurrentVersion != keyVersion {
+		return nil, sql.ErrNoRows
 	}
 	newProfile := current.EncryptedProfile
 	if encryptedProfile != nil {

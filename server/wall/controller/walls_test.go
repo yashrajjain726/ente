@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/ente-io/museum/ente"
@@ -14,7 +15,7 @@ func TestGetProfileReturnsHistoricalVersion(t *testing.T) {
 	wall, err := repos.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key-v1", "alice-profile-v1")
 	require.NoError(t, err)
 	profileV2 := "alice-profile-v2"
-	rotated, err := repos.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", &profileV2)
+	rotated, err := repos.Walls.RotateKey(ctx, aliceID, wall.WallID, wall.CurrentVersion, "alice-wall-key-v2", "wrapped-prev-key", &profileV2)
 	require.NoError(t, err)
 	require.Equal(t, 2, rotated.CurrentVersion)
 	require.NoError(t, userAuthRepo.AddToken(aliceID, ente.Photos, "alice-token", "127.0.0.1", "wall-test"))
@@ -54,4 +55,28 @@ func TestGetProfileRejectsInvalidVersion(t *testing.T) {
 
 	require.Nil(t, resp)
 	require.Error(t, err)
+}
+
+func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
+	module, repos, _, ctx := setupWallAuthControllerTest(t)
+	aliceID := insertWallControllerUser(t, repos, "alice@example.com", "alice-public")
+	wall, err := repos.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key-v1", "alice-profile-v1")
+	require.NoError(t, err)
+	ginCtx := newPublicWallContext()
+	ginCtx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(aliceID, 10))
+	profileV2 := "alice-profile-v2"
+
+	resp, err := module.Walls.RotateKey(ginCtx, models.RotateWallKeyRequest{
+		WallID:           wall.WallID,
+		KeyVersion:       wall.CurrentVersion + 1,
+		EncryptedWallKey: "alice-wall-key-v2",
+		WrappedPrevKey:   "wrapped-prev-key",
+		EncryptedProfile: &profileV2,
+	})
+
+	require.Nil(t, resp)
+	var apiErr *ente.ApiError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, ente.BadRequest, apiErr.Code)
+	require.Equal(t, "keyVersion does not match current wall version", apiErr.Message)
 }

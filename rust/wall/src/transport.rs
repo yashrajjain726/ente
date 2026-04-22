@@ -241,6 +241,7 @@ pub struct WallProfileResponse {
 #[serde(rename_all = "camelCase")]
 pub struct RotateWallKeyRequest {
     pub wall_id: String,
+    pub key_version: i32,
     pub encrypted_wall_key: String,
     pub wrapped_prev_key: String,
     #[serde(skip_serializing_if = "Option::is_none")]

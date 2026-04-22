@@ -195,6 +195,7 @@ type WallLookupResponse struct {
 
 type RotateWallKeyRequest struct {
 	WallID           string  `json:"wallId"`
+	KeyVersion       int     `json:"keyVersion"`
 	EncryptedWallKey string  `json:"encryptedWallKey"`
 	WrappedPrevKey   string  `json:"wrappedPrevKey"`
 	EncryptedProfile *string `json:"encryptedProfile,omitempty"`

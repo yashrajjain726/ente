@@ -1,11 +1,14 @@
 package controller
 
 import (
+	"database/sql"
+	"errors"
 	"strings"
 
 	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/wall/models"
 	"github.com/ente-io/museum/wall/repo"
+	"github.com/ente-io/stacktrace"
 	"github.com/gin-gonic/gin"
 )
 
@@ -163,11 +166,21 @@ func (c *WallsController) RotateKey(ctx *gin.Context, req models.RotateWallKeyRe
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.WallID) == "" || strings.TrimSpace(req.EncryptedWallKey) == "" || strings.TrimSpace(req.WrappedPrevKey) == "" {
-		return nil, ente.NewBadRequestWithMessage("wallId, encryptedWallKey and wrappedPrevKey are required")
+	if strings.TrimSpace(req.WallID) == "" || strings.TrimSpace(req.EncryptedWallKey) == "" || strings.TrimSpace(req.WrappedPrevKey) == "" || req.KeyVersion <= 0 {
+		return nil, ente.NewBadRequestWithMessage("wallId, keyVersion, encryptedWallKey and wrappedPrevKey are required")
 	}
-	wall, err := c.WallsRepo.RotateKey(ctx.Request.Context(), userID, req.WallID, req.EncryptedWallKey, req.WrappedPrevKey, req.EncryptedProfile)
+	current, err := c.auth.requireWallOwner(ctx.Request.Context(), userID, req.WallID)
 	if err != nil {
+		return nil, err
+	}
+	if req.KeyVersion != current.CurrentVersion {
+		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current wall version")
+	}
+	wall, err := c.WallsRepo.RotateKey(ctx.Request.Context(), userID, req.WallID, req.KeyVersion, req.EncryptedWallKey, req.WrappedPrevKey, req.EncryptedProfile)
+	if err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current wall version")
+		}
 		return nil, err
 	}
 	return toWallKeyResponse(wall), nil

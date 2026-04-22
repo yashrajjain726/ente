@@ -379,6 +379,7 @@ impl AccountWallCtx {
         let root_wall_key = self.get_or_create_root_wall_key().await?;
         let request = RotateWallKeyRequest {
             wall_id: wall_id.to_owned(),
+            key_version: current.key_version,
             encrypted_wall_key: encode_b64(&encrypt_secretbox_packed(
                 &root_wall_key,
                 &next_wall_key,
@@ -1750,6 +1751,79 @@ mod tests {
         entity.assert_async().await;
         walls.assert_async().await;
         create.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn rotate_wall_key_includes_current_key_version() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let root_wall_key = generate_key();
+        let wall_key = generate_key();
+        let entity_payload =
+            encrypt_entity_key(&ctx.master_key, &root_wall_key).expect("root wall entity");
+
+        let entity = server
+            .mock("GET", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "type".into(),
+                ROOT_WALL_KEY_TYPE.into(),
+            ))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "type": ROOT_WALL_KEY_TYPE,
+                    "encryptedKey": entity_payload.encrypted_key,
+                    "header": entity_payload.header,
+                })
+                .to_string(),
+            )
+            .expect(2)
+            .create_async()
+            .await;
+        let walls = server
+            .mock("GET", "/wall")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "wallId": "wall_owner_main",
+                    "wallSlug": "owner-main",
+                    "encryptedWallKey": encode_b64(&encrypt_secretbox_packed(&root_wall_key, &wall_key).expect("wall key wrap")),
+                    "encryptedProfile": "",
+                    "keyVersion": 4
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let rotate = server
+            .mock("POST", "/wall/rotate")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::Regex("\"keyVersion\":4".into()))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "wallId": "wall_owner_main",
+                    "wallSlug": "owner-main",
+                    "encryptedWallKey": "next-wall-key",
+                    "encryptedProfile": "",
+                    "keyVersion": 5
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let rotated = ctx
+            .rotate_wall_key("wall_owner_main", Some(b"profile v5"))
+            .await
+            .expect("rotation should send key version");
+
+        assert_eq!(rotated.key_version, 5);
+        entity.assert_async().await;
+        walls.assert_async().await;
+        rotate.assert_async().await;
     }
 
     #[tokio::test]
