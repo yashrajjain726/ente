@@ -65,6 +65,9 @@ func (c *FollowController) Request(ctx *gin.Context, req models.FollowRequestPay
 	}
 	created, err := c.FollowRepo.CreateRequest(ctx.Request.Context(), userID, wall.WallID)
 	if err != nil {
+		if errors.Is(stacktrace.RootCause(err), repo.ErrAlreadyFollowing) {
+			return nil, ente.NewBadRequestWithMessage("already following this wall")
+		}
 		return nil, err
 	}
 	return &models.FollowRequestCreatedResponse{RequestID: created.RequestID, Status: created.Status}, nil

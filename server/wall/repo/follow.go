@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -10,12 +11,31 @@ import (
 	"github.com/ente-io/stacktrace"
 )
 
+var ErrAlreadyFollowing = errors.New("wall follower already has access")
+
 func (r *FollowRepository) CreateRequest(ctx context.Context, requesterID int64, targetWallID string) (*WallFollowRequestRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
+	var wallExists int
+	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM walls WHERE wall_id = $1 FOR UPDATE`, targetWallID).Scan(&wallExists); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	var hasShare bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM wall_follow_shares
+			WHERE follower_id = $1 AND wall_id = $2
+		)
+	`, requesterID, targetWallID).Scan(&hasShare); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if hasShare {
+		return nil, ErrAlreadyFollowing
+	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE wall_follow_requests
 		SET status = 'pending'

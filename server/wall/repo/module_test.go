@@ -335,6 +335,30 @@ func TestApproveRequestCreatesShareAndMarksRequestApproved(t *testing.T) {
 	require.Equal(t, "approved", stored.Status)
 }
 
+func TestCreateRequestRejectsAlreadyFollowing(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+	request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
+	require.NoError(t, err)
+	_, err = module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "share-key", aliceWall.CurrentVersion)
+	require.NoError(t, err)
+
+	duplicate, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
+
+	require.Nil(t, duplicate)
+	require.ErrorIs(t, err, ErrAlreadyFollowing)
+	incoming, err := module.Follow.ListIncomingRequests(ctx, aliceID)
+	require.NoError(t, err)
+	require.Empty(t, incoming)
+}
+
 func TestApproveRequestRejectsStaleRequestStates(t *testing.T) {
 	for _, status := range []string{"cancelled", "rejected", "unfollowed", "approved"} {
 		t.Run(status, func(t *testing.T) {
