@@ -292,7 +292,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             whiteSpace: "nowrap",
                         }}
                     >
-                        Share your Ente link
+                        Share your profile
                     </Box>
                     <Box />
                 </Box>
