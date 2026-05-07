@@ -1,6 +1,7 @@
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
-import { Box } from "@mui/material";
+import { Box, Button } from "@mui/material";
+import { EnteLogo } from "ente-base/components/EnteLogo";
 import React from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 
@@ -77,7 +78,9 @@ const sampleMomentItems = [
 ];
 
 interface ProfileScreenProps {
-    onBack: () => void;
+    headerVariant?: "owner" | "public";
+    onBack?: () => void;
+    onFollow?: () => void;
     profile: SetupProfile;
 }
 
@@ -115,9 +118,12 @@ const Stat: React.FC<StatProps> = ({ label, value }) => (
 );
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
+    headerVariant = "owner",
     onBack,
+    onFollow,
     profile,
 }) => {
+    const isPublicProfile = headerVariant == "public";
     const displayName = profile.fullName.trim() || profile.username.trim();
     const initialsSource = displayName || profile.username.trim();
     const initials = initialsSource
@@ -153,78 +159,122 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     sx={{
                         alignItems: "center",
                         display: "grid",
-                        gridTemplateColumns: "24px 1fr 24px",
-                        p: 2,
+                        gridTemplateColumns: isPublicProfile
+                            ? "1fr auto"
+                            : "24px 1fr 24px",
+                        height: 56,
+                        px: 2,
+                        py: 0,
                         width: "100%",
                     }}
                 >
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label="Back to home"
-                        onClick={onBack}
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: "transparent",
-                            border: 0,
-                            color: textBase,
-                            cursor: "pointer",
-                            display: "flex",
-                            height: 24,
-                            justifyContent: "flex-start",
-                            p: 0,
-                            width: 24,
-                            "&:focus-visible": {
-                                borderRadius: "50%",
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                        }}
-                    >
-                        <ArrowBackRoundedIcon sx={{ fontSize: 24 }} />
-                    </Box>
-                    <Box
-                        component="h1"
-                        sx={{
-                            color: textBase,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 18,
-                            fontWeight: 700,
-                            justifySelf: "center",
-                            lineHeight: "24px",
-                            m: 0,
-                            maxWidth: "100%",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                        }}
-                    >
-                        {profile.username}
-                    </Box>
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label="Settings"
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: "transparent",
-                            border: 0,
-                            color: textBase,
-                            cursor: "pointer",
-                            display: "flex",
-                            height: 24,
-                            justifyContent: "flex-end",
-                            p: 0,
-                            width: 24,
-                            "&:focus-visible": {
-                                borderRadius: "50%",
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                        }}
-                    >
-                        <SettingsRoundedIcon sx={{ fontSize: 22 }} />
-                    </Box>
+                    {isPublicProfile ? (
+                        <Box
+                            sx={{
+                                alignSelf: "center",
+                                color: textBase,
+                                justifySelf: "flex-start",
+                                lineHeight: 0,
+                                overflow: "visible",
+                                width: 65,
+                                "& svg": {
+                                    display: "block",
+                                    overflow: "visible",
+                                },
+                            }}
+                        >
+                            <EnteLogo height={20} />
+                        </Box>
+                    ) : (
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label="Back to home"
+                            onClick={onBack}
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "transparent",
+                                border: 0,
+                                color: textBase,
+                                cursor: "pointer",
+                                display: "flex",
+                                height: 24,
+                                justifyContent: "flex-start",
+                                p: 0,
+                                width: 24,
+                                "&:focus-visible": {
+                                    borderRadius: "50%",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
+                            <ArrowBackRoundedIcon sx={{ fontSize: 24 }} />
+                        </Box>
+                    )}
+                    {!isPublicProfile && (
+                        <Box
+                            component="h1"
+                            sx={{
+                                color: textBase,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 18,
+                                fontWeight: 700,
+                                justifySelf: "center",
+                                lineHeight: "24px",
+                                m: 0,
+                                maxWidth: "100%",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {profile.username}
+                        </Box>
+                    )}
+                    {isPublicProfile ? (
+                        <Button
+                            type="button"
+                            onClick={onFollow}
+                            sx={{
+                                backgroundColor: green,
+                                borderRadius: "16px",
+                                color: "#FFFFFF",
+                                justifySelf: "flex-end",
+                                paddingBlock: "11px",
+                                paddingInline: "20px",
+                                "&:hover": { backgroundColor: "#07A820" },
+                            }}
+                        >
+                            Follow
+                        </Button>
+                    ) : (
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label="Settings"
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "transparent",
+                                border: 0,
+                                color: textBase,
+                                cursor: "pointer",
+                                display: "flex",
+                                height: 24,
+                                justifyContent: "flex-end",
+                                p: 0,
+                                width: 24,
+                                "&:focus-visible": {
+                                    borderRadius: "50%",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
+                            <SettingsRoundedIcon sx={{ fontSize: 22 }} />
+                        </Box>
+                    )}
                 </Box>
                 <Box sx={{ bgcolor: divider, height: "1px", width: "100%" }} />
 

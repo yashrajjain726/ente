@@ -1,5 +1,6 @@
+import { Box } from "@mui/material";
 import Head from "next/head";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     CreateAccountScreen,
     createAccountBackground,
@@ -19,6 +20,7 @@ import {
     ProfileScreen,
     profileBackground,
 } from "screens/ProfileScreen";
+import { PublicProfileScreen } from "screens/PublicProfileScreen";
 import {
     SetupProfileScreen,
     setupProfileBackground,
@@ -46,7 +48,58 @@ type Screen =
 
 type ProfileBackScreen = "login" | "recovery-key";
 
+const samplePublicProfileData = {
+    avatarUrl: "/images/sample-avatar.jpg",
+    fullName: "Maya Iyer",
+    username: "maya",
+};
+
+interface PublicProfileLink {
+    token: string;
+    username: string;
+}
+
+type RouteMode =
+    | { kind: "checking" }
+    | { kind: "app" }
+    | ({ kind: "public-profile" } & PublicProfileLink);
+
+const parsePublicProfileLink = (): PublicProfileLink | null => {
+    const match = /^\/([^/]+)\/?$/.exec(window.location.pathname);
+    const token = window.location.hash.slice(1);
+    if (!match || !token) return null;
+
+    try {
+        const username = decodeURIComponent(match[1] ?? "").trim();
+        return username ? { token, username } : null;
+    } catch {
+        return null;
+    }
+};
+
+const profileNameFromUsername = (username: string) =>
+    username
+        .replace(/[._-]+/g, " ")
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+
+const publicProfileFromLink = ({
+    username,
+}: PublicProfileLink): SetupProfile => ({
+    avatarUrl: samplePublicProfileData.avatarUrl,
+    fullName:
+        username == samplePublicProfileData.username
+            ? samplePublicProfileData.fullName
+            : profileNameFromUsername(username),
+    username,
+});
+
 const Page: React.FC = () => {
+    const [routeMode, setRouteMode] = useState<RouteMode>({
+        kind: "checking",
+    });
     const [screen, setScreen] = useState<Screen>("onboarding");
     const [email, setEmail] = useState("example@example.com");
     const [profile, setProfile] = useState<SetupProfile | null>(null);
@@ -58,31 +111,40 @@ const Page: React.FC = () => {
         setScreen("setup-profile");
     };
 
+    useEffect(() => {
+        const publicProfileLink = parsePublicProfileLink();
+        setRouteMode(
+            publicProfileLink
+                ? { kind: "public-profile", ...publicProfileLink }
+                : { kind: "app" },
+        );
+    }, []);
+
+    const themeColor =
+        routeMode.kind != "app"
+            ? profileBackground
+            : screen == "onboarding"
+              ? onboardingGreen
+              : screen == "verify-email"
+                ? verifyEmailBackground
+                : screen == "recovery-key"
+                  ? recoveryKeyBackground
+                  : screen == "login"
+                    ? loginBackground
+                    : screen == "setup-profile"
+                      ? setupProfileBackground
+                      : screen == "share-profile-link"
+                        ? shareProfileLinkBackground
+                        : screen == "home"
+                          ? homeBackground
+                          : screen == "profile"
+                            ? profileBackground
+                            : createAccountBackground;
+
     return (
         <>
             <Head>
-                <meta
-                    name="theme-color"
-                    content={
-                        screen == "onboarding"
-                            ? onboardingGreen
-                            : screen == "verify-email"
-                              ? verifyEmailBackground
-                              : screen == "recovery-key"
-                                ? recoveryKeyBackground
-                                : screen == "login"
-                                  ? loginBackground
-                                  : screen == "setup-profile"
-                                    ? setupProfileBackground
-                                    : screen == "share-profile-link"
-                                      ? shareProfileLinkBackground
-                                      : screen == "home"
-                                        ? homeBackground
-                                        : screen == "profile"
-                                          ? profileBackground
-                                        : createAccountBackground
-                    }
-                />
+                <meta name="theme-color" content={themeColor} />
                 <meta name="description" content={onboardingDescription} />
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link
@@ -95,70 +157,78 @@ const Page: React.FC = () => {
                     rel="stylesheet"
                 />
             </Head>
-            {screen == "onboarding" && (
-                <OnboardingScreen
-                    onCreateAccount={() => setScreen("create-account")}
-                    onLogin={() => setScreen("login")}
-                />
-            )}
-            {screen == "create-account" && (
-                <CreateAccountScreen
-                    onBack={() => setScreen("onboarding")}
-                    onCreateAccount={(nextEmail) => {
-                        setEmail(nextEmail || "example@example.com");
-                        setScreen("verify-email");
-                    }}
-                    onLogin={() => setScreen("login")}
-                />
-            )}
-            {screen == "login" && (
-                <LoginScreen
-                    onBack={() => setScreen("onboarding")}
-                    onContinue={() => openSetupProfile("login")}
-                    onSignup={() => setScreen("create-account")}
-                />
-            )}
-            {screen == "verify-email" && (
-                <VerifyEmailScreen
-                    email={email}
-                    onBack={() => setScreen("create-account")}
-                    onChangeEmail={() => setScreen("create-account")}
-                    onVerify={() => setScreen("recovery-key")}
-                />
-            )}
-            {screen == "recovery-key" && (
-                <RecoveryKeyScreen
-                    onBack={() => setScreen("verify-email")}
-                    onNext={() => openSetupProfile("recovery-key")}
-                />
-            )}
-            {screen == "setup-profile" && (
-                <SetupProfileScreen
-                    onBack={() => setScreen(profileBackScreen)}
-                    onContinue={(nextProfile) => {
-                        setProfile(nextProfile);
-                        setScreen("share-profile-link");
-                    }}
-                />
-            )}
-            {screen == "share-profile-link" && profile && (
-                <ShareProfileLinkScreen
-                    profile={profile}
-                    onBack={() => setScreen("setup-profile")}
-                    onDone={() => setScreen("home")}
-                />
-            )}
-            {screen == "home" && profile && (
-                <HomeScreen
-                    profile={profile}
-                    onOpenProfile={() => setScreen("profile")}
-                />
-            )}
-            {screen == "profile" && profile && (
-                <ProfileScreen
-                    profile={profile}
-                    onBack={() => setScreen("home")}
-                />
+            {routeMode.kind == "checking" ? (
+                <Box sx={{ bgcolor: profileBackground, minHeight: "100svh" }} />
+            ) : routeMode.kind == "public-profile" ? (
+                <PublicProfileScreen profile={publicProfileFromLink(routeMode)} />
+            ) : (
+                <>
+                    {screen == "onboarding" && (
+                        <OnboardingScreen
+                            onCreateAccount={() => setScreen("create-account")}
+                            onLogin={() => setScreen("login")}
+                        />
+                    )}
+                    {screen == "create-account" && (
+                        <CreateAccountScreen
+                            onBack={() => setScreen("onboarding")}
+                            onCreateAccount={(nextEmail) => {
+                                setEmail(nextEmail || "example@example.com");
+                                setScreen("verify-email");
+                            }}
+                            onLogin={() => setScreen("login")}
+                        />
+                    )}
+                    {screen == "login" && (
+                        <LoginScreen
+                            onBack={() => setScreen("onboarding")}
+                            onContinue={() => openSetupProfile("login")}
+                            onSignup={() => setScreen("create-account")}
+                        />
+                    )}
+                    {screen == "verify-email" && (
+                        <VerifyEmailScreen
+                            email={email}
+                            onBack={() => setScreen("create-account")}
+                            onChangeEmail={() => setScreen("create-account")}
+                            onVerify={() => setScreen("recovery-key")}
+                        />
+                    )}
+                    {screen == "recovery-key" && (
+                        <RecoveryKeyScreen
+                            onBack={() => setScreen("verify-email")}
+                            onNext={() => openSetupProfile("recovery-key")}
+                        />
+                    )}
+                    {screen == "setup-profile" && (
+                        <SetupProfileScreen
+                            onBack={() => setScreen(profileBackScreen)}
+                            onContinue={(nextProfile) => {
+                                setProfile(nextProfile);
+                                setScreen("share-profile-link");
+                            }}
+                        />
+                    )}
+                    {screen == "share-profile-link" && profile && (
+                        <ShareProfileLinkScreen
+                            profile={profile}
+                            onBack={() => setScreen("setup-profile")}
+                            onDone={() => setScreen("home")}
+                        />
+                    )}
+                    {screen == "home" && profile && (
+                        <HomeScreen
+                            profile={profile}
+                            onOpenProfile={() => setScreen("profile")}
+                        />
+                    )}
+                    {screen == "profile" && profile && (
+                        <ProfileScreen
+                            profile={profile}
+                            onBack={() => setScreen("home")}
+                        />
+                    )}
+                </>
             )}
         </>
     );
