@@ -8,44 +8,29 @@ export const homeBackground = "#FFFFFF";
 const green = "#08C225";
 const paleGreen = "#E7F6E9";
 const textBase = "#000";
-const textMuted = "#777";
 
 const sampleFeedItems = [
     {
         avatarUrl: "/images/sample-feed-4.jpg",
-        imageUrl: "/images/sample-feed-1.jpg",
         name: "Aparna Bhatnagar",
-        meta: "@aparnabhatnagar · 4 hours ago",
+        photos: [
+            { imageUrl: "/images/sample-feed-1.jpg" },
+            { imageUrl: "/images/sample-feed-5.jpg" },
+            { imageUrl: "/images/sample-feed-2.jpg" },
+        ],
     },
     {
         avatarUrl: "/images/sample-feed-3.jpg",
-        imageUrl: "/images/sample-feed-2.jpg",
         name: "Mira Sen",
-        meta: "@mirasen · 6 hours ago",
+        photos: [
+            { imageUrl: "/images/sample-feed-2.jpg" },
+            { imageUrl: "/images/sample-feed-6.jpg" },
+        ],
     },
     {
         avatarUrl: "/images/sample-feed-5.jpg",
-        imageUrl: "/images/sample-feed-3.jpg",
         name: "Nikhil Rao",
-        meta: "@nikhil · 8 hours ago",
-    },
-    {
-        avatarUrl: "/images/sample-feed-2.jpg",
-        imageUrl: "/images/sample-feed-4.jpg",
-        name: "Sara Thomas",
-        meta: "@sara · 12 hours ago",
-    },
-    {
-        avatarUrl: "/images/sample-feed-6.jpg",
-        imageUrl: "/images/sample-feed-5.jpg",
-        name: "Arjun Menon",
-        meta: "@arjun · yesterday",
-    },
-    {
-        avatarUrl: "/images/sample-feed-4.jpg",
-        imageUrl: "/images/sample-feed-6.jpg",
-        name: "Leah Kapoor",
-        meta: "@leah · yesterday",
+        photos: [{ imageUrl: "/images/sample-feed-3.jpg" }],
     },
 ];
 
@@ -56,10 +41,11 @@ interface HomeScreenProps {
 
 interface FeedItemProps {
     avatarUrl: string;
-    imageUrl: string;
-    meta: string;
     name: string;
+    photos: { imageUrl: string }[];
 }
+
+const firstNameFrom = (name: string) => name.trim().split(/\s+/)[0] || name;
 
 const PlusIcon: React.FC = () => (
     <Box
@@ -79,99 +65,115 @@ const PlusIcon: React.FC = () => (
     </Box>
 );
 
-const FeedItem: React.FC<FeedItemProps> = ({
-    avatarUrl,
-    imageUrl,
-    meta,
-    name,
-}) => (
-    <Box
-        component="article"
-        sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "10px",
-            width: "100%",
-        }}
-    >
+const FeedItem: React.FC<FeedItemProps> = ({ avatarUrl, name, photos }) => {
+    const firstName = firstNameFrom(name);
+
+    return (
         <Box
-            sx={{
-                alignItems: "center",
-                display: "flex",
-                gap: "10px",
-                minHeight: 36,
-                width: "100%",
-            }}
+            component="article"
+            sx={{ display: "flex", flexDirection: "column", width: "100%" }}
         >
             <Box
                 sx={{
-                    bgcolor: paleGreen,
-                    borderRadius: "50%",
-                    flexShrink: 0,
-                    height: 32,
-                    overflow: "hidden",
-                    width: 32,
+                    alignItems: "center",
+                    display: "flex",
+                    gap: "10px",
+                    mb: "10px",
+                    minHeight: 32,
+                    px: "16px",
+                    width: "100%",
                 }}
             >
                 <Box
-                    component="img"
-                    alt=""
-                    src={avatarUrl}
                     sx={{
-                        display: "block",
-                        height: "100%",
-                        objectFit: "cover",
-                        objectPosition: "center",
-                        width: "100%",
+                        bgcolor: paleGreen,
+                        borderRadius: "50%",
+                        flexShrink: 0,
+                        height: 28,
+                        overflow: "hidden",
+                        width: 28,
                     }}
-                />
-            </Box>
-            <Box sx={{ minWidth: 0 }}>
+                >
+                    <Box
+                        component="img"
+                        alt=""
+                        src={avatarUrl}
+                        sx={{
+                            display: "block",
+                            height: "100%",
+                            objectFit: "cover",
+                            objectPosition: "center",
+                            width: "100%",
+                        }}
+                    />
+                </Box>
                 <Box
                     sx={{
                         color: textBase,
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 14,
-                        fontWeight: 600,
-                        lineHeight: "18px",
+                        fontWeight: 650,
+                        lineHeight: "20px",
+                        minWidth: 0,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                     }}
                 >
-                    {name}
-                </Box>
-                <Box
-                    sx={{
-                        color: textMuted,
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 11,
-                        fontWeight: 500,
-                        lineHeight: "15px",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                    }}
-                >
-                    {meta}
+                    {firstName}
                 </Box>
             </Box>
+            <Box
+                sx={{
+                    display: "flex",
+                    gap: "16px",
+                    overflowX: "auto",
+                    overscrollBehaviorX: "contain",
+                    px: "16px",
+                    scrollPaddingInline: "16px",
+                    scrollSnapType: "x mandatory",
+                    scrollbarWidth: "none",
+                    WebkitOverflowScrolling: "touch",
+                    width: "100%",
+                    "&::-webkit-scrollbar": { display: "none" },
+                }}
+            >
+                {photos.map((photo, index) => (
+                    <Box
+                        key={`${name}-${photo.imageUrl}-${index}`}
+                        sx={{
+                            aspectRatio: "4 / 5",
+                            bgcolor: paleGreen,
+                            borderRadius: "20px",
+                            display: "block",
+                            flex: "0 0 78%",
+                            overflow: "hidden",
+                            scrollSnapAlign: "start",
+                            width: "78%",
+                            "@media (min-width: 600px)": {
+                                flexBasis: "76%",
+                                width: "76%",
+                            },
+                        }}
+                    >
+                        <Box
+                            component="img"
+                            alt={`${name} photo ${index + 1}`}
+                            src={photo.imageUrl}
+                            sx={{
+                                display: "block",
+                                height: "100%",
+                                objectFit: "cover",
+                                objectPosition: "center",
+                                width: "100%",
+                            }}
+                        />
+                    </Box>
+                ))}
+            </Box>
         </Box>
-        <Box
-            component="img"
-            alt=""
-            src={imageUrl}
-            sx={{
-                aspectRatio: "375 / 250",
-                display: "block",
-                ml: "-12px",
-                objectFit: "cover",
-                objectPosition: "center",
-                width: "calc(100% + 24px)",
-            }}
-        />
-    </Box>
-);
+    );
+};
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
     onOpenProfile,
@@ -302,19 +304,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     sx={{
                         display: "flex",
                         flexDirection: "column",
-                        gap: "24px",
+                        gap: "36px",
                         mt: "22px",
-                        px: "12px",
+                        pb: "28px",
                         width: "100%",
                     }}
                 >
                     {sampleFeedItems.map((item) => (
                         <FeedItem
-                            key={item.imageUrl}
+                            key={item.name}
                             avatarUrl={item.avatarUrl}
-                            imageUrl={item.imageUrl}
-                            meta={item.meta}
                             name={item.name}
+                            photos={item.photos}
                         />
                     ))}
                 </Box>
