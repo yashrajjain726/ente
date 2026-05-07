@@ -297,11 +297,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                         component="img"
                         alt=""
                         src="/images/verify-email.svg"
-                        sx={{
-                            height: 82,
-                            objectFit: "contain",
-                            width: 101,
-                        }}
+                        sx={{ height: 82, objectFit: "contain", width: 101 }}
                     />
 
                     <Box

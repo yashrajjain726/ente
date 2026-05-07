@@ -9,10 +9,7 @@ const textLight = "#969696";
 const textMuted = "#666";
 const warning = "#F63A3A";
 
-const mockLoginData = {
-    email: "example@example.com",
-    password: "password123",
-};
+const mockLoginData = { email: "example@example.com", password: "password123" };
 
 interface LoginScreenProps {
     onBack: () => void;
