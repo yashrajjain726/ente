@@ -162,12 +162,11 @@ const FeedItem: React.FC<FeedItemProps> = ({
             src={imageUrl}
             sx={{
                 aspectRatio: "375 / 250",
-                borderRadius: "8px",
                 display: "block",
-                ml: "-8px",
+                ml: "-12px",
                 objectFit: "cover",
                 objectPosition: "center",
-                width: "calc(100% + 16px)",
+                width: "calc(100% + 24px)",
             }}
         />
     </Box>
@@ -295,9 +294,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ profile }) => {
                     sx={{
                         display: "flex",
                         flexDirection: "column",
-                        gap: "32px",
+                        gap: "24px",
                         mt: "22px",
-                        pb: "4px",
                         px: "12px",
                         width: "100%",
                     }}
