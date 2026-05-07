@@ -66,7 +66,7 @@ const PlusIcon: React.FC = () => (
         component="svg"
         viewBox="4 4 16 16"
         aria-hidden
-        sx={{ display: "block", height: 20, width: 20 }}
+        sx={{ display: "block", height: 18, width: 18 }}
     >
         <path
             d="M12 5V19M5 12H19"
@@ -235,11 +235,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             justifySelf: "center",
                             lineHeight: 0,
                             overflow: "visible",
-                            width: 65,
+                            width: 58,
                             "& svg": { display: "block", overflow: "visible" },
                         }}
                     >
-                        <EnteLogo height={20} />
+                        <EnteLogo height={18} />
                     </Box>
                     <Box
                         component="button"
@@ -298,13 +298,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         )}
                     </Box>
                 </Box>
-                <Box
-                    sx={{
-                        bgcolor: "rgba(0, 0, 0, 0.08)",
-                        height: "1px",
-                        width: "100%",
-                    }}
-                />
                 <Box
                     sx={{
                         display: "flex",

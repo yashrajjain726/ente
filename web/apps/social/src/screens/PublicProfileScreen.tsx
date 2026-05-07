@@ -8,12 +8,4 @@ interface PublicProfileScreenProps {
 
 export const PublicProfileScreen: React.FC<PublicProfileScreenProps> = ({
     profile,
-}) => (
-    <ProfileScreen
-        headerVariant="public"
-        profile={profile}
-        onAddToCircle={() => {
-            window.location.assign("/");
-        }}
-    />
-);
+}) => <ProfileScreen headerVariant="public" profile={profile} />;

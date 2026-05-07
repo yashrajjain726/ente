@@ -1,6 +1,6 @@
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
-import { Box, Button } from "@mui/material";
+import { Box } from "@mui/material";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import React from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -12,49 +12,64 @@ const paleGreen = "#E7F6E9";
 const textBase = "#000";
 const textStrong = "#303030";
 const textSoft = "#777777";
-const divider = "rgba(0, 0, 0, 0.08)";
 
-const sampleMomentItems = [
+const sampleMomentGroups = [
     {
-        gridColumn: "1 / span 2",
-        gridRow: "1 / span 2",
-        imageUrl: "/images/sample-feed-1.jpg",
+        label: "Today",
+        items: [
+            { imageUrl: "/images/sample-feed-1.jpg" },
+            { imageUrl: "/images/sample-feed-5.jpg" },
+            { imageUrl: "/images/sample-feed-2.jpg" },
+            { imageUrl: "/images/sample-feed-6.jpg" },
+            { imageUrl: "/images/sample-feed-3.jpg" },
+            { imageUrl: "/images/sample-feed-4.jpg" },
+        ],
     },
-    { gridColumn: "3", gridRow: "1", imageUrl: "/images/sample-feed-2.jpg" },
-    { gridColumn: "3", gridRow: "2", imageUrl: "/images/sample-feed-3.jpg" },
-    { gridColumn: "1", gridRow: "3", imageUrl: "/images/sample-feed-4.jpg" },
     {
-        gridColumn: "2 / span 2",
-        gridRow: "3",
-        imageUrl: "/images/sample-feed-5.jpg",
+        label: "Yesterday",
+        items: [
+            { imageUrl: "/images/sample-feed-6.jpg" },
+            { imageUrl: "/images/sample-feed-3.jpg" },
+            { imageUrl: "/images/sample-feed-1.jpg" },
+            { imageUrl: "/images/sample-feed-5.jpg" },
+            { imageUrl: "/images/sample-feed-2.jpg" },
+        ],
     },
-    { gridColumn: "1", gridRow: "4", imageUrl: "/images/sample-feed-6.jpg" },
-    { gridColumn: "2", gridRow: "4", imageUrl: "/images/sample-feed-2.jpg" },
-    { gridColumn: "3", gridRow: "4", imageUrl: "/images/sample-feed-4.jpg" },
     {
-        gridColumn: "1 / span 2",
-        gridRow: "5",
-        imageUrl: "/images/sample-feed-3.jpg",
+        label: "Wed, Apr 29",
+        items: [{ imageUrl: "/images/sample-feed-5.jpg" }],
     },
-    { gridColumn: "3", gridRow: "5", imageUrl: "/images/sample-feed-6.jpg" },
-    { gridColumn: "1", gridRow: "6", imageUrl: "/images/sample-feed-5.jpg" },
     {
-        gridColumn: "2 / span 2",
-        gridRow: "6",
-        imageUrl: "/images/sample-feed-1.jpg",
+        label: "Tue, Apr 28",
+        items: [
+            { imageUrl: "/images/sample-feed-4.jpg" },
+            { imageUrl: "/images/sample-feed-1.jpg" },
+            { imageUrl: "/images/sample-feed-6.jpg" },
+            { imageUrl: "/images/sample-feed-5.jpg" },
+            { imageUrl: "/images/sample-feed-3.jpg" },
+            { imageUrl: "/images/sample-feed-2.jpg" },
+        ],
+    },
+    {
+        label: "Sat, Apr 25",
+        items: [
+            { imageUrl: "/images/sample-feed-2.jpg" },
+            { imageUrl: "/images/sample-feed-3.jpg" },
+            { imageUrl: "/images/sample-feed-4.jpg" },
+            { imageUrl: "/images/sample-feed-6.jpg" },
+            { imageUrl: "/images/sample-feed-1.jpg" },
+        ],
     },
 ];
 
 interface ProfileScreenProps {
     headerVariant?: "owner" | "public";
-    onAddToCircle?: () => void;
     onBack?: () => void;
     profile: SetupProfile;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     headerVariant = "owner",
-    onAddToCircle,
     onBack,
     profile,
 }) => {
@@ -66,8 +81,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         .slice(0, 2)
         .map((part) => part[0]?.toUpperCase())
         .join("");
-    const momentsSharedCount = 12;
-    const circlePeopleCount = 7;
+    const momentsSharedCount = sampleMomentGroups.reduce(
+        (count, group) => count + group.items.length,
+        0,
+    );
+    const friendsCount = 7;
 
     return (
         <Box
@@ -97,7 +115,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         alignItems: "center",
                         display: "grid",
                         gridTemplateColumns: isPublicProfile
-                            ? "1fr auto"
+                            ? "1fr"
                             : "24px 1fr 24px",
                         height: 56,
                         px: 2,
@@ -113,14 +131,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 justifySelf: "flex-start",
                                 lineHeight: 0,
                                 overflow: "visible",
-                                width: 65,
+                                width: 58,
                                 "& svg": {
                                     display: "block",
                                     overflow: "visible",
                                 },
                             }}
                         >
-                            <EnteLogo height={20} />
+                            <EnteLogo height={18} />
                         </Box>
                     ) : (
                         <Box
@@ -170,23 +188,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             {profile.username}
                         </Box>
                     )}
-                    {isPublicProfile ? (
-                        <Button
-                            type="button"
-                            onClick={onAddToCircle}
-                            sx={{
-                                backgroundColor: green,
-                                borderRadius: "16px",
-                                color: "#FFFFFF",
-                                justifySelf: "flex-end",
-                                paddingBlock: "11px",
-                                paddingInline: "20px",
-                                "&:hover": { backgroundColor: "#07A820" },
-                            }}
-                        >
-                            Join circle
-                        </Button>
-                    ) : (
+                    {!isPublicProfile && (
                         <Box
                             component="button"
                             type="button"
@@ -213,14 +215,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         </Box>
                     )}
                 </Box>
-                <Box sx={{ bgcolor: divider, height: "1px", width: "100%" }} />
-
                 <Box
                     sx={{
                         alignItems: "center",
                         display: "flex",
                         flexDirection: "column",
-                        px: "24px",
+                        px: "16px",
                         pt: "30px",
                         textAlign: "center",
                         width: "100%",
@@ -238,7 +238,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             display: "flex",
                             justifyContent: "center",
                             overflow: "hidden",
-                            width: 118,
+                            width: 120,
                         }}
                     >
                         {profile.avatarUrl ? (
@@ -260,7 +260,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     color: green,
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 34,
+                                    fontSize: 38,
                                     fontWeight: 800,
                                     lineHeight: 1,
                                 }}
@@ -271,138 +271,169 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     </Box>
                     <Box
                         sx={{
-                            color: textStrong,
-                            fontFamily:
-                                '"Nunito", "Inter Variable", sans-serif',
-                            fontSize: 22,
-                            fontWeight: 800,
-                            lineHeight: "28px",
-                            mt: "18px",
-                            maxWidth: "100%",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                        }}
-                    >
-                        {displayName}
-                    </Box>
-                    <Box
-                        sx={{
-                            color: textSoft,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 16,
-                            fontWeight: 700,
-                            lineHeight: "22px",
-                            mt: "2px",
-                            maxWidth: "100%",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                        }}
-                    >
-                        @{profile.username}
-                    </Box>
-                    <Box
-                        sx={{
-                            alignItems: "baseline",
                             display: "flex",
-                            flexWrap: "wrap",
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            gap: "8px",
-                            justifyContent: "center",
-                            mt: "15px",
-                            maxWidth: "100%",
-                        }}
-                    >
-                        <Box
-                            component="span"
-                            sx={{
-                                bgcolor: "#F7F7F7",
-                                border: "1px solid rgba(0, 0, 0, 0.04)",
-                                borderRadius: "999px",
-                                color: textSoft,
-                                fontSize: 14,
-                                fontWeight: 700,
-                                lineHeight: "18px",
-                                px: "12px",
-                                py: "7px",
-                            }}
-                        >
-                            <Box
-                                component="span"
-                                sx={{ color: textStrong, fontWeight: 850 }}
-                            >
-                                {momentsSharedCount}
-                            </Box>{" "}
-                            shared moments
-                        </Box>
-                        <Box
-                            component="span"
-                            sx={{
-                                bgcolor: "#F7F7F7",
-                                border: "1px solid rgba(0, 0, 0, 0.04)",
-                                borderRadius: "999px",
-                                color: textSoft,
-                                fontSize: 14,
-                                fontWeight: 700,
-                                lineHeight: "18px",
-                                px: "12px",
-                                py: "7px",
-                            }}
-                        >
-                            <Box
-                                component="span"
-                                sx={{ color: textStrong, fontWeight: 850 }}
-                            >
-                                {circlePeopleCount}
-                            </Box>{" "}
-                            people in circle
-                        </Box>
-                    </Box>
-                </Box>
-
-                <Box
-                    component="section"
-                    sx={{ mt: "24px", pb: 0, px: 0, width: "100%" }}
-                >
-                    <Box
-                        sx={{
-                            aspectRatio: "1 / 2",
-                            display: "grid",
-                            gap: "1px",
-                            gridTemplateColumns: "repeat(3, 1fr)",
-                            gridTemplateRows: "repeat(6, 1fr)",
+                            flexDirection: "column",
+                            mt: "14px",
+                            minWidth: 0,
                             width: "100%",
                         }}
                     >
-                        {sampleMomentItems.map((item, index) => (
+                        <Box
+                            sx={{
+                                color: textStrong,
+                                fontFamily:
+                                    '"Nunito", "Inter Variable", sans-serif',
+                                fontSize: 26,
+                                fontWeight: 800,
+                                lineHeight: "32px",
+                                maxWidth: "100%",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {displayName}
+                        </Box>
+                        <Box
+                            sx={{
+                                color: textSoft,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 16,
+                                fontWeight: 600,
+                                lineHeight: "20px",
+                                mt: "2px",
+                                maxWidth: "100%",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {momentsSharedCount} moments · {friendsCount}{" "}
+                            friends
+                        </Box>
+                    </Box>
+                </Box>
+                {isPublicProfile && (
+                    <Box sx={{ mt: "22px", px: "16px", width: "100%" }}>
+                        <Box
+                            component="button"
+                            type="button"
+                            onClick={() => {
+                                window.location.assign("/");
+                            }}
+                            sx={{
+                                backgroundColor: green,
+                                border: 0,
+                                borderRadius: "16px",
+                                color: "#FFFFFF",
+                                cursor: "pointer",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 700,
+                                lineHeight: "20px",
+                                paddingBlock: "11px",
+                                paddingInline: "20px",
+                                width: "100%",
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                                "&:hover": { backgroundColor: "#07A820" },
+                            }}
+                        >
+                            Add friend
+                        </Box>
+                    </Box>
+                )}
+                <Box
+                    component="section"
+                    sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "24px",
+                        mt: isPublicProfile ? "60px" : "30px",
+                        pb: "28px",
+                        px: 0,
+                        width: "100%",
+                    }}
+                >
+                    {sampleMomentGroups.map((group) => (
+                        <Box
+                            component="section"
+                            key={group.label}
+                            sx={{ width: "100%" }}
+                        >
+                            <Box sx={{ mb: "10px", px: "16px", width: "100%" }}>
+                                <Box
+                                    component="h2"
+                                    sx={{
+                                        color: textStrong,
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 14,
+                                        fontWeight: 650,
+                                        letterSpacing: 0,
+                                        lineHeight: "20px",
+                                        m: 0,
+                                    }}
+                                >
+                                    {group.label}
+                                </Box>
+                            </Box>
                             <Box
-                                key={`${item.imageUrl}-${index}`}
                                 sx={{
-                                    bgcolor: paleGreen,
-                                    display: "block",
-                                    gridColumn: item.gridColumn,
-                                    gridRow: item.gridRow,
-                                    height: "100%",
-                                    overflow: "hidden",
+                                    display: "flex",
+                                    gap: "16px",
+                                    overflowX: "auto",
+                                    overscrollBehaviorX: "contain",
+                                    px: "16px",
+                                    scrollPaddingInline: "16px",
+                                    scrollSnapType: "x mandatory",
+                                    scrollbarWidth: "none",
+                                    WebkitOverflowScrolling: "touch",
                                     width: "100%",
+                                    "&::-webkit-scrollbar": { display: "none" },
                                 }}
                             >
-                                <Box
-                                    component="img"
-                                    alt={`My moment ${index + 1}`}
-                                    src={item.imageUrl}
-                                    sx={{
-                                        display: "block",
-                                        height: "100%",
-                                        objectFit: "cover",
-                                        objectPosition: "center",
-                                        width: "100%",
-                                    }}
-                                />
+                                {group.items.map((item, index) => (
+                                    <Box
+                                        key={`${group.label}-${item.imageUrl}-${index}`}
+                                        sx={{
+                                            aspectRatio: "4 / 5",
+                                            bgcolor: paleGreen,
+                                            borderRadius: "20px",
+                                            display: "block",
+                                            flex: "0 0 78%",
+                                            overflow: "hidden",
+                                            scrollSnapAlign: "start",
+                                            width: "78%",
+                                            "@media (min-width: 600px)": {
+                                                flexBasis: "76%",
+                                                width: "76%",
+                                            },
+                                        }}
+                                    >
+                                        <Box
+                                            component="img"
+                                            alt={`${group.label} moment ${
+                                                index + 1
+                                            }`}
+                                            src={item.imageUrl}
+                                            sx={{
+                                                display: "block",
+                                                height: "100%",
+                                                objectFit: "cover",
+                                                objectPosition: "center",
+                                                width: "100%",
+                                            }}
+                                        />
+                                    </Box>
+                                ))}
                             </Box>
-                        ))}
-                    </Box>
+                        </Box>
+                    ))}
                 </Box>
             </Box>
         </Box>
