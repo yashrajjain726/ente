@@ -13,7 +13,7 @@ const textStrong = "#303030";
 const textSoft = "#777777";
 const divider = "rgba(0, 0, 0, 0.08)";
 
-const samplePostItems = [
+const sampleMomentItems = [
     {
         gridColumn: "1 / span 2",
         gridRow: "1 / span 2",
@@ -315,7 +315,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 width: "100%",
                             }}
                         >
-                            <Stat label="posts" value="12" />
+                            <Stat label="moments" value="12" />
                             <Stat label="followers" value="7" />
                             <Stat label="following" value="10" />
                         </Box>
@@ -341,7 +341,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             width: "100%",
                         }}
                     >
-                        {samplePostItems.map((item, index) => (
+                        {sampleMomentItems.map((item, index) => (
                             <Box
                                 key={`${item.imageUrl}-${index}`}
                                 sx={{
@@ -356,7 +356,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             >
                                 <Box
                                     component="img"
-                                    alt={`My post ${index + 1}`}
+                                    alt={`My moment ${index + 1}`}
                                     src={item.imageUrl}
                                     sx={{
                                         display: "block",
