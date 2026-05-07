@@ -15,9 +15,15 @@ const mockSetupProfileData = {
     fullName: "Maya Iyer",
 };
 
+export interface SetupProfile {
+    avatarUrl: string | null;
+    fullName: string;
+    username: string;
+}
+
 interface SetupProfileScreenProps {
     onBack: () => void;
-    onContinue?: () => void;
+    onContinue?: (profile: SetupProfile) => void;
 }
 
 interface TextInputProps {
@@ -197,7 +203,13 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
     };
 
     const submitProfile = () => {
-        if (canContinue) onContinue?.();
+        if (canContinue) {
+            onContinue?.({
+                avatarUrl,
+                fullName: fullName.trim(),
+                username: username.trim(),
+            });
+        }
     };
 
     const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {

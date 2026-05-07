@@ -17,7 +17,12 @@ import {
 import {
     SetupProfileScreen,
     setupProfileBackground,
+    type SetupProfile,
 } from "screens/SetupProfileScreen";
+import {
+    ShareProfileLinkScreen,
+    shareProfileLinkBackground,
+} from "screens/ShareProfileLinkScreen";
 import {
     VerifyEmailScreen,
     verifyEmailBackground,
@@ -29,13 +34,15 @@ type Screen =
     | "login"
     | "verify-email"
     | "recovery-key"
-    | "setup-profile";
+    | "setup-profile"
+    | "share-profile-link";
 
 type ProfileBackScreen = "login" | "recovery-key";
 
 const Page: React.FC = () => {
     const [screen, setScreen] = useState<Screen>("onboarding");
     const [email, setEmail] = useState("example@example.com");
+    const [profile, setProfile] = useState<SetupProfile | null>(null);
     const [profileBackScreen, setProfileBackScreen] =
         useState<ProfileBackScreen>("recovery-key");
 
@@ -60,7 +67,9 @@ const Page: React.FC = () => {
                                   ? loginBackground
                                   : screen == "setup-profile"
                                     ? setupProfileBackground
-                                    : createAccountBackground
+                                    : screen == "share-profile-link"
+                                      ? shareProfileLinkBackground
+                                      : createAccountBackground
                     }
                 />
                 <meta name="description" content={onboardingDescription} />
@@ -115,7 +124,17 @@ const Page: React.FC = () => {
             {screen == "setup-profile" && (
                 <SetupProfileScreen
                     onBack={() => setScreen(profileBackScreen)}
-                    onContinue={() => undefined}
+                    onContinue={(nextProfile) => {
+                        setProfile(nextProfile);
+                        setScreen("share-profile-link");
+                    }}
+                />
+            )}
+            {screen == "share-profile-link" && profile && (
+                <ShareProfileLinkScreen
+                    profile={profile}
+                    onBack={() => setScreen("setup-profile")}
+                    onDone={() => undefined}
                 />
             )}
         </>
