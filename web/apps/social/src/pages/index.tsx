@@ -15,6 +15,10 @@ import {
     recoveryKeyBackground,
 } from "screens/RecoveryKeyScreen";
 import {
+    SetupProfileScreen,
+    setupProfileBackground,
+} from "screens/SetupProfileScreen";
+import {
     VerifyEmailScreen,
     verifyEmailBackground,
 } from "screens/VerifyEmailScreen";
@@ -24,11 +28,21 @@ type Screen =
     | "create-account"
     | "login"
     | "verify-email"
-    | "recovery-key";
+    | "recovery-key"
+    | "setup-profile";
+
+type ProfileBackScreen = "login" | "recovery-key";
 
 const Page: React.FC = () => {
     const [screen, setScreen] = useState<Screen>("onboarding");
     const [email, setEmail] = useState("example@example.com");
+    const [profileBackScreen, setProfileBackScreen] =
+        useState<ProfileBackScreen>("recovery-key");
+
+    const openSetupProfile = (backScreen: ProfileBackScreen) => {
+        setProfileBackScreen(backScreen);
+        setScreen("setup-profile");
+    };
 
     return (
         <>
@@ -40,11 +54,13 @@ const Page: React.FC = () => {
                             ? onboardingGreen
                             : screen == "verify-email"
                               ? verifyEmailBackground
-                            : screen == "recovery-key"
+                              : screen == "recovery-key"
                                 ? recoveryKeyBackground
                                 : screen == "login"
                                   ? loginBackground
-                              : createAccountBackground
+                                  : screen == "setup-profile"
+                                    ? setupProfileBackground
+                                    : createAccountBackground
                     }
                 />
                 <meta name="description" content={onboardingDescription} />
@@ -78,7 +94,7 @@ const Page: React.FC = () => {
             {screen == "login" && (
                 <LoginScreen
                     onBack={() => setScreen("onboarding")}
-                    onContinue={() => undefined}
+                    onContinue={() => openSetupProfile("login")}
                     onSignup={() => setScreen("create-account")}
                 />
             )}
@@ -93,7 +109,13 @@ const Page: React.FC = () => {
             {screen == "recovery-key" && (
                 <RecoveryKeyScreen
                     onBack={() => setScreen("verify-email")}
-                    onNext={() => undefined}
+                    onNext={() => openSetupProfile("recovery-key")}
+                />
+            )}
+            {screen == "setup-profile" && (
+                <SetupProfileScreen
+                    onBack={() => setScreen(profileBackScreen)}
+                    onContinue={() => undefined}
                 />
             )}
         </>
