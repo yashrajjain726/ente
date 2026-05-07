@@ -4,6 +4,7 @@ import {
     CreateAccountScreen,
     createAccountBackground,
 } from "screens/CreateAccountScreen";
+import { LoginScreen, loginBackground } from "screens/LoginScreen";
 import {
     OnboardingScreen,
     onboardingDescription,
@@ -18,7 +19,12 @@ import {
     verifyEmailBackground,
 } from "screens/VerifyEmailScreen";
 
-type Screen = "onboarding" | "create-account" | "verify-email" | "recovery-key";
+type Screen =
+    | "onboarding"
+    | "create-account"
+    | "login"
+    | "verify-email"
+    | "recovery-key";
 
 const Page: React.FC = () => {
     const [screen, setScreen] = useState<Screen>("onboarding");
@@ -34,8 +40,10 @@ const Page: React.FC = () => {
                             ? onboardingGreen
                             : screen == "verify-email"
                               ? verifyEmailBackground
-                              : screen == "recovery-key"
+                            : screen == "recovery-key"
                                 ? recoveryKeyBackground
+                                : screen == "login"
+                                  ? loginBackground
                               : createAccountBackground
                     }
                 />
@@ -54,6 +62,7 @@ const Page: React.FC = () => {
             {screen == "onboarding" && (
                 <OnboardingScreen
                     onCreateAccount={() => setScreen("create-account")}
+                    onLogin={() => setScreen("login")}
                 />
             )}
             {screen == "create-account" && (
@@ -63,7 +72,14 @@ const Page: React.FC = () => {
                         setEmail(nextEmail || "example@example.com");
                         setScreen("verify-email");
                     }}
-                    onLogin={() => setScreen("onboarding")}
+                    onLogin={() => setScreen("login")}
+                />
+            )}
+            {screen == "login" && (
+                <LoginScreen
+                    onBack={() => setScreen("onboarding")}
+                    onContinue={() => undefined}
+                    onSignup={() => setScreen("create-account")}
                 />
             )}
             {screen == "verify-email" && (
