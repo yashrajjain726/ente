@@ -50,6 +50,7 @@ const sampleFeedItems = [
 ];
 
 interface HomeScreenProps {
+    onOpenProfile?: () => void;
     profile: SetupProfile;
 }
 
@@ -172,7 +173,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
     </Box>
 );
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ profile }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({
+    onOpenProfile,
+    profile,
+}) => {
     const initialsSource = profile.fullName.trim() || profile.username.trim();
     const initials = initialsSource
         .split(/\s+/)
@@ -231,26 +235,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ profile }) => {
                             justifySelf: "center",
                             lineHeight: 0,
                             overflow: "visible",
-                            width: 78,
+                            width: 65,
                             "& svg": { display: "block", overflow: "visible" },
                         }}
                     >
-                        <EnteLogo height={24} />
+                        <EnteLogo height={20} />
                     </Box>
                     <Box
+                        component="button"
+                        type="button"
+                        aria-label="Open profile"
+                        onClick={onOpenProfile}
                         sx={{
                             alignItems: "center",
                             bgcolor: profile.avatarUrl
                                 ? "transparent"
                                 : paleGreen,
+                            border: 0,
                             borderRadius: "50%",
                             color: green,
+                            cursor: onOpenProfile ? "pointer" : "default",
                             display: "flex",
                             height: 24,
                             justifyContent: "center",
                             justifySelf: "flex-end",
                             overflow: "hidden",
+                            p: 0,
                             width: 24,
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
                         }}
                     >
                         {profile.avatarUrl ? (

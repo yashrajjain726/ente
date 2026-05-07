@@ -16,6 +16,10 @@ import {
     recoveryKeyBackground,
 } from "screens/RecoveryKeyScreen";
 import {
+    ProfileScreen,
+    profileBackground,
+} from "screens/ProfileScreen";
+import {
     SetupProfileScreen,
     setupProfileBackground,
     type SetupProfile,
@@ -37,7 +41,8 @@ type Screen =
     | "recovery-key"
     | "setup-profile"
     | "share-profile-link"
-    | "home";
+    | "home"
+    | "profile";
 
 type ProfileBackScreen = "login" | "recovery-key";
 
@@ -73,6 +78,8 @@ const Page: React.FC = () => {
                                       ? shareProfileLinkBackground
                                       : screen == "home"
                                         ? homeBackground
+                                        : screen == "profile"
+                                          ? profileBackground
                                         : createAccountBackground
                     }
                 />
@@ -141,7 +148,18 @@ const Page: React.FC = () => {
                     onDone={() => setScreen("home")}
                 />
             )}
-            {screen == "home" && profile && <HomeScreen profile={profile} />}
+            {screen == "home" && profile && (
+                <HomeScreen
+                    profile={profile}
+                    onOpenProfile={() => setScreen("profile")}
+                />
+            )}
+            {screen == "profile" && profile && (
+                <ProfileScreen
+                    profile={profile}
+                    onBack={() => setScreen("home")}
+                />
+            )}
         </>
     );
 };
