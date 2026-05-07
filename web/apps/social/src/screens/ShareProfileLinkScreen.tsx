@@ -26,7 +26,7 @@ interface ActionRowProps {
 }
 
 const profileLinkForUsername = (username: string) =>
-    `https://ente.gg/${encodeURIComponent(username || "maya")}#${profileSecret}`;
+    `https://ente.gg/${encodeURIComponent(username || "anandbaburajan")}#${profileSecret}`;
 
 const BackIcon: React.FC = () => (
     <Box
@@ -200,8 +200,8 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
 
     const shareProfileLink = async () => {
         const shareData = {
-            title: `Follow ${displayName} on Ente`,
-            text: `Follow ${displayName} on Ente to see their private moments.`,
+            title: `Join ${displayName}'s circle on Ente`,
+            text: `Join ${displayName}'s circle on Ente to see their private moments.`,
             url: profileLink,
         };
 

@@ -11,8 +11,8 @@ const paleGreen = "#E7F6E9";
 
 const mockSetupProfileData = {
     avatarUrl: "/images/sample-avatar.jpg",
-    username: "maya",
-    fullName: "Maya Iyer",
+    username: "anandbaburajan",
+    fullName: "Anand Baburajan",
 };
 
 export interface SetupProfile {

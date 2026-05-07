@@ -12,15 +12,12 @@ import {
     onboardingDescription,
     onboardingGreen,
 } from "screens/OnboardingScreen";
+import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
+import { PublicProfileScreen } from "screens/PublicProfileScreen";
 import {
     RecoveryKeyScreen,
     recoveryKeyBackground,
 } from "screens/RecoveryKeyScreen";
-import {
-    ProfileScreen,
-    profileBackground,
-} from "screens/ProfileScreen";
-import { PublicProfileScreen } from "screens/PublicProfileScreen";
 import {
     SetupProfileScreen,
     setupProfileBackground,
@@ -50,8 +47,8 @@ type ProfileBackScreen = "login" | "recovery-key";
 
 const samplePublicProfileData = {
     avatarUrl: "/images/sample-avatar.jpg",
-    fullName: "Maya Iyer",
-    username: "maya",
+    fullName: "Anand Baburajan",
+    username: "anandbaburajan",
 };
 
 interface PublicProfileLink {
@@ -77,29 +74,14 @@ const parsePublicProfileLink = (): PublicProfileLink | null => {
     }
 };
 
-const profileNameFromUsername = (username: string) =>
-    username
-        .replace(/[._-]+/g, " ")
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(" ");
-
-const publicProfileFromLink = ({
-    username,
-}: PublicProfileLink): SetupProfile => ({
+const publicProfileFromLink = (): SetupProfile => ({
     avatarUrl: samplePublicProfileData.avatarUrl,
-    fullName:
-        username == samplePublicProfileData.username
-            ? samplePublicProfileData.fullName
-            : profileNameFromUsername(username),
-    username,
+    fullName: samplePublicProfileData.fullName,
+    username: samplePublicProfileData.username,
 });
 
 const Page: React.FC = () => {
-    const [routeMode, setRouteMode] = useState<RouteMode>({
-        kind: "checking",
-    });
+    const [routeMode, setRouteMode] = useState<RouteMode>({ kind: "checking" });
     const [screen, setScreen] = useState<Screen>("onboarding");
     const [email, setEmail] = useState("example@example.com");
     const [profile, setProfile] = useState<SetupProfile | null>(null);
@@ -160,7 +142,7 @@ const Page: React.FC = () => {
             {routeMode.kind == "checking" ? (
                 <Box sx={{ bgcolor: profileBackground, minHeight: "100svh" }} />
             ) : routeMode.kind == "public-profile" ? (
-                <PublicProfileScreen profile={publicProfileFromLink(routeMode)} />
+                <PublicProfileScreen profile={publicProfileFromLink()} />
             ) : (
                 <>
                     {screen == "onboarding" && (

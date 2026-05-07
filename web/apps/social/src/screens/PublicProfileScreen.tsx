@@ -12,7 +12,7 @@ export const PublicProfileScreen: React.FC<PublicProfileScreenProps> = ({
     <ProfileScreen
         headerVariant="public"
         profile={profile}
-        onFollow={() => {
+        onAddToCircle={() => {
             window.location.assign("/");
         }}
     />

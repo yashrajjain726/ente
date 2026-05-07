@@ -20,56 +20,24 @@ const sampleMomentItems = [
         gridRow: "1 / span 2",
         imageUrl: "/images/sample-feed-1.jpg",
     },
-    {
-        gridColumn: "3",
-        gridRow: "1",
-        imageUrl: "/images/sample-feed-2.jpg",
-    },
-    {
-        gridColumn: "3",
-        gridRow: "2",
-        imageUrl: "/images/sample-feed-3.jpg",
-    },
-    {
-        gridColumn: "1",
-        gridRow: "3",
-        imageUrl: "/images/sample-feed-4.jpg",
-    },
+    { gridColumn: "3", gridRow: "1", imageUrl: "/images/sample-feed-2.jpg" },
+    { gridColumn: "3", gridRow: "2", imageUrl: "/images/sample-feed-3.jpg" },
+    { gridColumn: "1", gridRow: "3", imageUrl: "/images/sample-feed-4.jpg" },
     {
         gridColumn: "2 / span 2",
         gridRow: "3",
         imageUrl: "/images/sample-feed-5.jpg",
     },
-    {
-        gridColumn: "1",
-        gridRow: "4",
-        imageUrl: "/images/sample-feed-6.jpg",
-    },
-    {
-        gridColumn: "2",
-        gridRow: "4",
-        imageUrl: "/images/sample-feed-2.jpg",
-    },
-    {
-        gridColumn: "3",
-        gridRow: "4",
-        imageUrl: "/images/sample-feed-4.jpg",
-    },
+    { gridColumn: "1", gridRow: "4", imageUrl: "/images/sample-feed-6.jpg" },
+    { gridColumn: "2", gridRow: "4", imageUrl: "/images/sample-feed-2.jpg" },
+    { gridColumn: "3", gridRow: "4", imageUrl: "/images/sample-feed-4.jpg" },
     {
         gridColumn: "1 / span 2",
         gridRow: "5",
         imageUrl: "/images/sample-feed-3.jpg",
     },
-    {
-        gridColumn: "3",
-        gridRow: "5",
-        imageUrl: "/images/sample-feed-6.jpg",
-    },
-    {
-        gridColumn: "1",
-        gridRow: "6",
-        imageUrl: "/images/sample-feed-5.jpg",
-    },
+    { gridColumn: "3", gridRow: "5", imageUrl: "/images/sample-feed-6.jpg" },
+    { gridColumn: "1", gridRow: "6", imageUrl: "/images/sample-feed-5.jpg" },
     {
         gridColumn: "2 / span 2",
         gridRow: "6",
@@ -79,48 +47,15 @@ const sampleMomentItems = [
 
 interface ProfileScreenProps {
     headerVariant?: "owner" | "public";
+    onAddToCircle?: () => void;
     onBack?: () => void;
-    onFollow?: () => void;
     profile: SetupProfile;
 }
 
-interface StatProps {
-    label: string;
-    value: string;
-}
-
-const Stat: React.FC<StatProps> = ({ label, value }) => (
-    <Box sx={{ minWidth: 0 }}>
-        <Box
-            sx={{
-                color: textStrong,
-                fontFamily: '"Inter Variable", Inter, sans-serif',
-                fontSize: 15,
-                fontWeight: 800,
-                lineHeight: "19px",
-            }}
-        >
-            {value}
-        </Box>
-        <Box
-            sx={{
-                color: textSoft,
-                fontFamily: '"Inter Variable", Inter, sans-serif',
-                fontSize: 13,
-                fontWeight: 650,
-                lineHeight: "17px",
-                mt: "1px",
-            }}
-        >
-            {label}
-        </Box>
-    </Box>
-);
-
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     headerVariant = "owner",
+    onAddToCircle,
     onBack,
-    onFollow,
     profile,
 }) => {
     const isPublicProfile = headerVariant == "public";
@@ -131,6 +66,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         .slice(0, 2)
         .map((part) => part[0]?.toUpperCase())
         .join("");
+    const momentsSharedCount = 12;
+    const circlePeopleCount = 7;
 
     return (
         <Box
@@ -236,7 +173,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     {isPublicProfile ? (
                         <Button
                             type="button"
-                            onClick={onFollow}
+                            onClick={onAddToCircle}
                             sx={{
                                 backgroundColor: green,
                                 borderRadius: "16px",
@@ -247,7 +184,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 "&:hover": { backgroundColor: "#07A820" },
                             }}
                         >
-                            Follow
+                            Join circle
                         </Button>
                     ) : (
                         <Box
@@ -282,9 +219,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     sx={{
                         alignItems: "center",
                         display: "flex",
-                        gap: "22px",
-                        px: "14px",
-                        pt: "24px",
+                        flexDirection: "column",
+                        px: "24px",
+                        pt: "30px",
+                        textAlign: "center",
                         width: "100%",
                     }}
                 >
@@ -298,11 +236,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             borderRadius: "50%",
                             color: green,
                             display: "flex",
-                            flexShrink: 0,
-                            height: 86,
                             justifyContent: "center",
                             overflow: "hidden",
-                            width: 86,
+                            width: 118,
                         }}
                     >
                         {profile.avatarUrl ? (
@@ -324,7 +260,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     color: green,
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 27,
+                                    fontSize: 34,
                                     fontWeight: 800,
                                     lineHeight: 1,
                                 }}
@@ -335,51 +271,99 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     </Box>
                     <Box
                         sx={{
+                            color: textStrong,
+                            fontFamily:
+                                '"Nunito", "Inter Variable", sans-serif',
+                            fontSize: 22,
+                            fontWeight: 800,
+                            lineHeight: "28px",
+                            mt: "18px",
+                            maxWidth: "100%",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        {displayName}
+                    </Box>
+                    <Box
+                        sx={{
+                            color: textSoft,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 16,
+                            fontWeight: 700,
+                            lineHeight: "22px",
+                            mt: "2px",
+                            maxWidth: "100%",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        @{profile.username}
+                    </Box>
+                    <Box
+                        sx={{
+                            alignItems: "baseline",
                             display: "flex",
-                            flex: "1 1 0",
-                            flexDirection: "column",
-                            minWidth: 0,
+                            flexWrap: "wrap",
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            gap: "8px",
+                            justifyContent: "center",
+                            mt: "15px",
+                            maxWidth: "100%",
                         }}
                     >
                         <Box
+                            component="span"
                             sx={{
-                                color: textStrong,
-                                fontFamily: '"Inter Variable", Inter, sans-serif',
-                                fontSize: 15,
-                                fontWeight: 750,
-                                lineHeight: "19px",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
+                                bgcolor: "#F7F7F7",
+                                border: "1px solid rgba(0, 0, 0, 0.04)",
+                                borderRadius: "999px",
+                                color: textSoft,
+                                fontSize: 14,
+                                fontWeight: 700,
+                                lineHeight: "18px",
+                                px: "12px",
+                                py: "7px",
                             }}
                         >
-                            {displayName}
+                            <Box
+                                component="span"
+                                sx={{ color: textStrong, fontWeight: 850 }}
+                            >
+                                {momentsSharedCount}
+                            </Box>{" "}
+                            shared moments
                         </Box>
                         <Box
+                            component="span"
                             sx={{
-                                alignItems: "flex-start",
-                                display: "grid",
-                                gap: "12px",
-                                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                                mt: "16px",
-                                width: "100%",
+                                bgcolor: "#F7F7F7",
+                                border: "1px solid rgba(0, 0, 0, 0.04)",
+                                borderRadius: "999px",
+                                color: textSoft,
+                                fontSize: 14,
+                                fontWeight: 700,
+                                lineHeight: "18px",
+                                px: "12px",
+                                py: "7px",
                             }}
                         >
-                            <Stat label="moments" value="12" />
-                            <Stat label="followers" value="7" />
-                            <Stat label="following" value="10" />
+                            <Box
+                                component="span"
+                                sx={{ color: textStrong, fontWeight: 850 }}
+                            >
+                                {circlePeopleCount}
+                            </Box>{" "}
+                            people in circle
                         </Box>
                     </Box>
                 </Box>
 
                 <Box
                     component="section"
-                    sx={{
-                        mt: "24px",
-                        pb: 0,
-                        px: 0,
-                        width: "100%",
-                    }}
+                    sx={{ mt: "24px", pb: 0, px: 0, width: "100%" }}
                 >
                     <Box
                         sx={{
