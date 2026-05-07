@@ -4,6 +4,7 @@ import {
     CreateAccountScreen,
     createAccountBackground,
 } from "screens/CreateAccountScreen";
+import { HomeScreen, homeBackground } from "screens/HomeScreen";
 import { LoginScreen, loginBackground } from "screens/LoginScreen";
 import {
     OnboardingScreen,
@@ -35,7 +36,8 @@ type Screen =
     | "verify-email"
     | "recovery-key"
     | "setup-profile"
-    | "share-profile-link";
+    | "share-profile-link"
+    | "home";
 
 type ProfileBackScreen = "login" | "recovery-key";
 
@@ -69,7 +71,9 @@ const Page: React.FC = () => {
                                     ? setupProfileBackground
                                     : screen == "share-profile-link"
                                       ? shareProfileLinkBackground
-                                      : createAccountBackground
+                                      : screen == "home"
+                                        ? homeBackground
+                                        : createAccountBackground
                     }
                 />
                 <meta name="description" content={onboardingDescription} />
@@ -134,9 +138,10 @@ const Page: React.FC = () => {
                 <ShareProfileLinkScreen
                     profile={profile}
                     onBack={() => setScreen("setup-profile")}
-                    onDone={() => undefined}
+                    onDone={() => setScreen("home")}
                 />
             )}
+            {screen == "home" && profile && <HomeScreen profile={profile} />}
         </>
     );
 };

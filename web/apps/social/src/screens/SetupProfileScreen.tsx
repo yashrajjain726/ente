@@ -10,7 +10,7 @@ const warning = "#F63A3A";
 const paleGreen = "#E7F6E9";
 
 const mockSetupProfileData = {
-    avatarUrl: "/images/mock-profile-picture.jpg",
+    avatarUrl: "/images/sample-avatar.jpg",
     username: "maya",
     fullName: "Maya Iyer",
 };

@@ -93,35 +93,26 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
             <Box
                 component="header"
                 sx={{
-                    display: "flex",
+                    alignItems: "center",
+                    display: "grid",
                     flexShrink: 0,
-                    height: 78,
-                    pt: "28px",
+                    gridTemplateColumns: "40px 1fr 40px",
+                    height: 40,
+                    mt: "44px",
                     width: "100%",
-                    "@media (max-height: 760px)": { height: 70, pt: "28px" },
                 }}
             >
+                <Box />
                 <Box
                     sx={{
-                        alignItems: "center",
-                        display: "grid",
-                        gridTemplateColumns: "24px 1fr 24px",
-                        height: 42,
-                        width: "100%",
+                        color: "white",
+                        justifySelf: "center",
+                        lineHeight: 0,
                     }}
                 >
-                    <Box />
-                    <Box
-                        sx={{
-                            color: "white",
-                            justifySelf: "center",
-                            lineHeight: 0,
-                        }}
-                    >
-                        <EnteLogo height={24} />
-                    </Box>
-                    <Box />
+                    <EnteLogo height={24} />
                 </Box>
+                <Box />
             </Box>
             <Box
                 component="img"
