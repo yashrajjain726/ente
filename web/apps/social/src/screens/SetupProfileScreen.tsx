@@ -460,7 +460,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                                 : undefined,
                         }}
                     >
-                        Continue
+                        Next
                     </Box>
                 </Box>
             </Box>
