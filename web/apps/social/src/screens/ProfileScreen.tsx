@@ -1,9 +1,15 @@
-import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
-import { Box } from "@mui/material";
+import {
+    ArrowLeft02Icon,
+    MoreHorizontalIcon,
+    Settings01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Box, Menu, MenuItem } from "@mui/material";
 import { EnteLogo } from "ente-base/components/EnteLogo";
-import React from "react";
+import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import { LinkIcon, ShareIcon } from "screens/ShareProfileLinkScreen";
+import { profileLinkForUsername } from "utils/profileLink";
 
 export const profileBackground = "#FFFFFF";
 
@@ -132,16 +138,21 @@ const buildPostMasonryRows = (items: SamplePostItem[]): PostMasonryRow[] => {
 interface ProfileScreenProps {
     headerVariant?: "owner" | "public";
     onBack?: () => void;
+    onOpenSettings?: () => void;
     profile: SetupProfile;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     headerVariant = "owner",
     onBack,
+    onOpenSettings,
     profile,
 }) => {
+    const [profileActionsAnchor, setProfileActionsAnchor] =
+        useState<HTMLElement | null>(null);
     const isPublicProfile = headerVariant == "public";
     const displayName = profile.fullName.trim() || profile.username.trim();
+    const profileLink = profileLinkForUsername(profile.username.trim());
     const initialsSource = displayName || profile.username.trim();
     const initials = initialsSource
         .split(/\s+/)
@@ -153,6 +164,30 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         0,
     );
     const friendsCount = 7;
+    const isProfileActionsOpen = Boolean(profileActionsAnchor);
+
+    const closeProfileActions = () => setProfileActionsAnchor(null);
+
+    const copyProfileURL = async () => {
+        closeProfileActions();
+        await navigator.clipboard.writeText(profileLink);
+    };
+
+    const shareProfile = async () => {
+        closeProfileActions();
+
+        if (typeof navigator.share == "function") {
+            try {
+                await navigator.share({ url: profileLink });
+                return;
+            } catch (error) {
+                if (error instanceof DOMException && error.name == "AbortError")
+                    return;
+            }
+        }
+
+        await navigator.clipboard.writeText(profileLink);
+    };
 
     return (
         <Box
@@ -246,7 +281,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 },
                             }}
                         >
-                            <ArrowBackRoundedIcon sx={{ fontSize: 24 }} />
+                            <HugeiconsIcon
+                                icon={ArrowLeft02Icon}
+                                size={24}
+                                strokeWidth={1.8}
+                            />
                         </Box>
                     )}
                     {isPublicProfile && (
@@ -311,12 +350,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             component="button"
                             type="button"
                             aria-label="Settings"
+                            onClick={onOpenSettings}
                             sx={{
                                 alignItems: "center",
                                 bgcolor: "transparent",
                                 border: 0,
                                 color: "inherit",
-                                cursor: "pointer",
+                                cursor: onOpenSettings ? "pointer" : "default",
                                 display: "flex",
                                 height: 24,
                                 justifyContent: "flex-end",
@@ -329,7 +369,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 },
                             }}
                         >
-                            <SettingsRoundedIcon sx={{ fontSize: 22 }} />
+                            <HugeiconsIcon
+                                icon={Settings01Icon}
+                                size={20}
+                                strokeWidth={1.8}
+                            />
                         </Box>
                     )}
                 </Box>
@@ -402,20 +446,219 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     >
                         <Box
                             sx={{
-                                color: textStrong,
-                                fontFamily:
-                                    '"Nunito", "Inter Variable", sans-serif',
-                                fontSize: 26,
-                                fontWeight: 800,
-                                lineHeight: "32px",
-                                maxWidth: "100%",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
+                                alignItems: "center",
+                                display: "grid",
+                                gridTemplateColumns:
+                                    "minmax(0, 1fr) minmax(0, max-content) minmax(0, 1fr)",
+                                minWidth: 0,
+                                width: "100%",
                             }}
                         >
-                            {displayName}
+                            <Box
+                                sx={{
+                                    color: textStrong,
+                                    fontFamily:
+                                        '"Nunito", "Inter Variable", sans-serif',
+                                    fontSize: 26,
+                                    fontWeight: 800,
+                                    gridColumn: 2,
+                                    lineHeight: "32px",
+                                    maxWidth: isPublicProfile
+                                        ? "100%"
+                                        : "calc(100vw - 72px)",
+                                    "@media (min-width: 600px)": {
+                                        maxWidth: isPublicProfile
+                                            ? "100%"
+                                            : 303,
+                                    },
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                {displayName}
+                            </Box>
+                            {!isPublicProfile && (
+                                <Box
+                                    component="button"
+                                    id="profile-actions-button"
+                                    type="button"
+                                    aria-label="Profile actions"
+                                    aria-controls={
+                                        isProfileActionsOpen
+                                            ? "profile-actions-menu"
+                                            : undefined
+                                    }
+                                    aria-expanded={
+                                        isProfileActionsOpen
+                                            ? "true"
+                                            : undefined
+                                    }
+                                    aria-haspopup="menu"
+                                    onClick={(event) =>
+                                        setProfileActionsAnchor(
+                                            event.currentTarget,
+                                        )
+                                    }
+                                    sx={{
+                                        alignItems: "center",
+                                        bgcolor: "transparent",
+                                        border: 0,
+                                        color: textStrong,
+                                        cursor: "pointer",
+                                        display: "flex",
+                                        gridColumn: 3,
+                                        height: 24,
+                                        justifyContent: "center",
+                                        justifySelf: "start",
+                                        ml: "4px",
+                                        p: 0,
+                                        width: 24,
+                                        "&:focus-visible": {
+                                            borderRadius: "50%",
+                                            outline: `2px solid ${green}`,
+                                            outlineOffset: 2,
+                                        },
+                                    }}
+                                >
+                                    <HugeiconsIcon
+                                        icon={MoreHorizontalIcon}
+                                        size={20}
+                                        strokeWidth={2}
+                                    />
+                                </Box>
+                            )}
                         </Box>
+                        {!isPublicProfile && (
+                            <Menu
+                                id="profile-actions-menu"
+                                anchorEl={profileActionsAnchor}
+                                open={isProfileActionsOpen}
+                                onClose={closeProfileActions}
+                                anchorOrigin={{
+                                    horizontal: "center",
+                                    vertical: "bottom",
+                                }}
+                                transformOrigin={{
+                                    horizontal: "center",
+                                    vertical: "top",
+                                }}
+                                slotProps={{
+                                    paper: {
+                                        sx: {
+                                            borderRadius: "16px",
+                                            boxShadow:
+                                                "0 14px 40px rgba(0, 0, 0, 0.16)",
+                                            mt: "6px",
+                                            minWidth: 190,
+                                            p: "4px",
+                                        },
+                                    },
+                                    list: {
+                                        "aria-labelledby":
+                                            "profile-actions-button",
+                                        sx: { p: 0 },
+                                    },
+                                }}
+                            >
+                                <MenuItem
+                                    disableRipple
+                                    onClick={() => void copyProfileURL()}
+                                    sx={{
+                                        borderRadius: "10px",
+                                        gap: "8px",
+                                        minHeight: 38,
+                                        px: "8px",
+                                        py: "7px",
+                                        "&.Mui-focusVisible": {
+                                            bgcolor: "rgba(0, 0, 0, 0.025)",
+                                        },
+                                        "&.Mui-selected": {
+                                            bgcolor: "rgba(0, 0, 0, 0.025)",
+                                        },
+                                        "&.Mui-selected:hover": {
+                                            bgcolor: "rgba(0, 0, 0, 0.025)",
+                                        },
+                                        "&:active": {
+                                            bgcolor: "rgba(0, 0, 0, 0.025)",
+                                        },
+                                        "&:hover": {
+                                            bgcolor: "rgba(0, 0, 0, 0.025)",
+                                        },
+                                    }}
+                                >
+                                    <Box
+                                        sx={{
+                                            alignItems: "center",
+                                            color: textBase,
+                                            display: "flex",
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <LinkIcon />
+                                    </Box>
+                                    <Box
+                                        sx={{
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            lineHeight: "18px",
+                                        }}
+                                    >
+                                        Copy profile URL
+                                    </Box>
+                                </MenuItem>
+                                <MenuItem
+                                    disableRipple
+                                    onClick={() => void shareProfile()}
+                                    sx={{
+                                        borderRadius: "10px",
+                                        gap: "8px",
+                                        minHeight: 38,
+                                        px: "8px",
+                                        py: "7px",
+                                        "&.Mui-focusVisible": {
+                                            bgcolor: "rgba(0, 0, 0, 0.025)",
+                                        },
+                                        "&.Mui-selected": {
+                                            bgcolor: "rgba(0, 0, 0, 0.025)",
+                                        },
+                                        "&.Mui-selected:hover": {
+                                            bgcolor: "rgba(0, 0, 0, 0.025)",
+                                        },
+                                        "&:active": {
+                                            bgcolor: "rgba(0, 0, 0, 0.025)",
+                                        },
+                                        "&:hover": {
+                                            bgcolor: "rgba(0, 0, 0, 0.025)",
+                                        },
+                                    }}
+                                >
+                                    <Box
+                                        sx={{
+                                            alignItems: "center",
+                                            color: textBase,
+                                            display: "flex",
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <ShareIcon />
+                                    </Box>
+                                    <Box
+                                        sx={{
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            lineHeight: "18px",
+                                        }}
+                                    >
+                                        Share profile
+                                    </Box>
+                                </MenuItem>
+                            </Menu>
+                        )}
                         <Box
                             sx={{
                                 color: textSoft,
@@ -508,34 +751,38 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                 },
                                             }}
                                         >
-                                            {row.items.map(({ item, index }) => (
-                                                <Box
-                                                    key={`${group.label}-${item.imageUrl}-${index}`}
-                                                    sx={{
-                                                        bgcolor: paleGreen,
-                                                        display: "block",
-                                                        flex: `${item.aspectRatio} 1 0`,
-                                                        minWidth: 0,
-                                                        overflow: "hidden",
-                                                    }}
-                                                >
+                                            {row.items.map(
+                                                ({ item, index }) => (
                                                     <Box
-                                                        component="img"
-                                                        alt={`${group.label} post ${
-                                                            index + 1
-                                                        }`}
-                                                        src={item.imageUrl}
+                                                        key={`${group.label}-${item.imageUrl}-${index}`}
                                                         sx={{
+                                                            bgcolor: paleGreen,
                                                             display: "block",
-                                                            height: "100%",
-                                                            objectFit: "cover",
-                                                            objectPosition:
-                                                                "center",
-                                                            width: "100%",
+                                                            flex: `${item.aspectRatio} 1 0`,
+                                                            minWidth: 0,
+                                                            overflow: "hidden",
                                                         }}
-                                                    />
-                                                </Box>
-                                            ))}
+                                                    >
+                                                        <Box
+                                                            component="img"
+                                                            alt={`${group.label} post ${
+                                                                index + 1
+                                                            }`}
+                                                            src={item.imageUrl}
+                                                            sx={{
+                                                                display:
+                                                                    "block",
+                                                                height: "100%",
+                                                                objectFit:
+                                                                    "cover",
+                                                                objectPosition:
+                                                                    "center",
+                                                                width: "100%",
+                                                            }}
+                                                        />
+                                                    </Box>
+                                                ),
+                                            )}
                                         </Box>
                                     ),
                                 )}

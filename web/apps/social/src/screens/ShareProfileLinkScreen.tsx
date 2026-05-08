@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import { profileLinkForUsername } from "utils/profileLink";
 
 export const shareProfileLinkBackground = "#FAFAFA";
 
@@ -10,7 +11,6 @@ const textMuted = "#666";
 const textLight = "#969696";
 const paleGreen = "#E7F6E9";
 const iconFill = "#F0F0F0";
-const profileSecret = "5d2a9WhmD2NU";
 
 interface ShareProfileLinkScreenProps {
     onBack: () => void;
@@ -24,9 +24,6 @@ interface ActionRowProps {
     startIcon: React.ReactNode;
     status?: string;
 }
-
-const profileLinkForUsername = (username: string) =>
-    `https://ente.gg/${encodeURIComponent(username || "anandbaburajan")}#${profileSecret}`;
 
 const BackIcon: React.FC = () => (
     <Box
@@ -46,7 +43,7 @@ const BackIcon: React.FC = () => (
     </Box>
 );
 
-const ShareIcon: React.FC = () => (
+export const ShareIcon: React.FC = () => (
     <Box
         component="svg"
         viewBox="0 0 24 24"
@@ -64,7 +61,7 @@ const ShareIcon: React.FC = () => (
     </Box>
 );
 
-const LinkIcon: React.FC = () => (
+export const LinkIcon: React.FC = () => (
     <Box
         component="svg"
         viewBox="0 0 24 24"
@@ -199,9 +196,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
     };
 
     const shareProfileLink = async () => {
-        const shareData = {
-            url: profileLink,
-        };
+        const shareData = { url: profileLink };
 
         if (typeof navigator.share == "function") {
             try {

@@ -14,6 +14,7 @@ import {
 } from "screens/OnboardingScreen";
 import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
 import { PublicProfileScreen } from "screens/PublicProfileScreen";
+import { SettingsScreen, settingsBackground } from "screens/SettingsScreen";
 import {
     SetupProfileScreen,
     setupProfileBackground,
@@ -36,7 +37,8 @@ type Screen =
     | "setup-profile"
     | "share-profile-link"
     | "home"
-    | "profile";
+    | "profile"
+    | "settings";
 
 type ProfileBackScreen = "login" | "verify-email";
 
@@ -114,7 +116,9 @@ const Page: React.FC = () => {
                         ? homeBackground
                         : screen == "profile"
                           ? profileBackground
-                          : createAccountBackground;
+                          : screen == "settings"
+                            ? settingsBackground
+                            : createAccountBackground;
 
     return (
         <>
@@ -195,6 +199,14 @@ const Page: React.FC = () => {
                         <ProfileScreen
                             profile={profile}
                             onBack={() => setScreen("home")}
+                            onOpenSettings={() => setScreen("settings")}
+                        />
+                    )}
+                    {screen == "settings" && profile && (
+                        <SettingsScreen
+                            email={email}
+                            profile={profile}
+                            onBack={() => setScreen("profile")}
                         />
                     )}
                 </>
