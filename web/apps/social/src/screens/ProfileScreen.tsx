@@ -137,7 +137,7 @@ const buildPostMasonryRows = (items: SamplePostItem[]): PostMasonryRow[] => {
 
 interface ProfileScreenProps {
     friendsCount?: number;
-    headerVariant?: "owner" | "public";
+    headerVariant?: "friend" | "owner" | "public";
     onBack?: () => void;
     onOpenFriends?: () => void;
     onOpenSettings?: () => void;
@@ -155,6 +155,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const [profileActionsAnchor, setProfileActionsAnchor] =
         useState<HTMLElement | null>(null);
     const isPublicProfile = headerVariant == "public";
+    const isOwnerProfile = headerVariant == "owner";
+    const isFriendProfile = headerVariant == "friend";
     const displayName = profile.fullName.trim() || profile.username.trim();
     const profileLink = profileLinkForUsername(profile.username.trim());
     const initialsSource = displayName || profile.username.trim();
@@ -168,6 +170,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         0,
     );
     const isProfileActionsOpen = Boolean(profileActionsAnchor);
+    const canOpenFriends = isOwnerProfile && Boolean(onOpenFriends);
 
     const closeProfileActions = () => setProfileActionsAnchor(null);
 
@@ -264,7 +267,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         <Box
                             component="button"
                             type="button"
-                            aria-label="Back to home"
+                            aria-label={
+                                isFriendProfile
+                                    ? "Back to friends"
+                                    : "Back to home"
+                            }
                             onClick={onBack}
                             sx={{
                                 alignItems: "center",
@@ -348,7 +355,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             {profile.username}
                         </Box>
                     )}
-                    {!isPublicProfile && (
+                    {isOwnerProfile ? (
                         <Box
                             component="button"
                             type="button"
@@ -378,6 +385,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 strokeWidth={1.8}
                             />
                         </Box>
+                    ) : (
+                        !isPublicProfile && (
+                            <Box aria-hidden sx={{ width: 24 }} />
+                        )
                     )}
                 </Box>
                 <Box
@@ -481,7 +492,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             >
                                 {displayName}
                             </Box>
-                            {!isPublicProfile && (
+                            {isOwnerProfile && (
                                 <Box
                                     component="button"
                                     id="profile-actions-button"
@@ -532,7 +543,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 </Box>
                             )}
                         </Box>
-                        {!isPublicProfile && (
+                        {isOwnerProfile && (
                             <Menu
                                 id="profile-actions-menu"
                                 anchorEl={profileActionsAnchor}
@@ -691,35 +702,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             <Box component="span">posts</Box>
                             <Box component="span">·</Box>
                             <Box
-                                component={
-                                    !isPublicProfile && onOpenFriends
-                                        ? "button"
-                                        : "span"
-                                }
-                                type={
-                                    !isPublicProfile && onOpenFriends
-                                        ? "button"
-                                        : undefined
-                                }
+                                component={canOpenFriends ? "button" : "span"}
+                                type={canOpenFriends ? "button" : undefined}
                                 aria-label={
-                                    !isPublicProfile && onOpenFriends
-                                        ? "Open friends"
-                                        : undefined
+                                    canOpenFriends ? "Open friends" : undefined
                                 }
                                 onClick={
-                                    !isPublicProfile && onOpenFriends
-                                        ? onOpenFriends
-                                        : undefined
+                                    canOpenFriends ? onOpenFriends : undefined
                                 }
                                 sx={{
                                     alignItems: "baseline",
                                     bgcolor: "transparent",
                                     border: 0,
                                     color: "inherit",
-                                    cursor:
-                                        !isPublicProfile && onOpenFriends
-                                            ? "pointer"
-                                            : "default",
+                                    cursor: canOpenFriends
+                                        ? "pointer"
+                                        : "default",
                                     display: "inline-flex",
                                     gap: "5px",
                                     font: "inherit",

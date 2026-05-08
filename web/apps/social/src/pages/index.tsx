@@ -41,6 +41,7 @@ type Screen =
     | "home"
     | "profile"
     | "friends"
+    | "friend-profile"
     | "settings";
 
 type ProfileBackScreen = "login" | "verify-email";
@@ -88,6 +89,9 @@ const Page: React.FC = () => {
     const [profile, setProfile] = useState<SetupProfile | null>(null);
     const [profileBackScreen, setProfileBackScreen] =
         useState<ProfileBackScreen>("verify-email");
+    const [selectedFriendID, setSelectedFriendID] = useState<string | null>(
+        null,
+    );
 
     const openSetupProfile = (backScreen: ProfileBackScreen) => {
         setProfileBackScreen(backScreen);
@@ -102,6 +106,10 @@ const Page: React.FC = () => {
                 : { kind: "app" },
         );
     }, []);
+
+    const selectedFriend = selectedFriendID
+        ? friends.find((friend) => friend.id == selectedFriendID)
+        : undefined;
 
     const themeColor =
         routeMode.kind != "app"
@@ -120,7 +128,7 @@ const Page: React.FC = () => {
                         ? homeBackground
                         : screen == "profile"
                           ? profileBackground
-                          : screen == "friends"
+                          : screen == "friends" || screen == "friend-profile"
                             ? friendsBackground
                             : screen == "settings"
                               ? settingsBackground
@@ -214,6 +222,10 @@ const Page: React.FC = () => {
                         <FriendsScreen
                             friends={friends}
                             onBack={() => setScreen("profile")}
+                            onOpenFriend={(friendID) => {
+                                setSelectedFriendID(friendID);
+                                setScreen("friend-profile");
+                            }}
                             onUnfriend={(friendID) =>
                                 setFriends((currentFriends) =>
                                     currentFriends.filter(
@@ -221,6 +233,18 @@ const Page: React.FC = () => {
                                     ),
                                 )
                             }
+                        />
+                    )}
+                    {screen == "friend-profile" && selectedFriend && (
+                        <ProfileScreen
+                            friendsCount={selectedFriend.friendsCount}
+                            headerVariant="friend"
+                            profile={{
+                                avatarUrl: selectedFriend.avatarUrl,
+                                fullName: selectedFriend.fullName,
+                                username: selectedFriend.username,
+                            }}
+                            onBack={() => setScreen("friends")}
                         />
                     )}
                     {screen == "settings" && profile && (

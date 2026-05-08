@@ -20,11 +20,13 @@ const dangerColor = "#F63A3A";
 interface FriendsScreenProps {
     friends: FriendProfile[];
     onBack?: () => void;
+    onOpenFriend?: (friendID: string) => void;
     onUnfriend?: (friendID: string) => void;
 }
 
 interface FriendRowProps {
     friend: FriendProfile;
+    onOpenFriend?: (friendID: string) => void;
     onUnfriend?: (friendID: string) => void;
 }
 
@@ -36,7 +38,11 @@ const initialsFor = (name: string) =>
         .map((part) => part[0]?.toUpperCase())
         .join("");
 
-const FriendRow: React.FC<FriendRowProps> = ({ friend, onUnfriend }) => {
+const FriendRow: React.FC<FriendRowProps> = ({
+    friend,
+    onOpenFriend,
+    onUnfriend,
+}) => {
     const [actionsAnchor, setActionsAnchor] = useState<HTMLElement | null>(
         null,
     );
@@ -59,7 +65,7 @@ const FriendRow: React.FC<FriendRowProps> = ({ friend, onUnfriend }) => {
             sx={{
                 alignItems: "center",
                 display: "grid",
-                gridTemplateColumns: "48px minmax(0, 1fr) 32px",
+                gridTemplateColumns: "minmax(0, 1fr) 32px",
                 gap: "12px",
                 listStyle: "none",
                 minHeight: 72,
@@ -69,81 +75,106 @@ const FriendRow: React.FC<FriendRowProps> = ({ friend, onUnfriend }) => {
             }}
         >
             <Box
+                component="button"
+                type="button"
+                onClick={() => onOpenFriend?.(friend.id)}
                 sx={{
                     alignItems: "center",
-                    bgcolor: friend.avatarUrl ? "transparent" : paleGreen,
-                    borderRadius: "50%",
-                    color: green,
-                    display: "flex",
-                    height: 48,
-                    justifyContent: "center",
-                    overflow: "hidden",
-                    width: 48,
-                }}
-            >
-                {friend.avatarUrl ? (
-                    <Box
-                        component="img"
-                        alt=""
-                        src={friend.avatarUrl}
-                        sx={{
-                            display: "block",
-                            height: "100%",
-                            objectFit: "cover",
-                            objectPosition: "center",
-                            width: "100%",
-                        }}
-                    />
-                ) : (
-                    <Box
-                        sx={{
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 15,
-                            fontWeight: 800,
-                            lineHeight: 1,
-                        }}
-                    >
-                        {initials}
-                    </Box>
-                )}
-            </Box>
-            <Box
-                sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
+                    bgcolor: "transparent",
+                    border: 0,
+                    borderRadius: "12px",
+                    cursor: onOpenFriend ? "pointer" : "default",
+                    display: "grid",
+                    gap: "12px",
+                    gridTemplateColumns: "48px minmax(0, 1fr)",
                     minWidth: 0,
+                    p: 0,
+                    textAlign: "left",
+                    width: "100%",
+                    "&:focus-visible": {
+                        outline: `2px solid ${green}`,
+                        outlineOffset: 2,
+                    },
                 }}
             >
                 <Box
                     sx={{
-                        color: textStrong,
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 15,
-                        fontWeight: 700,
-                        lineHeight: "20px",
-                        minWidth: 0,
+                        alignItems: "center",
+                        bgcolor: friend.avatarUrl ? "transparent" : paleGreen,
+                        borderRadius: "50%",
+                        color: green,
+                        display: "flex",
+                        height: 48,
+                        justifyContent: "center",
                         overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        width: 48,
                     }}
                 >
-                    {displayName}
+                    {friend.avatarUrl ? (
+                        <Box
+                            component="img"
+                            alt=""
+                            src={friend.avatarUrl}
+                            sx={{
+                                display: "block",
+                                height: "100%",
+                                objectFit: "cover",
+                                objectPosition: "center",
+                                width: "100%",
+                            }}
+                        />
+                    ) : (
+                        <Box
+                            sx={{
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 15,
+                                fontWeight: 800,
+                                lineHeight: 1,
+                            }}
+                        >
+                            {initials}
+                        </Box>
+                    )}
                 </Box>
                 <Box
                     sx={{
-                        color: textSoft,
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 13,
-                        fontWeight: 600,
-                        lineHeight: "18px",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
                         minWidth: 0,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
                     }}
                 >
-                    @{friend.username}
+                    <Box
+                        sx={{
+                            color: textStrong,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 15,
+                            fontWeight: 700,
+                            lineHeight: "20px",
+                            minWidth: 0,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        {displayName}
+                    </Box>
+                    <Box
+                        sx={{
+                            color: textSoft,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            lineHeight: "18px",
+                            minWidth: 0,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        @{friend.username}
+                    </Box>
                 </Box>
             </Box>
             <Box
@@ -244,6 +275,7 @@ const FriendRow: React.FC<FriendRowProps> = ({ friend, onUnfriend }) => {
 export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     friends,
     onBack,
+    onOpenFriend,
     onUnfriend,
 }) => (
     <Box
@@ -340,6 +372,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                         <FriendRow
                             key={friend.id}
                             friend={friend}
+                            onOpenFriend={onOpenFriend}
                             onUnfriend={onUnfriend}
                         />
                     ))}
