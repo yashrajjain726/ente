@@ -8,29 +8,54 @@ export const homeBackground = "#FFFFFF";
 const green = "#08C225";
 const paleGreen = "#E7F6E9";
 const textBase = "#000";
+const textSecondary = "#6B6B6B";
+
+const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
+const hoursAgo = (hours: number) => minutesAgo(hours * 60);
+const daysAgo = (days: number) => hoursAgo(days * 24);
 
 const sampleFeedItems = [
     {
         avatarUrl: "/images/sample-feed-4.jpg",
+        imageUrl: "/images/sample-feed-1.jpg",
         name: "Aparna Bhatnagar",
-        photos: [
-            { imageUrl: "/images/sample-feed-1.jpg" },
-            { imageUrl: "/images/sample-feed-5.jpg" },
-            { imageUrl: "/images/sample-feed-2.jpg" },
-        ],
+        timestampMs: minutesAgo(22),
     },
     {
         avatarUrl: "/images/sample-feed-3.jpg",
+        imageUrl: "/images/sample-feed-2.jpg",
         name: "Mira Sen",
-        photos: [
-            { imageUrl: "/images/sample-feed-2.jpg" },
-            { imageUrl: "/images/sample-feed-6.jpg" },
-        ],
+        timestampMs: hoursAgo(3),
     },
     {
         avatarUrl: "/images/sample-feed-5.jpg",
+        imageUrl: "/images/sample-feed-3.jpg",
         name: "Nikhil Rao",
-        photos: [{ imageUrl: "/images/sample-feed-3.jpg" }],
+        timestampMs: daysAgo(1),
+    },
+    {
+        avatarUrl: "/images/sample-feed-6.jpg",
+        imageUrl: "/images/sample-feed-4.jpg",
+        name: "Riya Kapoor",
+        timestampMs: daysAgo(2),
+    },
+    {
+        avatarUrl: "/images/sample-feed-4.jpg",
+        imageUrl: "/images/sample-feed-5.jpg",
+        name: "Aparna Bhatnagar",
+        timestampMs: daysAgo(4),
+    },
+    {
+        avatarUrl: "/images/sample-feed-3.jpg",
+        imageUrl: "/images/sample-feed-6.jpg",
+        name: "Mira Sen",
+        timestampMs: daysAgo(8),
+    },
+    {
+        avatarUrl: "/images/sample-feed-5.jpg",
+        imageUrl: "/images/sample-feed-2.jpg",
+        name: "Nikhil Rao",
+        timestampMs: new Date(new Date().getFullYear() - 1, 10, 18).getTime(),
     },
 ];
 
@@ -41,11 +66,39 @@ interface HomeScreenProps {
 
 interface FeedItemProps {
     avatarUrl: string;
+    imageUrl: string;
     name: string;
-    photos: { imageUrl: string }[];
+    timestampMs: number;
 }
 
 const firstNameFrom = (name: string) => name.trim().split(/\s+/)[0] || name;
+
+const formatFeedDate = (timestampMs: number): string => {
+    const now = Date.now();
+    const diff = now - timestampMs;
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+
+    const date = new Date(timestampMs);
+    const locale =
+        typeof navigator == "undefined" ? "en-US" : navigator.language;
+    if (date.getFullYear() == new Date(now).getFullYear()) {
+        return date.toLocaleDateString(locale, {
+            month: "short",
+            day: "numeric",
+        });
+    }
+    return date.toLocaleDateString(locale, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    });
+};
 
 const PlusIcon: React.FC = () => (
     <Box
@@ -65,8 +118,14 @@ const PlusIcon: React.FC = () => (
     </Box>
 );
 
-const FeedItem: React.FC<FeedItemProps> = ({ avatarUrl, name, photos }) => {
+const FeedItem: React.FC<FeedItemProps> = ({
+    avatarUrl,
+    imageUrl,
+    name,
+    timestampMs,
+}) => {
     const firstName = firstNameFrom(name);
+    const dateLabel = formatFeedDate(timestampMs);
 
     return (
         <Box
@@ -109,67 +168,77 @@ const FeedItem: React.FC<FeedItemProps> = ({ avatarUrl, name, photos }) => {
                 </Box>
                 <Box
                     sx={{
+                        alignItems: "baseline",
                         color: textBase,
+                        display: "flex",
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 14,
-                        fontWeight: 650,
+                        gap: "4px",
                         lineHeight: "20px",
                         minWidth: 0,
                         overflow: "hidden",
-                        textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                     }}
                 >
-                    {firstName}
+                    <Box
+                        component="span"
+                        sx={{
+                            fontWeight: 650,
+                            minWidth: 0,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                        }}
+                    >
+                        {firstName}
+                    </Box>
+                    <Box
+                        component="span"
+                        aria-hidden
+                        sx={{
+                            color: textSecondary,
+                            flexShrink: 0,
+                            fontWeight: 500,
+                        }}
+                    >
+                        ·
+                    </Box>
+                    <Box
+                        component="time"
+                        dateTime={new Date(timestampMs).toISOString()}
+                        sx={{
+                            color: textSecondary,
+                            flexShrink: 0,
+                            fontSize: 12,
+                            fontWeight: 500,
+                        }}
+                    >
+                        {dateLabel}
+                    </Box>
                 </Box>
             </Box>
             <Box
                 sx={{
-                    display: "flex",
-                    gap: "16px",
-                    overflowX: "auto",
-                    overscrollBehaviorX: "contain",
-                    px: "16px",
-                    scrollPaddingInline: "16px",
-                    scrollSnapType: "x mandatory",
-                    scrollbarWidth: "none",
-                    WebkitOverflowScrolling: "touch",
-                    width: "100%",
-                    "&::-webkit-scrollbar": { display: "none" },
+                    aspectRatio: "4 / 5",
+                    bgcolor: paleGreen,
+                    borderRadius: "20px",
+                    display: "block",
+                    mx: "16px",
+                    overflow: "hidden",
+                    width: "calc(100% - 32px)",
                 }}
             >
-                {photos.map((photo, index) => (
-                    <Box
-                        key={`${name}-${photo.imageUrl}-${index}`}
-                        sx={{
-                            aspectRatio: "4 / 5",
-                            bgcolor: paleGreen,
-                            borderRadius: "20px",
-                            display: "block",
-                            flex: "0 0 78%",
-                            overflow: "hidden",
-                            scrollSnapAlign: "start",
-                            width: "78%",
-                            "@media (min-width: 600px)": {
-                                flexBasis: "76%",
-                                width: "76%",
-                            },
-                        }}
-                    >
-                        <Box
-                            component="img"
-                            alt={`${name} photo ${index + 1}`}
-                            src={photo.imageUrl}
-                            sx={{
-                                display: "block",
-                                height: "100%",
-                                objectFit: "cover",
-                                objectPosition: "center",
-                                width: "100%",
-                            }}
-                        />
-                    </Box>
-                ))}
+                <Box
+                    component="img"
+                    alt={`${name} moment`}
+                    src={imageUrl}
+                    sx={{
+                        display: "block",
+                        height: "100%",
+                        objectFit: "cover",
+                        objectPosition: "center",
+                        width: "100%",
+                    }}
+                />
             </Box>
         </Box>
     );
@@ -306,16 +375,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         flexDirection: "column",
                         gap: "36px",
                         mt: "22px",
-                        pb: "28px",
+                        pb: "16px",
                         width: "100%",
                     }}
                 >
                     {sampleFeedItems.map((item) => (
                         <FeedItem
-                            key={item.name}
+                            key={`${item.name}-${item.imageUrl}`}
                             avatarUrl={item.avatarUrl}
+                            imageUrl={item.imageUrl}
                             name={item.name}
-                            photos={item.photos}
+                            timestampMs={item.timestampMs}
                         />
                     ))}
                 </Box>
