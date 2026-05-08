@@ -371,7 +371,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         >
                             <HugeiconsIcon
                                 icon={Settings01Icon}
-                                size={20}
+                                size={19}
                                 strokeWidth={1.8}
                             />
                         </Box>
