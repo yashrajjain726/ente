@@ -12,8 +12,14 @@ const paleGreen = "#E7F6E9";
 const textBase = "#000";
 const textStrong = "#303030";
 const textSoft = "#777777";
-const photoGridColumnCount = 4;
-const photoGridRadius = "12px";
+const coverForeground = "#FFFFFF";
+const profileHeaderHeight = 56;
+const profileAvatarTopOffset = 54;
+const profileAvatarSize = 120;
+const profileCoverHeight =
+    profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
+const photoMasonryGap = "3px";
+const photoMasonryRadius = "12px";
 
 const samplePhotoUrls = [
     "/images/sample-feed-1.jpg",
@@ -24,7 +30,9 @@ const samplePhotoUrls = [
     "/images/sample-feed-4.jpg",
 ] as const;
 
-const sampleMomentDateLabels = [
+const samplePhotoAspectRatios = [1.32, 0.82, 1.18, 0.92, 1.46, 1.04] as const;
+
+const samplePostDateLabels = [
     "Today",
     "Yesterday",
     "Wed, Apr 29",
@@ -37,20 +45,89 @@ const sampleMomentDateLabels = [
     "Wed, Apr 22",
 ];
 
-const sampleMomentPhotoCounts = [4, 2, 1, 6, 10, 3, 8, 5, 7, 9];
+const samplePostPhotoCounts = [4, 2, 1, 6, 10, 3, 8, 5, 7, 9];
 
 const samplePhotoUrlAt = (index: number): string =>
     samplePhotoUrls[index % samplePhotoUrls.length] ?? samplePhotoUrls[0];
 
-const sampleMomentGroups = sampleMomentDateLabels.map((label, groupIndex) => ({
+const samplePhotoAspectRatioAt = (index: number): number =>
+    samplePhotoAspectRatios[index % samplePhotoAspectRatios.length] ?? 1;
+
+const samplePostGroups = samplePostDateLabels.map((label, groupIndex) => ({
     label,
     items: Array.from(
-        { length: sampleMomentPhotoCounts[groupIndex] ?? 1 },
+        { length: samplePostPhotoCounts[groupIndex] ?? 1 },
         (_, itemIndex) => ({
             imageUrl: samplePhotoUrlAt(groupIndex + itemIndex),
+            aspectRatio: samplePhotoAspectRatioAt(groupIndex + itemIndex),
         }),
     ),
 }));
+
+type SamplePostItem = (typeof samplePostGroups)[number]["items"][number];
+
+interface PostMasonryRow {
+    height: number;
+    compactHeight: number;
+    items: { item: SamplePostItem; index: number }[];
+}
+
+const postMasonryRowSizes = (count: number): number[] => {
+    if (count <= 0) return [];
+    if (count <= 3) return [count];
+
+    const rowSizes: number[] = [];
+    let remaining = count;
+
+    while (remaining > 0) {
+        if (remaining == 2 || remaining == 3) {
+            rowSizes.push(remaining);
+            break;
+        }
+        if (remaining == 4) {
+            rowSizes.push(2, 2);
+            break;
+        }
+        if (remaining == 5) {
+            rowSizes.push(3, 2);
+            break;
+        }
+
+        const nextRowSize = rowSizes.length % 2 == 0 ? 3 : 2;
+        rowSizes.push(nextRowSize);
+        remaining -= nextRowSize;
+    }
+
+    return rowSizes;
+};
+
+const postMasonryRowHeight = (rowSize: number, rowIndex: number) => {
+    if (rowSize <= 1) return 190;
+    if (rowSize == 2) return rowIndex % 2 == 0 ? 152 : 142;
+    return rowIndex % 2 == 0 ? 116 : 108;
+};
+
+const buildPostMasonryRows = (items: SamplePostItem[]): PostMasonryRow[] => {
+    const rowSizes = postMasonryRowSizes(items.length);
+    let nextItemIndex = 0;
+
+    return rowSizes.map((rowSize, rowIndex) => {
+        const rowItems = items
+            .slice(nextItemIndex, nextItemIndex + rowSize)
+            .map((item, rowItemIndex) => ({
+                item,
+                index: nextItemIndex + rowItemIndex,
+            }));
+        nextItemIndex += rowSize;
+
+        const height = postMasonryRowHeight(rowItems.length, rowIndex);
+        return {
+            height,
+            compactHeight: Math.round(height * 0.9),
+            items: rowItems,
+        };
+    });
+};
 
 interface ProfileScreenProps {
     headerVariant?: "owner" | "public";
@@ -71,7 +148,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         .slice(0, 2)
         .map((part) => part[0]?.toUpperCase())
         .join("");
-    const momentsSharedCount = sampleMomentGroups.reduce(
+    const postsSharedCount = samplePostGroups.reduce(
         (count, group) => count + group.items.length,
         0,
     );
@@ -95,29 +172,44 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     boxSizing: "border-box",
                     minHeight: "100svh",
                     mx: "auto",
+                    overflow: "hidden",
+                    position: "relative",
                     width: "100%",
                     "@media (min-width: 600px)": { maxWidth: 375 },
                 }}
             >
                 <Box
+                    className="green-bg-with-noise-and-curves"
+                    sx={{
+                        height: profileCoverHeight,
+                        insetInline: 0,
+                        position: "absolute",
+                        top: 0,
+                        width: "100%",
+                        zIndex: 0,
+                    }}
+                />
+                <Box
                     component="header"
                     sx={{
                         alignItems: "center",
+                        color: coverForeground,
                         display: "grid",
                         gridTemplateColumns: isPublicProfile
-                            ? "1fr"
+                            ? "1fr auto"
                             : "24px 1fr 24px",
-                        height: 56,
+                        height: profileHeaderHeight,
+                        position: "relative",
                         px: 2,
                         py: 0,
                         width: "100%",
+                        zIndex: 1,
                     }}
                 >
                     {isPublicProfile ? (
                         <Box
                             sx={{
                                 alignSelf: "center",
-                                color: textBase,
                                 justifySelf: "flex-start",
                                 lineHeight: 0,
                                 overflow: "visible",
@@ -140,7 +232,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 alignItems: "center",
                                 bgcolor: "transparent",
                                 border: 0,
-                                color: textBase,
+                                color: "inherit",
                                 cursor: "pointer",
                                 display: "flex",
                                 height: 24,
@@ -157,11 +249,47 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             <ArrowBackRoundedIcon sx={{ fontSize: 24 }} />
                         </Box>
                     )}
+                    {isPublicProfile && (
+                        <Box
+                            component="button"
+                            type="button"
+                            onClick={() => {
+                                window.location.assign("/");
+                            }}
+                            sx={{
+                                alignItems: "center",
+                                backgroundColor: "#FFFFFF",
+                                border: 0,
+                                borderRadius: "999px",
+                                color: green,
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 13,
+                                fontWeight: 700,
+                                height: 36,
+                                justifyContent: "center",
+                                justifySelf: "flex-end",
+                                lineHeight: "18px",
+                                minWidth: 0,
+                                paddingInline: "16px",
+                                whiteSpace: "nowrap",
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                                "&:hover": { backgroundColor: "#F3FFF5" },
+                            }}
+                        >
+                            Add friend
+                        </Box>
+                    )}
                     {!isPublicProfile && (
                         <Box
                             component="h1"
                             sx={{
-                                color: textBase,
+                                color: "inherit",
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
                                 fontSize: 18,
@@ -187,7 +315,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 alignItems: "center",
                                 bgcolor: "transparent",
                                 border: 0,
-                                color: textBase,
+                                color: "inherit",
                                 cursor: "pointer",
                                 display: "flex",
                                 height: 24,
@@ -211,9 +339,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         display: "flex",
                         flexDirection: "column",
                         px: "16px",
-                        pt: "30px",
+                        position: "relative",
+                        pt: `${profileAvatarTopOffset}px`,
                         textAlign: "center",
                         width: "100%",
+                        zIndex: 1,
                     }}
                 >
                     <Box
@@ -223,12 +353,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             bgcolor: profile.avatarUrl
                                 ? "transparent"
                                 : paleGreen,
+                            border: "4px solid #FFFFFF",
                             borderRadius: "50%",
+                            boxSizing: "border-box",
                             color: green,
                             display: "flex",
                             justifyContent: "center",
                             overflow: "hidden",
-                            width: 120,
+                            width: profileAvatarSize,
                         }}
                     >
                         {profile.avatarUrl ? (
@@ -299,57 +431,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 whiteSpace: "nowrap",
                             }}
                         >
-                            {momentsSharedCount} moments · {friendsCount}{" "}
+                            {postsSharedCount} posts · {friendsCount}{" "}
                             friends
                         </Box>
                     </Box>
                 </Box>
-                {isPublicProfile && (
-                    <Box sx={{ mt: "22px", px: "16px", width: "100%" }}>
-                        <Box
-                            component="button"
-                            type="button"
-                            onClick={() => {
-                                window.location.assign("/");
-                            }}
-                            sx={{
-                                backgroundColor: green,
-                                border: 0,
-                                borderRadius: "16px",
-                                color: "#FFFFFF",
-                                cursor: "pointer",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 14,
-                                fontWeight: 700,
-                                lineHeight: "20px",
-                                paddingBlock: "11px",
-                                paddingInline: "20px",
-                                width: "100%",
-                                "&:focus-visible": {
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                                "&:hover": { backgroundColor: "#07A820" },
-                            }}
-                        >
-                            Add friend
-                        </Box>
-                    </Box>
-                )}
                 <Box
                     component="section"
                     sx={{
                         display: "flex",
                         flexDirection: "column",
                         gap: "24px",
-                        mt: isPublicProfile ? "60px" : "42px",
+                        mt: "42px",
                         pb: "16px",
                         px: 0,
                         width: "100%",
                     }}
                 >
-                    {sampleMomentGroups.map((group) => (
+                    {samplePostGroups.map((group) => (
                         <Box
                             component="section"
                             key={group.label}
@@ -374,75 +473,60 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             </Box>
                             <Box
                                 sx={{
-                                    display: "grid",
-                                    gap: "3px",
-                                    gridTemplateColumns: `repeat(${photoGridColumnCount}, minmax(0, 1fr))`,
-                                    px: "16px",
-                                    width: "100%",
+                                    borderRadius: photoMasonryRadius,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: photoMasonryGap,
+                                    mx: "16px",
+                                    overflow: "hidden",
+                                    width: "calc(100% - 32px)",
                                 }}
                             >
-                                {group.items.map((item, index) => {
-                                    const columnIndex =
-                                        index % photoGridColumnCount;
-                                    const hasPhotoAbove =
-                                        index - photoGridColumnCount >= 0;
-                                    const hasPhotoBelow =
-                                        index + photoGridColumnCount <
-                                        group.items.length;
-                                    const hasPhotoOnLeft = columnIndex > 0;
-                                    const hasPhotoOnRight =
-                                        columnIndex <
-                                            photoGridColumnCount - 1 &&
-                                        index + 1 < group.items.length;
-
-                                    return (
+                                {buildPostMasonryRows(group.items).map(
+                                    (row, rowIndex) => (
                                         <Box
-                                            key={`${group.label}-${item.imageUrl}-${index}`}
+                                            key={`${group.label}-row-${rowIndex}`}
                                             sx={{
-                                                aspectRatio: "4 / 5",
-                                                bgcolor: paleGreen,
-                                                borderBottomLeftRadius:
-                                                    !hasPhotoBelow &&
-                                                    !hasPhotoOnLeft
-                                                        ? photoGridRadius
-                                                        : 0,
-                                                borderBottomRightRadius:
-                                                    !hasPhotoBelow &&
-                                                    !hasPhotoOnRight
-                                                        ? photoGridRadius
-                                                        : 0,
-                                                borderTopLeftRadius:
-                                                    !hasPhotoAbove &&
-                                                    !hasPhotoOnLeft
-                                                        ? photoGridRadius
-                                                        : 0,
-                                                borderTopRightRadius:
-                                                    !hasPhotoAbove &&
-                                                    !hasPhotoOnRight
-                                                        ? photoGridRadius
-                                                        : 0,
-                                                display: "block",
-                                                overflow: "hidden",
+                                                display: "flex",
+                                                gap: photoMasonryGap,
+                                                height: row.height,
                                                 width: "100%",
+                                                "@media (max-width: 340px)": {
+                                                    height: row.compactHeight,
+                                                },
                                             }}
                                         >
-                                            <Box
-                                                component="img"
-                                                alt={`${group.label} moment ${
-                                                    index + 1
-                                                }`}
-                                                src={item.imageUrl}
-                                                sx={{
-                                                    display: "block",
-                                                    height: "100%",
-                                                    objectFit: "cover",
-                                                    objectPosition: "center",
-                                                    width: "100%",
-                                                }}
-                                            />
+                                            {row.items.map(({ item, index }) => (
+                                                <Box
+                                                    key={`${group.label}-${item.imageUrl}-${index}`}
+                                                    sx={{
+                                                        bgcolor: paleGreen,
+                                                        display: "block",
+                                                        flex: `${item.aspectRatio} 1 0`,
+                                                        minWidth: 0,
+                                                        overflow: "hidden",
+                                                    }}
+                                                >
+                                                    <Box
+                                                        component="img"
+                                                        alt={`${group.label} post ${
+                                                            index + 1
+                                                        }`}
+                                                        src={item.imageUrl}
+                                                        sx={{
+                                                            display: "block",
+                                                            height: "100%",
+                                                            objectFit: "cover",
+                                                            objectPosition:
+                                                                "center",
+                                                            width: "100%",
+                                                        }}
+                                                    />
+                                                </Box>
+                                            ))}
                                         </Box>
-                                    );
-                                })}
+                                    ),
+                                )}
                             </Box>
                         </Box>
                     ))}

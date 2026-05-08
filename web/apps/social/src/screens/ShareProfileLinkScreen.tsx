@@ -200,8 +200,6 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
 
     const shareProfileLink = async () => {
         const shareData = {
-            title: `Join ${displayName}'s circle on Ente`,
-            text: `Join ${displayName}'s circle on Ente to see their private moments.`,
             url: profileLink,
         };
 
@@ -292,7 +290,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             whiteSpace: "nowrap",
                         }}
                     >
-                        Share your profile
+                        Invite people
                     </Box>
                     <Box />
                 </Box>
@@ -455,6 +453,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                     }}
                 >
                     <Box
+                        className="green-bg-with-noise-and-curves"
                         component="button"
                         type="button"
                         onClick={onDone}

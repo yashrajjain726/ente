@@ -433,6 +433,11 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                     }}
                 >
                     <Box
+                        className={
+                            canVerify
+                                ? "green-bg-with-noise-and-curves"
+                                : undefined
+                        }
                         component="button"
                         type="button"
                         disabled={!canVerify}

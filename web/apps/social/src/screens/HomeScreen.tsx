@@ -229,7 +229,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
             >
                 <Box
                     component="img"
-                    alt={`${name} moment`}
+                    alt={`${name} post`}
                     src={imageUrl}
                     sx={{
                         display: "block",

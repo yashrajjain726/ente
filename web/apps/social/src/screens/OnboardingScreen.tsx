@@ -4,7 +4,7 @@ import React from "react";
 
 export const onboardingGreen = "#08C225";
 export const onboardingDescription =
-    "A truly private, beautiful way to share your life with the people who matter most";
+    "A truly private, beautiful way to share your life with the people you care about";
 
 const softGreen = "#E7F6E9";
 const copyGreen = "#AAFFB8";
@@ -64,6 +64,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
     onLogin,
 }) => (
     <Box
+        className="green-bg-with-noise-and-curves"
         component="main"
         sx={{
             bgcolor: onboardingGreen,
@@ -75,6 +76,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         }}
     >
         <Box
+            className="green-bg-with-noise-and-curves"
             sx={{
                 alignItems: "center",
                 bgcolor: onboardingGreen,
@@ -157,7 +159,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                         whiteSpace: "nowrap",
                     }}
                 >
-                    Share your moments
+                    Share your life
                 </Box>
                 <Box
                     component="p"
