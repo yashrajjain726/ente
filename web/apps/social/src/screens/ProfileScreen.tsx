@@ -419,6 +419,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         <Box
                             sx={{
                                 color: textSoft,
+                                display: "flex",
+                                gap: "5px",
+                                alignItems: "baseline",
+                                flexWrap: "wrap",
+                                justifyContent: "center",
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
                                 fontSize: 16,
@@ -431,8 +436,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 whiteSpace: "nowrap",
                             }}
                         >
-                            {postsSharedCount} posts · {friendsCount}{" "}
-                            friends
+                            <Box component="span" sx={{ color: textBase }}>
+                                {postsSharedCount}
+                            </Box>
+                            <Box component="span">posts</Box>
+                            <Box component="span">·</Box>
+                            <Box component="span" sx={{ color: textBase }}>
+                                {friendsCount}
+                            </Box>
+                            <Box component="span">friends</Box>
                         </Box>
                     </Box>
                 </Box>
