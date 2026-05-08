@@ -12,55 +12,45 @@ const paleGreen = "#E7F6E9";
 const textBase = "#000";
 const textStrong = "#303030";
 const textSoft = "#777777";
+const photoGridColumnCount = 4;
+const photoGridRadius = "12px";
 
-const sampleMomentGroups = [
-    {
-        label: "Today",
-        items: [
-            { imageUrl: "/images/sample-feed-1.jpg" },
-            { imageUrl: "/images/sample-feed-5.jpg" },
-            { imageUrl: "/images/sample-feed-2.jpg" },
-            { imageUrl: "/images/sample-feed-6.jpg" },
-            { imageUrl: "/images/sample-feed-3.jpg" },
-            { imageUrl: "/images/sample-feed-4.jpg" },
-        ],
-    },
-    {
-        label: "Yesterday",
-        items: [
-            { imageUrl: "/images/sample-feed-6.jpg" },
-            { imageUrl: "/images/sample-feed-3.jpg" },
-            { imageUrl: "/images/sample-feed-1.jpg" },
-            { imageUrl: "/images/sample-feed-5.jpg" },
-            { imageUrl: "/images/sample-feed-2.jpg" },
-        ],
-    },
-    {
-        label: "Wed, Apr 29",
-        items: [{ imageUrl: "/images/sample-feed-5.jpg" }],
-    },
-    {
-        label: "Tue, Apr 28",
-        items: [
-            { imageUrl: "/images/sample-feed-4.jpg" },
-            { imageUrl: "/images/sample-feed-1.jpg" },
-            { imageUrl: "/images/sample-feed-6.jpg" },
-            { imageUrl: "/images/sample-feed-5.jpg" },
-            { imageUrl: "/images/sample-feed-3.jpg" },
-            { imageUrl: "/images/sample-feed-2.jpg" },
-        ],
-    },
-    {
-        label: "Sat, Apr 25",
-        items: [
-            { imageUrl: "/images/sample-feed-2.jpg" },
-            { imageUrl: "/images/sample-feed-3.jpg" },
-            { imageUrl: "/images/sample-feed-4.jpg" },
-            { imageUrl: "/images/sample-feed-6.jpg" },
-            { imageUrl: "/images/sample-feed-1.jpg" },
-        ],
-    },
+const samplePhotoUrls = [
+    "/images/sample-feed-1.jpg",
+    "/images/sample-feed-5.jpg",
+    "/images/sample-feed-2.jpg",
+    "/images/sample-feed-6.jpg",
+    "/images/sample-feed-3.jpg",
+    "/images/sample-feed-4.jpg",
+] as const;
+
+const sampleMomentDateLabels = [
+    "Today",
+    "Yesterday",
+    "Wed, Apr 29",
+    "Tue, Apr 28",
+    "Mon, Apr 27",
+    "Sun, Apr 26",
+    "Sat, Apr 25",
+    "Fri, Apr 24",
+    "Thu, Apr 23",
+    "Wed, Apr 22",
 ];
+
+const sampleMomentPhotoCounts = [4, 2, 1, 6, 10, 3, 8, 5, 7, 9];
+
+const samplePhotoUrlAt = (index: number): string =>
+    samplePhotoUrls[index % samplePhotoUrls.length] ?? samplePhotoUrls[0];
+
+const sampleMomentGroups = sampleMomentDateLabels.map((label, groupIndex) => ({
+    label,
+    items: Array.from(
+        { length: sampleMomentPhotoCounts[groupIndex] ?? 1 },
+        (_, itemIndex) => ({
+            imageUrl: samplePhotoUrlAt(groupIndex + itemIndex),
+        }),
+    ),
+}));
 
 interface ProfileScreenProps {
     headerVariant?: "owner" | "public";
@@ -354,7 +344,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         flexDirection: "column",
                         gap: "24px",
                         mt: isPublicProfile ? "60px" : "30px",
-                        pb: "28px",
+                        pb: "16px",
                         px: 0,
                         width: "100%",
                     }}
@@ -384,53 +374,75 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             </Box>
                             <Box
                                 sx={{
-                                    display: "flex",
-                                    gap: "16px",
-                                    overflowX: "auto",
-                                    overscrollBehaviorX: "contain",
+                                    display: "grid",
+                                    gap: "3px",
+                                    gridTemplateColumns: `repeat(${photoGridColumnCount}, minmax(0, 1fr))`,
                                     px: "16px",
-                                    scrollPaddingInline: "16px",
-                                    scrollSnapType: "x mandatory",
-                                    scrollbarWidth: "none",
-                                    WebkitOverflowScrolling: "touch",
                                     width: "100%",
-                                    "&::-webkit-scrollbar": { display: "none" },
                                 }}
                             >
-                                {group.items.map((item, index) => (
-                                    <Box
-                                        key={`${group.label}-${item.imageUrl}-${index}`}
-                                        sx={{
-                                            aspectRatio: "4 / 5",
-                                            bgcolor: paleGreen,
-                                            borderRadius: "20px",
-                                            display: "block",
-                                            flex: "0 0 78%",
-                                            overflow: "hidden",
-                                            scrollSnapAlign: "start",
-                                            width: "78%",
-                                            "@media (min-width: 600px)": {
-                                                flexBasis: "76%",
-                                                width: "76%",
-                                            },
-                                        }}
-                                    >
+                                {group.items.map((item, index) => {
+                                    const columnIndex =
+                                        index % photoGridColumnCount;
+                                    const hasPhotoAbove =
+                                        index - photoGridColumnCount >= 0;
+                                    const hasPhotoBelow =
+                                        index + photoGridColumnCount <
+                                        group.items.length;
+                                    const hasPhotoOnLeft = columnIndex > 0;
+                                    const hasPhotoOnRight =
+                                        columnIndex <
+                                            photoGridColumnCount - 1 &&
+                                        index + 1 < group.items.length;
+
+                                    return (
                                         <Box
-                                            component="img"
-                                            alt={`${group.label} moment ${
-                                                index + 1
-                                            }`}
-                                            src={item.imageUrl}
+                                            key={`${group.label}-${item.imageUrl}-${index}`}
                                             sx={{
+                                                aspectRatio: "4 / 5",
+                                                bgcolor: paleGreen,
+                                                borderBottomLeftRadius:
+                                                    !hasPhotoBelow &&
+                                                    !hasPhotoOnLeft
+                                                        ? photoGridRadius
+                                                        : 0,
+                                                borderBottomRightRadius:
+                                                    !hasPhotoBelow &&
+                                                    !hasPhotoOnRight
+                                                        ? photoGridRadius
+                                                        : 0,
+                                                borderTopLeftRadius:
+                                                    !hasPhotoAbove &&
+                                                    !hasPhotoOnLeft
+                                                        ? photoGridRadius
+                                                        : 0,
+                                                borderTopRightRadius:
+                                                    !hasPhotoAbove &&
+                                                    !hasPhotoOnRight
+                                                        ? photoGridRadius
+                                                        : 0,
                                                 display: "block",
-                                                height: "100%",
-                                                objectFit: "cover",
-                                                objectPosition: "center",
+                                                overflow: "hidden",
                                                 width: "100%",
                                             }}
-                                        />
-                                    </Box>
-                                ))}
+                                        >
+                                            <Box
+                                                component="img"
+                                                alt={`${group.label} moment ${
+                                                    index + 1
+                                                }`}
+                                                src={item.imageUrl}
+                                                sx={{
+                                                    display: "block",
+                                                    height: "100%",
+                                                    objectFit: "cover",
+                                                    objectPosition: "center",
+                                                    width: "100%",
+                                                }}
+                                            />
+                                        </Box>
+                                    );
+                                })}
                             </Box>
                         </Box>
                     ))}
