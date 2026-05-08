@@ -1,10 +1,12 @@
 import { Box } from "@mui/material";
+import { sampleFriends } from "data/friends";
 import Head from "next/head";
 import React, { useEffect, useState } from "react";
 import {
     CreateAccountScreen,
     createAccountBackground,
 } from "screens/CreateAccountScreen";
+import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import { HomeScreen, homeBackground } from "screens/HomeScreen";
 import { LoginScreen, loginBackground } from "screens/LoginScreen";
 import {
@@ -38,6 +40,7 @@ type Screen =
     | "share-profile-link"
     | "home"
     | "profile"
+    | "friends"
     | "settings";
 
 type ProfileBackScreen = "login" | "verify-email";
@@ -81,6 +84,7 @@ const Page: React.FC = () => {
     const [routeMode, setRouteMode] = useState<RouteMode>({ kind: "checking" });
     const [screen, setScreen] = useState<Screen>("onboarding");
     const [email, setEmail] = useState("example@example.com");
+    const [friends, setFriends] = useState(sampleFriends);
     const [profile, setProfile] = useState<SetupProfile | null>(null);
     const [profileBackScreen, setProfileBackScreen] =
         useState<ProfileBackScreen>("verify-email");
@@ -116,9 +120,11 @@ const Page: React.FC = () => {
                         ? homeBackground
                         : screen == "profile"
                           ? profileBackground
-                          : screen == "settings"
-                            ? settingsBackground
-                            : createAccountBackground;
+                          : screen == "friends"
+                            ? friendsBackground
+                            : screen == "settings"
+                              ? settingsBackground
+                              : createAccountBackground;
 
     return (
         <>
@@ -197,9 +203,24 @@ const Page: React.FC = () => {
                     )}
                     {screen == "profile" && profile && (
                         <ProfileScreen
+                            friendsCount={friends.length}
                             profile={profile}
                             onBack={() => setScreen("home")}
+                            onOpenFriends={() => setScreen("friends")}
                             onOpenSettings={() => setScreen("settings")}
+                        />
+                    )}
+                    {screen == "friends" && (
+                        <FriendsScreen
+                            friends={friends}
+                            onBack={() => setScreen("profile")}
+                            onUnfriend={(friendID) =>
+                                setFriends((currentFriends) =>
+                                    currentFriends.filter(
+                                        (friend) => friend.id != friendID,
+                                    ),
+                                )
+                            }
                         />
                     )}
                     {screen == "settings" && profile && (

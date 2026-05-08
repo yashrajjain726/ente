@@ -1,0 +1,365 @@
+import {
+    ArrowLeft02Icon,
+    MoreVerticalIcon,
+    UserRemove01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Box, Menu, MenuItem } from "@mui/material";
+import type { FriendProfile } from "data/friends";
+import React, { useState } from "react";
+
+export const friendsBackground = "#FFFFFF";
+
+const green = "#08C225";
+const paleGreen = "#E7F6E9";
+const textBase = "#000";
+const textStrong = "#303030";
+const textSoft = "#777777";
+const dangerColor = "#F63A3A";
+
+interface FriendsScreenProps {
+    friends: FriendProfile[];
+    onBack?: () => void;
+    onUnfriend?: (friendID: string) => void;
+}
+
+interface FriendRowProps {
+    friend: FriendProfile;
+    onUnfriend?: (friendID: string) => void;
+}
+
+const initialsFor = (name: string) =>
+    name
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join("");
+
+const FriendRow: React.FC<FriendRowProps> = ({ friend, onUnfriend }) => {
+    const [actionsAnchor, setActionsAnchor] = useState<HTMLElement | null>(
+        null,
+    );
+    const isActionsOpen = Boolean(actionsAnchor);
+    const actionsMenuID = `friend-actions-menu-${friend.id}`;
+    const actionsButtonID = `friend-actions-button-${friend.id}`;
+    const displayName = friend.fullName.trim() || friend.username.trim();
+    const initials = initialsFor(displayName || friend.username);
+
+    const closeActions = () => setActionsAnchor(null);
+
+    const unfriend = () => {
+        closeActions();
+        onUnfriend?.(friend.id);
+    };
+
+    return (
+        <Box
+            component="li"
+            sx={{
+                alignItems: "center",
+                display: "grid",
+                gridTemplateColumns: "48px minmax(0, 1fr) 32px",
+                gap: "12px",
+                listStyle: "none",
+                minHeight: 72,
+                px: "18px",
+                py: "12px",
+                width: "100%",
+            }}
+        >
+            <Box
+                sx={{
+                    alignItems: "center",
+                    bgcolor: friend.avatarUrl ? "transparent" : paleGreen,
+                    borderRadius: "50%",
+                    color: green,
+                    display: "flex",
+                    height: 48,
+                    justifyContent: "center",
+                    overflow: "hidden",
+                    width: 48,
+                }}
+            >
+                {friend.avatarUrl ? (
+                    <Box
+                        component="img"
+                        alt=""
+                        src={friend.avatarUrl}
+                        sx={{
+                            display: "block",
+                            height: "100%",
+                            objectFit: "cover",
+                            objectPosition: "center",
+                            width: "100%",
+                        }}
+                    />
+                ) : (
+                    <Box
+                        sx={{
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 15,
+                            fontWeight: 800,
+                            lineHeight: 1,
+                        }}
+                    >
+                        {initials}
+                    </Box>
+                )}
+            </Box>
+            <Box
+                sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    minWidth: 0,
+                }}
+            >
+                <Box
+                    sx={{
+                        color: textStrong,
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 15,
+                        fontWeight: 700,
+                        lineHeight: "20px",
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                    }}
+                >
+                    {displayName}
+                </Box>
+                <Box
+                    sx={{
+                        color: textSoft,
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        lineHeight: "18px",
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                    }}
+                >
+                    @{friend.username}
+                </Box>
+            </Box>
+            <Box
+                component="button"
+                id={actionsButtonID}
+                type="button"
+                aria-label={`Actions for ${displayName}`}
+                aria-controls={isActionsOpen ? actionsMenuID : undefined}
+                aria-expanded={isActionsOpen ? "true" : undefined}
+                aria-haspopup="menu"
+                onClick={(event) => setActionsAnchor(event.currentTarget)}
+                sx={{
+                    alignItems: "center",
+                    bgcolor: "transparent",
+                    border: 0,
+                    borderRadius: "50%",
+                    color: textBase,
+                    cursor: "pointer",
+                    display: "flex",
+                    height: 32,
+                    justifyContent: "center",
+                    justifySelf: "flex-end",
+                    p: 0,
+                    width: 32,
+                    "&:focus-visible": {
+                        outline: `2px solid ${green}`,
+                        outlineOffset: 2,
+                    },
+                    "&:hover": { bgcolor: "rgba(0, 0, 0, 0.035)" },
+                }}
+            >
+                <HugeiconsIcon
+                    icon={MoreVerticalIcon}
+                    size={20}
+                    strokeWidth={1.8}
+                />
+            </Box>
+            <Menu
+                id={actionsMenuID}
+                anchorEl={actionsAnchor}
+                open={isActionsOpen}
+                onClose={closeActions}
+                anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+                transformOrigin={{ horizontal: "right", vertical: "top" }}
+                slotProps={{
+                    paper: {
+                        sx: {
+                            borderRadius: "16px",
+                            boxShadow: "0 14px 40px rgba(0, 0, 0, 0.16)",
+                            mt: "6px",
+                            minWidth: 0,
+                            p: "4px",
+                            width: "max-content",
+                        },
+                    },
+                    list: { "aria-labelledby": actionsButtonID, sx: { p: 0 } },
+                }}
+            >
+                <MenuItem
+                    disableRipple
+                    onClick={unfriend}
+                    sx={{
+                        borderRadius: "10px",
+                        color: dangerColor,
+                        gap: "8px",
+                        minHeight: 38,
+                        px: "9px",
+                        py: "7px",
+                        whiteSpace: "nowrap",
+                        "&.Mui-focusVisible": {
+                            bgcolor: "rgba(246, 58, 58, 0.06)",
+                        },
+                        "&:active": { bgcolor: "rgba(246, 58, 58, 0.06)" },
+                        "&:hover": { bgcolor: "rgba(246, 58, 58, 0.06)" },
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={UserRemove01Icon}
+                        size={18}
+                        strokeWidth={1.8}
+                    />
+                    <Box
+                        sx={{
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 650,
+                            lineHeight: "18px",
+                        }}
+                    >
+                        Unfriend
+                    </Box>
+                </MenuItem>
+            </Menu>
+        </Box>
+    );
+};
+
+export const FriendsScreen: React.FC<FriendsScreenProps> = ({
+    friends,
+    onBack,
+    onUnfriend,
+}) => (
+    <Box
+        component="main"
+        sx={{
+            bgcolor: friendsBackground,
+            color: textBase,
+            display: "grid",
+            minHeight: "100svh",
+            overflowX: "hidden",
+            placeItems: { xs: "stretch", sm: "start center" },
+        }}
+    >
+        <Box
+            sx={{
+                bgcolor: friendsBackground,
+                boxSizing: "border-box",
+                minHeight: "100svh",
+                mx: "auto",
+                width: "100%",
+                "@media (min-width: 600px)": { maxWidth: 375 },
+            }}
+        >
+            <Box
+                component="header"
+                sx={{
+                    alignItems: "center",
+                    display: "grid",
+                    gridTemplateColumns: "24px 1fr 24px",
+                    height: 56,
+                    px: 2,
+                    width: "100%",
+                }}
+            >
+                <Box
+                    component="button"
+                    type="button"
+                    aria-label="Back to profile"
+                    onClick={onBack}
+                    sx={{
+                        alignItems: "center",
+                        bgcolor: "transparent",
+                        border: 0,
+                        color: textBase,
+                        cursor: onBack ? "pointer" : "default",
+                        display: "flex",
+                        height: 24,
+                        justifyContent: "flex-start",
+                        p: 0,
+                        width: 24,
+                        "&:focus-visible": {
+                            borderRadius: "50%",
+                            outline: `2px solid ${green}`,
+                            outlineOffset: 2,
+                        },
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={ArrowLeft02Icon}
+                        size={24}
+                        strokeWidth={1.8}
+                    />
+                </Box>
+                <Box
+                    component="h1"
+                    sx={{
+                        color: textBase,
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 18,
+                        fontWeight: 700,
+                        justifySelf: "center",
+                        lineHeight: "24px",
+                        m: 0,
+                    }}
+                >
+                    Friends
+                </Box>
+            </Box>
+
+            {friends.length > 0 ? (
+                <Box
+                    component="ul"
+                    sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "4px",
+                        m: 0,
+                        mt: "8px",
+                        p: 0,
+                        width: "100%",
+                    }}
+                >
+                    {friends.map((friend) => (
+                        <FriendRow
+                            key={friend.id}
+                            friend={friend}
+                            onUnfriend={onUnfriend}
+                        />
+                    ))}
+                </Box>
+            ) : (
+                <Box
+                    sx={{
+                        color: textSoft,
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        lineHeight: "20px",
+                        px: "24px",
+                        py: "44px",
+                        textAlign: "center",
+                    }}
+                >
+                    No friends yet
+                </Box>
+            )}
+        </Box>
+    </Box>
+);

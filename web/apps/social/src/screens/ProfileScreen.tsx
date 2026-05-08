@@ -136,15 +136,19 @@ const buildPostMasonryRows = (items: SamplePostItem[]): PostMasonryRow[] => {
 };
 
 interface ProfileScreenProps {
+    friendsCount?: number;
     headerVariant?: "owner" | "public";
     onBack?: () => void;
+    onOpenFriends?: () => void;
     onOpenSettings?: () => void;
     profile: SetupProfile;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
+    friendsCount = 7,
     headerVariant = "owner",
     onBack,
+    onOpenFriends,
     onOpenSettings,
     profile,
 }) => {
@@ -163,7 +167,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         (count, group) => count + group.items.length,
         0,
     );
-    const friendsCount = 7;
     const isProfileActionsOpen = Boolean(profileActionsAnchor);
 
     const closeProfileActions = () => setProfileActionsAnchor(null);
@@ -550,8 +553,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                             boxShadow:
                                                 "0 14px 40px rgba(0, 0, 0, 0.16)",
                                             mt: "6px",
-                                            minWidth: 190,
+                                            minWidth: 0,
                                             p: "4px",
+                                            width: "max-content",
                                         },
                                     },
                                     list: {
@@ -570,6 +574,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         minHeight: 38,
                                         px: "8px",
                                         py: "7px",
+                                        whiteSpace: "nowrap",
                                         "&.Mui-focusVisible": {
                                             bgcolor: "rgba(0, 0, 0, 0.025)",
                                         },
@@ -618,6 +623,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         minHeight: 38,
                                         px: "8px",
                                         py: "7px",
+                                        whiteSpace: "nowrap",
                                         "&.Mui-focusVisible": {
                                             bgcolor: "rgba(0, 0, 0, 0.025)",
                                         },
@@ -684,10 +690,53 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             </Box>
                             <Box component="span">posts</Box>
                             <Box component="span">·</Box>
-                            <Box component="span" sx={{ color: textBase }}>
-                                {friendsCount}
+                            <Box
+                                component={
+                                    !isPublicProfile && onOpenFriends
+                                        ? "button"
+                                        : "span"
+                                }
+                                type={
+                                    !isPublicProfile && onOpenFriends
+                                        ? "button"
+                                        : undefined
+                                }
+                                aria-label={
+                                    !isPublicProfile && onOpenFriends
+                                        ? "Open friends"
+                                        : undefined
+                                }
+                                onClick={
+                                    !isPublicProfile && onOpenFriends
+                                        ? onOpenFriends
+                                        : undefined
+                                }
+                                sx={{
+                                    alignItems: "baseline",
+                                    bgcolor: "transparent",
+                                    border: 0,
+                                    color: "inherit",
+                                    cursor:
+                                        !isPublicProfile && onOpenFriends
+                                            ? "pointer"
+                                            : "default",
+                                    display: "inline-flex",
+                                    gap: "5px",
+                                    font: "inherit",
+                                    lineHeight: "inherit",
+                                    p: 0,
+                                    "&:focus-visible": {
+                                        borderRadius: "6px",
+                                        outline: `2px solid ${green}`,
+                                        outlineOffset: 2,
+                                    },
+                                }}
+                            >
+                                <Box component="span" sx={{ color: textBase }}>
+                                    {friendsCount}
+                                </Box>
+                                <Box component="span">friends</Box>
                             </Box>
-                            <Box component="span">friends</Box>
                         </Box>
                     </Box>
                 </Box>
