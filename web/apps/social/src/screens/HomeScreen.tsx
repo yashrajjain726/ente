@@ -80,7 +80,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ avatarUrl, name, photos }) => {
                     gap: "10px",
                     mb: "10px",
                     minHeight: 32,
-                    px: "16px",
+                    px: "20px",
                     width: "100%",
                 }}
             >

@@ -343,7 +343,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         display: "flex",
                         flexDirection: "column",
                         gap: "24px",
-                        mt: isPublicProfile ? "60px" : "30px",
+                        mt: isPublicProfile ? "60px" : "42px",
                         pb: "16px",
                         px: 0,
                         width: "100%",
@@ -355,7 +355,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             key={group.label}
                             sx={{ width: "100%" }}
                         >
-                            <Box sx={{ mb: "10px", px: "16px", width: "100%" }}>
+                            <Box sx={{ mb: "10px", px: "18px", width: "100%" }}>
                                 <Box
                                     component="h2"
                                     sx={{
