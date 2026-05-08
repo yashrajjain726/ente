@@ -15,10 +15,6 @@ import {
 import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
 import { PublicProfileScreen } from "screens/PublicProfileScreen";
 import {
-    RecoveryKeyScreen,
-    recoveryKeyBackground,
-} from "screens/RecoveryKeyScreen";
-import {
     SetupProfileScreen,
     setupProfileBackground,
     type SetupProfile,
@@ -37,13 +33,12 @@ type Screen =
     | "create-account"
     | "login"
     | "verify-email"
-    | "recovery-key"
     | "setup-profile"
     | "share-profile-link"
     | "home"
     | "profile";
 
-type ProfileBackScreen = "login" | "recovery-key";
+type ProfileBackScreen = "login" | "verify-email";
 
 const samplePublicProfileData = {
     avatarUrl: "/images/sample-avatar.jpg",
@@ -86,7 +81,7 @@ const Page: React.FC = () => {
     const [email, setEmail] = useState("example@example.com");
     const [profile, setProfile] = useState<SetupProfile | null>(null);
     const [profileBackScreen, setProfileBackScreen] =
-        useState<ProfileBackScreen>("recovery-key");
+        useState<ProfileBackScreen>("verify-email");
 
     const openSetupProfile = (backScreen: ProfileBackScreen) => {
         setProfileBackScreen(backScreen);
@@ -109,19 +104,17 @@ const Page: React.FC = () => {
               ? onboardingGreen
               : screen == "verify-email"
                 ? verifyEmailBackground
-                : screen == "recovery-key"
-                  ? recoveryKeyBackground
-                  : screen == "login"
-                    ? loginBackground
-                    : screen == "setup-profile"
-                      ? setupProfileBackground
-                      : screen == "share-profile-link"
-                        ? shareProfileLinkBackground
-                        : screen == "home"
-                          ? homeBackground
-                          : screen == "profile"
-                            ? profileBackground
-                            : createAccountBackground;
+                : screen == "login"
+                  ? loginBackground
+                  : screen == "setup-profile"
+                    ? setupProfileBackground
+                    : screen == "share-profile-link"
+                      ? shareProfileLinkBackground
+                      : screen == "home"
+                        ? homeBackground
+                        : screen == "profile"
+                          ? profileBackground
+                          : createAccountBackground;
 
     return (
         <>
@@ -173,13 +166,7 @@ const Page: React.FC = () => {
                             email={email}
                             onBack={() => setScreen("create-account")}
                             onChangeEmail={() => setScreen("create-account")}
-                            onVerify={() => setScreen("recovery-key")}
-                        />
-                    )}
-                    {screen == "recovery-key" && (
-                        <RecoveryKeyScreen
-                            onBack={() => setScreen("verify-email")}
-                            onNext={() => openSetupProfile("recovery-key")}
+                            onVerify={() => openSetupProfile("verify-email")}
                         />
                     )}
                     {screen == "setup-profile" && (
