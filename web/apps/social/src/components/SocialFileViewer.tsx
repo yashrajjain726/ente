@@ -17,10 +17,10 @@ const green = "#08C225";
 const paleGreen = "#E7F6E9";
 const textBase = "#F4F4F4";
 const textSecondary = "#A6A6A6";
+const textTertiary = "rgba(244, 244, 244, 0.52)";
 const viewerBackground = "#000000";
 const controlBackground = "rgba(36, 36, 36, 0.72)";
 const controlBackgroundHover = "rgba(48, 48, 48, 0.86)";
-const closeControlBackground = "#242424";
 const controlIcon = "#D8D8D8";
 const viewerHeaderHeight = 56;
 const viewerBottomPadding = 72;
@@ -289,7 +289,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                             component="time"
                             dateTime={new Date(photo.timestampMs).toISOString()}
                             sx={{
-                                color: textSecondary,
+                                color: textTertiary,
                                 flexShrink: 0,
                                 fontSize: 12,
                                 fontWeight: 500,
@@ -306,7 +306,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     onClick={onClose}
                     sx={{
                         alignItems: "center",
-                        bgcolor: closeControlBackground,
+                        bgcolor: controlBackground,
                         border: 0,
                         borderRadius: "50%",
                         color: controlIcon,
@@ -343,8 +343,8 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                 aria-hidden
                 sx={{
                     background:
-                        "linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0) 100%)",
-                    height: 112,
+                        "linear-gradient(180deg, rgba(0, 0, 0, 0.32) 0%, rgba(0, 0, 0, 0.13) 58%, rgba(0, 0, 0, 0) 100%)",
+                    height: 44,
                     left: 0,
                     pointerEvents: "none",
                     position: "fixed",
@@ -357,9 +357,9 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                 aria-hidden
                 sx={{
                     background:
-                        "linear-gradient(0deg, rgba(0, 0, 0, 0.48) 0%, rgba(0, 0, 0, 0) 100%)",
+                        "linear-gradient(0deg, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0.14) 58%, rgba(0, 0, 0, 0) 100%)",
                     bottom: 0,
-                    height: 140,
+                    height: 52,
                     left: 0,
                     pointerEvents: "none",
                     position: "fixed",
