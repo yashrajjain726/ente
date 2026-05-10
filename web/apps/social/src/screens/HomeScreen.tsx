@@ -1,7 +1,12 @@
 import { Box } from "@mui/material";
+import {
+    SocialFileViewer,
+    type SocialViewerPhoto,
+} from "components/SocialFileViewer";
 import { EnteLogo } from "ente-base/components/EnteLogo";
-import React from "react";
+import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import { firstNameFrom, formatSocialDate } from "utils/socialDisplay";
 
 export const homeBackground = "#FFFFFF";
 
@@ -13,45 +18,53 @@ const textSecondary = "#6B6B6B";
 const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
 const hoursAgo = (hours: number) => minutesAgo(hours * 60);
 const daysAgo = (days: number) => hoursAgo(days * 24);
+const sampleFeedPhotoAspectRatio = 900 / 680;
 
 const sampleFeedItems = [
     {
+        aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-4.jpg",
         imageUrl: "/images/sample-feed-1.jpg",
         name: "Aparna Bhatnagar",
         timestampMs: minutesAgo(22),
     },
     {
+        aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-3.jpg",
         imageUrl: "/images/sample-feed-2.jpg",
         name: "Mira Sen",
         timestampMs: hoursAgo(3),
     },
     {
+        aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-5.jpg",
         imageUrl: "/images/sample-feed-3.jpg",
         name: "Nikhil Rao",
         timestampMs: daysAgo(1),
     },
     {
+        aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-6.jpg",
         imageUrl: "/images/sample-feed-4.jpg",
         name: "Riya Kapoor",
         timestampMs: daysAgo(2),
     },
     {
+        aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-4.jpg",
         imageUrl: "/images/sample-feed-5.jpg",
         name: "Aparna Bhatnagar",
         timestampMs: daysAgo(4),
     },
     {
+        aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-3.jpg",
         imageUrl: "/images/sample-feed-6.jpg",
         name: "Mira Sen",
         timestampMs: daysAgo(8),
     },
     {
+        aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-5.jpg",
         imageUrl: "/images/sample-feed-2.jpg",
         name: "Nikhil Rao",
@@ -65,40 +78,13 @@ interface HomeScreenProps {
 }
 
 interface FeedItemProps {
+    aspectRatio: number;
     avatarUrl: string;
     imageUrl: string;
     name: string;
+    onOpenPhoto?: (photo: SocialViewerPhoto) => void;
     timestampMs: number;
 }
-
-const firstNameFrom = (name: string) => name.trim().split(/\s+/)[0] || name;
-
-const formatFeedDate = (timestampMs: number): string => {
-    const now = Date.now();
-    const diff = now - timestampMs;
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return "just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    if (days < 7) return `${days}d ago`;
-
-    const date = new Date(timestampMs);
-    const locale =
-        typeof navigator == "undefined" ? "en-US" : navigator.language;
-    if (date.getFullYear() == new Date(now).getFullYear()) {
-        return date.toLocaleDateString(locale, {
-            month: "short",
-            day: "numeric",
-        });
-    }
-    return date.toLocaleDateString(locale, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
-};
 
 const PlusIcon: React.FC = () => (
     <Box
@@ -119,13 +105,15 @@ const PlusIcon: React.FC = () => (
 );
 
 const FeedItem: React.FC<FeedItemProps> = ({
+    aspectRatio,
     avatarUrl,
     imageUrl,
     name,
+    onOpenPhoto,
     timestampMs,
 }) => {
     const firstName = firstNameFrom(name);
-    const dateLabel = formatFeedDate(timestampMs);
+    const dateLabel = formatSocialDate(timestampMs);
 
     return (
         <Box
@@ -217,14 +205,34 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 </Box>
             </Box>
             <Box
+                component="button"
+                type="button"
+                aria-label={`Open ${name} photo`}
+                onClick={() =>
+                    onOpenPhoto?.({
+                        alt: `${name} post`,
+                        avatarUrl,
+                        imageUrl,
+                        name,
+                        timestampMs,
+                    })
+                }
                 sx={{
-                    aspectRatio: "4 / 5",
+                    appearance: "none",
+                    aspectRatio,
                     bgcolor: paleGreen,
+                    border: 0,
                     borderRadius: "20px",
                     display: "block",
+                    cursor: onOpenPhoto ? "pointer" : "default",
                     mx: "16px",
                     overflow: "hidden",
+                    p: 0,
                     width: "calc(100% - 32px)",
+                    "&:focus-visible": {
+                        outline: `2px solid ${green}`,
+                        outlineOffset: 2,
+                    },
                 }}
             >
                 <Box
@@ -248,6 +256,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onOpenProfile,
     profile,
 }) => {
+    const [selectedPhoto, setSelectedPhoto] =
+        useState<SocialViewerPhoto | null>(null);
     const initialsSource = profile.fullName.trim() || profile.username.trim();
     const initials = initialsSource
         .split(/\s+/)
@@ -382,13 +392,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     {sampleFeedItems.map((item) => (
                         <FeedItem
                             key={`${item.name}-${item.imageUrl}`}
+                            aspectRatio={item.aspectRatio}
                             avatarUrl={item.avatarUrl}
                             imageUrl={item.imageUrl}
                             name={item.name}
+                            onOpenPhoto={setSelectedPhoto}
                             timestampMs={item.timestampMs}
                         />
                     ))}
                 </Box>
+                {selectedPhoto && (
+                    <SocialFileViewer
+                        photo={selectedPhoto}
+                        onClose={() => setSelectedPhoto(null)}
+                    />
+                )}
             </Box>
         </Box>
     );

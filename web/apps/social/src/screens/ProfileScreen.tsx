@@ -5,11 +5,16 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
+import {
+    SocialFileViewer,
+    type SocialViewerPhoto,
+} from "components/SocialFileViewer";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { LinkIcon, ShareIcon } from "screens/ShareProfileLinkScreen";
 import { profileLinkForUsername } from "utils/profileLink";
+import { initialsFor } from "utils/socialDisplay";
 
 export const profileBackground = "#FFFFFF";
 
@@ -52,6 +57,15 @@ const samplePostDateLabels = [
 ];
 
 const samplePostPhotoCounts = [4, 2, 1, 6, 10, 3, 8, 5, 7, 9];
+const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
+const hoursAgo = (hours: number) => minutesAgo(hours * 60);
+const daysAgo = (days: number) => hoursAgo(days * 24);
+
+const samplePostTimestampAt = (groupIndex: number, itemIndex: number) => {
+    if (groupIndex == 0) return minutesAgo(18 + itemIndex * 12);
+    if (groupIndex == 1) return hoursAgo(26 + itemIndex * 3);
+    return daysAgo(groupIndex + 1) - itemIndex * 20 * 60 * 1000;
+};
 
 const samplePhotoUrlAt = (index: number): string =>
     samplePhotoUrls[index % samplePhotoUrls.length] ?? samplePhotoUrls[0];
@@ -66,6 +80,7 @@ const samplePostGroups = samplePostDateLabels.map((label, groupIndex) => ({
         (_, itemIndex) => ({
             imageUrl: samplePhotoUrlAt(groupIndex + itemIndex),
             aspectRatio: samplePhotoAspectRatioAt(groupIndex + itemIndex),
+            timestampMs: samplePostTimestampAt(groupIndex, itemIndex),
         }),
     ),
 }));
@@ -154,17 +169,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
     const [profileActionsAnchor, setProfileActionsAnchor] =
         useState<HTMLElement | null>(null);
+    const [selectedPhoto, setSelectedPhoto] =
+        useState<SocialViewerPhoto | null>(null);
     const isPublicProfile = headerVariant == "public";
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
     const displayName = profile.fullName.trim() || profile.username.trim();
     const profileLink = profileLinkForUsername(profile.username.trim());
     const initialsSource = displayName || profile.username.trim();
-    const initials = initialsSource
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join("");
+    const initials = initialsFor(initialsSource);
     const postsSharedCount = samplePostGroups.reduce(
         (count, group) => count + group.items.length,
         0,
@@ -801,13 +814,41 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                             {row.items.map(
                                                 ({ item, index }) => (
                                                     <Box
+                                                        component="button"
+                                                        type="button"
+                                                        aria-label={`Open ${displayName} post ${
+                                                            index + 1
+                                                        }`}
+                                                        onClick={() =>
+                                                            setSelectedPhoto({
+                                                                alt: `${displayName} post ${
+                                                                    index + 1
+                                                                }`,
+                                                                avatarUrl:
+                                                                    profile.avatarUrl,
+                                                                imageUrl:
+                                                                    item.imageUrl,
+                                                                name: displayName,
+                                                                timestampMs:
+                                                                    item.timestampMs,
+                                                            })
+                                                        }
                                                         key={`${group.label}-${item.imageUrl}-${index}`}
                                                         sx={{
+                                                            appearance: "none",
                                                             bgcolor: paleGreen,
+                                                            border: 0,
+                                                            cursor: "pointer",
                                                             display: "block",
                                                             flex: `${item.aspectRatio} 1 0`,
                                                             minWidth: 0,
                                                             overflow: "hidden",
+                                                            p: 0,
+                                                            "&:focus-visible": {
+                                                                outline: `2px solid ${green}`,
+                                                                outlineOffset:
+                                                                    -2,
+                                                            },
                                                         }}
                                                     >
                                                         <Box
@@ -837,6 +878,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         </Box>
                     ))}
                 </Box>
+                {selectedPhoto && (
+                    <SocialFileViewer
+                        photo={selectedPhoto}
+                        onClose={() => setSelectedPhoto(null)}
+                    />
+                )}
             </Box>
         </Box>
     );
