@@ -882,6 +882,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     <SocialFileViewer
                         photo={selectedPhoto}
                         onClose={() => setSelectedPhoto(null)}
+                        onOpenProfile={() => setSelectedPhoto(null)}
                     />
                 )}
             </Box>

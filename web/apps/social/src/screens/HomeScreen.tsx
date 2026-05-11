@@ -24,6 +24,7 @@ const sampleFeedItems = [
     {
         aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-4.jpg",
+        friendID: "aparna-bhatnagar",
         imageUrl: "/images/sample-feed-1.jpg",
         name: "Aparna Bhatnagar",
         timestampMs: minutesAgo(22),
@@ -31,6 +32,7 @@ const sampleFeedItems = [
     {
         aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-3.jpg",
+        friendID: "mira-sen",
         imageUrl: "/images/sample-feed-2.jpg",
         name: "Mira Sen",
         timestampMs: hoursAgo(3),
@@ -38,6 +40,7 @@ const sampleFeedItems = [
     {
         aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-5.jpg",
+        friendID: "nikhil-rao",
         imageUrl: "/images/sample-feed-3.jpg",
         name: "Nikhil Rao",
         timestampMs: daysAgo(1),
@@ -45,6 +48,7 @@ const sampleFeedItems = [
     {
         aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-6.jpg",
+        friendID: "riya-kapoor",
         imageUrl: "/images/sample-feed-4.jpg",
         name: "Riya Kapoor",
         timestampMs: daysAgo(2),
@@ -52,6 +56,7 @@ const sampleFeedItems = [
     {
         aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-4.jpg",
+        friendID: "aparna-bhatnagar",
         imageUrl: "/images/sample-feed-5.jpg",
         name: "Aparna Bhatnagar",
         timestampMs: daysAgo(4),
@@ -59,6 +64,7 @@ const sampleFeedItems = [
     {
         aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-3.jpg",
+        friendID: "mira-sen",
         imageUrl: "/images/sample-feed-6.jpg",
         name: "Mira Sen",
         timestampMs: daysAgo(8),
@@ -66,6 +72,7 @@ const sampleFeedItems = [
     {
         aspectRatio: sampleFeedPhotoAspectRatio,
         avatarUrl: "/images/sample-feed-5.jpg",
+        friendID: "nikhil-rao",
         imageUrl: "/images/sample-feed-2.jpg",
         name: "Nikhil Rao",
         timestampMs: new Date(new Date().getFullYear() - 1, 10, 18).getTime(),
@@ -73,6 +80,7 @@ const sampleFeedItems = [
 ];
 
 interface HomeScreenProps {
+    onOpenFriend?: (friendID: string) => void;
     onOpenProfile?: () => void;
     profile: SetupProfile;
 }
@@ -80,8 +88,10 @@ interface HomeScreenProps {
 interface FeedItemProps {
     aspectRatio: number;
     avatarUrl: string;
+    friendID: string;
     imageUrl: string;
     name: string;
+    onOpenFriend?: (friendID: string) => void;
     onOpenPhoto?: (photo: SocialViewerPhoto) => void;
     timestampMs: number;
 }
@@ -107,13 +117,16 @@ const PlusIcon: React.FC = () => (
 const FeedItem: React.FC<FeedItemProps> = ({
     aspectRatio,
     avatarUrl,
+    friendID,
     imageUrl,
     name,
+    onOpenFriend,
     onOpenPhoto,
     timestampMs,
 }) => {
     const firstName = firstNameFrom(name);
     const dateLabel = formatSocialDate(timestampMs);
+    const openFriend = () => onOpenFriend?.(friendID);
 
     return (
         <Box
@@ -132,13 +145,26 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 }}
             >
                 <Box
+                    component="button"
+                    type="button"
+                    aria-label={`Open ${firstName}'s profile`}
+                    onClick={openFriend}
                     sx={{
+                        appearance: "none",
                         bgcolor: paleGreen,
                         borderRadius: "50%",
+                        border: 0,
+                        cursor: onOpenFriend ? "pointer" : "default",
+                        display: "block",
                         flexShrink: 0,
                         height: 28,
                         overflow: "hidden",
+                        p: 0,
                         width: 28,
+                        "&:focus-visible": {
+                            outline: `2px solid ${green}`,
+                            outlineOffset: 2,
+                        },
                     }}
                 >
                     <Box
@@ -169,12 +195,31 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     }}
                 >
                     <Box
-                        component="span"
+                        component="button"
+                        type="button"
+                        aria-label={`Open ${firstName}'s profile`}
+                        onClick={openFriend}
                         sx={{
+                            appearance: "none",
+                            bgcolor: "transparent",
+                            border: 0,
+                            color: "inherit",
+                            cursor: onOpenFriend ? "pointer" : "default",
+                            fontFamily: "inherit",
+                            fontSize: "inherit",
                             fontWeight: 650,
+                            lineHeight: "inherit",
                             minWidth: 0,
                             overflow: "hidden",
+                            p: 0,
+                            textAlign: "left",
                             textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            "&:focus-visible": {
+                                borderRadius: "4px",
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
                         }}
                     >
                         {firstName}
@@ -212,6 +257,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     onOpenPhoto?.({
                         alt: `${name} post`,
                         avatarUrl,
+                        friendID,
                         imageUrl,
                         name,
                         timestampMs,
@@ -253,11 +299,13 @@ const FeedItem: React.FC<FeedItemProps> = ({
 };
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
+    onOpenFriend,
     onOpenProfile,
     profile,
 }) => {
     const [selectedPhoto, setSelectedPhoto] =
         useState<SocialViewerPhoto | null>(null);
+    const selectedPhotoFriendID = selectedPhoto?.friendID;
     const initialsSource = profile.fullName.trim() || profile.username.trim();
     const initials = initialsSource
         .split(/\s+/)
@@ -394,8 +442,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             key={`${item.name}-${item.imageUrl}`}
                             aspectRatio={item.aspectRatio}
                             avatarUrl={item.avatarUrl}
+                            friendID={item.friendID}
                             imageUrl={item.imageUrl}
                             name={item.name}
+                            onOpenFriend={onOpenFriend}
                             onOpenPhoto={setSelectedPhoto}
                             timestampMs={item.timestampMs}
                         />
@@ -405,6 +455,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <SocialFileViewer
                         photo={selectedPhoto}
                         onClose={() => setSelectedPhoto(null)}
+                        onOpenProfile={
+                            selectedPhotoFriendID && onOpenFriend
+                                ? () => {
+                                      setSelectedPhoto(null);
+                                      onOpenFriend(selectedPhotoFriendID);
+                                  }
+                                : undefined
+                        }
                     />
                 )}
             </Box>

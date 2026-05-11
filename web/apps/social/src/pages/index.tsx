@@ -45,6 +45,7 @@ type Screen =
     | "settings";
 
 type ProfileBackScreen = "login" | "verify-email";
+type FriendProfileBackScreen = "friends" | "home";
 
 const samplePublicProfileData = {
     avatarUrl: "/images/sample-avatar.jpg",
@@ -89,6 +90,8 @@ const Page: React.FC = () => {
     const [profile, setProfile] = useState<SetupProfile | null>(null);
     const [profileBackScreen, setProfileBackScreen] =
         useState<ProfileBackScreen>("verify-email");
+    const [friendProfileBackScreen, setFriendProfileBackScreen] =
+        useState<FriendProfileBackScreen>("friends");
     const [selectedFriendID, setSelectedFriendID] = useState<string | null>(
         null,
     );
@@ -96,6 +99,15 @@ const Page: React.FC = () => {
     const openSetupProfile = (backScreen: ProfileBackScreen) => {
         setProfileBackScreen(backScreen);
         setScreen("setup-profile");
+    };
+
+    const openFriendProfile = (
+        friendID: string,
+        backScreen: FriendProfileBackScreen,
+    ) => {
+        setSelectedFriendID(friendID);
+        setFriendProfileBackScreen(backScreen);
+        setScreen("friend-profile");
     };
 
     useEffect(() => {
@@ -108,7 +120,8 @@ const Page: React.FC = () => {
     }, []);
 
     const selectedFriend = selectedFriendID
-        ? friends.find((friend) => friend.id == selectedFriendID)
+        ? (friends.find((friend) => friend.id == selectedFriendID) ??
+          sampleFriends.find((friend) => friend.id == selectedFriendID))
         : undefined;
 
     const themeColor =
@@ -206,6 +219,9 @@ const Page: React.FC = () => {
                     {screen == "home" && profile && (
                         <HomeScreen
                             profile={profile}
+                            onOpenFriend={(friendID) =>
+                                openFriendProfile(friendID, "home")
+                            }
                             onOpenProfile={() => setScreen("profile")}
                         />
                     )}
@@ -222,10 +238,9 @@ const Page: React.FC = () => {
                         <FriendsScreen
                             friends={friends}
                             onBack={() => setScreen("profile")}
-                            onOpenFriend={(friendID) => {
-                                setSelectedFriendID(friendID);
-                                setScreen("friend-profile");
-                            }}
+                            onOpenFriend={(friendID) =>
+                                openFriendProfile(friendID, "friends")
+                            }
                             onUnfriend={(friendID) =>
                                 setFriends((currentFriends) =>
                                     currentFriends.filter(
@@ -244,7 +259,7 @@ const Page: React.FC = () => {
                                 fullName: selectedFriend.fullName,
                                 username: selectedFriend.username,
                             }}
-                            onBack={() => setScreen("friends")}
+                            onBack={() => setScreen(friendProfileBackScreen)}
                         />
                     )}
                     {screen == "settings" && profile && (

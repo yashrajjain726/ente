@@ -26,6 +26,7 @@ const defaultPhotoHeight = 680;
 export interface SocialViewerPhoto {
     alt?: string;
     avatarUrl?: string | null;
+    friendID?: string;
     height?: number;
     imageUrl: string;
     name: string;
@@ -35,11 +36,13 @@ export interface SocialViewerPhoto {
 
 interface SocialFileViewerProps {
     onClose: () => void;
+    onOpenProfile?: () => void;
     photo: SocialViewerPhoto;
 }
 
 export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     onClose,
+    onOpenProfile,
     photo,
 }) => {
     const displayName = firstNameFrom(photo.name);
@@ -185,19 +188,35 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     }}
                 >
                     <Box
+                        component={onOpenProfile ? "button" : "div"}
+                        type={onOpenProfile ? "button" : undefined}
+                        aria-label={
+                            onOpenProfile
+                                ? `Open ${displayName}'s profile`
+                                : undefined
+                        }
+                        onClick={onOpenProfile}
                         sx={{
+                            appearance: "none",
                             alignItems: "center",
                             bgcolor: photo.avatarUrl
                                 ? "transparent"
                                 : paleGreen,
+                            border: 0,
                             borderRadius: "50%",
                             color: green,
+                            cursor: onOpenProfile ? "pointer" : "default",
                             display: "flex",
                             flexShrink: 0,
                             height: 32,
                             justifyContent: "center",
                             overflow: "hidden",
+                            p: 0,
                             width: 32,
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
                         }}
                     >
                         {photo.avatarUrl ? (
@@ -241,12 +260,35 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                         }}
                     >
                         <Box
-                            component="span"
+                            component={onOpenProfile ? "button" : "span"}
+                            type={onOpenProfile ? "button" : undefined}
+                            aria-label={
+                                onOpenProfile
+                                    ? `Open ${displayName}'s profile`
+                                    : undefined
+                            }
+                            onClick={onOpenProfile}
                             sx={{
+                                appearance: "none",
+                                bgcolor: "transparent",
+                                border: 0,
+                                color: "inherit",
+                                cursor: onOpenProfile ? "pointer" : "default",
+                                fontFamily: "inherit",
+                                fontSize: "inherit",
                                 fontWeight: 650,
+                                lineHeight: "inherit",
                                 minWidth: 0,
                                 overflow: "hidden",
+                                p: 0,
+                                textAlign: "left",
                                 textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                "&:focus-visible": {
+                                    borderRadius: "4px",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
                             }}
                         >
                             {displayName}
