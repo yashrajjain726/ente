@@ -264,9 +264,13 @@ const Page: React.FC = () => {
                     )}
                     {screen == "settings" && profile && (
                         <SettingsScreen
-                            email={email}
-                            profile={profile}
                             onBack={() => setScreen("profile")}
+                            onLogout={() => {
+                                setProfile(null);
+                                setSelectedFriendID(null);
+                                setFriends(sampleFriends);
+                                setScreen("login");
+                            }}
                         />
                     )}
                 </>
