@@ -50,6 +50,8 @@ type OnboardingEntrySource = "direct" | "add-friend-link";
 
 const onboardingSourceSearchParam = "onboardingSource";
 const addFriendLinkOnboardingSource: OnboardingEntrySource = "add-friend-link";
+const showMockFriends =
+    process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_FRIENDS != "true";
 
 const samplePublicProfileData = {
     avatarUrl: "/images/sample-avatar.jpg",
@@ -110,7 +112,9 @@ const Page: React.FC = () => {
     const [routeMode, setRouteMode] = useState<RouteMode>({ kind: "checking" });
     const [screen, setScreen] = useState<Screen>("onboarding");
     const [email, setEmail] = useState("example@example.com");
-    const [friends, setFriends] = useState(sampleFriends);
+    const [friends, setFriends] = useState(() =>
+        showMockFriends ? sampleFriends : [],
+    );
     const [onboardingEntrySource, setOnboardingEntrySource] =
         useState<OnboardingEntrySource>("direct");
     const [profile, setProfile] = useState<SetupProfile | null>(null);
@@ -264,6 +268,7 @@ const Page: React.FC = () => {
                     )}
                     {screen == "home" && profile && (
                         <HomeScreen
+                            friendsCount={friends.length}
                             profile={profile}
                             onOpenFriend={(friendID) =>
                                 openFriendProfile(friendID, "home")
@@ -315,7 +320,7 @@ const Page: React.FC = () => {
                                 setProfile(null);
                                 setOnboardingEntrySource("direct");
                                 setSelectedFriendID(null);
-                                setFriends(sampleFriends);
+                                setFriends(showMockFriends ? sampleFriends : []);
                                 setScreen("onboarding");
                             }}
                         />

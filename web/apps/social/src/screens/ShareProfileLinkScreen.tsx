@@ -1,3 +1,5 @@
+import { Share08Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -44,21 +46,7 @@ const BackIcon: React.FC = () => (
 );
 
 export const ShareIcon: React.FC = () => (
-    <Box
-        component="svg"
-        viewBox="0 0 24 24"
-        aria-hidden
-        sx={{ display: "block", height: 20, width: 20 }}
-    >
-        <path
-            d="M12 15.5V4.75M12 4.75L8.25 8.5M12 4.75L15.75 8.5M6.5 11.5V17.5C6.5 18.6 7.4 19.5 8.5 19.5H15.5C16.6 19.5 17.5 18.6 17.5 17.5V11.5"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-        />
-    </Box>
+    <HugeiconsIcon icon={Share08Icon} size={18} strokeWidth={1.8} />
 );
 
 export const LinkIcon: React.FC = () => (

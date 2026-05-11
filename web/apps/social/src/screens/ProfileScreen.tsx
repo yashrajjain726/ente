@@ -200,7 +200,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         0,
     );
     const isProfileActionsOpen = Boolean(profileActionsAnchor);
-    const canOpenFriends = isOwnerProfile && Boolean(onOpenFriends);
+    const canOpenFriends =
+        isOwnerProfile && friendsCount > 0 && Boolean(onOpenFriends);
 
     const closeProfileActions = () => setProfileActionsAnchor(null);
 

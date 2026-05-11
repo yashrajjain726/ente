@@ -12,7 +12,9 @@ import {
 } from "components/SocialFileViewer";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
+import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import { profileLinkForUsername } from "utils/profileLink";
 import { firstNameFrom, formatSocialDate } from "utils/socialDisplay";
 
 export const homeBackground = "#FFFFFF";
@@ -26,6 +28,8 @@ const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
 const hoursAgo = (hours: number) => minutesAgo(hours * 60);
 const daysAgo = (days: number) => hoursAgo(days * 24);
 const sampleFeedPhotoAspectRatio = 900 / 680;
+const showMockFeedData =
+    process.env.NEXT_PUBLIC_SHOW_SOCIAL_MOCK_FEED == "true";
 type PostActionPhase = "posting" | "posted";
 
 const sampleFeedItems = [
@@ -88,6 +92,7 @@ const sampleFeedItems = [
 ];
 
 interface HomeScreenProps {
+    friendsCount: number;
     onOpenFriend?: (friendID: string) => void;
     onOpenProfile?: () => void;
     profile: SetupProfile;
@@ -307,6 +312,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
 };
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
+    friendsCount,
     onOpenFriend,
     onOpenProfile,
     profile,
@@ -317,6 +323,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         useState<PostActionPhase | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const selectedPhotoFriendID = selectedPhoto?.friendID;
+    const feedItems = showMockFeedData ? sampleFeedItems : [];
+    const hasFeedItems = feedItems.length > 0;
+    const emptyFeedMessage =
+        friendsCount == 0
+            ? "When you add friends, their posts will appear here."
+            : "When your friends share posts, they'll appear here.";
+    const profileLink = profileLinkForUsername(profile.username.trim());
     const isPostActionPosting = postActionPhase == "posting";
     const isPostActionPosted = postActionPhase == "posted";
     const postActionFeedbackPhase: SocialActionPhase | null =
@@ -332,6 +345,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         .map((part) => part[0]?.toUpperCase())
         .join("");
     const openPostPhotoPicker = () => postInputRef.current?.click();
+
+    const shareProfileLink = async () => {
+        if (typeof navigator.share == "function") {
+            try {
+                await navigator.share({ url: profileLink });
+                return;
+            } catch (error) {
+                if (error instanceof DOMException && error.name == "AbortError")
+                    return;
+            }
+        }
+
+        await navigator.clipboard.writeText(profileLink);
+    };
 
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
         event,
@@ -508,27 +535,109 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Box>
                 <Box
                     sx={{
+                        boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        gap: "36px",
-                        mt: "22px",
-                        pb: "16px",
+                        gap: hasFeedItems ? "36px" : 0,
+                        justifyContent: hasFeedItems ? "flex-start" : "center",
+                        minHeight: "calc(100svh - 56px)",
+                        pb: hasFeedItems ? "16px" : "56px",
+                        pt: hasFeedItems ? "22px" : 0,
                         width: "100%",
                     }}
                 >
-                    {sampleFeedItems.map((item) => (
-                        <FeedItem
-                            key={`${item.name}-${item.imageUrl}`}
-                            aspectRatio={item.aspectRatio}
-                            avatarUrl={item.avatarUrl}
-                            friendID={item.friendID}
-                            imageUrl={item.imageUrl}
-                            name={item.name}
-                            onOpenFriend={onOpenFriend}
-                            onOpenPhoto={setSelectedPhoto}
-                            timestampMs={item.timestampMs}
-                        />
-                    ))}
+                    {hasFeedItems ? (
+                        feedItems.map((item) => (
+                            <FeedItem
+                                key={`${item.name}-${item.imageUrl}`}
+                                aspectRatio={item.aspectRatio}
+                                avatarUrl={item.avatarUrl}
+                                friendID={item.friendID}
+                                imageUrl={item.imageUrl}
+                                name={item.name}
+                                onOpenFriend={onOpenFriend}
+                                onOpenPhoto={setSelectedPhoto}
+                                timestampMs={item.timestampMs}
+                            />
+                        ))
+                    ) : (
+                        <Box
+                            sx={{
+                                alignItems: "center",
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "center",
+                                px: 3,
+                                textAlign: "center",
+                                width: "100%",
+                            }}
+                        >
+                            <Box
+                                component="img"
+                                alt=""
+                                src="/images/share-memories.svg"
+                                sx={{
+                                    display: "block",
+                                    height: "auto",
+                                    width: 156,
+                                    "@media (max-width: 340px)": {
+                                        width: 140,
+                                    },
+                                }}
+                            />
+                            <Box
+                                component="p"
+                                sx={{
+                                    color: textSecondary,
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    lineHeight: "20px",
+                                    m: 0,
+                                    mt: "36px",
+                                    maxWidth: 220,
+                                }}
+                            >
+                                {emptyFeedMessage}
+                            </Box>
+                            {friendsCount == 0 && (
+                                <Box
+                                    component="button"
+                                    type="button"
+                                    onClick={shareProfileLink}
+                                    sx={{
+                                        alignItems: "center",
+                                        bgcolor: "#F2F2F2",
+                                        border: 0,
+                                        borderRadius: "18px",
+                                        color: textBase,
+                                        cursor: "pointer",
+                                        display: "inline-flex",
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        gap: "6px",
+                                        height: 36,
+                                        justifyContent: "center",
+                                        lineHeight: "18px",
+                                        mt: "18px",
+                                        px: "14px",
+                                        whiteSpace: "nowrap",
+                                        "&:focus-visible": {
+                                            outline: `2px solid ${green}`,
+                                            outlineOffset: 2,
+                                        },
+                                        "&:hover": { bgcolor: "#E8E8E8" },
+                                    }}
+                                >
+                                    <ShareIcon />
+                                    Share link
+                                </Box>
+                            )}
+                        </Box>
+                    )}
                 </Box>
                 {selectedPhoto && (
                     <SocialFileViewer
