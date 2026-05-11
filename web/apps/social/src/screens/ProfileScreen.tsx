@@ -44,6 +44,15 @@ const showMockProfilePosts =
     process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_PROFILE_POSTS != "true";
 type PostActionPhase = "posting" | "posted";
 
+interface ProfilePhotoDimensions {
+    height: number;
+    width: number;
+}
+
+interface SampleProfilePhoto extends ProfilePhotoDimensions {
+    imageUrl: string;
+}
+
 const postActionSpin = keyframes`
     from {
         transform: rotate(0deg);
@@ -54,16 +63,44 @@ const postActionSpin = keyframes`
     }
 `;
 
-const samplePhotoUrls = [
-    "/images/sample-feed-1.jpg",
-    "/images/sample-feed-5.jpg",
-    "/images/sample-feed-2.jpg",
-    "/images/sample-feed-6.jpg",
-    "/images/sample-feed-3.jpg",
-    "/images/sample-feed-4.jpg",
-] as const;
-
-const samplePhotoAspectRatios = [1.32, 0.82, 1.18, 0.92, 1.46, 1.04] as const;
+const samplePhotos = [
+    { height: 680, imageUrl: "/images/sample-feed-1.jpg", width: 900 },
+    {
+        height: 1020,
+        imageUrl: "/images/sample-feed-portrait-1.jpg",
+        width: 680,
+    },
+    { height: 680, imageUrl: "/images/sample-feed-5.jpg", width: 900 },
+    {
+        height: 1020,
+        imageUrl: "/images/sample-feed-portrait-2.jpg",
+        width: 680,
+    },
+    { height: 680, imageUrl: "/images/sample-feed-2.jpg", width: 900 },
+    {
+        height: 1020,
+        imageUrl: "/images/sample-feed-portrait-3.jpg",
+        width: 680,
+    },
+    { height: 680, imageUrl: "/images/sample-feed-6.jpg", width: 900 },
+    {
+        height: 1020,
+        imageUrl: "/images/sample-feed-portrait-4.jpg",
+        width: 680,
+    },
+    { height: 680, imageUrl: "/images/sample-feed-3.jpg", width: 900 },
+    {
+        height: 1020,
+        imageUrl: "/images/sample-feed-portrait-5.jpg",
+        width: 680,
+    },
+    { height: 680, imageUrl: "/images/sample-feed-4.jpg", width: 900 },
+    {
+        height: 1020,
+        imageUrl: "/images/sample-feed-portrait-6.jpg",
+        width: 680,
+    },
+] as const satisfies readonly SampleProfilePhoto[];
 
 const samplePostDateLabels = [
     "Today",
@@ -89,22 +126,26 @@ const samplePostTimestampAt = (groupIndex: number, itemIndex: number) => {
     return daysAgo(groupIndex + 1) - itemIndex * 20 * 60 * 1000;
 };
 
-const samplePhotoUrlAt = (index: number): string =>
-    samplePhotoUrls[index % samplePhotoUrls.length] ?? samplePhotoUrls[0];
+const samplePhotoAt = (index: number): SampleProfilePhoto =>
+    samplePhotos[index % samplePhotos.length] ?? samplePhotos[0];
 
-const samplePhotoAspectRatioAt = (index: number): number =>
-    samplePhotoAspectRatios[index % samplePhotoAspectRatios.length] ?? 1;
+const photoAspectRatio = ({ height, width }: ProfilePhotoDimensions): number =>
+    height > 0 && width > 0 ? width / height : 1;
 
 const samplePostGroups = samplePostDateLabels.map((label, groupIndex) => ({
     label,
     items: Array.from(
         { length: samplePostPhotoCounts[groupIndex] ?? 1 },
-        (_, itemIndex) => ({
-            id: `${groupIndex}-${itemIndex}`,
-            imageUrl: samplePhotoUrlAt(groupIndex + itemIndex),
-            aspectRatio: samplePhotoAspectRatioAt(groupIndex + itemIndex),
-            timestampMs: samplePostTimestampAt(groupIndex, itemIndex),
-        }),
+        (_, itemIndex) => {
+            const photo = samplePhotoAt(groupIndex + itemIndex);
+            return {
+                height: photo.height,
+                id: `${groupIndex}-${itemIndex}`,
+                imageUrl: photo.imageUrl,
+                timestampMs: samplePostTimestampAt(groupIndex, itemIndex),
+                width: photo.width,
+            };
+        },
     ),
 }));
 
@@ -115,67 +156,56 @@ interface SelectedProfilePost {
     photo: SocialViewerPhoto;
 }
 
-interface PostMasonryRow {
-    height: number;
-    compactHeight: number;
-    items: { item: SamplePostItem; index: number }[];
+interface PostMasonryTile {
+    aspectRatio: number;
+    dimensions: ProfilePhotoDimensions;
+    index: number;
+    item: SamplePostItem;
 }
 
-const postMasonryRowSizes = (count: number): number[] => {
-    if (count <= 0) return [];
-    if (count <= 3) return [count];
+interface PostMasonryRow {
+    aspectRatio: number;
+    tiles: PostMasonryTile[];
+}
 
-    const rowSizes: number[] = [];
-    let remaining = count;
-
-    while (remaining > 0) {
-        if (remaining == 2 || remaining == 3) {
-            rowSizes.push(remaining);
-            break;
-        }
-        if (remaining == 4) {
-            rowSizes.push(2, 2);
-            break;
-        }
-        if (remaining == 5) {
-            rowSizes.push(3, 2);
-            break;
-        }
-
-        const nextRowSize = rowSizes.length % 2 == 0 ? 3 : 2;
-        rowSizes.push(nextRowSize);
-        remaining -= nextRowSize;
-    }
-
-    return rowSizes;
-};
-
-const postMasonryRowHeight = (rowSize: number, rowIndex: number) => {
-    if (rowSize <= 1) return 190;
-    if (rowSize == 2) return rowIndex % 2 == 0 ? 152 : 142;
-    return rowIndex % 2 == 0 ? 116 : 108;
-};
-
-const buildPostMasonryRows = (items: SamplePostItem[]): PostMasonryRow[] => {
-    const rowSizes = postMasonryRowSizes(items.length);
-    let nextItemIndex = 0;
-
-    return rowSizes.map((rowSize, rowIndex) => {
-        const rowItems = items
-            .slice(nextItemIndex, nextItemIndex + rowSize)
-            .map((item, rowItemIndex) => ({
-                item,
-                index: nextItemIndex + rowItemIndex,
-            }));
-        nextItemIndex += rowSize;
-
-        const height = postMasonryRowHeight(rowItems.length, rowIndex);
+const buildPostMasonryRows = (
+    items: SamplePostItem[],
+    loadedDimensionsByURL: Record<string, ProfilePhotoDimensions>,
+): PostMasonryRow[] => {
+    const tiles = items.map((item, index) => {
+        const dimensions = loadedDimensionsByURL[item.imageUrl] ?? item;
         return {
-            height,
-            compactHeight: Math.round(height * 0.9),
-            items: rowItems,
+            aspectRatio: Math.max(0.1, photoAspectRatio(dimensions)),
+            dimensions,
+            index,
+            item,
         };
     });
+    const rows = new Array<PostMasonryRow>();
+    let nextTileIndex = 0;
+
+    while (nextTileIndex < tiles.length) {
+        const rowSize = preferredPostMasonryRowSize(
+            tiles.length - nextTileIndex,
+        );
+        const rowTiles = tiles.slice(nextTileIndex, nextTileIndex + rowSize);
+        rows.push({
+            aspectRatio: rowTiles.reduce(
+                (aspectRatio, tile) => aspectRatio + tile.aspectRatio,
+                0,
+            ),
+            tiles: rowTiles,
+        });
+        nextTileIndex += rowSize;
+    }
+
+    return rows;
+};
+
+const preferredPostMasonryRowSize = (remainingTiles: number) => {
+    if (remainingTiles <= 3) return remainingTiles;
+    if (remainingTiles == 4 || remainingTiles == 5) return 2;
+    return remainingTiles % 2 == 0 ? 2 : 3;
 };
 
 interface ProfileScreenProps {
@@ -206,6 +236,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
         () => new Set(),
     );
+    const [loadedPhotoDimensionsByURL, setLoadedPhotoDimensionsByURL] =
+        useState<Record<string, ProfilePhotoDimensions>>({});
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const isPublicProfile = headerVariant == "public";
     const isOwnerProfile = headerVariant == "owner";
@@ -240,6 +272,27 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
     const closeProfileActions = () => setProfileActionsAnchor(null);
     const openPostPhotoPicker = () => postInputRef.current?.click();
+    const rememberLoadedPhotoDimensions = (
+        imageUrl: string,
+        image: HTMLImageElement,
+    ) => {
+        const { naturalHeight, naturalWidth } = image;
+        if (naturalHeight <= 0 || naturalWidth <= 0) return;
+
+        setLoadedPhotoDimensionsByURL((currentDimensions) => {
+            const current = currentDimensions[imageUrl];
+            if (
+                current?.height == naturalHeight &&
+                current.width == naturalWidth
+            )
+                return currentDimensions;
+
+            return {
+                ...currentDimensions,
+                [imageUrl]: { height: naturalHeight, width: naturalWidth },
+            };
+        });
+    };
 
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
         event,
@@ -867,63 +920,69 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     }}
                 >
                     {hasProfilePosts ? (
-                        visiblePostGroups.map((group) => (
-                            <Box
-                                component="section"
-                                key={group.label}
-                                sx={{ width: "100%" }}
-                            >
+                        visiblePostGroups.map((group) => {
+                            const masonryRows = buildPostMasonryRows(
+                                group.items,
+                                loadedPhotoDimensionsByURL,
+                            );
+
+                            return (
                                 <Box
-                                    sx={{
-                                        mb: "10px",
-                                        px: "18px",
-                                        width: "100%",
-                                    }}
+                                    component="section"
+                                    key={group.label}
+                                    sx={{ width: "100%" }}
                                 >
                                     <Box
-                                        component="h2"
                                         sx={{
-                                            color: textStrong,
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 14,
-                                            fontWeight: 650,
-                                            letterSpacing: 0,
-                                            lineHeight: "20px",
-                                            m: 0,
+                                            mb: "10px",
+                                            px: "18px",
+                                            width: "100%",
                                         }}
                                     >
-                                        {group.label}
+                                        <Box
+                                            component="h2"
+                                            sx={{
+                                                color: textStrong,
+                                                fontFamily:
+                                                    '"Inter Variable", Inter, sans-serif',
+                                                fontSize: 14,
+                                                fontWeight: 650,
+                                                letterSpacing: 0,
+                                                lineHeight: "20px",
+                                                m: 0,
+                                            }}
+                                        >
+                                            {group.label}
+                                        </Box>
                                     </Box>
-                                </Box>
-                                <Box
-                                    sx={{
-                                        borderRadius: photoMasonryRadius,
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: photoMasonryGap,
-                                        mx: "16px",
-                                        overflow: "hidden",
-                                        width: "calc(100% - 32px)",
-                                    }}
-                                >
-                                    {buildPostMasonryRows(group.items).map(
-                                        (row, rowIndex) => (
+                                    <Box
+                                        sx={{
+                                            borderRadius: photoMasonryRadius,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: photoMasonryGap,
+                                            mx: "16px",
+                                            overflow: "hidden",
+                                            width: "calc(100% - 32px)",
+                                        }}
+                                    >
+                                        {masonryRows.map((row, rowIndex) => (
                                             <Box
                                                 key={`${group.label}-row-${rowIndex}`}
                                                 sx={{
                                                     display: "flex",
                                                     gap: photoMasonryGap,
-                                                    height: row.height,
+                                                    aspectRatio: `${row.aspectRatio} / 1`,
                                                     width: "100%",
-                                                    "@media (max-width: 340px)":
-                                                        {
-                                                            height: row.compactHeight,
-                                                        },
                                                 }}
                                             >
-                                                {row.items.map(
-                                                    ({ item, index }) => (
+                                                {row.tiles.map(
+                                                    ({
+                                                        aspectRatio,
+                                                        dimensions,
+                                                        item,
+                                                        index,
+                                                    }) => (
                                                         <Box
                                                             component="button"
                                                             type="button"
@@ -941,11 +1000,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                             }`,
                                                                             avatarUrl:
                                                                                 profile.avatarUrl,
+                                                                            height: dimensions.height,
                                                                             imageUrl:
                                                                                 item.imageUrl,
                                                                             name: displayName,
                                                                             timestampMs:
                                                                                 item.timestampMs,
+                                                                            width: dimensions.width,
                                                                         },
                                                                     },
                                                                 )
@@ -960,7 +1021,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                 cursor: "pointer",
                                                                 display:
                                                                     "block",
-                                                                flex: `${item.aspectRatio} 1 0`,
+                                                                flex: `${aspectRatio} 1 0`,
+                                                                height: "100%",
                                                                 minWidth: 0,
                                                                 overflow:
                                                                     "hidden",
@@ -978,6 +1040,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                 alt={`${group.label} post ${
                                                                     index + 1
                                                                 }`}
+                                                                onLoad={(
+                                                                    event,
+                                                                ) =>
+                                                                    rememberLoadedPhotoDimensions(
+                                                                        item.imageUrl,
+                                                                        event.currentTarget,
+                                                                    )
+                                                                }
                                                                 src={
                                                                     item.imageUrl
                                                                 }
@@ -996,11 +1066,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                     ),
                                                 )}
                                             </Box>
-                                        ),
-                                    )}
+                                        ))}
+                                    </Box>
                                 </Box>
-                            </Box>
-                        ))
+                            );
+                        })
                     ) : (
                         <Box
                             sx={{

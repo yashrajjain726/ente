@@ -12,8 +12,8 @@ import {
 } from "components/SocialFileViewer";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
-import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import { profileLinkForUsername } from "utils/profileLink";
 import { firstNameFrom, formatSocialDate } from "utils/socialDisplay";
 
@@ -27,14 +27,15 @@ const textSecondary = "#6B6B6B";
 const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
 const hoursAgo = (hours: number) => minutesAgo(hours * 60);
 const daysAgo = (days: number) => hoursAgo(days * 24);
-const sampleFeedPhotoAspectRatio = 900 / 680;
+const sampleFeedLandscapePhotoAspectRatio = 900 / 680;
+const sampleFeedPortraitPhotoAspectRatio = 680 / 1020;
 const showMockFeedData =
     process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_FEED != "true";
 type PostActionPhase = "posting" | "posted";
 
 const sampleFeedItems = [
     {
-        aspectRatio: sampleFeedPhotoAspectRatio,
+        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
         avatarUrl: "/images/sample-feed-4.jpg",
         friendID: "aparna-bhatnagar",
         imageUrl: "/images/sample-feed-1.jpg",
@@ -42,7 +43,15 @@ const sampleFeedItems = [
         timestampMs: minutesAgo(22),
     },
     {
-        aspectRatio: sampleFeedPhotoAspectRatio,
+        aspectRatio: sampleFeedPortraitPhotoAspectRatio,
+        avatarUrl: "/images/sample-feed-3.jpg",
+        friendID: "mira-sen",
+        imageUrl: "/images/sample-feed-portrait-2.jpg",
+        name: "Mira Sen",
+        timestampMs: hoursAgo(2),
+    },
+    {
+        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
         avatarUrl: "/images/sample-feed-3.jpg",
         friendID: "mira-sen",
         imageUrl: "/images/sample-feed-2.jpg",
@@ -50,7 +59,15 @@ const sampleFeedItems = [
         timestampMs: hoursAgo(3),
     },
     {
-        aspectRatio: sampleFeedPhotoAspectRatio,
+        aspectRatio: sampleFeedPortraitPhotoAspectRatio,
+        avatarUrl: "/images/sample-feed-5.jpg",
+        friendID: "nikhil-rao",
+        imageUrl: "/images/sample-feed-portrait-3.jpg",
+        name: "Nikhil Rao",
+        timestampMs: hoursAgo(7),
+    },
+    {
+        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
         avatarUrl: "/images/sample-feed-5.jpg",
         friendID: "nikhil-rao",
         imageUrl: "/images/sample-feed-3.jpg",
@@ -58,7 +75,15 @@ const sampleFeedItems = [
         timestampMs: daysAgo(1),
     },
     {
-        aspectRatio: sampleFeedPhotoAspectRatio,
+        aspectRatio: sampleFeedPortraitPhotoAspectRatio,
+        avatarUrl: "/images/sample-feed-6.jpg",
+        friendID: "riya-kapoor",
+        imageUrl: "/images/sample-feed-portrait-4.jpg",
+        name: "Riya Kapoor",
+        timestampMs: daysAgo(1) - 3 * 60 * 60 * 1000,
+    },
+    {
+        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
         avatarUrl: "/images/sample-feed-6.jpg",
         friendID: "riya-kapoor",
         imageUrl: "/images/sample-feed-4.jpg",
@@ -66,7 +91,15 @@ const sampleFeedItems = [
         timestampMs: daysAgo(2),
     },
     {
-        aspectRatio: sampleFeedPhotoAspectRatio,
+        aspectRatio: sampleFeedPortraitPhotoAspectRatio,
+        avatarUrl: "/images/sample-feed-4.jpg",
+        friendID: "aparna-bhatnagar",
+        imageUrl: "/images/sample-feed-portrait-1.jpg",
+        name: "Aparna Bhatnagar",
+        timestampMs: daysAgo(3),
+    },
+    {
+        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
         avatarUrl: "/images/sample-feed-4.jpg",
         friendID: "aparna-bhatnagar",
         imageUrl: "/images/sample-feed-5.jpg",
@@ -74,7 +107,15 @@ const sampleFeedItems = [
         timestampMs: daysAgo(4),
     },
     {
-        aspectRatio: sampleFeedPhotoAspectRatio,
+        aspectRatio: sampleFeedPortraitPhotoAspectRatio,
+        avatarUrl: "/images/sample-feed-3.jpg",
+        friendID: "mira-sen",
+        imageUrl: "/images/sample-feed-portrait-5.jpg",
+        name: "Mira Sen",
+        timestampMs: daysAgo(6),
+    },
+    {
+        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
         avatarUrl: "/images/sample-feed-3.jpg",
         friendID: "mira-sen",
         imageUrl: "/images/sample-feed-6.jpg",
@@ -82,7 +123,15 @@ const sampleFeedItems = [
         timestampMs: daysAgo(8),
     },
     {
-        aspectRatio: sampleFeedPhotoAspectRatio,
+        aspectRatio: sampleFeedPortraitPhotoAspectRatio,
+        avatarUrl: "/images/sample-feed-5.jpg",
+        friendID: "nikhil-rao",
+        imageUrl: "/images/sample-feed-portrait-6.jpg",
+        name: "Nikhil Rao",
+        timestampMs: daysAgo(12),
+    },
+    {
+        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
         avatarUrl: "/images/sample-feed-5.jpg",
         friendID: "nikhil-rao",
         imageUrl: "/images/sample-feed-2.jpg",
@@ -580,9 +629,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     display: "block",
                                     height: "auto",
                                     width: 156,
-                                    "@media (max-width: 340px)": {
-                                        width: 140,
-                                    },
+                                    "@media (max-width: 340px)": { width: 140 },
                                 }}
                             />
                             <Box
