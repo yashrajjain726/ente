@@ -5,6 +5,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
+import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import type { FriendProfile } from "data/friends";
 import React, { useState } from "react";
 
@@ -277,122 +278,142 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     onBack,
     onOpenFriend,
     onUnfriend,
-}) => (
-    <Box
-        component="main"
-        sx={{
-            bgcolor: friendsBackground,
-            color: textBase,
-            display: "grid",
-            minHeight: "100svh",
-            overflowX: "hidden",
-            placeItems: { xs: "stretch", sm: "start center" },
-        }}
-    >
+}) => {
+    const [friendToUnfriend, setFriendToUnfriend] =
+        React.useState<FriendProfile | null>(null);
+
+    const cancelUnfriend = () => setFriendToUnfriend(null);
+
+    const confirmUnfriend = () => {
+        if (friendToUnfriend) onUnfriend?.(friendToUnfriend.id);
+        setFriendToUnfriend(null);
+    };
+
+    return (
         <Box
+            component="main"
             sx={{
                 bgcolor: friendsBackground,
+                color: textBase,
+                display: "grid",
                 boxSizing: "border-box",
                 minHeight: "100svh",
-                mx: "auto",
-                width: "100%",
-                "@media (min-width: 600px)": { maxWidth: 375 },
+                overflowX: "hidden",
+                placeItems: { xs: "stretch", sm: "start center" },
             }}
         >
             <Box
-                component="header"
                 sx={{
-                    alignItems: "center",
-                    display: "grid",
-                    gridTemplateColumns: "24px 1fr 24px",
-                    height: 56,
-                    px: 2,
+                    bgcolor: friendsBackground,
+                    boxSizing: "border-box",
+                    minHeight: "100svh",
+                    mx: "auto",
                     width: "100%",
+                    "@media (min-width: 600px)": { maxWidth: 375 },
                 }}
             >
                 <Box
-                    component="button"
-                    type="button"
-                    aria-label="Back to profile"
-                    onClick={onBack}
+                    component="header"
                     sx={{
                         alignItems: "center",
-                        bgcolor: "transparent",
-                        border: 0,
-                        color: textBase,
-                        cursor: onBack ? "pointer" : "default",
-                        display: "flex",
-                        height: 24,
-                        justifyContent: "flex-start",
-                        p: 0,
-                        width: 24,
-                        "&:focus-visible": {
-                            borderRadius: "50%",
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
-                    }}
-                >
-                    <HugeiconsIcon
-                        icon={ArrowLeft02Icon}
-                        size={24}
-                        strokeWidth={1.8}
-                    />
-                </Box>
-                <Box
-                    component="h1"
-                    sx={{
-                        color: textBase,
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 18,
-                        fontWeight: 700,
-                        justifySelf: "center",
-                        lineHeight: "24px",
-                        m: 0,
-                    }}
-                >
-                    Friends
-                </Box>
-            </Box>
-
-            {friends.length > 0 ? (
-                <Box
-                    component="ul"
-                    sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "4px",
-                        m: 0,
-                        mt: "8px",
-                        p: 0,
+                        display: "grid",
+                        gridTemplateColumns: "24px 1fr 24px",
+                        height: 56,
+                        px: 2,
                         width: "100%",
                     }}
                 >
-                    {friends.map((friend) => (
-                        <FriendRow
-                            key={friend.id}
-                            friend={friend}
-                            onOpenFriend={onOpenFriend}
-                            onUnfriend={onUnfriend}
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label="Back to profile"
+                        onClick={onBack}
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: "transparent",
+                            border: 0,
+                            color: textBase,
+                            cursor: onBack ? "pointer" : "default",
+                            display: "flex",
+                            height: 24,
+                            justifyContent: "flex-start",
+                            p: 0,
+                            width: 24,
+                            "&:focus-visible": {
+                                borderRadius: "50%",
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={ArrowLeft02Icon}
+                            size={24}
+                            strokeWidth={1.8}
                         />
-                    ))}
+                    </Box>
+                    <Box
+                        component="h1"
+                        sx={{
+                            color: textBase,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 18,
+                            fontWeight: 700,
+                            justifySelf: "center",
+                            lineHeight: "24px",
+                            m: 0,
+                        }}
+                    >
+                        Friends
+                    </Box>
                 </Box>
-            ) : (
-                <Box
-                    sx={{
-                        color: textSoft,
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 14,
-                        fontWeight: 600,
-                        lineHeight: "20px",
-                        px: "24px",
-                        py: "44px",
-                        textAlign: "center",
-                    }}
-                >
-                    No friends yet
-                </Box>
-            )}
+
+                {friends.length > 0 ? (
+                    <Box
+                        component="ul"
+                        sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "4px",
+                            m: 0,
+                            mt: "8px",
+                            p: 0,
+                            width: "100%",
+                        }}
+                    >
+                        {friends.map((friend) => (
+                            <FriendRow
+                                key={friend.id}
+                                friend={friend}
+                                onOpenFriend={onOpenFriend}
+                                onUnfriend={() => setFriendToUnfriend(friend)}
+                            />
+                        ))}
+                    </Box>
+                ) : (
+                    <Box
+                        sx={{
+                            color: textSoft,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            lineHeight: "20px",
+                            px: "24px",
+                            py: "44px",
+                            textAlign: "center",
+                        }}
+                    >
+                        No friends yet
+                    </Box>
+                )}
+            </Box>
+            <ConfirmationActionSheet
+                open={Boolean(friendToUnfriend)}
+                title="Are you sure you want to unfriend?"
+                confirmLabel="Yes, unfriend"
+                onCancel={cancelUnfriend}
+                onConfirm={confirmUnfriend}
+            />
         </Box>
-    </Box>
-);
+    );
+};
