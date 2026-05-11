@@ -6,6 +6,7 @@ const dangerColor = "#F63A3A";
 const textBase = "#000";
 
 interface ConfirmationActionSheetProps {
+    appearance?: "light" | "dark";
     open: boolean;
     title: string;
     confirmLabel: string;
@@ -17,6 +18,7 @@ interface ConfirmationActionSheetProps {
 export const ConfirmationActionSheet: React.FC<
     ConfirmationActionSheetProps
 > = ({
+    appearance = "light",
     open,
     title,
     confirmLabel,
@@ -25,6 +27,7 @@ export const ConfirmationActionSheet: React.FC<
     onConfirm,
 }) => {
     const titleID = React.useId();
+    const isDark = appearance == "dark";
 
     return (
         <Dialog
@@ -32,13 +35,28 @@ export const ConfirmationActionSheet: React.FC<
             onClose={onCancel}
             maxWidth={false}
             aria-labelledby={titleID}
+            sx={
+                isDark
+                    ? {
+                          zIndex: 1500,
+                          "& .MuiBackdrop-root": {
+                              backgroundColor:
+                                  "rgba(0, 0, 0, 0.86) !important",
+                          },
+                      }
+                    : undefined
+            }
             slotProps={{
                 backdrop: {
-                    sx: { backgroundColor: "rgba(0, 0, 0, 0.48)" },
+                    sx: {
+                        backgroundColor: isDark
+                            ? "rgba(0, 0, 0, 0.86)"
+                            : "rgba(0, 0, 0, 0.48)",
+                    },
                 },
                 paper: {
                     sx: {
-                        bgcolor: "#FAFAFA",
+                        bgcolor: isDark ? "#1E1E1E" : "#FAFAFA",
                         borderRadius: "20px 20px 0 0",
                         bottom: 0,
                         boxShadow: "none",
@@ -58,7 +76,7 @@ export const ConfirmationActionSheet: React.FC<
                 component="h2"
                 id={titleID}
                 sx={{
-                    color: textBase,
+                    color: isDark ? "#F4F4F4" : textBase,
                     fontFamily: '"Inter Variable", Inter, sans-serif',
                     fontSize: 15,
                     fontWeight: 600,
@@ -86,8 +104,8 @@ export const ConfirmationActionSheet: React.FC<
                 />
                 <SheetButton
                     label={cancelLabel}
-                    backgroundColor="#F2F2F2"
-                    color="#666666"
+                    backgroundColor={isDark ? "#333333" : "#F2F2F2"}
+                    color={isDark ? "#D8D8D8" : "#666666"}
                     onClick={onCancel}
                 />
             </Box>

@@ -78,6 +78,7 @@ const samplePostGroups = samplePostDateLabels.map((label, groupIndex) => ({
     items: Array.from(
         { length: samplePostPhotoCounts[groupIndex] ?? 1 },
         (_, itemIndex) => ({
+            id: `${groupIndex}-${itemIndex}`,
             imageUrl: samplePhotoUrlAt(groupIndex + itemIndex),
             aspectRatio: samplePhotoAspectRatioAt(groupIndex + itemIndex),
             timestampMs: samplePostTimestampAt(groupIndex, itemIndex),
@@ -86,6 +87,11 @@ const samplePostGroups = samplePostDateLabels.map((label, groupIndex) => ({
 }));
 
 type SamplePostItem = (typeof samplePostGroups)[number]["items"][number];
+
+interface SelectedProfilePost {
+    id: string;
+    photo: SocialViewerPhoto;
+}
 
 interface PostMasonryRow {
     height: number;
@@ -169,8 +175,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
     const [profileActionsAnchor, setProfileActionsAnchor] =
         useState<HTMLElement | null>(null);
-    const [selectedPhoto, setSelectedPhoto] =
-        useState<SocialViewerPhoto | null>(null);
+    const [selectedPost, setSelectedPost] =
+        useState<SelectedProfilePost | null>(null);
+    const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
+        () => new Set(),
+    );
     const isPublicProfile = headerVariant == "public";
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
@@ -178,7 +187,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const profileLink = profileLinkForUsername(profile.username.trim());
     const initialsSource = displayName || profile.username.trim();
     const initials = initialsFor(initialsSource);
-    const postsSharedCount = samplePostGroups.reduce(
+    const visiblePostGroups = samplePostGroups
+        .map((group) => ({
+            ...group,
+            items: group.items.filter((item) => !deletedPostIDs.has(item.id)),
+        }))
+        .filter((group) => group.items.length > 0);
+    const postsSharedCount = visiblePostGroups.reduce(
         (count, group) => count + group.items.length,
         0,
     );
@@ -206,6 +221,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         }
 
         await navigator.clipboard.writeText(profileLink);
+    };
+
+    const deleteSelectedPost = () => {
+        if (!selectedPost) return;
+
+        setDeletedPostIDs((currentPostIDs) => {
+            const nextPostIDs = new Set(currentPostIDs);
+            nextPostIDs.add(selectedPost.id);
+            return nextPostIDs;
+        });
+        setSelectedPost(null);
     };
 
     return (
@@ -763,7 +789,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         width: "100%",
                     }}
                 >
-                    {samplePostGroups.map((group) => (
+                    {visiblePostGroups.map((group) => (
                         <Box
                             component="section"
                             key={group.label}
@@ -820,17 +846,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                             index + 1
                                                         }`}
                                                         onClick={() =>
-                                                            setSelectedPhoto({
-                                                                alt: `${displayName} post ${
-                                                                    index + 1
-                                                                }`,
-                                                                avatarUrl:
-                                                                    profile.avatarUrl,
-                                                                imageUrl:
-                                                                    item.imageUrl,
-                                                                name: displayName,
-                                                                timestampMs:
-                                                                    item.timestampMs,
+                                                            setSelectedPost({
+                                                                id: item.id,
+                                                                photo: {
+                                                                    alt: `${displayName} post ${
+                                                                        index +
+                                                                        1
+                                                                    }`,
+                                                                    avatarUrl:
+                                                                        profile.avatarUrl,
+                                                                    imageUrl:
+                                                                        item.imageUrl,
+                                                                    name: displayName,
+                                                                    timestampMs:
+                                                                        item.timestampMs,
+                                                                },
                                                             })
                                                         }
                                                         key={`${group.label}-${item.imageUrl}-${index}`}
@@ -878,11 +908,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         </Box>
                     ))}
                 </Box>
-                {selectedPhoto && (
+                {selectedPost && (
                     <SocialFileViewer
-                        photo={selectedPhoto}
-                        onClose={() => setSelectedPhoto(null)}
-                        onOpenProfile={() => setSelectedPhoto(null)}
+                        photo={selectedPost.photo}
+                        onClose={() => setSelectedPost(null)}
+                        onDeletePost={
+                            isOwnerProfile ? deleteSelectedPost : undefined
+                        }
+                        onOpenProfile={() => setSelectedPost(null)}
                     />
                 )}
             </Box>

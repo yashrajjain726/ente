@@ -1,6 +1,11 @@
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import {
+    Cancel01Icon,
+    Delete02Icon,
+    MoreHorizontalIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box } from "@mui/material";
+import { Box, Menu, MenuItem } from "@mui/material";
+import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
 import {
@@ -18,6 +23,7 @@ const viewerBackground = "#000000";
 const controlBackground = "rgba(36, 36, 36, 0.72)";
 const controlBackgroundHover = "rgba(48, 48, 48, 0.86)";
 const controlIcon = "#D8D8D8";
+const dangerColor = "#F63A3A";
 const viewerHeaderHeight = 56;
 const viewerBottomPadding = 0;
 const defaultPhotoWidth = 900;
@@ -36,12 +42,14 @@ export interface SocialViewerPhoto {
 
 interface SocialFileViewerProps {
     onClose: () => void;
+    onDeletePost?: () => void;
     onOpenProfile?: () => void;
     photo: SocialViewerPhoto;
 }
 
 export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     onClose,
+    onDeletePost,
     onOpenProfile,
     photo,
 }) => {
@@ -49,6 +57,24 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     const dateLabel = formatSocialDate(photo.timestampMs);
     const initials = initialsFor(photo.name);
     const viewerRootRef = React.useRef<HTMLDivElement | null>(null);
+    const [actionsAnchor, setActionsAnchor] =
+        React.useState<HTMLElement | null>(null);
+    const [deleteSheetOpen, setDeleteSheetOpen] = React.useState(false);
+    const actionsMenuID = "social-viewer-actions-menu";
+    const actionsButtonID = "social-viewer-actions-button";
+    const isActionsOpen = Boolean(actionsAnchor);
+
+    const closeActions = () => setActionsAnchor(null);
+
+    const requestDeletePost = () => {
+        closeActions();
+        setDeleteSheetOpen(true);
+    };
+
+    const confirmDeletePost = () => {
+        setDeleteSheetOpen(false);
+        onDeletePost?.();
+    };
 
     React.useEffect(() => {
         const root = viewerRootRef.current;
@@ -137,12 +163,13 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
 
     React.useEffect(() => {
         const closeOnEscape = (event: KeyboardEvent) => {
+            if (deleteSheetOpen) return;
             if (event.key == "Escape") onClose();
         };
 
         window.addEventListener("keydown", closeOnEscape);
         return () => window.removeEventListener("keydown", closeOnEscape);
-    }, [onClose]);
+    }, [deleteSheetOpen, onClose]);
 
     return (
         <Box
@@ -171,7 +198,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     display: "grid",
                     flexShrink: 0,
                     gap: "12px",
-                    gridTemplateColumns: "minmax(0, 1fr) 40px",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
                     minHeight: viewerHeaderHeight,
                     position: "relative",
                     px: "16px",
@@ -319,36 +346,161 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     </Box>
                 </Box>
                 <Box
-                    component="button"
-                    type="button"
-                    aria-label="Close viewer"
-                    onClick={onClose}
                     sx={{
                         alignItems: "center",
-                        bgcolor: controlBackground,
-                        border: 0,
-                        borderRadius: "50%",
-                        color: controlIcon,
-                        cursor: "pointer",
                         display: "flex",
-                        height: 28,
-                        justifyContent: "center",
+                        gap: "16px",
                         justifySelf: "flex-end",
-                        p: 0,
-                        width: 28,
-                        "&:focus-visible": {
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
-                        "&:hover": { bgcolor: controlBackgroundHover },
                     }}
                 >
-                    <HugeiconsIcon
-                        icon={Cancel01Icon}
-                        size={18}
-                        strokeWidth={1.8}
-                    />
+                    {onDeletePost && (
+                        <Box
+                            component="button"
+                            id={actionsButtonID}
+                            type="button"
+                            aria-label="Post actions"
+                            aria-controls={
+                                isActionsOpen ? actionsMenuID : undefined
+                            }
+                            aria-expanded={isActionsOpen ? "true" : undefined}
+                            aria-haspopup="menu"
+                            onClick={(event) =>
+                                setActionsAnchor(event.currentTarget)
+                            }
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "transparent",
+                                border: 0,
+                                color: controlIcon,
+                                cursor: "pointer",
+                                display: "flex",
+                                height: 32,
+                                justifyContent: "center",
+                                p: 0,
+                                width: 32,
+                                "&:focus-visible": {
+                                    borderRadius: "50%",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                                "&:hover": { color: textBase },
+                            }}
+                        >
+                            <HugeiconsIcon
+                                icon={MoreHorizontalIcon}
+                                size={26}
+                                strokeWidth={2}
+                            />
+                        </Box>
+                    )}
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label="Close viewer"
+                        onClick={onClose}
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: controlBackground,
+                            border: 0,
+                            borderRadius: "50%",
+                            color: controlIcon,
+                            cursor: "pointer",
+                            display: "flex",
+                            height: 28,
+                            justifyContent: "center",
+                            p: 0,
+                            width: 28,
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                            "&:hover": { bgcolor: controlBackgroundHover },
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={Cancel01Icon}
+                            size={18}
+                            strokeWidth={1.8}
+                        />
+                    </Box>
                 </Box>
+                {onDeletePost && (
+                    <Menu
+                        id={actionsMenuID}
+                        anchorEl={actionsAnchor}
+                        open={isActionsOpen}
+                        onClose={closeActions}
+                        anchorOrigin={{
+                            horizontal: "right",
+                            vertical: "bottom",
+                        }}
+                        transformOrigin={{
+                            horizontal: "right",
+                            vertical: "top",
+                        }}
+                        slotProps={{
+                            paper: {
+                                sx: {
+                                    bgcolor: "#1E1E1E",
+                                    borderRadius: "16px",
+                                    boxShadow:
+                                        "0 14px 40px rgba(0, 0, 0, 0.16)",
+                                    mt: "6px",
+                                    minWidth: 0,
+                                    p: "4px",
+                                    width: "max-content",
+                                },
+                            },
+                            list: {
+                                "aria-labelledby": actionsButtonID,
+                                sx: { p: 0 },
+                            },
+                        }}
+                    >
+                        <MenuItem
+                            disableRipple
+                            onClick={requestDeletePost}
+                            sx={{
+                                alignItems: "center",
+                                borderRadius: "10px",
+                                color: dangerColor,
+                                display: "flex",
+                                gap: "8px",
+                                minHeight: 38,
+                                px: "8px",
+                                py: "7px",
+                                whiteSpace: "nowrap",
+                                "&.Mui-focusVisible": {
+                                    bgcolor: "rgba(246, 58, 58, 0.14)",
+                                },
+                                "&:active": {
+                                    bgcolor: "rgba(246, 58, 58, 0.14)",
+                                },
+                                "&:hover": {
+                                    bgcolor: "rgba(246, 58, 58, 0.14)",
+                                },
+                            }}
+                        >
+                            <HugeiconsIcon
+                                icon={Delete02Icon}
+                                size={18}
+                                strokeWidth={1.8}
+                                style={{ flexShrink: 0 }}
+                            />
+                            <Box
+                                sx={{
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 13,
+                                    fontWeight: 650,
+                                    lineHeight: "18px",
+                                }}
+                            >
+                                Delete post
+                            </Box>
+                        </MenuItem>
+                    </Menu>
+                )}
             </Box>
             <Box
                 sx={{
@@ -386,6 +538,16 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     zIndex: 1,
                 }}
             />
+            {onDeletePost && (
+                <ConfirmationActionSheet
+                    appearance="dark"
+                    open={deleteSheetOpen}
+                    title="Are you sure you want to delete this?"
+                    confirmLabel="Yes, delete"
+                    onCancel={() => setDeleteSheetOpen(false)}
+                    onConfirm={confirmDeletePost}
+                />
+            )}
         </Box>
     );
 };
