@@ -6,6 +6,11 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
+import {
+    socialActionBusyDurationMs,
+    socialActionDoneDurationMs,
+    type SocialActionPhase,
+} from "components/SocialActionFeedback";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
 import {
@@ -28,6 +33,8 @@ const viewerHeaderHeight = 56;
 const viewerBottomPadding = 0;
 const defaultPhotoWidth = 900;
 const defaultPhotoHeight = 680;
+const viewerExitDurationMs = 200;
+const viewerExitTransition = `${viewerExitDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`;
 
 export interface SocialViewerPhoto {
     alt?: string;
@@ -60,21 +67,66 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     const [actionsAnchor, setActionsAnchor] =
         React.useState<HTMLElement | null>(null);
     const [deleteSheetOpen, setDeleteSheetOpen] = React.useState(false);
+    const [deleteActionPhase, setDeleteActionPhase] =
+        React.useState<SocialActionPhase | null>(null);
+    const [isDeleteExit, setIsDeleteExit] = React.useState(false);
     const actionsMenuID = "social-viewer-actions-menu";
     const actionsButtonID = "social-viewer-actions-button";
     const isActionsOpen = Boolean(actionsAnchor);
+    const isDeleteActionRunning = deleteActionPhase != null;
 
     const closeActions = () => setActionsAnchor(null);
 
     const requestDeletePost = () => {
+        if (isDeleteActionRunning || isDeleteExit) return;
         closeActions();
         setDeleteSheetOpen(true);
     };
 
-    const confirmDeletePost = () => {
+    const closeDeleteSheet = () => {
+        if (isDeleteActionRunning || isDeleteExit) return;
         setDeleteSheetOpen(false);
-        onDeletePost?.();
     };
+
+    const confirmDeletePost = () => {
+        if (isDeleteActionRunning || isDeleteExit) return;
+        setDeleteActionPhase("busy");
+    };
+
+    React.useEffect(() => {
+        if (!deleteActionPhase) return;
+
+        const timeoutID = window.setTimeout(
+            () => {
+                if (deleteActionPhase == "busy") {
+                    setDeleteActionPhase("done");
+                    return;
+                }
+
+                setDeleteSheetOpen(false);
+                onDeletePost?.();
+                setIsDeleteExit(true);
+            },
+            deleteActionPhase == "busy"
+                ? socialActionBusyDurationMs
+                : socialActionDoneDurationMs,
+        );
+
+        return () => window.clearTimeout(timeoutID);
+    }, [deleteActionPhase, onDeletePost]);
+
+    const handleDeleteSheetExited = () => {
+        if (!isDeleteExit) return;
+
+        setDeleteActionPhase(null);
+    };
+
+    React.useEffect(() => {
+        if (!isDeleteExit) return;
+
+        const timeoutID = window.setTimeout(onClose, viewerExitDurationMs);
+        return () => window.clearTimeout(timeoutID);
+    }, [isDeleteExit, onClose]);
 
     React.useEffect(() => {
         const root = viewerRootRef.current;
@@ -185,8 +237,11 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                 inset: 0,
                 isolation: "isolate",
                 minHeight: "100svh",
+                opacity: isDeleteExit ? 0 : 1,
                 overflow: "hidden",
+                pointerEvents: isDeleteExit ? "none" : "auto",
                 position: "fixed",
+                transition: `opacity ${viewerExitTransition}`,
                 width: "100vw",
                 zIndex: 1300,
             }}
@@ -544,8 +599,12 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     open={deleteSheetOpen}
                     title="Are you sure you want to delete this?"
                     confirmLabel="Yes, delete"
-                    onCancel={() => setDeleteSheetOpen(false)}
+                    confirmActionPhase={deleteActionPhase}
+                    confirmDisabled={isDeleteActionRunning}
+                    cancelDisabled={isDeleteActionRunning}
+                    onCancel={closeDeleteSheet}
                     onConfirm={confirmDeletePost}
+                    onExited={handleDeleteSheetExited}
                 />
             )}
         </Box>

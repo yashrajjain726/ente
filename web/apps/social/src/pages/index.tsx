@@ -269,7 +269,7 @@ const Page: React.FC = () => {
                                 setProfile(null);
                                 setSelectedFriendID(null);
                                 setFriends(sampleFriends);
-                                setScreen("login");
+                                setScreen("onboarding");
                             }}
                         />
                     )}

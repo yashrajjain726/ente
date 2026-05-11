@@ -1,4 +1,8 @@
 import { Box, Dialog } from "@mui/material";
+import {
+    SocialActionFeedbackIcon,
+    type SocialActionPhase,
+} from "components/SocialActionFeedback";
 import React from "react";
 
 const green = "#08C225";
@@ -10,9 +14,13 @@ interface ConfirmationActionSheetProps {
     open: boolean;
     title: string;
     confirmLabel: string;
+    confirmActionPhase?: SocialActionPhase | null;
+    confirmDisabled?: boolean;
     cancelLabel?: string;
+    cancelDisabled?: boolean;
     onCancel: () => void;
     onConfirm: () => void;
+    onExited?: () => void;
 }
 
 export const ConfirmationActionSheet: React.FC<
@@ -22,9 +30,13 @@ export const ConfirmationActionSheet: React.FC<
     open,
     title,
     confirmLabel,
+    confirmActionPhase = null,
+    confirmDisabled = false,
     cancelLabel = "Cancel",
+    cancelDisabled = false,
     onCancel,
     onConfirm,
+    onExited,
 }) => {
     const titleID = React.useId();
     const isDark = appearance == "dark";
@@ -32,7 +44,7 @@ export const ConfirmationActionSheet: React.FC<
     return (
         <Dialog
             open={open}
-            onClose={onCancel}
+            onClose={confirmActionPhase ? undefined : onCancel}
             maxWidth={false}
             aria-labelledby={titleID}
             sx={
@@ -40,8 +52,7 @@ export const ConfirmationActionSheet: React.FC<
                     ? {
                           zIndex: 1500,
                           "& .MuiBackdrop-root": {
-                              backgroundColor:
-                                  "rgba(0, 0, 0, 0.86) !important",
+                              backgroundColor: "rgba(0, 0, 0, 0.86) !important",
                           },
                       }
                     : undefined
@@ -70,6 +81,7 @@ export const ConfirmationActionSheet: React.FC<
                         maxWidth: 363,
                     },
                 },
+                transition: { onExited },
             }}
         >
             <Box
@@ -100,12 +112,15 @@ export const ConfirmationActionSheet: React.FC<
                     label={confirmLabel}
                     backgroundColor={dangerColor}
                     color="#FFFFFF"
+                    disabled={confirmDisabled}
+                    actionPhase={confirmActionPhase}
                     onClick={onConfirm}
                 />
                 <SheetButton
                     label={cancelLabel}
                     backgroundColor={isDark ? "#333333" : "#F2F2F2"}
                     color={isDark ? "#D8D8D8" : "#666666"}
+                    disabled={cancelDisabled}
                     onClick={onCancel}
                 />
             </Box>
@@ -116,6 +131,8 @@ export const ConfirmationActionSheet: React.FC<
 interface SheetButtonProps {
     backgroundColor: string;
     color: string;
+    actionPhase?: SocialActionPhase | null;
+    disabled?: boolean;
     label: string;
     onClick: () => void;
 }
@@ -123,12 +140,16 @@ interface SheetButtonProps {
 const SheetButton: React.FC<SheetButtonProps> = ({
     backgroundColor,
     color,
+    actionPhase = null,
+    disabled = false,
     label,
     onClick,
 }) => (
     <Box
         component="button"
         type="button"
+        aria-label={label}
+        disabled={disabled}
         onClick={onClick}
         sx={{
             alignItems: "center",
@@ -136,7 +157,7 @@ const SheetButton: React.FC<SheetButtonProps> = ({
             border: 0,
             borderRadius: "20px",
             color,
-            cursor: "pointer",
+            cursor: disabled ? "default" : "pointer",
             display: "flex",
             fontFamily: '"Inter Variable", Inter, sans-serif',
             fontSize: 14,
@@ -148,14 +169,15 @@ const SheetButton: React.FC<SheetButtonProps> = ({
             py: "14px",
             transition: "filter 120ms ease, opacity 120ms ease",
             width: "100%",
-            "&:active": { filter: "brightness(0.96)" },
+            "&:active": disabled ? undefined : { filter: "brightness(0.96)" },
+            "&:disabled": { opacity: 1 },
             "&:focus-visible": {
                 outline: `2px solid ${green}`,
                 outlineOffset: 2,
             },
-            "&:hover": { filter: "brightness(0.98)" },
+            "&:hover": disabled ? undefined : { filter: "brightness(0.98)" },
         }}
     >
-        {label}
+        {actionPhase ? <SocialActionFeedbackIcon phase={actionPhase} /> : label}
     </Box>
 );

@@ -231,7 +231,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             nextPostIDs.add(selectedPost.id);
             return nextPostIDs;
         });
-        setSelectedPost(null);
     };
 
     return (
