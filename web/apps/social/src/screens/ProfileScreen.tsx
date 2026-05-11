@@ -880,6 +880,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </Box>
                 {selectedPhoto && (
                     <SocialFileViewer
+                        currentUser={{
+                            avatarUrl: profile.avatarUrl,
+                            name: displayName,
+                        }}
                         photo={selectedPhoto}
                         onClose={() => setSelectedPhoto(null)}
                     />
