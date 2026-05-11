@@ -23,6 +23,7 @@ export const homeBackground = "#FFFFFF";
 
 const green = "#08C225";
 const paleGreen = "#E7F6E9";
+const feedCardBackground = "#F5F5F5";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
 
@@ -213,16 +214,30 @@ const FeedItem: React.FC<FeedItemProps> = ({
     return (
         <Box
             component="article"
-            sx={{ display: "flex", flexDirection: "column", width: "100%" }}
+            sx={{
+                bgcolor: feedCardBackground,
+                borderRadius: "16px",
+                boxSizing: "border-box",
+                display: "flex",
+                flexDirection: "column",
+                mx: "16px",
+                p: "12px",
+                width: "calc(100% - 32px)",
+            }}
         >
             <Box
                 sx={{
                     alignItems: "center",
-                    display: "flex",
+                    boxSizing: "border-box",
+                    color: textBase,
+                    display: "grid",
+                    fontFamily: '"Inter Variable", Inter, sans-serif',
+                    fontSize: 14,
                     gap: "10px",
+                    gridTemplateColumns: "28px minmax(0, 1fr) auto",
+                    lineHeight: "20px",
                     mb: "10px",
                     minHeight: 32,
-                    px: "20px",
                     width: "100%",
                 }}
             >
@@ -263,72 +278,49 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     />
                 </Box>
                 <Box
+                    component="button"
+                    type="button"
+                    aria-label={`Open ${firstName}'s profile`}
+                    onClick={openFriend}
                     sx={{
-                        alignItems: "baseline",
-                        color: textBase,
-                        display: "flex",
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 14,
-                        gap: "4px",
-                        lineHeight: "20px",
+                        appearance: "none",
+                        bgcolor: "transparent",
+                        border: 0,
+                        color: "inherit",
+                        cursor: onOpenFriend ? "pointer" : "default",
+                        display: "block",
+                        fontFamily: "inherit",
+                        fontSize: "inherit",
+                        fontWeight: 650,
+                        lineHeight: "inherit",
                         minWidth: 0,
                         overflow: "hidden",
+                        p: 0,
+                        textAlign: "left",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        "&:focus-visible": {
+                            borderRadius: "4px",
+                            outline: `2px solid ${green}`,
+                            outlineOffset: 2,
+                        },
+                    }}
+                >
+                    {firstName}
+                </Box>
+                <Box
+                    component="time"
+                    dateTime={new Date(timestampMs).toISOString()}
+                    sx={{
+                        color: textSecondary,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        justifySelf: "end",
+                        textAlign: "right",
                         whiteSpace: "nowrap",
                     }}
                 >
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label={`Open ${firstName}'s profile`}
-                        onClick={openFriend}
-                        sx={{
-                            appearance: "none",
-                            bgcolor: "transparent",
-                            border: 0,
-                            color: "inherit",
-                            cursor: onOpenFriend ? "pointer" : "default",
-                            fontFamily: "inherit",
-                            fontSize: "inherit",
-                            fontWeight: 650,
-                            lineHeight: "inherit",
-                            minWidth: 0,
-                            overflow: "hidden",
-                            p: 0,
-                            textAlign: "left",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            "&:focus-visible": {
-                                borderRadius: "4px",
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                        }}
-                    >
-                        {firstName}
-                    </Box>
-                    <Box
-                        component="span"
-                        aria-hidden
-                        sx={{
-                            color: textSecondary,
-                            flexShrink: 0,
-                            fontWeight: 500,
-                        }}
-                    >
-                        ·
-                    </Box>
-                    <Box
-                        component="time"
-                        dateTime={new Date(timestampMs).toISOString()}
-                        sx={{
-                            color: textSecondary,
-                            flexShrink: 0,
-                            fontSize: 12,
-                            fontWeight: 500,
-                        }}
-                    >
-                        {dateLabel}
-                    </Box>
+                    {dateLabel}
                 </Box>
             </Box>
             <Box
@@ -352,13 +344,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     aspectRatio: `${photoDimensions.width} / ${photoDimensions.height}`,
                     bgcolor: paleGreen,
                     border: 0,
-                    borderRadius: "20px",
+                    borderRadius: "12px",
                     display: "block",
                     cursor: onOpenPhoto ? "pointer" : "default",
-                    mx: "16px",
                     overflow: "hidden",
                     p: 0,
-                    width: "calc(100% - 32px)",
+                    width: "100%",
                     "&:focus-visible": {
                         outline: `2px solid ${green}`,
                         outlineOffset: 2,
@@ -629,7 +620,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        gap: hasFeedItems ? "36px" : 0,
+                        gap: hasFeedItems ? "16px" : 0,
                         justifyContent: hasFeedItems ? "flex-start" : "center",
                         minHeight: "calc(100svh - 64px)",
                         pb: hasFeedItems ? "16px" : "56px",
