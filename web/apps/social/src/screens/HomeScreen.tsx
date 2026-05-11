@@ -1,4 +1,10 @@
+import {
+    Loading03Icon,
+    Tick02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
+import { keyframes } from "@mui/material/styles";
 import {
     SocialFileViewer,
     type SocialViewerPhoto,
@@ -19,6 +25,20 @@ const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
 const hoursAgo = (hours: number) => minutesAgo(hours * 60);
 const daysAgo = (days: number) => hoursAgo(days * 24);
 const sampleFeedPhotoAspectRatio = 900 / 680;
+const postActionPostingDurationMs = 2000;
+const postActionPostedDurationMs = 2400;
+const postActionTransition = "220ms cubic-bezier(0.4, 0, 0.2, 1)";
+const postActionSpin = keyframes`
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+`;
+
+type PostActionPhase = "posting" | "posted";
 
 const sampleFeedItems = [
     {
@@ -305,13 +325,44 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedPhoto, setSelectedPhoto] =
         useState<SocialViewerPhoto | null>(null);
+    const [postActionPhase, setPostActionPhase] =
+        useState<PostActionPhase | null>(null);
+    const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const selectedPhotoFriendID = selectedPhoto?.friendID;
+    const isPostActionPosting = postActionPhase == "posting";
+    const isPostActionPosted = postActionPhase == "posted";
     const initialsSource = profile.fullName.trim() || profile.username.trim();
     const initials = initialsSource
         .split(/\s+/)
         .slice(0, 2)
         .map((part) => part[0]?.toUpperCase())
         .join("");
+    const openPostPhotoPicker = () => postInputRef.current?.click();
+
+    const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
+        event,
+    ) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file) return;
+
+        setPostActionPhase("posting");
+    };
+
+    React.useEffect(() => {
+        if (!postActionPhase) return;
+
+        const timeoutID = window.setTimeout(
+            () =>
+                setPostActionPhase(
+                    postActionPhase == "posting" ? "posted" : null,
+                ),
+            postActionPhase == "posting"
+                ? postActionPostingDurationMs
+                : postActionPostedDurationMs,
+        );
+        return () => window.clearTimeout(timeoutID);
+    }, [postActionPhase]);
 
     return (
         <Box
@@ -346,16 +397,117 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     }}
                 >
                     <Box
+                        ref={postInputRef}
+                        component="input"
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePostPhotoSelect}
+                        sx={{ display: "none" }}
+                    />
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={
+                            isPostActionPosting
+                                ? "Posting photo"
+                                : isPostActionPosted
+                                  ? "Photo posted"
+                                  : "Post photo"
+                        }
+                        disabled={postActionPhase != null}
+                        onClick={openPostPhotoPicker}
                         sx={{
                             alignItems: "center",
-                            color: textBase,
+                            bgcolor: "transparent",
+                            border: 0,
+                            color: isPostActionPosted ? green : textBase,
+                            cursor:
+                                postActionPhase == null
+                                    ? "pointer"
+                                    : "default",
                             display: "flex",
                             height: 24,
                             justifyContent: "flex-start",
+                            opacity: 1,
+                            p: 0,
                             width: 24,
+                            transition: `color ${postActionTransition}`,
+                            "&:focus-visible": {
+                                borderRadius: "50%",
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
                         }}
                     >
-                        <PlusIcon />
+                        <Box
+                            component="span"
+                            sx={{
+                                display: "grid",
+                                height: 18,
+                                placeItems: "center",
+                                width: 18,
+                            }}
+                        >
+                            <Box
+                                component="span"
+                                sx={{
+                                    display: "flex",
+                                    gridArea: "1 / 1",
+                                    opacity: postActionPhase == null ? 1 : 0,
+                                    transform:
+                                        postActionPhase == null
+                                            ? "scale(1)"
+                                            : "scale(0.82)",
+                                    transition: `opacity ${postActionTransition}, transform ${postActionTransition}`,
+                                }}
+                            >
+                                <PlusIcon />
+                            </Box>
+                            <Box
+                                component="span"
+                                sx={{
+                                    display: "flex",
+                                    gridArea: "1 / 1",
+                                    opacity: isPostActionPosting ? 1 : 0,
+                                    transform: isPostActionPosting
+                                        ? "scale(1)"
+                                        : "scale(0.82)",
+                                    transition: `opacity ${postActionTransition}, transform ${postActionTransition}`,
+                                }}
+                            >
+                                <Box
+                                    component="span"
+                                    sx={{
+                                        animation: `${postActionSpin} 2.4s linear infinite`,
+                                        display: "flex",
+                                    }}
+                                >
+                                    <HugeiconsIcon
+                                        icon={Loading03Icon}
+                                        size={22}
+                                        strokeWidth={1.8}
+                                    />
+                                </Box>
+                            </Box>
+                            <Box
+                                component="span"
+                                sx={{
+                                    display: "flex",
+                                    gridArea: "1 / 1",
+                                    opacity: isPostActionPosted ? 1 : 0,
+                                    transform: isPostActionPosted
+                                        ? "scale(1)"
+                                        : "scale(0.82)",
+                                    transition: `opacity ${postActionTransition}, transform ${postActionTransition}`,
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={Tick02Icon}
+                                    size={22}
+                                    strokeWidth={1.8}
+                                />
+                            </Box>
+                        </Box>
                     </Box>
                     <Box
                         sx={{
