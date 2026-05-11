@@ -6,6 +6,11 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
+import {
+    socialActionBusyDurationMs,
+    socialActionDoneDurationMs,
+    type SocialActionPhase,
+} from "components/SocialActionFeedback";
 import type { FriendProfile } from "data/friends";
 import React, { useState } from "react";
 
@@ -281,12 +286,44 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
 }) => {
     const [friendToUnfriend, setFriendToUnfriend] =
         React.useState<FriendProfile | null>(null);
+    const [unfriendActionPhase, setUnfriendActionPhase] =
+        React.useState<SocialActionPhase | null>(null);
+    const isUnfriendActionRunning = unfriendActionPhase != null;
 
-    const cancelUnfriend = () => setFriendToUnfriend(null);
+    const cancelUnfriend = () => {
+        if (isUnfriendActionRunning) return;
+        setFriendToUnfriend(null);
+    };
 
     const confirmUnfriend = () => {
-        if (friendToUnfriend) onUnfriend?.(friendToUnfriend.id);
-        setFriendToUnfriend(null);
+        if (!friendToUnfriend || isUnfriendActionRunning) return;
+        setUnfriendActionPhase("busy");
+    };
+
+    React.useEffect(() => {
+        if (!unfriendActionPhase) return;
+
+        const timeoutID = window.setTimeout(
+            () => {
+                if (unfriendActionPhase == "busy") {
+                    setUnfriendActionPhase("done");
+                    return;
+                }
+
+                if (friendToUnfriend) onUnfriend?.(friendToUnfriend.id);
+                setFriendToUnfriend(null);
+            },
+            unfriendActionPhase == "busy"
+                ? socialActionBusyDurationMs
+                : socialActionDoneDurationMs,
+        );
+
+        return () => window.clearTimeout(timeoutID);
+    }, [friendToUnfriend, onUnfriend, unfriendActionPhase]);
+
+    const handleUnfriendSheetExited = () => {
+        if (!unfriendActionPhase) return;
+        setUnfriendActionPhase(null);
     };
 
     return (
@@ -411,8 +448,12 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 open={Boolean(friendToUnfriend)}
                 title="Are you sure you want to unfriend?"
                 confirmLabel="Yes, unfriend"
+                confirmActionPhase={unfriendActionPhase}
+                confirmDisabled={isUnfriendActionRunning}
+                cancelDisabled={isUnfriendActionRunning}
                 onCancel={cancelUnfriend}
                 onConfirm={confirmUnfriend}
+                onExited={handleUnfriendSheetExited}
             />
         </Box>
     );
