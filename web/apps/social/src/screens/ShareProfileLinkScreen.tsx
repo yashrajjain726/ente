@@ -436,7 +436,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                     }}
                 >
                     <Box
-                        className="green-bg-with-noise-and-curves"
+                        className="green-bg"
                         component="button"
                         type="button"
                         onClick={onDone}

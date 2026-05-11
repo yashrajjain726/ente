@@ -447,7 +447,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                     <Box
                         className={
                             canContinue
-                                ? "green-bg-with-noise-and-curves"
+                                ? "green-bg"
                                 : undefined
                         }
                         component="button"

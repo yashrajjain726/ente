@@ -361,7 +361,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                         <Box
                             className={
                                 acceptedTerms
-                                    ? "green-bg-with-noise-and-curves"
+                                    ? "green-bg"
                                     : undefined
                             }
                             sx={{
@@ -452,7 +452,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                     <Box
                         className={
                             canCreateAccount
-                                ? "green-bg-with-noise-and-curves"
+                                ? "green-bg"
                                 : undefined
                         }
                         component="button"

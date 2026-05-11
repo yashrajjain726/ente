@@ -64,7 +64,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
     onLogin,
 }) => (
     <Box
-        className="green-bg-with-noise-and-curves"
+        className="green-bg"
         component="main"
         sx={{
             bgcolor: onboardingGreen,
@@ -76,7 +76,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         }}
     >
         <Box
-            className="green-bg-with-noise-and-curves"
+            className="green-bg"
             sx={{
                 alignItems: "center",
                 bgcolor: onboardingGreen,

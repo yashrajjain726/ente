@@ -1,14 +1,13 @@
 import {
+    AddSquareIcon,
     ArrowLeft02Icon,
-    Loading03Icon,
     MoreHorizontalIcon,
     Settings01Icon,
-    Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
-import { keyframes } from "@mui/material/styles";
 import {
+    SocialActionFeedbackIcon,
     socialActionBusyDurationMs,
     socialActionDoneDurationMs,
     socialActionTransition,
@@ -41,7 +40,7 @@ const profileCoverHeight =
 const photoMasonryGap = "3px";
 const photoMasonryRadius = "12px";
 const showMockProfilePosts =
-    process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_PROFILE_POSTS != "true";
+    process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_PROFILE_POSTS == "false";
 type PostActionPhase = "posting" | "posted";
 
 interface ProfilePhotoDimensions {
@@ -52,16 +51,6 @@ interface ProfilePhotoDimensions {
 interface SampleProfilePhoto extends ProfilePhotoDimensions {
     imageUrl: string;
 }
-
-const postActionSpin = keyframes`
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-`;
 
 const samplePhotos = [
     { height: 680, imageUrl: "/images/sample-feed-1.jpg", width: 900 },
@@ -387,7 +376,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     />
                 )}
                 <Box
-                    className="green-bg-with-noise-and-curves"
+                    className="green-bg"
                     sx={{
                         height: profileCoverHeight,
                         insetInline: 0,
@@ -1131,10 +1120,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     disabled={postActionPhase != null}
                                     onClick={openPostPhotoPicker}
                                     sx={{
+                                        appearance: "none",
                                         alignItems: "center",
-                                        bgcolor: "#F2F2F2",
+                                        bgcolor: "transparent",
                                         border: 0,
-                                        borderRadius: "50%",
+                                        boxSizing: "border-box",
                                         color: isPostActionPosted
                                             ? green
                                             : textBase,
@@ -1142,108 +1132,36 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                             postActionPhase == null
                                                 ? "pointer"
                                                 : "default",
-                                        display: "grid",
-                                        height: 40,
+                                        display: "flex",
+                                        fontSize: 0,
+                                        height: 32,
+                                        justifyContent: "center",
                                         lineHeight: 0,
                                         mt: "20px",
                                         p: 0,
+                                        placeSelf: "center",
                                         placeItems: "center",
-                                        position: "relative",
                                         transition: `color ${socialActionTransition}`,
-                                        width: 40,
+                                        width: 32,
+                                        "& svg": { display: "block" },
                                         "&:focus-visible": {
+                                            borderRadius: "6px",
                                             outline: `2px solid ${green}`,
                                             outlineOffset: 2,
                                         },
-                                        "&:hover": {
-                                            bgcolor:
-                                                postActionPhase == null
-                                                    ? "#E8E8E8"
-                                                    : "#F2F2F2",
-                                        },
                                     }}
                                 >
-                                    {postActionFeedbackPhase == "busy" ? (
-                                        <Box
-                                            component="span"
-                                            sx={{
-                                                display: "flex",
-                                                left: "50%",
-                                                lineHeight: 0,
-                                                position: "absolute",
-                                                top: "50%",
-                                                transform:
-                                                    "translate(-50%, -50%)",
-                                            }}
-                                        >
-                                            <Box
-                                                component="span"
-                                                sx={{
-                                                    animation: `${postActionSpin} 2.4s linear infinite`,
-                                                    display: "flex",
-                                                    lineHeight: 0,
-                                                }}
-                                            >
-                                                <HugeiconsIcon
-                                                    icon={Loading03Icon}
-                                                    size={22}
-                                                    strokeWidth={1.8}
-                                                />
-                                            </Box>
-                                        </Box>
-                                    ) : postActionFeedbackPhase == "done" ? (
-                                        <Box
-                                            component="span"
-                                            sx={{
-                                                display: "flex",
-                                                left: "50%",
-                                                lineHeight: 0,
-                                                position: "absolute",
-                                                top: "50%",
-                                                transform:
-                                                    "translate(-50%, -50%)",
-                                            }}
-                                        >
+                                    <SocialActionFeedbackIcon
+                                        idleIcon={
                                             <HugeiconsIcon
-                                                icon={Tick02Icon}
-                                                size={22}
+                                                icon={AddSquareIcon}
+                                                size={28}
                                                 strokeWidth={1.8}
                                             />
-                                        </Box>
-                                    ) : (
-                                        <>
-                                            <Box
-                                                aria-hidden
-                                                component="span"
-                                                sx={{
-                                                    bgcolor: "currentColor",
-                                                    borderRadius: "999px",
-                                                    height: "2px",
-                                                    left: "50%",
-                                                    position: "absolute",
-                                                    top: "50%",
-                                                    transform:
-                                                        "translate(-50%, -50%)",
-                                                    width: "15px",
-                                                }}
-                                            />
-                                            <Box
-                                                aria-hidden
-                                                component="span"
-                                                sx={{
-                                                    bgcolor: "currentColor",
-                                                    borderRadius: "999px",
-                                                    height: "15px",
-                                                    left: "50%",
-                                                    position: "absolute",
-                                                    top: "50%",
-                                                    transform:
-                                                        "translate(-50%, -50%)",
-                                                    width: "2px",
-                                                }}
-                                            />
-                                        </>
-                                    )}
+                                        }
+                                        phase={postActionFeedbackPhase}
+                                        size={28}
+                                    />
                                 </Box>
                             )}
                         </Box>

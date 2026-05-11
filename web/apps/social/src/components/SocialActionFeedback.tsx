@@ -23,74 +23,89 @@ const socialActionSpin = keyframes`
 interface SocialActionFeedbackIconProps {
     idleIcon?: React.ReactNode;
     phase: SocialActionPhase | null;
+    size?: number;
 }
 
 export const SocialActionFeedbackIcon: React.FC<
     SocialActionFeedbackIconProps
-> = ({ idleIcon, phase }) => (
-    <Box
-        component="span"
-        sx={{
-            display: "grid",
-            height: 18,
-            lineHeight: 0,
-            placeItems: "center",
-            width: 18,
-        }}
-    >
-        {idleIcon && (
+> = ({ idleIcon, phase, size = 18 }) => {
+    const statusIconSize = size == 18 ? 22 : size;
+
+    return (
+        <Box
+            component="span"
+            sx={{
+                display: "grid",
+                height: size,
+                lineHeight: 0,
+                placeItems: "center",
+                width: size,
+            }}
+        >
+            {idleIcon && (
+                <Box
+                    component="span"
+                    sx={{
+                        display: "flex",
+                        gridArea: "1 / 1",
+                        lineHeight: 0,
+                        opacity: phase == null ? 1 : 0,
+                        transform: phase == null ? "scale(1)" : "scale(0.82)",
+                        transition:
+                            phase == "busy"
+                                ? "none"
+                                : `opacity ${socialActionTransition}, transform ${socialActionTransition}`,
+                    }}
+                >
+                    {idleIcon}
+                </Box>
+            )}
             <Box
                 component="span"
                 sx={{
                     display: "flex",
                     gridArea: "1 / 1",
                     lineHeight: 0,
-                    opacity: phase == null ? 1 : 0,
-                    transform: phase == null ? "scale(1)" : "scale(0.82)",
-                    transition: `opacity ${socialActionTransition}, transform ${socialActionTransition}`,
+                    opacity: phase == "busy" ? 1 : 0,
+                    transform: phase == "busy" ? "scale(1)" : "scale(0.82)",
+                    transition:
+                        phase == "busy"
+                            ? "none"
+                            : `opacity ${socialActionTransition}, transform ${socialActionTransition}`,
                 }}
             >
-                {idleIcon}
+                <Box
+                    component="span"
+                    sx={{
+                        animation: `${socialActionSpin} 2.4s linear infinite`,
+                        display: "flex",
+                        lineHeight: 0,
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={Loading03Icon}
+                        size={statusIconSize}
+                        strokeWidth={1.8}
+                    />
+                </Box>
             </Box>
-        )}
-        <Box
-            component="span"
-            sx={{
-                display: "flex",
-                gridArea: "1 / 1",
-                lineHeight: 0,
-                opacity: phase == "busy" ? 1 : 0,
-                transform: phase == "busy" ? "scale(1)" : "scale(0.82)",
-                transition: `opacity ${socialActionTransition}, transform ${socialActionTransition}`,
-            }}
-        >
             <Box
                 component="span"
                 sx={{
-                    animation: `${socialActionSpin} 2.4s linear infinite`,
                     display: "flex",
+                    gridArea: "1 / 1",
                     lineHeight: 0,
+                    opacity: phase == "done" ? 1 : 0,
+                    transform: phase == "done" ? "scale(1)" : "scale(0.82)",
+                    transition: `opacity ${socialActionTransition}, transform ${socialActionTransition}`,
                 }}
             >
                 <HugeiconsIcon
-                    icon={Loading03Icon}
-                    size={22}
+                    icon={Tick02Icon}
+                    size={statusIconSize}
                     strokeWidth={1.8}
                 />
             </Box>
         </Box>
-        <Box
-            component="span"
-            sx={{
-                display: "flex",
-                gridArea: "1 / 1",
-                lineHeight: 0,
-                opacity: phase == "done" ? 1 : 0,
-                transform: phase == "done" ? "scale(1)" : "scale(0.82)",
-                transition: `opacity ${socialActionTransition}, transform ${socialActionTransition}`,
-            }}
-        >
-            <HugeiconsIcon icon={Tick02Icon} size={22} strokeWidth={1.8} />
-        </Box>
-    </Box>
-);
+    );
+};

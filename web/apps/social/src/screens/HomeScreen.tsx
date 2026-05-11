@@ -1,3 +1,5 @@
+import { AddSquareIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import {
     SocialActionFeedbackIcon,
@@ -147,6 +149,11 @@ interface HomeScreenProps {
     profile: SetupProfile;
 }
 
+interface FeedPhotoDimensions {
+    height: number;
+    width: number;
+}
+
 interface FeedItemProps {
     aspectRatio: number;
     avatarUrl: string;
@@ -158,23 +165,15 @@ interface FeedItemProps {
     timestampMs: number;
 }
 
-const PlusIcon: React.FC = () => (
-    <Box
-        component="svg"
-        viewBox="4 4 16 16"
-        aria-hidden
-        sx={{ display: "block", height: 18, width: 18 }}
-    >
-        <path
-            d="M12 5V19M5 12H19"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-        />
-    </Box>
-);
+const dimensionsFromAspectRatio = (
+    aspectRatio: number,
+): FeedPhotoDimensions => {
+    const safeAspectRatio =
+        Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 1;
+    const height = 1000;
+
+    return { height, width: Math.round(safeAspectRatio * height) };
+};
 
 const FeedItem: React.FC<FeedItemProps> = ({
     aspectRatio,
@@ -189,6 +188,27 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const firstName = firstNameFrom(name);
     const dateLabel = formatSocialDate(timestampMs);
     const openFriend = () => onOpenFriend?.(friendID);
+    const [loadedPhotoDimensions, setLoadedPhotoDimensions] =
+        useState<FeedPhotoDimensions | null>(null);
+    const photoDimensions =
+        loadedPhotoDimensions ?? dimensionsFromAspectRatio(aspectRatio);
+    const rememberLoadedPhotoDimensions: React.ReactEventHandler<
+        HTMLImageElement
+    > = ({ currentTarget }) => {
+        const { naturalHeight, naturalWidth } = currentTarget;
+        if (!naturalHeight || !naturalWidth) return;
+
+        setLoadedPhotoDimensions((currentDimensions) => {
+            if (
+                currentDimensions?.height == naturalHeight &&
+                currentDimensions.width == naturalWidth
+            ) {
+                return currentDimensions;
+            }
+
+            return { height: naturalHeight, width: naturalWidth };
+        });
+    };
 
     return (
         <Box
@@ -320,14 +340,16 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         alt: `${name} post`,
                         avatarUrl,
                         friendID,
+                        height: photoDimensions.height,
                         imageUrl,
                         name,
                         timestampMs,
+                        width: photoDimensions.width,
                     })
                 }
                 sx={{
                     appearance: "none",
-                    aspectRatio,
+                    aspectRatio: `${photoDimensions.width} / ${photoDimensions.height}`,
                     bgcolor: paleGreen,
                     border: 0,
                     borderRadius: "20px",
@@ -347,6 +369,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     component="img"
                     alt={`${name} post`}
                     src={imageUrl}
+                    onLoad={rememberLoadedPhotoDimensions}
                     sx={{
                         display: "block",
                         height: "100%",
@@ -461,7 +484,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     sx={{
                         alignItems: "center",
                         display: "grid",
-                        gridTemplateColumns: "24px 1fr 24px",
+                        gridTemplateColumns: "32px 1fr 32px",
                         p: 2,
                         width: "100%",
                     }}
@@ -477,75 +500,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <Box
                         component="button"
                         type="button"
-                        aria-label={
-                            isPostActionPosting
-                                ? "Posting photo"
-                                : isPostActionPosted
-                                  ? "Photo posted"
-                                  : "Post photo"
-                        }
-                        disabled={postActionPhase != null}
-                        onClick={openPostPhotoPicker}
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: "transparent",
-                            border: 0,
-                            color: isPostActionPosted ? green : textBase,
-                            cursor:
-                                postActionPhase == null ? "pointer" : "default",
-                            display: "flex",
-                            height: 24,
-                            justifyContent: "flex-start",
-                            opacity: 1,
-                            p: 0,
-                            width: 24,
-                            transition: `color ${socialActionTransition}`,
-                            "&:focus-visible": {
-                                borderRadius: "50%",
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                        }}
-                    >
-                        <SocialActionFeedbackIcon
-                            idleIcon={<PlusIcon />}
-                            phase={postActionFeedbackPhase}
-                        />
-                    </Box>
-                    <Box
-                        sx={{
-                            alignSelf: "center",
-                            color: textBase,
-                            justifySelf: "center",
-                            lineHeight: 0,
-                            overflow: "visible",
-                            width: 58,
-                            "& svg": { display: "block", overflow: "visible" },
-                        }}
-                    >
-                        <EnteLogo height={18} />
-                    </Box>
-                    <Box
-                        component="button"
-                        type="button"
                         aria-label="Open profile"
                         onClick={onOpenProfile}
                         sx={{
+                            appearance: "none",
                             alignItems: "center",
                             bgcolor: profile.avatarUrl
                                 ? "transparent"
                                 : paleGreen,
                             border: 0,
                             borderRadius: "50%",
+                            boxSizing: "border-box",
                             color: green,
                             cursor: onOpenProfile ? "pointer" : "default",
                             display: "flex",
-                            height: 24,
+                            height: 28,
                             justifyContent: "center",
-                            justifySelf: "flex-end",
+                            justifySelf: "flex-start",
+                            lineHeight: 0,
+                            placeSelf: "center start",
                             overflow: "hidden",
                             p: 0,
-                            width: 24,
+                            width: 28,
                             "&:focus-visible": {
                                 outline: `2px solid ${green}`,
                                 outlineOffset: 2,
@@ -581,6 +557,72 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             </Box>
                         )}
                     </Box>
+                    <Box
+                        sx={{
+                            alignSelf: "center",
+                            color: textBase,
+                            justifySelf: "center",
+                            lineHeight: 0,
+                            overflow: "visible",
+                            placeSelf: "center",
+                            width: 58,
+                            "& svg": { display: "block", overflow: "visible" },
+                        }}
+                    >
+                        <EnteLogo height={18} />
+                    </Box>
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={
+                            isPostActionPosting
+                                ? "Posting photo"
+                                : isPostActionPosted
+                                  ? "Photo posted"
+                                  : "Post photo"
+                        }
+                        disabled={postActionPhase != null}
+                        onClick={openPostPhotoPicker}
+                        sx={{
+                            appearance: "none",
+                            alignItems: "center",
+                            bgcolor: "transparent",
+                            border: 0,
+                            boxSizing: "border-box",
+                            color: isPostActionPosted ? green : textBase,
+                            cursor:
+                                postActionPhase == null ? "pointer" : "default",
+                            display: "flex",
+                            fontSize: 0,
+                            height: 32,
+                            justifyContent: "center",
+                            justifySelf: "flex-end",
+                            lineHeight: 0,
+                            opacity: 1,
+                            p: 0,
+                            placeSelf: "center end",
+                            width: 32,
+                            transition: `color ${socialActionTransition}`,
+                            "& svg": { display: "block" },
+                            "&:focus-visible": {
+                                borderRadius: "6px",
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                        }}
+                    >
+                        <SocialActionFeedbackIcon
+                            idleIcon={
+                                <HugeiconsIcon
+                                    icon={AddSquareIcon}
+                                    size={28}
+                                    strokeWidth={1.8}
+                                />
+                            }
+                            phase={postActionFeedbackPhase}
+                            size={28}
+                        />
+                    </Box>
                 </Box>
                 <Box
                     sx={{
@@ -589,7 +631,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         flexDirection: "column",
                         gap: hasFeedItems ? "36px" : 0,
                         justifyContent: hasFeedItems ? "flex-start" : "center",
-                        minHeight: "calc(100svh - 56px)",
+                        minHeight: "calc(100svh - 64px)",
                         pb: hasFeedItems ? "16px" : "56px",
                         pt: hasFeedItems ? "22px" : 0,
                         width: "100%",

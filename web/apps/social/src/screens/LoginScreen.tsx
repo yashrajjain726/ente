@@ -317,7 +317,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     <Box
                         className={
                             canContinue
-                                ? "green-bg-with-noise-and-curves"
+                                ? "green-bg"
                                 : undefined
                         }
                         component="button"
