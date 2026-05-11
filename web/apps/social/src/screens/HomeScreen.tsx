@@ -238,6 +238,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     lineHeight: "20px",
                     mb: "10px",
                     minHeight: 32,
+                    px: "4px",
                     width: "100%",
                 }}
             >
@@ -620,7 +621,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        gap: hasFeedItems ? "16px" : 0,
+                        gap: hasFeedItems ? "24px" : 0,
                         justifyContent: hasFeedItems ? "flex-start" : "center",
                         minHeight: "calc(100svh - 64px)",
                         pb: hasFeedItems ? "16px" : "56px",
