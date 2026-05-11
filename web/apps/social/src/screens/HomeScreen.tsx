@@ -403,10 +403,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Box>
                 {selectedPhoto && (
                     <SocialFileViewer
-                        currentUser={{
-                            avatarUrl: profile.avatarUrl,
-                            name: initialsSource,
-                        }}
                         photo={selectedPhoto}
                         onClose={() => setSelectedPhoto(null)}
                     />
