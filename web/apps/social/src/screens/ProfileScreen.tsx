@@ -1,10 +1,19 @@
 import {
     ArrowLeft02Icon,
+    Loading03Icon,
     MoreHorizontalIcon,
     Settings01Icon,
+    Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
+import { keyframes } from "@mui/material/styles";
+import {
+    socialActionBusyDurationMs,
+    socialActionDoneDurationMs,
+    socialActionTransition,
+    type SocialActionPhase,
+} from "components/SocialActionFeedback";
 import {
     SocialFileViewer,
     type SocialViewerPhoto,
@@ -14,7 +23,7 @@ import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { LinkIcon, ShareIcon } from "screens/ShareProfileLinkScreen";
 import { profileLinkForUsername } from "utils/profileLink";
-import { initialsFor } from "utils/socialDisplay";
+import { firstNameFrom, initialsFor } from "utils/socialDisplay";
 
 export const profileBackground = "#FFFFFF";
 
@@ -31,6 +40,19 @@ const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
 const photoMasonryGap = "3px";
 const photoMasonryRadius = "12px";
+const showMockProfilePosts =
+    process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_PROFILE_POSTS != "true";
+type PostActionPhase = "posting" | "posted";
+
+const postActionSpin = keyframes`
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+`;
 
 const samplePhotoUrls = [
     "/images/sample-feed-1.jpg",
@@ -179,17 +201,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         useState<HTMLElement | null>(null);
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
+    const [postActionPhase, setPostActionPhase] =
+        useState<PostActionPhase | null>(null);
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
         () => new Set(),
     );
+    const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const isPublicProfile = headerVariant == "public";
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
     const displayName = profile.fullName.trim() || profile.username.trim();
     const profileLink = profileLinkForUsername(profile.username.trim());
+    const firstName = firstNameFrom(displayName);
     const initialsSource = displayName || profile.username.trim();
     const initials = initialsFor(initialsSource);
-    const visiblePostGroups = samplePostGroups
+    const visiblePostGroups = (showMockProfilePosts ? samplePostGroups : [])
         .map((group) => ({
             ...group,
             items: group.items.filter((item) => !deletedPostIDs.has(item.id)),
@@ -202,8 +228,28 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const isProfileActionsOpen = Boolean(profileActionsAnchor);
     const canOpenFriends =
         isOwnerProfile && friendsCount > 0 && Boolean(onOpenFriends);
+    const hasProfilePosts = postsSharedCount > 0;
+    const isPostActionPosting = postActionPhase == "posting";
+    const isPostActionPosted = postActionPhase == "posted";
+    const postActionFeedbackPhase: SocialActionPhase | null =
+        postActionPhase == "posting"
+            ? "busy"
+            : postActionPhase == "posted"
+              ? "done"
+              : null;
 
     const closeProfileActions = () => setProfileActionsAnchor(null);
+    const openPostPhotoPicker = () => postInputRef.current?.click();
+
+    const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
+        event,
+    ) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file) return;
+
+        setPostActionPhase("posting");
+    };
 
     const copyProfileURL = async () => {
         closeProfileActions();
@@ -236,6 +282,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         });
     };
 
+    React.useEffect(() => {
+        if (!postActionPhase) return;
+
+        const timeoutID = window.setTimeout(
+            () =>
+                setPostActionPhase(
+                    postActionPhase == "posting" ? "posted" : null,
+                ),
+            postActionPhase == "posting"
+                ? socialActionBusyDurationMs
+                : socialActionDoneDurationMs,
+        );
+        return () => window.clearTimeout(timeoutID);
+    }, [postActionPhase]);
+
     return (
         <Box
             component="main"
@@ -252,6 +313,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 sx={{
                     bgcolor: profileBackground,
                     boxSizing: "border-box",
+                    display: "flex",
+                    flexDirection: "column",
                     minHeight: "100svh",
                     mx: "auto",
                     overflow: "hidden",
@@ -260,6 +323,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     "@media (min-width: 600px)": { maxWidth: 375 },
                 }}
             >
+                {isOwnerProfile && (
+                    <Box
+                        ref={postInputRef}
+                        component="input"
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePostPhotoSelect}
+                        sx={{ display: "none" }}
+                    />
+                )}
                 <Box
                     className="green-bg-with-noise-and-curves"
                     sx={{
@@ -780,133 +853,331 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Box
                     component="section"
                     sx={{
+                        alignItems: "stretch",
+                        boxSizing: "border-box",
                         display: "flex",
+                        flex: hasProfilePosts ? "0 0 auto" : "1 1 0",
                         flexDirection: "column",
                         gap: "24px",
-                        mt: "42px",
+                        minHeight: hasProfilePosts ? undefined : 0,
+                        mt: "24px",
                         pb: "16px",
                         px: 0,
                         width: "100%",
                     }}
                 >
-                    {visiblePostGroups.map((group) => (
-                        <Box
-                            component="section"
-                            key={group.label}
-                            sx={{ width: "100%" }}
-                        >
-                            <Box sx={{ mb: "10px", px: "18px", width: "100%" }}>
+                    {hasProfilePosts ? (
+                        visiblePostGroups.map((group) => (
+                            <Box
+                                component="section"
+                                key={group.label}
+                                sx={{ width: "100%" }}
+                            >
                                 <Box
-                                    component="h2"
                                     sx={{
-                                        color: textStrong,
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 14,
-                                        fontWeight: 650,
-                                        letterSpacing: 0,
-                                        lineHeight: "20px",
-                                        m: 0,
+                                        mb: "10px",
+                                        px: "18px",
+                                        width: "100%",
                                     }}
                                 >
-                                    {group.label}
+                                    <Box
+                                        component="h2"
+                                        sx={{
+                                            color: textStrong,
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 14,
+                                            fontWeight: 650,
+                                            letterSpacing: 0,
+                                            lineHeight: "20px",
+                                            m: 0,
+                                        }}
+                                    >
+                                        {group.label}
+                                    </Box>
                                 </Box>
-                            </Box>
-                            <Box
-                                sx={{
-                                    borderRadius: photoMasonryRadius,
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: photoMasonryGap,
-                                    mx: "16px",
-                                    overflow: "hidden",
-                                    width: "calc(100% - 32px)",
-                                }}
-                            >
-                                {buildPostMasonryRows(group.items).map(
-                                    (row, rowIndex) => (
-                                        <Box
-                                            key={`${group.label}-row-${rowIndex}`}
-                                            sx={{
-                                                display: "flex",
-                                                gap: photoMasonryGap,
-                                                height: row.height,
-                                                width: "100%",
-                                                "@media (max-width: 340px)": {
-                                                    height: row.compactHeight,
-                                                },
-                                            }}
-                                        >
-                                            {row.items.map(
-                                                ({ item, index }) => (
-                                                    <Box
-                                                        component="button"
-                                                        type="button"
-                                                        aria-label={`Open ${displayName} post ${
-                                                            index + 1
-                                                        }`}
-                                                        onClick={() =>
-                                                            setSelectedPost({
-                                                                id: item.id,
-                                                                photo: {
-                                                                    alt: `${displayName} post ${
-                                                                        index +
-                                                                        1
-                                                                    }`,
-                                                                    avatarUrl:
-                                                                        profile.avatarUrl,
-                                                                    imageUrl:
-                                                                        item.imageUrl,
-                                                                    name: displayName,
-                                                                    timestampMs:
-                                                                        item.timestampMs,
-                                                                },
-                                                            })
-                                                        }
-                                                        key={`${group.label}-${item.imageUrl}-${index}`}
-                                                        sx={{
-                                                            appearance: "none",
-                                                            bgcolor: paleGreen,
-                                                            border: 0,
-                                                            cursor: "pointer",
-                                                            display: "block",
-                                                            flex: `${item.aspectRatio} 1 0`,
-                                                            minWidth: 0,
-                                                            overflow: "hidden",
-                                                            p: 0,
-                                                            "&:focus-visible": {
-                                                                outline: `2px solid ${green}`,
-                                                                outlineOffset:
-                                                                    -2,
-                                                            },
-                                                        }}
-                                                    >
+                                <Box
+                                    sx={{
+                                        borderRadius: photoMasonryRadius,
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: photoMasonryGap,
+                                        mx: "16px",
+                                        overflow: "hidden",
+                                        width: "calc(100% - 32px)",
+                                    }}
+                                >
+                                    {buildPostMasonryRows(group.items).map(
+                                        (row, rowIndex) => (
+                                            <Box
+                                                key={`${group.label}-row-${rowIndex}`}
+                                                sx={{
+                                                    display: "flex",
+                                                    gap: photoMasonryGap,
+                                                    height: row.height,
+                                                    width: "100%",
+                                                    "@media (max-width: 340px)":
+                                                        {
+                                                            height: row.compactHeight,
+                                                        },
+                                                }}
+                                            >
+                                                {row.items.map(
+                                                    ({ item, index }) => (
                                                         <Box
-                                                            component="img"
-                                                            alt={`${group.label} post ${
+                                                            component="button"
+                                                            type="button"
+                                                            aria-label={`Open ${displayName} post ${
                                                                 index + 1
                                                             }`}
-                                                            src={item.imageUrl}
+                                                            onClick={() =>
+                                                                setSelectedPost(
+                                                                    {
+                                                                        id: item.id,
+                                                                        photo: {
+                                                                            alt: `${displayName} post ${
+                                                                                index +
+                                                                                1
+                                                                            }`,
+                                                                            avatarUrl:
+                                                                                profile.avatarUrl,
+                                                                            imageUrl:
+                                                                                item.imageUrl,
+                                                                            name: displayName,
+                                                                            timestampMs:
+                                                                                item.timestampMs,
+                                                                        },
+                                                                    },
+                                                                )
+                                                            }
+                                                            key={`${group.label}-${item.imageUrl}-${index}`}
                                                             sx={{
+                                                                appearance:
+                                                                    "none",
+                                                                bgcolor:
+                                                                    paleGreen,
+                                                                border: 0,
+                                                                cursor: "pointer",
                                                                 display:
                                                                     "block",
-                                                                height: "100%",
-                                                                objectFit:
-                                                                    "cover",
-                                                                objectPosition:
-                                                                    "center",
-                                                                width: "100%",
+                                                                flex: `${item.aspectRatio} 1 0`,
+                                                                minWidth: 0,
+                                                                overflow:
+                                                                    "hidden",
+                                                                p: 0,
+                                                                "&:focus-visible":
+                                                                    {
+                                                                        outline: `2px solid ${green}`,
+                                                                        outlineOffset:
+                                                                            -2,
+                                                                    },
                                                             }}
-                                                        />
-                                                    </Box>
-                                                ),
-                                            )}
-                                        </Box>
-                                    ),
-                                )}
+                                                        >
+                                                            <Box
+                                                                component="img"
+                                                                alt={`${group.label} post ${
+                                                                    index + 1
+                                                                }`}
+                                                                src={
+                                                                    item.imageUrl
+                                                                }
+                                                                sx={{
+                                                                    display:
+                                                                        "block",
+                                                                    height: "100%",
+                                                                    objectFit:
+                                                                        "cover",
+                                                                    objectPosition:
+                                                                        "center",
+                                                                    width: "100%",
+                                                                }}
+                                                            />
+                                                        </Box>
+                                                    ),
+                                                )}
+                                            </Box>
+                                        ),
+                                    )}
+                                </Box>
                             </Box>
+                        ))
+                    ) : (
+                        <Box
+                            sx={{
+                                alignItems: "center",
+                                boxSizing: "border-box",
+                                display: "flex",
+                                flex: 1,
+                                flexDirection: "column",
+                                justifyContent: "center",
+                                minHeight: 0,
+                                pb: "12px",
+                                px: 3,
+                                textAlign: "center",
+                                width: "100%",
+                            }}
+                        >
+                            {isOwnerProfile && (
+                                <Box
+                                    component="img"
+                                    alt=""
+                                    src="/images/ducky-camera.svg"
+                                    sx={{
+                                        display: "block",
+                                        height: "auto",
+                                        width: 128,
+                                    }}
+                                />
+                            )}
+                            <Box
+                                component="p"
+                                sx={{
+                                    color: textSoft,
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    lineHeight: "20px",
+                                    m: 0,
+                                    mt: isOwnerProfile ? "28px" : 0,
+                                    maxWidth: isOwnerProfile ? 230 : 250,
+                                }}
+                            >
+                                {isOwnerProfile
+                                    ? "Your profile is looking empty. Share something with your friends."
+                                    : `${firstName} hasn't posted anything yet.`}
+                            </Box>
+                            {isOwnerProfile && (
+                                <Box
+                                    component="button"
+                                    type="button"
+                                    aria-label={
+                                        isPostActionPosting
+                                            ? "Posting photo"
+                                            : isPostActionPosted
+                                              ? "Photo posted"
+                                              : "Post photo"
+                                    }
+                                    disabled={postActionPhase != null}
+                                    onClick={openPostPhotoPicker}
+                                    sx={{
+                                        alignItems: "center",
+                                        bgcolor: "#F2F2F2",
+                                        border: 0,
+                                        borderRadius: "50%",
+                                        color: isPostActionPosted
+                                            ? green
+                                            : textBase,
+                                        cursor:
+                                            postActionPhase == null
+                                                ? "pointer"
+                                                : "default",
+                                        display: "grid",
+                                        height: 40,
+                                        lineHeight: 0,
+                                        mt: "20px",
+                                        p: 0,
+                                        placeItems: "center",
+                                        position: "relative",
+                                        transition: `color ${socialActionTransition}`,
+                                        width: 40,
+                                        "&:focus-visible": {
+                                            outline: `2px solid ${green}`,
+                                            outlineOffset: 2,
+                                        },
+                                        "&:hover": {
+                                            bgcolor:
+                                                postActionPhase == null
+                                                    ? "#E8E8E8"
+                                                    : "#F2F2F2",
+                                        },
+                                    }}
+                                >
+                                    {postActionFeedbackPhase == "busy" ? (
+                                        <Box
+                                            component="span"
+                                            sx={{
+                                                display: "flex",
+                                                left: "50%",
+                                                lineHeight: 0,
+                                                position: "absolute",
+                                                top: "50%",
+                                                transform:
+                                                    "translate(-50%, -50%)",
+                                            }}
+                                        >
+                                            <Box
+                                                component="span"
+                                                sx={{
+                                                    animation: `${postActionSpin} 2.4s linear infinite`,
+                                                    display: "flex",
+                                                    lineHeight: 0,
+                                                }}
+                                            >
+                                                <HugeiconsIcon
+                                                    icon={Loading03Icon}
+                                                    size={22}
+                                                    strokeWidth={1.8}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    ) : postActionFeedbackPhase == "done" ? (
+                                        <Box
+                                            component="span"
+                                            sx={{
+                                                display: "flex",
+                                                left: "50%",
+                                                lineHeight: 0,
+                                                position: "absolute",
+                                                top: "50%",
+                                                transform:
+                                                    "translate(-50%, -50%)",
+                                            }}
+                                        >
+                                            <HugeiconsIcon
+                                                icon={Tick02Icon}
+                                                size={22}
+                                                strokeWidth={1.8}
+                                            />
+                                        </Box>
+                                    ) : (
+                                        <>
+                                            <Box
+                                                aria-hidden
+                                                component="span"
+                                                sx={{
+                                                    bgcolor: "currentColor",
+                                                    borderRadius: "999px",
+                                                    height: "2px",
+                                                    left: "50%",
+                                                    position: "absolute",
+                                                    top: "50%",
+                                                    transform:
+                                                        "translate(-50%, -50%)",
+                                                    width: "15px",
+                                                }}
+                                            />
+                                            <Box
+                                                aria-hidden
+                                                component="span"
+                                                sx={{
+                                                    bgcolor: "currentColor",
+                                                    borderRadius: "999px",
+                                                    height: "15px",
+                                                    left: "50%",
+                                                    position: "absolute",
+                                                    top: "50%",
+                                                    transform:
+                                                        "translate(-50%, -50%)",
+                                                    width: "2px",
+                                                }}
+                                            />
+                                        </>
+                                    )}
+                                </Box>
+                            )}
                         </Box>
-                    ))}
+                    )}
                 </Box>
                 {selectedPost && (
                     <SocialFileViewer

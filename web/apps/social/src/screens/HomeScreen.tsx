@@ -29,7 +29,7 @@ const hoursAgo = (hours: number) => minutesAgo(hours * 60);
 const daysAgo = (days: number) => hoursAgo(days * 24);
 const sampleFeedPhotoAspectRatio = 900 / 680;
 const showMockFeedData =
-    process.env.NEXT_PUBLIC_SHOW_SOCIAL_MOCK_FEED == "true";
+    process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_FEED != "true";
 type PostActionPhase = "posting" | "posted";
 
 const sampleFeedItems = [

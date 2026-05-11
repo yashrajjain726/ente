@@ -126,11 +126,11 @@ const SocialIcon: React.FC<SocialIconProps> = ({ label, src }) => (
             borderRadius: "10px",
             cursor: "pointer",
             display: "flex",
-            height: 32,
+            height: 36,
             justifyContent: "center",
             p: 0,
             transition: "background-color 120ms ease",
-            width: 32,
+            width: 36,
             "&:active": { bgcolor: "rgba(0, 0, 0, 0.025)" },
             "&:focus-visible": {
                 outline: `2px solid ${green}`,
@@ -144,7 +144,7 @@ const SocialIcon: React.FC<SocialIconProps> = ({ label, src }) => (
             aria-hidden
             alt=""
             src={src}
-            sx={{ display: "block", maxHeight: 20, maxWidth: 20 }}
+            sx={{ display: "block", maxHeight: 24, maxWidth: 24 }}
         />
     </Box>
 );
