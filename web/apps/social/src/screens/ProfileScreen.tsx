@@ -40,7 +40,7 @@ const profileCoverHeight =
 const photoMasonryGap = "3px";
 const photoMasonryRadius = "12px";
 const showMockProfilePosts =
-    process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_PROFILE_POSTS == "false";
+    process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_PROFILE_POSTS != "true";
 type PostActionPhase = "posting" | "posted";
 
 interface ProfilePhotoDimensions {
