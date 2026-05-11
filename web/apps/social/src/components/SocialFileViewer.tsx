@@ -30,7 +30,6 @@ const controlBackgroundHover = "rgba(48, 48, 48, 0.86)";
 const controlIcon = "#D8D8D8";
 const dangerColor = "#F63A3A";
 const viewerHeaderHeight = 56;
-const viewerBottomPadding = 0;
 const defaultPhotoWidth = 900;
 const defaultPhotoHeight = 680;
 const viewerExitDurationMs = 200;
@@ -167,12 +166,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                 loop: false,
                 mainClass: "pswp-social-viewer",
                 maxZoomLevel: 4,
-                paddingFn: () => ({
-                    bottom: viewerBottomPadding,
-                    left: 0,
-                    right: 0,
-                    top: viewerHeaderHeight,
-                }),
+                paddingFn: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
                 pinchToClose: false,
                 returnFocus: false,
                 secondaryZoomLevel: 2,
