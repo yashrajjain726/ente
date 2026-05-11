@@ -22,6 +22,7 @@ export interface SetupProfile {
 }
 
 interface SetupProfileScreenProps {
+    ctaLabel?: string;
     onBack: () => void;
     onContinue?: (profile: SetupProfile) => void;
 }
@@ -160,6 +161,7 @@ const TextInput: React.FC<TextInputProps> = ({
 );
 
 export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
+    ctaLabel = "Next",
     onBack,
     onContinue,
 }) => {
@@ -477,7 +479,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                                 : undefined,
                         }}
                     >
-                        Next
+                        {ctaLabel}
                     </Box>
                 </Box>
             </Box>

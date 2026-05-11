@@ -159,6 +159,7 @@ const buildPostMasonryRows = (items: SamplePostItem[]): PostMasonryRow[] => {
 interface ProfileScreenProps {
     friendsCount?: number;
     headerVariant?: "friend" | "owner" | "public";
+    onAddFriend?: () => void;
     onBack?: () => void;
     onOpenFriends?: () => void;
     onOpenSettings?: () => void;
@@ -168,6 +169,7 @@ interface ProfileScreenProps {
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     friendsCount = 7,
     headerVariant = "owner",
+    onAddFriend,
     onBack,
     onOpenFriends,
     onOpenSettings,
@@ -340,16 +342,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         <Box
                             component="button"
                             type="button"
-                            onClick={() => {
-                                window.location.assign("/");
-                            }}
+                            onClick={onAddFriend}
                             sx={{
                                 alignItems: "center",
                                 backgroundColor: "#FFFFFF",
                                 border: 0,
                                 borderRadius: "999px",
                                 color: green,
-                                cursor: "pointer",
+                                cursor: onAddFriend ? "pointer" : "default",
                                 display: "inline-flex",
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',

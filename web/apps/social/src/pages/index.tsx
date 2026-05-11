@@ -46,6 +46,10 @@ type Screen =
 
 type ProfileBackScreen = "login" | "verify-email";
 type FriendProfileBackScreen = "friends" | "home";
+type OnboardingEntrySource = "direct" | "add-friend-link";
+
+const onboardingSourceSearchParam = "onboardingSource";
+const addFriendLinkOnboardingSource: OnboardingEntrySource = "add-friend-link";
 
 const samplePublicProfileData = {
     avatarUrl: "/images/sample-avatar.jpg",
@@ -76,6 +80,26 @@ const parsePublicProfileLink = (): PublicProfileLink | null => {
     }
 };
 
+const parseOnboardingEntrySource = (): OnboardingEntrySource => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(onboardingSourceSearchParam) ==
+        addFriendLinkOnboardingSource
+        ? "add-friend-link"
+        : "direct";
+};
+
+const removeOnboardingEntrySourceFromURL = () => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has(onboardingSourceSearchParam)) return;
+
+    url.searchParams.delete(onboardingSourceSearchParam);
+    window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+    );
+};
+
 const publicProfileFromLink = (): SetupProfile => ({
     avatarUrl: samplePublicProfileData.avatarUrl,
     fullName: samplePublicProfileData.fullName,
@@ -87,6 +111,8 @@ const Page: React.FC = () => {
     const [screen, setScreen] = useState<Screen>("onboarding");
     const [email, setEmail] = useState("example@example.com");
     const [friends, setFriends] = useState(sampleFriends);
+    const [onboardingEntrySource, setOnboardingEntrySource] =
+        useState<OnboardingEntrySource>("direct");
     const [profile, setProfile] = useState<SetupProfile | null>(null);
     const [profileBackScreen, setProfileBackScreen] =
         useState<ProfileBackScreen>("verify-email");
@@ -112,6 +138,10 @@ const Page: React.FC = () => {
 
     useEffect(() => {
         const publicProfileLink = parsePublicProfileLink();
+        if (!publicProfileLink) {
+            setOnboardingEntrySource(parseOnboardingEntrySource());
+            removeOnboardingEntrySourceFromURL();
+        }
         setRouteMode(
             publicProfileLink
                 ? { kind: "public-profile", ...publicProfileLink }
@@ -123,6 +153,8 @@ const Page: React.FC = () => {
         ? (friends.find((friend) => friend.id == selectedFriendID) ??
           sampleFriends.find((friend) => friend.id == selectedFriendID))
         : undefined;
+    const isAddFriendLinkOnboarding =
+        onboardingEntrySource == "add-friend-link";
 
     const themeColor =
         routeMode.kind != "app"
@@ -166,7 +198,14 @@ const Page: React.FC = () => {
             {routeMode.kind == "checking" ? (
                 <Box sx={{ bgcolor: profileBackground, minHeight: "100svh" }} />
             ) : routeMode.kind == "public-profile" ? (
-                <PublicProfileScreen profile={publicProfileFromLink()} />
+                <PublicProfileScreen
+                    profile={publicProfileFromLink()}
+                    onAddFriend={() => {
+                        window.location.assign(
+                            `/?${onboardingSourceSearchParam}=${addFriendLinkOnboardingSource}`,
+                        );
+                    }}
+                />
             ) : (
                 <>
                     {screen == "onboarding" && (
@@ -202,10 +241,17 @@ const Page: React.FC = () => {
                     )}
                     {screen == "setup-profile" && (
                         <SetupProfileScreen
+                            ctaLabel={
+                                isAddFriendLinkOnboarding ? "Done" : "Next"
+                            }
                             onBack={() => setScreen(profileBackScreen)}
                             onContinue={(nextProfile) => {
                                 setProfile(nextProfile);
-                                setScreen("share-profile-link");
+                                setScreen(
+                                    isAddFriendLinkOnboarding
+                                        ? "home"
+                                        : "share-profile-link",
+                                );
                             }}
                         />
                     )}
@@ -267,6 +313,7 @@ const Page: React.FC = () => {
                             onBack={() => setScreen("profile")}
                             onLogout={() => {
                                 setProfile(null);
+                                setOnboardingEntrySource("direct");
                                 setSelectedFriendID(null);
                                 setFriends(sampleFriends);
                                 setScreen("onboarding");
