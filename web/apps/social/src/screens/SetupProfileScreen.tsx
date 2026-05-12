@@ -445,11 +445,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                     }}
                 >
                     <Box
-                        className={
-                            canContinue
-                                ? "green-bg"
-                                : undefined
-                        }
+                        className={canContinue ? "green-bg" : undefined}
                         component="button"
                         type="button"
                         disabled={!canContinue}

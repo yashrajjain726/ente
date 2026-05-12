@@ -315,11 +315,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     }}
                 >
                     <Box
-                        className={
-                            canContinue
-                                ? "green-bg"
-                                : undefined
-                        }
+                        className={canContinue ? "green-bg" : undefined}
                         component="button"
                         type="button"
                         disabled={!canContinue}

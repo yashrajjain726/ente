@@ -320,7 +320,9 @@ const Page: React.FC = () => {
                                 setProfile(null);
                                 setOnboardingEntrySource("direct");
                                 setSelectedFriendID(null);
-                                setFriends(showMockFriends ? sampleFriends : []);
+                                setFriends(
+                                    showMockFriends ? sampleFriends : [],
+                                );
                                 setScreen("onboarding");
                             }}
                         />

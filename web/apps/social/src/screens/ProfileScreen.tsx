@@ -405,12 +405,23 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 >
                     {isPublicProfile ? (
                         <Box
+                            component="a"
+                            href="https://ente.com/"
+                            aria-label="Go to ente.com"
                             sx={{
                                 alignSelf: "center",
+                                color: "inherit",
+                                cursor: "pointer",
                                 justifySelf: "flex-start",
                                 lineHeight: 0,
                                 overflow: "visible",
+                                textDecoration: "none",
                                 width: 58,
+                                "&:focus-visible": {
+                                    borderRadius: "4px",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 3,
+                                },
                                 "& svg": {
                                     display: "block",
                                     overflow: "visible",
