@@ -41,9 +41,9 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, wallID,
 	}
 	for _, obj := range objects {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO wall_post_assets (post_id, object_key, bucket_id, size, position, variant, blur_hash_cipher)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-		`, postID, obj.ObjectKey, obj.BucketID, obj.Size, obj.Position, obj.Variant, obj.BlurHashCipher); err != nil {
+			INSERT INTO wall_post_assets (post_id, object_key, bucket_id, size, position, variant, blur_hash_cipher, width, height, media_type)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		`, postID, obj.ObjectKey, obj.BucketID, obj.Size, obj.Position, obj.Variant, obj.BlurHashCipher, obj.Width, obj.Height, obj.MediaType); err != nil {
 			return 0, stacktrace.Propagate(err, "")
 		}
 		if err := ConsumeTempObjectTx(ctx, tx, ownerID, obj.ObjectKey, TempObjectPurposePost, nil); err != nil {
@@ -135,8 +135,8 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor s
 		  AND (
 		    p.owner_id = $1 OR
 		    EXISTS (
-		      SELECT 1 FROM wall_follow_shares fs
-		      WHERE fs.follower_id = $1 AND fs.wall_id = p.wall_id
+		      SELECT 1 FROM wall_friend_shares fs
+		      WHERE fs.friend_id = $1 AND fs.wall_id = p.wall_id
 		    )
 			  )`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
@@ -173,7 +173,7 @@ func (r *PostsRepository) ListAssetsByPostIDs(ctx context.Context, postIDs []int
 	if len(postIDs) == 0 {
 		return map[int64][]WallPostAssetRecord{}, nil
 	}
-	query, args := inClause("SELECT asset_id, post_id, object_key, bucket_id, size, position, variant, blur_hash_cipher, created_at FROM wall_post_assets WHERE post_id IN (%s) ORDER BY position ASC, asset_id ASC", postIDs, 0)
+	query, args := inClause("SELECT asset_id, post_id, object_key, bucket_id, size, position, variant, blur_hash_cipher, width, height, media_type, created_at FROM wall_post_assets WHERE post_id IN (%s) ORDER BY position ASC, asset_id ASC", postIDs, 0)
 	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -182,7 +182,7 @@ func (r *PostsRepository) ListAssetsByPostIDs(ctx context.Context, postIDs []int
 	result := make(map[int64][]WallPostAssetRecord, len(postIDs))
 	for rows.Next() {
 		var rec WallPostAssetRecord
-		if err := rows.Scan(&rec.AssetID, &rec.PostID, &rec.ObjectKey, &rec.BucketID, &rec.Size, &rec.Position, &rec.Variant, &rec.BlurHashCipher, &rec.CreatedAt); err != nil {
+		if err := rows.Scan(&rec.AssetID, &rec.PostID, &rec.ObjectKey, &rec.BucketID, &rec.Size, &rec.Position, &rec.Variant, &rec.BlurHashCipher, &rec.Width, &rec.Height, &rec.MediaType, &rec.CreatedAt); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		result[rec.PostID] = append(result[rec.PostID], rec)
@@ -295,6 +295,8 @@ func (r *PostsRepository) CreateComment(ctx context.Context, postID, authorID in
 func (r *PostsRepository) GetComment(ctx context.Context, commentID, viewerID int64) (*WallCommentRecord, error) {
 	return scanCommentRecord(r.DB.QueryRowContext(ctx, `
 		SELECT c.comment_id, c.post_id, c.author_id, author_wall.wall_slug, c.comment_cipher, c.parent_comment_id, c.created_at,
+		       (SELECT COUNT(*) FROM wall_comment_likes cl WHERE cl.comment_id = c.comment_id) AS likes,
+		       EXISTS (SELECT 1 FROM wall_comment_likes cl WHERE cl.comment_id = c.comment_id AND cl.user_id = $2) AS viewer_liked,
 		       (c.author_id = $2) AS viewer_can_delete
 		FROM wall_post_comments c
 		JOIN walls author_wall ON author_wall.owner_id = c.author_id
@@ -302,7 +304,7 @@ func (r *PostsRepository) GetComment(ctx context.Context, commentID, viewerID in
 	`, commentID, viewerID))
 }
 
-func (r *PostsRepository) ListTopLevelComments(ctx context.Context, postID, viewerID int64, cursor string, limit int) ([]WallCommentRecord, string, error) {
+func (r *PostsRepository) ListComments(ctx context.Context, postID, viewerID int64, cursor string, limit int) ([]WallCommentRecord, string, error) {
 	limit = optionalInt(limit, 20)
 	if limit > 100 {
 		limit = 100
@@ -310,10 +312,12 @@ func (r *PostsRepository) ListTopLevelComments(ctx context.Context, postID, view
 	args := []any{postID, viewerID}
 	query := `
 		SELECT c.comment_id, c.post_id, c.author_id, author_wall.wall_slug, c.comment_cipher, c.parent_comment_id, c.created_at,
-		       (c.author_id = $2) AS viewer_can_delete
-		FROM wall_post_comments c
-		JOIN walls author_wall ON author_wall.owner_id = c.author_id
-		WHERE c.post_id = $1 AND c.parent_comment_id IS NULL AND c.is_deleted = FALSE`
+	       (SELECT COUNT(*) FROM wall_comment_likes cl WHERE cl.comment_id = c.comment_id) AS likes,
+	       EXISTS (SELECT 1 FROM wall_comment_likes cl WHERE cl.comment_id = c.comment_id AND cl.user_id = $2) AS viewer_liked,
+	       (c.author_id = $2) AS viewer_can_delete
+	FROM wall_post_comments c
+	JOIN walls author_wall ON author_wall.owner_id = c.author_id
+	WHERE c.post_id = $1 AND c.is_deleted = FALSE`
 	if trimmed := strings.TrimSpace(cursor); trimmed != "" {
 		if cursorID, err := strconv.ParseInt(trimmed, 10, 64); err == nil && cursorID > 0 {
 			args = append(args, cursorID)
@@ -346,35 +350,26 @@ func (r *PostsRepository) ListTopLevelComments(ctx context.Context, postID, view
 	return out, nextCursor, nil
 }
 
-func (r *PostsRepository) ListReplies(ctx context.Context, postID, viewerID int64, parentIDs []int64) (map[int64][]WallCommentRecord, error) {
-	if len(parentIDs) == 0 {
-		return map[int64][]WallCommentRecord{}, nil
+func (r *PostsRepository) SetCommentLike(ctx context.Context, postID, commentID, userID int64, like bool) error {
+	if like {
+		_, err := r.DB.ExecContext(ctx, `
+			INSERT INTO wall_comment_likes (comment_id, user_id)
+			SELECT c.comment_id, $3
+			FROM wall_post_comments c
+			WHERE c.post_id = $1 AND c.comment_id = $2 AND c.is_deleted = FALSE
+			ON CONFLICT DO NOTHING
+		`, postID, commentID, userID)
+		return stacktrace.Propagate(err, "")
 	}
-	query, args := inClause(`
-		SELECT c.comment_id, c.post_id, c.author_id, author_wall.wall_slug, c.comment_cipher, c.parent_comment_id, c.created_at,
-		       (c.author_id = $1) AS viewer_can_delete
-		FROM wall_post_comments c
-		JOIN walls author_wall ON author_wall.owner_id = c.author_id
-		WHERE c.post_id = $2 AND c.parent_comment_id IN (%s) AND c.is_deleted = FALSE
-		ORDER BY c.comment_id ASC
-	`, parentIDs, 2)
-	args = append([]any{viewerID, postID}, args...)
-	rows, err := r.DB.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	defer rows.Close()
-	result := make(map[int64][]WallCommentRecord)
-	for rows.Next() {
-		rec, err := scanCommentRecord(rows)
-		if err != nil {
-			return nil, err
-		}
-		if rec.ParentCommentID.Valid {
-			result[rec.ParentCommentID.Int64] = append(result[rec.ParentCommentID.Int64], *rec)
-		}
-	}
-	return result, stacktrace.Propagate(rows.Err(), "")
+	_, err := r.DB.ExecContext(ctx, `
+		DELETE FROM wall_comment_likes cl
+		USING wall_post_comments c
+		WHERE cl.comment_id = c.comment_id
+		  AND c.post_id = $1
+		  AND c.comment_id = $2
+		  AND cl.user_id = $3
+	`, postID, commentID, userID)
+	return stacktrace.Propagate(err, "")
 }
 
 func (r *PostsRepository) DeleteComment(ctx context.Context, postID, commentID, viewerID int64) error {
@@ -422,7 +417,7 @@ func formatPostCursor(post WallPostRecord) string {
 
 func scanCommentRecord(scanner interface{ Scan(dest ...any) error }) (*WallCommentRecord, error) {
 	var rec WallCommentRecord
-	if err := scanner.Scan(&rec.CommentID, &rec.PostID, &rec.AuthorID, &rec.Author, &rec.CommentCipher, &rec.ParentCommentID, &rec.CreatedAt, &rec.ViewerCanDelete); err != nil {
+	if err := scanner.Scan(&rec.CommentID, &rec.PostID, &rec.AuthorID, &rec.Author, &rec.CommentCipher, &rec.ParentCommentID, &rec.CreatedAt, &rec.Likes, &rec.ViewerLiked, &rec.ViewerCanDelete); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil

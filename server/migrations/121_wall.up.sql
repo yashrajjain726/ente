@@ -69,6 +69,9 @@ CREATE TABLE IF NOT EXISTS wall_post_assets (
     position             INTEGER NOT NULL DEFAULT 0,
     variant              TEXT,
     blur_hash_cipher     TEXT,
+    width                INTEGER,
+    height               INTEGER,
+    media_type           TEXT,
     created_at           BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     CONSTRAINT uq_wall_post_assets_object_key UNIQUE (object_key),
     CONSTRAINT uq_wall_post_assets_position UNIQUE (post_id, position, variant)
@@ -130,48 +133,49 @@ CREATE TRIGGER update_wall_post_comments_updated_at
     FOR EACH ROW
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
-CREATE TABLE IF NOT EXISTS wall_follow_requests (
-    request_id        BIGSERIAL PRIMARY KEY,
-    requester_id      BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    target_wall_id    TEXT   NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,
-    status            TEXT   NOT NULL DEFAULT 'pending',
-    created_at        BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    updated_at        BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    CONSTRAINT chk_wall_follow_requests_status CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled', 'unfollowed'))
+CREATE TABLE IF NOT EXISTS wall_comment_likes (
+    comment_id   BIGINT NOT NULL REFERENCES wall_post_comments (comment_id) ON DELETE CASCADE,
+    user_id      BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    created_at   BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    PRIMARY KEY (comment_id, user_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_wall_follow_requests_target_status
-    ON wall_follow_requests (target_wall_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wall_comment_likes_comment_id
+    ON wall_comment_likes (comment_id);
 
-CREATE INDEX IF NOT EXISTS idx_wall_follow_requests_requester_status
-    ON wall_follow_requests (requester_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wall_comment_likes_user_id
+    ON wall_comment_likes (user_id, created_at DESC);
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_wall_follow_requests_pending
-    ON wall_follow_requests (requester_id, target_wall_id)
-    WHERE status = 'pending';
-
-CREATE TRIGGER update_wall_follow_requests_updated_at
-    BEFORE UPDATE ON wall_follow_requests
-    FOR EACH ROW
-EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
-
-CREATE TABLE IF NOT EXISTS wall_follow_shares (
+CREATE TABLE IF NOT EXISTS wall_friend_shares (
     wall_id              TEXT   NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,
-    follower_id          BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    friend_id            BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     encrypted_wall_key   TEXT   NOT NULL,
     key_version          INTEGER NOT NULL DEFAULT 1,
     created_at           BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
     updated_at           BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
-    PRIMARY KEY (wall_id, follower_id)
+    PRIMARY KEY (wall_id, friend_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_wall_follow_shares_follower
-    ON wall_follow_shares (follower_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wall_friend_shares_friend
+    ON wall_friend_shares (friend_id, created_at DESC);
 
-CREATE TRIGGER update_wall_follow_shares_updated_at
-    BEFORE UPDATE ON wall_follow_shares
+CREATE TRIGGER update_wall_friend_shares_updated_at
+    BEFORE UPDATE ON wall_friend_shares
     FOR EACH ROW
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
+
+CREATE TABLE IF NOT EXISTS wall_friend_events (
+    event_id        BIGSERIAL PRIMARY KEY,
+    actor_id        BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    actor_wall_id   TEXT   NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,
+    target_id       BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    target_wall_id  TEXT   NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,
+    created_at      BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    CONSTRAINT chk_wall_friend_events_distinct_users CHECK (actor_id <> target_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wall_friend_events_target_created
+    ON wall_friend_events (target_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS wall_links (
     wall_id              TEXT PRIMARY KEY REFERENCES walls (wall_id) ON DELETE CASCADE,

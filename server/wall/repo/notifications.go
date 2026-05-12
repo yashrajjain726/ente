@@ -1,0 +1,330 @@
+package repo
+
+import (
+	"context"
+	"strconv"
+	"strings"
+
+	"github.com/ente-io/stacktrace"
+)
+
+const wallNotificationRows = `
+	SELECT
+		'post_like:' || pl.post_id::text || ':' || pl.user_id::text AS notification_id,
+		'likedPost' AS notification_type,
+		pl.created_at,
+		pl.user_id AS actor_id,
+		actor_wall.wall_slug AS actor_username,
+		actor_wall.wall_id AS actor_wall_id,
+		actor_wall.wall_slug AS actor_wall_slug,
+		p.post_id,
+		p.wall_id AS post_wall_id,
+		post_wall.wall_slug AS post_wall_slug,
+		p.owner_id AS post_owner_id,
+		owner_wall.wall_slug AS post_author,
+		asset.object_key AS post_object_key,
+		asset.size AS post_object_size,
+		asset.position AS post_object_position,
+		asset.variant AS post_object_variant,
+		asset.blur_hash_cipher AS post_object_blur_hash_cipher,
+		asset.width AS post_object_width,
+		asset.height AS post_object_height,
+		asset.media_type AS post_object_media_type,
+		NULL::bigint AS comment_id,
+		NULL::bigint AS parent_comment_id,
+		NULL::bigint AS comment_author_id,
+		NULL::text AS comment_author,
+		NULL::text AS comment_cipher,
+		NULL::bigint AS comment_created_at
+	FROM wall_post_likes pl
+	JOIN wall_posts p ON p.post_id = pl.post_id
+	JOIN walls actor_wall ON actor_wall.owner_id = pl.user_id
+	JOIN walls post_wall ON post_wall.wall_id = p.wall_id
+	JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+	LEFT JOIN LATERAL (
+		SELECT object_key, size, position, variant, blur_hash_cipher, width, height, media_type
+		FROM wall_post_assets
+		WHERE post_id = p.post_id
+		ORDER BY position ASC, asset_id ASC
+		LIMIT 1
+	) asset ON TRUE
+	WHERE p.owner_id = $1
+	  AND pl.user_id <> $1
+	  AND p.is_deleted = FALSE
+
+	UNION ALL
+
+	SELECT
+		'comment:' || c.comment_id::text AS notification_id,
+		'commentedOnPost' AS notification_type,
+		c.created_at,
+		c.author_id AS actor_id,
+		actor_wall.wall_slug AS actor_username,
+		actor_wall.wall_id AS actor_wall_id,
+		actor_wall.wall_slug AS actor_wall_slug,
+		p.post_id,
+		p.wall_id AS post_wall_id,
+		post_wall.wall_slug AS post_wall_slug,
+		p.owner_id AS post_owner_id,
+		owner_wall.wall_slug AS post_author,
+		asset.object_key AS post_object_key,
+		asset.size AS post_object_size,
+		asset.position AS post_object_position,
+		asset.variant AS post_object_variant,
+		asset.blur_hash_cipher AS post_object_blur_hash_cipher,
+		asset.width AS post_object_width,
+		asset.height AS post_object_height,
+		asset.media_type AS post_object_media_type,
+		c.comment_id,
+		NULL::bigint AS parent_comment_id,
+		c.author_id AS comment_author_id,
+		actor_wall.wall_slug AS comment_author,
+		c.comment_cipher,
+		c.created_at AS comment_created_at
+	FROM wall_post_comments c
+	JOIN wall_posts p ON p.post_id = c.post_id
+	JOIN walls actor_wall ON actor_wall.owner_id = c.author_id
+	JOIN walls post_wall ON post_wall.wall_id = p.wall_id
+	JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+	LEFT JOIN LATERAL (
+		SELECT object_key, size, position, variant, blur_hash_cipher, width, height, media_type
+		FROM wall_post_assets
+		WHERE post_id = p.post_id
+		ORDER BY position ASC, asset_id ASC
+		LIMIT 1
+	) asset ON TRUE
+	WHERE p.owner_id = $1
+	  AND c.author_id <> $1
+	  AND c.parent_comment_id IS NULL
+	  AND c.is_deleted = FALSE
+	  AND p.is_deleted = FALSE
+
+	UNION ALL
+
+	SELECT
+		'reply:' || c.comment_id::text AS notification_id,
+		'repliedToComment' AS notification_type,
+		c.created_at,
+		c.author_id AS actor_id,
+		actor_wall.wall_slug AS actor_username,
+		actor_wall.wall_id AS actor_wall_id,
+		actor_wall.wall_slug AS actor_wall_slug,
+		p.post_id,
+		p.wall_id AS post_wall_id,
+		post_wall.wall_slug AS post_wall_slug,
+		p.owner_id AS post_owner_id,
+		owner_wall.wall_slug AS post_author,
+		asset.object_key AS post_object_key,
+		asset.size AS post_object_size,
+		asset.position AS post_object_position,
+		asset.variant AS post_object_variant,
+		asset.blur_hash_cipher AS post_object_blur_hash_cipher,
+		asset.width AS post_object_width,
+		asset.height AS post_object_height,
+		asset.media_type AS post_object_media_type,
+		c.comment_id,
+		c.parent_comment_id,
+		c.author_id AS comment_author_id,
+		actor_wall.wall_slug AS comment_author,
+		c.comment_cipher,
+		c.created_at AS comment_created_at
+	FROM wall_post_comments c
+	JOIN wall_post_comments parent ON parent.comment_id = c.parent_comment_id
+	JOIN wall_posts p ON p.post_id = c.post_id
+	JOIN walls actor_wall ON actor_wall.owner_id = c.author_id
+	JOIN walls post_wall ON post_wall.wall_id = p.wall_id
+	JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+	LEFT JOIN LATERAL (
+		SELECT object_key, size, position, variant, blur_hash_cipher, width, height, media_type
+		FROM wall_post_assets
+		WHERE post_id = p.post_id
+		ORDER BY position ASC, asset_id ASC
+		LIMIT 1
+	) asset ON TRUE
+	WHERE parent.author_id = $1
+	  AND c.author_id <> $1
+	  AND c.is_deleted = FALSE
+	  AND parent.is_deleted = FALSE
+	  AND p.is_deleted = FALSE
+
+	UNION ALL
+
+	SELECT
+		'comment_like:' || cl.comment_id::text || ':' || cl.user_id::text AS notification_id,
+		'likedComment' AS notification_type,
+		cl.created_at,
+		cl.user_id AS actor_id,
+		actor_wall.wall_slug AS actor_username,
+		actor_wall.wall_id AS actor_wall_id,
+		actor_wall.wall_slug AS actor_wall_slug,
+		p.post_id,
+		p.wall_id AS post_wall_id,
+		post_wall.wall_slug AS post_wall_slug,
+		p.owner_id AS post_owner_id,
+		owner_wall.wall_slug AS post_author,
+		asset.object_key AS post_object_key,
+		asset.size AS post_object_size,
+		asset.position AS post_object_position,
+		asset.variant AS post_object_variant,
+		asset.blur_hash_cipher AS post_object_blur_hash_cipher,
+		asset.width AS post_object_width,
+		asset.height AS post_object_height,
+		asset.media_type AS post_object_media_type,
+		c.comment_id,
+		c.parent_comment_id,
+		c.author_id AS comment_author_id,
+		comment_author_wall.wall_slug AS comment_author,
+		c.comment_cipher,
+		c.created_at AS comment_created_at
+	FROM wall_comment_likes cl
+	JOIN wall_post_comments c ON c.comment_id = cl.comment_id
+	JOIN wall_posts p ON p.post_id = c.post_id
+	JOIN walls actor_wall ON actor_wall.owner_id = cl.user_id
+	JOIN walls comment_author_wall ON comment_author_wall.owner_id = c.author_id
+	JOIN walls post_wall ON post_wall.wall_id = p.wall_id
+	JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+	LEFT JOIN LATERAL (
+		SELECT object_key, size, position, variant, blur_hash_cipher, width, height, media_type
+		FROM wall_post_assets
+		WHERE post_id = p.post_id
+		ORDER BY position ASC, asset_id ASC
+		LIMIT 1
+	) asset ON TRUE
+	WHERE c.author_id = $1
+	  AND cl.user_id <> $1
+	  AND c.is_deleted = FALSE
+	  AND p.is_deleted = FALSE
+
+	UNION ALL
+
+	SELECT
+		'friend_add:' || fe.event_id::text AS notification_id,
+		'addedYouAsFriend' AS notification_type,
+		fe.created_at,
+		fe.actor_id,
+		actor_wall.wall_slug AS actor_username,
+		actor_wall.wall_id AS actor_wall_id,
+		actor_wall.wall_slug AS actor_wall_slug,
+		NULL::bigint AS post_id,
+		NULL::text AS post_wall_id,
+		NULL::text AS post_wall_slug,
+		NULL::bigint AS post_owner_id,
+		NULL::text AS post_author,
+		NULL::text AS post_object_key,
+		NULL::bigint AS post_object_size,
+		NULL::integer AS post_object_position,
+		NULL::text AS post_object_variant,
+		NULL::text AS post_object_blur_hash_cipher,
+		NULL::integer AS post_object_width,
+		NULL::integer AS post_object_height,
+		NULL::text AS post_object_media_type,
+		NULL::bigint AS comment_id,
+		NULL::bigint AS parent_comment_id,
+		NULL::bigint AS comment_author_id,
+		NULL::text AS comment_author,
+		NULL::text AS comment_cipher,
+		NULL::bigint AS comment_created_at
+	FROM wall_friend_events fe
+	JOIN walls actor_wall ON actor_wall.wall_id = fe.actor_wall_id
+	WHERE fe.target_id = $1
+	  AND fe.actor_id <> $1
+`
+
+func (r *NotificationsRepository) List(ctx context.Context, userID int64, cursor string, limit int) ([]WallNotificationRecord, string, error) {
+	limit = optionalInt(limit, 50)
+	if limit > 100 {
+		limit = 100
+	}
+	var cursorCreatedAt any
+	var cursorID any
+	if createdAt, id, ok := parseNotificationCursor(cursor); ok {
+		cursorCreatedAt = createdAt
+		cursorID = id
+	}
+	rows, err := r.DB.QueryContext(ctx, `
+		WITH notifications AS (`+wallNotificationRows+`)
+		SELECT n.notification_id, n.notification_type, n.created_at,
+		       n.actor_id, n.actor_username, n.actor_wall_id, n.actor_wall_slug,
+		       n.post_id, n.post_wall_id, n.post_wall_slug, n.post_owner_id, n.post_author,
+		       n.post_object_key, n.post_object_size, n.post_object_position, n.post_object_variant,
+		       n.post_object_blur_hash_cipher, n.post_object_width, n.post_object_height, n.post_object_media_type,
+		       n.comment_id, n.parent_comment_id, n.comment_author_id, n.comment_author, n.comment_cipher, n.comment_created_at
+		FROM notifications n
+		WHERE ($2::bigint IS NULL OR (n.created_at, n.notification_id) < ($2::bigint, $3::text))
+		ORDER BY n.created_at DESC, n.notification_id DESC
+		LIMIT $4
+	`, userID, cursorCreatedAt, cursorID, limit+1)
+	if err != nil {
+		return nil, "", stacktrace.Propagate(err, "")
+	}
+	defer rows.Close()
+
+	out := make([]WallNotificationRecord, 0, limit+1)
+	for rows.Next() {
+		rec, err := scanNotificationRecord(rows)
+		if err != nil {
+			return nil, "", err
+		}
+		out = append(out, *rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", stacktrace.Propagate(err, "")
+	}
+	nextCursor := ""
+	if len(out) > limit {
+		nextCursor = formatNotificationCursor(out[limit-1])
+		out = out[:limit]
+	}
+	return out, nextCursor, nil
+}
+
+func scanNotificationRecord(scanner interface{ Scan(dest ...any) error }) (*WallNotificationRecord, error) {
+	var rec WallNotificationRecord
+	if err := scanner.Scan(
+		&rec.ID,
+		&rec.Type,
+		&rec.CreatedAt,
+		&rec.ActorID,
+		&rec.ActorUsername,
+		&rec.ActorWallID,
+		&rec.ActorWallSlug,
+		&rec.PostID,
+		&rec.PostWallID,
+		&rec.PostWallSlug,
+		&rec.PostOwnerID,
+		&rec.PostAuthor,
+		&rec.PostObjectKey,
+		&rec.PostObjectSize,
+		&rec.PostObjectPosition,
+		&rec.PostObjectVariant,
+		&rec.PostObjectBlurHashCipher,
+		&rec.PostObjectWidth,
+		&rec.PostObjectHeight,
+		&rec.PostObjectMediaType,
+		&rec.CommentID,
+		&rec.ParentCommentID,
+		&rec.CommentAuthorID,
+		&rec.CommentAuthor,
+		&rec.CommentCipher,
+		&rec.CommentCreatedAt,
+	); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return &rec, nil
+}
+
+func parseNotificationCursor(cursor string) (int64, string, bool) {
+	createdAtText, id, ok := strings.Cut(strings.TrimSpace(cursor), ":")
+	if !ok || strings.TrimSpace(id) == "" {
+		return 0, "", false
+	}
+	createdAt, err := strconv.ParseInt(createdAtText, 10, 64)
+	if err != nil || createdAt <= 0 {
+		return 0, "", false
+	}
+	return createdAt, id, true
+}
+
+func formatNotificationCursor(notification WallNotificationRecord) string {
+	return strconv.FormatInt(notification.CreatedAt, 10) + ":" + notification.ID
+}

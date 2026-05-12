@@ -3,11 +3,12 @@ DROP TABLE IF EXISTS wall_link_sessions;
 DROP TRIGGER IF EXISTS update_wall_links_updated_at ON wall_links;
 DROP TABLE IF EXISTS wall_links;
 
-DROP TRIGGER IF EXISTS update_wall_follow_shares_updated_at ON wall_follow_shares;
-DROP TABLE IF EXISTS wall_follow_shares;
+DROP TABLE IF EXISTS wall_friend_events;
 
-DROP TRIGGER IF EXISTS update_wall_follow_requests_updated_at ON wall_follow_requests;
-DROP TABLE IF EXISTS wall_follow_requests;
+DROP TRIGGER IF EXISTS update_wall_friend_shares_updated_at ON wall_friend_shares;
+DROP TABLE IF EXISTS wall_friend_shares;
+
+DROP TABLE IF EXISTS wall_comment_likes;
 
 DROP TRIGGER IF EXISTS update_wall_post_comments_updated_at ON wall_post_comments;
 DROP TABLE IF EXISTS wall_post_comments;

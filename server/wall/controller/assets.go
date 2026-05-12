@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	maxUploadBytes         int64 = 2 * 1024 * 1024
+	maxUploadBytes         int64 = 20 * 1024 * 1024
 	uploadURLExpiry              = 15 * time.Minute
 	uploadTempObjectExpiry       = 2 * uploadURLExpiry
 	uploadPurposePost            = wallrepo.TempObjectPurposePost
@@ -29,7 +29,6 @@ const (
 type AssetsController struct {
 	AssetsRepo *wallrepo.AssetsRepository
 	WallsRepo  *wallrepo.WallsRepository
-	FollowRepo *wallrepo.FollowRepository
 	LinksRepo  *wallrepo.LinksRepository
 	auth       authDeps
 }

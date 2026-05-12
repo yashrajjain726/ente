@@ -84,6 +84,16 @@ func (r *WallsRepository) GetWallBySlug(ctx context.Context, wallSlug string) (*
 	`, normalizeSlug(wallSlug)))
 }
 
+func (r *WallsRepository) GetOwnerPublicKey(ctx context.Context, ownerID int64) (string, error) {
+	var publicKey string
+	err := r.DB.QueryRowContext(ctx, `
+		SELECT public_key
+		FROM key_attributes
+		WHERE user_id = $1
+	`, ownerID).Scan(&publicKey)
+	return publicKey, stacktrace.Propagate(err, "")
+}
+
 func (r *WallsRepository) UpdateProfile(ctx context.Context, ownerID int64, wallID, encryptedProfile string, avatar *struct {
 	ObjectKey string
 	BucketID  string

@@ -26,13 +26,12 @@ type ListFeedRequest struct {
 	Limit  int    `form:"limit"`
 }
 
-type CommunityRequest struct {
-	Query  string `form:"q"`
+type ListNotificationsRequest struct {
 	Cursor string `form:"cursor"`
 	Limit  int    `form:"limit"`
 }
 
-type ListWallFollowersRequest struct {
+type ListWallFriendsRequest struct {
 	WallID string `form:"wallId"`
 }
 
@@ -100,60 +99,36 @@ type WallLinkLoginResponse struct {
 	WallID           string `json:"wallId"`
 	WallSlug         string `json:"wallSlug"`
 	Owner            string `json:"owner"`
+	PublicKey        string `json:"publicKey,omitempty"`
 	KeyVersion       int    `json:"keyVersion"`
 	EncryptedWallKey string `json:"encryptedWallKey"`
 }
 
-type FollowRequestPayload struct {
+type AddFriendPayload struct {
+	TargetWallID              string `json:"targetWallId"`
+	LinkSessionToken          string `json:"linkSessionToken"`
+	RequesterWallID           string `json:"requesterWallId"`
+	TargetEncryptedWallKey    string `json:"targetEncryptedWallKey"`
+	TargetKeyVersion          int    `json:"targetKeyVersion"`
+	RequesterEncryptedWallKey string `json:"requesterEncryptedWallKey"`
+	RequesterKeyVersion       int    `json:"requesterKeyVersion"`
+}
+
+type FriendTargetPayload struct {
 	TargetUsername *string `json:"targetUsername,omitempty"`
 	TargetWallID   *string `json:"targetWallId,omitempty"`
 }
 
-type ApproveFollowPayload struct {
-	RequestID        int64  `json:"requestId"`
-	WallID           string `json:"wallId"`
-	EncryptedWallKey string `json:"encryptedWallKey"`
-	KeyVersion       int    `json:"keyVersion"`
-}
-
-type RejectFollowPayload struct {
-	RequestID int64 `json:"requestId"`
-}
-
-type CancelFollowRequestPayload struct {
-	RequestID int64 `json:"requestId"`
-}
-
-type FollowRequestResponse struct {
-	RequestID         int64  `json:"requestId"`
-	Follower          string `json:"follower"`
-	WallID            string `json:"wallId"`
-	WallSlug          string `json:"wallSlug"`
-	FollowerPublicKey string `json:"followerPublicKey"`
-	Status            string `json:"status"`
-	CreatedAt         string `json:"createdAt"`
-}
-
-type OutgoingFollowRequestResponse struct {
-	RequestID int64  `json:"requestId"`
-	Followee  string `json:"followee"`
-	WallID    string `json:"wallId"`
-	WallSlug  string `json:"wallSlug"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"createdAt"`
-}
-
-type FollowShareResponse struct {
-	Followee         string `json:"followee"`
+type FriendShareResponse struct {
+	Friend           string `json:"friend"`
 	WallID           string `json:"wallId"`
 	WallSlug         string `json:"wallSlug"`
 	EncryptedWallKey string `json:"encryptedWallKey"`
 	KeyVersion       int    `json:"keyVersion"`
 }
 
-type FollowRequestCreatedResponse struct {
-	RequestID int64  `json:"requestId"`
-	Status    string `json:"status"`
+type FriendStatusResponse struct {
+	Status string `json:"status"`
 }
 
 type UpdateWallProfileRequest struct {
@@ -188,9 +163,10 @@ type UpdateWallSlugRequest struct {
 }
 
 type WallLookupResponse struct {
-	WallID   string `json:"wallId"`
-	WallSlug string `json:"wallSlug"`
-	Owner    string `json:"owner"`
+	WallID    string `json:"wallId"`
+	WallSlug  string `json:"wallSlug"`
+	Owner     string `json:"owner"`
+	PublicKey string `json:"publicKey,omitempty"`
 }
 
 type RotateWallKeyRequest struct {
@@ -206,22 +182,27 @@ type WallKeyVersionResponse struct {
 	CreatedAt      string `json:"createdAt"`
 }
 
-type WallFollowerResponse struct {
-	FollowerID int64  `json:"followerId"`
-	Username   string `json:"username"`
-	PublicKey  string `json:"publicKey"`
-	KeyVersion int    `json:"keyVersion"`
-	CreatedAt  string `json:"createdAt"`
+type WallFriendResponse struct {
+	FriendID         int64                  `json:"friendId"`
+	WallID           string                 `json:"wallId"`
+	Username         string                 `json:"username"`
+	PublicKey        string                 `json:"publicKey"`
+	KeyVersion       int                    `json:"keyVersion"`
+	EncryptedProfile string                 `json:"encryptedProfile,omitempty"`
+	Avatar           *ProfileAvatarResponse `json:"avatar,omitempty"`
+	Friends          int64                  `json:"friends"`
+	Posts            int64                  `json:"posts"`
+	CreatedAt        string                 `json:"createdAt"`
 }
 
-type RefreshFollowSharesRequest struct {
+type RefreshFriendSharesRequest struct {
 	WallID     string               `json:"wallId"`
 	KeyVersion int                  `json:"keyVersion"`
 	Shares     []ShareUpdatePayload `json:"shares"`
 }
 
 type ShareUpdatePayload struct {
-	FollowerID       int64  `json:"followerId"`
+	FriendID         int64  `json:"friendId"`
 	EncryptedWallKey string `json:"encryptedWallKey"`
 }
 
@@ -245,6 +226,14 @@ type LikePostResponse struct {
 	Liked bool `json:"liked"`
 }
 
+type LikeCommentRequest struct {
+	Like bool `json:"like"`
+}
+
+type LikeCommentResponse struct {
+	Liked bool `json:"liked"`
+}
+
 type UpdatePostCaptionRequest struct {
 	CaptionCipher *string `json:"captionCipher,omitempty"`
 }
@@ -255,6 +244,9 @@ type PostObjectPayload struct {
 	Position       int    `json:"position,omitempty"`
 	Variant        string `json:"variant,omitempty"`
 	BlurHashCipher string `json:"blurHashCipher,omitempty"`
+	Width          int    `json:"width,omitempty"`
+	Height         int    `json:"height,omitempty"`
+	MediaType      string `json:"mediaType,omitempty"`
 }
 
 type PostResponse struct {
@@ -284,13 +276,15 @@ type FeedPage struct {
 }
 
 type CommentResponse struct {
-	CommentID       int64             `json:"commentId"`
-	Author          string            `json:"author"`
-	CommentCipher   string            `json:"commentCipher"`
-	CreatedAt       string            `json:"createdAt"`
-	ViewerCanDelete bool              `json:"viewerCanDelete"`
-	ParentCommentID *int64            `json:"parentCommentId,omitempty"`
-	Replies         []CommentResponse `json:"replies,omitempty"`
+	CommentID       int64  `json:"commentId"`
+	AuthorID        int64  `json:"authorId"`
+	Author          string `json:"author"`
+	CommentCipher   string `json:"commentCipher"`
+	CreatedAt       string `json:"createdAt"`
+	Likes           int64  `json:"likes"`
+	ViewerLiked     bool   `json:"viewerLiked"`
+	ViewerCanDelete bool   `json:"viewerCanDelete"`
+	ParentCommentID *int64 `json:"parentCommentId,omitempty"`
 }
 
 type ListCommentsResponse struct {
@@ -303,20 +297,43 @@ type CreateCommentRequest struct {
 	ParentCommentID *int64 `json:"parentCommentId,omitempty"`
 }
 
-type CommunityUserResponse struct {
-	Username     string `json:"username"`
-	WallID       string `json:"wallId"`
-	WallSlug     string `json:"wallSlug"`
-	Followers    int64  `json:"followers"`
-	Following    int64  `json:"following"`
-	Posts        int64  `json:"posts"`
-	Relationship string `json:"relationship,omitempty"`
-	Bio          string `json:"bio,omitempty"`
+type NotificationActorResponse struct {
+	UserID   int64  `json:"userId"`
+	Username string `json:"username"`
+	WallID   string `json:"wallId"`
+	WallSlug string `json:"wallSlug"`
 }
 
-type CommunityResponse struct {
-	Users      []CommunityUserResponse `json:"users"`
-	NextCursor string                  `json:"nextCursor,omitempty"`
+type NotificationPostResponse struct {
+	PostID      int64               `json:"postId"`
+	WallID      string              `json:"wallId"`
+	WallSlug    string              `json:"wallSlug"`
+	OwnerUserID int64               `json:"ownerUserId"`
+	Author      string              `json:"author"`
+	Objects     []PostObjectPayload `json:"objects,omitempty"`
+}
+
+type NotificationCommentResponse struct {
+	CommentID       int64  `json:"commentId"`
+	AuthorID        int64  `json:"authorId,omitempty"`
+	Author          string `json:"author,omitempty"`
+	CommentCipher   string `json:"commentCipher,omitempty"`
+	CreatedAt       string `json:"createdAt,omitempty"`
+	ParentCommentID *int64 `json:"parentCommentId,omitempty"`
+}
+
+type NotificationResponse struct {
+	ID        string                       `json:"id"`
+	Type      string                       `json:"type"`
+	CreatedAt string                       `json:"createdAt"`
+	Actor     NotificationActorResponse    `json:"actor"`
+	Post      *NotificationPostResponse    `json:"post,omitempty"`
+	Comment   *NotificationCommentResponse `json:"comment,omitempty"`
+}
+
+type NotificationPage struct {
+	Items      []NotificationResponse `json:"items"`
+	NextCursor string                 `json:"nextCursor,omitempty"`
 }
 
 type UpdatedCountResponse struct {

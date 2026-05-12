@@ -6,13 +6,14 @@ import (
 )
 
 type Module struct {
-	Walls    *WallsController
-	Posts    *PostsController
-	Follow   *FollowController
-	Links    *LinksController
-	Assets   *AssetsController
-	Cleanup  *CleanupController
-	UserAuth *baserepo.UserAuthRepository
+	Walls         *WallsController
+	Posts         *PostsController
+	Friends       *FriendsController
+	Notifications *NotificationsController
+	Links         *LinksController
+	Assets        *AssetsController
+	Cleanup       *CleanupController
+	UserAuth      *baserepo.UserAuthRepository
 }
 
 func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository) *Module {
@@ -20,15 +21,16 @@ func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository) *M
 		UserAuthRepo: userAuthRepo,
 		LinksRepo:    repos.Links,
 		WallsRepo:    repos.Walls,
-		FollowRepo:   repos.Follow,
+		FriendsRepo:  repos.Friends,
 	}
 	return &Module{
-		Walls:    &WallsController{WallsRepo: repos.Walls, AssetsRepo: repos.Assets, auth: authDeps},
-		Posts:    &PostsController{PostsRepo: repos.Posts, WallsRepo: repos.Walls, FollowRepo: repos.Follow, AssetsRepo: repos.Assets, auth: authDeps},
-		Follow:   &FollowController{FollowRepo: repos.Follow, WallsRepo: repos.Walls, auth: authDeps},
-		Links:    &LinksController{LinksRepo: repos.Links, WallsRepo: repos.Walls, auth: authDeps},
-		Assets:   &AssetsController{AssetsRepo: repos.Assets, WallsRepo: repos.Walls, FollowRepo: repos.Follow, LinksRepo: repos.Links, auth: authDeps},
-		Cleanup:  &CleanupController{AssetsRepo: repos.Assets},
-		UserAuth: userAuthRepo,
+		Walls:         &WallsController{WallsRepo: repos.Walls, AssetsRepo: repos.Assets, auth: authDeps},
+		Posts:         &PostsController{PostsRepo: repos.Posts, WallsRepo: repos.Walls, AssetsRepo: repos.Assets, auth: authDeps},
+		Friends:       &FriendsController{FriendsRepo: repos.Friends, WallsRepo: repos.Walls, auth: authDeps},
+		Notifications: &NotificationsController{NotificationsRepo: repos.Notifications, auth: authDeps},
+		Links:         &LinksController{LinksRepo: repos.Links, WallsRepo: repos.Walls, auth: authDeps},
+		Assets:        &AssetsController{AssetsRepo: repos.Assets, WallsRepo: repos.Walls, LinksRepo: repos.Links, auth: authDeps},
+		Cleanup:       &CleanupController{AssetsRepo: repos.Assets},
+		UserAuth:      userAuthRepo,
 	}
 }

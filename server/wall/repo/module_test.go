@@ -88,28 +88,28 @@ func TestWallModuleLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, versions, 2)
 
-	request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
-	require.NoError(t, err)
-	require.Equal(t, "pending", request.Status)
-
-	incoming, err := module.Follow.ListIncomingRequests(ctx, aliceID)
-	require.NoError(t, err)
-	require.Len(t, incoming, 1)
-
-	err = module.Follow.UpsertShare(ctx, aliceWall.WallID, bobID, "share-key", rotatedWall.CurrentVersion)
-	require.NoError(t, err)
-	err = module.Follow.UpdateRequestStatus(ctx, request.RequestID, "approved")
+	err = module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "alice-share-key", rotatedWall.CurrentVersion, "bob-share-key", bobWall.CurrentVersion)
 	require.NoError(t, err)
 
-	shares, err := module.Follow.ListSharesForFollower(ctx, bobID)
+	shares, err := module.Friends.ListSharesForFriend(ctx, bobID)
 	require.NoError(t, err)
 	require.Len(t, shares, 1)
-	require.Equal(t, "share-key", shares[0].EncryptedWallKey)
+	require.Equal(t, "alice-share-key", shares[0].EncryptedWallKey)
 
-	followers, err := module.Follow.ListFollowersForWall(ctx, aliceWall.WallID)
+	aliceShares, err := module.Friends.ListSharesForFriend(ctx, aliceID)
 	require.NoError(t, err)
-	require.Len(t, followers, 1)
-	require.Equal(t, "bob", followers[0].Username)
+	require.Len(t, aliceShares, 1)
+	require.Equal(t, "bob-share-key", aliceShares[0].EncryptedWallKey)
+
+	friends, err := module.Friends.ListFriendsForWall(ctx, aliceWall.WallID)
+	require.NoError(t, err)
+	require.Len(t, friends, 1)
+	require.Equal(t, "bob", friends[0].Username)
+
+	bobFriends, err := module.Friends.ListFriendsForWall(ctx, bobWall.WallID)
+	require.NoError(t, err)
+	require.Len(t, bobFriends, 1)
+	require.Equal(t, "alice", bobFriends[0].Username)
 
 	for _, tempObject := range []WallTempObjectRecord{
 		{
@@ -164,14 +164,12 @@ func TestWallModuleLifecycle(t *testing.T) {
 	_, err = module.Posts.CreateComment(ctx, postID, aliceID, "reply-1", &comment.CommentID)
 	require.NoError(t, err)
 
-	comments, nextCommentsCursor, err := module.Posts.ListTopLevelComments(ctx, postID, bobID, "", 20)
+	comments, nextCommentsCursor, err := module.Posts.ListComments(ctx, postID, bobID, "", 20)
 	require.NoError(t, err)
-	require.Len(t, comments, 1)
+	require.Len(t, comments, 2)
 	require.Empty(t, nextCommentsCursor)
-
-	replies, err := module.Posts.ListReplies(ctx, postID, bobID, []int64{comment.CommentID})
-	require.NoError(t, err)
-	require.Len(t, replies[comment.CommentID], 1)
+	require.Equal(t, comment.CommentID, comments[1].CommentID)
+	require.Equal(t, comment.CommentID, comments[0].ParentCommentID.Int64)
 
 	assets, err := module.Posts.ListAssetsByPostIDs(ctx, []int64{postID})
 	require.NoError(t, err)
@@ -307,7 +305,7 @@ func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
 	requireQueuedTempObject(t, module, "wall/alice/avatar-new", TempObjectPurposeAvatar, "b2-us-west")
 }
 
-func TestApproveRequestCreatesShareAndMarksRequestApproved(t *testing.T) {
+func TestAddFriendCreatesReciprocalSharesAndEvent(t *testing.T) {
 	ctx := context.Background()
 	module := newWallTestModule(t)
 
@@ -315,27 +313,29 @@ func TestApproveRequestCreatesShareAndMarksRequestApproved(t *testing.T) {
 	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
 	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
 	require.NoError(t, err)
-	_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
-	require.NoError(t, err)
-	request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
+	bobWall, err := module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
 	require.NoError(t, err)
 
-	approved, err := module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "share-key", aliceWall.CurrentVersion)
+	err = module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "alice-share-key", aliceWall.CurrentVersion, "bob-share-key", bobWall.CurrentVersion)
 	require.NoError(t, err)
-	require.Equal(t, request.RequestID, approved.RequestID)
-	require.Equal(t, "approved", approved.Status)
 
-	share, err := module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
+	share, err := module.Friends.GetShareForFriendAndWall(ctx, bobID, aliceWall.WallID)
 	require.NoError(t, err)
-	require.Equal(t, "share-key", share.EncryptedWallKey)
+	require.Equal(t, "alice-share-key", share.EncryptedWallKey)
 	require.Equal(t, aliceWall.CurrentVersion, share.KeyVersion)
 
-	stored, err := module.Follow.GetRequest(ctx, request.RequestID)
+	reciprocalShare, err := module.Friends.GetShareForFriendAndWall(ctx, aliceID, bobWall.WallID)
 	require.NoError(t, err)
-	require.Equal(t, "approved", stored.Status)
+	require.Equal(t, "bob-share-key", reciprocalShare.EncryptedWallKey)
+	require.Equal(t, bobWall.CurrentVersion, reciprocalShare.KeyVersion)
+
+	var eventCount int
+	err = module.Friends.DB.QueryRow(`SELECT COUNT(*) FROM wall_friend_events WHERE actor_id = $1 AND target_id = $2`, bobID, aliceID).Scan(&eventCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, eventCount)
 }
 
-func TestCreateRequestRejectsAlreadyFollowing(t *testing.T) {
+func TestAddFriendIsIdempotentForExistingFriends(t *testing.T) {
 	ctx := context.Background()
 	module := newWallTestModule(t)
 
@@ -343,109 +343,21 @@ func TestCreateRequestRejectsAlreadyFollowing(t *testing.T) {
 	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
 	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
 	require.NoError(t, err)
-	_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
+	bobWall, err := module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
 	require.NoError(t, err)
-	request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
-	require.NoError(t, err)
-	_, err = module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "share-key", aliceWall.CurrentVersion)
+	err = module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "alice-share-key", aliceWall.CurrentVersion, "bob-share-key", bobWall.CurrentVersion)
 	require.NoError(t, err)
 
-	duplicate, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
+	err = module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "alice-share-key-v2", aliceWall.CurrentVersion, "bob-share-key-v2", bobWall.CurrentVersion)
 
-	require.Nil(t, duplicate)
-	require.ErrorIs(t, err, ErrAlreadyFollowing)
-	incoming, err := module.Follow.ListIncomingRequests(ctx, aliceID)
 	require.NoError(t, err)
-	require.Empty(t, incoming)
-}
-
-func TestApproveRequestRejectsStaleRequestStates(t *testing.T) {
-	for _, status := range []string{"cancelled", "rejected", "unfollowed", "approved"} {
-		t.Run(status, func(t *testing.T) {
-			ctx := context.Background()
-			module := newWallTestModule(t)
-
-			aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
-			bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
-			aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
-			require.NoError(t, err)
-			_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
-			require.NoError(t, err)
-			request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
-			require.NoError(t, err)
-
-			if status == "approved" {
-				_, err = module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "initial-share-key", aliceWall.CurrentVersion)
-				require.NoError(t, err)
-				err = module.Follow.DeleteShareByWallAndFollower(ctx, aliceWall.WallID, bobID)
-				require.NoError(t, err)
-			} else {
-				err = module.Follow.UpdateRequestStatus(ctx, request.RequestID, status)
-				require.NoError(t, err)
-			}
-
-			approved, err := module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "stale-share-key", aliceWall.CurrentVersion)
-			require.Nil(t, approved)
-			require.ErrorIs(t, err, sql.ErrNoRows)
-			_, err = module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
-			require.ErrorIs(t, err, sql.ErrNoRows)
-		})
-	}
-}
-
-func TestUpdatePendingRequestStatusOnlyUpdatesPendingRequests(t *testing.T) {
-	for _, status := range []string{"cancelled", "rejected"} {
-		t.Run(status, func(t *testing.T) {
-			ctx := context.Background()
-			module := newWallTestModule(t)
-
-			aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
-			bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
-			aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
-			require.NoError(t, err)
-			_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
-			require.NoError(t, err)
-			request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
-			require.NoError(t, err)
-
-			err = module.Follow.UpdatePendingRequestStatus(ctx, request.RequestID, status)
-			require.NoError(t, err)
-
-			stored, err := module.Follow.GetRequest(ctx, request.RequestID)
-			require.NoError(t, err)
-			require.Equal(t, status, stored.Status)
-		})
-	}
-}
-
-func TestUpdatePendingRequestStatusRejectsApprovedRequests(t *testing.T) {
-	for _, status := range []string{"cancelled", "rejected"} {
-		t.Run(status, func(t *testing.T) {
-			ctx := context.Background()
-			module := newWallTestModule(t)
-
-			aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
-			bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
-			aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
-			require.NoError(t, err)
-			_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
-			require.NoError(t, err)
-			request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
-			require.NoError(t, err)
-			_, err = module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "share-key", aliceWall.CurrentVersion)
-			require.NoError(t, err)
-
-			err = module.Follow.UpdatePendingRequestStatus(ctx, request.RequestID, status)
-			require.ErrorIs(t, err, sql.ErrNoRows)
-
-			stored, err := module.Follow.GetRequest(ctx, request.RequestID)
-			require.NoError(t, err)
-			require.Equal(t, "approved", stored.Status)
-			share, err := module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
-			require.NoError(t, err)
-			require.Equal(t, "share-key", share.EncryptedWallKey)
-		})
-	}
+	share, err := module.Friends.GetShareForFriendAndWall(ctx, bobID, aliceWall.WallID)
+	require.NoError(t, err)
+	require.Equal(t, "alice-share-key-v2", share.EncryptedWallKey)
+	var eventCount int
+	err = module.Friends.DB.QueryRow(`SELECT COUNT(*) FROM wall_friend_events WHERE actor_id = $1 AND target_id = $2`, bobID, aliceID).Scan(&eventCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, eventCount)
 }
 
 func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
@@ -459,25 +371,25 @@ func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
 	_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
 	require.NoError(t, err)
 
-	err = module.Follow.UpsertShare(ctx, aliceWall.WallID, bobID, "share-key-v1", aliceWall.CurrentVersion)
+	err = module.Friends.UpsertShare(ctx, aliceWall.WallID, bobID, "share-key-v1", aliceWall.CurrentVersion)
 	require.NoError(t, err)
 
 	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
 
-	err = module.Follow.UpdateShare(ctx, aliceWall.WallID, bobID, "share-key-v2", rotatedWall.CurrentVersion)
+	err = module.Friends.UpdateShare(ctx, aliceWall.WallID, bobID, "share-key-v2", rotatedWall.CurrentVersion)
 	require.NoError(t, err)
-	share, err := module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
+	share, err := module.Friends.GetShareForFriendAndWall(ctx, bobID, aliceWall.WallID)
 	require.NoError(t, err)
 	require.Equal(t, "share-key-v2", share.EncryptedWallKey)
 	require.Equal(t, rotatedWall.CurrentVersion, share.KeyVersion)
 
-	err = module.Follow.DeleteShareByWallAndFollower(ctx, aliceWall.WallID, bobID)
+	err = module.Friends.DeleteShareByWallAndFriend(ctx, aliceWall.WallID, bobID)
 	require.NoError(t, err)
-	err = module.Follow.UpdateShare(ctx, aliceWall.WallID, bobID, "stale-share-key", rotatedWall.CurrentVersion)
+	err = module.Friends.UpdateShare(ctx, aliceWall.WallID, bobID, "stale-share-key", rotatedWall.CurrentVersion)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
-	_, err = module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
+	_, err = module.Friends.GetShareForFriendAndWall(ctx, bobID, aliceWall.WallID)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 }
 
@@ -501,7 +413,7 @@ func TestCreatePostRejectsStaleKeyVersion(t *testing.T) {
 	require.Empty(t, posts)
 }
 
-func TestApproveRequestRejectsStaleKeyVersion(t *testing.T) {
+func TestAddFriendRejectsStaleKeyVersion(t *testing.T) {
 	ctx := context.Background()
 	module := newWallTestModule(t)
 
@@ -509,21 +421,17 @@ func TestApproveRequestRejectsStaleKeyVersion(t *testing.T) {
 	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
 	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
 	require.NoError(t, err)
-	_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
-	require.NoError(t, err)
-	request, err := module.Follow.CreateRequest(ctx, bobID, aliceWall.WallID)
+	bobWall, err := module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
 	require.NoError(t, err)
 	_, err = module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
 
-	approved, err := module.Follow.ApproveRequest(ctx, request.RequestID, aliceWall.WallID, "stale-share-key", aliceWall.CurrentVersion)
-	require.Nil(t, approved)
+	err = module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "stale-share-key", aliceWall.CurrentVersion, "bob-share-key", bobWall.CurrentVersion)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
-	stored, err := module.Follow.GetRequest(ctx, request.RequestID)
-	require.NoError(t, err)
-	require.Equal(t, "pending", stored.Status)
-	_, err = module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
+	_, err = module.Friends.GetShareForFriendAndWall(ctx, bobID, aliceWall.WallID)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+	_, err = module.Friends.GetShareForFriendAndWall(ctx, aliceID, bobWall.WallID)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 }
 
@@ -537,15 +445,15 @@ func TestUpdateShareRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 	_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
 	require.NoError(t, err)
-	err = module.Follow.UpsertShare(ctx, aliceWall.WallID, bobID, "share-key-v1", aliceWall.CurrentVersion)
+	err = module.Friends.UpsertShare(ctx, aliceWall.WallID, bobID, "share-key-v1", aliceWall.CurrentVersion)
 	require.NoError(t, err)
 	_, err = module.Walls.RotateKey(ctx, aliceID, aliceWall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
 
-	err = module.Follow.UpdateShare(ctx, aliceWall.WallID, bobID, "stale-share-key", aliceWall.CurrentVersion)
+	err = module.Friends.UpdateShare(ctx, aliceWall.WallID, bobID, "stale-share-key", aliceWall.CurrentVersion)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
-	share, err := module.Follow.GetShareForFollowerAndWall(ctx, bobID, aliceWall.WallID)
+	share, err := module.Friends.GetShareForFriendAndWall(ctx, bobID, aliceWall.WallID)
 	require.NoError(t, err)
 	require.Equal(t, "share-key-v1", share.EncryptedWallKey)
 	require.Equal(t, aliceWall.CurrentVersion, share.KeyVersion)
@@ -770,7 +678,58 @@ func TestListFeedCursorUsesCreatedAtSortOrder(t *testing.T) {
 	require.Equal(t, "2000:"+strconv.FormatInt(second, 10), nextCursor)
 }
 
-func TestListTopLevelCommentsPaginates(t *testing.T) {
+func TestNotificationsIncludeWallSocialEvents(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	bobWall, err := module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+
+	postID, err := module.Posts.CreatePost(ctx, aliceID, aliceWall.WallID, "post-key", nil, aliceWall.CurrentVersion, nil)
+	require.NoError(t, err)
+	err = module.Posts.SetLike(ctx, postID, bobID, true)
+	require.NoError(t, err)
+	setPostLikeCreatedAt(t, module, 2000, postID, bobID)
+
+	bobComment, err := module.Posts.CreateComment(ctx, postID, bobID, "bob-comment", nil)
+	require.NoError(t, err)
+	setCommentCreatedAt(t, module, 3000, bobComment.CommentID)
+
+	aliceComment, err := module.Posts.CreateComment(ctx, postID, aliceID, "alice-comment", nil)
+	require.NoError(t, err)
+	bobReply, err := module.Posts.CreateComment(ctx, postID, bobID, "bob-reply", &aliceComment.CommentID)
+	require.NoError(t, err)
+	setCommentCreatedAt(t, module, 4000, bobReply.CommentID)
+
+	err = module.Posts.SetCommentLike(ctx, postID, aliceComment.CommentID, bobID, true)
+	require.NoError(t, err)
+	setCommentLikeCreatedAt(t, module, 5000, aliceComment.CommentID, bobID)
+
+	err = module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "alice-share-key", aliceWall.CurrentVersion, "bob-share-key", bobWall.CurrentVersion)
+	require.NoError(t, err)
+	setFriendEventCreatedAt(t, module, 6000, bobID, aliceID)
+
+	page, nextCursor, err := module.Notifications.List(ctx, aliceID, "", 3)
+	require.NoError(t, err)
+	require.Len(t, page, 3)
+	require.Equal(t, "addedYouAsFriend", page[0].Type)
+	require.Equal(t, "likedComment", page[1].Type)
+	require.Equal(t, "repliedToComment", page[2].Type)
+	require.NotEmpty(t, nextCursor)
+
+	page, nextCursor, err = module.Notifications.List(ctx, aliceID, nextCursor, 3)
+	require.NoError(t, err)
+	require.Len(t, page, 2)
+	require.Equal(t, "commentedOnPost", page[0].Type)
+	require.Equal(t, "likedPost", page[1].Type)
+	require.Empty(t, nextCursor)
+}
+
+func TestListCommentsPaginates(t *testing.T) {
 	ctx := context.Background()
 	module := newWallTestModule(t)
 
@@ -787,14 +746,14 @@ func TestListTopLevelCommentsPaginates(t *testing.T) {
 	third, err := module.Posts.CreateComment(ctx, postID, aliceID, "comment-3", nil)
 	require.NoError(t, err)
 
-	page, nextCursor, err := module.Posts.ListTopLevelComments(ctx, postID, aliceID, "", 2)
+	page, nextCursor, err := module.Posts.ListComments(ctx, postID, aliceID, "", 2)
 	require.NoError(t, err)
 	require.Len(t, page, 2)
 	require.Equal(t, third.CommentID, page[0].CommentID)
 	require.Equal(t, second.CommentID, page[1].CommentID)
 	require.Equal(t, strconv.FormatInt(second.CommentID, 10), nextCursor)
 
-	page, nextCursor, err = module.Posts.ListTopLevelComments(ctx, postID, aliceID, nextCursor, 2)
+	page, nextCursor, err = module.Posts.ListComments(ctx, postID, aliceID, nextCursor, 2)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, first.CommentID, page[0].CommentID)
@@ -872,4 +831,28 @@ func setPostCreatedAt(t *testing.T, module *Module, createdAt int64, postIDs ...
 		_, err := module.Posts.DB.Exec(`UPDATE wall_posts SET created_at = $1 WHERE post_id = $2`, createdAt, postID)
 		require.NoError(t, err)
 	}
+}
+
+func setPostLikeCreatedAt(t *testing.T, module *Module, createdAt, postID, userID int64) {
+	t.Helper()
+	_, err := module.Posts.DB.Exec(`UPDATE wall_post_likes SET created_at = $1 WHERE post_id = $2 AND user_id = $3`, createdAt, postID, userID)
+	require.NoError(t, err)
+}
+
+func setCommentCreatedAt(t *testing.T, module *Module, createdAt, commentID int64) {
+	t.Helper()
+	_, err := module.Posts.DB.Exec(`UPDATE wall_post_comments SET created_at = $1 WHERE comment_id = $2`, createdAt, commentID)
+	require.NoError(t, err)
+}
+
+func setCommentLikeCreatedAt(t *testing.T, module *Module, createdAt, commentID, userID int64) {
+	t.Helper()
+	_, err := module.Posts.DB.Exec(`UPDATE wall_comment_likes SET created_at = $1 WHERE comment_id = $2 AND user_id = $3`, createdAt, commentID, userID)
+	require.NoError(t, err)
+}
+
+func setFriendEventCreatedAt(t *testing.T, module *Module, createdAt, actorID, targetID int64) {
+	t.Helper()
+	_, err := module.Friends.DB.Exec(`UPDATE wall_friend_events SET created_at = $1 WHERE actor_id = $2 AND target_id = $3`, createdAt, actorID, targetID)
+	require.NoError(t, err)
 }

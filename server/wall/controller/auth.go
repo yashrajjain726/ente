@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/ente-io/museum/ente"
 	baserepo "github.com/ente-io/museum/pkg/repo"
@@ -24,7 +25,7 @@ type authDeps struct {
 	UserAuthRepo *baserepo.UserAuthRepository
 	LinksRepo    *wallrepo.LinksRepository
 	WallsRepo    *wallrepo.WallsRepository
-	FollowRepo   *wallrepo.FollowRepository
+	FriendsRepo  *wallrepo.FriendsRepository
 }
 
 func (a authDeps) requireUser(c *gin.Context) (int64, error) {
@@ -78,6 +79,26 @@ func (a authDeps) requireWallOwner(ctx context.Context, ownerID int64, wallID st
 	return wall, nil
 }
 
+func (a authDeps) requireLinkSession(ctx context.Context, token string) (*wallrepo.WallLinkSessionRecord, error) {
+	token = strings.TrimSpace(token)
+	if token == "" || a.LinksRepo == nil {
+		return nil, ente.ErrAuthenticationRequired
+	}
+	sum := sha256.Sum256([]byte(token))
+	session, err := a.LinksRepo.GetSession(ctx, sum[:])
+	if err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, ente.ErrAuthenticationRequired
+		}
+		return nil, err
+	}
+	if session.ExpiresAt <= timeutil.Microseconds() {
+		_ = a.LinksRepo.DeleteSession(ctx, sum[:])
+		return nil, ente.ErrAuthenticationRequired
+	}
+	return session, nil
+}
+
 func (a authDeps) canViewWall(ctx context.Context, viewer *viewerAuth, wall *wallrepo.WallRecord) error {
 	switch {
 	case viewer == nil:
@@ -86,7 +107,7 @@ func (a authDeps) canViewWall(ctx context.Context, viewer *viewerAuth, wall *wal
 		if viewer.UserID == wall.OwnerID {
 			return nil
 		}
-		_, err := a.FollowRepo.GetShareForFollowerAndWall(ctx, viewer.UserID, wall.WallID)
+		_, err := a.FriendsRepo.GetShareForFriendAndWall(ctx, viewer.UserID, wall.WallID)
 		if err != nil {
 			if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 				return ente.ErrPermissionDenied

@@ -7,11 +7,12 @@ import (
 )
 
 type Module struct {
-	Walls  *WallsRepository
-	Posts  *PostsRepository
-	Follow *FollowRepository
-	Links  *LinksRepository
-	Assets *AssetsRepository
+	Walls         *WallsRepository
+	Posts         *PostsRepository
+	Friends       *FriendsRepository
+	Notifications *NotificationsRepository
+	Links         *LinksRepository
+	Assets        *AssetsRepository
 }
 
 type WallsRepository struct {
@@ -22,7 +23,11 @@ type PostsRepository struct {
 	DB *sql.DB
 }
 
-type FollowRepository struct {
+type FriendsRepository struct {
+	DB *sql.DB
+}
+
+type NotificationsRepository struct {
 	DB *sql.DB
 }
 
@@ -82,6 +87,9 @@ type WallPostAssetRecord struct {
 	Position       int
 	Variant        sql.NullString
 	BlurHashCipher sql.NullString
+	Width          sql.NullInt64
+	Height         sql.NullInt64
+	MediaType      sql.NullString
 	CreatedAt      int64
 }
 
@@ -104,26 +112,16 @@ type WallCommentRecord struct {
 	CommentCipher   string
 	ParentCommentID sql.NullInt64
 	CreatedAt       int64
+	Likes           int64
+	ViewerLiked     bool
 	ViewerCanDelete bool
-}
-
-type WallFollowRequestRecord struct {
-	RequestID     int64
-	RequesterID   int64
-	TargetWallID  string
-	Status        string
-	CreatedAt     int64
-	UpdatedAt     int64
-	RequesterSlug string
-	RequesterKey  string
-	TargetSlug    string
 }
 
 type WallShareRecord struct {
 	WallID           string
-	FollowerID       int64
-	FolloweeID       int64
-	FolloweeSlug     string
+	FriendID         int64
+	OwnerID          int64
+	WallSlug         string
 	EncryptedWallKey string
 	KeyVersion       int
 	CreatedAt        int64
@@ -131,16 +129,22 @@ type WallShareRecord struct {
 }
 
 type WallShareUpdateRecord struct {
-	FollowerID       int64
+	FriendID         int64
 	EncryptedWallKey string
 }
 
-type WallFollowerRecord struct {
-	FollowerID int64
-	Username   string
-	PublicKey  string
-	KeyVersion int
-	CreatedAt  int64
+type WallFriendRecord struct {
+	FriendID         int64
+	WallID           string
+	Username         string
+	PublicKey        string
+	KeyVersion       int
+	EncryptedProfile string
+	AvatarObjectKey  sql.NullString
+	AvatarSize       sql.NullInt64
+	Friends          int64
+	Posts            int64
+	CreatedAt        int64
 }
 
 type WallLinkRecord struct {
@@ -169,23 +173,42 @@ type WallLinkSessionRecord struct {
 	EncryptedWallKey string
 }
 
-type CommunityRecord struct {
-	Username     string
-	WallID       string
-	WallSlug     string
-	Followers    int64
-	Following    int64
-	Posts        int64
-	Relationship string
-	Bio          string
+type WallNotificationRecord struct {
+	ID                       string
+	Type                     string
+	CreatedAt                int64
+	ActorID                  int64
+	ActorUsername            string
+	ActorWallID              string
+	ActorWallSlug            string
+	PostID                   sql.NullInt64
+	PostWallID               sql.NullString
+	PostWallSlug             sql.NullString
+	PostOwnerID              sql.NullInt64
+	PostAuthor               sql.NullString
+	PostObjectKey            sql.NullString
+	PostObjectSize           sql.NullInt64
+	PostObjectPosition       sql.NullInt64
+	PostObjectVariant        sql.NullString
+	PostObjectBlurHashCipher sql.NullString
+	PostObjectWidth          sql.NullInt64
+	PostObjectHeight         sql.NullInt64
+	PostObjectMediaType      sql.NullString
+	CommentID                sql.NullInt64
+	ParentCommentID          sql.NullInt64
+	CommentAuthorID          sql.NullInt64
+	CommentAuthor            sql.NullString
+	CommentCipher            sql.NullString
+	CommentCreatedAt         sql.NullInt64
 }
 
 func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {
 	return &Module{
-		Walls:  &WallsRepository{DB: db},
-		Posts:  &PostsRepository{DB: db},
-		Follow: &FollowRepository{DB: db},
-		Links:  &LinksRepository{DB: db},
-		Assets: &AssetsRepository{DB: db, S3Config: s3Config},
+		Walls:         &WallsRepository{DB: db},
+		Posts:         &PostsRepository{DB: db},
+		Friends:       &FriendsRepository{DB: db},
+		Notifications: &NotificationsRepository{DB: db},
+		Links:         &LinksRepository{DB: db},
+		Assets:        &AssetsRepository{DB: db, S3Config: s3Config},
 	}
 }

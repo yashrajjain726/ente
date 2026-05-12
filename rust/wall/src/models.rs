@@ -85,8 +85,8 @@ pub struct DecryptedComment {
 }
 
 #[derive(Debug, Clone)]
-pub struct DecryptedFollowShare {
-    pub followee: String,
+pub struct DecryptedFriendShare {
+    pub friend: String,
     pub wall_id: String,
     pub wall_slug: String,
     pub wall_key: Vec<u8>,
@@ -123,5 +123,5 @@ pub struct FeedPage {
 #[derive(Debug, Clone)]
 pub struct HydratedKeys {
     pub owned: Vec<(String, Vec<u8>)>,
-    pub followed: Vec<DecryptedFollowShare>,
+    pub friends: Vec<DecryptedFriendShare>,
 }

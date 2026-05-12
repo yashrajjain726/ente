@@ -16,7 +16,6 @@ import (
 type PostsController struct {
 	PostsRepo  *repo.PostsRepository
 	WallsRepo  *repo.WallsRepository
-	FollowRepo *repo.FollowRepository
 	AssetsRepo *repo.AssetsRepository
 	auth       authDeps
 }
@@ -52,6 +51,9 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 			Position:       object.Position,
 			Variant:        sql.NullString{String: object.Variant, Valid: strings.TrimSpace(object.Variant) != ""},
 			BlurHashCipher: sql.NullString{String: object.BlurHashCipher, Valid: strings.TrimSpace(object.BlurHashCipher) != ""},
+			Width:          sql.NullInt64{Int64: int64(object.Width), Valid: object.Width > 0},
+			Height:         sql.NullInt64{Int64: int64(object.Height), Valid: object.Height > 0},
+			MediaType:      sql.NullString{String: object.MediaType, Valid: strings.TrimSpace(object.MediaType) != ""},
 		})
 	}
 	postID, err := c.PostsRepo.CreatePost(ctx.Request.Context(), userID, wall.WallID, req.EncryptedPostKey, req.CaptionCipher, req.KeyVersion, assets)
@@ -247,26 +249,13 @@ func (c *PostsController) ListComments(ctx *gin.Context, postID string) (*models
 		return nil, err
 	}
 	limit, _ := strconv.Atoi(strings.TrimSpace(ctx.Query("limit")))
-	comments, nextCursor, err := c.PostsRepo.ListTopLevelComments(ctx.Request.Context(), id, viewerID, ctx.Query("cursor"), limit)
-	if err != nil {
-		return nil, err
-	}
-	parentIDs := make([]int64, 0, len(comments))
-	for _, comment := range comments {
-		parentIDs = append(parentIDs, comment.CommentID)
-	}
-	repliesByParent, err := c.PostsRepo.ListReplies(ctx.Request.Context(), id, viewerID, parentIDs)
+	comments, nextCursor, err := c.PostsRepo.ListComments(ctx.Request.Context(), id, viewerID, ctx.Query("cursor"), limit)
 	if err != nil {
 		return nil, err
 	}
 	resp := make([]models.CommentResponse, 0, len(comments))
 	for _, comment := range comments {
-		replies := repliesByParent[comment.CommentID]
-		replyResp := make([]models.CommentResponse, 0, len(replies))
-		for _, reply := range replies {
-			replyResp = append(replyResp, toCommentResponse(reply, nil))
-		}
-		resp = append(resp, toCommentResponse(comment, replyResp))
+		resp = append(resp, toCommentResponse(comment))
 	}
 	return &models.ListCommentsResponse{Comments: resp, NextCursor: nextCursor}, nil
 }
@@ -305,7 +294,7 @@ func (c *PostsController) CreateComment(ctx *gin.Context, postID string, req mod
 			}
 			return nil, err
 		}
-		if parent.PostID != id || parent.ParentCommentID.Valid {
+		if parent.PostID != id {
 			return nil, ente.NewBadRequestWithMessage("invalid parentCommentId")
 		}
 	}
@@ -313,8 +302,45 @@ func (c *PostsController) CreateComment(ctx *gin.Context, postID string, req mod
 	if err != nil {
 		return nil, err
 	}
-	resp := toCommentResponse(*comment, nil)
+	resp := toCommentResponse(*comment)
 	return &resp, nil
+}
+
+func (c *PostsController) ToggleCommentLike(ctx *gin.Context, postID, commentID string, req models.LikeCommentRequest) (*models.LikeCommentResponse, error) {
+	userID, err := c.auth.requireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	postIDInt, err := strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
+	if err != nil || postIDInt <= 0 {
+		return nil, ente.NewBadRequestWithMessage("invalid postID")
+	}
+	commentIDInt, err := strconv.ParseInt(strings.TrimSpace(commentID), 10, 64)
+	if err != nil || commentIDInt <= 0 {
+		return nil, ente.NewBadRequestWithMessage("invalid commentID")
+	}
+	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), postIDInt, userID)
+	if err != nil {
+		return nil, err
+	}
+	wall, err := c.WallsRepo.GetWallByID(ctx.Request.Context(), post.WallID)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.auth.canViewWall(ctx.Request.Context(), &viewerAuth{UserID: userID}, wall); err != nil {
+		return nil, err
+	}
+	comment, err := c.PostsRepo.GetComment(ctx.Request.Context(), commentIDInt, userID)
+	if err != nil {
+		return nil, err
+	}
+	if comment.PostID != postIDInt {
+		return nil, ente.NewBadRequestWithMessage("invalid commentID")
+	}
+	if err := c.PostsRepo.SetCommentLike(ctx.Request.Context(), postIDInt, commentIDInt, userID, req.Like); err != nil {
+		return nil, err
+	}
+	return &models.LikeCommentResponse{Liked: req.Like}, nil
 }
 
 func (c *PostsController) DeleteComment(ctx *gin.Context, postID, commentID string) error {

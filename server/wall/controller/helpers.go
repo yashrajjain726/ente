@@ -52,6 +52,15 @@ func toPostObjectPayload(asset wallrepo.WallPostAssetRecord) models.PostObjectPa
 	if asset.BlurHashCipher.Valid {
 		resp.BlurHashCipher = asset.BlurHashCipher.String
 	}
+	if asset.Width.Valid {
+		resp.Width = int(asset.Width.Int64)
+	}
+	if asset.Height.Valid {
+		resp.Height = int(asset.Height.Int64)
+	}
+	if asset.MediaType.Valid {
+		resp.MediaType = asset.MediaType.String
+	}
 	return resp
 }
 
@@ -79,14 +88,16 @@ func toPostResponse(post *wallrepo.WallPostRecord, assets []wallrepo.WallPostAss
 	return resp
 }
 
-func toCommentResponse(comment wallrepo.WallCommentRecord, replies []models.CommentResponse) models.CommentResponse {
+func toCommentResponse(comment wallrepo.WallCommentRecord) models.CommentResponse {
 	resp := models.CommentResponse{
 		CommentID:       comment.CommentID,
+		AuthorID:        comment.AuthorID,
 		Author:          comment.Author,
 		CommentCipher:   comment.CommentCipher,
 		CreatedAt:       formatMicros(comment.CreatedAt),
+		Likes:           comment.Likes,
+		ViewerLiked:     comment.ViewerLiked,
 		ViewerCanDelete: comment.ViewerCanDelete,
-		Replies:         replies,
 	}
 	if comment.ParentCommentID.Valid {
 		parentID := comment.ParentCommentID.Int64

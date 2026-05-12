@@ -92,6 +92,12 @@ pub struct PostObjectPayload {
     pub blur_hash_cipher: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub variant: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -119,6 +125,17 @@ pub struct LikePostRequest {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LikePostResponse {
+    pub liked: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LikeCommentRequest {
+    pub like: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LikeCommentResponse {
     pub liked: bool,
 }
 
@@ -168,20 +185,93 @@ pub struct CreateCommentRequest {
 #[serde(rename_all = "camelCase")]
 pub struct CommentResponse {
     pub comment_id: i64,
+    #[serde(default)]
+    pub author_id: i64,
     pub author: String,
     pub comment_cipher: String,
     pub created_at: String,
+    #[serde(default)]
+    pub likes: i64,
+    #[serde(default)]
+    pub viewer_liked: bool,
     pub viewer_can_delete: bool,
     #[serde(default)]
     pub parent_comment_id: Option<i64>,
-    #[serde(default)]
-    pub replies: Vec<CommentResponse>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListCommentsResponse {
     pub comments: Vec<CommentResponse>,
+    #[serde(default)]
+    pub next_cursor: String,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum WallNotificationType {
+    LikedPost,
+    CommentedOnPost,
+    LikedComment,
+    RepliedToComment,
+    AddedYouAsFriend,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WallNotificationActor {
+    pub user_id: i64,
+    pub username: String,
+    pub wall_id: String,
+    pub wall_slug: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WallNotificationPost {
+    pub post_id: i64,
+    pub wall_id: String,
+    pub wall_slug: String,
+    pub owner_user_id: i64,
+    pub author: String,
+    #[serde(default)]
+    pub objects: Vec<PostObjectPayload>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WallNotificationComment {
+    pub comment_id: i64,
+    #[serde(default)]
+    pub author_id: i64,
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub comment_cipher: String,
+    #[serde(default)]
+    pub created_at: String,
+    #[serde(default)]
+    pub parent_comment_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WallNotification {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub notification_type: WallNotificationType,
+    pub created_at: String,
+    pub actor: WallNotificationActor,
+    #[serde(default)]
+    pub post: Option<WallNotificationPost>,
+    #[serde(default)]
+    pub comment: Option<WallNotificationComment>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WallNotificationPage {
+    pub items: Vec<WallNotification>,
     #[serde(default)]
     pub next_cursor: String,
 }
@@ -272,7 +362,25 @@ mod tests {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FollowRequestPayload {
+pub struct AddFriendPayload {
+    pub target_wall_id: String,
+    pub link_session_token: String,
+    pub requester_wall_id: String,
+    pub target_encrypted_wall_key: String,
+    pub target_key_version: i32,
+    pub requester_encrypted_wall_key: String,
+    pub requester_key_version: i32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FriendStatusResponse {
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FriendTargetPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_username: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -281,75 +389,34 @@ pub struct FollowRequestPayload {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FollowRequestCreatedResponse {
-    pub request_id: i64,
-    pub status: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FollowRequestResponse {
-    pub request_id: i64,
-    pub follower: String,
+pub struct WallFriendResponse {
+    pub friend_id: i64,
+    #[serde(default)]
     pub wall_id: String,
-    pub wall_slug: String,
-    pub follower_public_key: String,
-    pub status: String,
-    pub created_at: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OutgoingFollowRequestResponse {
-    pub request_id: i64,
-    pub followee: String,
-    pub wall_id: String,
-    pub wall_slug: String,
-    pub status: String,
-    pub created_at: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ApproveFollowPayload {
-    pub request_id: i64,
-    pub wall_id: String,
-    pub encrypted_wall_key: String,
-    pub key_version: i32,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RejectFollowPayload {
-    pub request_id: i64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CancelFollowRequestPayload {
-    pub request_id: i64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WallFollowerResponse {
-    pub follower_id: i64,
     pub username: String,
     pub public_key: String,
     pub key_version: i32,
+    #[serde(default)]
+    pub encrypted_profile: String,
+    #[serde(default)]
+    pub avatar: Option<ProfileAvatarResponse>,
+    #[serde(default)]
+    pub friends: i64,
+    #[serde(default)]
+    pub posts: i64,
     pub created_at: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ShareUpdatePayload {
-    pub follower_id: i64,
+    pub friend_id: i64,
     pub encrypted_wall_key: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RefreshFollowSharesRequest {
+pub struct RefreshFriendSharesRequest {
     pub wall_id: String,
     pub key_version: i32,
     pub shares: Vec<ShareUpdatePayload>,
@@ -357,8 +424,8 @@ pub struct RefreshFollowSharesRequest {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FollowShareResponse {
-    pub followee: String,
+pub struct FriendShareResponse {
+    pub friend: String,
     pub wall_id: String,
     pub wall_slug: String,
     pub encrypted_wall_key: String,
@@ -399,6 +466,8 @@ pub struct WallLinkLoginResponse {
     pub wall_id: String,
     pub wall_slug: String,
     pub owner: String,
+    #[serde(default)]
+    pub public_key: String,
     pub key_version: i32,
     pub encrypted_wall_key: String,
 }
@@ -420,28 +489,6 @@ pub struct WallLookupResponse {
     pub wall_id: String,
     pub wall_slug: String,
     pub owner: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CommunityUserResponse {
-    pub username: String,
-    pub wall_id: String,
-    pub wall_slug: String,
-    pub followers: i64,
     #[serde(default)]
-    pub following: i64,
-    pub posts: i64,
-    #[serde(default)]
-    pub relationship: String,
-    #[serde(default)]
-    pub bio: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CommunityResponse {
-    pub users: Vec<CommunityUserResponse>,
-    #[serde(default)]
-    pub next_cursor: String,
+    pub public_key: String,
 }

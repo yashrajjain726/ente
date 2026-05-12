@@ -143,7 +143,11 @@ func (c *WallsController) UpdateSlug(ctx *gin.Context, wallID string, req models
 	if err != nil {
 		return nil, err
 	}
-	return &models.WallLookupResponse{WallID: wall.WallID, WallSlug: wall.WallSlug, Owner: wall.WallSlug}, nil
+	publicKey, err := c.WallsRepo.GetOwnerPublicKey(ctx.Request.Context(), wall.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	return &models.WallLookupResponse{WallID: wall.WallID, WallSlug: wall.WallSlug, Owner: wall.WallSlug, PublicKey: publicKey}, nil
 }
 
 func (c *WallsController) LookupBySlug(ctx *gin.Context, wallSlug string) (*models.WallLookupResponse, error) {
@@ -151,10 +155,15 @@ func (c *WallsController) LookupBySlug(ctx *gin.Context, wallSlug string) (*mode
 	if err != nil {
 		return nil, err
 	}
+	publicKey, err := c.WallsRepo.GetOwnerPublicKey(ctx.Request.Context(), wall.OwnerID)
+	if err != nil {
+		return nil, err
+	}
 	return &models.WallLookupResponse{
-		WallID:   wall.WallID,
-		WallSlug: wall.WallSlug,
-		Owner:    wall.WallSlug,
+		WallID:    wall.WallID,
+		WallSlug:  wall.WallSlug,
+		Owner:     wall.WallSlug,
+		PublicKey: publicKey,
 	}, nil
 }
 

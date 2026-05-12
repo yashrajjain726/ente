@@ -6,7 +6,7 @@ use support::{auth, wall};
 
 #[tokio::test]
 #[ignore = "requires local Museum at ENTE_E2E_ENDPOINT or http://localhost:8080"]
-async fn wall_bootstrap_posts_follow_share_and_link_suite() {
+async fn wall_bootstrap_posts_friend_share_and_link_suite() {
     let endpoint = support::endpoint();
     if !support::assert_server_or_skip(&endpoint, "wall rust e2e suite").await {
         return;
@@ -18,10 +18,10 @@ async fn wall_bootstrap_posts_follow_share_and_link_suite() {
         support::unique_password("WallOwner"),
     )
     .await;
-    let follower = auth::create_account(
+    let friend = auth::create_account(
         &endpoint,
-        support::unique_test_email("wall-follower"),
-        support::unique_password("WallFollower"),
+        support::unique_test_email("wall-friend"),
+        support::unique_password("WallFriender"),
     )
     .await;
     let outsider = auth::create_account(
@@ -32,11 +32,11 @@ async fn wall_bootstrap_posts_follow_share_and_link_suite() {
     .await;
 
     let owner_ctx = wall::open_ctx(&endpoint, &owner);
-    let follower_ctx = wall::open_ctx(&endpoint, &follower);
+    let friend_ctx = wall::open_ctx(&endpoint, &friend);
     let outsider_ctx = wall::open_ctx(&endpoint, &outsider);
 
     let owner_slug = format!("owner-{}", owner.user_id);
-    let follower_slug = format!("follower-{}", follower.user_id);
+    let friend_slug = format!("friend-{}", friend.user_id);
     let outsider_slug = format!("outsider-{}", outsider.user_id);
 
     let owner_profile = wall::profile_payload("Owner", "Owner bio");
@@ -44,13 +44,11 @@ async fn wall_bootstrap_posts_follow_share_and_link_suite() {
         .create_wall(&owner_slug, &owner_profile)
         .await
         .expect("owner wall creation failed");
-    follower_ctx
-        .create_wall(
-            &follower_slug,
-            &wall::profile_payload("Follower", "Follower bio"),
-        )
+    let friend_profile_payload = wall::profile_payload("Friender", "Friender bio");
+    let friend_wall = friend_ctx
+        .create_wall(&friend_slug, &friend_profile_payload)
         .await
-        .expect("follower wall creation failed");
+        .expect("friend wall creation failed");
     outsider_ctx
         .create_wall(
             &outsider_slug,
@@ -121,97 +119,11 @@ async fn wall_bootstrap_posts_follow_share_and_link_suite() {
     );
 
     wall::assert_http_status(
-        follower_ctx
+        friend_ctx
             .get_wall_profile_raw(&owner_wall.wall_id, None)
             .await,
         403,
     );
-
-    follower_ctx
-        .request_follow_by_wall(&owner_wall.wall_id)
-        .await
-        .expect("follow request should succeed");
-    let incoming = owner_ctx
-        .list_incoming_follow_requests()
-        .await
-        .expect("incoming follow requests should load");
-    assert_eq!(incoming.len(), 1);
-    assert_eq!(incoming[0].wall_id, owner_wall.wall_id);
-    owner_ctx
-        .approve_follow_request(&incoming[0])
-        .await
-        .expect("follow approval should succeed");
-
-    let shares = follower_ctx
-        .list_follow_shares()
-        .await
-        .expect("follow shares should load");
-    assert_eq!(shares.len(), 1);
-    let decrypted_share = follower_ctx
-        .decrypt_follow_share(&shares[0])
-        .expect("follow share should decrypt");
-    assert_eq!(decrypted_share.wall_id, owner_wall.wall_id);
-
-    let hydrated = follower_ctx
-        .hydrate_wall_keys()
-        .await
-        .expect("wall keys should hydrate");
-    assert_eq!(hydrated.owned.len(), 1);
-    assert_eq!(hydrated.followed.len(), 1);
-    assert_eq!(hydrated.followed[0].wall_id, owner_wall.wall_id);
-
-    let follower_profile = follower_ctx
-        .get_wall_profile_decrypted(&owner_wall.wall_id, None)
-        .await
-        .expect("approved follower should decrypt profile");
-    assert_eq!(follower_profile.profile, updated_profile);
-    assert_eq!(follower_profile.wall_slug, updated_slug);
-
-    let feed = follower_ctx
-        .list_feed(None, Some(10))
-        .await
-        .expect("feed should load after follow approval");
-    assert_eq!(feed.items.len(), 1);
-    assert_eq!(feed.items[0].post_id, post_id);
-    let feed_post = follower_ctx
-        .decrypt_feed_item(&feed.items[0])
-        .await
-        .expect("feed item should decrypt");
-    assert_eq!(
-        feed_post.caption_plaintext.as_deref(),
-        Some(br#"{"caption":"hello world"}"#.as_slice())
-    );
-
-    let liked = follower_ctx
-        .like_post(post_id, true)
-        .await
-        .expect("liking post should succeed");
-    assert!(liked.liked);
-    let top_level = follower_ctx
-        .create_comment(post_id, &post_key, b"looks great", None)
-        .await
-        .expect("comment creation should succeed");
-    owner_ctx
-        .create_comment(post_id, &post_key, b"thanks", Some(top_level.comment_id))
-        .await
-        .expect("reply creation should succeed");
-
-    let comments = follower_ctx
-        .list_comments(post_id, None, None)
-        .await
-        .expect("comments should load");
-    assert_eq!(comments.comments.len(), 1);
-    assert_eq!(comments.comments[0].replies.len(), 1);
-    let parent = follower_ctx
-        .decrypt_comment(&post_key, &comments.comments[0])
-        .expect("parent comment should decrypt");
-    let reply = follower_ctx
-        .decrypt_comment(&post_key, &comments.comments[0].replies[0])
-        .expect("reply comment should decrypt");
-    assert_eq!(parent.plaintext, b"looks great");
-    assert_eq!(reply.plaintext, b"thanks");
-
-    wall::assert_http_status(outsider_ctx.fetch_post_decrypted(post_id).await, 403);
 
     let link = owner_ctx
         .create_wall_link(&owner_wall.wall_id)
@@ -227,6 +139,88 @@ async fn wall_bootstrap_posts_follow_share_and_link_suite() {
     })
     .await
     .expect("wall link should open");
+    friend_ctx
+        .add_friend_from_link(&link_ctx)
+        .await
+        .expect("friend add should succeed");
+
+    let shares = friend_ctx
+        .list_friend_shares()
+        .await
+        .expect("friend shares should load");
+    assert_eq!(shares.len(), 1);
+    let decrypted_share = friend_ctx
+        .decrypt_friend_share(&shares[0])
+        .expect("friend share should decrypt");
+    assert_eq!(decrypted_share.wall_id, owner_wall.wall_id);
+
+    let hydrated = friend_ctx
+        .hydrate_wall_keys()
+        .await
+        .expect("wall keys should hydrate");
+    assert_eq!(hydrated.owned.len(), 1);
+    assert_eq!(hydrated.friends.len(), 1);
+    assert_eq!(hydrated.friends[0].wall_id, owner_wall.wall_id);
+
+    let friend_profile = friend_ctx
+        .get_wall_profile_decrypted(&owner_wall.wall_id, None)
+        .await
+        .expect("approved friend should decrypt profile");
+    assert_eq!(friend_profile.profile, updated_profile);
+    assert_eq!(friend_profile.wall_slug, updated_slug);
+
+    let owner_view_of_friend = owner_ctx
+        .get_wall_profile_decrypted(&friend_wall.wall_id, None)
+        .await
+        .expect("approved owner should decrypt friend profile");
+    assert_eq!(owner_view_of_friend.profile, friend_profile_payload);
+    assert_eq!(owner_view_of_friend.wall_slug, friend_slug);
+
+    let feed = friend_ctx
+        .list_feed(None, Some(10))
+        .await
+        .expect("feed should load after friend approval");
+    assert_eq!(feed.items.len(), 1);
+    assert_eq!(feed.items[0].post_id, post_id);
+    let feed_post = friend_ctx
+        .decrypt_feed_item(&feed.items[0])
+        .await
+        .expect("feed item should decrypt");
+    assert_eq!(
+        feed_post.caption_plaintext.as_deref(),
+        Some(br#"{"caption":"hello world"}"#.as_slice())
+    );
+
+    let liked = friend_ctx
+        .like_post(post_id, true)
+        .await
+        .expect("liking post should succeed");
+    assert!(liked.liked);
+    let top_level = friend_ctx
+        .create_comment(post_id, &post_key, b"looks great", None)
+        .await
+        .expect("comment creation should succeed");
+    owner_ctx
+        .create_comment(post_id, &post_key, b"thanks", Some(top_level.comment_id))
+        .await
+        .expect("reply creation should succeed");
+
+    let comments = friend_ctx
+        .list_comments(post_id, None, None)
+        .await
+        .expect("comments should load");
+    assert_eq!(comments.comments.len(), 2);
+    let parent = friend_ctx
+        .decrypt_comment(&post_key, &comments.comments[1])
+        .expect("parent comment should decrypt");
+    let reply = friend_ctx
+        .decrypt_comment(&post_key, &comments.comments[0])
+        .expect("reply comment should decrypt");
+    assert_eq!(parent.plaintext, b"looks great");
+    assert_eq!(reply.plaintext, b"thanks");
+
+    wall::assert_http_status(outsider_ctx.fetch_post_decrypted(post_id).await, 403);
+
     let link_profile = link_ctx
         .get_wall_profile_decrypted(None)
         .await
@@ -250,13 +244,12 @@ async fn wall_bootstrap_posts_follow_share_and_link_suite() {
         .list_comments(post_id, None, None)
         .await
         .expect("link session should list comments");
-    assert_eq!(link_comments.comments.len(), 1);
-    assert_eq!(link_comments.comments[0].replies.len(), 1);
+    assert_eq!(link_comments.comments.len(), 2);
     let link_parent = link_ctx
-        .decrypt_comment(&link_post.post_key, &link_comments.comments[0])
+        .decrypt_comment(&link_post.post_key, &link_comments.comments[1])
         .expect("link session should decrypt parent comment");
     let link_reply = link_ctx
-        .decrypt_comment(&link_post.post_key, &link_comments.comments[0].replies[0])
+        .decrypt_comment(&link_post.post_key, &link_comments.comments[0])
         .expect("link session should decrypt reply comment");
     assert_eq!(link_parent.plaintext, b"looks great");
     assert_eq!(link_reply.plaintext, b"thanks");
@@ -282,30 +275,30 @@ async fn wall_rotation_history_refresh_and_link_suite() {
         support::unique_password("WallRotationOwner"),
     )
     .await;
-    let follower = auth::create_account(
+    let friend = auth::create_account(
         &endpoint,
-        support::unique_test_email("wall-rotation-follower"),
-        support::unique_password("WallRotationFollower"),
+        support::unique_test_email("wall-rotation-friend"),
+        support::unique_password("WallRotationFriender"),
     )
     .await;
 
     let owner_ctx = wall::open_ctx(&endpoint, &owner);
-    let follower_ctx = wall::open_ctx(&endpoint, &follower);
+    let friend_ctx = wall::open_ctx(&endpoint, &friend);
 
     let owner_slug = format!("rotation-owner-{}", owner.user_id);
-    let follower_slug = format!("rotation-follower-{}", follower.user_id);
+    let friend_slug = format!("rotation-friend-{}", friend.user_id);
     let profile_v1 = wall::profile_payload("Rotation Owner", "Profile v1");
     let owner_wall = owner_ctx
         .create_wall(&owner_slug, &profile_v1)
         .await
         .expect("owner wall creation failed");
-    follower_ctx
+    friend_ctx
         .create_wall(
-            &follower_slug,
-            &wall::profile_payload("Rotation Follower", "Follower bio"),
+            &friend_slug,
+            &wall::profile_payload("Rotation Friender", "Friender bio"),
         )
         .await
-        .expect("follower wall creation failed");
+        .expect("friend wall creation failed");
 
     let post_key_v1 = owner_ctx.generate_post_key();
     let object_v1 = owner_ctx
@@ -322,24 +315,30 @@ async fn wall_rotation_history_refresh_and_link_suite() {
         .await
         .expect("v1 post creation should succeed");
 
-    follower_ctx
-        .request_follow_by_wall(&owner_wall.wall_id)
+    let link = owner_ctx
+        .create_wall_link(&owner_wall.wall_id)
         .await
-        .expect("follow request should succeed");
-    let incoming = owner_ctx
-        .list_incoming_follow_requests()
+        .expect("rotation wall link should be created");
+    let link_ctx = WallLinkCtx::open(OpenWallLinkCtxInput {
+        base_url: endpoint.clone(),
+        wall_username: link.wall_username.clone(),
+        access_key: link.access_key.clone(),
+        user_agent: Some("ente-e2e".to_string()),
+        client_package: Some("io.ente.photos".to_string()),
+        client_version: Some("ente-e2e".to_string()),
+    })
+    .await
+    .expect("rotation wall link should open");
+    friend_ctx
+        .add_friend_from_link(&link_ctx)
         .await
-        .expect("incoming follow requests should load");
-    owner_ctx
-        .approve_follow_request(&incoming[0])
-        .await
-        .expect("follow approval should succeed");
+        .expect("friend add should succeed");
 
-    let follower_profile_v1 = follower_ctx
+    let friend_profile_v1 = friend_ctx
         .get_wall_profile_decrypted(&owner_wall.wall_id, Some(owner_wall.key_version))
         .await
-        .expect("follower should decrypt v1 profile");
-    assert_eq!(follower_profile_v1.profile, profile_v1);
+        .expect("friend should decrypt v1 profile");
+    assert_eq!(friend_profile_v1.profile, profile_v1);
 
     let profile_v2 = wall::profile_payload("Rotation Owner", "Profile v2");
     let rotated_wall = owner_ctx
@@ -349,14 +348,14 @@ async fn wall_rotation_history_refresh_and_link_suite() {
     assert_eq!(rotated_wall.key_version, owner_wall.key_version + 1);
 
     let refreshed = owner_ctx
-        .refresh_follow_shares(&owner_wall.wall_id)
+        .refresh_friend_shares(&owner_wall.wall_id)
         .await
-        .expect("follow shares should refresh");
+        .expect("friend shares should refresh");
     assert_eq!(refreshed, 1);
-    let refreshed_shares = follower_ctx
-        .list_follow_shares()
+    let refreshed_shares = friend_ctx
+        .list_friend_shares()
         .await
-        .expect("refreshed follow shares should load");
+        .expect("refreshed friend shares should load");
     assert_eq!(refreshed_shares.len(), 1);
     assert_eq!(refreshed_shares[0].key_version, rotated_wall.key_version);
 
@@ -385,13 +384,13 @@ async fn wall_rotation_history_refresh_and_link_suite() {
         .await
         .expect("owner should decrypt current profile");
     assert_eq!(owner_profile_v2.profile, profile_v2);
-    let follower_profile_v2 = follower_ctx
+    let friend_profile_v2 = friend_ctx
         .get_wall_profile_decrypted(&owner_wall.wall_id, None)
         .await
-        .expect("follower should decrypt current profile");
-    assert_eq!(follower_profile_v2.profile, profile_v2);
+        .expect("friend should decrypt current profile");
+    assert_eq!(friend_profile_v2.profile, profile_v2);
 
-    let feed = follower_ctx
+    let feed = friend_ctx
         .list_feed(None, Some(10))
         .await
         .expect("feed should load after rotation");
@@ -399,26 +398,26 @@ async fn wall_rotation_history_refresh_and_link_suite() {
         .items
         .iter()
         .find(|item| item.post_id == post_id_v1)
-        .expect("v1 post should remain in follower feed");
+        .expect("v1 post should remain in friend feed");
     let feed_v2 = feed
         .items
         .iter()
         .find(|item| item.post_id == post_id_v2)
-        .expect("v2 post should appear in follower feed");
-    let follower_post_v1 = follower_ctx
+        .expect("v2 post should appear in friend feed");
+    let friend_post_v1 = friend_ctx
         .decrypt_feed_item(feed_v1)
         .await
-        .expect("follower should decrypt v1 post after rotation");
+        .expect("friend should decrypt v1 post after rotation");
     assert_eq!(
-        follower_post_v1.caption_plaintext.as_deref(),
+        friend_post_v1.caption_plaintext.as_deref(),
         Some(br#"{"caption":"version one"}"#.as_slice())
     );
-    let follower_post_v2 = follower_ctx
+    let friend_post_v2 = friend_ctx
         .decrypt_feed_item(feed_v2)
         .await
-        .expect("follower should decrypt v2 post after rotation");
+        .expect("friend should decrypt v2 post after rotation");
     assert_eq!(
-        follower_post_v2.caption_plaintext.as_deref(),
+        friend_post_v2.caption_plaintext.as_deref(),
         Some(br#"{"caption":"version two"}"#.as_slice())
     );
 

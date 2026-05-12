@@ -121,11 +121,16 @@ func (c *LinksController) Login(ctx *gin.Context, req models.WallLinkLoginReques
 	if err := c.LinksRepo.CreateSession(ctx.Request.Context(), sessionHash[:], link.WallID, link.AuthKeyHash, link.KeyVersion, timeutil.MicrosecondsAfterMinutes(wallLinkSessionDurationMinutes)); err != nil {
 		return nil, err
 	}
+	publicKey, err := c.WallsRepo.GetOwnerPublicKey(ctx.Request.Context(), link.OwnerID)
+	if err != nil {
+		return nil, err
+	}
 	return &models.WallLinkLoginResponse{
 		SessionToken:     sessionToken,
 		WallID:           link.WallID,
 		WallSlug:         link.WallSlug,
 		Owner:            link.OwnerSlug,
+		PublicKey:        publicKey,
 		KeyVersion:       link.KeyVersion,
 		EncryptedWallKey: link.EncryptedWallKey,
 	}, nil

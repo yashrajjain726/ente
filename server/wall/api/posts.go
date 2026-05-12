@@ -80,6 +80,16 @@ func (h *Handlers) CreateComment(c *gin.Context) {
 	respondJSON(c, resp, err)
 }
 
+func (h *Handlers) ToggleCommentLike(c *gin.Context) {
+	var req models.LikeCommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondJSON(c, nil, ente.ErrBadRequest)
+		return
+	}
+	resp, err := h.Module.Posts.ToggleCommentLike(c, c.Param("postID"), c.Param("commentID"), req)
+	respondJSON(c, resp, err)
+}
+
 func (h *Handlers) DeleteComment(c *gin.Context) {
 	respondStatus(c, h.Module.Posts.DeleteComment(c, c.Param("postID"), c.Param("commentID")))
 }

@@ -8,22 +8,21 @@ use crate::crypto::{
 };
 use crate::error::{Result, WallError};
 use crate::models::{
-    CreatedWall, CreatedWallLink, DecryptedComment, DecryptedFollowShare, DecryptedPost,
+    CreatedWall, CreatedWallLink, DecryptedComment, DecryptedFriendShare, DecryptedPost,
     DecryptedWallProfile, FeedItem, FeedPage, HydratedKeys, OpenAccountWallCtxInput,
     OpenWallLinkCtxInput, PrivateKeySource,
 };
 use crate::transport::{
-    ApproveFollowPayload, AssetDownloadResponse, CancelFollowRequestPayload, CommentResponse,
-    CommunityResponse, CreateCommentRequest, CreateEntityKeyRequest, CreatePostRequest,
-    CreatePostResponse, CreateWallRequest, EntityKeyPayload, EntityKeyResponse,
-    FollowRequestCreatedResponse, FollowRequestPayload, FollowRequestResponse, FollowShareResponse,
-    LikePostRequest, LikePostResponse, ListCommentsResponse, OutgoingFollowRequestResponse,
-    PostObjectPayload, PostPage, PostResponse, PresignUploadRequest, PresignUploadResponse,
-    ProfileAvatarPayload, RefreshFollowSharesRequest, RejectFollowPayload, RotateWallKeyRequest,
-    ShareUpdatePayload, UpdatePostCaptionRequest, UpdateWallProfileRequest,
-    UpdateWallProfileResponse, UpdateWallSlugRequest, WallFollowerResponse, WallKeyResponse,
+    AddFriendPayload, AssetDownloadResponse, CommentResponse, CreateCommentRequest,
+    CreateEntityKeyRequest, CreatePostRequest, CreatePostResponse, CreateWallRequest,
+    EntityKeyPayload, EntityKeyResponse, FriendShareResponse, FriendStatusResponse,
+    FriendTargetPayload, LikeCommentRequest, LikeCommentResponse, LikePostRequest,
+    LikePostResponse, ListCommentsResponse, PostObjectPayload, PostPage, PostResponse,
+    PresignUploadRequest, PresignUploadResponse, ProfileAvatarPayload, RefreshFriendSharesRequest,
+    RotateWallKeyRequest, ShareUpdatePayload, UpdatePostCaptionRequest, UpdateWallProfileRequest,
+    UpdateWallProfileResponse, UpdateWallSlugRequest, WallFriendResponse, WallKeyResponse,
     WallKeyVersionResponse, WallLinkCreateRequest, WallLinkLoginRequest, WallLinkLoginResponse,
-    WallLinkStatusResponse, WallLookupResponse, WallProfileResponse,
+    WallLinkStatusResponse, WallLookupResponse, WallNotificationPage, WallProfileResponse,
 };
 use ente_core::crypto::{sealed, secretbox};
 use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
@@ -47,9 +46,11 @@ pub struct AccountWallCtx {
 
 pub struct WallLinkCtx {
     client: HttpClient,
+    session_token: String,
     owner_handle: String,
     wall_id: String,
     wall_slug: String,
+    owner_public_key: Vec<u8>,
     wall_key: Vec<u8>,
     key_version: i32,
 }
@@ -149,30 +150,43 @@ impl AccountWallCtx {
         self.client.get_json("/wall", &[]).await.map_err(Into::into)
     }
 
-    pub async fn list_follow_shares(&self) -> Result<Vec<FollowShareResponse>> {
+    pub async fn list_friend_shares(&self) -> Result<Vec<FriendShareResponse>> {
         self.client
-            .get_json("/wall/follow/shares", &[])
+            .get_json("/wall/friends/shares", &[])
             .await
             .map_err(Into::into)
     }
 
-    pub fn decrypt_follow_share(
+    pub fn decrypt_friend_share(
         &self,
-        share: &FollowShareResponse,
-    ) -> Result<DecryptedFollowShare> {
+        share: &FriendShareResponse,
+    ) -> Result<DecryptedFriendShare> {
         let packed = decode_b64(&share.encrypted_wall_key)?;
         let (ciphertext, _) = unpack_payload(&packed)?;
         if ciphertext.is_empty() {
             return Err(WallError::MissingEncryptedWallKey);
         }
         let wall_key = sealed::open(&ciphertext, &self.public_key, &self.private_key)?;
-        Ok(DecryptedFollowShare {
-            followee: share.followee.clone(),
+        Ok(DecryptedFriendShare {
+            friend: share.friend.clone(),
             wall_id: share.wall_id.clone(),
             wall_slug: share.wall_slug.clone(),
             wall_key,
             key_version: share.key_version,
         })
+    }
+
+    async fn default_owned_wall_access(&self) -> Result<(WallKeyResponse, Vec<u8>)> {
+        let root_wall_key = self.get_or_create_root_wall_key().await?;
+        let wall = self
+            .list_owned_walls()
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| WallError::InvalidInput("no owned wall is available".into()))?;
+        let packed = decode_b64(&wall.encrypted_wall_key)?;
+        let wall_key = decrypt_secretbox_packed(&root_wall_key, &packed)?;
+        Ok((wall, wall_key))
     }
 
     pub async fn resolve_owned_wall_key(&self, wall_id: &str) -> Result<Option<Vec<u8>>> {
@@ -241,25 +255,6 @@ impl AccountWallCtx {
     pub async fn lookup_wall_by_slug(&self, wall_slug: &str) -> Result<WallLookupResponse> {
         let path = format!("/wall/public/by-slug/{}", urlencoding::encode(wall_slug));
         self.client.get_json(&path, &[]).await.map_err(Into::into)
-    }
-
-    pub async fn search_community(
-        &self,
-        query: &str,
-        cursor: Option<String>,
-        limit: Option<i32>,
-    ) -> Result<CommunityResponse> {
-        let mut query_params = vec![("q", query.to_owned())];
-        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
-            query_params.push(("cursor", value));
-        }
-        if let Some(value) = limit {
-            query_params.push(("limit", value.to_string()));
-        }
-        self.client
-            .get_json("/wall/community", &query_params)
-            .await
-            .map_err(Into::into)
     }
 
     pub async fn update_wall_slug(
@@ -462,6 +457,9 @@ impl AccountWallCtx {
             position,
             blur_hash_cipher: None,
             variant: None,
+            width: None,
+            height: None,
+            media_type: None,
         })
     }
 
@@ -593,6 +591,24 @@ impl AccountWallCtx {
             .map_err(Into::into)
     }
 
+    pub async fn list_notifications(
+        &self,
+        cursor: Option<String>,
+        limit: Option<i32>,
+    ) -> Result<WallNotificationPage> {
+        let mut query = Vec::new();
+        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
+            query.push(("cursor", value));
+        }
+        if let Some(value) = limit {
+            query.push(("limit", value.to_string()));
+        }
+        self.client
+            .get_json("/wall/notifications", &query)
+            .await
+            .map_err(Into::into)
+    }
+
     pub async fn fetch_post_decrypted(&self, post_id: i64) -> Result<DecryptedPost> {
         let path = format!("/wall/posts/{post_id}");
         let post: PostResponse = self.client.get_json(&path, &[]).await?;
@@ -611,13 +627,13 @@ impl AccountWallCtx {
             }
         }
 
-        let followed_records = self.list_follow_shares().await?;
-        let mut followed = Vec::with_capacity(followed_records.len());
-        for record in &followed_records {
-            followed.push(self.decrypt_follow_share(record)?);
+        let friends_records = self.list_friend_shares().await?;
+        let mut friends = Vec::with_capacity(friends_records.len());
+        for record in &friends_records {
+            friends.push(self.decrypt_friend_share(record)?);
         }
 
-        Ok(HydratedKeys { owned, followed })
+        Ok(HydratedKeys { owned, friends })
     }
 
     pub fn decrypt_post_key(&self, wall_key: &[u8], post: &PostResponse) -> Result<Vec<u8>> {
@@ -709,6 +725,20 @@ impl AccountWallCtx {
             .map_err(Into::into)
     }
 
+    pub async fn like_comment(
+        &self,
+        post_id: i64,
+        comment_id: i64,
+        like: bool,
+    ) -> Result<LikeCommentResponse> {
+        let path = format!("/wall/posts/{post_id}/comments/{comment_id}/like");
+        let request = LikeCommentRequest { like };
+        self.client
+            .post_json(&path, &request)
+            .await
+            .map_err(Into::into)
+    }
+
     pub async fn list_comments(
         &self,
         post_id: i64,
@@ -766,170 +796,91 @@ impl AccountWallCtx {
             .map_err(Into::into)
     }
 
-    pub async fn request_follow_by_wall(
-        &self,
-        wall_id: &str,
-    ) -> Result<FollowRequestCreatedResponse> {
-        let request = FollowRequestPayload {
+    pub async fn add_friend_from_link(&self, link: &WallLinkCtx) -> Result<FriendStatusResponse> {
+        if link.owner_public_key().is_empty() {
+            return Err(WallError::InvalidInput(
+                "target public key is required".into(),
+            ));
+        }
+        let (requester_wall, requester_wall_key) = self.default_owned_wall_access().await?;
+        let target_share = sealed::seal(link.wall_key(), &self.public_key)?;
+        let requester_share = sealed::seal(&requester_wall_key, link.owner_public_key())?;
+        let payload = AddFriendPayload {
+            target_wall_id: link.wall_id().to_owned(),
+            link_session_token: link.session_token().to_owned(),
+            requester_wall_id: requester_wall.wall_id,
+            target_encrypted_wall_key: encode_b64(&pack_payload(&target_share, &[])),
+            target_key_version: link.key_version(),
+            requester_encrypted_wall_key: encode_b64(&pack_payload(&requester_share, &[])),
+            requester_key_version: requester_wall.key_version,
+        };
+        self.client
+            .post_json("/wall/friends/add", &payload)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn unfriend_by_wall(&self, wall_id: &str) -> Result<()> {
+        let request = FriendTargetPayload {
             target_username: None,
             target_wall_id: Some(wall_id.to_owned()),
         };
         self.client
-            .post_json("/wall/follow/request", &request)
+            .post_empty("/wall/friends/unfriend", &request)
             .await
             .map_err(Into::into)
     }
 
-    pub async fn request_follow_by_username(
-        &self,
-        username: &str,
-    ) -> Result<FollowRequestCreatedResponse> {
-        let request = FollowRequestPayload {
+    pub async fn unfriend_by_username(&self, username: &str) -> Result<()> {
+        let request = FriendTargetPayload {
             target_username: Some(username.to_owned()),
             target_wall_id: None,
         };
         self.client
-            .post_json("/wall/follow/request", &request)
+            .post_empty("/wall/friends/unfriend", &request)
             .await
             .map_err(Into::into)
     }
 
-    pub async fn list_incoming_follow_requests(&self) -> Result<Vec<FollowRequestResponse>> {
-        self.client
-            .get_json("/wall/follow/requests", &[])
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn list_follow_requests(&self) -> Result<Vec<FollowRequestResponse>> {
-        self.list_incoming_follow_requests().await
-    }
-
-    pub async fn list_outgoing_follow_requests(
-        &self,
-    ) -> Result<Vec<OutgoingFollowRequestResponse>> {
-        self.client
-            .get_json("/wall/follow/requests/outgoing", &[])
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn approve_follow_request(
-        &self,
-        request: &FollowRequestResponse,
-    ) -> Result<FollowRequestCreatedResponse> {
-        let access = self
-            .resolve_owned_wall_access(&request.wall_id)
-            .await?
-            .ok_or_else(|| {
-                WallError::InvalidInput(format!(
-                    "wall {} is not owned by the account",
-                    request.wall_id
-                ))
-            })?;
-        let follower_public_key = decode_b64(&request.follower_public_key)?;
-        let sealed_share = sealed::seal(&access.wall_key, &follower_public_key)?;
-        let payload = ApproveFollowPayload {
-            request_id: request.request_id,
-            wall_id: request.wall_id.clone(),
-            encrypted_wall_key: encode_b64(&pack_payload(&sealed_share, &[])),
-            key_version: access.key_version,
-        };
-        self.client
-            .post_json("/wall/follow/approve", &payload)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn reject_follow_request(&self, request_id: i64) -> Result<()> {
-        let payload = RejectFollowPayload { request_id };
-        self.client
-            .post_empty("/wall/follow/reject", &payload)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn cancel_follow_request(&self, request_id: i64) -> Result<()> {
-        let payload = CancelFollowRequestPayload { request_id };
-        self.client
-            .post_empty("/wall/follow/request/cancel", &payload)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn cancel_follow_request_by_wall(&self, wall_id: &str) -> Result<()> {
-        let request = self
-            .list_outgoing_follow_requests()
-            .await?
-            .into_iter()
-            .find(|request| request.wall_id == wall_id)
-            .ok_or_else(|| {
-                WallError::InvalidInput(format!("no pending follow request for wall {wall_id}"))
-            })?;
-        self.cancel_follow_request(request.request_id).await
-    }
-
-    pub async fn unfollow_by_wall(&self, wall_id: &str) -> Result<()> {
-        let request = FollowRequestPayload {
-            target_username: None,
-            target_wall_id: Some(wall_id.to_owned()),
-        };
-        self.client
-            .post_empty("/wall/follow/unfollow", &request)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn unfollow_by_username(&self, username: &str) -> Result<()> {
-        let request = FollowRequestPayload {
-            target_username: Some(username.to_owned()),
-            target_wall_id: None,
-        };
-        self.client
-            .post_empty("/wall/follow/unfollow", &request)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn list_wall_followers(&self, wall_id: &str) -> Result<Vec<WallFollowerResponse>> {
+    pub async fn list_wall_friends(&self, wall_id: &str) -> Result<Vec<WallFriendResponse>> {
         let query = vec![("wallId", wall_id.to_owned())];
         self.client
-            .get_json("/wall/follow/followers", &query)
+            .get_json("/wall/friends", &query)
             .await
             .map_err(Into::into)
     }
 
-    pub async fn refresh_follow_shares(&self, wall_id: &str) -> Result<usize> {
+    pub async fn refresh_friend_shares(&self, wall_id: &str) -> Result<usize> {
         let access = self
             .resolve_owned_wall_access(wall_id)
             .await?
             .ok_or_else(|| {
                 WallError::InvalidInput(format!("wall {wall_id} is not owned by the account"))
             })?;
-        let followers = self.list_wall_followers(wall_id).await?;
+        let friends = self.list_wall_friends(wall_id).await?;
         let mut updates = Vec::new();
-        for follower in followers {
-            if follower.key_version == access.key_version {
+        for friend in friends {
+            if friend.key_version == access.key_version {
                 continue;
             }
-            let public_key = decode_b64(&follower.public_key)?;
+            let public_key = decode_b64(&friend.public_key)?;
             let sealed_share = sealed::seal(&access.wall_key, &public_key)?;
             updates.push(ShareUpdatePayload {
-                follower_id: follower.follower_id,
+                friend_id: friend.friend_id,
                 encrypted_wall_key: encode_b64(&pack_payload(&sealed_share, &[])),
             });
         }
         if updates.is_empty() {
             return Ok(0);
         }
-        let payload = RefreshFollowSharesRequest {
+        let payload = RefreshFriendSharesRequest {
             wall_id: wall_id.to_owned(),
             key_version: access.key_version,
             shares: updates,
         };
         let updated = payload.shares.len();
         self.client
-            .post_empty("/wall/follow/shares/refresh", &payload)
+            .post_empty("/wall/friends/shares/refresh", &payload)
             .await?;
         Ok(updated)
     }
@@ -992,11 +943,11 @@ impl AccountWallCtx {
         &self,
         wall_id: &str,
     ) -> Result<Option<ResolvedWallAccess>> {
-        let shares = self.list_follow_shares().await?;
+        let shares = self.list_friend_shares().await?;
         let Some(record) = shares.into_iter().find(|value| value.wall_id == wall_id) else {
             return Ok(None);
         };
-        let share = self.decrypt_follow_share(&record)?;
+        let share = self.decrypt_friend_share(&record)?;
         Ok(Some(ResolvedWallAccess {
             wall_key: share.wall_key,
             key_version: share.key_version,
@@ -1076,9 +1027,15 @@ impl WallLinkCtx {
             decrypt_secretbox_packed(&wrap_key, &decode_b64(&response.encrypted_wall_key)?)?;
         Ok(Self {
             client,
+            session_token: response.session_token,
             owner_handle: response.owner,
             wall_id: response.wall_id,
             wall_slug: response.wall_slug,
+            owner_public_key: if response.public_key.trim().is_empty() {
+                Vec::new()
+            } else {
+                decode_b64(&response.public_key)?
+            },
             wall_key,
             key_version: response.key_version,
         })
@@ -1086,6 +1043,10 @@ impl WallLinkCtx {
 
     pub fn client(&self) -> &HttpClient {
         &self.client
+    }
+
+    pub fn session_token(&self) -> &str {
+        &self.session_token
     }
 
     pub fn owner(&self) -> &str {
@@ -1098,6 +1059,10 @@ impl WallLinkCtx {
 
     pub fn wall_slug(&self) -> &str {
         &self.wall_slug
+    }
+
+    pub fn owner_public_key(&self) -> &[u8] {
+        &self.owner_public_key
     }
 
     pub fn key_version(&self) -> i32 {
@@ -1613,9 +1578,11 @@ mod tests {
                 None,
             )
             .expect("http client"),
+            session_token: "link-token".to_owned(),
             owner_handle: "owner".to_owned(),
             wall_id: "wall_owner_gallery".to_owned(),
             wall_slug: "owner-gallery".to_owned(),
+            owner_public_key: Vec::new(),
             wall_key: current_wall_key,
             key_version: 2,
         };
@@ -1753,12 +1720,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn approve_follow_request_includes_wall_key_version() {
+    async fn add_friend_from_link_sends_reciprocal_wall_shares() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
         let root_wall_key = generate_key();
-        let wall_key = generate_key();
-        let (follower_public_key, _) = keys::generate_keypair().expect("valid follower keypair");
+        let requester_wall_key = generate_key();
+        let target_wall_key = generate_key();
+        let (target_public_key, _) = keys::generate_keypair().expect("valid target keypair");
         let entity_payload =
             encrypt_entity_key(&ctx.master_key, &root_wall_key).expect("root wall entity");
 
@@ -1786,120 +1754,59 @@ mod tests {
             .with_status(200)
             .with_body(
                 json!([{
-                    "wallId": "wall_owner_main",
-                    "wallSlug": "owner-main",
-                    "encryptedWallKey": encode_b64(&encrypt_secretbox_packed(&root_wall_key, &wall_key).expect("wall key wrap")),
+                    "wallId": "wall_viewer_main",
+                    "wallSlug": "viewer-main",
+                    "encryptedWallKey": encode_b64(&encrypt_secretbox_packed(&root_wall_key, &requester_wall_key).expect("wall key wrap")),
                     "encryptedProfile": "",
-                    "keyVersion": 3
+                    "keyVersion": 4
                 }])
                 .to_string(),
             )
             .create_async()
             .await;
-        let approve = server
-            .mock("POST", "/wall/follow/approve")
+        let add = server
+            .mock("POST", "/wall/friends/add")
             .match_header("x-auth-token", "token")
-            .match_body(Matcher::Regex("\"keyVersion\":3".into()))
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"targetWallId\":\"wall_owner_main\"".into()),
+                Matcher::Regex("\"linkSessionToken\":\"link-session-token\"".into()),
+                Matcher::Regex("\"requesterWallId\":\"wall_viewer_main\"".into()),
+                Matcher::Regex("\"targetKeyVersion\":5".into()),
+                Matcher::Regex("\"requesterKeyVersion\":4".into()),
+                Matcher::Regex("\"targetEncryptedWallKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"requesterEncryptedWallKey\":\"[^\"]+\"".into()),
+            ]))
             .with_status(200)
-            .with_body(json!({"requestId": 11, "status": "approved"}).to_string())
+            .with_body(json!({"status": "friend"}).to_string())
             .create_async()
             .await;
-        let request = FollowRequestResponse {
-            request_id: 11,
-            follower: "viewer".to_owned(),
+        let link = WallLinkCtx {
+            client: build_http_client(
+                &server.url(),
+                Some("link-session-token".to_owned()),
+                None,
+                None,
+                None,
+            )
+            .expect("http client"),
+            session_token: "link-session-token".to_owned(),
+            owner_handle: "owner".to_owned(),
             wall_id: "wall_owner_main".to_owned(),
             wall_slug: "owner-main".to_owned(),
-            follower_public_key: encode_b64(&follower_public_key),
-            status: "pending".to_owned(),
-            created_at: "2026-04-16T00:00:00Z".to_owned(),
+            owner_public_key: target_public_key,
+            wall_key: target_wall_key,
+            key_version: 5,
         };
 
         let response = ctx
-            .approve_follow_request(&request)
+            .add_friend_from_link(&link)
             .await
-            .expect("approval should send key version");
+            .expect("direct friendship should send reciprocal shares");
 
-        assert_eq!(response.request_id, 11);
+        assert_eq!(response.status, "friend");
         entity.assert_async().await;
         walls.assert_async().await;
-        approve.assert_async().await;
-    }
-
-    #[tokio::test]
-    async fn follow_request_helpers_use_explicit_incoming_and_outgoing_routes() {
-        let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
-
-        let incoming = server
-            .mock("GET", "/wall/follow/requests")
-            .match_header("x-auth-token", "token")
-            .with_status(200)
-            .with_body(
-                json!([{
-                    "requestId": 41,
-                    "follower": "viewer",
-                    "wallId": "wall_owner_main",
-                    "wallSlug": "owner-main",
-                    "followerPublicKey": "cHVi",
-                    "status": "pending",
-                    "createdAt": "2026-04-16T00:00:00Z"
-                }])
-                .to_string(),
-            )
-            .create_async()
-            .await;
-        let outgoing = server
-            .mock("GET", "/wall/follow/requests/outgoing")
-            .match_header("x-auth-token", "token")
-            .with_status(200)
-            .with_body(
-                json!([{
-                    "requestId": 42,
-                    "followee": "owner",
-                    "wallId": "wall_owner_main",
-                    "wallSlug": "owner-main",
-                    "status": "pending",
-                    "createdAt": "2026-04-16T00:00:00Z"
-                }])
-                .to_string(),
-            )
-            .expect(2)
-            .create_async()
-            .await;
-        let cancel = server
-            .mock("POST", "/wall/follow/request/cancel")
-            .match_header("x-auth-token", "token")
-            .match_body(Matcher::JsonString(json!({"requestId": 42}).to_string()))
-            .with_status(200)
-            .expect(2)
-            .create_async()
-            .await;
-
-        let incoming_requests = ctx
-            .list_incoming_follow_requests()
-            .await
-            .expect("incoming follow requests should load");
-        assert_eq!(incoming_requests.len(), 1);
-        assert_eq!(incoming_requests[0].request_id, 41);
-
-        let outgoing_requests = ctx
-            .list_outgoing_follow_requests()
-            .await
-            .expect("outgoing follow requests should load");
-        assert_eq!(outgoing_requests.len(), 1);
-        assert_eq!(outgoing_requests[0].followee, "owner");
-
-        ctx.cancel_follow_request(42)
-            .await
-            .expect("direct cancel should succeed");
-
-        ctx.cancel_follow_request_by_wall("wall_owner_main")
-            .await
-            .expect("cancel by wall should resolve outgoing request");
-
-        incoming.assert_async().await;
-        outgoing.assert_async().await;
-        cancel.assert_async().await;
+        add.assert_async().await;
     }
 
     #[tokio::test]
@@ -1919,15 +1826,8 @@ mod tests {
             .with_status(200)
             .create_async()
             .await;
-        let reject = server
-            .mock("POST", "/wall/follow/reject")
-            .match_header("x-auth-token", "token")
-            .match_body(Matcher::JsonString(json!({"requestId": 11}).to_string()))
-            .with_status(200)
-            .create_async()
-            .await;
-        let unfollow_wall = server
-            .mock("POST", "/wall/follow/unfollow")
+        let unfriend_wall = server
+            .mock("POST", "/wall/friends/unfriend")
             .match_header("x-auth-token", "token")
             .match_body(Matcher::JsonString(
                 json!({"targetWallId": "wall_owner_main"}).to_string(),
@@ -1935,8 +1835,8 @@ mod tests {
             .with_status(200)
             .create_async()
             .await;
-        let unfollow_username = server
-            .mock("POST", "/wall/follow/unfollow")
+        let unfriend_username = server
+            .mock("POST", "/wall/friends/unfriend")
             .match_header("x-auth-token", "token")
             .match_body(Matcher::JsonString(
                 json!({"targetUsername": "owner"}).to_string(),
@@ -1951,30 +1851,48 @@ mod tests {
         ctx.delete_comment(42, 7)
             .await
             .expect("delete comment should accept empty response");
-        ctx.reject_follow_request(11)
+        ctx.unfriend_by_wall("wall_owner_main")
             .await
-            .expect("reject should accept empty response");
-        ctx.unfollow_by_wall("wall_owner_main")
+            .expect("unfriend by wall should accept empty response");
+        ctx.unfriend_by_username("owner")
             .await
-            .expect("unfollow by wall should accept empty response");
-        ctx.unfollow_by_username("owner")
-            .await
-            .expect("unfollow by username should accept empty response");
+            .expect("unfriend by username should accept empty response");
 
         delete_post.assert_async().await;
         delete_comment.assert_async().await;
-        reject.assert_async().await;
-        unfollow_wall.assert_async().await;
-        unfollow_username.assert_async().await;
+        unfriend_wall.assert_async().await;
+        unfriend_username.assert_async().await;
     }
 
     #[tokio::test]
-    async fn refresh_follow_shares_accepts_empty_server_response() {
+    async fn like_comment_uses_comment_like_endpoint() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let like = server
+            .mock("POST", "/wall/posts/42/comments/7/like")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::JsonString(json!({"like": true}).to_string()))
+            .with_status(200)
+            .with_body(json!({"liked": true}).to_string())
+            .create_async()
+            .await;
+
+        let response = ctx
+            .like_comment(42, 7, true)
+            .await
+            .expect("comment like should succeed");
+
+        assert!(response.liked);
+        like.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn refresh_friend_shares_accepts_empty_server_response() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
         let root_wall_key = generate_key();
         let wall_key = generate_key();
-        let (follower_public_key, _) = keys::generate_keypair().expect("valid follower keypair");
+        let (friend_public_key, _) = keys::generate_keypair().expect("valid friend keypair");
         let entity_payload =
             encrypt_entity_key(&ctx.master_key, &root_wall_key).expect("root wall entity");
 
@@ -2012,8 +1930,8 @@ mod tests {
             )
             .create_async()
             .await;
-        let followers = server
-            .mock("GET", "/wall/follow/followers")
+        let friends = server
+            .mock("GET", "/wall/friends")
             .match_header("x-auth-token", "token")
             .match_query(Matcher::UrlEncoded(
                 "wallId".into(),
@@ -2022,9 +1940,9 @@ mod tests {
             .with_status(200)
             .with_body(
                 json!([{
-                    "followerId": 7,
+                    "friendId": 7,
                     "username": "viewer",
-                    "publicKey": encode_b64(&follower_public_key),
+                    "publicKey": encode_b64(&friend_public_key),
                     "keyVersion": 2,
                     "createdAt": "2026-04-16T00:00:00Z"
                 }])
@@ -2033,10 +1951,10 @@ mod tests {
             .create_async()
             .await;
         let refresh = server
-            .mock("POST", "/wall/follow/shares/refresh")
+            .mock("POST", "/wall/friends/shares/refresh")
             .match_header("x-auth-token", "token")
             .match_body(Matcher::AllOf(vec![
-                Matcher::Regex("\"followerId\":7".into()),
+                Matcher::Regex("\"friendId\":7".into()),
                 Matcher::Regex("\"keyVersion\":3".into()),
             ]))
             .with_status(200)
@@ -2044,14 +1962,14 @@ mod tests {
             .await;
 
         let updated = ctx
-            .refresh_follow_shares("wall_owner_main")
+            .refresh_friend_shares("wall_owner_main")
             .await
             .expect("refresh should accept empty response");
 
         assert_eq!(updated, 1);
         entity.assert_async().await;
         walls.assert_async().await;
-        followers.assert_async().await;
+        friends.assert_async().await;
         refresh.assert_async().await;
     }
 
@@ -2099,6 +2017,60 @@ mod tests {
         assert_eq!(page.items[0].post_id, 42);
         assert_eq!(page.next_cursor, "cursor-2");
         feed.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn list_notifications_uses_wall_notifications_endpoint() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let notifications = server
+            .mock("GET", "/wall/notifications")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::AllOf(vec![
+                Matcher::UrlEncoded("cursor".into(), "cursor-1".into()),
+                Matcher::UrlEncoded("limit".into(), "5".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "items": [{
+                        "id": "post_like:42:9",
+                        "type": "likedPost",
+                        "createdAt": "2026-04-16T00:00:00Z",
+                        "actor": {
+                            "userId": 9,
+                            "username": "mira",
+                            "wallId": "wall_mira",
+                            "wallSlug": "mira"
+                        },
+                        "post": {
+                            "postId": 42,
+                            "wallId": "wall_owner_gallery",
+                            "wallSlug": "owner-gallery",
+                            "ownerUserId": 7,
+                            "author": "owner-gallery"
+                        }
+                    }],
+                    "nextCursor": "cursor-2"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let page = ctx
+            .list_notifications(Some("cursor-1".to_owned()), Some(5))
+            .await
+            .expect("notifications should load");
+
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(
+            page.items[0].notification_type,
+            crate::transport::WallNotificationType::LikedPost
+        );
+        assert_eq!(page.items[0].actor.username, "mira");
+        assert_eq!(page.next_cursor, "cursor-2");
+        notifications.assert_async().await;
     }
 
     #[tokio::test]
@@ -2234,7 +2206,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hydrate_wall_keys_loads_owned_and_followed_walls() {
+    async fn hydrate_wall_keys_loads_owned_and_friends_walls() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
         let root_wall_key = generate_key();
@@ -2280,12 +2252,12 @@ mod tests {
             .create_async()
             .await;
         let shares = server
-            .mock("GET", "/wall/follow/shares")
+            .mock("GET", "/wall/friends/shares")
             .match_header("x-auth-token", "token")
             .with_status(200)
             .with_body(
                 json!([{
-                    "followee": "owner",
+                    "friend": "owner",
                     "wallId": "wall_shared_gallery",
                     "wallSlug": "shared-gallery",
                     "encryptedWallKey": encode_b64(&pack_payload(&sealed_share, &[])),
@@ -2305,9 +2277,9 @@ mod tests {
         assert_eq!(hydrated.owned.len(), 1);
         assert_eq!(hydrated.owned[0].0, "wall_owner_gallery");
         assert_eq!(hydrated.owned[0].1, owned_wall_key);
-        assert_eq!(hydrated.followed.len(), 1);
-        assert_eq!(hydrated.followed[0].wall_id, "wall_shared_gallery");
-        assert_eq!(hydrated.followed[0].wall_key, shared_wall_key);
+        assert_eq!(hydrated.friends.len(), 1);
+        assert_eq!(hydrated.friends[0].wall_id, "wall_shared_gallery");
+        assert_eq!(hydrated.friends[0].wall_key, shared_wall_key);
         entity.assert_async().await;
         owned.assert_async().await;
         shares.assert_async().await;

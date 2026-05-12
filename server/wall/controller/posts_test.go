@@ -90,7 +90,7 @@ func TestCreateCommentRejectsParentFromAnotherPost(t *testing.T) {
 	require.Equal(t, 0, countWallComments(t, repos.Posts.DB, secondPostID))
 }
 
-func TestCreateCommentRejectsReplyAsParent(t *testing.T) {
+func TestCreateCommentAcceptsReplyAsParent(t *testing.T) {
 	posts, repos, ctx := setupPostsControllerTest(t)
 	aliceID := insertWallControllerUser(t, repos, "alice@example.com", "alice-public")
 	wall, err := repos.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
@@ -107,9 +107,10 @@ func TestCreateCommentRejectsReplyAsParent(t *testing.T) {
 		ParentCommentID: &reply.CommentID,
 	})
 
-	require.Nil(t, resp)
-	require.Error(t, err)
-	require.Equal(t, 2, countWallComments(t, repos.Posts.DB, postID))
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, reply.CommentID, *resp.ParentCommentID)
+	require.Equal(t, 3, countWallComments(t, repos.Posts.DB, postID))
 }
 
 func TestCreateCommentAcceptsTopLevelParentOnSamePost(t *testing.T) {
