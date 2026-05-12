@@ -10,6 +10,8 @@ import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import { HomeScreen, homeBackground } from "screens/HomeScreen";
 import { LoginScreen, loginBackground } from "screens/LoginScreen";
 import {
+    addFriendOnboardingDescription,
+    addFriendOnboardingTitle,
     OnboardingScreen,
     onboardingDescription,
     onboardingGreen,
@@ -214,8 +216,18 @@ const Page: React.FC = () => {
                 <>
                     {screen == "onboarding" && (
                         <OnboardingScreen
+                            description={
+                                isAddFriendLinkOnboarding
+                                    ? addFriendOnboardingDescription
+                                    : undefined
+                            }
                             onCreateAccount={() => setScreen("create-account")}
                             onLogin={() => setScreen("login")}
+                            title={
+                                isAddFriendLinkOnboarding
+                                    ? addFriendOnboardingTitle
+                                    : undefined
+                            }
                         />
                     )}
                     {screen == "create-account" && (

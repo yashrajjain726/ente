@@ -3,8 +3,12 @@ import { EnteLogo } from "ente-base/components/EnteLogo";
 import React from "react";
 
 export const onboardingGreen = "#08C225";
+export const onboardingTitle = "Share your life";
 export const onboardingDescription =
     "A truly private, beautiful way to share your life with the people you care about";
+export const addFriendOnboardingTitle = "Follow their life";
+export const addFriendOnboardingDescription =
+    "A truly private, beautiful way to see everyday moments from the people you care about";
 
 const softGreen = "#E7F6E9";
 const copyGreen = "#AAFFB8";
@@ -55,13 +59,17 @@ const ActionButton: React.FC<ActionButtonProps> = ({
 );
 
 interface OnboardingScreenProps {
+    description?: string;
     onCreateAccount: () => void;
     onLogin?: () => void;
+    title?: string;
 }
 
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
+    description = onboardingDescription,
     onCreateAccount,
     onLogin,
+    title = onboardingTitle,
 }) => (
     <Box
         className="green-bg"
@@ -177,7 +185,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                             whiteSpace: "nowrap",
                         }}
                     >
-                        Share your life
+                        {title}
                     </Box>
                     <Box
                         component="p"
@@ -192,7 +200,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                             maxWidth: 314,
                         }}
                     >
-                        {onboardingDescription}
+                        {description}
                     </Box>
                 </Box>
             </Box>
