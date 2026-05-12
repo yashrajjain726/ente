@@ -81,6 +81,12 @@ interface SocialComment {
     text: string;
 }
 
+interface SocialLiker {
+    id: string;
+    avatarUrl?: string | null;
+    name: string;
+}
+
 interface CommentContextMenuState {
     anchorEl: HTMLElement;
     comment: SocialComment;
@@ -312,6 +318,25 @@ const mockComments: SocialComment[] = [
     },
 ];
 
+const mockPhotoLikers: SocialLiker[] = [
+    { id: "mira", avatarUrl: "/images/sample-feed-3.jpg", name: "Mira Sen" },
+    {
+        id: "kabir",
+        avatarUrl: "/images/sample-feed-1.jpg",
+        name: "Kabir Mehta",
+    },
+    {
+        id: "devika",
+        avatarUrl: "/images/sample-feed-2.jpg",
+        name: "Devika Iyer",
+    },
+    {
+        id: "nikhil",
+        avatarUrl: "/images/sample-feed-5.jpg",
+        name: "Nikhil Rao",
+    },
+];
+
 const commentAuthorKey = (comment: SocialComment) =>
     comment.isOwner ? "current-user" : comment.author;
 
@@ -453,6 +478,25 @@ const DeleteIcon: React.FC = () => (
             d="M11.5 2.83203L11.0869 9.51543C10.9813 11.223 10.9285 12.0768 10.5005 12.6906C10.2889 12.9941 10.0165 13.2502 9.70047 13.4427C9.0614 13.832 8.206 13.832 6.49513 13.832C4.78208 13.832 3.92553 13.832 3.28603 13.442C2.96987 13.2492 2.69733 12.9926 2.48579 12.6886C2.05792 12.0738 2.0063 11.2188 1.90307 9.50883L1.5 2.83203M0.5 2.83333H12.5M9.2038 2.83333L8.74873 1.89449C8.4464 1.27084 8.2952 0.959013 8.03447 0.76454C7.97667 0.7214 7.9154 0.683027 7.85133 0.6498C7.5626 0.5 7.21607 0.5 6.523 0.5C5.81253 0.5 5.45733 0.5 5.16379 0.65608C5.09873 0.690673 5.03665 0.7306 4.97819 0.775447C4.71443 0.9778 4.56709 1.30103 4.27241 1.94751L3.86861 2.83333M4.83203 10.166V6.16602M8.16797 10.166V6.16602"
             stroke="currentColor"
             strokeLinecap="round"
+        />
+    </svg>
+);
+
+const HeartFilledIcon: React.FC = () => (
+    <svg
+        width="18"
+        height="16"
+        viewBox="0 0 30 26"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            d="M12.4926 23.4794C8.64537 20.6025 1.02344 14.0254 1.02344 8.10676C1.02344 4.19475 3.89425 1.02344 7.84162 1.02344C9.88707 1.02344 11.9325 1.70526 14.6598 4.43253C17.3871 1.70526 19.4325 1.02344 21.478 1.02344C25.4253 1.02344 28.2962 4.19475 28.2962 8.10676C28.2962 14.0254 20.6743 20.6025 16.827 23.4794C15.5324 24.4474 13.7872 24.4474 12.4926 23.4794Z"
+            fill="#08C225"
+            stroke="#08C225"
+            strokeWidth="2.04545"
+            strokeLinecap="round"
+            strokeLinejoin="round"
         />
     </svg>
 );
@@ -699,7 +743,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 14,
                         fontWeight: 600,
-                        lineHeight: "22px",
+                        lineHeight: "21px",
                         overflowWrap: "anywhere",
                         whiteSpace: "pre-wrap",
                     }}
@@ -743,7 +787,9 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     onOpenProfile,
     photo,
 }) => {
-    const [screen, setScreen] = React.useState<"photo" | "comments">("photo");
+    const [screen, setScreen] = React.useState<"photo" | "comments" | "likes">(
+        "photo",
+    );
     const [isPhotoLiked, setIsPhotoLiked] = React.useState(false);
     const [isCommentButtonPopping, setIsCommentButtonPopping] =
         React.useState(false);
@@ -765,7 +811,26 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     const commentsContainerRef = React.useRef<HTMLDivElement | null>(null);
     const commentInputRef = React.useRef<HTMLTextAreaElement | null>(null);
     const commentOpenTimeoutRef = React.useRef<number | null>(null);
+    const likeHoldTimeoutRef = React.useRef<number | null>(null);
+    const likeHoldStartPointRef = React.useRef<{ x: number; y: number } | null>(
+        null,
+    );
+    const ignoreNextLikeClickRef = React.useRef(false);
+    const suppressNextLikeContextMenuRef = React.useRef(false);
+    const suppressLikeContextMenuTimeoutRef = React.useRef<number | null>(null);
     const currentUserName = currentUser?.name.trim() || "You";
+    const photoLikers = React.useMemo(() => {
+        if (!isPhotoLiked) return mockPhotoLikers;
+
+        return [
+            {
+                id: "current-user",
+                avatarUrl: currentUser?.avatarUrl,
+                name: "You",
+            },
+            ...mockPhotoLikers,
+        ];
+    }, [currentUser?.avatarUrl, isPhotoLiked]);
     const sortedVisibleComments = React.useMemo(
         () =>
             comments
@@ -777,6 +842,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         [comments],
     );
     const commentCount = sortedVisibleComments.length;
+    const likeCount = photoLikers.length;
     const commentButtonLabel =
         commentCount > 0
             ? `Comment on photo, ${commentCount} ${
@@ -797,6 +863,88 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     const actionsButtonID = "social-viewer-actions-button";
     const isActionsOpen = Boolean(actionsAnchor);
     const isDeleteActionRunning = deleteActionPhase != null;
+
+    const clearLikeHoldTimeout = () => {
+        if (likeHoldTimeoutRef.current != null) {
+            window.clearTimeout(likeHoldTimeoutRef.current);
+            likeHoldTimeoutRef.current = null;
+        }
+        likeHoldStartPointRef.current = null;
+    };
+
+    const suppressNativeLikeContextMenu = () => {
+        suppressNextLikeContextMenuRef.current = true;
+        if (suppressLikeContextMenuTimeoutRef.current != null)
+            window.clearTimeout(suppressLikeContextMenuTimeoutRef.current);
+
+        suppressLikeContextMenuTimeoutRef.current = window.setTimeout(() => {
+            suppressNextLikeContextMenuRef.current = false;
+            suppressLikeContextMenuTimeoutRef.current = null;
+        }, 700);
+    };
+
+    const openLikes = () => {
+        clearLikeHoldTimeout();
+        setCommentContextMenu(null);
+        setScreen("likes");
+    };
+
+    const closeLikes = React.useCallback(() => {
+        if (likeHoldTimeoutRef.current != null) {
+            window.clearTimeout(likeHoldTimeoutRef.current);
+            likeHoldTimeoutRef.current = null;
+        }
+        likeHoldStartPointRef.current = null;
+        setScreen("photo");
+    }, []);
+
+    const handlePhotoLikeClick = () => {
+        if (ignoreNextLikeClickRef.current) {
+            ignoreNextLikeClickRef.current = false;
+            return;
+        }
+
+        setIsPhotoLiked((isLiked) => !isLiked);
+    };
+
+    const handlePhotoLikeContextMenu = (
+        event: React.MouseEvent<HTMLElement>,
+    ) => {
+        event.preventDefault();
+        event.stopPropagation();
+        ignoreNextLikeClickRef.current = false;
+        openLikes();
+    };
+
+    const startPhotoLikeHold = (event: React.PointerEvent<HTMLElement>) => {
+        if (event.pointerType == "mouse" && event.button != 0) return;
+
+        clearLikeHoldTimeout();
+        likeHoldStartPointRef.current = { x: event.clientX, y: event.clientY };
+        likeHoldTimeoutRef.current = window.setTimeout(() => {
+            likeHoldTimeoutRef.current = null;
+            likeHoldStartPointRef.current = null;
+            ignoreNextLikeClickRef.current = true;
+            suppressNativeLikeContextMenu();
+            openLikes();
+            window.setTimeout(() => {
+                ignoreNextLikeClickRef.current = false;
+            }, 400);
+        }, 500);
+    };
+
+    const cancelPhotoLikeHoldOnMove = (
+        event: React.PointerEvent<HTMLElement>,
+    ) => {
+        const startPoint = likeHoldStartPointRef.current;
+        if (!startPoint) return;
+
+        const distance = Math.hypot(
+            event.clientX - startPoint.x,
+            event.clientY - startPoint.y,
+        );
+        if (distance > 8) clearLikeHoldTimeout();
+    };
 
     const closeActions = () => setActionsAnchor(null);
 
@@ -926,9 +1074,37 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         () => () => {
             if (commentOpenTimeoutRef.current != null)
                 window.clearTimeout(commentOpenTimeoutRef.current);
+            if (likeHoldTimeoutRef.current != null)
+                window.clearTimeout(likeHoldTimeoutRef.current);
+            if (suppressLikeContextMenuTimeoutRef.current != null)
+                window.clearTimeout(suppressLikeContextMenuTimeoutRef.current);
         },
         [],
     );
+
+    React.useEffect(() => {
+        const suppressDelayedContextMenu = (event: MouseEvent) => {
+            if (!suppressNextLikeContextMenuRef.current) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            suppressNextLikeContextMenuRef.current = false;
+            if (suppressLikeContextMenuTimeoutRef.current != null) {
+                window.clearTimeout(suppressLikeContextMenuTimeoutRef.current);
+                suppressLikeContextMenuTimeoutRef.current = null;
+            }
+        };
+
+        document.addEventListener("contextmenu", suppressDelayedContextMenu, {
+            capture: true,
+        });
+        return () =>
+            document.removeEventListener(
+                "contextmenu",
+                suppressDelayedContextMenu,
+                { capture: true },
+            );
+    }, []);
 
     React.useEffect(() => {
         if (replyingTo) commentInputRef.current?.focus();
@@ -1067,13 +1243,17 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                 closeComments();
                 return;
             }
+            if (screen == "likes") {
+                closeLikes();
+                return;
+            }
 
             onClose();
         };
 
         window.addEventListener("keydown", closeOnEscape);
         return () => window.removeEventListener("keydown", closeOnEscape);
-    }, [commentContextMenu, deleteSheetOpen, onClose, screen]);
+    }, [closeLikes, commentContextMenu, deleteSheetOpen, onClose, screen]);
 
     return (
         <Box
@@ -1463,8 +1643,20 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     type="button"
                     aria-label={isPhotoLiked ? "Unlike photo" : "Like photo"}
                     aria-pressed={isPhotoLiked}
-                    onClick={() => setIsPhotoLiked((isLiked) => !isLiked)}
-                    sx={viewerActionButtonSx}
+                    onClick={handlePhotoLikeClick}
+                    onContextMenuCapture={handlePhotoLikeContextMenu}
+                    onPointerCancel={clearLikeHoldTimeout}
+                    onPointerDown={startPhotoLikeHold}
+                    onPointerLeave={clearLikeHoldTimeout}
+                    onPointerMove={cancelPhotoLikeHoldOnMove}
+                    onPointerUp={clearLikeHoldTimeout}
+                    sx={{
+                        ...viewerActionButtonSx,
+                        touchAction: "manipulation",
+                        userSelect: "none",
+                        WebkitTouchCallout: "none",
+                        WebkitUserSelect: "none",
+                    }}
                 >
                     <HugeiconsIcon
                         fill={isPhotoLiked ? green : "none"}
@@ -1521,6 +1713,174 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     )}
                 </Box>
             </Box>
+            {screen == "likes" && (
+                <Box
+                    sx={{
+                        bgcolor: commentsBackground,
+                        boxSizing: "border-box",
+                        color: textBase,
+                        display: "flex",
+                        flexDirection: "column",
+                        inset: 0,
+                        maxWidth: "100vw",
+                        overflow: "hidden",
+                        overflowX: "hidden",
+                        position: "fixed",
+                        width: "100%",
+                        zIndex: 3,
+                    }}
+                >
+                    <Box
+                        component="header"
+                        sx={{
+                            alignItems: "center",
+                            boxSizing: "border-box",
+                            display: "grid",
+                            flexShrink: 0,
+                            gridTemplateColumns: "1fr 40px",
+                            minHeight: 56,
+                            px: "16px",
+                            width: "100%",
+                        }}
+                    >
+                        <Box
+                            component="h1"
+                            sx={{
+                                color: textBase,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 16,
+                                fontWeight: 750,
+                                lineHeight: "20px",
+                                m: 0,
+                            }}
+                        >
+                            {likeCount} {likeCount == 1 ? "like" : "likes"}
+                        </Box>
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label="Close likes"
+                            onClick={closeLikes}
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "transparent",
+                                border: 0,
+                                borderRadius: "50%",
+                                color: controlIcon,
+                                cursor: "pointer",
+                                display: "flex",
+                                height: 28,
+                                justifyContent: "center",
+                                justifySelf: "flex-end",
+                                p: 0,
+                                width: 28,
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                                "&:hover": {
+                                    bgcolor: "transparent",
+                                    color: textBase,
+                                },
+                            }}
+                        >
+                            <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={18}
+                                strokeWidth={1.8}
+                            />
+                        </Box>
+                    </Box>
+                    <Box
+                        component="ul"
+                        sx={{
+                            boxSizing: "border-box",
+                            flex: "1 1 auto",
+                            listStyle: "none",
+                            m: 0,
+                            maxWidth: "100%",
+                            minHeight: 0,
+                            overflowX: "hidden",
+                            overflowY: "auto",
+                            p: "14px 16px 18px",
+                            width: "100%",
+                        }}
+                    >
+                        {photoLikers.length == 0 ? (
+                            <Box
+                                sx={{
+                                    alignItems: "center",
+                                    color: commentsMuted,
+                                    display: "flex",
+                                    flex: "1 1 auto",
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    justifyContent: "center",
+                                    lineHeight: "20px",
+                                    minHeight: "100%",
+                                }}
+                            >
+                                No likes yet
+                            </Box>
+                        ) : (
+                            photoLikers.map((liker) => (
+                                <Box
+                                    component="li"
+                                    key={liker.id}
+                                    sx={{
+                                        alignItems: "center",
+                                        borderRadius: "12px",
+                                        boxSizing: "border-box",
+                                        display: "flex",
+                                        gap: "12px",
+                                        minHeight: 52,
+                                        px: "2px",
+                                        py: "8px",
+                                        width: "100%",
+                                    }}
+                                >
+                                    <SocialAvatar
+                                        avatarUrl={liker.avatarUrl}
+                                        name={liker.name}
+                                        size={36}
+                                    />
+                                    <Box
+                                        sx={{
+                                            color: textBase,
+                                            flex: "1 1 auto",
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 14,
+                                            fontWeight: 650,
+                                            lineHeight: "20px",
+                                            minWidth: 0,
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap",
+                                        }}
+                                    >
+                                        {liker.name}
+                                    </Box>
+                                    <Box
+                                        aria-hidden
+                                        sx={{
+                                            alignItems: "center",
+                                            display: "flex",
+                                            flexShrink: 0,
+                                            justifyContent: "center",
+                                        }}
+                                    >
+                                        <HeartFilledIcon />
+                                    </Box>
+                                </Box>
+                            ))
+                        )}
+                    </Box>
+                </Box>
+            )}
             {screen == "comments" && (
                 <Box
                     sx={{
@@ -1569,9 +1929,9 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                 color: textBase,
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: 750,
-                                lineHeight: "24px",
+                                lineHeight: "20px",
                                 m: 0,
                             }}
                         >
@@ -1923,7 +2283,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                     maxHeight: 300,
                                     minHeight: 40,
                                     overflow: "auto",
-                                    p: "2px 54px 2px 16px",
+                                    p: "1px 54px 3px 16px",
                                     width: "100%",
                                     "&::-webkit-scrollbar": { width: "8px" },
                                     "&::-webkit-scrollbar-track": {
@@ -1963,7 +2323,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                                 '"Inter Variable", Inter, sans-serif',
                                             fontSize: 14,
                                             fontWeight: 600,
-                                            lineHeight: "22px",
+                                            lineHeight: "21px",
                                             "&::before, &::after": {
                                                 display: "none",
                                             },
@@ -1971,7 +2331,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                         "& .MuiInputBase-input": {
                                             color: textBase,
                                             font: "inherit",
-                                            lineHeight: "22px",
+                                            lineHeight: "21px",
                                             p: 0,
                                             "&::placeholder": {
                                                 color: commentsMuted,
@@ -2007,7 +2367,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                     p: 0,
                                     position: "absolute",
                                     right: 8,
-                                    bottom: 8,
+                                    bottom: 7,
                                     transition:
                                         "background-color 180ms ease, color 180ms ease, opacity 180ms ease, transform 120ms ease",
                                     width: 32,
