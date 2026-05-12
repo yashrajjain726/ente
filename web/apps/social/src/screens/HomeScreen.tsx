@@ -26,6 +26,7 @@ const paleGreen = "#E7F6E9";
 const feedCardBackground = "#F5F5F5";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
+const feedAvatarSize = 26;
 
 const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
 const hoursAgo = (hours: number) => minutesAgo(hours * 60);
@@ -234,7 +235,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     fontFamily: '"Inter Variable", Inter, sans-serif',
                     fontSize: 14,
                     gap: "8px",
-                    gridTemplateColumns: "28px minmax(0, 1fr) auto",
+                    gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr) auto`,
                     lineHeight: "20px",
                     mb: "10px",
                     minHeight: 32,
@@ -255,10 +256,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         cursor: onOpenFriend ? "pointer" : "default",
                         display: "block",
                         flexShrink: 0,
-                        height: 28,
+                        height: feedAvatarSize,
                         overflow: "hidden",
                         p: 0,
-                        width: 28,
+                        width: feedAvatarSize,
                         "&:focus-visible": {
                             outline: `2px solid ${green}`,
                             outlineOffset: 2,
@@ -575,14 +576,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             color: green,
                             cursor: onOpenProfile ? "pointer" : "default",
                             display: "flex",
-                            height: 26,
+                            height: feedAvatarSize,
                             justifyContent: "center",
                             justifySelf: "flex-end",
                             lineHeight: 0,
                             placeSelf: "center end",
                             overflow: "hidden",
                             p: 0,
-                            width: 26,
+                            width: feedAvatarSize,
                             "&:focus-visible": {
                                 outline: `2px solid ${green}`,
                                 outlineOffset: 2,
