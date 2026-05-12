@@ -213,10 +213,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                     mt: "52px",
                     width: "100%",
                     "@media (max-height: 760px)": { mt: "40px" },
-                    "@media (min-width: 600px)": {
-                        mb: "44px",
-                        mt: 0,
-                    },
+                    "@media (min-width: 600px)": { mb: "44px", mt: 0 },
                 }}
             >
                 <ActionButton variant="primary" onClick={onCreateAccount}>

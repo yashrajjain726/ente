@@ -10,9 +10,9 @@ import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import { HomeScreen, homeBackground } from "screens/HomeScreen";
 import { LoginScreen, loginBackground } from "screens/LoginScreen";
 import {
+    OnboardingScreen,
     addFriendOnboardingDescription,
     addFriendOnboardingTitle,
-    OnboardingScreen,
     onboardingDescription,
     onboardingGreen,
 } from "screens/OnboardingScreen";

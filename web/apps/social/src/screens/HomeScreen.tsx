@@ -294,7 +294,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         fontFamily: "inherit",
                         fontSize: "inherit",
                         fontWeight: 650,
+                        justifySelf: "start",
                         lineHeight: "inherit",
+                        maxWidth: "100%",
                         minWidth: 0,
                         overflow: "hidden",
                         p: 0,
@@ -726,6 +728,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Box>
                 {selectedPhoto && (
                     <SocialFileViewer
+                        currentUser={{
+                            avatarUrl: profile.avatarUrl,
+                            name: initialsSource,
+                        }}
                         photo={selectedPhoto}
                         onClose={() => setSelectedPhoto(null)}
                         onOpenProfile={
