@@ -88,7 +88,10 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                 overflow: "hidden",
                 px: 3,
                 width: "100%",
-                "@media (min-width: 600px)": { maxWidth: 375 },
+                "@media (min-width: 600px)": {
+                    maxWidth: 390,
+                    minHeight: "100svh",
+                },
                 "@media (max-height: 760px)": { minHeight: "100svh" },
             }}
         >
@@ -117,64 +120,80 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                 <Box />
             </Box>
             <Box
-                component="img"
-                alt=""
-                src="/images/share-memories.svg"
-                sx={{
-                    flexShrink: 0,
-                    height: 245.189,
-                    mt: "112px",
-                    width: 282,
-                    "@media (max-height: 760px)": {
-                        height: 219,
-                        mt: "68px",
-                        width: 252,
-                    },
-                    "@media (max-width: 340px)": {
-                        height: "auto",
-                        width: "76vw",
-                    },
-                }}
-            />
-            <Box
                 sx={{
                     alignItems: "center",
                     display: "flex",
                     flexDirection: "column",
                     flexShrink: 0,
-                    mt: "92px",
-                    textAlign: "center",
-                    "@media (max-height: 760px)": { mt: "60px" },
+                    width: "100%",
+                    "@media (min-width: 600px)": {
+                        flex: "1 1 auto",
+                        justifyContent: "center",
+                        minHeight: 0,
+                    },
                 }}
             >
                 <Box
-                    component="h1"
+                    component="img"
+                    alt=""
+                    src="/images/share-memories.svg"
                     sx={{
-                        fontFamily: "Nunito, sans-serif",
-                        fontSize: 24,
-                        fontWeight: 800,
-                        letterSpacing: 0,
-                        lineHeight: "29px",
-                        m: 0,
-                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                        height: 245.189,
+                        mt: "112px",
+                        width: 282,
+                        "@media (max-height: 760px)": {
+                            height: 219,
+                            mt: "68px",
+                            width: 252,
+                        },
+                        "@media (max-width: 340px)": {
+                            height: "auto",
+                            width: "76vw",
+                        },
+                        "@media (min-width: 600px)": { mt: 0 },
                     }}
-                >
-                    Share your life
-                </Box>
+                />
                 <Box
-                    component="p"
                     sx={{
-                        color: copyGreen,
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 14,
-                        fontWeight: 500,
-                        lineHeight: "20px",
-                        m: 0,
-                        mt: "12px",
-                        maxWidth: 314,
+                        alignItems: "center",
+                        display: "flex",
+                        flexDirection: "column",
+                        flexShrink: 0,
+                        mt: "92px",
+                        textAlign: "center",
+                        "@media (max-height: 760px)": { mt: "60px" },
                     }}
                 >
-                    {onboardingDescription}
+                    <Box
+                        component="h1"
+                        sx={{
+                            fontFamily: "Nunito, sans-serif",
+                            fontSize: 24,
+                            fontWeight: 800,
+                            letterSpacing: 0,
+                            lineHeight: "29px",
+                            m: 0,
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        Share your life
+                    </Box>
+                    <Box
+                        component="p"
+                        sx={{
+                            color: copyGreen,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 14,
+                            fontWeight: 500,
+                            lineHeight: "20px",
+                            m: 0,
+                            mt: "12px",
+                            maxWidth: 314,
+                        }}
+                    >
+                        {onboardingDescription}
+                    </Box>
                 </Box>
             </Box>
             <Box
@@ -186,6 +205,10 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                     mt: "52px",
                     width: "100%",
                     "@media (max-height: 760px)": { mt: "40px" },
+                    "@media (min-width: 600px)": {
+                        mb: "44px",
+                        mt: 0,
+                    },
                 }}
             >
                 <ActionButton variant="primary" onClick={onCreateAccount}>

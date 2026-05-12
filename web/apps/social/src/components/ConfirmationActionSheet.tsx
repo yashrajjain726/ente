@@ -79,6 +79,13 @@ export const ConfirmationActionSheet: React.FC<
                         transform: "translateX(-50%)",
                         width: "calc(100vw - 12px)",
                         maxWidth: 363,
+                        "@media (min-width: 600px)": {
+                            borderRadius: "20px",
+                            bottom: "auto",
+                            top: "50%",
+                            transform: "translate(-50%, -50%)",
+                            width: 363,
+                        },
                     },
                 },
                 transition: { onExited },

@@ -242,7 +242,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                     pb: "120px",
                     px: 3,
                     width: "100%",
-                    "@media (min-width: 600px)": { maxWidth: 375 },
+                    "@media (min-width: 600px)": { maxWidth: 390 },
                 }}
             >
                 <Box
@@ -437,7 +437,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                         bottom: 0,
                         boxSizing: "border-box",
                         left: "50%",
-                        maxWidth: 375,
+                        maxWidth: 390,
                         p: 3,
                         position: "fixed",
                         transform: "translateX(-50%)",

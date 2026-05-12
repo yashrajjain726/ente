@@ -362,7 +362,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     overflow: "hidden",
                     position: "relative",
                     width: "100%",
-                    "@media (min-width: 600px)": { maxWidth: 375 },
+                    "@media (min-width: 600px)": { maxWidth: 390 },
                 }}
             >
                 {isOwnerProfile && (
@@ -384,6 +384,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         top: 0,
                         width: "100%",
                         zIndex: 0,
+                        "@media (min-width: 600px)": {
+                            borderBottomLeftRadius: photoMasonryRadius,
+                            borderBottomRightRadius: photoMasonryRadius,
+                        },
                     }}
                 />
                 <Box

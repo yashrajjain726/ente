@@ -13,6 +13,7 @@ const textMuted = "#666";
 const textLight = "#969696";
 const paleGreen = "#E7F6E9";
 const iconFill = "#F0F0F0";
+const actionRowHover = "#F5F5F5";
 
 interface ShareProfileLinkScreenProps {
     onBack: () => void;
@@ -112,7 +113,7 @@ const ActionRow: React.FC<ActionRowProps> = ({
                 outline: `2px solid ${green}`,
                 outlineOffset: 2,
             },
-            "&:hover": { bgcolor: "#F7F7F7" },
+            "&:hover": { bgcolor: actionRowHover },
         }}
     >
         <Box
@@ -222,7 +223,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                     pb: "120px",
                     px: 3,
                     width: "100%",
-                    "@media (min-width: 600px)": { maxWidth: 375 },
+                    "@media (min-width: 600px)": { maxWidth: 390 },
                 }}
             >
                 <Box
@@ -428,7 +429,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                         bottom: 0,
                         boxSizing: "border-box",
                         left: "50%",
-                        maxWidth: 375,
+                        maxWidth: 390,
                         p: 3,
                         position: "fixed",
                         transform: "translateX(-50%)",

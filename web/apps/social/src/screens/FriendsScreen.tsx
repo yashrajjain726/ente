@@ -346,7 +346,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     minHeight: "100svh",
                     mx: "auto",
                     width: "100%",
-                    "@media (min-width: 600px)": { maxWidth: 375 },
+                    "@media (min-width: 600px)": { maxWidth: 390 },
                 }}
             >
                 <Box

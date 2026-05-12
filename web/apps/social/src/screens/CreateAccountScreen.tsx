@@ -247,7 +247,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                     pb: "154px",
                     px: 3,
                     width: "100%",
-                    "@media (min-width: 600px)": { maxWidth: 375 },
+                    "@media (min-width: 600px)": { maxWidth: 390 },
                 }}
             >
                 <Box
@@ -438,7 +438,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                         flexDirection: "column",
                         gap: "16px",
                         left: "50%",
-                        maxWidth: 375,
+                        maxWidth: 390,
                         p: 3,
                         position: "fixed",
                         transform: "translateX(-50%)",
