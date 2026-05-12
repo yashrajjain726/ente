@@ -51,6 +51,8 @@ interface SocialViewerUser {
     name: string;
 }
 
+export type SocialViewerInitialScreen = "photo" | "comments" | "likes";
+
 export interface SocialViewerPhoto {
     alt?: string;
     avatarUrl?: string | null;
@@ -64,6 +66,7 @@ export interface SocialViewerPhoto {
 
 interface SocialFileViewerProps {
     currentUser?: SocialViewerUser;
+    initialScreen?: SocialViewerInitialScreen;
     onClose: () => void;
     onDeletePost?: () => void;
     onOpenProfile?: () => void;
@@ -802,14 +805,14 @@ const CommentItem: React.FC<CommentItemProps> = ({
 
 export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     currentUser,
+    initialScreen = "photo",
     onClose,
     onDeletePost,
     onOpenProfile,
     photo,
 }) => {
-    const [screen, setScreen] = React.useState<"photo" | "comments" | "likes">(
-        "photo",
-    );
+    const [screen, setScreen] =
+        React.useState<SocialViewerInitialScreen>(initialScreen);
     const [isPhotoLiked, setIsPhotoLiked] = React.useState(false);
     const [isCommentButtonPopping, setIsCommentButtonPopping] =
         React.useState(false);
@@ -1352,11 +1355,11 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                             cursor: onOpenProfile ? "pointer" : "default",
                             display: "flex",
                             flexShrink: 0,
-                            height: 32,
+                            height: 28,
                             justifyContent: "center",
                             overflow: "hidden",
                             p: 0,
-                            width: 32,
+                            width: 28,
                             "&:focus-visible": {
                                 outline: `2px solid ${green}`,
                                 outlineOffset: 2,
@@ -1381,7 +1384,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                 sx={{
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 11,
+                                    fontSize: 10,
                                     fontWeight: 800,
                                     lineHeight: 1,
                                 }}

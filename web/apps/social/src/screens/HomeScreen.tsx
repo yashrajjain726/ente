@@ -1,4 +1,8 @@
-import { AddSquareIcon } from "@hugeicons/core-free-icons";
+import {
+    AddSquareIcon,
+    Comment01Icon,
+    FavouriteIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import {
@@ -10,6 +14,7 @@ import {
 } from "components/SocialActionFeedback";
 import {
     SocialFileViewer,
+    type SocialViewerInitialScreen,
     type SocialViewerPhoto,
 } from "components/SocialFileViewer";
 import { EnteLogo } from "ente-base/components/EnteLogo";
@@ -43,6 +48,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-4.jpg",
         friendID: "aparna-bhatnagar",
         imageUrl: "/images/sample-feed-1.jpg",
+        likeCount: 18,
+        commentCount: 6,
         name: "Aparna Bhatnagar",
         timestampMs: minutesAgo(22),
     },
@@ -51,6 +58,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-3.jpg",
         friendID: "mira-sen",
         imageUrl: "/images/sample-feed-portrait-2.jpg",
+        likeCount: 24,
+        commentCount: 9,
         name: "Mira Sen",
         timestampMs: hoursAgo(2),
     },
@@ -59,6 +68,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-3.jpg",
         friendID: "mira-sen",
         imageUrl: "/images/sample-feed-2.jpg",
+        likeCount: 15,
+        commentCount: 4,
         name: "Mira Sen",
         timestampMs: hoursAgo(3),
     },
@@ -67,6 +78,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-5.jpg",
         friendID: "nikhil-rao",
         imageUrl: "/images/sample-feed-portrait-3.jpg",
+        likeCount: 31,
+        commentCount: 12,
         name: "Nikhil Rao",
         timestampMs: hoursAgo(7),
     },
@@ -75,6 +88,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-5.jpg",
         friendID: "nikhil-rao",
         imageUrl: "/images/sample-feed-3.jpg",
+        likeCount: 11,
+        commentCount: 3,
         name: "Nikhil Rao",
         timestampMs: daysAgo(1),
     },
@@ -83,6 +98,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-6.jpg",
         friendID: "riya-kapoor",
         imageUrl: "/images/sample-feed-portrait-4.jpg",
+        likeCount: 28,
+        commentCount: 8,
         name: "Riya Kapoor",
         timestampMs: daysAgo(1) - 3 * 60 * 60 * 1000,
     },
@@ -91,6 +108,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-6.jpg",
         friendID: "riya-kapoor",
         imageUrl: "/images/sample-feed-4.jpg",
+        likeCount: 16,
+        commentCount: 5,
         name: "Riya Kapoor",
         timestampMs: daysAgo(2),
     },
@@ -99,6 +118,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-4.jpg",
         friendID: "aparna-bhatnagar",
         imageUrl: "/images/sample-feed-portrait-1.jpg",
+        likeCount: 22,
+        commentCount: 7,
         name: "Aparna Bhatnagar",
         timestampMs: daysAgo(3),
     },
@@ -107,6 +128,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-4.jpg",
         friendID: "aparna-bhatnagar",
         imageUrl: "/images/sample-feed-5.jpg",
+        likeCount: 13,
+        commentCount: 4,
         name: "Aparna Bhatnagar",
         timestampMs: daysAgo(4),
     },
@@ -115,6 +138,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-3.jpg",
         friendID: "mira-sen",
         imageUrl: "/images/sample-feed-portrait-5.jpg",
+        likeCount: 36,
+        commentCount: 14,
         name: "Mira Sen",
         timestampMs: daysAgo(6),
     },
@@ -123,6 +148,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-3.jpg",
         friendID: "mira-sen",
         imageUrl: "/images/sample-feed-6.jpg",
+        likeCount: 19,
+        commentCount: 6,
         name: "Mira Sen",
         timestampMs: daysAgo(8),
     },
@@ -131,6 +158,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-5.jpg",
         friendID: "nikhil-rao",
         imageUrl: "/images/sample-feed-portrait-6.jpg",
+        likeCount: 27,
+        commentCount: 10,
         name: "Nikhil Rao",
         timestampMs: daysAgo(12),
     },
@@ -139,6 +168,8 @@ const sampleFeedItems = [
         avatarUrl: "/images/sample-feed-5.jpg",
         friendID: "nikhil-rao",
         imageUrl: "/images/sample-feed-2.jpg",
+        likeCount: 43,
+        commentCount: 17,
         name: "Nikhil Rao",
         timestampMs: new Date(new Date().getFullYear() - 1, 10, 18).getTime(),
     },
@@ -159,11 +190,16 @@ interface FeedPhotoDimensions {
 interface FeedItemProps {
     aspectRatio: number;
     avatarUrl: string;
+    commentCount: number;
     friendID: string;
     imageUrl: string;
+    likeCount: number;
     name: string;
     onOpenFriend?: (friendID: string) => void;
-    onOpenPhoto?: (photo: SocialViewerPhoto) => void;
+    onOpenPhoto?: (
+        photo: SocialViewerPhoto,
+        initialScreen?: SocialViewerInitialScreen,
+    ) => void;
     timestampMs: number;
 }
 
@@ -180,16 +216,21 @@ const dimensionsFromAspectRatio = (
 const FeedItem: React.FC<FeedItemProps> = ({
     aspectRatio,
     avatarUrl,
+    commentCount,
     friendID,
     imageUrl,
+    likeCount,
     name,
     onOpenFriend,
     onOpenPhoto,
     timestampMs,
 }) => {
+    const [isLiked, setIsLiked] = useState(false);
+    const [isLikeButtonPopping, setIsLikeButtonPopping] = useState(false);
     const firstName = firstNameFrom(name);
     const dateLabel = formatSocialDate(timestampMs);
     const openFriend = () => onOpenFriend?.(friendID);
+    const likePopTimeoutRef = React.useRef<number | null>(null);
     const [loadedPhotoDimensions, setLoadedPhotoDimensions] =
         useState<FeedPhotoDimensions | null>(null);
     const photoDimensions =
@@ -211,6 +252,40 @@ const FeedItem: React.FC<FeedItemProps> = ({
             return { height: naturalHeight, width: naturalWidth };
         });
     };
+    const openPhoto = (initialScreen?: SocialViewerInitialScreen) =>
+        onOpenPhoto?.(
+            {
+                alt: `${name} post`,
+                avatarUrl,
+                friendID,
+                height: photoDimensions.height,
+                imageUrl,
+                name,
+                timestampMs,
+                width: photoDimensions.width,
+            },
+            initialScreen,
+        );
+    const visibleLikeCount = likeCount + (isLiked ? 1 : 0);
+    const handleLikeClick = () => {
+        if (likePopTimeoutRef.current != null)
+            window.clearTimeout(likePopTimeoutRef.current);
+
+        setIsLikeButtonPopping(true);
+        setIsLiked((current) => !current);
+        likePopTimeoutRef.current = window.setTimeout(() => {
+            likePopTimeoutRef.current = null;
+            setIsLikeButtonPopping(false);
+        }, 120);
+    };
+
+    React.useEffect(
+        () => () => {
+            if (likePopTimeoutRef.current != null)
+                window.clearTimeout(likePopTimeoutRef.current);
+        },
+        [],
+    );
 
     return (
         <Box
@@ -331,18 +406,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 component="button"
                 type="button"
                 aria-label={`Open ${name} photo`}
-                onClick={() =>
-                    onOpenPhoto?.({
-                        alt: `${name} post`,
-                        avatarUrl,
-                        friendID,
-                        height: photoDimensions.height,
-                        imageUrl,
-                        name,
-                        timestampMs,
-                        width: photoDimensions.width,
-                    })
-                }
+                onClick={() => openPhoto()}
                 sx={{
                     appearance: "none",
                     aspectRatio: `${photoDimensions.width} / ${photoDimensions.height}`,
@@ -374,6 +438,120 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     }}
                 />
             </Box>
+            <Box
+                sx={{
+                    alignItems: "center",
+                    display: "flex",
+                    gap: "2px",
+                    justifyContent: "flex-start",
+                    mt: "10px",
+                    px: "4px",
+                }}
+            >
+                <Box
+                    component="button"
+                    type="button"
+                    aria-label={isLiked ? "Unlike post" : "Like post"}
+                    aria-pressed={isLiked}
+                    onClick={handleLikeClick}
+                    sx={{
+                        alignItems: "center",
+                        appearance: "none",
+                        bgcolor: "transparent",
+                        border: 0,
+                        borderRadius: 0,
+                        color: isLiked ? green : textBase,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        height: 24,
+                        justifyContent: "center",
+                        p: 0,
+                        transform: isLikeButtonPopping
+                            ? "scale(0.96)"
+                            : "scale(1)",
+                        transition: "color 120ms ease, transform 120ms ease",
+                        width: 24,
+                        "&:focus-visible": {
+                            outline: `2px solid ${green}`,
+                            outlineOffset: 2,
+                        },
+                        "&:hover": { bgcolor: "transparent" },
+                    }}
+                >
+                    <HugeiconsIcon
+                        fill={isLiked ? green : "none"}
+                        icon={FavouriteIcon}
+                        primaryColor={isLiked ? green : undefined}
+                        size={22}
+                        strokeWidth={1.8}
+                    />
+                </Box>
+                <Box
+                    component="button"
+                    type="button"
+                    aria-label={`View ${visibleLikeCount} ${
+                        visibleLikeCount == 1 ? "like" : "likes"
+                    }`}
+                    onClick={() => openPhoto("likes")}
+                    sx={{
+                        appearance: "none",
+                        bgcolor: "transparent",
+                        border: 0,
+                        borderRadius: "8px",
+                        color: textBase,
+                        cursor: onOpenPhoto ? "pointer" : "default",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        lineHeight: "18px",
+                        p: "4px 0",
+                        "&:focus-visible": {
+                            outline: `2px solid ${green}`,
+                            outlineOffset: 2,
+                        },
+                        "&:hover": { color: green },
+                    }}
+                >
+                    {visibleLikeCount}
+                </Box>
+                <Box
+                    component="button"
+                    type="button"
+                    aria-label={`View ${commentCount} ${
+                        commentCount == 1 ? "comment" : "comments"
+                    }`}
+                    onClick={() => openPhoto("comments")}
+                    sx={{
+                        alignItems: "center",
+                        appearance: "none",
+                        bgcolor: "transparent",
+                        border: 0,
+                        borderRadius: "8px",
+                        color: textBase,
+                        cursor: onOpenPhoto ? "pointer" : "default",
+                        display: "inline-flex",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        gap: "4px",
+                        lineHeight: "18px",
+                        ml: "12px",
+                        p: "4px 2px",
+                        "&:focus-visible": {
+                            outline: `2px solid ${green}`,
+                            outlineOffset: 2,
+                        },
+                        "&:hover": { color: green },
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={Comment01Icon}
+                        size={20}
+                        strokeWidth={1.8}
+                    />
+                    {commentCount}
+                </Box>
+            </Box>
         </Box>
     );
 };
@@ -386,6 +564,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedPhoto, setSelectedPhoto] =
         useState<SocialViewerPhoto | null>(null);
+    const [selectedViewerScreen, setSelectedViewerScreen] =
+        useState<SocialViewerInitialScreen>("photo");
     const [postActionPhase, setPostActionPhase] =
         useState<PostActionPhase | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -412,6 +592,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         .map((part) => part[0]?.toUpperCase())
         .join("");
     const openPostPhotoPicker = () => postInputRef.current?.click();
+    const openFeedPhoto = (
+        photo: SocialViewerPhoto,
+        initialScreen: SocialViewerInitialScreen = "photo",
+    ) => {
+        setSelectedViewerScreen(initialScreen);
+        setSelectedPhoto(photo);
+    };
+    const closeSelectedPhoto = () => {
+        setSelectedPhoto(null);
+        setSelectedViewerScreen("photo");
+    };
 
     const shareProfileLink = async () => {
         if (typeof navigator.share == "function") {
@@ -641,11 +832,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 key={`${item.name}-${item.imageUrl}`}
                                 aspectRatio={item.aspectRatio}
                                 avatarUrl={item.avatarUrl}
+                                commentCount={item.commentCount}
                                 friendID={item.friendID}
                                 imageUrl={item.imageUrl}
+                                likeCount={item.likeCount}
                                 name={item.name}
                                 onOpenFriend={onOpenFriend}
-                                onOpenPhoto={setSelectedPhoto}
+                                onOpenPhoto={openFeedPhoto}
                                 timestampMs={item.timestampMs}
                             />
                         ))
@@ -732,12 +925,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             avatarUrl: profile.avatarUrl,
                             name: initialsSource,
                         }}
+                        initialScreen={selectedViewerScreen}
                         photo={selectedPhoto}
-                        onClose={() => setSelectedPhoto(null)}
+                        onClose={closeSelectedPhoto}
                         onOpenProfile={
                             selectedPhotoFriendID && onOpenFriend
                                 ? () => {
-                                      setSelectedPhoto(null);
+                                      closeSelectedPhoto();
                                       onOpenFriend(selectedPhotoFriendID);
                                   }
                                 : undefined
