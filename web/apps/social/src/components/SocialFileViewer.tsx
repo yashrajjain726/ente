@@ -1507,13 +1507,13 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                     '"Inter Variable", Inter, sans-serif',
                                 fontSize: 10,
                                 fontWeight: 800,
-                                height: 20,
+                                height: 24,
                                 justifyContent: "center",
                                 lineHeight: 1,
                                 position: "absolute",
-                                right: -5,
-                                top: -5,
-                                width: 20,
+                                right: -8,
+                                top: -8,
+                                width: 24,
                             }}
                         >
                             {commentCount}
