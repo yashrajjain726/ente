@@ -492,6 +492,75 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <Box
                         component="button"
                         type="button"
+                        aria-label={
+                            isPostActionPosting
+                                ? "Posting photo"
+                                : isPostActionPosted
+                                  ? "Photo posted"
+                                  : "Post photo"
+                        }
+                        disabled={postActionPhase != null}
+                        onClick={openPostPhotoPicker}
+                        sx={{
+                            appearance: "none",
+                            alignItems: "center",
+                            bgcolor: "transparent",
+                            border: 0,
+                            boxSizing: "border-box",
+                            color: isPostActionPosted ? green : textBase,
+                            cursor:
+                                postActionPhase == null ? "pointer" : "default",
+                            display: "flex",
+                            fontSize: 0,
+                            height: 32,
+                            justifyContent: "center",
+                            justifySelf: "flex-start",
+                            lineHeight: 0,
+                            opacity: 1,
+                            p: 0,
+                            placeSelf: "center start",
+                            width: 28,
+                            transition: `color ${socialActionTransition}`,
+                            "& svg": {
+                                display: "block",
+                                transform: "translateX(-2px)",
+                            },
+                            "&:focus-visible": {
+                                borderRadius: "6px",
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                        }}
+                    >
+                        <SocialActionFeedbackIcon
+                            idleIcon={
+                                <HugeiconsIcon
+                                    icon={AddSquareIcon}
+                                    size={28}
+                                    strokeWidth={1.8}
+                                />
+                            }
+                            phase={postActionFeedbackPhase}
+                            size={28}
+                        />
+                    </Box>
+                    <Box
+                        sx={{
+                            alignSelf: "center",
+                            color: textBase,
+                            justifySelf: "center",
+                            lineHeight: 0,
+                            overflow: "visible",
+                            placeSelf: "center",
+                            width: 58,
+                            "& svg": { display: "block", overflow: "visible" },
+                        }}
+                    >
+                        <EnteLogo height={18} />
+                    </Box>
+                    <Box
+                        component="button"
+                        type="button"
                         aria-label="Open profile"
                         onClick={onOpenProfile}
                         sx={{
@@ -508,9 +577,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             display: "flex",
                             height: 28,
                             justifyContent: "center",
-                            justifySelf: "flex-start",
+                            justifySelf: "flex-end",
                             lineHeight: 0,
-                            placeSelf: "center start",
+                            placeSelf: "center end",
                             overflow: "hidden",
                             p: 0,
                             width: 28,
@@ -548,72 +617,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 {initials}
                             </Box>
                         )}
-                    </Box>
-                    <Box
-                        sx={{
-                            alignSelf: "center",
-                            color: textBase,
-                            justifySelf: "center",
-                            lineHeight: 0,
-                            overflow: "visible",
-                            placeSelf: "center",
-                            width: 58,
-                            "& svg": { display: "block", overflow: "visible" },
-                        }}
-                    >
-                        <EnteLogo height={18} />
-                    </Box>
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label={
-                            isPostActionPosting
-                                ? "Posting photo"
-                                : isPostActionPosted
-                                  ? "Photo posted"
-                                  : "Post photo"
-                        }
-                        disabled={postActionPhase != null}
-                        onClick={openPostPhotoPicker}
-                        sx={{
-                            appearance: "none",
-                            alignItems: "center",
-                            bgcolor: "transparent",
-                            border: 0,
-                            boxSizing: "border-box",
-                            color: isPostActionPosted ? green : textBase,
-                            cursor:
-                                postActionPhase == null ? "pointer" : "default",
-                            display: "flex",
-                            fontSize: 0,
-                            height: 32,
-                            justifyContent: "center",
-                            justifySelf: "flex-end",
-                            lineHeight: 0,
-                            opacity: 1,
-                            p: 0,
-                            placeSelf: "center end",
-                            width: 32,
-                            transition: `color ${socialActionTransition}`,
-                            "& svg": { display: "block" },
-                            "&:focus-visible": {
-                                borderRadius: "6px",
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                        }}
-                    >
-                        <SocialActionFeedbackIcon
-                            idleIcon={
-                                <HugeiconsIcon
-                                    icon={AddSquareIcon}
-                                    size={28}
-                                    strokeWidth={1.8}
-                                />
-                            }
-                            phase={postActionFeedbackPhase}
-                            size={28}
-                        />
                     </Box>
                 </Box>
                 <Box
