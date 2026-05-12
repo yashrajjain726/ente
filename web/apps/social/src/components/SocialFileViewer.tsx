@@ -377,6 +377,26 @@ const viewerActionButtonSx = {
     "&:hover": { bgcolor: controlBackgroundHover },
 };
 
+const viewerCountBadgeSx = {
+    alignItems: "center",
+    bgcolor: "#FFFFFF",
+    border: `2px solid ${viewerBackground}`,
+    borderRadius: "50%",
+    boxSizing: "border-box",
+    color: "#111111",
+    display: "inline-flex",
+    fontFamily: '"Inter Variable", Inter, sans-serif',
+    fontSize: 10,
+    fontWeight: 800,
+    height: 24,
+    justifyContent: "center",
+    lineHeight: 1,
+    position: "absolute",
+    right: -8,
+    top: -8,
+    width: 24,
+};
+
 const SocialAvatar: React.FC<{
     avatarUrl?: string | null;
     name: string;
@@ -849,6 +869,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                   commentCount == 1 ? "comment" : "comments"
               }`
             : "Comment on photo";
+    const likeCountLabel = `${likeCount} ${likeCount == 1 ? "like" : "likes"}`;
     const isContextCommentLiked = commentContextMenu
         ? likedCommentIDs.has(commentContextMenu.comment.id)
         : false;
@@ -913,6 +934,12 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         event.preventDefault();
         event.stopPropagation();
         ignoreNextLikeClickRef.current = false;
+        openLikes();
+    };
+
+    const handleLikeCountClick = (event: React.MouseEvent<HTMLElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
         openLikes();
     };
 
@@ -1639,32 +1666,57 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                 }}
             >
                 <Box
-                    component="button"
-                    type="button"
-                    aria-label={isPhotoLiked ? "Unlike photo" : "Like photo"}
-                    aria-pressed={isPhotoLiked}
-                    onClick={handlePhotoLikeClick}
-                    onContextMenuCapture={handlePhotoLikeContextMenu}
-                    onPointerCancel={clearLikeHoldTimeout}
-                    onPointerDown={startPhotoLikeHold}
-                    onPointerLeave={clearLikeHoldTimeout}
-                    onPointerMove={cancelPhotoLikeHoldOnMove}
-                    onPointerUp={clearLikeHoldTimeout}
-                    sx={{
-                        ...viewerActionButtonSx,
-                        touchAction: "manipulation",
-                        userSelect: "none",
-                        WebkitTouchCallout: "none",
-                        WebkitUserSelect: "none",
-                    }}
+                    sx={{ height: 48, position: "relative", width: 48 }}
                 >
-                    <HugeiconsIcon
-                        fill={isPhotoLiked ? green : "none"}
-                        icon={FavouriteIcon}
-                        primaryColor={isPhotoLiked ? green : undefined}
-                        size={26}
-                        strokeWidth={1.8}
-                    />
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={
+                            isPhotoLiked ? "Unlike photo" : "Like photo"
+                        }
+                        aria-pressed={isPhotoLiked}
+                        onClick={handlePhotoLikeClick}
+                        onContextMenuCapture={handlePhotoLikeContextMenu}
+                        onPointerCancel={clearLikeHoldTimeout}
+                        onPointerDown={startPhotoLikeHold}
+                        onPointerLeave={clearLikeHoldTimeout}
+                        onPointerMove={cancelPhotoLikeHoldOnMove}
+                        onPointerUp={clearLikeHoldTimeout}
+                        sx={{
+                            ...viewerActionButtonSx,
+                            touchAction: "manipulation",
+                            userSelect: "none",
+                            WebkitTouchCallout: "none",
+                            WebkitUserSelect: "none",
+                        }}
+                    >
+                        <HugeiconsIcon
+                            fill={isPhotoLiked ? green : "none"}
+                            icon={FavouriteIcon}
+                            primaryColor={isPhotoLiked ? green : undefined}
+                            size={26}
+                            strokeWidth={1.8}
+                        />
+                    </Box>
+                    {likeCount > 0 && (
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={`View ${likeCountLabel}`}
+                            onClick={handleLikeCountClick}
+                            sx={{
+                                ...viewerCountBadgeSx,
+                                cursor: "pointer",
+                                p: 0,
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
+                            {likeCount}
+                        </Box>
+                    )}
                 </Box>
                 <Box
                     component="button"
@@ -1687,26 +1739,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     {commentCount > 0 && (
                         <Box
                             aria-hidden
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: "#FFFFFF",
-                                border: `2px solid ${viewerBackground}`,
-                                borderRadius: "50%",
-                                boxSizing: "border-box",
-                                color: "#111111",
-                                display: "inline-flex",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 10,
-                                fontWeight: 800,
-                                height: 24,
-                                justifyContent: "center",
-                                lineHeight: 1,
-                                position: "absolute",
-                                right: -8,
-                                top: -8,
-                                width: 24,
-                            }}
+                            sx={viewerCountBadgeSx}
                         >
                             {commentCount}
                         </Box>
