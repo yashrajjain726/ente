@@ -3,7 +3,6 @@ import {
     Comment01Icon,
     Delete02Icon,
     FavouriteIcon,
-    MailReply01Icon,
     MoreHorizontalIcon,
     Navigation03Icon,
 } from "@hugeicons/core-free-icons";
@@ -46,7 +45,6 @@ const commentsSurfaceHover = "#343434";
 const commentsOwnerBubble = "#3FA43D";
 const commentsMuted = "rgba(244, 244, 244, 0.54)";
 const commentsTimestamp = "rgba(255, 255, 255, 0.55)";
-const commentActionHoldDurationMs = 500;
 
 interface SocialViewerUser {
     avatarUrl?: string | null;
@@ -401,6 +399,64 @@ const SocialAvatar: React.FC<{
     </Box>
 );
 
+const ReplyIcon: React.FC = () => (
+    <svg
+        width="12"
+        height="9"
+        viewBox="0 0 12 9"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="M4.5241 0.242677C4.62341 0.34442 4.67919 0.482337 4.67919 0.626134C4.67919 0.76993 4.62341 0.907847 4.5241 1.00959L1.89369 3.70102H7.68483C8.3587 3.70102 9.35854 3.9036 10.2042 4.52653C11.0775 5.17045 11.7507 6.23762 11.7507 7.86116C11.7507 8.00507 11.6948 8.14309 11.5953 8.24485C11.4959 8.34661 11.361 8.40378 11.2203 8.40378C11.0797 8.40378 10.9448 8.34661 10.8453 8.24485C10.7459 8.14309 10.69 8.00507 10.69 7.86116C10.69 6.59069 10.1844 5.84982 9.58481 5.40776C8.95761 4.94544 8.18899 4.78627 7.68483 4.78627H1.89369L4.5241 7.4777C4.5762 7.52738 4.61799 7.58728 4.64698 7.65384C4.67597 7.72041 4.69155 7.79226 4.69281 7.86512C4.69406 7.93798 4.68096 8.01035 4.65429 8.07791C4.62762 8.14548 4.58792 8.20686 4.53756 8.25839C4.4872 8.30991 4.42722 8.35053 4.36118 8.37782C4.29515 8.40512 4.22442 8.41852 4.15321 8.41723C4.082 8.41595 4.01178 8.4 3.94673 8.37034C3.88167 8.34068 3.82313 8.29792 3.77457 8.24461L0.23908 4.6271C0.139767 4.52536 0.0839844 4.38744 0.0839844 4.24364C0.0839844 4.09985 0.139767 3.96193 0.23908 3.86019L3.77457 0.242677C3.87401 0.141061 4.0088 0.0839844 4.14934 0.0839844C4.28987 0.0839844 4.42466 0.141061 4.5241 0.242677Z"
+            fill="currentColor"
+            stroke="currentColor"
+            strokeWidth="0.166667"
+        />
+    </svg>
+);
+
+interface HeartIconProps {
+    filled?: boolean;
+    small?: boolean;
+}
+
+const HeartIcon: React.FC<HeartIconProps> = ({ filled, small }) => (
+    <svg
+        width={small ? "13" : "16"}
+        height={small ? "11" : "14"}
+        viewBox="0 0 16 14"
+        fill={filled ? "#08C225" : "none"}
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            d="M6.63749 12.3742C4.66259 10.885 0.75 7.4804 0.75 4.41664C0.75 2.39161 2.22368 0.75 4.25 0.75C5.3 0.75 6.35 1.10294 7.75 2.51469C9.15 1.10294 10.2 0.75 11.25 0.75C13.2763 0.75 14.75 2.39161 14.75 4.41664C14.75 7.4804 10.8374 10.885 8.86251 12.3742C8.19793 12.8753 7.30207 12.8753 6.63749 12.3742Z"
+            stroke={filled ? "#08C225" : "currentColor"}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+    </svg>
+);
+
+const DeleteIcon: React.FC = () => (
+    <svg
+        width="13"
+        height="15"
+        viewBox="0 0 13 15"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            d="M11.5 2.83203L11.0869 9.51543C10.9813 11.223 10.9285 12.0768 10.5005 12.6906C10.2889 12.9941 10.0165 13.2502 9.70047 13.4427C9.0614 13.832 8.206 13.832 6.49513 13.832C4.78208 13.832 3.92553 13.832 3.28603 13.442C2.96987 13.2492 2.69733 12.9926 2.48579 12.6886C2.05792 12.0738 2.0063 11.2188 1.90307 9.50883L1.5 2.83203M0.5 2.83333H12.5M9.2038 2.83333L8.74873 1.89449C8.4464 1.27084 8.2952 0.959013 8.03447 0.76454C7.97667 0.7214 7.9154 0.683027 7.85133 0.6498C7.5626 0.5 7.21607 0.5 6.523 0.5C5.81253 0.5 5.45733 0.5 5.16379 0.65608C5.09873 0.690673 5.03665 0.7306 4.97819 0.775447C4.71443 0.9778 4.56709 1.30103 4.27241 1.94751L3.86861 2.83333M4.83203 10.166V6.16602M8.16797 10.166V6.16602"
+            stroke="currentColor"
+            strokeLinecap="round"
+        />
+    </svg>
+);
+
 interface CommentItemProps {
     comment: SocialComment;
     isHighlighted: boolean;
@@ -423,10 +479,6 @@ const CommentItem: React.FC<CommentItemProps> = ({
     showOwnTimestamp,
 }) => {
     const isOwner = Boolean(comment.isOwner);
-    const holdTimeoutRef = React.useRef<number | null>(null);
-    const holdStartPointRef = React.useRef<{ x: number; y: number } | null>(
-        null,
-    );
     const authorName = firstNameFrom(comment.author);
     const timestampLabel = formatTimeAgo(comment.createdAtMicros);
     const timestampDateTime = new Date(
@@ -442,46 +494,15 @@ const CommentItem: React.FC<CommentItemProps> = ({
         : isLastInSequence
           ? "6px 20px 20px 20px"
           : "6px 20px 20px 6px";
-    const clearHoldTimeout = () => {
-        if (holdTimeoutRef.current == null) return;
 
-        window.clearTimeout(holdTimeoutRef.current);
-        holdTimeoutRef.current = null;
-        holdStartPointRef.current = null;
-    };
-
-    const openActions = (anchorEl: HTMLElement) => {
+    const handleContextMenu = (event: React.MouseEvent<HTMLElement>) => {
         const selection = window.getSelection();
         if (selection && selection.toString().length > 0) return;
 
-        onOpenActions(comment, anchorEl);
+        event.preventDefault();
+        event.stopPropagation();
+        onOpenActions(comment, event.currentTarget);
     };
-
-    const startActionHold = (event: React.PointerEvent<HTMLElement>) => {
-        if (event.pointerType == "mouse" && event.button != 0) return;
-
-        clearHoldTimeout();
-        const anchorEl = event.currentTarget;
-        holdStartPointRef.current = { x: event.clientX, y: event.clientY };
-        holdTimeoutRef.current = window.setTimeout(() => {
-            holdTimeoutRef.current = null;
-            holdStartPointRef.current = null;
-            openActions(anchorEl);
-        }, commentActionHoldDurationMs);
-    };
-
-    const cancelHoldOnMove = (event: React.PointerEvent<HTMLElement>) => {
-        const startPoint = holdStartPointRef.current;
-        if (!startPoint) return;
-
-        const distance = Math.hypot(
-            event.clientX - startPoint.x,
-            event.clientY - startPoint.y,
-        );
-        if (distance > 8) clearHoldTimeout();
-    };
-
-    React.useEffect(() => clearHoldTimeout, []);
 
     return (
         <Box
@@ -495,7 +516,9 @@ const CommentItem: React.FC<CommentItemProps> = ({
                 mb: isLastInSequence ? "24px" : "6px",
                 maxWidth: "100%",
                 minWidth: 0,
+                position: "relative",
                 width: "100%",
+                zIndex: isHighlighted ? 2 : "auto",
             }}
         >
             {showHeader && (
@@ -591,55 +614,21 @@ const CommentItem: React.FC<CommentItemProps> = ({
             )}
             <Box
                 className={isOwner ? "green-bg" : undefined}
-                component="button"
-                type="button"
-                aria-label={`Comment actions for ${authorName}`}
-                onContextMenuCapture={(event) => event.preventDefault()}
-                onContextMenu={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    clearHoldTimeout();
-                    openActions(event.currentTarget);
-                }}
-                onPointerCancel={clearHoldTimeout}
-                onPointerDown={startActionHold}
-                onPointerLeave={clearHoldTimeout}
-                onPointerMove={cancelHoldOnMove}
-                onPointerUp={clearHoldTimeout}
+                onContextMenu={handleContextMenu}
                 sx={{
-                    appearance: "none",
                     bgcolor: isOwner ? commentsOwnerBubble : commentsSurface,
-                    border: 0,
                     borderRadius: bubbleBorderRadius,
                     color: textBase,
-                    cursor: "pointer",
                     display: "block",
-                    font: "inherit",
                     maxWidth: "min(calc(100vw - 72px), 360px)",
                     minWidth: 0,
                     ml: isOwner ? 0 : "38px",
-                    overflow: "hidden",
-                    outline: isHighlighted
-                        ? `2px solid rgba(255, 255, 255, 0.42)`
-                        : undefined,
-                    outlineOffset: 2,
+                    overflow: "visible",
+                    position: "relative",
                     px: "16px",
                     py: parentComment ? "16px" : "14px",
                     textAlign: "left",
-                    touchAction: "pan-y",
-                    userSelect: "none",
-                    WebkitTouchCallout: "none",
-                    WebkitUserSelect: "none",
                     width: "fit-content",
-                    "&, & *": {
-                        userSelect: "none",
-                        WebkitTouchCallout: "none",
-                        WebkitUserSelect: "none",
-                    },
-                    "&:focus-visible": {
-                        outline: `2px solid ${green}`,
-                        outlineOffset: 2,
-                    },
                     "&:hover": {
                         bgcolor: isOwner ? commentsOwnerBubble : "#343434",
                     },
@@ -720,21 +709,26 @@ const CommentItem: React.FC<CommentItemProps> = ({
                 {isLiked && (
                     <Box
                         aria-label="Liked"
+                        role="img"
                         sx={{
                             alignItems: "center",
+                            bgcolor: "#2B2B2B",
+                            border: `2px solid ${commentsBackground}`,
+                            borderRadius: "999px",
+                            bottom: -11,
+                            boxShadow: "0 4px 10px rgba(0, 0, 0, 0.2)",
+                            boxSizing: "border-box",
                             color: green,
                             display: "inline-flex",
+                            height: 22,
                             justifyContent: "center",
-                            mt: "8px",
+                            minWidth: 28,
+                            px: "7px",
+                            position: "absolute",
+                            ...(isOwner ? { left: 8 } : { right: 8 }),
                         }}
                     >
-                        <HugeiconsIcon
-                            fill={green}
-                            icon={FavouriteIcon}
-                            primaryColor={green}
-                            size={13}
-                            strokeWidth={1.8}
-                        />
+                        <HeartIcon filled small />
                     </Box>
                 )}
             </Box>
@@ -1544,6 +1538,18 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                         zIndex: 3,
                     }}
                 >
+                    {commentContextMenu && (
+                        <Box
+                            aria-hidden
+                            onClick={closeCommentActions}
+                            sx={{
+                                bgcolor: "rgba(0, 0, 0, 0.6)",
+                                inset: 0,
+                                position: "absolute",
+                                zIndex: 1,
+                            }}
+                        />
+                    )}
                     <Box
                         component="header"
                         sx={{
@@ -1723,7 +1729,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                             disableRipple
                             onClick={() => handleCommentAction("like")}
                             sx={{
-                                borderRadius: "10px",
+                                borderRadius: "12px",
                                 color: textBase,
                                 gap: "8px",
                                 minHeight: 38,
@@ -1734,15 +1740,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                 },
                             }}
                         >
-                            <HugeiconsIcon
-                                fill={isContextCommentLiked ? green : "none"}
-                                icon={FavouriteIcon}
-                                primaryColor={
-                                    isContextCommentLiked ? green : undefined
-                                }
-                                size={16}
-                                strokeWidth={1.8}
-                            />
+                            <HeartIcon small />
                             <Box
                                 sx={{
                                     fontFamily:
@@ -1759,7 +1757,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                             disableRipple
                             onClick={() => handleCommentAction("reply")}
                             sx={{
-                                borderRadius: "10px",
+                                borderRadius: "12px",
                                 color: textBase,
                                 gap: "8px",
                                 minHeight: 38,
@@ -1770,11 +1768,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                 },
                             }}
                         >
-                            <HugeiconsIcon
-                                icon={MailReply01Icon}
-                                size={16}
-                                strokeWidth={1.8}
-                            />
+                            <ReplyIcon />
                             <Box
                                 sx={{
                                     fontFamily:
@@ -1792,7 +1786,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                 disableRipple
                                 onClick={() => handleCommentAction("delete")}
                                 sx={{
-                                    borderRadius: "10px",
+                                    borderRadius: "12px",
                                     color: dangerColor,
                                     gap: "8px",
                                     minHeight: 38,
@@ -1803,11 +1797,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                     },
                                 }}
                             >
-                                <HugeiconsIcon
-                                    icon={Delete02Icon}
-                                    size={16}
-                                    strokeWidth={1.8}
-                                />
+                                <DeleteIcon />
                                 <Box
                                     sx={{
                                         fontFamily:
