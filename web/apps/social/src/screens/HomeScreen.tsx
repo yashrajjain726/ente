@@ -32,6 +32,12 @@ const feedCardBackground = "#F5F5F5";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
 const feedAvatarSize = 26;
+const headerActionSize = 32;
+const headerActionGap = 8;
+const headerAddIconSize = 24;
+const headerAvatarSize = 23;
+const headerIconSize = 25;
+const headerSideWidth = headerActionSize * 2 + headerActionGap;
 
 const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
 const hoursAgo = (hours: number) => minutesAgo(hours * 60);
@@ -178,6 +184,7 @@ const sampleFeedItems = [
 interface HomeScreenProps {
     friendsCount: number;
     onOpenFriend?: (friendID: string) => void;
+    onOpenNotifications?: () => void;
     onOpenProfile?: () => void;
     profile: SetupProfile;
 }
@@ -559,6 +566,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
 export const HomeScreen: React.FC<HomeScreenProps> = ({
     friendsCount,
     onOpenFriend,
+    onOpenNotifications,
     onOpenProfile,
     profile,
 }) => {
@@ -670,8 +678,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     sx={{
                         alignItems: "center",
                         display: "grid",
-                        gridTemplateColumns: "32px 1fr 32px",
-                        p: 2,
+                        gap: "12px",
+                        gridTemplateColumns: `${headerSideWidth}px minmax(0, 1fr) ${headerSideWidth}px`,
+                        boxSizing: "border-box",
+                        pb: 2,
+                        pt: 1.5,
+                        px: 1.25,
                         width: "100%",
                     }}
                 >
@@ -706,21 +718,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 postActionPhase == null ? "pointer" : "default",
                             display: "flex",
                             fontSize: 0,
-                            height: 32,
+                            height: headerActionSize,
                             justifyContent: "center",
-                            justifySelf: "flex-start",
                             lineHeight: 0,
+                            ml: 0,
                             opacity: 1,
                             p: 0,
                             placeSelf: "center start",
-                            width: 28,
+                            width: headerActionSize,
                             transition: `color ${socialActionTransition}`,
-                            "& svg": {
-                                display: "block",
-                                transform: "translateX(-2px)",
-                            },
+                            "& svg": { display: "block" },
                             "&:focus-visible": {
-                                borderRadius: "6px",
+                                borderRadius: "50%",
                                 outline: `2px solid ${green}`,
                                 outlineOffset: 2,
                             },
@@ -730,12 +739,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             idleIcon={
                                 <HugeiconsIcon
                                     icon={AddSquareIcon}
-                                    size={28}
+                                    size={headerAddIconSize}
                                     strokeWidth={1.8}
                                 />
                             }
                             phase={postActionFeedbackPhase}
-                            size={28}
+                            size={headerAddIconSize}
                         />
                     </Box>
                     <Box
@@ -744,6 +753,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             color: textBase,
                             justifySelf: "center",
                             lineHeight: 0,
+                            minWidth: 0,
                             overflow: "visible",
                             placeSelf: "center",
                             width: 58,
@@ -753,64 +763,125 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         <EnteLogo height={18} />
                     </Box>
                     <Box
-                        component="button"
-                        type="button"
-                        aria-label="Open profile"
-                        onClick={onOpenProfile}
                         sx={{
-                            appearance: "none",
                             alignItems: "center",
-                            bgcolor: profile.avatarUrl
-                                ? "transparent"
-                                : paleGreen,
-                            border: 0,
-                            borderRadius: "50%",
-                            boxSizing: "border-box",
-                            color: green,
-                            cursor: onOpenProfile ? "pointer" : "default",
                             display: "flex",
-                            height: feedAvatarSize,
-                            justifyContent: "center",
+                            gap: `${headerActionGap}px`,
+                            justifyContent: "flex-end",
                             justifySelf: "flex-end",
-                            lineHeight: 0,
-                            placeSelf: "center end",
-                            overflow: "hidden",
-                            p: 0,
-                            width: feedAvatarSize,
-                            "&:focus-visible": {
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
+                            minWidth: 0,
+                            width: "100%",
                         }}
                     >
-                        {profile.avatarUrl ? (
-                            <Box
-                                component="img"
-                                alt=""
-                                src={profile.avatarUrl}
-                                sx={{
-                                    display: "block",
-                                    height: "100%",
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label="Open notifications"
+                            onClick={onOpenNotifications}
+                            sx={{
+                                appearance: "none",
+                                alignItems: "center",
+                                bgcolor: "transparent",
+                                border: 0,
+                                boxSizing: "border-box",
+                                color: textBase,
+                                cursor: onOpenNotifications
+                                    ? "pointer"
+                                    : "default",
+                                display: "flex",
+                                fontSize: 0,
+                                height: headerActionSize,
+                                justifyContent: "center",
+                                lineHeight: 0,
+                                p: 0,
+                                width: headerActionSize,
+                                "& svg": { display: "block" },
+                                "&:focus-visible": {
                                     borderRadius: "50%",
-                                    objectFit: "cover",
-                                    objectPosition: "center",
-                                    width: "100%",
-                                }}
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
+                            <HugeiconsIcon
+                                icon={FavouriteIcon}
+                                size={headerIconSize}
+                                strokeWidth={1.8}
                             />
-                        ) : (
+                        </Box>
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label="Open profile"
+                            onClick={onOpenProfile}
+                            sx={{
+                                appearance: "none",
+                                alignItems: "center",
+                                bgcolor: "transparent",
+                                border: 0,
+                                borderRadius: "50%",
+                                boxSizing: "border-box",
+                                color: green,
+                                cursor: onOpenProfile ? "pointer" : "default",
+                                display: "flex",
+                                height: headerActionSize,
+                                justifyContent: "center",
+                                lineHeight: 0,
+                                overflow: "visible",
+                                p: 0,
+                                pr: "2.5px",
+                                width: headerActionSize,
+                                "&:focus-visible": {
+                                    borderRadius: "50%",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
                             <Box
                                 sx={{
-                                    color: green,
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 10,
-                                    fontWeight: 700,
-                                    lineHeight: 1,
+                                    alignItems: "center",
+                                    bgcolor: profile.avatarUrl
+                                        ? "transparent"
+                                        : paleGreen,
+                                    borderRadius: "50%",
+                                    display: "flex",
+                                    height: headerAvatarSize,
+                                    justifyContent: "center",
+                                    overflow: "hidden",
+                                    width: headerAvatarSize,
                                 }}
                             >
-                                {initials}
+                                {profile.avatarUrl ? (
+                                    <Box
+                                        component="img"
+                                        alt=""
+                                        src={profile.avatarUrl}
+                                        sx={{
+                                            display: "block",
+                                            height: "100%",
+                                            borderRadius: "50%",
+                                            objectFit: "cover",
+                                            objectPosition: "center",
+                                            width: "100%",
+                                        }}
+                                    />
+                                ) : (
+                                    <Box
+                                        sx={{
+                                            color: green,
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 9,
+                                            fontWeight: 700,
+                                            lineHeight: 1,
+                                        }}
+                                    >
+                                        {initials}
+                                    </Box>
+                                )}
                             </Box>
-                        )}
+                        </Box>
                     </Box>
                 </Box>
                 <Box

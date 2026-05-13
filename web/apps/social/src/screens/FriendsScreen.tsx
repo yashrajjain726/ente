@@ -374,6 +374,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             display: "flex",
                             height: 24,
                             justifyContent: "flex-start",
+                            ml: "-2px",
                             p: 0,
                             width: 24,
                             "&:focus-visible": {

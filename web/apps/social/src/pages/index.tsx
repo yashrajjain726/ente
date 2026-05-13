@@ -10,6 +10,10 @@ import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import { HomeScreen, homeBackground } from "screens/HomeScreen";
 import { LoginScreen, loginBackground } from "screens/LoginScreen";
 import {
+    NotificationsScreen,
+    notificationsBackground,
+} from "screens/NotificationsScreen";
+import {
     OnboardingScreen,
     addFriendOnboardingDescription,
     addFriendOnboardingTitle,
@@ -43,11 +47,12 @@ type Screen =
     | "home"
     | "profile"
     | "friends"
+    | "notifications"
     | "friend-profile"
     | "settings";
 
 type ProfileBackScreen = "login" | "verify-email";
-type FriendProfileBackScreen = "friends" | "home";
+type FriendProfileBackScreen = "friends" | "home" | "notifications";
 type OnboardingEntrySource = "direct" | "add-friend-link";
 
 const onboardingSourceSearchParam = "onboardingSource";
@@ -181,9 +186,11 @@ const Page: React.FC = () => {
                           ? profileBackground
                           : screen == "friends" || screen == "friend-profile"
                             ? friendsBackground
-                            : screen == "settings"
-                              ? settingsBackground
-                              : createAccountBackground;
+                            : screen == "notifications"
+                              ? notificationsBackground
+                              : screen == "settings"
+                                ? settingsBackground
+                                : createAccountBackground;
 
     return (
         <>
@@ -285,6 +292,9 @@ const Page: React.FC = () => {
                             onOpenFriend={(friendID) =>
                                 openFriendProfile(friendID, "home")
                             }
+                            onOpenNotifications={() =>
+                                setScreen("notifications")
+                            }
                             onOpenProfile={() => setScreen("profile")}
                         />
                     )}
@@ -310,6 +320,14 @@ const Page: React.FC = () => {
                                         (friend) => friend.id != friendID,
                                     ),
                                 )
+                            }
+                        />
+                    )}
+                    {screen == "notifications" && (
+                        <NotificationsScreen
+                            onBack={() => setScreen("home")}
+                            onOpenFriend={(friendID) =>
+                                openFriendProfile(friendID, "notifications")
                             }
                         />
                     )}
