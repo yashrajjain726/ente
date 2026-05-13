@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import {
     CreateAccountScreen,
     createAccountBackground,
+    type CreateAccountInput,
 } from "screens/CreateAccountScreen";
 import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import { HomeScreen, homeBackground } from "screens/HomeScreen";
@@ -36,6 +37,11 @@ import {
     VerifyEmailScreen,
     verifyEmailBackground,
 } from "screens/VerifyEmailScreen";
+import {
+    beginSocialSignup,
+    completeSocialSignup,
+    resendSocialSignupCode,
+} from "services/socialSignup";
 
 type Screen =
     | "onboarding"
@@ -132,6 +138,8 @@ const Page: React.FC = () => {
     const [selectedFriendID, setSelectedFriendID] = useState<string | null>(
         null,
     );
+    const [isLiveSignupVerification, setIsLiveSignupVerification] =
+        useState(false);
 
     const openSetupProfile = (backScreen: ProfileBackScreen) => {
         setProfileBackScreen(backScreen);
@@ -159,6 +167,32 @@ const Page: React.FC = () => {
                 : { kind: "app" },
         );
     }, []);
+
+    const createAccount = async (input: CreateAccountInput) => {
+        try {
+            await beginSocialSignup(input);
+            setEmail(input.email || "example@example.com");
+            setIsLiveSignupVerification(true);
+            setScreen("verify-email");
+        } catch (error) {
+            console.error("Social signup failed", error);
+        }
+    };
+
+    const verifySignupEmail = async (code: string) => {
+        if (!isLiveSignupVerification) {
+            openSetupProfile("verify-email");
+            return;
+        }
+
+        try {
+            await completeSocialSignup(email, code);
+            setIsLiveSignupVerification(false);
+            openSetupProfile("verify-email");
+        } catch (error) {
+            console.error("Social signup verification failed", error);
+        }
+    };
 
     const selectedFriend = selectedFriendID
         ? (friends.find((friend) => friend.id == selectedFriendID) ??
@@ -240,10 +274,9 @@ const Page: React.FC = () => {
                     {screen == "create-account" && (
                         <CreateAccountScreen
                             onBack={() => setScreen("onboarding")}
-                            onCreateAccount={(nextEmail) => {
-                                setEmail(nextEmail || "example@example.com");
-                                setScreen("verify-email");
-                            }}
+                            onCreateAccount={(input) =>
+                                void createAccount(input)
+                            }
                             onLogin={() => setScreen("login")}
                         />
                     )}
@@ -257,9 +290,17 @@ const Page: React.FC = () => {
                     {screen == "verify-email" && (
                         <VerifyEmailScreen
                             email={email}
+                            initialCode={
+                                isLiveSignupVerification ? "" : undefined
+                            }
                             onBack={() => setScreen("create-account")}
                             onChangeEmail={() => setScreen("create-account")}
-                            onVerify={() => openSetupProfile("verify-email")}
+                            onResendCode={
+                                isLiveSignupVerification
+                                    ? () => void resendSocialSignupCode(email)
+                                    : undefined
+                            }
+                            onVerify={(code) => void verifySignupEmail(code)}
                         />
                     )}
                     {screen == "setup-profile" && (

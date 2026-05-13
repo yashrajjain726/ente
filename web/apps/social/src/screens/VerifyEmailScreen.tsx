@@ -13,9 +13,11 @@ const mockVerificationCode = "888888";
 
 interface VerifyEmailScreenProps {
     email: string;
+    initialCode?: string;
     onBack: () => void;
     onChangeEmail: () => void;
-    onVerify?: () => void;
+    onResendCode?: () => void;
+    onVerify?: (code: string) => void;
 }
 
 const BackIcon: React.FC = () => (
@@ -114,11 +116,20 @@ const OtpInput: React.FC<OtpInputProps> = ({
 
 export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
     email,
+    initialCode = mockVerificationCode,
     onBack,
     onChangeEmail,
+    onResendCode,
     onVerify,
 }) => {
-    const [otp, setOtp] = useState<string[]>(mockVerificationCode.split(""));
+    const [otp, setOtp] = useState<string[]>(
+        initialCode
+            .replace(/\D/g, "")
+            .slice(0, 6)
+            .padEnd(6, " ")
+            .split("")
+            .map((digit) => (digit == " " ? "" : digit)),
+    );
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
     const activeIndex = Math.max(
@@ -134,19 +145,18 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
 
     useEffect(() => {
         const initialFocusIndex =
-            mockVerificationCode.replace(/\D/g, "").slice(0, 6).length >= 6
+            initialCode.replace(/\D/g, "").slice(0, 6).length >= 6
                 ? 5
                 : Math.max(
                       0,
-                      mockVerificationCode.replace(/\D/g, "").slice(0, 6)
-                          .length,
+                      initialCode.replace(/\D/g, "").slice(0, 6).length,
                   );
         const animationFrame = window.requestAnimationFrame(() =>
             focusInput(initialFocusIndex),
         );
 
         return () => window.cancelAnimationFrame(animationFrame);
-    }, []);
+    }, [initialCode]);
 
     const setDigitsFrom = (startIndex: number, rawValue: string) => {
         const digits = rawValue.replace(/\D/g, "").slice(0, 6 - startIndex);
@@ -202,6 +212,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
     const handleResendCode = () => {
         setOtp(Array(6).fill(""));
         focusInput(0);
+        onResendCode?.();
     };
 
     return (
@@ -437,7 +448,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                         component="button"
                         type="button"
                         disabled={!canVerify}
-                        onClick={onVerify}
+                        onClick={() => onVerify?.(otp.join(""))}
                         sx={{
                             alignItems: "center",
                             bgcolor: canVerify ? green : "#F5F5F5",

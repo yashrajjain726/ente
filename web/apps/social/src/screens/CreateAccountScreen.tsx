@@ -9,15 +9,15 @@ const textLight = "#969696";
 const textMuted = "#666";
 const warning = "#F63A3A";
 
-const mockCreateAccountData = {
-    email: "example@example.com",
-    password: "password123",
-    referralSource: "A friend",
-};
+export interface CreateAccountInput {
+    email: string;
+    password: string;
+    referralSource: string;
+}
 
 interface CreateAccountScreenProps {
     onBack: () => void;
-    onCreateAccount: (email: string) => void;
+    onCreateAccount: (input: CreateAccountInput) => void;
     onLogin?: () => void;
 }
 
@@ -198,15 +198,11 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
     onCreateAccount,
     onLogin,
 }) => {
-    const [email, setEmail] = useState(mockCreateAccountData.email);
-    const [password, setPassword] = useState(mockCreateAccountData.password);
-    const [confirmPassword, setConfirmPassword] = useState(
-        mockCreateAccountData.password,
-    );
-    const [referralSource, setReferralSource] = useState(
-        mockCreateAccountData.referralSource,
-    );
-    const [acceptedTerms, setAcceptedTerms] = useState(true);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [referralSource, setReferralSource] = useState("");
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
 
     const canCreateAccount =
         email.trim().length > 0 &&
@@ -216,7 +212,9 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
         acceptedTerms;
 
     const submitCreateAccount = () => {
-        if (canCreateAccount) onCreateAccount(email.trim());
+        if (canCreateAccount) {
+            onCreateAccount({ email: email.trim(), password, referralSource });
+        }
     };
 
     const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
