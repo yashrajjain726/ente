@@ -6,7 +6,6 @@ export const createAccountBackground = "#FAFAFA";
 const green = "#08C225";
 const textBase = "#000";
 const textLight = "#969696";
-const textMuted = "#666";
 const warning = "#F63A3A";
 
 export interface CreateAccountInput {
@@ -16,9 +15,9 @@ export interface CreateAccountInput {
 }
 
 interface CreateAccountScreenProps {
+    isSubmitting?: boolean;
     onBack: () => void;
     onCreateAccount: (input: CreateAccountInput) => void;
-    onLogin?: () => void;
 }
 
 interface TextInputProps {
@@ -194,9 +193,9 @@ const TextInput: React.FC<TextInputProps> = ({
 };
 
 export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
+    isSubmitting = false,
     onBack,
     onCreateAccount,
-    onLogin,
 }) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -205,6 +204,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
     const [acceptedTerms, setAcceptedTerms] = useState(false);
 
     const canCreateAccount =
+        !isSubmitting &&
         email.trim().length > 0 &&
         password.length > 0 &&
         confirmPassword.length > 0 &&
@@ -474,37 +474,9 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                                 : undefined,
                         }}
                     >
-                        Create an account
-                    </Box>
-                    <Box
-                        sx={{
-                            color: textMuted,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 500,
-                            lineHeight: "20px",
-                            opacity: 0.8,
-                            textAlign: "center",
-                            width: "100%",
-                        }}
-                    >
-                        Already have an account?{" "}
-                        <Box
-                            component="button"
-                            type="button"
-                            onClick={onLogin}
-                            sx={{
-                                bgcolor: "transparent",
-                                border: 0,
-                                color: green,
-                                cursor: onLogin ? "pointer" : "default",
-                                font: "inherit",
-                                p: 0,
-                                textDecoration: "underline",
-                            }}
-                        >
-                            Login
-                        </Box>
+                        {isSubmitting
+                            ? "Creating account..."
+                            : "Create an account"}
                     </Box>
                 </Box>
             </Box>

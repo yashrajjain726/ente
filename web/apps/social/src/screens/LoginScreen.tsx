@@ -6,15 +6,18 @@ export const loginBackground = "#FAFAFA";
 const green = "#08C225";
 const textBase = "#000";
 const textLight = "#969696";
-const textMuted = "#666";
 const warning = "#F63A3A";
 
-const mockLoginData = { email: "example@example.com", password: "password123" };
+export interface SocialLoginCredentials {
+    email: string;
+    password: string;
+}
 
 interface LoginScreenProps {
+    errorMessage?: string;
+    isSubmitting?: boolean;
     onBack: () => void;
-    onContinue?: () => void;
-    onSignup: () => void;
+    onContinue?: (credentials: SocialLoginCredentials) => Promise<void> | void;
 }
 
 interface TextInputProps {
@@ -172,17 +175,19 @@ const TextInput: React.FC<TextInputProps> = ({
 };
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
+    errorMessage,
+    isSubmitting = false,
     onBack,
     onContinue,
-    onSignup,
 }) => {
-    const [email, setEmail] = useState(mockLoginData.email);
-    const [password, setPassword] = useState(mockLoginData.password);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
 
-    const canContinue = email.trim().length > 0 && password.length > 0;
+    const canContinue =
+        !isSubmitting && email.trim().length > 0 && password.length > 0;
 
     const submitLogin = () => {
-        if (canContinue) onContinue?.();
+        if (canContinue) void onContinue?.({ email, password });
     };
 
     const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
@@ -296,6 +301,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                         type="password"
                         value={password}
                     />
+                    {errorMessage && (
+                        <Box
+                            role="alert"
+                            sx={{
+                                color: warning,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 13,
+                                fontWeight: 500,
+                                lineHeight: "18px",
+                                mt: "-8px",
+                            }}
+                        >
+                            {errorMessage}
+                        </Box>
+                    )}
                 </Box>
 
                 <Box
@@ -345,37 +366,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                                 : undefined,
                         }}
                     >
-                        Continue
-                    </Box>
-                    <Box
-                        sx={{
-                            color: textMuted,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 500,
-                            lineHeight: "20px",
-                            opacity: 0.8,
-                            textAlign: "center",
-                            width: "100%",
-                        }}
-                    >
-                        Don&apos;t have an account?{" "}
-                        <Box
-                            component="button"
-                            type="button"
-                            onClick={onSignup}
-                            sx={{
-                                bgcolor: "transparent",
-                                border: 0,
-                                color: green,
-                                cursor: "pointer",
-                                font: "inherit",
-                                p: 0,
-                                textDecoration: "underline",
-                            }}
-                        >
-                            Signup
-                        </Box>
+                        {isSubmitting ? "Signing in..." : "Continue"}
                     </Box>
                 </Box>
             </Box>

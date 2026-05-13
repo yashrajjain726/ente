@@ -1,6 +1,6 @@
 import { SocialPageMeta } from "components/SocialPageMeta";
 import { useRouter } from "next/router";
-import React from "react";
+import React, { useState } from "react";
 import {
     CreateAccountScreen,
     createAccountBackground,
@@ -13,8 +13,10 @@ import { socialRoutes } from "utils/socialRoutes";
 const Page: React.FC = () => {
     const router = useRouter();
     const { setIsLiveSignupVerification, setSignupEmail } = useSocialAppState();
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const createAccount = async (input: CreateAccountInput) => {
+        setIsSubmitting(true);
         try {
             await beginSocialSignup(input);
             setSignupEmail(input.email);
@@ -22,6 +24,7 @@ const Page: React.FC = () => {
             void router.push(socialRoutes.verify);
         } catch (error) {
             console.error("Social signup failed", error);
+            setIsSubmitting(false);
         }
     };
 
@@ -29,9 +32,9 @@ const Page: React.FC = () => {
         <>
             <SocialPageMeta themeColor={createAccountBackground} />
             <CreateAccountScreen
+                isSubmitting={isSubmitting}
                 onBack={() => void router.push(socialRoutes.onboarding)}
                 onCreateAccount={(input) => void createAccount(input)}
-                onLogin={() => void router.push(socialRoutes.login)}
             />
         </>
     );
