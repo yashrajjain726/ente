@@ -502,7 +502,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         cursor: onOpenPhoto ? "pointer" : "default",
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 13,
-                        fontWeight: 700,
+                        fontWeight: 500,
                         lineHeight: "18px",
                         p: "4px 0",
                         "&:focus-visible": {
@@ -532,7 +532,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         display: "inline-flex",
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 13,
-                        fontWeight: 700,
+                        fontWeight: 500,
                         gap: "4px",
                         lineHeight: "18px",
                         ml: "12px",
