@@ -361,6 +361,47 @@ func TestAddFriendIsIdempotentForExistingFriends(t *testing.T) {
 	require.Equal(t, 1, eventCount)
 }
 
+func TestDeleteFriendshipRemovesReciprocalShares(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice-delete-friend@example.com", "alice-public")
+	bobID := insertWallUser(t, module, "bob-delete-friend@example.com", "bob-public")
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice-delete-friend", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	bobWall, err := module.Walls.CreateWall(ctx, bobID, "bob-delete-friend", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+
+	err = module.Friends.AddFriend(ctx, aliceID, aliceWall.WallID, bobWall.WallID, "bob-share-key", bobWall.CurrentVersion, "alice-share-key", aliceWall.CurrentVersion)
+	require.NoError(t, err)
+
+	aliceShares, err := module.Friends.ListSharesForFriend(ctx, aliceID)
+	require.NoError(t, err)
+	require.Len(t, aliceShares, 1)
+	bobShares, err := module.Friends.ListSharesForFriend(ctx, bobID)
+	require.NoError(t, err)
+	require.Len(t, bobShares, 1)
+
+	err = module.Friends.DeleteFriendship(ctx, aliceID, bobWall.WallID)
+	require.NoError(t, err)
+
+	aliceShares, err = module.Friends.ListSharesForFriend(ctx, aliceID)
+	require.NoError(t, err)
+	require.Empty(t, aliceShares)
+	bobShares, err = module.Friends.ListSharesForFriend(ctx, bobID)
+	require.NoError(t, err)
+	require.Empty(t, bobShares)
+	aliceFriends, err := module.Friends.ListFriendsForWall(ctx, aliceWall.WallID)
+	require.NoError(t, err)
+	require.Empty(t, aliceFriends)
+	bobFriends, err := module.Friends.ListFriendsForWall(ctx, bobWall.WallID)
+	require.NoError(t, err)
+	require.Empty(t, bobFriends)
+	relationship, err := module.Friends.GetRelationship(ctx, aliceID, bobID, bobWall.WallID)
+	require.NoError(t, err)
+	require.Empty(t, relationship)
+}
+
 func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
 	ctx := context.Background()
 	module := newWallTestModule(t)

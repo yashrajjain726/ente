@@ -1455,6 +1455,35 @@ mod tests {
         .expect("account wall ctx should open")
     }
 
+    fn root_entity_response(master_key: &[u8], root_wall_key: &[u8]) -> String {
+        let payload = encrypt_entity_key(master_key, root_wall_key).expect("root wall entity");
+        json!({
+            "type": ROOT_WALL_KEY_TYPE,
+            "encryptedKey": payload.encrypted_key,
+            "header": payload.header,
+        })
+        .to_string()
+    }
+
+    fn owned_wall_response(
+        root_wall_key: &[u8],
+        wall_key: &[u8],
+        wall_id: &str,
+        wall_slug: &str,
+        key_version: i32,
+    ) -> String {
+        json!([{
+            "wallId": wall_id,
+            "wallSlug": wall_slug,
+            "encryptedWallKey": encode_b64(
+                &encrypt_secretbox_packed(root_wall_key, wall_key).expect("wall key wrap")
+            ),
+            "encryptedProfile": "",
+            "keyVersion": key_version
+        }])
+        .to_string()
+    }
+
     #[tokio::test]
     async fn get_or_create_root_wall_key_creates_when_missing() {
         let mut server = Server::new_async().await;
@@ -1799,6 +1828,167 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn upload_post_photo_asset_attaches_photo_metadata() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let presign = server
+            .mock("POST", "/wall/uploads/presign")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(
+                json!({
+                    "url": format!("{}/upload/photo-object", server.url()),
+                    "method": "PUT",
+                    "headers": {
+                        "content-type": "application/octet-stream"
+                    },
+                    "objectKey": "photo-object",
+                    "expiresIn": 300
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let upload = server
+            .mock("PUT", "/upload/photo-object")
+            .match_header("content-type", "application/octet-stream")
+            .with_status(200)
+            .create_async()
+            .await;
+
+        let payload = ctx
+            .upload_post_photo_asset(
+                &generate_key(),
+                b"photo-bytes",
+                Some(4032),
+                Some(3024),
+                Some("image/jpeg".to_owned()),
+            )
+            .await
+            .expect("photo upload should succeed");
+
+        assert_eq!(payload.object_key, "photo-object");
+        assert_eq!(payload.position, Some(0));
+        assert_eq!(payload.width, Some(4032));
+        assert_eq!(payload.height, Some(3024));
+        assert_eq!(payload.media_type.as_deref(), Some("image/jpeg"));
+        presign.assert_async().await;
+        upload.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn upload_avatar_uses_avatar_presign_and_object_store() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let presign = server
+            .mock("POST", "/wall/uploads/presign")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"purpose\":\"avatar\"".into()),
+                Matcher::Regex("\"wallId\":\"wall_owner_main\"".into()),
+                Matcher::Regex("\"size\"".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "url": format!("{}/upload/avatar-object", server.url()),
+                    "method": "PUT",
+                    "headers": {
+                        "content-type": "application/octet-stream"
+                    },
+                    "objectKey": "avatar-object",
+                    "expiresIn": 300
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let upload = server
+            .mock("PUT", "/upload/avatar-object")
+            .match_header("content-type", "application/octet-stream")
+            .with_status(200)
+            .create_async()
+            .await;
+
+        let payload = ctx
+            .upload_avatar("wall_owner_main", &generate_key(), b"avatar-bytes")
+            .await
+            .expect("avatar upload should succeed");
+
+        assert_eq!(payload.object_key, "avatar-object");
+        assert!(payload.size.unwrap_or_default() > 0);
+        presign.assert_async().await;
+        upload.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn create_wall_with_key_sends_encrypted_wall_and_profile_payloads() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let wall_key = generate_key();
+        let missing_root = server
+            .mock("GET", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "type".into(),
+                ROOT_WALL_KEY_TYPE.into(),
+            ))
+            .with_status(404)
+            .expect(1)
+            .create_async()
+            .await;
+        let create_root = server
+            .mock("POST", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"type\":\"wall\"".into()),
+                Matcher::Regex("\"encryptedKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"header\":\"[^\"]+\"".into()),
+            ]))
+            .with_status(200)
+            .with_body(r#"{"status":"ok"}"#)
+            .create_async()
+            .await;
+        let create_wall = server
+            .mock("POST", "/wall")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"wallSlug\":\"owner-main\"".into()),
+                Matcher::Regex("\"encryptedWallKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"encryptedProfile\":\"[^\"]+\"".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "wallId": "wall_owner_main",
+                    "wallSlug": "owner-main",
+                    "encryptedWallKey": "",
+                    "encryptedProfile": "",
+                    "keyVersion": 1
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let created = ctx
+            .create_wall_with_key("owner-main", &wall_key, b"profile-json")
+            .await
+            .expect("wall should be created");
+
+        assert_eq!(created.wall_id, "wall_owner_main");
+        assert_eq!(created.wall_slug, "owner-main");
+        assert_eq!(created.key_version, 1);
+        let profile_plaintext =
+            decrypt_secretbox_packed(&wall_key, &decode_b64(&created.encrypted_profile).unwrap())
+                .expect("created profile should decrypt");
+        assert_eq!(profile_plaintext, b"profile-json");
+        missing_root.assert_async().await;
+        create_root.assert_async().await;
+        create_wall.assert_async().await;
+    }
+
+    #[tokio::test]
     async fn create_post_includes_wall_key_version() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
@@ -1859,6 +2049,155 @@ mod tests {
         entity.assert_async().await;
         walls.assert_async().await;
         create.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn update_wall_profile_sends_encrypted_profile_and_avatar_payload() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let root_wall_key = generate_key();
+        let wall_key = generate_key();
+        let entity = server
+            .mock("GET", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "type".into(),
+                ROOT_WALL_KEY_TYPE.into(),
+            ))
+            .with_status(200)
+            .with_body(root_entity_response(&ctx.master_key, &root_wall_key))
+            .create_async()
+            .await;
+        let walls = server
+            .mock("GET", "/wall")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(owned_wall_response(
+                &root_wall_key,
+                &wall_key,
+                "wall_owner_main",
+                "owner-main",
+                3,
+            ))
+            .create_async()
+            .await;
+        let update = server
+            .mock("POST", "/wall/profile")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"wallId\":\"wall_owner_main\"".into()),
+                Matcher::Regex("\"encryptedProfile\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"avatar\"".into()),
+                Matcher::Regex("\"objectKey\":\"avatar-object\"".into()),
+                Matcher::Regex("\"size\":123".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "status": "ok",
+                    "avatar": {
+                        "objectKey": "avatar-object",
+                        "size": 123,
+                        "updatedAt": "2026-04-16T00:00:00Z"
+                    }
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let response = ctx
+            .update_wall_profile(
+                "wall_owner_main",
+                b"profile-v2",
+                Some(ProfileAvatarPayload {
+                    object_key: "avatar-object".to_owned(),
+                    size: Some(123),
+                }),
+                false,
+            )
+            .await
+            .expect("profile update should succeed");
+
+        assert_eq!(response.status, "ok");
+        assert_eq!(
+            response
+                .avatar
+                .as_ref()
+                .map(|avatar| avatar.object_key.as_str()),
+            Some("avatar-object")
+        );
+        entity.assert_async().await;
+        walls.assert_async().await;
+        update.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn get_wall_profile_decrypted_loads_and_decrypts_profile() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let root_wall_key = generate_key();
+        let wall_key = generate_key();
+        let encrypted_profile = encode_b64(
+            &encrypt_secretbox_packed(&wall_key, b"profile-json").expect("profile wrap"),
+        );
+        let profile = server
+            .mock("GET", "/wall/profile")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "wallId".into(),
+                "wall_owner_main".into(),
+            ))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "wallId": "wall_owner_main",
+                    "wallSlug": "owner-main",
+                    "version": 3,
+                    "encryptedProfile": encrypted_profile,
+                    "updatedAt": "2026-04-16T00:00:00Z"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let entity = server
+            .mock("GET", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "type".into(),
+                ROOT_WALL_KEY_TYPE.into(),
+            ))
+            .with_status(200)
+            .with_body(root_entity_response(&ctx.master_key, &root_wall_key))
+            .create_async()
+            .await;
+        let walls = server
+            .mock("GET", "/wall")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(owned_wall_response(
+                &root_wall_key,
+                &wall_key,
+                "wall_owner_main",
+                "owner-main",
+                3,
+            ))
+            .create_async()
+            .await;
+
+        let decrypted = ctx
+            .get_wall_profile_decrypted("wall_owner_main", None)
+            .await
+            .expect("profile should decrypt");
+
+        assert_eq!(decrypted.wall_id, "wall_owner_main");
+        assert_eq!(decrypted.wall_slug, "owner-main");
+        assert_eq!(decrypted.version, 3);
+        assert_eq!(decrypted.profile, b"profile-json");
+        profile.assert_async().await;
+        entity.assert_async().await;
+        walls.assert_async().await;
     }
 
     #[tokio::test]
@@ -2007,6 +2346,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn update_post_caption_uses_caption_endpoint() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let update = server
+            .mock("POST", "/wall/posts/42/caption")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::Regex("\"captionCipher\":\"[^\"]+\"".into()))
+            .with_status(200)
+            .create_async()
+            .await;
+
+        ctx.update_post_caption(42, &generate_key(), Some(b"updated caption"))
+            .await
+            .expect("caption update should succeed");
+
+        update.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn like_post_uses_post_like_endpoint() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let like = server
+            .mock("POST", "/wall/posts/42/like")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::JsonString(json!({"like": true}).to_string()))
+            .with_status(200)
+            .with_body(json!({"liked": true}).to_string())
+            .create_async()
+            .await;
+
+        let response = ctx
+            .like_post(42, true)
+            .await
+            .expect("post like should succeed");
+
+        assert!(response.liked);
+        like.assert_async().await;
+    }
+
+    #[tokio::test]
     async fn like_comment_uses_comment_like_endpoint() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
@@ -2065,6 +2445,93 @@ mod tests {
         assert_eq!(response.likers[0].actor.wall_id, "wall_liker");
         assert_eq!(response.next_cursor, "2000:8");
         likers.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn list_comments_uses_post_comments_endpoint() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let comments = server
+            .mock("GET", "/wall/posts/42/comments")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::AllOf(vec![
+                Matcher::UrlEncoded("cursor".into(), "7".into()),
+                Matcher::UrlEncoded("limit".into(), "5".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "comments": [{
+                        "commentId": 7,
+                        "author": {
+                            "userId": 8,
+                            "wallId": "wall_commenter",
+                            "wallSlug": "commenter"
+                        },
+                        "commentCipher": "cGFja2Vk",
+                        "createdAt": "2026-04-16T00:00:00Z",
+                        "likes": 2,
+                        "viewerLiked": true,
+                        "viewerCanDelete": false,
+                        "parentCommentId": 3
+                    }],
+                    "nextCursor": "6"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let response = ctx
+            .list_comments(42, Some(5), Some(7))
+            .await
+            .expect("comments should load");
+
+        assert_eq!(response.comments[0].comment_id, 7);
+        assert_eq!(response.comments[0].parent_comment_id, Some(3));
+        assert_eq!(response.next_cursor, "6");
+        comments.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn list_wall_friends_uses_wall_friends_endpoint() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let friends = server
+            .mock("GET", "/wall/friends")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "wallId".into(),
+                "wall_owner_main".into(),
+            ))
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "friend": {
+                        "userId": 8,
+                        "wallId": "wall_friend",
+                        "wallSlug": "friend",
+                        "publicKey": "friend-public-key",
+                        "keyVersion": 2,
+                        "encryptedProfile": "profile-cipher"
+                    },
+                    "shareKeyVersion": 2,
+                    "createdAt": "2026-04-16T00:00:00Z"
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let response = ctx
+            .list_wall_friends("wall_owner_main")
+            .await
+            .expect("friends should load");
+
+        assert_eq!(response.len(), 1);
+        assert_eq!(response[0].friend.wall_id, "wall_friend");
+        assert_eq!(response[0].share_key_version, 2);
+        friends.assert_async().await;
     }
 
     #[tokio::test]
@@ -2218,6 +2685,107 @@ mod tests {
         walls.assert_async().await;
         friends.assert_async().await;
         refresh.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn wall_link_status_create_and_delete_use_link_endpoints() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let root_wall_key = generate_key();
+        let wall_key = generate_key();
+
+        let entity = server
+            .mock("GET", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "type".into(),
+                ROOT_WALL_KEY_TYPE.into(),
+            ))
+            .with_status(200)
+            .with_body(root_entity_response(&ctx.master_key, &root_wall_key))
+            .create_async()
+            .await;
+        let walls = server
+            .mock("GET", "/wall")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(owned_wall_response(
+                &root_wall_key,
+                &wall_key,
+                "wall_owner_main",
+                "owner-main",
+                3,
+            ))
+            .create_async()
+            .await;
+        let status = server
+            .mock("GET", "/wall/links/wall_owner_main")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(
+                json!({
+                    "wallId": "wall_owner_main",
+                    "wallSlug": "owner-main",
+                    "keyVersion": 3,
+                    "active": true,
+                    "createdAt": "2026-04-16T00:00:00Z",
+                    "updatedAt": "2026-04-16T00:00:00Z"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let create = server
+            .mock("POST", "/wall/links")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"wallId\":\"wall_owner_main\"".into()),
+                Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"keyVersion\":3".into()),
+                Matcher::Regex("\"encryptedWallKey\":\"[^\"]+\"".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "wallId": "wall_owner_main",
+                    "wallSlug": "owner-main",
+                    "keyVersion": 3,
+                    "active": true,
+                    "createdAt": "2026-04-16T00:00:00Z",
+                    "updatedAt": "2026-04-16T00:00:00Z"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let delete = server
+            .mock("DELETE", "/wall/links/wall_owner_main")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .create_async()
+            .await;
+
+        let status_response = ctx
+            .get_wall_link_status("wall_owner_main")
+            .await
+            .expect("link status should load");
+        let created = ctx
+            .create_wall_link("wall_owner_main")
+            .await
+            .expect("link should be created");
+        ctx.delete_wall_link("wall_owner_main")
+            .await
+            .expect("link should be deleted");
+
+        assert!(status_response.active);
+        assert_eq!(created.wall_id, "wall_owner_main");
+        assert_eq!(created.wall_username, "owner-main");
+        assert_eq!(created.key_version, 3);
+        status.assert_async().await;
+        entity.assert_async().await;
+        walls.assert_async().await;
+        create.assert_async().await;
+        delete.assert_async().await;
     }
 
     #[tokio::test]

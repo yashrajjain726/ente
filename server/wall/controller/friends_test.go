@@ -40,3 +40,46 @@ func TestFriendRelationshipReportsSelfFriendAndEmpty(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, resp.Relationship)
 }
+
+func TestUnfriendByWallIDRemovesReciprocalShares(t *testing.T) {
+	friends, repos, ctx := setupFriendsControllerTest(t)
+	aliceID := insertWallControllerUser(t, repos, "alice-unfriend-wall@example.com", "alice-public")
+	bobID := insertWallControllerUser(t, repos, "bob-unfriend-wall@example.com", "bob-public")
+	aliceWall, err := repos.Walls.CreateWall(ctx, aliceID, "alice-unfriend-wall", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	bobWall, err := repos.Walls.CreateWall(ctx, bobID, "bob-unfriend-wall", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+	require.NoError(t, repos.Friends.AddFriend(ctx, aliceID, aliceWall.WallID, bobWall.WallID, "bob-share-key", bobWall.CurrentVersion, "alice-share-key", aliceWall.CurrentVersion))
+
+	err = friends.Unfriend(newWallControllerContext(aliceID), models.FriendTargetPayload{TargetWallID: &bobWall.WallID})
+
+	require.NoError(t, err)
+	aliceShares, err := repos.Friends.ListSharesForFriend(ctx, aliceID)
+	require.NoError(t, err)
+	require.Empty(t, aliceShares)
+	bobShares, err := repos.Friends.ListSharesForFriend(ctx, bobID)
+	require.NoError(t, err)
+	require.Empty(t, bobShares)
+}
+
+func TestUnfriendByUsernameRemovesReciprocalShares(t *testing.T) {
+	friends, repos, ctx := setupFriendsControllerTest(t)
+	aliceID := insertWallControllerUser(t, repos, "alice-unfriend-username@example.com", "alice-public")
+	bobID := insertWallControllerUser(t, repos, "bob-unfriend-username@example.com", "bob-public")
+	aliceWall, err := repos.Walls.CreateWall(ctx, aliceID, "alice-unfriend-username", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	bobWall, err := repos.Walls.CreateWall(ctx, bobID, "bob-unfriend-username", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+	require.NoError(t, repos.Friends.AddFriend(ctx, aliceID, aliceWall.WallID, bobWall.WallID, "bob-share-key", bobWall.CurrentVersion, "alice-share-key", aliceWall.CurrentVersion))
+
+	targetUsername := "bob-unfriend-username"
+	err = friends.Unfriend(newWallControllerContext(aliceID), models.FriendTargetPayload{TargetUsername: &targetUsername})
+
+	require.NoError(t, err)
+	aliceShares, err := repos.Friends.ListSharesForFriend(ctx, aliceID)
+	require.NoError(t, err)
+	require.Empty(t, aliceShares)
+	bobShares, err := repos.Friends.ListSharesForFriend(ctx, bobID)
+	require.NoError(t, err)
+	require.Empty(t, bobShares)
+}
