@@ -515,10 +515,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             fontWeight: 500,
                             lineHeight: "18px",
                             p: "4px 0",
-                            "&:focus-visible": {
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
                             "&:hover": { color: green },
                         }}
                     >
@@ -552,10 +548,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         lineHeight: "18px",
                         ml: "12px",
                         p: "4px 2px",
-                        "&:focus-visible": {
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
                         "&:hover": { color: green },
                     }}
                 >
