@@ -108,6 +108,7 @@ type WallCommentRecord struct {
 	CommentID       int64
 	PostID          int64
 	AuthorID        int64
+	AuthorWallID    string
 	Author          string
 	CommentCipher   string
 	ParentCommentID sql.NullInt64
@@ -115,6 +116,13 @@ type WallCommentRecord struct {
 	Likes           int64
 	ViewerLiked     bool
 	ViewerCanDelete bool
+}
+
+type WallPostLikerRecord struct {
+	UserID    int64
+	WallID    string
+	WallSlug  string
+	CreatedAt int64
 }
 
 type WallShareRecord struct {
@@ -197,6 +205,7 @@ type WallNotificationRecord struct {
 	CommentID                sql.NullInt64
 	ParentCommentID          sql.NullInt64
 	CommentAuthorID          sql.NullInt64
+	CommentAuthorWallID      sql.NullString
 	CommentAuthor            sql.NullString
 	CommentCipher            sql.NullString
 	CommentCreatedAt         sql.NullInt64

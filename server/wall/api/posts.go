@@ -61,6 +61,11 @@ func (h *Handlers) TogglePostLike(c *gin.Context) {
 	respondJSON(c, resp, err)
 }
 
+func (h *Handlers) ListPostLikers(c *gin.Context) {
+	resp, err := h.Module.Posts.ListLikers(c, c.Param("postID"))
+	respondJSON(c, resp, err)
+}
+
 func (h *Handlers) DeletePost(c *gin.Context) {
 	respondStatus(c, h.Module.Posts.Delete(c, c.Param("postID")))
 }

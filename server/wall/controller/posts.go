@@ -211,6 +211,47 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models
 	return &models.LikePostResponse{Liked: req.Like}, nil
 }
 
+func (c *PostsController) ListLikers(ctx *gin.Context, postID string) (*models.ListPostLikersResponse, error) {
+	id, err := strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
+	if err != nil || id <= 0 {
+		return nil, ente.NewBadRequestWithMessage("invalid postID")
+	}
+	viewer, err := c.auth.resolveViewer(ctx)
+	if err != nil {
+		return nil, err
+	}
+	viewerID := int64(0)
+	if viewer != nil {
+		viewerID = viewer.UserID
+	}
+	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), id, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	wall, err := c.WallsRepo.GetWallByID(ctx.Request.Context(), post.WallID)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.auth.canViewWall(ctx.Request.Context(), viewer, wall); err != nil {
+		return nil, err
+	}
+	limit, _ := strconv.Atoi(strings.TrimSpace(ctx.Query("limit")))
+	likers, nextCursor, err := c.PostsRepo.ListPostLikers(ctx.Request.Context(), id, ctx.Query("cursor"), limit)
+	if err != nil {
+		return nil, err
+	}
+	resp := make([]models.PostLikerResponse, 0, len(likers))
+	for _, liker := range likers {
+		resp = append(resp, models.PostLikerResponse{
+			UserID:    liker.UserID,
+			WallID:    liker.WallID,
+			WallSlug:  liker.WallSlug,
+			CreatedAt: formatMicros(liker.CreatedAt),
+		})
+	}
+	return &models.ListPostLikersResponse{Likers: resp, NextCursor: nextCursor}, nil
+}
+
 func (c *PostsController) Delete(ctx *gin.Context, postID string) error {
 	userID, err := c.auth.requireUser(ctx)
 	if err != nil {

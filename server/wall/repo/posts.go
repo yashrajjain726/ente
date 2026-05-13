@@ -261,6 +261,47 @@ func (r *PostsRepository) SetLike(ctx context.Context, postID, userID int64, lik
 	return stacktrace.Propagate(err, "")
 }
 
+func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, cursor string, limit int) ([]WallPostLikerRecord, string, error) {
+	limit = optionalInt(limit, 50)
+	if limit > 100 {
+		limit = 100
+	}
+	args := []any{postID}
+	query := `
+		SELECT pl.user_id, liker_wall.wall_id, liker_wall.wall_slug, pl.created_at
+		FROM wall_post_likes pl
+		JOIN walls liker_wall ON liker_wall.owner_id = pl.user_id
+		WHERE pl.post_id = $1`
+	if cursorCreatedAt, cursorUserID, ok := parsePostLikerCursor(cursor); ok {
+		args = append(args, cursorCreatedAt, cursorUserID)
+		query += ` AND (pl.created_at, pl.user_id) < ($2, $3)`
+	}
+	args = append(args, limit+1)
+	query += ` ORDER BY pl.created_at DESC, pl.user_id DESC LIMIT $` + strconv.Itoa(len(args))
+	rows, err := r.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, "", stacktrace.Propagate(err, "")
+	}
+	defer rows.Close()
+	out := make([]WallPostLikerRecord, 0, limit+1)
+	for rows.Next() {
+		var rec WallPostLikerRecord
+		if err := rows.Scan(&rec.UserID, &rec.WallID, &rec.WallSlug, &rec.CreatedAt); err != nil {
+			return nil, "", stacktrace.Propagate(err, "")
+		}
+		out = append(out, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", stacktrace.Propagate(err, "")
+	}
+	nextCursor := ""
+	if len(out) > limit {
+		nextCursor = formatPostLikerCursor(out[limit-1])
+		out = out[:limit]
+	}
+	return out, nextCursor, nil
+}
+
 func (r *PostsRepository) UpdateCaption(ctx context.Context, postID, ownerID int64, captionCipher *string) error {
 	caption := ""
 	if captionCipher != nil {
@@ -294,7 +335,7 @@ func (r *PostsRepository) CreateComment(ctx context.Context, postID, authorID in
 
 func (r *PostsRepository) GetComment(ctx context.Context, commentID, viewerID int64) (*WallCommentRecord, error) {
 	return scanCommentRecord(r.DB.QueryRowContext(ctx, `
-		SELECT c.comment_id, c.post_id, c.author_id, author_wall.wall_slug, c.comment_cipher, c.parent_comment_id, c.created_at,
+		SELECT c.comment_id, c.post_id, c.author_id, author_wall.wall_id, author_wall.wall_slug, c.comment_cipher, c.parent_comment_id, c.created_at,
 		       (SELECT COUNT(*) FROM wall_comment_likes cl WHERE cl.comment_id = c.comment_id) AS likes,
 		       EXISTS (SELECT 1 FROM wall_comment_likes cl WHERE cl.comment_id = c.comment_id AND cl.user_id = $2) AS viewer_liked,
 		       (c.author_id = $2) AS viewer_can_delete
@@ -311,7 +352,7 @@ func (r *PostsRepository) ListComments(ctx context.Context, postID, viewerID int
 	}
 	args := []any{postID, viewerID}
 	query := `
-		SELECT c.comment_id, c.post_id, c.author_id, author_wall.wall_slug, c.comment_cipher, c.parent_comment_id, c.created_at,
+		SELECT c.comment_id, c.post_id, c.author_id, author_wall.wall_id, author_wall.wall_slug, c.comment_cipher, c.parent_comment_id, c.created_at,
 	       (SELECT COUNT(*) FROM wall_comment_likes cl WHERE cl.comment_id = c.comment_id) AS likes,
 	       EXISTS (SELECT 1 FROM wall_comment_likes cl WHERE cl.comment_id = c.comment_id AND cl.user_id = $2) AS viewer_liked,
 	       (c.author_id = $2) AS viewer_can_delete
@@ -415,9 +456,29 @@ func formatPostCursor(post WallPostRecord) string {
 	return strconv.FormatInt(post.CreatedAt, 10) + ":" + strconv.FormatInt(post.PostID, 10)
 }
 
+func parsePostLikerCursor(cursor string) (int64, int64, bool) {
+	createdAtText, userIDText, ok := strings.Cut(strings.TrimSpace(cursor), ":")
+	if !ok {
+		return 0, 0, false
+	}
+	createdAt, err := strconv.ParseInt(createdAtText, 10, 64)
+	if err != nil || createdAt <= 0 {
+		return 0, 0, false
+	}
+	userID, err := strconv.ParseInt(userIDText, 10, 64)
+	if err != nil || userID <= 0 {
+		return 0, 0, false
+	}
+	return createdAt, userID, true
+}
+
+func formatPostLikerCursor(liker WallPostLikerRecord) string {
+	return strconv.FormatInt(liker.CreatedAt, 10) + ":" + strconv.FormatInt(liker.UserID, 10)
+}
+
 func scanCommentRecord(scanner interface{ Scan(dest ...any) error }) (*WallCommentRecord, error) {
 	var rec WallCommentRecord
-	if err := scanner.Scan(&rec.CommentID, &rec.PostID, &rec.AuthorID, &rec.Author, &rec.CommentCipher, &rec.ParentCommentID, &rec.CreatedAt, &rec.Likes, &rec.ViewerLiked, &rec.ViewerCanDelete); err != nil {
+	if err := scanner.Scan(&rec.CommentID, &rec.PostID, &rec.AuthorID, &rec.AuthorWallID, &rec.Author, &rec.CommentCipher, &rec.ParentCommentID, &rec.CreatedAt, &rec.Likes, &rec.ViewerLiked, &rec.ViewerCanDelete); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil

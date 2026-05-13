@@ -35,6 +35,10 @@ type ListWallFriendsRequest struct {
 	WallID string `form:"wallId"`
 }
 
+type FriendRelationshipRequest struct {
+	TargetWallID string `form:"targetWallId" binding:"required"`
+}
+
 type WallKeyResponse struct {
 	WallID           string `json:"wallId"`
 	WallSlug         string `json:"wallSlug"`
@@ -129,6 +133,10 @@ type FriendShareResponse struct {
 
 type FriendStatusResponse struct {
 	Status string `json:"status"`
+}
+
+type FriendRelationshipResponse struct {
+	Relationship string `json:"relationship"`
 }
 
 type UpdateWallProfileRequest struct {
@@ -226,6 +234,18 @@ type LikePostResponse struct {
 	Liked bool `json:"liked"`
 }
 
+type ListPostLikersResponse struct {
+	Likers     []PostLikerResponse `json:"likers"`
+	NextCursor string              `json:"nextCursor,omitempty"`
+}
+
+type PostLikerResponse struct {
+	UserID    int64  `json:"userId"`
+	WallID    string `json:"wallId"`
+	WallSlug  string `json:"wallSlug"`
+	CreatedAt string `json:"createdAt"`
+}
+
 type LikeCommentRequest struct {
 	Like bool `json:"like"`
 }
@@ -278,6 +298,7 @@ type FeedPage struct {
 type CommentResponse struct {
 	CommentID       int64  `json:"commentId"`
 	AuthorID        int64  `json:"authorId"`
+	AuthorWallID    string `json:"authorWallId"`
 	Author          string `json:"author"`
 	CommentCipher   string `json:"commentCipher"`
 	CreatedAt       string `json:"createdAt"`
@@ -316,6 +337,7 @@ type NotificationPostResponse struct {
 type NotificationCommentResponse struct {
 	CommentID       int64  `json:"commentId"`
 	AuthorID        int64  `json:"authorId,omitempty"`
+	AuthorWallID    string `json:"authorWallId,omitempty"`
 	Author          string `json:"author,omitempty"`
 	CommentCipher   string `json:"commentCipher,omitempty"`
 	CreatedAt       string `json:"createdAt,omitempty"`

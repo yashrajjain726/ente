@@ -83,6 +83,9 @@ func toNotificationResponse(notification repo.WallNotificationRecord) models.Not
 		if notification.CommentAuthorID.Valid {
 			comment.AuthorID = notification.CommentAuthorID.Int64
 		}
+		if notification.CommentAuthorWallID.Valid {
+			comment.AuthorWallID = notification.CommentAuthorWallID.String
+		}
 		if notification.CommentAuthor.Valid {
 			comment.Author = notification.CommentAuthor.String
 		}

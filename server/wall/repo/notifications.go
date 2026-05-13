@@ -33,6 +33,7 @@ const wallNotificationRows = `
 		NULL::bigint AS comment_id,
 		NULL::bigint AS parent_comment_id,
 		NULL::bigint AS comment_author_id,
+		NULL::text AS comment_author_wall_id,
 		NULL::text AS comment_author,
 		NULL::text AS comment_cipher,
 		NULL::bigint AS comment_created_at
@@ -78,6 +79,7 @@ const wallNotificationRows = `
 		c.comment_id,
 		NULL::bigint AS parent_comment_id,
 		c.author_id AS comment_author_id,
+		actor_wall.wall_id AS comment_author_wall_id,
 		actor_wall.wall_slug AS comment_author,
 		c.comment_cipher,
 		c.created_at AS comment_created_at
@@ -125,6 +127,7 @@ const wallNotificationRows = `
 		c.comment_id,
 		c.parent_comment_id,
 		c.author_id AS comment_author_id,
+		actor_wall.wall_id AS comment_author_wall_id,
 		actor_wall.wall_slug AS comment_author,
 		c.comment_cipher,
 		c.created_at AS comment_created_at
@@ -173,6 +176,7 @@ const wallNotificationRows = `
 		c.comment_id,
 		c.parent_comment_id,
 		c.author_id AS comment_author_id,
+		comment_author_wall.wall_id AS comment_author_wall_id,
 		comment_author_wall.wall_slug AS comment_author,
 		c.comment_cipher,
 		c.created_at AS comment_created_at
@@ -221,6 +225,7 @@ const wallNotificationRows = `
 		NULL::bigint AS comment_id,
 		NULL::bigint AS parent_comment_id,
 		NULL::bigint AS comment_author_id,
+		NULL::text AS comment_author_wall_id,
 		NULL::text AS comment_author,
 		NULL::text AS comment_cipher,
 		NULL::bigint AS comment_created_at
@@ -248,7 +253,7 @@ func (r *NotificationsRepository) List(ctx context.Context, userID int64, cursor
 		       n.post_id, n.post_wall_id, n.post_wall_slug, n.post_owner_id, n.post_author,
 		       n.post_object_key, n.post_object_size, n.post_object_position, n.post_object_variant,
 		       n.post_object_blur_hash_cipher, n.post_object_width, n.post_object_height, n.post_object_media_type,
-		       n.comment_id, n.parent_comment_id, n.comment_author_id, n.comment_author, n.comment_cipher, n.comment_created_at
+		       n.comment_id, n.parent_comment_id, n.comment_author_id, n.comment_author_wall_id, n.comment_author, n.comment_cipher, n.comment_created_at
 		FROM notifications n
 		WHERE ($2::bigint IS NULL OR (n.created_at, n.notification_id) < ($2::bigint, $3::text))
 		ORDER BY n.created_at DESC, n.notification_id DESC
@@ -304,6 +309,7 @@ func scanNotificationRecord(scanner interface{ Scan(dest ...any) error }) (*Wall
 		&rec.CommentID,
 		&rec.ParentCommentID,
 		&rec.CommentAuthorID,
+		&rec.CommentAuthorWallID,
 		&rec.CommentAuthor,
 		&rec.CommentCipher,
 		&rec.CommentCreatedAt,

@@ -126,6 +126,26 @@ func (c *FriendsController) ListFriends(ctx *gin.Context, req models.ListWallFri
 	return resp, nil
 }
 
+func (c *FriendsController) Relationship(ctx *gin.Context, req models.FriendRelationshipRequest) (*models.FriendRelationshipResponse, error) {
+	userID, err := c.auth.requireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	targetWallID := strings.TrimSpace(req.TargetWallID)
+	if targetWallID == "" {
+		return nil, ente.NewBadRequestWithMessage("targetWallId is required")
+	}
+	targetWall, err := c.WallsRepo.GetWallByID(ctx.Request.Context(), targetWallID)
+	if err != nil {
+		return nil, err
+	}
+	relationship, err := c.FriendsRepo.GetRelationship(ctx.Request.Context(), userID, targetWall.OwnerID, targetWall.WallID)
+	if err != nil {
+		return nil, err
+	}
+	return &models.FriendRelationshipResponse{Relationship: relationship}, nil
+}
+
 func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFriendSharesRequest) error {
 	userID, err := c.auth.requireUser(ctx)
 	if err != nil {

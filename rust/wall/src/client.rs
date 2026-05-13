@@ -15,14 +15,15 @@ use crate::models::{
 use crate::transport::{
     AddFriendPayload, AssetDownloadResponse, CommentResponse, CreateCommentRequest,
     CreateEntityKeyRequest, CreatePostRequest, CreatePostResponse, CreateWallRequest,
-    EntityKeyPayload, EntityKeyResponse, FriendShareResponse, FriendStatusResponse,
-    FriendTargetPayload, LikeCommentRequest, LikeCommentResponse, LikePostRequest,
-    LikePostResponse, ListCommentsResponse, PostObjectPayload, PostPage, PostResponse,
-    PresignUploadRequest, PresignUploadResponse, ProfileAvatarPayload, RefreshFriendSharesRequest,
-    RotateWallKeyRequest, ShareUpdatePayload, UpdatePostCaptionRequest, UpdateWallProfileRequest,
-    UpdateWallProfileResponse, UpdateWallSlugRequest, WallFriendResponse, WallKeyResponse,
-    WallKeyVersionResponse, WallLinkCreateRequest, WallLinkLoginRequest, WallLinkLoginResponse,
-    WallLinkStatusResponse, WallLookupResponse, WallNotificationPage, WallProfileResponse,
+    EntityKeyPayload, EntityKeyResponse, FriendRelationshipResponse, FriendShareResponse,
+    FriendStatusResponse, FriendTargetPayload, LikeCommentRequest, LikeCommentResponse,
+    LikePostRequest, LikePostResponse, ListCommentsResponse, ListPostLikersResponse,
+    PostObjectPayload, PostPage, PostResponse, PresignUploadRequest, PresignUploadResponse,
+    ProfileAvatarPayload, RefreshFriendSharesRequest, RotateWallKeyRequest, ShareUpdatePayload,
+    UpdatePostCaptionRequest, UpdateWallProfileRequest, UpdateWallProfileResponse,
+    UpdateWallSlugRequest, WallFriendResponse, WallKeyResponse, WallKeyVersionResponse,
+    WallLinkCreateRequest, WallLinkLoginRequest, WallLinkLoginResponse, WallLinkStatusResponse,
+    WallLookupResponse, WallNotificationPage, WallProfileResponse,
 };
 use ente_core::crypto::{sealed, secretbox};
 use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
@@ -463,6 +464,21 @@ impl AccountWallCtx {
         })
     }
 
+    pub async fn upload_post_photo_asset(
+        &self,
+        post_key: &[u8],
+        plaintext: &[u8],
+        width: Option<i32>,
+        height: Option<i32>,
+        media_type: Option<String>,
+    ) -> Result<PostObjectPayload> {
+        let mut object = self.upload_post_asset(post_key, plaintext, Some(0)).await?;
+        object.width = width.filter(|value| *value > 0);
+        object.height = height.filter(|value| *value > 0);
+        object.media_type = media_type.filter(|value| !value.trim().is_empty());
+        Ok(object)
+    }
+
     pub async fn upload_avatar(
         &self,
         wall_id: &str,
@@ -609,10 +625,21 @@ impl AccountWallCtx {
             .map_err(Into::into)
     }
 
-    pub async fn fetch_post_decrypted(&self, post_id: i64) -> Result<DecryptedPost> {
+    pub async fn get_post(&self, post_id: i64) -> Result<PostResponse> {
         let path = format!("/wall/posts/{post_id}");
-        let post: PostResponse = self.client.get_json(&path, &[]).await?;
+        self.client.get_json(&path, &[]).await.map_err(Into::into)
+    }
+
+    pub async fn fetch_post_decrypted(&self, post_id: i64) -> Result<DecryptedPost> {
+        let post = self.get_post(post_id).await?;
         self.decrypt_post_for_wall(&post.wall_id, &post).await
+    }
+
+    pub async fn download_post_asset(&self, post_id: i64, object_key: &str) -> Result<Vec<u8>> {
+        let post = self.get_post(post_id).await?;
+        let decrypted = self.decrypt_post_for_wall(&post.wall_id, &post).await?;
+        self.download_decrypted_asset(&post.wall_id, object_key, &decrypted.post_key)
+            .await
     }
 
     pub async fn hydrate_wall_keys(&self) -> Result<HydratedKeys> {
@@ -721,6 +748,26 @@ impl AccountWallCtx {
         let request = LikePostRequest { like };
         self.client
             .post_json(&path, &request)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn list_post_likers(
+        &self,
+        post_id: i64,
+        cursor: Option<String>,
+        limit: Option<i32>,
+    ) -> Result<ListPostLikersResponse> {
+        let mut query = Vec::new();
+        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
+            query.push(("cursor", value));
+        }
+        if let Some(value) = limit {
+            query.push(("limit", value.to_string()));
+        }
+        let path = format!("/wall/posts/{post_id}/likes");
+        self.client
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }
@@ -846,6 +893,17 @@ impl AccountWallCtx {
         let query = vec![("wallId", wall_id.to_owned())];
         self.client
             .get_json("/wall/friends", &query)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn get_relationship(
+        &self,
+        target_wall_id: &str,
+    ) -> Result<FriendRelationshipResponse> {
+        let query = vec![("targetWallId", target_wall_id.to_owned())];
+        self.client
+            .get_json("/wall/friends/relationship", &query)
             .await
             .map_err(Into::into)
     }
@@ -984,6 +1042,7 @@ fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
         post_id: item.post_id,
         wall_id: item.wall_id.clone(),
         wall_slug: item.wall_slug.clone(),
+        owner_user_id: item.owner_user_id,
         author: item.wall_slug.clone(),
         encrypted_post_key: item.encrypted_post_key.clone(),
         caption_cipher: item.caption_cipher.clone(),
@@ -1112,6 +1171,11 @@ impl WallLinkCtx {
             .map_err(Into::into)
     }
 
+    pub async fn get_post(&self, post_id: i64) -> Result<PostResponse> {
+        let path = format!("/wall/posts/{post_id}");
+        self.client.get_json(&path, &[]).await.map_err(Into::into)
+    }
+
     pub async fn decrypt_post_key(&self, post: &PostResponse) -> Result<Vec<u8>> {
         let wall_key = self
             .resolve_wall_key_for_version(Some(post.key_version))
@@ -1137,6 +1201,13 @@ impl WallLinkCtx {
             post_key,
             caption_plaintext,
         })
+    }
+
+    pub async fn download_post_asset(&self, post_id: i64, object_key: &str) -> Result<Vec<u8>> {
+        let post = self.get_post(post_id).await?;
+        let decrypted = self.decrypt_post(&post).await?;
+        self.download_decrypted_asset(object_key, &decrypted.post_key)
+            .await
     }
 
     pub async fn list_comments(
@@ -1168,6 +1239,26 @@ impl WallLinkCtx {
         Ok(DecryptedComment {
             plaintext: decrypt_secretbox_packed(post_key, &packed)?,
         })
+    }
+
+    pub async fn list_post_likers(
+        &self,
+        post_id: i64,
+        cursor: Option<String>,
+        limit: Option<i32>,
+    ) -> Result<ListPostLikersResponse> {
+        let mut query = Vec::new();
+        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
+            query.push(("cursor", value));
+        }
+        if let Some(value) = limit {
+            query.push(("limit", value.to_string()));
+        }
+        let path = format!("/wall/posts/{post_id}/likes");
+        self.client
+            .get_json(&path, &query)
+            .await
+            .map_err(Into::into)
     }
 
     pub async fn list_wall_key_versions(&self) -> Result<Vec<WallKeyVersionResponse>> {
@@ -1590,6 +1681,7 @@ mod tests {
             post_id: 42,
             wall_id: "wall_owner_gallery".to_owned(),
             wall_slug: "owner-gallery".to_owned(),
+            owner_user_id: 7,
             author: "owner-gallery".to_owned(),
             encrypted_post_key: encode_b64(
                 &encrypt_secretbox_packed(&previous_wall_key, &post_key)
@@ -1884,6 +1976,105 @@ mod tests {
 
         assert!(response.liked);
         like.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn list_post_likers_uses_post_likes_endpoint() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let likers = server
+            .mock("GET", "/wall/posts/42/likes")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::AllOf(vec![
+                Matcher::UrlEncoded("cursor".into(), "3000:7".into()),
+                Matcher::UrlEncoded("limit".into(), "5".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "likers": [{
+                        "userId": 8,
+                        "wallId": "wall_liker",
+                        "wallSlug": "liker",
+                        "createdAt": "2026-04-16T00:00:00Z"
+                    }],
+                    "nextCursor": "2000:8"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let response = ctx
+            .list_post_likers(42, Some("3000:7".to_owned()), Some(5))
+            .await
+            .expect("likers should load");
+
+        assert_eq!(response.likers[0].wall_id, "wall_liker");
+        assert_eq!(response.next_cursor, "2000:8");
+        likers.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn get_relationship_uses_relationship_endpoint() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let relationship = server
+            .mock("GET", "/wall/friends/relationship")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "targetWallId".into(),
+                "wall_friend".into(),
+            ))
+            .with_status(200)
+            .with_body(json!({"relationship": "friend"}).to_string())
+            .create_async()
+            .await;
+
+        let response = ctx
+            .get_relationship("wall_friend")
+            .await
+            .expect("relationship should load");
+
+        assert_eq!(response.relationship, "friend");
+        relationship.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn wall_link_list_post_likers_uses_session_token() {
+        let mut server = Server::new_async().await;
+        let ctx = WallLinkCtx {
+            client: build_http_client(
+                &server.url(),
+                Some("link-session-token".to_owned()),
+                None,
+                None,
+                None,
+            )
+            .expect("http client"),
+            session_token: "link-session-token".to_owned(),
+            owner_handle: "owner".to_owned(),
+            wall_id: "wall_owner_main".to_owned(),
+            wall_slug: "owner-main".to_owned(),
+            owner_public_key: Vec::new(),
+            wall_key: generate_key(),
+            key_version: 1,
+        };
+        let likers = server
+            .mock("GET", "/wall/posts/42/likes")
+            .match_header("x-auth-token", "link-session-token")
+            .with_status(200)
+            .with_body(json!({"likers": [], "nextCursor": ""}).to_string())
+            .create_async()
+            .await;
+
+        let response = ctx
+            .list_post_likers(42, None, None)
+            .await
+            .expect("link likers should load");
+
+        assert!(response.likers.is_empty());
+        likers.assert_async().await;
     }
 
     #[tokio::test]

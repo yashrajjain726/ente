@@ -92,6 +92,7 @@ func toCommentResponse(comment wallrepo.WallCommentRecord) models.CommentRespons
 	resp := models.CommentResponse{
 		CommentID:       comment.CommentID,
 		AuthorID:        comment.AuthorID,
+		AuthorWallID:    comment.AuthorWallID,
 		Author:          comment.Author,
 		CommentCipher:   comment.CommentCipher,
 		CreatedAt:       formatMicros(comment.CreatedAt),

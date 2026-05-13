@@ -35,6 +35,16 @@ func (h *Handlers) ListWallFriends(c *gin.Context) {
 	respondJSON(c, resp, err)
 }
 
+func (h *Handlers) FriendRelationship(c *gin.Context) {
+	var req models.FriendRelationshipRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		respondJSON(c, nil, ente.ErrBadRequest)
+		return
+	}
+	resp, err := h.Module.Friends.Relationship(c, req)
+	respondJSON(c, resp, err)
+}
+
 func (h *Handlers) RefreshFriendShares(c *gin.Context) {
 	var req models.RefreshFriendSharesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

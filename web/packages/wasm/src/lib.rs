@@ -5,3 +5,4 @@ mod contacts;
 mod crypto;
 mod http;
 mod urls;
+mod wall;

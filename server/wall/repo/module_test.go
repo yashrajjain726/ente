@@ -169,6 +169,7 @@ func TestWallModuleLifecycle(t *testing.T) {
 	require.Len(t, comments, 2)
 	require.Empty(t, nextCommentsCursor)
 	require.Equal(t, comment.CommentID, comments[1].CommentID)
+	require.Equal(t, bobWall.WallID, comments[1].AuthorWallID)
 	require.Equal(t, comment.CommentID, comments[0].ParentCommentID.Int64)
 
 	assets, err := module.Posts.ListAssetsByPostIDs(ctx, []int64{postID})
@@ -718,7 +719,9 @@ func TestNotificationsIncludeWallSocialEvents(t *testing.T) {
 	require.Len(t, page, 3)
 	require.Equal(t, "addedYouAsFriend", page[0].Type)
 	require.Equal(t, "likedComment", page[1].Type)
+	require.Equal(t, aliceWall.WallID, page[1].CommentAuthorWallID.String)
 	require.Equal(t, "repliedToComment", page[2].Type)
+	require.Equal(t, bobWall.WallID, page[2].CommentAuthorWallID.String)
 	require.NotEmpty(t, nextCursor)
 
 	page, nextCursor, err = module.Notifications.List(ctx, aliceID, nextCursor, 3)
@@ -757,6 +760,41 @@ func TestListCommentsPaginates(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, first.CommentID, page[0].CommentID)
+	require.Empty(t, nextCursor)
+}
+
+func TestListPostLikersPaginates(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
+	devID := insertWallUser(t, module, "dev@example.com", "dev-public")
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	bobWall, err := module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+	devWall, err := module.Walls.CreateWall(ctx, devID, "dev", "dev-wall-key", "dev-profile")
+	require.NoError(t, err)
+	postID, err := module.Posts.CreatePost(ctx, aliceID, aliceWall.WallID, "post-key", nil, aliceWall.CurrentVersion, nil)
+	require.NoError(t, err)
+	require.NoError(t, module.Posts.SetLike(ctx, postID, bobID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, postID, devID, true))
+	setPostLikeCreatedAt(t, module, 3000, postID, bobID)
+	setPostLikeCreatedAt(t, module, 2000, postID, devID)
+
+	page, nextCursor, err := module.Posts.ListPostLikers(ctx, postID, "", 1)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
+	require.Equal(t, bobID, page[0].UserID)
+	require.Equal(t, bobWall.WallID, page[0].WallID)
+	require.Equal(t, "3000:"+strconv.FormatInt(bobID, 10), nextCursor)
+
+	page, nextCursor, err = module.Posts.ListPostLikers(ctx, postID, nextCursor, 1)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
+	require.Equal(t, devID, page[0].UserID)
+	require.Equal(t, devWall.WallID, page[0].WallID)
 	require.Empty(t, nextCursor)
 }
 

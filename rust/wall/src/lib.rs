@@ -12,10 +12,11 @@ pub use models::{
     OpenWallLinkCtxInput, PrivateKeySource,
 };
 pub use transport::{
-    CommentResponse, EntityKeyPayload, FriendShareResponse, FriendStatusResponse,
-    LikeCommentResponse, LikePostResponse, PostObjectPayload, PostPage, PostResponse,
-    PresignUploadResponse, ProfileAvatarPayload, ProfileAvatarResponse, WallFriendResponse,
-    WallKeyResponse, WallKeyVersionResponse, WallLinkLoginResponse, WallLinkStatusResponse,
-    WallLookupResponse, WallNotification, WallNotificationActor, WallNotificationComment,
-    WallNotificationPage, WallNotificationPost, WallNotificationType, WallProfileResponse,
+    CommentResponse, EntityKeyPayload, FriendRelationshipResponse, FriendShareResponse,
+    FriendStatusResponse, LikeCommentResponse, LikePostResponse, ListPostLikersResponse,
+    PostLikerResponse, PostObjectPayload, PostPage, PostResponse, PresignUploadResponse,
+    ProfileAvatarPayload, ProfileAvatarResponse, WallFriendResponse, WallKeyResponse,
+    WallKeyVersionResponse, WallLinkLoginResponse, WallLinkStatusResponse, WallLookupResponse,
+    WallNotification, WallNotificationActor, WallNotificationComment, WallNotificationPage,
+    WallNotificationPost, WallNotificationType, WallProfileResponse,
 };
