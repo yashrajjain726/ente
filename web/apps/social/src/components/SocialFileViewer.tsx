@@ -69,6 +69,7 @@ interface SocialFileViewerProps {
     initialScreen?: SocialViewerInitialScreen;
     onClose: () => void;
     onDeletePost?: () => void;
+    onOpenFriend?: (friendID: string) => void;
     onOpenProfile?: () => void;
     photo: SocialViewerPhoto;
 }
@@ -87,6 +88,7 @@ interface SocialComment {
 interface SocialLiker {
     id: string;
     avatarUrl?: string | null;
+    friendID?: string;
     name: string;
 }
 
@@ -106,7 +108,7 @@ const microsAgo = (durationMs: number) =>
 const mockComments: SocialComment[] = [
     {
         id: "kabir-plan",
-        author: "Kabir Mehta",
+        author: "Kabir Menon",
         avatarUrl: "/images/sample-feed-1.jpg",
         createdAtMicros: microsAgo(6 * minuteMs),
         text: "This is the overlook near the old forest road, right?",
@@ -139,7 +141,7 @@ const mockComments: SocialComment[] = [
     },
     {
         id: "kabir-followup",
-        author: "Kabir Mehta",
+        author: "Kabir Menon",
         avatarUrl: "/images/sample-feed-1.jpg",
         createdAtMicros: microsAgo(4 * minuteMs),
         parentCommentID: "you-kabir-plan",
@@ -217,7 +219,7 @@ const mockComments: SocialComment[] = [
     },
     {
         id: "devika",
-        author: "Devika Iyer",
+        author: "Isha Mehta",
         avatarUrl: "/images/sample-feed-2.jpg",
         createdAtMicros: microsAgo(74 * minuteMs),
         text: "Saving this for the weekend plan.",
@@ -233,7 +235,7 @@ const mockComments: SocialComment[] = [
     },
     {
         id: "devika-route",
-        author: "Devika Iyer",
+        author: "Isha Mehta",
         avatarUrl: "/images/sample-feed-2.jpg",
         createdAtMicros: microsAgo(70 * minuteMs),
         parentCommentID: "you-reply-devika",
@@ -250,7 +252,7 @@ const mockComments: SocialComment[] = [
     },
     {
         id: "kabir",
-        author: "Kabir Mehta",
+        author: "Kabir Menon",
         avatarUrl: "/images/sample-feed-1.jpg",
         createdAtMicros: microsAgo(3 * hourMs),
         text: "Looks peaceful. Was it crowded?",
@@ -266,7 +268,7 @@ const mockComments: SocialComment[] = [
     },
     {
         id: "kabir-crowd-2",
-        author: "Kabir Mehta",
+        author: "Kabir Menon",
         avatarUrl: "/images/sample-feed-1.jpg",
         createdAtMicros: microsAgo(3 * hourMs - 8 * minuteMs),
         parentCommentID: "you-crowd-reply",
@@ -283,21 +285,21 @@ const mockComments: SocialComment[] = [
     },
     {
         id: "samar",
-        author: "Samar Jain",
+        author: "Aparna Bhatnagar",
         avatarUrl: "/images/sample-feed-4.jpg",
         createdAtMicros: microsAgo(3 * dayMs),
         text: "The composition makes it feel cinematic.",
     },
     {
         id: "samar-2",
-        author: "Samar Jain",
+        author: "Aparna Bhatnagar",
         avatarUrl: "/images/sample-feed-4.jpg",
         createdAtMicros: microsAgo(3 * dayMs - 8 * minuteMs),
         text: "Also love that the sky is not overdone.",
     },
     {
         id: "leena",
-        author: "Leena Shah",
+        author: "Riya Kapoor",
         avatarUrl: "/images/sample-feed-6.jpg",
         createdAtMicros: microsAgo(8 * dayMs),
         text: "Need the exact location for this one.",
@@ -313,7 +315,7 @@ const mockComments: SocialComment[] = [
     },
     {
         id: "leena-final",
-        author: "Leena Shah",
+        author: "Riya Kapoor",
         avatarUrl: "/images/sample-feed-6.jpg",
         createdAtMicros: microsAgo(8 * dayMs - 39 * minuteMs),
         parentCommentID: "you-reply-leena",
@@ -322,23 +324,50 @@ const mockComments: SocialComment[] = [
 ];
 
 const mockPhotoLikers: SocialLiker[] = [
-    { id: "mira", avatarUrl: "/images/sample-feed-3.jpg", name: "Mira Sen" },
+    {
+        id: "mira",
+        avatarUrl: "/images/sample-feed-3.jpg",
+        friendID: "mira-sen",
+        name: "Mira Sen",
+    },
     {
         id: "kabir",
         avatarUrl: "/images/sample-feed-1.jpg",
-        name: "Kabir Mehta",
+        friendID: "kabir-menon",
+        name: "Kabir Menon",
     },
     {
         id: "devika",
         avatarUrl: "/images/sample-feed-2.jpg",
-        name: "Devika Iyer",
+        friendID: "isha-mehta",
+        name: "Isha Mehta",
     },
     {
         id: "nikhil",
         avatarUrl: "/images/sample-feed-5.jpg",
+        friendID: "nikhil-rao",
         name: "Nikhil Rao",
     },
 ];
+
+const friendIDForPersonName = (name: string): string | undefined => {
+    switch (name.trim()) {
+        case "Aparna Bhatnagar":
+            return "aparna-bhatnagar";
+        case "Isha Mehta":
+            return "isha-mehta";
+        case "Kabir Menon":
+            return "kabir-menon";
+        case "Riya Kapoor":
+            return "riya-kapoor";
+        case "Mira Sen":
+            return "mira-sen";
+        case "Nikhil Rao":
+            return "nikhil-rao";
+        default:
+            return undefined;
+    }
+};
 
 const commentAuthorKey = (comment: SocialComment) =>
     comment.isOwner ? "current-user" : comment.author;
@@ -530,6 +559,7 @@ interface CommentItemProps {
     isLiked: boolean;
     isLastInSequence: boolean;
     onOpenActions: (comment: SocialComment, anchorEl: HTMLElement) => void;
+    onOpenAuthorProfile?: () => void;
     parentComment?: SocialComment;
     showHeader: boolean;
     showOwnTimestamp: boolean;
@@ -541,6 +571,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
     isLiked,
     isLastInSequence,
     onOpenActions,
+    onOpenAuthorProfile,
     parentComment,
     showHeader,
     showOwnTimestamp,
@@ -590,14 +621,29 @@ const CommentItem: React.FC<CommentItemProps> = ({
         >
             {showHeader && (
                 <Box
+                    component={onOpenAuthorProfile ? "button" : "div"}
+                    type={onOpenAuthorProfile ? "button" : undefined}
+                    onClick={onOpenAuthorProfile}
                     sx={{
                         alignItems: "center",
+                        appearance: "none",
+                        bgcolor: "transparent",
+                        border: 0,
+                        color: "inherit",
+                        cursor: onOpenAuthorProfile ? "pointer" : "default",
                         display: "flex",
                         gap: "10px",
                         maxWidth: "min(calc(100vw - 32px), 360px)",
                         mb: "10px",
                         minWidth: 0,
+                        p: 0,
+                        textAlign: "left",
                         width: "100%",
+                        "&:focus-visible": {
+                            borderRadius: "18px",
+                            outline: `2px solid ${green}`,
+                            outlineOffset: 3,
+                        },
                     }}
                 >
                     <SocialAvatar
@@ -621,7 +667,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
                                 fontSize: 14,
-                                fontWeight: 750,
+                                fontWeight: 600,
                                 lineHeight: "20px",
                                 minWidth: 0,
                                 overflow: "hidden",
@@ -808,6 +854,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     initialScreen = "photo",
     onClose,
     onDeletePost,
+    onOpenFriend,
     onOpenProfile,
     photo,
 }) => {
@@ -1024,6 +1071,11 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     };
 
     const closeCommentActions = () => setCommentContextMenu(null);
+
+    const openFriendProfile = (friendID: string) => {
+        setCommentContextMenu(null);
+        onOpenFriend?.(friendID);
+    };
 
     const handleCommentAction = (action: "like" | "reply" | "delete") => {
         if (!commentContextMenu) return;
@@ -1862,57 +1914,96 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                 No likes yet
                             </Box>
                         ) : (
-                            photoLikers.map((liker) => (
-                                <Box
-                                    component="li"
-                                    key={liker.id}
-                                    sx={{
-                                        alignItems: "center",
-                                        borderRadius: "12px",
-                                        boxSizing: "border-box",
-                                        display: "flex",
-                                        gap: "12px",
-                                        minHeight: 52,
-                                        px: "2px",
-                                        py: "8px",
-                                        width: "100%",
-                                    }}
-                                >
-                                    <SocialAvatar
-                                        avatarUrl={liker.avatarUrl}
-                                        name={liker.name}
-                                        size={36}
-                                    />
+                            photoLikers.map((liker) => {
+                                const likerName = firstNameFrom(liker.name);
+                                const friendID =
+                                    liker.friendID ??
+                                    friendIDForPersonName(liker.name);
+                                const canOpenFriend = Boolean(
+                                    friendID && onOpenFriend,
+                                );
+                                const openLikerProfile =
+                                    canOpenFriend && friendID
+                                        ? () => openFriendProfile(friendID)
+                                        : undefined;
+
+                                return (
                                     <Box
-                                        sx={{
-                                            color: textBase,
-                                            flex: "1 1 auto",
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 14,
-                                            fontWeight: 650,
-                                            lineHeight: "20px",
-                                            minWidth: 0,
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            whiteSpace: "nowrap",
-                                        }}
+                                        component="li"
+                                        key={liker.id}
+                                        sx={{ listStyle: "none" }}
                                     >
-                                        {liker.name}
+                                        <Box
+                                            component={
+                                                canOpenFriend ? "button" : "div"
+                                            }
+                                            type={
+                                                canOpenFriend
+                                                    ? "button"
+                                                    : undefined
+                                            }
+                                            onClick={openLikerProfile}
+                                            sx={{
+                                                alignItems: "center",
+                                                appearance: "none",
+                                                bgcolor: "transparent",
+                                                border: 0,
+                                                borderRadius: "12px",
+                                                boxSizing: "border-box",
+                                                color: "inherit",
+                                                cursor: canOpenFriend
+                                                    ? "pointer"
+                                                    : "default",
+                                                display: "flex",
+                                                gap: "12px",
+                                                minHeight: 52,
+                                                px: "2px",
+                                                py: "8px",
+                                                textAlign: "left",
+                                                width: "100%",
+                                                "&:focus-visible": {
+                                                    outline: `2px solid ${green}`,
+                                                    outlineOffset: 2,
+                                                },
+                                            }}
+                                        >
+                                            <SocialAvatar
+                                                avatarUrl={liker.avatarUrl}
+                                                name={likerName}
+                                                size={36}
+                                            />
+                                            <Box
+                                                sx={{
+                                                    color: textBase,
+                                                    flex: "1 1 auto",
+                                                    fontFamily:
+                                                        '"Inter Variable", Inter, sans-serif',
+                                                    fontSize: 14,
+                                                    fontWeight: 600,
+                                                    lineHeight: "20px",
+                                                    minWidth: 0,
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap",
+                                                }}
+                                            >
+                                                {likerName}
+                                            </Box>
+                                            <Box
+                                                aria-hidden
+                                                sx={{
+                                                    alignItems: "center",
+                                                    display: "flex",
+                                                    flexShrink: 0,
+                                                    justifyContent: "center",
+                                                }}
+                                            >
+                                                <HeartFilledIcon />
+                                            </Box>
+                                        </Box>
                                     </Box>
-                                    <Box
-                                        aria-hidden
-                                        sx={{
-                                            alignItems: "center",
-                                            display: "flex",
-                                            flexShrink: 0,
-                                            justifyContent: "center",
-                                        }}
-                                    >
-                                        <HeartFilledIcon />
-                                    </Box>
-                                </Box>
-                            ))
+                                );
+                            })
                         )}
                     </Box>
                 </Box>
@@ -2064,6 +2155,9 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                         commentGroupTimeThresholdMicros;
                                 const isFirstInSequence = !isSameSequenceAsPrev;
                                 const isLastInSequence = !isSameSequenceAsNext;
+                                const authorFriendID = comment.isOwner
+                                    ? undefined
+                                    : friendIDForPersonName(comment.author);
 
                                 return (
                                     <CommentItem
@@ -2078,6 +2172,14 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                             comment.id,
                                         )}
                                         onOpenActions={openCommentActions}
+                                        onOpenAuthorProfile={
+                                            authorFriendID && onOpenFriend
+                                                ? () =>
+                                                      openFriendProfile(
+                                                          authorFriendID,
+                                                      )
+                                                : undefined
+                                        }
                                         parentComment={getParentComment(
                                             comment.parentCommentID,
                                             comments,

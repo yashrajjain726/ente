@@ -274,6 +274,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
             initialScreen,
         );
     const visibleLikeCount = likeCount + (isLiked ? 1 : 0);
+    const hasVisibleLikes = visibleLikeCount > 0;
+    const hasComments = commentCount > 0;
     const handleLikeClick = () => {
         if (likePopTimeoutRef.current != null)
             window.clearTimeout(likePopTimeoutRef.current);
@@ -493,40 +495,46 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         strokeWidth={1.8}
                     />
                 </Box>
+                {hasVisibleLikes && (
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={`View ${visibleLikeCount} ${
+                            visibleLikeCount == 1 ? "like" : "likes"
+                        }`}
+                        onClick={() => openPhoto("likes")}
+                        sx={{
+                            appearance: "none",
+                            bgcolor: "transparent",
+                            border: 0,
+                            borderRadius: "8px",
+                            color: textBase,
+                            cursor: onOpenPhoto ? "pointer" : "default",
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 500,
+                            lineHeight: "18px",
+                            p: "4px 0",
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                            "&:hover": { color: green },
+                        }}
+                    >
+                        {visibleLikeCount}
+                    </Box>
+                )}
                 <Box
                     component="button"
                     type="button"
-                    aria-label={`View ${visibleLikeCount} ${
-                        visibleLikeCount == 1 ? "like" : "likes"
-                    }`}
-                    onClick={() => openPhoto("likes")}
-                    sx={{
-                        appearance: "none",
-                        bgcolor: "transparent",
-                        border: 0,
-                        borderRadius: "8px",
-                        color: textBase,
-                        cursor: onOpenPhoto ? "pointer" : "default",
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 13,
-                        fontWeight: 500,
-                        lineHeight: "18px",
-                        p: "4px 0",
-                        "&:focus-visible": {
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
-                        "&:hover": { color: green },
-                    }}
-                >
-                    {visibleLikeCount}
-                </Box>
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label={`View ${commentCount} ${
-                        commentCount == 1 ? "comment" : "comments"
-                    }`}
+                    aria-label={
+                        hasComments
+                            ? `View ${commentCount} ${
+                                  commentCount == 1 ? "comment" : "comments"
+                              }`
+                            : "Comment on post"
+                    }
                     onClick={() => openPhoto("comments")}
                     sx={{
                         alignItems: "center",
@@ -556,7 +564,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         size={20}
                         strokeWidth={1.8}
                     />
-                    {commentCount}
+                    {hasComments && commentCount}
                 </Box>
             </Box>
         </Box>
@@ -999,6 +1007,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         initialScreen={selectedViewerScreen}
                         photo={selectedPhoto}
                         onClose={closeSelectedPhoto}
+                        onOpenFriend={
+                            onOpenFriend
+                                ? (friendID) => {
+                                      closeSelectedPhoto();
+                                      onOpenFriend(friendID);
+                                  }
+                                : undefined
+                        }
                         onOpenProfile={
                             selectedPhotoFriendID && onOpenFriend
                                 ? () => {

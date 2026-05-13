@@ -52,7 +52,7 @@ type Screen =
     | "settings";
 
 type ProfileBackScreen = "login" | "verify-email";
-type FriendProfileBackScreen = "friends" | "home" | "notifications";
+type FriendProfileBackScreen = "friends" | "home" | "notifications" | "profile";
 type OnboardingEntrySource = "direct" | "add-friend-link";
 
 const onboardingSourceSearchParam = "onboardingSource";
@@ -303,6 +303,9 @@ const Page: React.FC = () => {
                             friendsCount={friends.length}
                             profile={profile}
                             onBack={() => setScreen("home")}
+                            onOpenFriend={(friendID) =>
+                                openFriendProfile(friendID, "profile")
+                            }
                             onOpenFriends={() => setScreen("friends")}
                             onOpenSettings={() => setScreen("settings")}
                         />
@@ -341,6 +344,12 @@ const Page: React.FC = () => {
                                 username: selectedFriend.username,
                             }}
                             onBack={() => setScreen(friendProfileBackScreen)}
+                            onOpenFriend={(friendID) =>
+                                openFriendProfile(
+                                    friendID,
+                                    friendProfileBackScreen,
+                                )
+                            }
                         />
                     )}
                     {screen == "settings" && profile && (

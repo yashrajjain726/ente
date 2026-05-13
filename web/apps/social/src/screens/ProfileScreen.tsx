@@ -202,6 +202,7 @@ interface ProfileScreenProps {
     headerVariant?: "friend" | "owner" | "public";
     onAddFriend?: () => void;
     onBack?: () => void;
+    onOpenFriend?: (friendID: string) => void;
     onOpenFriends?: () => void;
     onOpenSettings?: () => void;
     profile: SetupProfile;
@@ -212,6 +213,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     headerVariant = "owner",
     onAddFriend,
     onBack,
+    onOpenFriend,
     onOpenFriends,
     onOpenSettings,
     profile,
@@ -1193,6 +1195,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         onClose={() => setSelectedPost(null)}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
+                        }
+                        onOpenFriend={
+                            onOpenFriend
+                                ? (friendID) => {
+                                      setSelectedPost(null);
+                                      onOpenFriend(friendID);
+                                  }
+                                : undefined
                         }
                         onOpenProfile={() => setSelectedPost(null)}
                     />

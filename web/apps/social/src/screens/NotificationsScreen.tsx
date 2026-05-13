@@ -7,7 +7,7 @@ import { Box } from "@mui/material";
 import type { FriendProfile } from "data/friends";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
-import { initialsFor } from "utils/socialDisplay";
+import { firstNameFrom, initialsFor } from "utils/socialDisplay";
 
 export const notificationsBackground = "#FFFFFF";
 
@@ -267,31 +267,31 @@ const actionForNotification = (
 ): { icon: React.ReactNode; label: string } => {
     switch (type) {
         case "liked-post":
-            return { icon: <LikedPhotoIcon />, label: "Liked your post" };
+            return { icon: <LikedPhotoIcon />, label: "liked your post" };
         case "commented-post":
             return {
                 icon: <CommentedPhotoIcon />,
-                label: "Commented on your post",
+                label: "commented on your post",
             };
         case "liked-comment":
             return {
                 icon: <LikedCommentIcon />,
-                label: "Liked a comment",
+                label: "liked a comment",
             };
         case "liked-your-comment":
             return {
                 icon: <LikedCommentIcon />,
-                label: "Liked your comment",
+                label: "liked your comment",
             };
         case "replied-comment":
             return {
                 icon: <RepliedCommentIcon />,
-                label: "Replied to a comment",
+                label: "replied to a comment",
             };
         case "added-friend":
             return {
                 icon: <UserAddNotificationIcon />,
-                label: "Added you as a friend",
+                label: "added you as a friend",
             };
     }
 };
@@ -303,7 +303,10 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
     const { icon, label } = actionForNotification(notification.type);
     const actorName =
         notification.actor.fullName.trim() || notification.actor.username;
-    const actorInitials = initialsFor(actorName || notification.actor.username);
+    const actorFirstName = firstNameFrom(actorName);
+    const actorInitials = initialsFor(
+        actorFirstName || notification.actor.username,
+    );
     const timestampMicros = microsForTimestamp(notification.timestampMs);
     const timestampDateTime = new Date(
         Math.floor(timestampMicros / 1000),
@@ -443,7 +446,7 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
                             color: textBase,
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 14,
-                            fontWeight: 600,
+                            fontWeight: 500,
                             lineHeight: "19px",
                             minWidth: 0,
                             overflow: "hidden",
@@ -451,9 +454,14 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
                             whiteSpace: "nowrap",
                         }}
                     >
-                        {actorName}
+                        <Box component="span" sx={{ fontWeight: 600 }}>
+                            {actorFirstName}
+                        </Box>{" "}
+                        {label}
                     </Box>
                     <Box
+                        component="time"
+                        dateTime={timestampDateTime}
                         sx={{
                             color: textSoft,
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -466,27 +474,7 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
                             whiteSpace: "nowrap",
                         }}
                     >
-                        {label}
-                        <Box
-                            component="span"
-                            aria-hidden
-                            sx={{
-                                color: textSoft,
-                                px: "5px",
-                            }}
-                        >
-                            ·
-                        </Box>
-                        <Box
-                            component="time"
-                            dateTime={timestampDateTime}
-                            sx={{
-                                color: textSoft,
-                                display: "inline",
-                            }}
-                        >
-                            {timestampLabel}
-                        </Box>
+                        {timestampLabel}
                     </Box>
                 </Box>
                 {notification.postThumbnailUrl && (
