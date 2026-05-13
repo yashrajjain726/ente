@@ -1,7 +1,4 @@
-import {
-    ArrowLeft02Icon,
-    UserAdd01Icon,
-} from "@hugeicons/core-free-icons";
+import { ArrowLeft02Icon, UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import type { FriendProfile } from "data/friends";
@@ -274,15 +271,9 @@ const actionForNotification = (
                 label: "commented on your post",
             };
         case "liked-comment":
-            return {
-                icon: <LikedCommentIcon />,
-                label: "liked a comment",
-            };
+            return { icon: <LikedCommentIcon />, label: "liked a comment" };
         case "liked-your-comment":
-            return {
-                icon: <LikedCommentIcon />,
-                label: "liked your comment",
-            };
+            return { icon: <LikedCommentIcon />, label: "liked your comment" };
         case "replied-comment":
             return {
                 icon: <RepliedCommentIcon />,
