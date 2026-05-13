@@ -81,22 +81,24 @@ const FriendRow: React.FC<FriendRowProps> = ({
             }}
         >
             <Box
-                component="button"
-                type="button"
-                onClick={() => onOpenFriend?.(friend.id)}
+                component={onOpenFriend ? "button" : "div"}
+                type={onOpenFriend ? "button" : undefined}
+                onClick={
+                    onOpenFriend ? () => onOpenFriend(friend.id) : undefined
+                }
                 sx={{
                     alignItems: "center",
                     bgcolor: "transparent",
                     border: 0,
                     borderRadius: "12px",
                     cursor: onOpenFriend ? "pointer" : "default",
-                    display: "grid",
+                    display: "flex",
                     gap: "12px",
-                    gridTemplateColumns: "48px minmax(0, 1fr)",
+                    maxWidth: "100%",
                     minWidth: 0,
                     p: 0,
                     textAlign: "left",
-                    width: "100%",
+                    width: "fit-content",
                     "&:focus-visible": {
                         outline: `2px solid ${green}`,
                         outlineOffset: 2,
@@ -110,6 +112,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
                         borderRadius: "50%",
                         color: green,
                         display: "flex",
+                        flexShrink: 0,
                         height: 48,
                         justifyContent: "center",
                         overflow: "hidden",
@@ -146,6 +149,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
                 <Box
                     sx={{
                         display: "flex",
+                        flex: "0 1 auto",
                         flexDirection: "column",
                         justifyContent: "center",
                         minWidth: 0,

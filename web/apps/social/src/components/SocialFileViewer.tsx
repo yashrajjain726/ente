@@ -621,46 +621,49 @@ const CommentItem: React.FC<CommentItemProps> = ({
         >
             {showHeader && (
                 <Box
-                    component={onOpenAuthorProfile ? "button" : "div"}
-                    type={onOpenAuthorProfile ? "button" : undefined}
-                    onClick={onOpenAuthorProfile}
                     sx={{
                         alignItems: "center",
-                        appearance: "none",
-                        bgcolor: "transparent",
-                        border: 0,
                         color: "inherit",
-                        cursor: onOpenAuthorProfile ? "pointer" : "default",
                         display: "flex",
-                        gap: "10px",
+                        gap: "4px",
                         maxWidth: "min(calc(100vw - 32px), 360px)",
                         mb: "10px",
                         minWidth: 0,
-                        p: 0,
                         textAlign: "left",
                         width: "100%",
-                        "&:focus-visible": {
-                            borderRadius: "18px",
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 3,
-                        },
                     }}
                 >
-                    <SocialAvatar
-                        avatarUrl={comment.avatarUrl}
-                        name={authorName}
-                        size={28}
-                    />
                     <Box
+                        component={onOpenAuthorProfile ? "button" : "div"}
+                        type={onOpenAuthorProfile ? "button" : undefined}
+                        onClick={onOpenAuthorProfile}
                         sx={{
-                            alignItems: "baseline",
+                            alignItems: "center",
+                            appearance: "none",
+                            bgcolor: "transparent",
+                            border: 0,
+                            color: "inherit",
+                            cursor: onOpenAuthorProfile ? "pointer" : "default",
                             display: "flex",
-                            gap: "4px",
+                            flex: "0 1 auto",
+                            gap: "10px",
                             minWidth: 0,
-                            overflow: "hidden",
-                            whiteSpace: "nowrap",
+                            p: 0,
+                            textAlign: "left",
+                            width: "fit-content",
+                            maxWidth: "100%",
+                            "&:focus-visible": {
+                                borderRadius: "18px",
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 3,
+                            },
                         }}
                     >
+                        <SocialAvatar
+                            avatarUrl={comment.avatarUrl}
+                            name={authorName}
+                            size={28}
+                        />
                         <Box
                             sx={{
                                 color: textBase,
@@ -672,39 +675,38 @@ const CommentItem: React.FC<CommentItemProps> = ({
                                 minWidth: 0,
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
                             }}
                         >
                             {authorName}
                         </Box>
-                        <Box
-                            aria-hidden
-                            sx={{
-                                color: commentsTimestamp,
-                                flexShrink: 0,
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 12,
-                                fontWeight: 600,
-                                lineHeight: "16px",
-                            }}
-                        >
-                            ·
-                        </Box>
-                        <Box
-                            component="time"
-                            dateTime={timestampDateTime}
-                            sx={{
-                                color: commentsTimestamp,
-                                flexShrink: 0,
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 12,
-                                fontWeight: 600,
-                                lineHeight: "16px",
-                            }}
-                        >
-                            {timestampLabel}
-                        </Box>
+                    </Box>
+                    <Box
+                        aria-hidden
+                        sx={{
+                            color: commentsTimestamp,
+                            flexShrink: 0,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            lineHeight: "16px",
+                        }}
+                    >
+                        ·
+                    </Box>
+                    <Box
+                        component="time"
+                        dateTime={timestampDateTime}
+                        sx={{
+                            color: commentsTimestamp,
+                            flexShrink: 0,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            lineHeight: "16px",
+                        }}
+                    >
+                        {timestampLabel}
                     </Box>
                 </Box>
             )}
@@ -1934,26 +1936,10 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                         sx={{ listStyle: "none" }}
                                     >
                                         <Box
-                                            component={
-                                                canOpenFriend ? "button" : "div"
-                                            }
-                                            type={
-                                                canOpenFriend
-                                                    ? "button"
-                                                    : undefined
-                                            }
-                                            onClick={openLikerProfile}
                                             sx={{
                                                 alignItems: "center",
-                                                appearance: "none",
-                                                bgcolor: "transparent",
-                                                border: 0,
-                                                borderRadius: "12px",
                                                 boxSizing: "border-box",
                                                 color: "inherit",
-                                                cursor: canOpenFriend
-                                                    ? "pointer"
-                                                    : "default",
                                                 display: "flex",
                                                 gap: "12px",
                                                 minHeight: 52,
@@ -1961,33 +1947,67 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                                 py: "8px",
                                                 textAlign: "left",
                                                 width: "100%",
-                                                "&:focus-visible": {
-                                                    outline: `2px solid ${green}`,
-                                                    outlineOffset: 2,
-                                                },
                                             }}
                                         >
-                                            <SocialAvatar
-                                                avatarUrl={liker.avatarUrl}
-                                                name={likerName}
-                                                size={36}
-                                            />
                                             <Box
+                                                component={
+                                                    canOpenFriend
+                                                        ? "button"
+                                                        : "div"
+                                                }
+                                                type={
+                                                    canOpenFriend
+                                                        ? "button"
+                                                        : undefined
+                                                }
+                                                onClick={openLikerProfile}
                                                 sx={{
-                                                    color: textBase,
-                                                    flex: "1 1 auto",
-                                                    fontFamily:
-                                                        '"Inter Variable", Inter, sans-serif',
-                                                    fontSize: 14,
-                                                    fontWeight: 600,
-                                                    lineHeight: "20px",
+                                                    alignItems: "center",
+                                                    appearance: "none",
+                                                    bgcolor: "transparent",
+                                                    border: 0,
+                                                    borderRadius: "12px",
+                                                    color: "inherit",
+                                                    cursor: canOpenFriend
+                                                        ? "pointer"
+                                                        : "default",
+                                                    display: "flex",
+                                                    flex: "0 1 auto",
+                                                    gap: "12px",
+                                                    maxWidth: "100%",
                                                     minWidth: 0,
-                                                    overflow: "hidden",
-                                                    textOverflow: "ellipsis",
-                                                    whiteSpace: "nowrap",
+                                                    p: 0,
+                                                    textAlign: "left",
+                                                    width: "fit-content",
+                                                    "&:focus-visible": {
+                                                        outline: `2px solid ${green}`,
+                                                        outlineOffset: 2,
+                                                    },
                                                 }}
                                             >
-                                                {likerName}
+                                                <SocialAvatar
+                                                    avatarUrl={liker.avatarUrl}
+                                                    name={likerName}
+                                                    size={36}
+                                                />
+                                                <Box
+                                                    sx={{
+                                                        color: textBase,
+                                                        flex: "0 1 auto",
+                                                        fontFamily:
+                                                            '"Inter Variable", Inter, sans-serif',
+                                                        fontSize: 14,
+                                                        fontWeight: 600,
+                                                        lineHeight: "20px",
+                                                        minWidth: 0,
+                                                        overflow: "hidden",
+                                                        textOverflow:
+                                                            "ellipsis",
+                                                        whiteSpace: "nowrap",
+                                                    }}
+                                                >
+                                                    {likerName}
+                                                </Box>
                                             </Box>
                                             <Box
                                                 aria-hidden
@@ -1996,6 +2016,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                                     display: "flex",
                                                     flexShrink: 0,
                                                     justifyContent: "center",
+                                                    ml: "auto",
                                                 }}
                                             >
                                                 <HeartFilledIcon />
