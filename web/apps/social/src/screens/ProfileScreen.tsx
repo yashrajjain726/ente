@@ -21,6 +21,10 @@ import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { LinkIcon, ShareIcon } from "screens/ShareProfileLinkScreen";
+import {
+    createLocalPostPhoto,
+    type LocalPostPhotoDimensions,
+} from "utils/localPostPhoto";
 import { profileLinkForUsername } from "utils/profileLink";
 import { firstNameFrom, initialsFor } from "utils/socialDisplay";
 
@@ -142,7 +146,9 @@ type SamplePostItem = (typeof samplePostGroups)[number]["items"][number];
 
 interface SelectedProfilePost {
     id: string;
+    localObjectUrl?: string;
     photo: SocialViewerPhoto;
+    showPostCaptionInput?: boolean;
 }
 
 interface PostMasonryTile {
@@ -230,6 +236,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const [loadedPhotoDimensionsByURL, setLoadedPhotoDimensionsByURL] =
         useState<Record<string, ProfilePhotoDimensions>>({});
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
+    const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
+    const pendingPostRef = React.useRef<SelectedProfilePost | null>(null);
     const isPublicProfile = headerVariant == "public";
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
@@ -262,7 +270,40 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               : null;
 
     const closeProfileActions = () => setProfileActionsAnchor(null);
+    const revokeLocalPostObjectUrl = React.useCallback((objectUrl?: string) => {
+        if (!objectUrl || !localPostObjectUrlsRef.current.has(objectUrl))
+            return;
+
+        URL.revokeObjectURL(objectUrl);
+        localPostObjectUrlsRef.current.delete(objectUrl);
+    }, []);
+    const applyLocalPostDimensions = React.useCallback(
+        (objectUrl: string, dimensions: LocalPostPhotoDimensions) => {
+            const pendingPost = pendingPostRef.current;
+            if (pendingPost?.localObjectUrl == objectUrl) {
+                pendingPostRef.current = {
+                    ...pendingPost,
+                    photo: { ...pendingPost.photo, ...dimensions },
+                };
+            }
+
+            setSelectedPost((currentPost) =>
+                currentPost?.localObjectUrl == objectUrl
+                    ? {
+                          ...currentPost,
+                          photo: { ...currentPost.photo, ...dimensions },
+                      }
+                    : currentPost,
+            );
+        },
+        [],
+    );
     const openPostPhotoPicker = () => postInputRef.current?.click();
+    const closeSelectedPost = () => {
+        const localObjectUrl = selectedPost?.localObjectUrl;
+        setSelectedPost(null);
+        revokeLocalPostObjectUrl(localObjectUrl);
+    };
     const rememberLoadedPhotoDimensions = (
         imageUrl: string,
         image: HTMLImageElement,
@@ -291,6 +332,23 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         const file = event.target.files?.[0];
         event.target.value = "";
         if (!file) return;
+
+        revokeLocalPostObjectUrl(pendingPostRef.current?.localObjectUrl);
+        pendingPostRef.current = null;
+
+        const localPost = createLocalPostPhoto({
+            avatarUrl: profile.avatarUrl,
+            file,
+            name: displayName || "You",
+            onDimensionsLoaded: applyLocalPostDimensions,
+        });
+        localPostObjectUrlsRef.current.add(localPost.objectUrl);
+        pendingPostRef.current = {
+            id: `local-${localPost.photo.timestampMs}`,
+            localObjectUrl: localPost.objectUrl,
+            photo: localPost.photo,
+            showPostCaptionInput: true,
+        };
 
         setPostActionPhase("posting");
     };
@@ -330,16 +388,33 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         if (!postActionPhase) return;
 
         const timeoutID = window.setTimeout(
-            () =>
-                setPostActionPhase(
-                    postActionPhase == "posting" ? "posted" : null,
-                ),
+            () => {
+                if (postActionPhase == "posting") {
+                    setPostActionPhase("posted");
+                    return;
+                }
+
+                const postedPost = pendingPostRef.current;
+                pendingPostRef.current = null;
+                if (postedPost) setSelectedPost(postedPost);
+                setPostActionPhase(null);
+            },
             postActionPhase == "posting"
                 ? socialActionBusyDurationMs
                 : socialActionDoneDurationMs,
         );
         return () => window.clearTimeout(timeoutID);
     }, [postActionPhase]);
+
+    React.useEffect(
+        () => () => {
+            localPostObjectUrlsRef.current.forEach((objectUrl) =>
+                URL.revokeObjectURL(objectUrl),
+            );
+            localPostObjectUrlsRef.current.clear();
+        },
+        [],
+    );
 
     return (
         <Box
@@ -1192,19 +1267,20 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             name: displayName,
                         }}
                         photo={selectedPost.photo}
-                        onClose={() => setSelectedPost(null)}
+                        showPostCaptionInput={selectedPost.showPostCaptionInput}
+                        onClose={closeSelectedPost}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
                         }
                         onOpenFriend={
                             onOpenFriend
                                 ? (friendID) => {
-                                      setSelectedPost(null);
+                                      closeSelectedPost();
                                       onOpenFriend(friendID);
                                   }
                                 : undefined
                         }
-                        onOpenProfile={() => setSelectedPost(null)}
+                        onOpenProfile={closeSelectedPost}
                     />
                 )}
             </Box>

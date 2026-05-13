@@ -3,11 +3,14 @@ import {
     Comment01Icon,
     Delete02Icon,
     FavouriteIcon,
+    Loading03Icon,
     MoreHorizontalIcon,
     Navigation03Icon,
+    Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem, TextField } from "@mui/material";
+import { keyframes } from "@mui/material/styles";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
     socialActionBusyDurationMs,
@@ -38,6 +41,7 @@ const viewerBottomPadding = 72;
 const defaultPhotoWidth = 900;
 const defaultPhotoHeight = 680;
 const viewerExitDurationMs = 200;
+const viewerIntroTransition = "160ms cubic-bezier(0.2, 0, 0, 1)";
 const viewerExitTransition = `${viewerExitDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`;
 const commentsBackground = "#202020";
 const commentsSurface = "#2C2C2C";
@@ -45,6 +49,20 @@ const commentsSurfaceHover = "#343434";
 const commentsOwnerBubble = "#3FA43D";
 const commentsMuted = "rgba(244, 244, 244, 0.54)";
 const commentsTimestamp = "rgba(255, 255, 255, 0.55)";
+const commentSendPendingDurationMs = 1500;
+const captionSendDoneDurationMs = 1500;
+const captionComposerExitDurationMs = 260;
+const captionActionsEnterDurationMs = 160;
+
+const commentSendSpin = keyframes`
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+`;
 
 interface SocialViewerUser {
     avatarUrl?: string | null;
@@ -72,6 +90,7 @@ interface SocialFileViewerProps {
     onOpenFriend?: (friendID: string) => void;
     onOpenProfile?: () => void;
     photo: SocialViewerPhoto;
+    showPostCaptionInput?: boolean;
 }
 
 interface SocialComment {
@@ -96,6 +115,8 @@ interface CommentContextMenuState {
     anchorEl: HTMLElement;
     comment: SocialComment;
 }
+
+type CommentSendPhase = "idle" | "sending" | "done";
 
 const minuteMs = 60 * 1000;
 const hourMs = 60 * minuteMs;
@@ -851,6 +872,189 @@ const CommentItem: React.FC<CommentItemProps> = ({
     );
 };
 
+interface CommentComposerProps {
+    canSend: boolean;
+    inputRef?: React.Ref<HTMLTextAreaElement>;
+    onChange: (value: string) => void;
+    onKeyDown: (event: React.KeyboardEvent) => void;
+    onSend: () => void;
+    placeholder: string;
+    sendPhase: CommentSendPhase;
+    sendLabel: string;
+    value: string;
+}
+
+const CommentComposer: React.FC<CommentComposerProps> = ({
+    canSend,
+    inputRef,
+    onChange,
+    onKeyDown,
+    onSend,
+    placeholder,
+    sendPhase,
+    sendLabel,
+    value,
+}) => {
+    const isSending = sendPhase == "sending";
+    const isDone = sendPhase == "done";
+    const isMutedStatus = isSending || isDone;
+    const isSendButtonActive = canSend || isMutedStatus;
+    const sendButtonBg = isMutedStatus
+        ? commentsSurfaceHover
+        : isSendButtonActive
+          ? "#FFFFFF"
+          : commentsSurfaceHover;
+    const sendButtonColor = isSending
+        ? controlIcon
+        : isDone
+          ? green
+          : isSendButtonActive
+            ? "#3A3A3A"
+            : controlIcon;
+    const sendIcon = isSending
+        ? Loading03Icon
+        : isDone
+          ? Tick02Icon
+          : Navigation03Icon;
+
+    return (
+        <Box
+            sx={{
+                bgcolor: commentsSurface,
+                borderRadius: "24px",
+                boxSizing: "border-box",
+                maxWidth: "100%",
+                minWidth: 0,
+                position: "relative",
+                width: "100%",
+            }}
+        >
+            <Box
+                sx={{
+                    alignItems: "center",
+                    boxSizing: "border-box",
+                    display: "flex",
+                    maxHeight: 300,
+                    minHeight: 40,
+                    overflow: "auto",
+                    p: "1px 54px 3px 16px",
+                    width: "100%",
+                    "&::-webkit-scrollbar": { width: "8px" },
+                    "&::-webkit-scrollbar-track": { background: "transparent" },
+                    "&::-webkit-scrollbar-thumb": {
+                        background: "rgba(255, 255, 255, 0.3)",
+                        borderRadius: "4px",
+                    },
+                    "&::-webkit-scrollbar-thumb:hover": {
+                        background: "rgba(255, 255, 255, 0.5)",
+                    },
+                    scrollbarColor: "rgba(255, 255, 255, 0.3) transparent",
+                    scrollbarWidth: "thin",
+                }}
+            >
+                <TextField
+                    fullWidth
+                    multiline
+                    minRows={1}
+                    variant="standard"
+                    placeholder={placeholder}
+                    value={value}
+                    onChange={(event) => onChange(event.target.value)}
+                    onKeyDown={onKeyDown}
+                    onClick={(event) => event.stopPropagation()}
+                    inputRef={inputRef}
+                    slotProps={{
+                        htmlInput: {
+                            maxLength: 280,
+                            readOnly: sendPhase != "idle",
+                        },
+                    }}
+                    sx={{
+                        "& .MuiInput-root": {
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            lineHeight: "21px",
+                            "&::before, &::after": { display: "none" },
+                        },
+                        "& .MuiInputBase-input": {
+                            color: textBase,
+                            font: "inherit",
+                            lineHeight: "21px",
+                            p: 0,
+                            "&::placeholder": {
+                                color: commentsMuted,
+                                opacity: 1,
+                            },
+                        },
+                    }}
+                />
+            </Box>
+            <Box
+                component="button"
+                type="button"
+                aria-label={isSending ? "Sending" : isDone ? "Sent" : sendLabel}
+                disabled={!canSend || sendPhase != "idle"}
+                onClick={onSend}
+                sx={{
+                    alignItems: "center",
+                    bgcolor: sendButtonBg,
+                    border: 0,
+                    borderRadius: "50%",
+                    color: sendButtonColor,
+                    cursor:
+                        canSend && sendPhase == "idle" ? "pointer" : "default",
+                    display: "flex",
+                    height: 32,
+                    justifyContent: "center",
+                    opacity: isSending ? 0.72 : isSendButtonActive ? 1 : 0.42,
+                    p: 0,
+                    position: "absolute",
+                    right: 8,
+                    bottom: 7,
+                    transition:
+                        "background-color 180ms ease, color 180ms ease, opacity 180ms ease, transform 120ms ease",
+                    width: 32,
+                    "&:active": {
+                        transform:
+                            canSend && sendPhase == "idle"
+                                ? "scale(0.96)"
+                                : "none",
+                    },
+                    "&:focus-visible": {
+                        outline: `2px solid ${green}`,
+                        outlineOffset: 2,
+                    },
+                    "&:hover": {
+                        bgcolor: isMutedStatus
+                            ? commentsSurfaceHover
+                            : isSendButtonActive
+                              ? "#F2F2F2"
+                              : "rgba(255, 255, 255, 0.14)",
+                    },
+                }}
+            >
+                <Box
+                    component="span"
+                    sx={{
+                        animation: isSending
+                            ? `${commentSendSpin} 1s linear infinite`
+                            : "none",
+                        display: "flex",
+                        transform: isSending ? "none" : "translate(-1px, 1px)",
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={sendIcon}
+                        size={18}
+                        strokeWidth={1.8}
+                    />
+                </Box>
+            </Box>
+        </Box>
+    );
+};
+
 export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     currentUser,
     initialScreen = "photo",
@@ -859,15 +1063,30 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     onOpenFriend,
     onOpenProfile,
     photo,
+    showPostCaptionInput = false,
 }) => {
-    const [screen, setScreen] =
-        React.useState<SocialViewerInitialScreen>(initialScreen);
+    const [screen, setScreen] = React.useState<SocialViewerInitialScreen>(
+        showPostCaptionInput ? "photo" : initialScreen,
+    );
+    const [isIntroVisible, setIsIntroVisible] =
+        React.useState(!showPostCaptionInput);
+    const [isPostCaptionInputVisible, setIsPostCaptionInputVisible] =
+        React.useState(showPostCaptionInput);
+    const [isPostCaptionInputExiting, setIsPostCaptionInputExiting] =
+        React.useState(false);
+    const [arePhotoActionsMounted, setArePhotoActionsMounted] =
+        React.useState(!showPostCaptionInput);
+    const [arePhotoActionsRevealed, setArePhotoActionsRevealed] =
+        React.useState(!showPostCaptionInput);
     const [isPhotoLiked, setIsPhotoLiked] = React.useState(false);
     const [isCommentButtonPopping, setIsCommentButtonPopping] =
         React.useState(false);
-    const [comments, setComments] =
-        React.useState<SocialComment[]>(mockComments);
+    const [comments, setComments] = React.useState<SocialComment[]>(() =>
+        showPostCaptionInput ? [] : mockComments,
+    );
     const [commentText, setCommentText] = React.useState("");
+    const [commentSendPhase, setCommentSendPhase] =
+        React.useState<CommentSendPhase>("idle");
     const [replyingTo, setReplyingTo] = React.useState<SocialComment | null>(
         null,
     );
@@ -882,6 +1101,9 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     const viewerRootRef = React.useRef<HTMLDivElement | null>(null);
     const commentsContainerRef = React.useRef<HTMLDivElement | null>(null);
     const commentInputRef = React.useRef<HTMLTextAreaElement | null>(null);
+    const commentSendTimeoutRef = React.useRef<number | null>(null);
+    const captionExitFallbackTimeoutRef = React.useRef<number | null>(null);
+    const photoActionsRevealFrameRef = React.useRef<number | null>(null);
     const commentOpenTimeoutRef = React.useRef<number | null>(null);
     const likeHoldTimeoutRef = React.useRef<number | null>(null);
     const likeHoldStartPointRef = React.useRef<{ x: number; y: number } | null>(
@@ -892,7 +1114,8 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     const suppressLikeContextMenuTimeoutRef = React.useRef<number | null>(null);
     const currentUserName = currentUser?.name.trim() || "You";
     const photoLikers = React.useMemo(() => {
-        if (!isPhotoLiked) return mockPhotoLikers;
+        const baseLikers = showPostCaptionInput ? [] : mockPhotoLikers;
+        if (!isPhotoLiked) return baseLikers;
 
         return [
             {
@@ -900,9 +1123,9 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                 avatarUrl: currentUser?.avatarUrl,
                 name: "You",
             },
-            ...mockPhotoLikers,
+            ...baseLikers,
         ];
-    }, [currentUser?.avatarUrl, isPhotoLiked]);
+    }, [currentUser?.avatarUrl, isPhotoLiked, showPostCaptionInput]);
     const sortedVisibleComments = React.useMemo(
         () =>
             comments
@@ -925,7 +1148,8 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     const isContextCommentLiked = commentContextMenu
         ? likedCommentIDs.has(commentContextMenu.comment.id)
         : false;
-    const canSendComment = commentText.trim().length > 0;
+    const canSendComment =
+        commentText.trim().length > 0 && commentSendPhase == "idle";
     const [actionsAnchor, setActionsAnchor] =
         React.useState<HTMLElement | null>(null);
     const [deleteSheetOpen, setDeleteSheetOpen] = React.useState(false);
@@ -1051,6 +1275,9 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
             commentOpenTimeoutRef.current = null;
             setIsCommentButtonPopping(false);
             setScreen("comments");
+            window.requestAnimationFrame(() => {
+                commentInputRef.current?.focus();
+            });
         }, 120);
     };
 
@@ -1122,28 +1349,71 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         }
     };
 
+    const completeCaptionComposerExit = () => {
+        if (captionExitFallbackTimeoutRef.current != null) {
+            window.clearTimeout(captionExitFallbackTimeoutRef.current);
+            captionExitFallbackTimeoutRef.current = null;
+        }
+        if (photoActionsRevealFrameRef.current != null) {
+            window.cancelAnimationFrame(photoActionsRevealFrameRef.current);
+            photoActionsRevealFrameRef.current = null;
+        }
+
+        setCommentText("");
+        setCommentSendPhase("idle");
+        setIsPostCaptionInputVisible(false);
+        setIsPostCaptionInputExiting(false);
+        setArePhotoActionsMounted(true);
+        photoActionsRevealFrameRef.current = window.requestAnimationFrame(
+            () => {
+                photoActionsRevealFrameRef.current = null;
+                setArePhotoActionsRevealed(true);
+            },
+        );
+    };
+
     const sendComment = () => {
         const text = commentText.trim();
-        if (!text) return;
+        if (!text || commentSendPhase != "idle") return;
 
-        const newComment: SocialComment = {
-            author: currentUserName,
-            avatarUrl: currentUser?.avatarUrl,
-            createdAtMicros: Date.now() * 1000,
-            id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            isOwner: true,
-            parentCommentID: replyingTo?.id,
-            text,
-        };
+        const parentCommentID = replyingTo?.id;
+        const isCaptionSend = isPostCaptionInputVisible && screen == "photo";
+        setCommentSendPhase("sending");
 
-        setComments((currentComments) => [...currentComments, newComment]);
-        setCommentText("");
-        setReplyingTo(null);
+        commentSendTimeoutRef.current = window.setTimeout(() => {
+            commentSendTimeoutRef.current = null;
+            const newComment: SocialComment = {
+                author: currentUserName,
+                avatarUrl: currentUser?.avatarUrl,
+                createdAtMicros: Date.now() * 1000,
+                id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                isOwner: true,
+                parentCommentID,
+                text,
+            };
 
-        window.setTimeout(() => {
-            if (commentsContainerRef.current)
-                commentsContainerRef.current.scrollTop = 0;
-        }, 0);
+            setComments((currentComments) => [...currentComments, newComment]);
+            setReplyingTo(null);
+
+            if (isCaptionSend) {
+                setCommentSendPhase("done");
+                commentSendTimeoutRef.current = window.setTimeout(() => {
+                    commentSendTimeoutRef.current = null;
+                    setIsPostCaptionInputExiting(true);
+                    captionExitFallbackTimeoutRef.current = window.setTimeout(
+                        completeCaptionComposerExit,
+                        captionComposerExitDurationMs + 80,
+                    );
+                }, captionSendDoneDurationMs);
+            } else {
+                setCommentText("");
+                setCommentSendPhase("idle");
+                window.setTimeout(() => {
+                    if (commentsContainerRef.current)
+                        commentsContainerRef.current.scrollTop = 0;
+                }, 0);
+            }
+        }, commentSendPendingDurationMs);
     };
 
     const handleCommentKeyDown = (event: React.KeyboardEvent) => {
@@ -1156,6 +1426,12 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
 
     React.useEffect(
         () => () => {
+            if (commentSendTimeoutRef.current != null)
+                window.clearTimeout(commentSendTimeoutRef.current);
+            if (captionExitFallbackTimeoutRef.current != null)
+                window.clearTimeout(captionExitFallbackTimeoutRef.current);
+            if (photoActionsRevealFrameRef.current != null)
+                window.cancelAnimationFrame(photoActionsRevealFrameRef.current);
             if (commentOpenTimeoutRef.current != null)
                 window.clearTimeout(commentOpenTimeoutRef.current);
             if (likeHoldTimeoutRef.current != null)
@@ -1193,6 +1469,29 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     React.useEffect(() => {
         if (replyingTo) commentInputRef.current?.focus();
     }, [replyingTo]);
+
+    React.useEffect(() => {
+        if (
+            !isIntroVisible ||
+            !isPostCaptionInputVisible ||
+            isPostCaptionInputExiting ||
+            screen != "photo"
+        )
+            return;
+
+        commentInputRef.current?.focus();
+    }, [
+        isIntroVisible,
+        isPostCaptionInputExiting,
+        isPostCaptionInputVisible,
+        screen,
+    ]);
+
+    React.useEffect(() => {
+        if (screen != "comments") return;
+
+        commentInputRef.current?.focus();
+    }, [screen]);
 
     React.useEffect(() => {
         if (!deleteActionPhase) return;
@@ -1236,6 +1535,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         let disposed = false;
         let closedByReact = false;
         let pswp: PhotoSwipe | undefined;
+        let introAnimationFrameID: number | undefined;
 
         void import("photoswipe").then(({ default: PhotoSwipeClass }) => {
             if (disposed || !viewerRootRef.current) return;
@@ -1288,11 +1588,19 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                 if (!closedByReact) onClose();
             });
             pswp.init();
+
+            if (showPostCaptionInput) {
+                introAnimationFrameID = window.requestAnimationFrame(() => {
+                    if (!disposed) setIsIntroVisible(true);
+                });
+            }
         });
 
         return () => {
             disposed = true;
             closedByReact = true;
+            if (introAnimationFrameID != undefined)
+                window.cancelAnimationFrame(introAnimationFrameID);
             pswp?.destroy();
         };
     }, [
@@ -1302,6 +1610,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         photo.imageUrl,
         photo.name,
         photo.width,
+        showPostCaptionInput,
     ]);
 
     React.useEffect(() => {
@@ -1360,13 +1669,34 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                 overflowX: "hidden",
                 pointerEvents: isDeleteExit ? "none" : "auto",
                 position: "fixed",
-                transition: `opacity ${viewerExitTransition}`,
+                transition: isDeleteExit
+                    ? `opacity ${viewerExitTransition}`
+                    : undefined,
                 width: "100%",
                 zIndex: 1300,
+                "& .pswp-social-viewer": {
+                    opacity: isIntroVisible ? 1 : 0,
+                    transform: isIntroVisible ? "scale(1)" : "scale(0.985)",
+                    transformOrigin: "center center",
+                    transition: showPostCaptionInput
+                        ? `opacity ${viewerIntroTransition}, transform ${viewerIntroTransition}`
+                        : "none",
+                    willChange: showPostCaptionInput
+                        ? "opacity, transform"
+                        : "auto",
+                },
+                "& [data-social-viewer-chrome='true']": {
+                    opacity: isIntroVisible ? 1 : 0,
+                    transition: showPostCaptionInput
+                        ? `opacity ${viewerIntroTransition}`
+                        : "none",
+                    willChange: showPostCaptionInput ? "opacity" : "auto",
+                },
             }}
         >
             <Box
                 component="header"
+                data-social-viewer-chrome="true"
                 sx={{
                     alignItems: "center",
                     display: "grid",
@@ -1686,6 +2016,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
             />
             <Box
                 aria-hidden
+                data-social-viewer-chrome="true"
                 sx={{
                     background:
                         "linear-gradient(180deg, rgba(0, 0, 0, 0.32) 0%, rgba(0, 0, 0, 0.13) 58%, rgba(0, 0, 0, 0) 100%)",
@@ -1700,6 +2031,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
             />
             <Box
                 aria-hidden
+                data-social-viewer-chrome="true"
                 sx={{
                     background:
                         "linear-gradient(0deg, rgba(0, 0, 0, 0.34) 0%, rgba(0, 0, 0, 0.14) 58%, rgba(0, 0, 0, 0) 100%)",
@@ -1712,97 +2044,148 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     zIndex: 1,
                 }}
             />
-            <Box
-                sx={{
-                    bottom: "16px",
-                    display: "flex",
-                    gap: "10px",
-                    position: "fixed",
-                    right: "16px",
-                    zIndex: 2,
-                }}
-            >
+            {arePhotoActionsMounted && (
                 <Box
-                    sx={{ height: 48, position: "relative", width: 48 }}
+                    data-social-viewer-bottom="true"
+                    sx={{
+                        bottom: "16px",
+                        display: "flex",
+                        gap: "10px",
+                        opacity:
+                            isIntroVisible && arePhotoActionsRevealed ? 1 : 0,
+                        pointerEvents: arePhotoActionsRevealed
+                            ? "auto"
+                            : "none",
+                        position: "fixed",
+                        right: "16px",
+                        transition: `opacity ${captionActionsEnterDurationMs}ms cubic-bezier(0.2, 0, 0, 1)`,
+                        zIndex: 2,
+                    }}
                 >
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label={
-                            isPhotoLiked ? "Unlike photo" : "Like photo"
-                        }
-                        aria-pressed={isPhotoLiked}
-                        onClick={handlePhotoLikeClick}
-                        onContextMenuCapture={handlePhotoLikeContextMenu}
-                        onPointerCancel={clearLikeHoldTimeout}
-                        onPointerDown={startPhotoLikeHold}
-                        onPointerLeave={clearLikeHoldTimeout}
-                        onPointerMove={cancelPhotoLikeHoldOnMove}
-                        onPointerUp={clearLikeHoldTimeout}
-                        sx={{
-                            ...viewerActionButtonSx,
-                            touchAction: "manipulation",
-                            userSelect: "none",
-                            WebkitTouchCallout: "none",
-                            WebkitUserSelect: "none",
-                        }}
-                    >
-                        <HugeiconsIcon
-                            fill={isPhotoLiked ? green : "none"}
-                            icon={FavouriteIcon}
-                            primaryColor={isPhotoLiked ? green : undefined}
-                            size={26}
-                            strokeWidth={1.8}
-                        />
-                    </Box>
-                    {likeCount > 0 && (
+                    <Box sx={{ height: 48, position: "relative", width: 48 }}>
                         <Box
                             component="button"
                             type="button"
-                            aria-label={`View ${likeCountLabel}`}
-                            onClick={handleLikeCountClick}
+                            aria-label={
+                                isPhotoLiked ? "Unlike photo" : "Like photo"
+                            }
+                            aria-pressed={isPhotoLiked}
+                            onClick={handlePhotoLikeClick}
+                            onContextMenuCapture={handlePhotoLikeContextMenu}
+                            onPointerCancel={clearLikeHoldTimeout}
+                            onPointerDown={startPhotoLikeHold}
+                            onPointerLeave={clearLikeHoldTimeout}
+                            onPointerMove={cancelPhotoLikeHoldOnMove}
+                            onPointerUp={clearLikeHoldTimeout}
                             sx={{
-                                ...viewerCountBadgeSx,
-                                cursor: "pointer",
-                                p: 0,
-                                "&:focus-visible": {
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
+                                ...viewerActionButtonSx,
+                                touchAction: "manipulation",
+                                userSelect: "none",
+                                WebkitTouchCallout: "none",
+                                WebkitUserSelect: "none",
                             }}
                         >
-                            {likeCount}
+                            <HugeiconsIcon
+                                fill={isPhotoLiked ? green : "none"}
+                                icon={FavouriteIcon}
+                                primaryColor={isPhotoLiked ? green : undefined}
+                                size={26}
+                                strokeWidth={1.8}
+                            />
                         </Box>
-                    )}
+                        {likeCount > 0 && (
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label={`View ${likeCountLabel}`}
+                                onClick={handleLikeCountClick}
+                                sx={{
+                                    ...viewerCountBadgeSx,
+                                    cursor: "pointer",
+                                    p: 0,
+                                    "&:focus-visible": {
+                                        outline: `2px solid ${green}`,
+                                        outlineOffset: 2,
+                                    },
+                                }}
+                            >
+                                {likeCount}
+                            </Box>
+                        )}
+                    </Box>
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={commentButtonLabel}
+                        onClick={openComments}
+                        sx={{
+                            ...viewerActionButtonSx,
+                            position: "relative",
+                            transform: isCommentButtonPopping
+                                ? "scale(0.96)"
+                                : "scale(1)",
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={Comment01Icon}
+                            size={26}
+                            strokeWidth={1.8}
+                        />
+                        {commentCount > 0 && (
+                            <Box aria-hidden sx={viewerCountBadgeSx}>
+                                {commentCount}
+                            </Box>
+                        )}
+                    </Box>
                 </Box>
+            )}
+            {isPostCaptionInputVisible && screen == "photo" && (
                 <Box
-                    component="button"
-                    type="button"
-                    aria-label={commentButtonLabel}
-                    onClick={openComments}
+                    data-social-viewer-bottom="true"
+                    onTransitionEnd={(event) => {
+                        if (
+                            event.target != event.currentTarget ||
+                            event.propertyName != "opacity" ||
+                            !isPostCaptionInputExiting
+                        )
+                            return;
+
+                        completeCaptionComposerExit();
+                    }}
                     sx={{
-                        ...viewerActionButtonSx,
-                        position: "relative",
-                        transform: isCommentButtonPopping
-                            ? "scale(0.96)"
-                            : "scale(1)",
+                        bgcolor: "transparent",
+                        bottom: 0,
+                        boxSizing: "border-box",
+                        left: 0,
+                        maxWidth: "100%",
+                        opacity:
+                            isIntroVisible && !isPostCaptionInputExiting
+                                ? 1
+                                : 0,
+                        p: "0 14px max(12px, env(safe-area-inset-bottom))",
+                        pointerEvents: isPostCaptionInputExiting
+                            ? "none"
+                            : "auto",
+                        position: "fixed",
+                        right: 0,
+                        transition: `opacity ${captionComposerExitDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+                        width: "100%",
+                        zIndex: 2,
                     }}
                 >
-                    <HugeiconsIcon
-                        icon={Comment01Icon}
-                        size={26}
-                        strokeWidth={1.8}
+                    <CommentComposer
+                        canSend={canSendComment}
+                        inputRef={commentInputRef}
+                        onChange={setCommentText}
+                        onKeyDown={handleCommentKeyDown}
+                        onSend={sendComment}
+                        placeholder="Add a caption..."
+                        sendPhase={commentSendPhase}
+                        sendLabel="Send caption"
+                        value={commentText}
                     />
-                    {commentCount > 0 && (
-                        <Box
-                            aria-hidden
-                            sx={viewerCountBadgeSx}
-                        >
-                            {commentCount}
-                        </Box>
-                    )}
                 </Box>
-            </Box>
+            )}
             {screen == "likes" && (
                 <Box
                     sx={{
@@ -2423,144 +2806,17 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                 </Box>
                             </Box>
                         )}
-                        <Box
-                            sx={{
-                                bgcolor: commentsSurface,
-                                borderRadius: "24px",
-                                boxSizing: "border-box",
-                                maxWidth: "100%",
-                                minWidth: 0,
-                                position: "relative",
-                                width: "100%",
-                            }}
-                        >
-                            <Box
-                                sx={{
-                                    alignItems: "center",
-                                    boxSizing: "border-box",
-                                    display: "flex",
-                                    maxHeight: 300,
-                                    minHeight: 40,
-                                    overflow: "auto",
-                                    p: "1px 54px 3px 16px",
-                                    width: "100%",
-                                    "&::-webkit-scrollbar": { width: "8px" },
-                                    "&::-webkit-scrollbar-track": {
-                                        background: "transparent",
-                                    },
-                                    "&::-webkit-scrollbar-thumb": {
-                                        background: "rgba(255, 255, 255, 0.3)",
-                                        borderRadius: "4px",
-                                    },
-                                    "&::-webkit-scrollbar-thumb:hover": {
-                                        background: "rgba(255, 255, 255, 0.5)",
-                                    },
-                                    scrollbarColor:
-                                        "rgba(255, 255, 255, 0.3) transparent",
-                                    scrollbarWidth: "thin",
-                                }}
-                            >
-                                <TextField
-                                    fullWidth
-                                    multiline
-                                    minRows={1}
-                                    variant="standard"
-                                    placeholder="Add a comment..."
-                                    value={commentText}
-                                    onChange={(event) =>
-                                        setCommentText(event.target.value)
-                                    }
-                                    onKeyDown={handleCommentKeyDown}
-                                    onClick={(event) => event.stopPropagation()}
-                                    inputRef={commentInputRef}
-                                    slotProps={{
-                                        htmlInput: { maxLength: 280 },
-                                    }}
-                                    sx={{
-                                        "& .MuiInput-root": {
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 14,
-                                            fontWeight: 600,
-                                            lineHeight: "21px",
-                                            "&::before, &::after": {
-                                                display: "none",
-                                            },
-                                        },
-                                        "& .MuiInputBase-input": {
-                                            color: textBase,
-                                            font: "inherit",
-                                            lineHeight: "21px",
-                                            p: 0,
-                                            "&::placeholder": {
-                                                color: commentsMuted,
-                                                opacity: 1,
-                                            },
-                                        },
-                                    }}
-                                />
-                            </Box>
-                            <Box
-                                component="button"
-                                type="button"
-                                aria-label="Send comment"
-                                disabled={!canSendComment}
-                                onClick={sendComment}
-                                sx={{
-                                    alignItems: "center",
-                                    bgcolor: canSendComment
-                                        ? "#FFFFFF"
-                                        : commentsSurfaceHover,
-                                    border: 0,
-                                    borderRadius: "50%",
-                                    color: canSendComment
-                                        ? "#3A3A3A"
-                                        : controlIcon,
-                                    cursor: canSendComment
-                                        ? "pointer"
-                                        : "default",
-                                    display: "flex",
-                                    height: 32,
-                                    justifyContent: "center",
-                                    opacity: canSendComment ? 1 : 0.42,
-                                    p: 0,
-                                    position: "absolute",
-                                    right: 8,
-                                    bottom: 7,
-                                    transition:
-                                        "background-color 180ms ease, color 180ms ease, opacity 180ms ease, transform 120ms ease",
-                                    width: 32,
-                                    "&:active": {
-                                        transform: canSendComment
-                                            ? "scale(0.96)"
-                                            : "none",
-                                    },
-                                    "&:focus-visible": {
-                                        outline: `2px solid ${green}`,
-                                        outlineOffset: 2,
-                                    },
-                                    "&:hover": {
-                                        bgcolor: canSendComment
-                                            ? "#F2F2F2"
-                                            : "rgba(255, 255, 255, 0.14)",
-                                    },
-                                }}
-                            >
-                                <Box
-                                    component="span"
-                                    sx={{
-                                        display: "flex",
-                                        transform: "translate(-1px, 1px)",
-                                    }}
-                                >
-                                    <HugeiconsIcon
-                                        icon={Navigation03Icon}
-                                        size={16}
-                                        strokeWidth={1.8}
-                                    />
-                                </Box>
-                            </Box>
-                        </Box>
+                        <CommentComposer
+                            canSend={canSendComment}
+                            inputRef={commentInputRef}
+                            onChange={setCommentText}
+                            onKeyDown={handleCommentKeyDown}
+                            onSend={sendComment}
+                            placeholder="Add a comment..."
+                            sendPhase={commentSendPhase}
+                            sendLabel="Send comment"
+                            value={commentText}
+                        />
                     </Box>
                 </Box>
             )}

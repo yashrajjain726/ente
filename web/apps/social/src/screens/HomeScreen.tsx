@@ -21,6 +21,10 @@ import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
+import {
+    createLocalPostPhoto,
+    type LocalPostPhotoDimensions,
+} from "utils/localPostPhoto";
 import { profileLinkForUsername } from "utils/profileLink";
 import { firstNameFrom, formatSocialDate } from "utils/socialDisplay";
 
@@ -192,6 +196,13 @@ interface HomeScreenProps {
 interface FeedPhotoDimensions {
     height: number;
     width: number;
+}
+
+interface SelectedHomeViewer {
+    initialScreen: SocialViewerInitialScreen;
+    localObjectUrl?: string;
+    photo: SocialViewerPhoto;
+    showPostCaptionInput?: boolean;
 }
 
 interface FeedItemProps {
@@ -570,14 +581,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onOpenProfile,
     profile,
 }) => {
-    const [selectedPhoto, setSelectedPhoto] =
-        useState<SocialViewerPhoto | null>(null);
-    const [selectedViewerScreen, setSelectedViewerScreen] =
-        useState<SocialViewerInitialScreen>("photo");
+    const [selectedViewer, setSelectedViewer] =
+        useState<SelectedHomeViewer | null>(null);
     const [postActionPhase, setPostActionPhase] =
         useState<PostActionPhase | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
-    const selectedPhotoFriendID = selectedPhoto?.friendID;
+    const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
+    const pendingPostViewerRef = React.useRef<SelectedHomeViewer | null>(null);
+    const selectedPhotoFriendID = selectedViewer?.photo.friendID;
     const feedItems = showMockFeedData ? sampleFeedItems : [];
     const hasFeedItems = feedItems.length > 0;
     const emptyFeedMessage =
@@ -599,17 +610,45 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         .slice(0, 2)
         .map((part) => part[0]?.toUpperCase())
         .join("");
+    const revokeLocalPostObjectUrl = React.useCallback((objectUrl?: string) => {
+        if (!objectUrl || !localPostObjectUrlsRef.current.has(objectUrl))
+            return;
+
+        URL.revokeObjectURL(objectUrl);
+        localPostObjectUrlsRef.current.delete(objectUrl);
+    }, []);
+    const applyLocalPostDimensions = React.useCallback(
+        (objectUrl: string, dimensions: LocalPostPhotoDimensions) => {
+            const pendingViewer = pendingPostViewerRef.current;
+            if (pendingViewer?.localObjectUrl == objectUrl) {
+                pendingPostViewerRef.current = {
+                    ...pendingViewer,
+                    photo: { ...pendingViewer.photo, ...dimensions },
+                };
+            }
+
+            setSelectedViewer((currentViewer) =>
+                currentViewer?.localObjectUrl == objectUrl
+                    ? {
+                          ...currentViewer,
+                          photo: { ...currentViewer.photo, ...dimensions },
+                      }
+                    : currentViewer,
+            );
+        },
+        [],
+    );
     const openPostPhotoPicker = () => postInputRef.current?.click();
     const openFeedPhoto = (
         photo: SocialViewerPhoto,
         initialScreen: SocialViewerInitialScreen = "photo",
     ) => {
-        setSelectedViewerScreen(initialScreen);
-        setSelectedPhoto(photo);
+        setSelectedViewer({ initialScreen, photo });
     };
     const closeSelectedPhoto = () => {
-        setSelectedPhoto(null);
-        setSelectedViewerScreen("photo");
+        const localObjectUrl = selectedViewer?.localObjectUrl;
+        setSelectedViewer(null);
+        revokeLocalPostObjectUrl(localObjectUrl);
     };
 
     const shareProfileLink = async () => {
@@ -633,6 +672,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         event.target.value = "";
         if (!file) return;
 
+        revokeLocalPostObjectUrl(pendingPostViewerRef.current?.localObjectUrl);
+        pendingPostViewerRef.current = null;
+
+        const localPost = createLocalPostPhoto({
+            avatarUrl: profile.avatarUrl,
+            file,
+            name: initialsSource || "You",
+            onDimensionsLoaded: applyLocalPostDimensions,
+        });
+        localPostObjectUrlsRef.current.add(localPost.objectUrl);
+        pendingPostViewerRef.current = {
+            initialScreen: "photo",
+            localObjectUrl: localPost.objectUrl,
+            photo: localPost.photo,
+            showPostCaptionInput: true,
+        };
+
         setPostActionPhase("posting");
     };
 
@@ -640,16 +696,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         if (!postActionPhase) return;
 
         const timeoutID = window.setTimeout(
-            () =>
-                setPostActionPhase(
-                    postActionPhase == "posting" ? "posted" : null,
-                ),
+            () => {
+                if (postActionPhase == "posting") {
+                    setPostActionPhase("posted");
+                    return;
+                }
+
+                const postedViewer = pendingPostViewerRef.current;
+                pendingPostViewerRef.current = null;
+                if (postedViewer) setSelectedViewer(postedViewer);
+                setPostActionPhase(null);
+            },
             postActionPhase == "posting"
                 ? socialActionBusyDurationMs
                 : socialActionDoneDurationMs,
         );
         return () => window.clearTimeout(timeoutID);
     }, [postActionPhase]);
+
+    React.useEffect(
+        () => () => {
+            localPostObjectUrlsRef.current.forEach((objectUrl) =>
+                URL.revokeObjectURL(objectUrl),
+            );
+            localPostObjectUrlsRef.current.clear();
+        },
+        [],
+    );
 
     return (
         <Box
@@ -990,14 +1063,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         </Box>
                     )}
                 </Box>
-                {selectedPhoto && (
+                {selectedViewer && (
                     <SocialFileViewer
                         currentUser={{
                             avatarUrl: profile.avatarUrl,
                             name: initialsSource,
                         }}
-                        initialScreen={selectedViewerScreen}
-                        photo={selectedPhoto}
+                        initialScreen={selectedViewer.initialScreen}
+                        photo={selectedViewer.photo}
+                        showPostCaptionInput={
+                            selectedViewer.showPostCaptionInput
+                        }
                         onClose={closeSelectedPhoto}
                         onOpenFriend={
                             onOpenFriend
