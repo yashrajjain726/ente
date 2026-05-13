@@ -20,24 +20,33 @@ func (c *NotificationsController) List(ctx *gin.Context, req models.ListNotifica
 	if err != nil {
 		return nil, err
 	}
+	actors := make([]repo.WallActorRecord, 0, len(notifications)*3)
+	for _, notification := range notifications {
+		actors = append(actors, notification.Actor)
+		if notification.PostID.Valid {
+			actors = append(actors, notification.PostAuthor)
+		}
+		if notification.CommentID.Valid {
+			actors = append(actors, notification.CommentAuthor)
+		}
+	}
+	visible, err := actorVisibility(ctx.Request.Context(), c.auth, &viewerAuth{UserID: userID}, actors...)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]models.NotificationResponse, 0, len(notifications))
 	for _, notification := range notifications {
-		items = append(items, toNotificationResponse(notification))
+		items = append(items, toNotificationResponse(notification, visible))
 	}
 	return &models.NotificationPage{Items: items, NextCursor: nextCursor}, nil
 }
 
-func toNotificationResponse(notification repo.WallNotificationRecord) models.NotificationResponse {
+func toNotificationResponse(notification repo.WallNotificationRecord, visible map[string]bool) models.NotificationResponse {
 	resp := models.NotificationResponse{
 		ID:        notification.ID,
 		Type:      notification.Type,
 		CreatedAt: formatMicros(notification.CreatedAt),
-		Actor: models.NotificationActorResponse{
-			UserID:   notification.ActorID,
-			Username: notification.ActorUsername,
-			WallID:   notification.ActorWallID,
-			WallSlug: notification.ActorWallSlug,
-		},
+		Actor:     toActorResponse(notification.Actor, visibleActor(visible, notification.Actor)),
 	}
 	if notification.PostID.Valid {
 		post := &models.NotificationPostResponse{
@@ -45,7 +54,7 @@ func toNotificationResponse(notification repo.WallNotificationRecord) models.Not
 			WallID:      notification.PostWallID.String,
 			WallSlug:    notification.PostWallSlug.String,
 			OwnerUserID: notification.PostOwnerID.Int64,
-			Author:      notification.PostAuthor.String,
+			Author:      toActorResponse(notification.PostAuthor, visibleActor(visible, notification.PostAuthor)),
 		}
 		if notification.PostObjectKey.Valid {
 			object := models.PostObjectPayload{
@@ -79,15 +88,7 @@ func toNotificationResponse(notification repo.WallNotificationRecord) models.Not
 	if notification.CommentID.Valid {
 		comment := &models.NotificationCommentResponse{
 			CommentID: notification.CommentID.Int64,
-		}
-		if notification.CommentAuthorID.Valid {
-			comment.AuthorID = notification.CommentAuthorID.Int64
-		}
-		if notification.CommentAuthorWallID.Valid {
-			comment.AuthorWallID = notification.CommentAuthorWallID.String
-		}
-		if notification.CommentAuthor.Valid {
-			comment.Author = notification.CommentAuthor.String
+			Author:    toActorResponse(notification.CommentAuthor, visibleActor(visible, notification.CommentAuthor)),
 		}
 		if notification.CommentCipher.Valid {
 			comment.CommentCipher = notification.CommentCipher.String

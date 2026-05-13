@@ -104,12 +104,12 @@ func TestWallModuleLifecycle(t *testing.T) {
 	friends, err := module.Friends.ListFriendsForWall(ctx, aliceWall.WallID)
 	require.NoError(t, err)
 	require.Len(t, friends, 1)
-	require.Equal(t, "bob", friends[0].Username)
+	require.Equal(t, "bob", friends[0].Friend.WallSlug)
 
 	bobFriends, err := module.Friends.ListFriendsForWall(ctx, bobWall.WallID)
 	require.NoError(t, err)
 	require.Len(t, bobFriends, 1)
-	require.Equal(t, "alice", bobFriends[0].Username)
+	require.Equal(t, "alice", bobFriends[0].Friend.WallSlug)
 
 	for _, tempObject := range []WallTempObjectRecord{
 		{
@@ -169,7 +169,7 @@ func TestWallModuleLifecycle(t *testing.T) {
 	require.Len(t, comments, 2)
 	require.Empty(t, nextCommentsCursor)
 	require.Equal(t, comment.CommentID, comments[1].CommentID)
-	require.Equal(t, bobWall.WallID, comments[1].AuthorWallID)
+	require.Equal(t, bobWall.WallID, comments[1].Author.WallID)
 	require.Equal(t, comment.CommentID, comments[0].ParentCommentID.Int64)
 
 	assets, err := module.Posts.ListAssetsByPostIDs(ctx, []int64{postID})
@@ -719,9 +719,9 @@ func TestNotificationsIncludeWallSocialEvents(t *testing.T) {
 	require.Len(t, page, 3)
 	require.Equal(t, "addedYouAsFriend", page[0].Type)
 	require.Equal(t, "likedComment", page[1].Type)
-	require.Equal(t, aliceWall.WallID, page[1].CommentAuthorWallID.String)
+	require.Equal(t, aliceWall.WallID, page[1].CommentAuthor.WallID)
 	require.Equal(t, "repliedToComment", page[2].Type)
-	require.Equal(t, bobWall.WallID, page[2].CommentAuthorWallID.String)
+	require.Equal(t, bobWall.WallID, page[2].CommentAuthor.WallID)
 	require.NotEmpty(t, nextCursor)
 
 	page, nextCursor, err = module.Notifications.List(ctx, aliceID, nextCursor, 3)
@@ -786,15 +786,15 @@ func TestListPostLikersPaginates(t *testing.T) {
 	page, nextCursor, err := module.Posts.ListPostLikers(ctx, postID, "", 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
-	require.Equal(t, bobID, page[0].UserID)
-	require.Equal(t, bobWall.WallID, page[0].WallID)
+	require.Equal(t, bobID, page[0].Actor.UserID)
+	require.Equal(t, bobWall.WallID, page[0].Actor.WallID)
 	require.Equal(t, "3000:"+strconv.FormatInt(bobID, 10), nextCursor)
 
 	page, nextCursor, err = module.Posts.ListPostLikers(ctx, postID, nextCursor, 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
-	require.Equal(t, devID, page[0].UserID)
-	require.Equal(t, devWall.WallID, page[0].WallID)
+	require.Equal(t, devID, page[0].Actor.UserID)
+	require.Equal(t, devWall.WallID, page[0].Actor.WallID)
 	require.Empty(t, nextCursor)
 }
 

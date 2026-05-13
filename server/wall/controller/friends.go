@@ -101,26 +101,10 @@ func (c *FriendsController) ListFriends(ctx *gin.Context, req models.ListWallFri
 	}
 	resp := make([]models.WallFriendResponse, 0, len(friends))
 	for _, friend := range friends {
-		var avatar *models.ProfileAvatarResponse
-		if friend.AvatarObjectKey.Valid {
-			avatar = &models.ProfileAvatarResponse{
-				ObjectKey: friend.AvatarObjectKey.String,
-			}
-			if friend.AvatarSize.Valid {
-				avatar.Size = friend.AvatarSize.Int64
-			}
-		}
 		resp = append(resp, models.WallFriendResponse{
-			FriendID:         friend.FriendID,
-			WallID:           friend.WallID,
-			Username:         friend.Username,
-			PublicKey:        friend.PublicKey,
-			KeyVersion:       friend.KeyVersion,
-			EncryptedProfile: friend.EncryptedProfile,
-			Avatar:           avatar,
-			Friends:          friend.Friends,
-			Posts:            friend.Posts,
-			CreatedAt:        formatMicros(friend.CreatedAt),
+			Friend:          toActorResponse(friend.Friend, true),
+			ShareKeyVersion: friend.ShareKeyVersion,
+			CreatedAt:       formatMicros(friend.CreatedAt),
 		})
 	}
 	return resp, nil

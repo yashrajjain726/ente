@@ -154,7 +154,7 @@ pub struct PostResponse {
     pub wall_slug: String,
     #[serde(default)]
     pub owner_user_id: i64,
-    pub author: String,
+    pub author: WallActorResponse,
     pub encrypted_post_key: String,
     #[serde(default)]
     pub caption_cipher: String,
@@ -187,11 +187,7 @@ pub struct CreateCommentRequest {
 #[serde(rename_all = "camelCase")]
 pub struct CommentResponse {
     pub comment_id: i64,
-    #[serde(default)]
-    pub author_id: i64,
-    #[serde(default)]
-    pub author_wall_id: String,
-    pub author: String,
+    pub author: WallActorResponse,
     pub comment_cipher: String,
     pub created_at: String,
     #[serde(default)]
@@ -221,13 +217,26 @@ pub enum WallNotificationType {
     AddedYouAsFriend,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct WallNotificationActor {
+pub struct WallActorResponse {
+    #[serde(default)]
     pub user_id: i64,
-    pub username: String,
+    #[serde(default)]
     pub wall_id: String,
     pub wall_slug: String,
+    #[serde(default)]
+    pub public_key: String,
+    #[serde(default)]
+    pub key_version: i32,
+    #[serde(default)]
+    pub encrypted_profile: String,
+    #[serde(default)]
+    pub avatar: Option<ProfileAvatarResponse>,
+    #[serde(default)]
+    pub friends: Option<i64>,
+    #[serde(default)]
+    pub posts: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -237,7 +246,7 @@ pub struct WallNotificationPost {
     pub wall_id: String,
     pub wall_slug: String,
     pub owner_user_id: i64,
-    pub author: String,
+    pub author: WallActorResponse,
     #[serde(default)]
     pub objects: Vec<PostObjectPayload>,
 }
@@ -246,12 +255,7 @@ pub struct WallNotificationPost {
 #[serde(rename_all = "camelCase")]
 pub struct WallNotificationComment {
     pub comment_id: i64,
-    #[serde(default)]
-    pub author_id: i64,
-    #[serde(default)]
-    pub author_wall_id: String,
-    #[serde(default)]
-    pub author: String,
+    pub author: WallActorResponse,
     #[serde(default)]
     pub comment_cipher: String,
     #[serde(default)]
@@ -267,7 +271,7 @@ pub struct WallNotification {
     #[serde(rename = "type")]
     pub notification_type: WallNotificationType,
     pub created_at: String,
-    pub actor: WallNotificationActor,
+    pub actor: WallActorResponse,
     #[serde(default)]
     pub post: Option<WallNotificationPost>,
     #[serde(default)]
@@ -402,20 +406,9 @@ pub struct FriendTargetPayload {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WallFriendResponse {
-    pub friend_id: i64,
+    pub friend: WallActorResponse,
     #[serde(default)]
-    pub wall_id: String,
-    pub username: String,
-    pub public_key: String,
-    pub key_version: i32,
-    #[serde(default)]
-    pub encrypted_profile: String,
-    #[serde(default)]
-    pub avatar: Option<ProfileAvatarResponse>,
-    #[serde(default)]
-    pub friends: i64,
-    #[serde(default)]
-    pub posts: i64,
+    pub share_key_version: i32,
     pub created_at: String,
 }
 
@@ -447,9 +440,7 @@ pub struct FriendShareResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PostLikerResponse {
-    pub user_id: i64,
-    pub wall_id: String,
-    pub wall_slug: String,
+    pub actor: WallActorResponse,
     pub created_at: String,
 }
 

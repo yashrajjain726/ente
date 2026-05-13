@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS idx_wall_post_comments_post_comment_desc;
+DROP INDEX IF EXISTS idx_wall_post_likes_post_created_user;

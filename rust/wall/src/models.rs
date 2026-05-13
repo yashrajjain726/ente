@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::transport::{PostObjectPayload, ProfileAvatarResponse};
+use crate::transport::{PostObjectPayload, ProfileAvatarResponse, WallActorResponse};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -100,6 +100,7 @@ pub struct FeedItem {
     pub wall_id: String,
     pub wall_slug: String,
     pub owner_user_id: i64,
+    pub author: WallActorResponse,
     pub encrypted_post_key: String,
     #[serde(default)]
     pub caption_cipher: String,

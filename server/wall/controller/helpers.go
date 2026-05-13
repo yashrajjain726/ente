@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"time"
 
 	"github.com/ente-io/museum/wall/models"
@@ -26,6 +27,76 @@ func toAvatarResponse(wall *wallrepo.WallRecord) *models.ProfileAvatarResponse {
 		resp.Size = wall.AvatarSize.Int64
 	}
 	return resp
+}
+
+func toActorAvatarResponse(actor wallrepo.WallActorRecord) *models.ProfileAvatarResponse {
+	if !actor.AvatarObjectKey.Valid {
+		return nil
+	}
+	resp := &models.ProfileAvatarResponse{
+		ObjectKey: actor.AvatarObjectKey.String,
+		UpdatedAt: formatMicros(actor.UpdatedAt),
+	}
+	if actor.AvatarSize.Valid {
+		resp.Size = actor.AvatarSize.Int64
+	}
+	return resp
+}
+
+func toActorResponse(actor wallrepo.WallActorRecord, includePrivate bool) models.WallActorResponse {
+	resp := models.WallActorResponse{
+		WallSlug: actor.WallSlug,
+	}
+	if !includePrivate {
+		return resp
+	}
+	resp.UserID = actor.UserID
+	resp.WallID = actor.WallID
+	resp.PublicKey = actor.PublicKey
+	resp.KeyVersion = actor.KeyVersion
+	resp.EncryptedProfile = actor.EncryptedProfile
+	resp.Avatar = toActorAvatarResponse(actor)
+	if actor.Friends.Valid {
+		friends := actor.Friends.Int64
+		resp.Friends = &friends
+	}
+	if actor.Posts.Valid {
+		posts := actor.Posts.Int64
+		resp.Posts = &posts
+	}
+	return resp
+}
+
+func actorVisibility(ctx context.Context, auth authDeps, viewer *viewerAuth, actors ...wallrepo.WallActorRecord) (map[string]bool, error) {
+	visible := make(map[string]bool)
+	if len(actors) == 0 || viewer == nil {
+		return visible, nil
+	}
+	wallIDSet := make(map[string]struct{}, len(actors))
+	for _, actor := range actors {
+		if actor.WallID != "" {
+			wallIDSet[actor.WallID] = struct{}{}
+		}
+	}
+	if len(wallIDSet) == 0 {
+		return visible, nil
+	}
+	if viewer.Link != nil {
+		visible[viewer.Link.WallID] = true
+		return visible, nil
+	}
+	if viewer.UserID <= 0 || auth.FriendsRepo == nil {
+		return visible, nil
+	}
+	wallIDs := make([]string, 0, len(wallIDSet))
+	for wallID := range wallIDSet {
+		wallIDs = append(wallIDs, wallID)
+	}
+	return auth.FriendsRepo.ListAccessibleWallIDs(ctx, viewer.UserID, wallIDs)
+}
+
+func visibleActor(visible map[string]bool, actor wallrepo.WallActorRecord) bool {
+	return visible[actor.WallID]
 }
 
 func toWallKeyResponse(wall *wallrepo.WallRecord) *models.WallKeyResponse {
@@ -64,13 +135,13 @@ func toPostObjectPayload(asset wallrepo.WallPostAssetRecord) models.PostObjectPa
 	return resp
 }
 
-func toPostResponse(post *wallrepo.WallPostRecord, assets []wallrepo.WallPostAssetRecord) *models.PostResponse {
+func toPostResponse(post *wallrepo.WallPostRecord, assets []wallrepo.WallPostAssetRecord, includeAuthorPrivate bool) *models.PostResponse {
 	resp := &models.PostResponse{
 		PostID:           post.PostID,
 		WallID:           post.WallID,
 		WallSlug:         post.WallSlug,
 		OwnerUserID:      post.OwnerID,
-		Author:           post.Author,
+		Author:           toActorResponse(post.Author, includeAuthorPrivate),
 		EncryptedPostKey: post.EncryptedPostKey,
 		CaptionCipher:    post.CaptionCipher,
 		KeyVersion:       post.KeyVersion,
@@ -88,12 +159,10 @@ func toPostResponse(post *wallrepo.WallPostRecord, assets []wallrepo.WallPostAss
 	return resp
 }
 
-func toCommentResponse(comment wallrepo.WallCommentRecord) models.CommentResponse {
+func toCommentResponse(comment wallrepo.WallCommentRecord, includeAuthorPrivate bool) models.CommentResponse {
 	resp := models.CommentResponse{
 		CommentID:       comment.CommentID,
-		AuthorID:        comment.AuthorID,
-		AuthorWallID:    comment.AuthorWallID,
-		Author:          comment.Author,
+		Author:          toActorResponse(comment.Author, includeAuthorPrivate),
 		CommentCipher:   comment.CommentCipher,
 		CreatedAt:       formatMicros(comment.CreatedAt),
 		Likes:           comment.Likes,

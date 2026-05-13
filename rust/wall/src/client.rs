@@ -21,9 +21,9 @@ use crate::transport::{
     PostObjectPayload, PostPage, PostResponse, PresignUploadRequest, PresignUploadResponse,
     ProfileAvatarPayload, RefreshFriendSharesRequest, RotateWallKeyRequest, ShareUpdatePayload,
     UpdatePostCaptionRequest, UpdateWallProfileRequest, UpdateWallProfileResponse,
-    UpdateWallSlugRequest, WallFriendResponse, WallKeyResponse, WallKeyVersionResponse,
-    WallLinkCreateRequest, WallLinkLoginRequest, WallLinkLoginResponse, WallLinkStatusResponse,
-    WallLookupResponse, WallNotificationPage, WallProfileResponse,
+    UpdateWallSlugRequest, WallActorResponse, WallFriendResponse, WallKeyResponse,
+    WallKeyVersionResponse, WallLinkCreateRequest, WallLinkLoginRequest, WallLinkLoginResponse,
+    WallLinkStatusResponse, WallLookupResponse, WallNotificationPage, WallProfileResponse,
 };
 use ente_core::crypto::{sealed, secretbox};
 use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
@@ -711,6 +711,28 @@ impl AccountWallCtx {
         self.decrypt_post(&wall_key, post)
     }
 
+    pub async fn decrypt_actor_profile(
+        &self,
+        actor: &WallActorResponse,
+    ) -> Result<Option<Vec<u8>>> {
+        if actor.encrypted_profile.trim().is_empty()
+            || actor.wall_id.trim().is_empty()
+            || actor.key_version <= 0
+        {
+            return Ok(None);
+        }
+        let Some(wall_key) = self
+            .resolve_wall_key_for_version(&actor.wall_id, Some(actor.key_version))
+            .await?
+        else {
+            return Ok(None);
+        };
+        Ok(Some(decrypt_secretbox_packed(
+            &wall_key,
+            &decode_b64(&actor.encrypted_profile)?,
+        )?))
+    }
+
     pub async fn decrypt_feed_item(&self, item: &FeedItem) -> Result<DecryptedPost> {
         let post = post_response_from_feed_item(item);
         self.decrypt_post_for_wall(&item.wall_id, &post).await
@@ -918,13 +940,13 @@ impl AccountWallCtx {
         let friends = self.list_wall_friends(wall_id).await?;
         let mut updates = Vec::new();
         for friend in friends {
-            if friend.key_version == access.key_version {
+            if friend.share_key_version == access.key_version {
                 continue;
             }
-            let public_key = decode_b64(&friend.public_key)?;
+            let public_key = decode_b64(&friend.friend.public_key)?;
             let sealed_share = sealed::seal(&access.wall_key, &public_key)?;
             updates.push(ShareUpdatePayload {
-                friend_id: friend.friend_id,
+                friend_id: friend.friend.user_id,
                 encrypted_wall_key: encode_b64(&pack_payload(&sealed_share, &[])),
             });
         }
@@ -1043,7 +1065,7 @@ fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
         wall_id: item.wall_id.clone(),
         wall_slug: item.wall_slug.clone(),
         owner_user_id: item.owner_user_id,
-        author: item.wall_slug.clone(),
+        author: item.author.clone(),
         encrypted_post_key: item.encrypted_post_key.clone(),
         caption_cipher: item.caption_cipher.clone(),
         key_version: item.key_version,
@@ -1201,6 +1223,28 @@ impl WallLinkCtx {
             post_key,
             caption_plaintext,
         })
+    }
+
+    pub async fn decrypt_actor_profile(
+        &self,
+        actor: &WallActorResponse,
+    ) -> Result<Option<Vec<u8>>> {
+        if actor.encrypted_profile.trim().is_empty()
+            || actor.wall_id != self.wall_id
+            || actor.key_version <= 0
+        {
+            return Ok(None);
+        }
+        let Some(wall_key) = self
+            .resolve_wall_key_for_version(Some(actor.key_version))
+            .await?
+        else {
+            return Ok(None);
+        };
+        Ok(Some(decrypt_secretbox_packed(
+            &wall_key,
+            &decode_b64(&actor.encrypted_profile)?,
+        )?))
     }
 
     pub async fn download_post_asset(&self, post_id: i64, object_key: &str) -> Result<Vec<u8>> {
@@ -1682,7 +1726,13 @@ mod tests {
             wall_id: "wall_owner_gallery".to_owned(),
             wall_slug: "owner-gallery".to_owned(),
             owner_user_id: 7,
-            author: "owner-gallery".to_owned(),
+            author: WallActorResponse {
+                user_id: 7,
+                wall_id: "wall_owner_gallery".to_owned(),
+                wall_slug: "owner-gallery".to_owned(),
+                key_version: 2,
+                ..Default::default()
+            },
             encrypted_post_key: encode_b64(
                 &encrypt_secretbox_packed(&previous_wall_key, &post_key)
                     .expect("encrypted post key"),
@@ -1993,9 +2043,11 @@ mod tests {
             .with_body(
                 json!({
                     "likers": [{
-                        "userId": 8,
-                        "wallId": "wall_liker",
-                        "wallSlug": "liker",
+                        "actor": {
+                            "userId": 8,
+                            "wallId": "wall_liker",
+                            "wallSlug": "liker"
+                        },
                         "createdAt": "2026-04-16T00:00:00Z"
                     }],
                     "nextCursor": "2000:8"
@@ -2010,7 +2062,7 @@ mod tests {
             .await
             .expect("likers should load");
 
-        assert_eq!(response.likers[0].wall_id, "wall_liker");
+        assert_eq!(response.likers[0].actor.wall_id, "wall_liker");
         assert_eq!(response.next_cursor, "2000:8");
         likers.assert_async().await;
     }
@@ -2131,10 +2183,14 @@ mod tests {
             .with_status(200)
             .with_body(
                 json!([{
-                    "friendId": 7,
-                    "username": "viewer",
-                    "publicKey": encode_b64(&friend_public_key),
-                    "keyVersion": 2,
+                    "friend": {
+                        "userId": 7,
+                        "wallId": "wall_viewer",
+                        "wallSlug": "viewer",
+                        "publicKey": encode_b64(&friend_public_key),
+                        "keyVersion": 2
+                    },
+                    "shareKeyVersion": 2,
                     "createdAt": "2026-04-16T00:00:00Z"
                 }])
                 .to_string(),
@@ -2183,6 +2239,11 @@ mod tests {
                         "wallId": "wall_owner_gallery",
                         "wallSlug": "owner-gallery",
                         "ownerUserId": 7,
+                        "author": {
+                            "userId": 7,
+                            "wallId": "wall_owner_gallery",
+                            "wallSlug": "owner-gallery"
+                        },
                         "encryptedPostKey": "cGFja2Vk",
                         "captionCipher": "",
                         "keyVersion": 3,
@@ -2239,7 +2300,11 @@ mod tests {
                             "wallId": "wall_owner_gallery",
                             "wallSlug": "owner-gallery",
                             "ownerUserId": 7,
-                            "author": "owner-gallery"
+                            "author": {
+                                "userId": 7,
+                                "wallId": "wall_owner_gallery",
+                                "wallSlug": "owner-gallery"
+                            }
                         }
                     }],
                     "nextCursor": "cursor-2"
@@ -2259,7 +2324,7 @@ mod tests {
             page.items[0].notification_type,
             crate::transport::WallNotificationType::LikedPost
         );
-        assert_eq!(page.items[0].actor.username, "mira");
+        assert_eq!(page.items[0].actor.wall_slug, "mira");
         assert_eq!(page.next_cursor, "cursor-2");
         notifications.assert_async().await;
     }
@@ -2284,7 +2349,11 @@ mod tests {
                         "wallId": "wall_owner_gallery",
                         "wallSlug": "owner-gallery",
                         "ownerUserId": 7,
-                        "author": "owner-gallery",
+                        "author": {
+                            "userId": 7,
+                            "wallId": "wall_owner_gallery",
+                            "wallSlug": "owner-gallery"
+                        },
                         "encryptedPostKey": "cGFja2Vk",
                         "captionCipher": "",
                         "keyVersion": 3,
@@ -2366,7 +2435,11 @@ mod tests {
                     "postId": 42,
                     "wallId": "wall_owner_gallery",
                     "wallSlug": "owner-gallery",
-                    "author": "owner-gallery",
+                    "author": {
+                        "userId": 7,
+                        "wallId": "wall_owner_gallery",
+                        "wallSlug": "owner-gallery"
+                    },
                     "encryptedPostKey": encode_b64(&encrypt_secretbox_packed(&wall_key, &post_key).expect("post key wrap")),
                     "captionCipher": encode_b64(&encrypt_secretbox_packed(&post_key, caption).expect("caption wrap")),
                     "keyVersion": 3,

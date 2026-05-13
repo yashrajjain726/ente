@@ -13,15 +13,20 @@ const wallNotificationRows = `
 		'post_like:' || pl.post_id::text || ':' || pl.user_id::text AS notification_id,
 		'likedPost' AS notification_type,
 		pl.created_at,
-		pl.user_id AS actor_id,
-		actor_wall.wall_slug AS actor_username,
-		actor_wall.wall_id AS actor_wall_id,
-		actor_wall.wall_slug AS actor_wall_slug,
+		actor_wall.owner_id, actor_wall.wall_id, actor_wall.wall_slug, actor_ka.public_key,
+		actor_wall.current_version, actor_wall.encrypted_profile, actor_wall.avatar_object_key,
+		actor_wall.avatar_size, actor_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = actor_wall.wall_id) AS actor_friends,
+		(SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = actor_wall.wall_id AND ap.is_deleted = FALSE) AS actor_posts,
 		p.post_id,
 		p.wall_id AS post_wall_id,
 		post_wall.wall_slug AS post_wall_slug,
 		p.owner_id AS post_owner_id,
-		owner_wall.wall_slug AS post_author,
+		owner_wall.owner_id, owner_wall.wall_id, owner_wall.wall_slug, owner_ka.public_key,
+		owner_wall.current_version, owner_wall.encrypted_profile, owner_wall.avatar_object_key,
+		owner_wall.avatar_size, owner_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = owner_wall.wall_id) AS post_author_friends,
+		(SELECT COUNT(*) FROM wall_posts op WHERE op.wall_id = owner_wall.wall_id AND op.is_deleted = FALSE) AS post_author_posts,
 		asset.object_key AS post_object_key,
 		asset.size AS post_object_size,
 		asset.position AS post_object_position,
@@ -32,16 +37,16 @@ const wallNotificationRows = `
 		asset.media_type AS post_object_media_type,
 		NULL::bigint AS comment_id,
 		NULL::bigint AS parent_comment_id,
-		NULL::bigint AS comment_author_id,
-		NULL::text AS comment_author_wall_id,
-		NULL::text AS comment_author,
+		0::bigint, ''::text, ''::text, ''::text, 0::integer, ''::text, NULL::text, NULL::bigint, 0::bigint, NULL::bigint, NULL::bigint,
 		NULL::text AS comment_cipher,
 		NULL::bigint AS comment_created_at
 	FROM wall_post_likes pl
 	JOIN wall_posts p ON p.post_id = pl.post_id
 	JOIN walls actor_wall ON actor_wall.owner_id = pl.user_id
+	JOIN key_attributes actor_ka ON actor_ka.user_id = pl.user_id
 	JOIN walls post_wall ON post_wall.wall_id = p.wall_id
 	JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+	JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
 	LEFT JOIN LATERAL (
 		SELECT object_key, size, position, variant, blur_hash_cipher, width, height, media_type
 		FROM wall_post_assets
@@ -59,15 +64,20 @@ const wallNotificationRows = `
 		'comment:' || c.comment_id::text AS notification_id,
 		'commentedOnPost' AS notification_type,
 		c.created_at,
-		c.author_id AS actor_id,
-		actor_wall.wall_slug AS actor_username,
-		actor_wall.wall_id AS actor_wall_id,
-		actor_wall.wall_slug AS actor_wall_slug,
+		actor_wall.owner_id, actor_wall.wall_id, actor_wall.wall_slug, actor_ka.public_key,
+		actor_wall.current_version, actor_wall.encrypted_profile, actor_wall.avatar_object_key,
+		actor_wall.avatar_size, actor_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = actor_wall.wall_id) AS actor_friends,
+		(SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = actor_wall.wall_id AND ap.is_deleted = FALSE) AS actor_posts,
 		p.post_id,
 		p.wall_id AS post_wall_id,
 		post_wall.wall_slug AS post_wall_slug,
 		p.owner_id AS post_owner_id,
-		owner_wall.wall_slug AS post_author,
+		owner_wall.owner_id, owner_wall.wall_id, owner_wall.wall_slug, owner_ka.public_key,
+		owner_wall.current_version, owner_wall.encrypted_profile, owner_wall.avatar_object_key,
+		owner_wall.avatar_size, owner_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = owner_wall.wall_id) AS post_author_friends,
+		(SELECT COUNT(*) FROM wall_posts op WHERE op.wall_id = owner_wall.wall_id AND op.is_deleted = FALSE) AS post_author_posts,
 		asset.object_key AS post_object_key,
 		asset.size AS post_object_size,
 		asset.position AS post_object_position,
@@ -78,16 +88,20 @@ const wallNotificationRows = `
 		asset.media_type AS post_object_media_type,
 		c.comment_id,
 		NULL::bigint AS parent_comment_id,
-		c.author_id AS comment_author_id,
-		actor_wall.wall_id AS comment_author_wall_id,
-		actor_wall.wall_slug AS comment_author,
+		actor_wall.owner_id, actor_wall.wall_id, actor_wall.wall_slug, actor_ka.public_key,
+		actor_wall.current_version, actor_wall.encrypted_profile, actor_wall.avatar_object_key,
+		actor_wall.avatar_size, actor_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = actor_wall.wall_id) AS comment_author_friends,
+		(SELECT COUNT(*) FROM wall_posts cp WHERE cp.wall_id = actor_wall.wall_id AND cp.is_deleted = FALSE) AS comment_author_posts,
 		c.comment_cipher,
 		c.created_at AS comment_created_at
 	FROM wall_post_comments c
 	JOIN wall_posts p ON p.post_id = c.post_id
 	JOIN walls actor_wall ON actor_wall.owner_id = c.author_id
+	JOIN key_attributes actor_ka ON actor_ka.user_id = c.author_id
 	JOIN walls post_wall ON post_wall.wall_id = p.wall_id
 	JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+	JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
 	LEFT JOIN LATERAL (
 		SELECT object_key, size, position, variant, blur_hash_cipher, width, height, media_type
 		FROM wall_post_assets
@@ -107,15 +121,20 @@ const wallNotificationRows = `
 		'reply:' || c.comment_id::text AS notification_id,
 		'repliedToComment' AS notification_type,
 		c.created_at,
-		c.author_id AS actor_id,
-		actor_wall.wall_slug AS actor_username,
-		actor_wall.wall_id AS actor_wall_id,
-		actor_wall.wall_slug AS actor_wall_slug,
+		actor_wall.owner_id, actor_wall.wall_id, actor_wall.wall_slug, actor_ka.public_key,
+		actor_wall.current_version, actor_wall.encrypted_profile, actor_wall.avatar_object_key,
+		actor_wall.avatar_size, actor_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = actor_wall.wall_id) AS actor_friends,
+		(SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = actor_wall.wall_id AND ap.is_deleted = FALSE) AS actor_posts,
 		p.post_id,
 		p.wall_id AS post_wall_id,
 		post_wall.wall_slug AS post_wall_slug,
 		p.owner_id AS post_owner_id,
-		owner_wall.wall_slug AS post_author,
+		owner_wall.owner_id, owner_wall.wall_id, owner_wall.wall_slug, owner_ka.public_key,
+		owner_wall.current_version, owner_wall.encrypted_profile, owner_wall.avatar_object_key,
+		owner_wall.avatar_size, owner_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = owner_wall.wall_id) AS post_author_friends,
+		(SELECT COUNT(*) FROM wall_posts op WHERE op.wall_id = owner_wall.wall_id AND op.is_deleted = FALSE) AS post_author_posts,
 		asset.object_key AS post_object_key,
 		asset.size AS post_object_size,
 		asset.position AS post_object_position,
@@ -126,17 +145,21 @@ const wallNotificationRows = `
 		asset.media_type AS post_object_media_type,
 		c.comment_id,
 		c.parent_comment_id,
-		c.author_id AS comment_author_id,
-		actor_wall.wall_id AS comment_author_wall_id,
-		actor_wall.wall_slug AS comment_author,
+		actor_wall.owner_id, actor_wall.wall_id, actor_wall.wall_slug, actor_ka.public_key,
+		actor_wall.current_version, actor_wall.encrypted_profile, actor_wall.avatar_object_key,
+		actor_wall.avatar_size, actor_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = actor_wall.wall_id) AS comment_author_friends,
+		(SELECT COUNT(*) FROM wall_posts cp WHERE cp.wall_id = actor_wall.wall_id AND cp.is_deleted = FALSE) AS comment_author_posts,
 		c.comment_cipher,
 		c.created_at AS comment_created_at
 	FROM wall_post_comments c
 	JOIN wall_post_comments parent ON parent.comment_id = c.parent_comment_id
 	JOIN wall_posts p ON p.post_id = c.post_id
 	JOIN walls actor_wall ON actor_wall.owner_id = c.author_id
+	JOIN key_attributes actor_ka ON actor_ka.user_id = c.author_id
 	JOIN walls post_wall ON post_wall.wall_id = p.wall_id
 	JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+	JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
 	LEFT JOIN LATERAL (
 		SELECT object_key, size, position, variant, blur_hash_cipher, width, height, media_type
 		FROM wall_post_assets
@@ -156,15 +179,20 @@ const wallNotificationRows = `
 		'comment_like:' || cl.comment_id::text || ':' || cl.user_id::text AS notification_id,
 		'likedComment' AS notification_type,
 		cl.created_at,
-		cl.user_id AS actor_id,
-		actor_wall.wall_slug AS actor_username,
-		actor_wall.wall_id AS actor_wall_id,
-		actor_wall.wall_slug AS actor_wall_slug,
+		actor_wall.owner_id, actor_wall.wall_id, actor_wall.wall_slug, actor_ka.public_key,
+		actor_wall.current_version, actor_wall.encrypted_profile, actor_wall.avatar_object_key,
+		actor_wall.avatar_size, actor_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = actor_wall.wall_id) AS actor_friends,
+		(SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = actor_wall.wall_id AND ap.is_deleted = FALSE) AS actor_posts,
 		p.post_id,
 		p.wall_id AS post_wall_id,
 		post_wall.wall_slug AS post_wall_slug,
 		p.owner_id AS post_owner_id,
-		owner_wall.wall_slug AS post_author,
+		owner_wall.owner_id, owner_wall.wall_id, owner_wall.wall_slug, owner_ka.public_key,
+		owner_wall.current_version, owner_wall.encrypted_profile, owner_wall.avatar_object_key,
+		owner_wall.avatar_size, owner_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = owner_wall.wall_id) AS post_author_friends,
+		(SELECT COUNT(*) FROM wall_posts op WHERE op.wall_id = owner_wall.wall_id AND op.is_deleted = FALSE) AS post_author_posts,
 		asset.object_key AS post_object_key,
 		asset.size AS post_object_size,
 		asset.position AS post_object_position,
@@ -175,18 +203,23 @@ const wallNotificationRows = `
 		asset.media_type AS post_object_media_type,
 		c.comment_id,
 		c.parent_comment_id,
-		c.author_id AS comment_author_id,
-		comment_author_wall.wall_id AS comment_author_wall_id,
-		comment_author_wall.wall_slug AS comment_author,
+		comment_author_wall.owner_id, comment_author_wall.wall_id, comment_author_wall.wall_slug, comment_author_ka.public_key,
+		comment_author_wall.current_version, comment_author_wall.encrypted_profile, comment_author_wall.avatar_object_key,
+		comment_author_wall.avatar_size, comment_author_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = comment_author_wall.wall_id) AS comment_author_friends,
+		(SELECT COUNT(*) FROM wall_posts cp WHERE cp.wall_id = comment_author_wall.wall_id AND cp.is_deleted = FALSE) AS comment_author_posts,
 		c.comment_cipher,
 		c.created_at AS comment_created_at
 	FROM wall_comment_likes cl
 	JOIN wall_post_comments c ON c.comment_id = cl.comment_id
 	JOIN wall_posts p ON p.post_id = c.post_id
 	JOIN walls actor_wall ON actor_wall.owner_id = cl.user_id
+	JOIN key_attributes actor_ka ON actor_ka.user_id = cl.user_id
 	JOIN walls comment_author_wall ON comment_author_wall.owner_id = c.author_id
+	JOIN key_attributes comment_author_ka ON comment_author_ka.user_id = c.author_id
 	JOIN walls post_wall ON post_wall.wall_id = p.wall_id
 	JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+	JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
 	LEFT JOIN LATERAL (
 		SELECT object_key, size, position, variant, blur_hash_cipher, width, height, media_type
 		FROM wall_post_assets
@@ -205,15 +238,16 @@ const wallNotificationRows = `
 		'friend_add:' || fe.event_id::text AS notification_id,
 		'addedYouAsFriend' AS notification_type,
 		fe.created_at,
-		fe.actor_id,
-		actor_wall.wall_slug AS actor_username,
-		actor_wall.wall_id AS actor_wall_id,
-		actor_wall.wall_slug AS actor_wall_slug,
+		actor_wall.owner_id, actor_wall.wall_id, actor_wall.wall_slug, actor_ka.public_key,
+		actor_wall.current_version, actor_wall.encrypted_profile, actor_wall.avatar_object_key,
+		actor_wall.avatar_size, actor_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = actor_wall.wall_id) AS actor_friends,
+		(SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = actor_wall.wall_id AND ap.is_deleted = FALSE) AS actor_posts,
 		NULL::bigint AS post_id,
 		NULL::text AS post_wall_id,
 		NULL::text AS post_wall_slug,
 		NULL::bigint AS post_owner_id,
-		NULL::text AS post_author,
+		0::bigint, ''::text, ''::text, ''::text, 0::integer, ''::text, NULL::text, NULL::bigint, 0::bigint, NULL::bigint, NULL::bigint,
 		NULL::text AS post_object_key,
 		NULL::bigint AS post_object_size,
 		NULL::integer AS post_object_position,
@@ -224,13 +258,12 @@ const wallNotificationRows = `
 		NULL::text AS post_object_media_type,
 		NULL::bigint AS comment_id,
 		NULL::bigint AS parent_comment_id,
-		NULL::bigint AS comment_author_id,
-		NULL::text AS comment_author_wall_id,
-		NULL::text AS comment_author,
+		0::bigint, ''::text, ''::text, ''::text, 0::integer, ''::text, NULL::text, NULL::bigint, 0::bigint, NULL::bigint, NULL::bigint,
 		NULL::text AS comment_cipher,
 		NULL::bigint AS comment_created_at
 	FROM wall_friend_events fe
 	JOIN walls actor_wall ON actor_wall.wall_id = fe.actor_wall_id
+	JOIN key_attributes actor_ka ON actor_ka.user_id = actor_wall.owner_id
 	WHERE fe.target_id = $1
 	  AND fe.actor_id <> $1
 `
@@ -248,12 +281,7 @@ func (r *NotificationsRepository) List(ctx context.Context, userID int64, cursor
 	}
 	rows, err := r.DB.QueryContext(ctx, `
 		WITH notifications AS (`+wallNotificationRows+`)
-		SELECT n.notification_id, n.notification_type, n.created_at,
-		       n.actor_id, n.actor_username, n.actor_wall_id, n.actor_wall_slug,
-		       n.post_id, n.post_wall_id, n.post_wall_slug, n.post_owner_id, n.post_author,
-		       n.post_object_key, n.post_object_size, n.post_object_position, n.post_object_variant,
-		       n.post_object_blur_hash_cipher, n.post_object_width, n.post_object_height, n.post_object_media_type,
-		       n.comment_id, n.parent_comment_id, n.comment_author_id, n.comment_author_wall_id, n.comment_author, n.comment_cipher, n.comment_created_at
+		SELECT n.*
 		FROM notifications n
 		WHERE ($2::bigint IS NULL OR (n.created_at, n.notification_id) < ($2::bigint, $3::text))
 		ORDER BY n.created_at DESC, n.notification_id DESC
@@ -285,35 +313,14 @@ func (r *NotificationsRepository) List(ctx context.Context, userID int64, cursor
 
 func scanNotificationRecord(scanner interface{ Scan(dest ...any) error }) (*WallNotificationRecord, error) {
 	var rec WallNotificationRecord
-	if err := scanner.Scan(
-		&rec.ID,
-		&rec.Type,
-		&rec.CreatedAt,
-		&rec.ActorID,
-		&rec.ActorUsername,
-		&rec.ActorWallID,
-		&rec.ActorWallSlug,
-		&rec.PostID,
-		&rec.PostWallID,
-		&rec.PostWallSlug,
-		&rec.PostOwnerID,
-		&rec.PostAuthor,
-		&rec.PostObjectKey,
-		&rec.PostObjectSize,
-		&rec.PostObjectPosition,
-		&rec.PostObjectVariant,
-		&rec.PostObjectBlurHashCipher,
-		&rec.PostObjectWidth,
-		&rec.PostObjectHeight,
-		&rec.PostObjectMediaType,
-		&rec.CommentID,
-		&rec.ParentCommentID,
-		&rec.CommentAuthorID,
-		&rec.CommentAuthorWallID,
-		&rec.CommentAuthor,
-		&rec.CommentCipher,
-		&rec.CommentCreatedAt,
-	); err != nil {
+	dest := []any{&rec.ID, &rec.Type, &rec.CreatedAt}
+	dest = append(dest, wallActorScanDest(&rec.Actor)...)
+	dest = append(dest, &rec.PostID, &rec.PostWallID, &rec.PostWallSlug, &rec.PostOwnerID)
+	dest = append(dest, wallActorScanDest(&rec.PostAuthor)...)
+	dest = append(dest, &rec.PostObjectKey, &rec.PostObjectSize, &rec.PostObjectPosition, &rec.PostObjectVariant, &rec.PostObjectBlurHashCipher, &rec.PostObjectWidth, &rec.PostObjectHeight, &rec.PostObjectMediaType, &rec.CommentID, &rec.ParentCommentID)
+	dest = append(dest, wallActorScanDest(&rec.CommentAuthor)...)
+	dest = append(dest, &rec.CommentCipher, &rec.CommentCreatedAt)
+	if err := scanner.Scan(dest...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil

@@ -68,7 +68,7 @@ type WallPostRecord struct {
 	WallID           string
 	WallSlug         string
 	OwnerID          int64
-	Author           string
+	Author           WallActorRecord
 	EncryptedPostKey string
 	CaptionCipher    string
 	KeyVersion       int
@@ -107,9 +107,7 @@ type WallTempObjectRecord struct {
 type WallCommentRecord struct {
 	CommentID       int64
 	PostID          int64
-	AuthorID        int64
-	AuthorWallID    string
-	Author          string
+	Author          WallActorRecord
 	CommentCipher   string
 	ParentCommentID sql.NullInt64
 	CreatedAt       int64
@@ -119,10 +117,22 @@ type WallCommentRecord struct {
 }
 
 type WallPostLikerRecord struct {
-	UserID    int64
-	WallID    string
-	WallSlug  string
+	Actor     WallActorRecord
 	CreatedAt int64
+}
+
+type WallActorRecord struct {
+	UserID           int64
+	WallID           string
+	WallSlug         string
+	PublicKey        string
+	KeyVersion       int
+	EncryptedProfile string
+	AvatarObjectKey  sql.NullString
+	AvatarSize       sql.NullInt64
+	UpdatedAt        int64
+	Friends          sql.NullInt64
+	Posts            sql.NullInt64
 }
 
 type WallShareRecord struct {
@@ -142,17 +152,9 @@ type WallShareUpdateRecord struct {
 }
 
 type WallFriendRecord struct {
-	FriendID         int64
-	WallID           string
-	Username         string
-	PublicKey        string
-	KeyVersion       int
-	EncryptedProfile string
-	AvatarObjectKey  sql.NullString
-	AvatarSize       sql.NullInt64
-	Friends          int64
-	Posts            int64
-	CreatedAt        int64
+	Friend          WallActorRecord
+	ShareKeyVersion int
+	CreatedAt       int64
 }
 
 type WallLinkRecord struct {
@@ -185,15 +187,12 @@ type WallNotificationRecord struct {
 	ID                       string
 	Type                     string
 	CreatedAt                int64
-	ActorID                  int64
-	ActorUsername            string
-	ActorWallID              string
-	ActorWallSlug            string
+	Actor                    WallActorRecord
 	PostID                   sql.NullInt64
 	PostWallID               sql.NullString
 	PostWallSlug             sql.NullString
 	PostOwnerID              sql.NullInt64
-	PostAuthor               sql.NullString
+	PostAuthor               WallActorRecord
 	PostObjectKey            sql.NullString
 	PostObjectSize           sql.NullInt64
 	PostObjectPosition       sql.NullInt64
@@ -204,9 +203,7 @@ type WallNotificationRecord struct {
 	PostObjectMediaType      sql.NullString
 	CommentID                sql.NullInt64
 	ParentCommentID          sql.NullInt64
-	CommentAuthorID          sql.NullInt64
-	CommentAuthorWallID      sql.NullString
-	CommentAuthor            sql.NullString
+	CommentAuthor            WallActorRecord
 	CommentCipher            sql.NullString
 	CommentCreatedAt         sql.NullInt64
 }

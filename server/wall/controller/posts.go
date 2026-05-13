@@ -96,7 +96,7 @@ func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*
 	}
 	resp := make([]models.PostResponse, 0, len(posts))
 	for _, post := range posts {
-		resp = append(resp, *toPostResponse(&post, assetsByPost[post.PostID]))
+		resp = append(resp, *toPostResponse(&post, assetsByPost[post.PostID], true))
 	}
 	return &models.PostPage{
 		Items:      resp,
@@ -123,7 +123,7 @@ func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest)
 	}
 	items := make([]models.PostResponse, 0, len(posts))
 	for _, post := range posts {
-		items = append(items, *toPostResponse(&post, assetsByPost[post.PostID]))
+		items = append(items, *toPostResponse(&post, assetsByPost[post.PostID], true))
 	}
 	return &models.FeedPage{
 		Items:      items,
@@ -159,7 +159,7 @@ func (c *PostsController) Get(ctx *gin.Context, postID string) (*models.PostResp
 	if err != nil {
 		return nil, err
 	}
-	return toPostResponse(post, assetsByPost[id]), nil
+	return toPostResponse(post, assetsByPost[id], true), nil
 }
 
 func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req models.UpdatePostCaptionRequest) (*models.PostResponse, error) {
@@ -182,7 +182,7 @@ func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req mod
 	if err != nil {
 		return nil, err
 	}
-	return toPostResponse(post, assetsByPost[id]), nil
+	return toPostResponse(post, assetsByPost[id], true), nil
 }
 
 func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models.LikePostRequest) (*models.LikePostResponse, error) {
@@ -241,11 +241,17 @@ func (c *PostsController) ListLikers(ctx *gin.Context, postID string) (*models.L
 		return nil, err
 	}
 	resp := make([]models.PostLikerResponse, 0, len(likers))
+	actors := make([]repo.WallActorRecord, 0, len(likers))
+	for _, liker := range likers {
+		actors = append(actors, liker.Actor)
+	}
+	visible, err := actorVisibility(ctx.Request.Context(), c.auth, viewer, actors...)
+	if err != nil {
+		return nil, err
+	}
 	for _, liker := range likers {
 		resp = append(resp, models.PostLikerResponse{
-			UserID:    liker.UserID,
-			WallID:    liker.WallID,
-			WallSlug:  liker.WallSlug,
+			Actor:     toActorResponse(liker.Actor, visibleActor(visible, liker.Actor)),
 			CreatedAt: formatMicros(liker.CreatedAt),
 		})
 	}
@@ -295,8 +301,16 @@ func (c *PostsController) ListComments(ctx *gin.Context, postID string) (*models
 		return nil, err
 	}
 	resp := make([]models.CommentResponse, 0, len(comments))
+	actors := make([]repo.WallActorRecord, 0, len(comments))
 	for _, comment := range comments {
-		resp = append(resp, toCommentResponse(comment))
+		actors = append(actors, comment.Author)
+	}
+	visible, err := actorVisibility(ctx.Request.Context(), c.auth, viewer, actors...)
+	if err != nil {
+		return nil, err
+	}
+	for _, comment := range comments {
+		resp = append(resp, toCommentResponse(comment, visibleActor(visible, comment.Author)))
 	}
 	return &models.ListCommentsResponse{Comments: resp, NextCursor: nextCursor}, nil
 }
@@ -343,7 +357,7 @@ func (c *PostsController) CreateComment(ctx *gin.Context, postID string, req mod
 	if err != nil {
 		return nil, err
 	}
-	resp := toCommentResponse(*comment)
+	resp := toCommentResponse(*comment, true)
 	return &resp, nil
 }
 

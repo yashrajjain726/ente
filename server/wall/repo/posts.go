@@ -58,16 +58,23 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, wallID,
 
 func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID int64) (*WallPostRecord, error) {
 	return scanPostRecord(r.DB.QueryRowContext(ctx, `
-		SELECT p.post_id, p.wall_id, w.wall_slug, p.owner_id, owner_wall.wall_slug, p.encrypted_post_key, p.caption_cipher,
+		SELECT p.post_id, p.wall_id, w.wall_slug, p.owner_id,
+		       owner_wall.owner_id, owner_wall.wall_id, owner_wall.wall_slug, owner_ka.public_key,
+		       owner_wall.current_version, owner_wall.encrypted_profile, owner_wall.avatar_object_key,
+		       owner_wall.avatar_size, owner_wall.updated_at,
+		       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = owner_wall.wall_id) AS author_friends,
+		       (SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = owner_wall.wall_id AND ap.is_deleted = FALSE) AS author_posts,
+		       p.encrypted_post_key, p.caption_cipher,
 		       p.key_version, p.created_at,
 		       (SELECT COUNT(*) FROM wall_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
 		       EXISTS (SELECT 1 FROM wall_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $2) AS viewer_liked,
 		       (SELECT COUNT(*) FROM wall_post_comments pc WHERE pc.post_id = p.post_id AND pc.is_deleted = FALSE) AS comments
-		FROM wall_posts p
-		JOIN walls w ON w.wall_id = p.wall_id
-		JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
-		WHERE p.post_id = $1 AND p.is_deleted = FALSE
-	`, postID, viewerID))
+			FROM wall_posts p
+			JOIN walls w ON w.wall_id = p.wall_id
+			JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+			JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
+			WHERE p.post_id = $1 AND p.is_deleted = FALSE
+		`, postID, viewerID))
 }
 
 func (r *PostsRepository) ListPostsByWall(ctx context.Context, wallID string, viewerID int64, cursor string, limit int) ([]WallPostRecord, string, error) {
@@ -77,15 +84,22 @@ func (r *PostsRepository) ListPostsByWall(ctx context.Context, wallID string, vi
 	}
 	args := []any{wallID, viewerID}
 	query := `
-		SELECT p.post_id, p.wall_id, w.wall_slug, p.owner_id, owner_wall.wall_slug, p.encrypted_post_key, p.caption_cipher,
-		       p.key_version, p.created_at,
-		       (SELECT COUNT(*) FROM wall_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-		       EXISTS (SELECT 1 FROM wall_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $2) AS viewer_liked,
-		       (SELECT COUNT(*) FROM wall_post_comments pc WHERE pc.post_id = p.post_id AND pc.is_deleted = FALSE) AS comments
-			FROM wall_posts p
-			JOIN walls w ON w.wall_id = p.wall_id
-			JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
-			WHERE p.wall_id = $1 AND p.is_deleted = FALSE`
+			SELECT p.post_id, p.wall_id, w.wall_slug, p.owner_id,
+			       owner_wall.owner_id, owner_wall.wall_id, owner_wall.wall_slug, owner_ka.public_key,
+			       owner_wall.current_version, owner_wall.encrypted_profile, owner_wall.avatar_object_key,
+			       owner_wall.avatar_size, owner_wall.updated_at,
+			       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = owner_wall.wall_id) AS author_friends,
+			       (SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = owner_wall.wall_id AND ap.is_deleted = FALSE) AS author_posts,
+			       p.encrypted_post_key, p.caption_cipher,
+			       p.key_version, p.created_at,
+			       (SELECT COUNT(*) FROM wall_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
+			       EXISTS (SELECT 1 FROM wall_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $2) AS viewer_liked,
+			       (SELECT COUNT(*) FROM wall_post_comments pc WHERE pc.post_id = p.post_id AND pc.is_deleted = FALSE) AS comments
+				FROM wall_posts p
+				JOIN walls w ON w.wall_id = p.wall_id
+				JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+				JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
+				WHERE p.wall_id = $1 AND p.is_deleted = FALSE`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorPostID)
 		query += ` AND (p.created_at, p.post_id) < ($3, $4)`
@@ -123,15 +137,22 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor s
 	}
 	args := []any{viewerID}
 	query := `
-		SELECT p.post_id, p.wall_id, w.wall_slug, p.owner_id, owner_wall.wall_slug, p.encrypted_post_key, p.caption_cipher,
-		       p.key_version, p.created_at,
-		       (SELECT COUNT(*) FROM wall_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-		       EXISTS (SELECT 1 FROM wall_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $1) AS viewer_liked,
-		       (SELECT COUNT(*) FROM wall_post_comments pc WHERE pc.post_id = p.post_id AND pc.is_deleted = FALSE) AS comments
-		FROM wall_posts p
-		JOIN walls w ON w.wall_id = p.wall_id
-		JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
-		WHERE p.is_deleted = FALSE
+			SELECT p.post_id, p.wall_id, w.wall_slug, p.owner_id,
+			       owner_wall.owner_id, owner_wall.wall_id, owner_wall.wall_slug, owner_ka.public_key,
+			       owner_wall.current_version, owner_wall.encrypted_profile, owner_wall.avatar_object_key,
+			       owner_wall.avatar_size, owner_wall.updated_at,
+			       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = owner_wall.wall_id) AS author_friends,
+			       (SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = owner_wall.wall_id AND ap.is_deleted = FALSE) AS author_posts,
+			       p.encrypted_post_key, p.caption_cipher,
+			       p.key_version, p.created_at,
+			       (SELECT COUNT(*) FROM wall_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
+			       EXISTS (SELECT 1 FROM wall_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $1) AS viewer_liked,
+			       (SELECT COUNT(*) FROM wall_post_comments pc WHERE pc.post_id = p.post_id AND pc.is_deleted = FALSE) AS comments
+			FROM wall_posts p
+			JOIN walls w ON w.wall_id = p.wall_id
+			JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+			JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
+			WHERE p.is_deleted = FALSE
 		  AND (
 		    p.owner_id = $1 OR
 		    EXISTS (
@@ -268,9 +289,15 @@ func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, curs
 	}
 	args := []any{postID}
 	query := `
-		SELECT pl.user_id, liker_wall.wall_id, liker_wall.wall_slug, pl.created_at
+		SELECT liker_wall.owner_id, liker_wall.wall_id, liker_wall.wall_slug, liker_ka.public_key,
+		       liker_wall.current_version, liker_wall.encrypted_profile, liker_wall.avatar_object_key,
+		       liker_wall.avatar_size, liker_wall.updated_at,
+		       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = liker_wall.wall_id) AS liker_friends,
+		       (SELECT COUNT(*) FROM wall_posts lp WHERE lp.wall_id = liker_wall.wall_id AND lp.is_deleted = FALSE) AS liker_posts,
+		       pl.created_at
 		FROM wall_post_likes pl
 		JOIN walls liker_wall ON liker_wall.owner_id = pl.user_id
+		JOIN key_attributes liker_ka ON liker_ka.user_id = pl.user_id
 		WHERE pl.post_id = $1`
 	if cursorCreatedAt, cursorUserID, ok := parsePostLikerCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorUserID)
@@ -286,7 +313,9 @@ func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, curs
 	out := make([]WallPostLikerRecord, 0, limit+1)
 	for rows.Next() {
 		var rec WallPostLikerRecord
-		if err := rows.Scan(&rec.UserID, &rec.WallID, &rec.WallSlug, &rec.CreatedAt); err != nil {
+		dest := wallActorScanDest(&rec.Actor)
+		dest = append(dest, &rec.CreatedAt)
+		if err := rows.Scan(dest...); err != nil {
 			return nil, "", stacktrace.Propagate(err, "")
 		}
 		out = append(out, rec)
@@ -335,12 +364,19 @@ func (r *PostsRepository) CreateComment(ctx context.Context, postID, authorID in
 
 func (r *PostsRepository) GetComment(ctx context.Context, commentID, viewerID int64) (*WallCommentRecord, error) {
 	return scanCommentRecord(r.DB.QueryRowContext(ctx, `
-		SELECT c.comment_id, c.post_id, c.author_id, author_wall.wall_id, author_wall.wall_slug, c.comment_cipher, c.parent_comment_id, c.created_at,
+		SELECT c.comment_id, c.post_id,
+		       author_wall.owner_id, author_wall.wall_id, author_wall.wall_slug, author_ka.public_key,
+		       author_wall.current_version, author_wall.encrypted_profile, author_wall.avatar_object_key,
+		       author_wall.avatar_size, author_wall.updated_at,
+		       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = author_wall.wall_id) AS author_friends,
+		       (SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = author_wall.wall_id AND ap.is_deleted = FALSE) AS author_posts,
+		       c.comment_cipher, c.parent_comment_id, c.created_at,
 		       (SELECT COUNT(*) FROM wall_comment_likes cl WHERE cl.comment_id = c.comment_id) AS likes,
 		       EXISTS (SELECT 1 FROM wall_comment_likes cl WHERE cl.comment_id = c.comment_id AND cl.user_id = $2) AS viewer_liked,
 		       (c.author_id = $2) AS viewer_can_delete
 		FROM wall_post_comments c
 		JOIN walls author_wall ON author_wall.owner_id = c.author_id
+		JOIN key_attributes author_ka ON author_ka.user_id = c.author_id
 		WHERE c.comment_id = $1 AND c.is_deleted = FALSE
 	`, commentID, viewerID))
 }
@@ -352,12 +388,19 @@ func (r *PostsRepository) ListComments(ctx context.Context, postID, viewerID int
 	}
 	args := []any{postID, viewerID}
 	query := `
-		SELECT c.comment_id, c.post_id, c.author_id, author_wall.wall_id, author_wall.wall_slug, c.comment_cipher, c.parent_comment_id, c.created_at,
+		SELECT c.comment_id, c.post_id,
+		       author_wall.owner_id, author_wall.wall_id, author_wall.wall_slug, author_ka.public_key,
+		       author_wall.current_version, author_wall.encrypted_profile, author_wall.avatar_object_key,
+		       author_wall.avatar_size, author_wall.updated_at,
+		       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = author_wall.wall_id) AS author_friends,
+		       (SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = author_wall.wall_id AND ap.is_deleted = FALSE) AS author_posts,
+		       c.comment_cipher, c.parent_comment_id, c.created_at,
 	       (SELECT COUNT(*) FROM wall_comment_likes cl WHERE cl.comment_id = c.comment_id) AS likes,
 	       EXISTS (SELECT 1 FROM wall_comment_likes cl WHERE cl.comment_id = c.comment_id AND cl.user_id = $2) AS viewer_liked,
 	       (c.author_id = $2) AS viewer_can_delete
 	FROM wall_post_comments c
 	JOIN walls author_wall ON author_wall.owner_id = c.author_id
+	JOIN key_attributes author_ka ON author_ka.user_id = c.author_id
 	WHERE c.post_id = $1 AND c.is_deleted = FALSE`
 	if trimmed := strings.TrimSpace(cursor); trimmed != "" {
 		if cursorID, err := strconv.ParseInt(trimmed, 10, 64); err == nil && cursorID > 0 {
@@ -430,7 +473,10 @@ func (r *PostsRepository) DeleteComment(ctx context.Context, postID, commentID, 
 
 func scanPostRecord(scanner interface{ Scan(dest ...any) error }) (*WallPostRecord, error) {
 	var rec WallPostRecord
-	if err := scanner.Scan(&rec.PostID, &rec.WallID, &rec.WallSlug, &rec.OwnerID, &rec.Author, &rec.EncryptedPostKey, &rec.CaptionCipher, &rec.KeyVersion, &rec.CreatedAt, &rec.Likes, &rec.ViewerLiked, &rec.Comments); err != nil {
+	dest := []any{&rec.PostID, &rec.WallID, &rec.WallSlug, &rec.OwnerID}
+	dest = append(dest, wallActorScanDest(&rec.Author)...)
+	dest = append(dest, &rec.EncryptedPostKey, &rec.CaptionCipher, &rec.KeyVersion, &rec.CreatedAt, &rec.Likes, &rec.ViewerLiked, &rec.Comments)
+	if err := scanner.Scan(dest...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil
@@ -473,12 +519,15 @@ func parsePostLikerCursor(cursor string) (int64, int64, bool) {
 }
 
 func formatPostLikerCursor(liker WallPostLikerRecord) string {
-	return strconv.FormatInt(liker.CreatedAt, 10) + ":" + strconv.FormatInt(liker.UserID, 10)
+	return strconv.FormatInt(liker.CreatedAt, 10) + ":" + strconv.FormatInt(liker.Actor.UserID, 10)
 }
 
 func scanCommentRecord(scanner interface{ Scan(dest ...any) error }) (*WallCommentRecord, error) {
 	var rec WallCommentRecord
-	if err := scanner.Scan(&rec.CommentID, &rec.PostID, &rec.AuthorID, &rec.AuthorWallID, &rec.Author, &rec.CommentCipher, &rec.ParentCommentID, &rec.CreatedAt, &rec.Likes, &rec.ViewerLiked, &rec.ViewerCanDelete); err != nil {
+	dest := []any{&rec.CommentID, &rec.PostID}
+	dest = append(dest, wallActorScanDest(&rec.Author)...)
+	dest = append(dest, &rec.CommentCipher, &rec.ParentCommentID, &rec.CreatedAt, &rec.Likes, &rec.ViewerLiked, &rec.ViewerCanDelete)
+	if err := scanner.Scan(dest...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil

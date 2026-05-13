@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/ente-io/stacktrace"
+	"github.com/lib/pq"
 )
 
 var ErrAlreadyFriends = errors.New("wall users are already friends")
@@ -228,20 +229,22 @@ func (r *FriendsRepository) ListSharesForFriend(ctx context.Context, friendID in
 
 func (r *FriendsRepository) ListFriendsForWall(ctx context.Context, wallID string) ([]WallFriendRecord, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT s.friend_id,
+		SELECT friend_wall.owner_id,
 		       friend_wall.wall_id,
 		       friend_wall.wall_slug,
-		       ka.public_key,
-		       s.key_version,
+		       friend_ka.public_key,
+		       friend_wall.current_version,
 		       friend_wall.encrypted_profile,
 		       friend_wall.avatar_object_key,
 		       friend_wall.avatar_size,
+		       friend_wall.updated_at,
 		       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = friend_wall.wall_id) AS friends,
 		       (SELECT COUNT(*) FROM wall_posts p WHERE p.wall_id = friend_wall.wall_id AND p.is_deleted = FALSE) AS posts,
+		       s.key_version,
 		       s.created_at
 		FROM wall_friend_shares s
 		JOIN walls friend_wall ON friend_wall.owner_id = s.friend_id
-		JOIN key_attributes ka ON ka.user_id = s.friend_id
+		JOIN key_attributes friend_ka ON friend_ka.user_id = s.friend_id
 		WHERE s.wall_id = $1
 		ORDER BY lower(friend_wall.wall_slug) ASC
 	`, wallID)
@@ -252,22 +255,40 @@ func (r *FriendsRepository) ListFriendsForWall(ctx context.Context, wallID strin
 	var out []WallFriendRecord
 	for rows.Next() {
 		var rec WallFriendRecord
-		if err := rows.Scan(
-			&rec.FriendID,
-			&rec.WallID,
-			&rec.Username,
-			&rec.PublicKey,
-			&rec.KeyVersion,
-			&rec.EncryptedProfile,
-			&rec.AvatarObjectKey,
-			&rec.AvatarSize,
-			&rec.Friends,
-			&rec.Posts,
-			&rec.CreatedAt,
-		); err != nil {
+		dest := wallActorScanDest(&rec.Friend)
+		dest = append(dest, &rec.ShareKeyVersion, &rec.CreatedAt)
+		if err := rows.Scan(dest...); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		out = append(out, rec)
+	}
+	return out, stacktrace.Propagate(rows.Err(), "")
+}
+
+func (r *FriendsRepository) ListAccessibleWallIDs(ctx context.Context, viewerID int64, wallIDs []string) (map[string]bool, error) {
+	out := make(map[string]bool, len(wallIDs))
+	if viewerID <= 0 || len(wallIDs) == 0 {
+		return out, nil
+	}
+	rows, err := r.DB.QueryContext(ctx, `
+		SELECT wall_id
+		FROM walls
+		WHERE owner_id = $1 AND wall_id = ANY($2)
+		UNION
+		SELECT wall_id
+		FROM wall_friend_shares
+		WHERE friend_id = $1 AND wall_id = ANY($2)
+	`, viewerID, pq.Array(wallIDs))
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var wallID string
+		if err := rows.Scan(&wallID); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		out[wallID] = true
 	}
 	return out, stacktrace.Propagate(rows.Err(), "")
 }

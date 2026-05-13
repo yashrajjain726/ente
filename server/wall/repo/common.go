@@ -34,6 +34,22 @@ func optionalInt(limit int, fallback int) int {
 	return limit
 }
 
+func wallActorScanDest(actor *WallActorRecord) []any {
+	return []any{
+		&actor.UserID,
+		&actor.WallID,
+		&actor.WallSlug,
+		&actor.PublicKey,
+		&actor.KeyVersion,
+		&actor.EncryptedProfile,
+		&actor.AvatarObjectKey,
+		&actor.AvatarSize,
+		&actor.UpdatedAt,
+		&actor.Friends,
+		&actor.Posts,
+	}
+}
+
 func wrapUnique(err error, message string) error {
 	if err == nil {
 		return nil

@@ -1,6 +1,6 @@
 mod support;
 
-use ente_wall::{OpenWallLinkCtxInput, WallLinkCtx};
+use ente_wall::{OpenWallLinkCtxInput, WallLinkCtx, WallNotificationType};
 
 use support::{auth, wall};
 
@@ -182,6 +182,16 @@ async fn wall_bootstrap_posts_friend_share_and_link_suite() {
         .expect("feed should load after friend approval");
     assert_eq!(feed.items.len(), 1);
     assert_eq!(feed.items[0].post_id, post_id);
+    assert_eq!(feed.items[0].author.wall_id, owner_wall.wall_id);
+    assert_eq!(feed.items[0].author.wall_slug, updated_slug);
+    let feed_author_profile = friend_ctx
+        .decrypt_actor_profile(&feed.items[0].author)
+        .await
+        .expect("friend should decrypt feed author profile");
+    assert_eq!(
+        feed_author_profile.as_deref(),
+        Some(updated_profile.as_slice())
+    );
     let feed_post = friend_ctx
         .decrypt_feed_item(&feed.items[0])
         .await
@@ -196,6 +206,21 @@ async fn wall_bootstrap_posts_friend_share_and_link_suite() {
         .await
         .expect("liking post should succeed");
     assert!(liked.liked);
+    let likers = owner_ctx
+        .list_post_likers(post_id, None, Some(10))
+        .await
+        .expect("post likers should load");
+    assert_eq!(likers.likers.len(), 1);
+    assert_eq!(likers.likers[0].actor.wall_id, friend_wall.wall_id);
+    assert_eq!(likers.likers[0].actor.wall_slug, friend_slug);
+    let liker_profile = owner_ctx
+        .decrypt_actor_profile(&likers.likers[0].actor)
+        .await
+        .expect("owner should decrypt liker profile");
+    assert_eq!(
+        liker_profile.as_deref(),
+        Some(friend_profile_payload.as_slice())
+    );
     let top_level = friend_ctx
         .create_comment(post_id, &post_key, b"looks great", None)
         .await
@@ -210,6 +235,8 @@ async fn wall_bootstrap_posts_friend_share_and_link_suite() {
         .await
         .expect("comments should load");
     assert_eq!(comments.comments.len(), 2);
+    assert_eq!(comments.comments[1].author.wall_id, friend_wall.wall_id);
+    assert_eq!(comments.comments[0].author.wall_id, owner_wall.wall_id);
     let parent = friend_ctx
         .decrypt_comment(&post_key, &comments.comments[1])
         .expect("parent comment should decrypt");
@@ -218,6 +245,26 @@ async fn wall_bootstrap_posts_friend_share_and_link_suite() {
         .expect("reply comment should decrypt");
     assert_eq!(parent.plaintext, b"looks great");
     assert_eq!(reply.plaintext, b"thanks");
+
+    let notifications = owner_ctx
+        .list_notifications(None, Some(10))
+        .await
+        .expect("owner notifications should load");
+    let liked_notification = notifications
+        .items
+        .iter()
+        .find(|item| item.notification_type == WallNotificationType::LikedPost)
+        .expect("liked post notification should exist");
+    assert_eq!(liked_notification.actor.wall_id, friend_wall.wall_id);
+    assert_eq!(
+        liked_notification
+            .post
+            .as_ref()
+            .expect("liked post notification should include post")
+            .author
+            .wall_id,
+        owner_wall.wall_id
+    );
 
     wall::assert_http_status(outsider_ctx.fetch_post_decrypted(post_id).await, 403);
 
@@ -231,6 +278,15 @@ async fn wall_bootstrap_posts_friend_share_and_link_suite() {
         .await
         .expect("link session should list posts");
     assert_eq!(link_posts.items.len(), 1);
+    assert_eq!(link_posts.items[0].author.wall_id, owner_wall.wall_id);
+    let link_author_profile = link_ctx
+        .decrypt_actor_profile(&link_posts.items[0].author)
+        .await
+        .expect("link should decrypt owner actor profile");
+    assert_eq!(
+        link_author_profile.as_deref(),
+        Some(updated_profile.as_slice())
+    );
     assert!(link_posts.next_cursor.is_empty());
     let link_post = link_ctx
         .decrypt_post(&link_posts.items[0])
@@ -245,6 +301,9 @@ async fn wall_bootstrap_posts_friend_share_and_link_suite() {
         .await
         .expect("link session should list comments");
     assert_eq!(link_comments.comments.len(), 2);
+    assert_eq!(link_comments.comments[0].author.wall_id, owner_wall.wall_id);
+    assert!(link_comments.comments[1].author.wall_id.is_empty());
+    assert_eq!(link_comments.comments[1].author.wall_slug, friend_slug);
     let link_parent = link_ctx
         .decrypt_comment(&link_post.post_key, &link_comments.comments[1])
         .expect("link session should decrypt parent comment");
