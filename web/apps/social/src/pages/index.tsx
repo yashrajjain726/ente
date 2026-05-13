@@ -1,70 +1,25 @@
-import { Box } from "@mui/material";
-import { sampleFriends } from "data/friends";
-import Head from "next/head";
+import { SocialPageMeta } from "components/SocialPageMeta";
+import { SocialRouteFallback } from "components/SocialRouteFallback";
+import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
-import {
-    CreateAccountScreen,
-    createAccountBackground,
-    type CreateAccountInput,
-} from "screens/CreateAccountScreen";
-import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
-import { HomeScreen, homeBackground } from "screens/HomeScreen";
-import { LoginScreen, loginBackground } from "screens/LoginScreen";
-import {
-    NotificationsScreen,
-    notificationsBackground,
-} from "screens/NotificationsScreen";
 import {
     OnboardingScreen,
     addFriendOnboardingDescription,
     addFriendOnboardingTitle,
-    onboardingDescription,
     onboardingGreen,
 } from "screens/OnboardingScreen";
-import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
+import { profileBackground } from "screens/ProfileScreen";
 import { PublicProfileScreen } from "screens/PublicProfileScreen";
-import { SettingsScreen, settingsBackground } from "screens/SettingsScreen";
+import type { SetupProfile } from "screens/SetupProfileScreen";
 import {
-    SetupProfileScreen,
-    setupProfileBackground,
-    type SetupProfile,
-} from "screens/SetupProfileScreen";
+    type OnboardingEntrySource,
+    useSocialAppState,
+} from "state/socialAppState";
 import {
-    ShareProfileLinkScreen,
-    shareProfileLinkBackground,
-} from "screens/ShareProfileLinkScreen";
-import {
-    VerifyEmailScreen,
-    verifyEmailBackground,
-} from "screens/VerifyEmailScreen";
-import {
-    beginSocialSignup,
-    completeSocialSignup,
-    resendSocialSignupCode,
-} from "services/socialSignup";
-
-type Screen =
-    | "onboarding"
-    | "create-account"
-    | "login"
-    | "verify-email"
-    | "setup-profile"
-    | "share-profile-link"
-    | "home"
-    | "profile"
-    | "friends"
-    | "notifications"
-    | "friend-profile"
-    | "settings";
-
-type ProfileBackScreen = "login" | "verify-email";
-type FriendProfileBackScreen = "friends" | "home" | "notifications" | "profile";
-type OnboardingEntrySource = "direct" | "add-friend-link";
-
-const onboardingSourceSearchParam = "onboardingSource";
-const addFriendLinkOnboardingSource: OnboardingEntrySource = "add-friend-link";
-const showMockFriends =
-    process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_FRIENDS != "true";
+    addFriendLinkOnboardingSource,
+    onboardingSourceSearchParam,
+    socialRoutes,
+} from "utils/socialRoutes";
 
 const samplePublicProfileData = {
     avatarUrl: "/images/sample-avatar.jpg",
@@ -122,38 +77,10 @@ const publicProfileFromLink = (): SetupProfile => ({
 });
 
 const Page: React.FC = () => {
+    const router = useRouter();
+    const { onboardingEntrySource, setOnboardingEntrySource } =
+        useSocialAppState();
     const [routeMode, setRouteMode] = useState<RouteMode>({ kind: "checking" });
-    const [screen, setScreen] = useState<Screen>("onboarding");
-    const [email, setEmail] = useState("example@example.com");
-    const [friends, setFriends] = useState(() =>
-        showMockFriends ? sampleFriends : [],
-    );
-    const [onboardingEntrySource, setOnboardingEntrySource] =
-        useState<OnboardingEntrySource>("direct");
-    const [profile, setProfile] = useState<SetupProfile | null>(null);
-    const [profileBackScreen, setProfileBackScreen] =
-        useState<ProfileBackScreen>("verify-email");
-    const [friendProfileBackScreen, setFriendProfileBackScreen] =
-        useState<FriendProfileBackScreen>("friends");
-    const [selectedFriendID, setSelectedFriendID] = useState<string | null>(
-        null,
-    );
-    const [isLiveSignupVerification, setIsLiveSignupVerification] =
-        useState(false);
-
-    const openSetupProfile = (backScreen: ProfileBackScreen) => {
-        setProfileBackScreen(backScreen);
-        setScreen("setup-profile");
-    };
-
-    const openFriendProfile = (
-        friendID: string,
-        backScreen: FriendProfileBackScreen,
-    ) => {
-        setSelectedFriendID(friendID);
-        setFriendProfileBackScreen(backScreen);
-        setScreen("friend-profile");
-    };
 
     useEffect(() => {
         const publicProfileLink = parsePublicProfileLink();
@@ -166,249 +93,49 @@ const Page: React.FC = () => {
                 ? { kind: "public-profile", ...publicProfileLink }
                 : { kind: "app" },
         );
-    }, []);
+    }, [setOnboardingEntrySource]);
 
-    const createAccount = async (input: CreateAccountInput) => {
-        try {
-            await beginSocialSignup(input);
-            setEmail(input.email || "example@example.com");
-            setIsLiveSignupVerification(true);
-            setScreen("verify-email");
-        } catch (error) {
-            console.error("Social signup failed", error);
-        }
-    };
+    if (routeMode.kind == "checking") {
+        return <SocialRouteFallback background={profileBackground} />;
+    }
 
-    const verifySignupEmail = async (code: string) => {
-        if (!isLiveSignupVerification) {
-            openSetupProfile("verify-email");
-            return;
-        }
-
-        try {
-            await completeSocialSignup(email, code);
-            setIsLiveSignupVerification(false);
-            openSetupProfile("verify-email");
-        } catch (error) {
-            console.error("Social signup verification failed", error);
-        }
-    };
-
-    const selectedFriend = selectedFriendID
-        ? (friends.find((friend) => friend.id == selectedFriendID) ??
-          sampleFriends.find((friend) => friend.id == selectedFriendID))
-        : undefined;
-    const isAddFriendLinkOnboarding =
-        onboardingEntrySource == "add-friend-link";
-
-    const themeColor =
-        routeMode.kind != "app"
-            ? profileBackground
-            : screen == "onboarding"
-              ? onboardingGreen
-              : screen == "verify-email"
-                ? verifyEmailBackground
-                : screen == "login"
-                  ? loginBackground
-                  : screen == "setup-profile"
-                    ? setupProfileBackground
-                    : screen == "share-profile-link"
-                      ? shareProfileLinkBackground
-                      : screen == "home"
-                        ? homeBackground
-                        : screen == "profile"
-                          ? profileBackground
-                          : screen == "friends" || screen == "friend-profile"
-                            ? friendsBackground
-                            : screen == "notifications"
-                              ? notificationsBackground
-                              : screen == "settings"
-                                ? settingsBackground
-                                : createAccountBackground;
-
-    return (
-        <>
-            <Head>
-                <meta name="theme-color" content={themeColor} />
-                <meta name="description" content={onboardingDescription} />
-                <link rel="preconnect" href="https://fonts.googleapis.com" />
-                <link
-                    rel="preconnect"
-                    href="https://fonts.gstatic.com"
-                    crossOrigin="anonymous"
-                />
-                <link
-                    href="https://fonts.googleapis.com/css2?family=Nunito:wght@800&display=swap"
-                    rel="stylesheet"
-                />
-            </Head>
-            {routeMode.kind == "checking" ? (
-                <Box sx={{ bgcolor: profileBackground, minHeight: "100svh" }} />
-            ) : routeMode.kind == "public-profile" ? (
+    if (routeMode.kind == "public-profile") {
+        return (
+            <>
+                <SocialPageMeta themeColor={profileBackground} />
                 <PublicProfileScreen
                     profile={publicProfileFromLink()}
                     onAddFriend={() => {
+                        setOnboardingEntrySource("add-friend-link");
                         window.location.assign(
                             `/?${onboardingSourceSearchParam}=${addFriendLinkOnboardingSource}`,
                         );
                     }}
                 />
-            ) : (
-                <>
-                    {screen == "onboarding" && (
-                        <OnboardingScreen
-                            description={
-                                isAddFriendLinkOnboarding
-                                    ? addFriendOnboardingDescription
-                                    : undefined
-                            }
-                            onCreateAccount={() => setScreen("create-account")}
-                            onLogin={() => setScreen("login")}
-                            title={
-                                isAddFriendLinkOnboarding
-                                    ? addFriendOnboardingTitle
-                                    : undefined
-                            }
-                        />
-                    )}
-                    {screen == "create-account" && (
-                        <CreateAccountScreen
-                            onBack={() => setScreen("onboarding")}
-                            onCreateAccount={(input) =>
-                                void createAccount(input)
-                            }
-                            onLogin={() => setScreen("login")}
-                        />
-                    )}
-                    {screen == "login" && (
-                        <LoginScreen
-                            onBack={() => setScreen("onboarding")}
-                            onContinue={() => openSetupProfile("login")}
-                            onSignup={() => setScreen("create-account")}
-                        />
-                    )}
-                    {screen == "verify-email" && (
-                        <VerifyEmailScreen
-                            email={email}
-                            initialCode={
-                                isLiveSignupVerification ? "" : undefined
-                            }
-                            onBack={() => setScreen("create-account")}
-                            onChangeEmail={() => setScreen("create-account")}
-                            onResendCode={
-                                isLiveSignupVerification
-                                    ? () => void resendSocialSignupCode(email)
-                                    : undefined
-                            }
-                            onVerify={(code) => void verifySignupEmail(code)}
-                        />
-                    )}
-                    {screen == "setup-profile" && (
-                        <SetupProfileScreen
-                            ctaLabel={
-                                isAddFriendLinkOnboarding ? "Done" : "Next"
-                            }
-                            onBack={() => setScreen(profileBackScreen)}
-                            onContinue={(nextProfile) => {
-                                setProfile(nextProfile);
-                                setScreen(
-                                    isAddFriendLinkOnboarding
-                                        ? "home"
-                                        : "share-profile-link",
-                                );
-                            }}
-                        />
-                    )}
-                    {screen == "share-profile-link" && profile && (
-                        <ShareProfileLinkScreen
-                            profile={profile}
-                            onBack={() => setScreen("setup-profile")}
-                            onDone={() => setScreen("home")}
-                        />
-                    )}
-                    {screen == "home" && profile && (
-                        <HomeScreen
-                            friendsCount={friends.length}
-                            profile={profile}
-                            onOpenFriend={(friendID) =>
-                                openFriendProfile(friendID, "home")
-                            }
-                            onOpenNotifications={() =>
-                                setScreen("notifications")
-                            }
-                            onOpenProfile={() => setScreen("profile")}
-                        />
-                    )}
-                    {screen == "profile" && profile && (
-                        <ProfileScreen
-                            friendsCount={friends.length}
-                            profile={profile}
-                            onBack={() => setScreen("home")}
-                            onOpenFriend={(friendID) =>
-                                openFriendProfile(friendID, "profile")
-                            }
-                            onOpenFriends={() => setScreen("friends")}
-                            onOpenSettings={() => setScreen("settings")}
-                        />
-                    )}
-                    {screen == "friends" && (
-                        <FriendsScreen
-                            friends={friends}
-                            onBack={() => setScreen("profile")}
-                            onOpenFriend={(friendID) =>
-                                openFriendProfile(friendID, "friends")
-                            }
-                            onUnfriend={(friendID) =>
-                                setFriends((currentFriends) =>
-                                    currentFriends.filter(
-                                        (friend) => friend.id != friendID,
-                                    ),
-                                )
-                            }
-                        />
-                    )}
-                    {screen == "notifications" && (
-                        <NotificationsScreen
-                            onBack={() => setScreen("home")}
-                            onOpenFriend={(friendID) =>
-                                openFriendProfile(friendID, "notifications")
-                            }
-                        />
-                    )}
-                    {screen == "friend-profile" && selectedFriend && (
-                        <ProfileScreen
-                            friendsCount={selectedFriend.friendsCount}
-                            headerVariant="friend"
-                            profile={{
-                                avatarUrl: selectedFriend.avatarUrl,
-                                fullName: selectedFriend.fullName,
-                                username: selectedFriend.username,
-                            }}
-                            onBack={() => setScreen(friendProfileBackScreen)}
-                            onOpenFriend={(friendID) =>
-                                openFriendProfile(
-                                    friendID,
-                                    friendProfileBackScreen,
-                                )
-                            }
-                        />
-                    )}
-                    {screen == "settings" && profile && (
-                        <SettingsScreen
-                            onBack={() => setScreen("profile")}
-                            onLogout={() => {
-                                setProfile(null);
-                                setOnboardingEntrySource("direct");
-                                setSelectedFriendID(null);
-                                setFriends(
-                                    showMockFriends ? sampleFriends : [],
-                                );
-                                setScreen("onboarding");
-                            }}
-                        />
-                    )}
-                </>
-            )}
+            </>
+        );
+    }
+
+    const isAddFriendLinkOnboarding =
+        onboardingEntrySource == "add-friend-link";
+
+    return (
+        <>
+            <SocialPageMeta themeColor={onboardingGreen} />
+            <OnboardingScreen
+                description={
+                    isAddFriendLinkOnboarding
+                        ? addFriendOnboardingDescription
+                        : undefined
+                }
+                onCreateAccount={() => void router.push(socialRoutes.signup)}
+                onLogin={() => void router.push(socialRoutes.login)}
+                title={
+                    isAddFriendLinkOnboarding
+                        ? addFriendOnboardingTitle
+                        : undefined
+                }
+            />
         </>
     );
 };

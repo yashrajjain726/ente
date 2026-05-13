@@ -7,6 +7,7 @@ import { shareTheme } from "ente-base/components/utils/theme";
 import type { AppProps } from "next/app";
 import "photoswipe/dist/photoswipe.css";
 import React from "react";
+import { SocialAppStateProvider } from "state/SocialAppStateProvider";
 import "styles/globals.css";
 
 const App: React.FC<AppProps> = ({ Component, pageProps }) => {
@@ -20,7 +21,9 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
         >
             <CustomHead title="Ente" />
             <CssBaseline enableColorScheme />
-            <Component {...pageProps} />
+            <SocialAppStateProvider>
+                <Component {...pageProps} />
+            </SocialAppStateProvider>
         </ThemeProvider>
     );
 };
