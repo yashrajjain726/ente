@@ -100,7 +100,7 @@ async fn wall_bootstrap_posts_friend_share_and_link_suite() {
         .upload_post_asset(&post_key, b"wall e2e encrypted post asset", Some(0))
         .await
         .expect("post asset upload should succeed");
-    let (post_id, post_key) = owner_ctx
+    let (post_id, _post_key) = owner_ctx
         .create_post(
             &owner_wall.wall_id,
             &[object],
@@ -221,30 +221,6 @@ async fn wall_bootstrap_posts_friend_share_and_link_suite() {
         liker_profile.as_deref(),
         Some(friend_profile_payload.as_slice())
     );
-    let top_level = friend_ctx
-        .create_comment(post_id, &post_key, b"looks great", None)
-        .await
-        .expect("comment creation should succeed");
-    owner_ctx
-        .create_comment(post_id, &post_key, b"thanks", Some(top_level.comment_id))
-        .await
-        .expect("reply creation should succeed");
-
-    let comments = friend_ctx
-        .list_comments(post_id, None, None)
-        .await
-        .expect("comments should load");
-    assert_eq!(comments.comments.len(), 2);
-    assert_eq!(comments.comments[1].author.wall_id, friend_wall.wall_id);
-    assert_eq!(comments.comments[0].author.wall_id, owner_wall.wall_id);
-    let parent = friend_ctx
-        .decrypt_comment(&post_key, &comments.comments[1])
-        .expect("parent comment should decrypt");
-    let reply = friend_ctx
-        .decrypt_comment(&post_key, &comments.comments[0])
-        .expect("reply comment should decrypt");
-    assert_eq!(parent.plaintext, b"looks great");
-    assert_eq!(reply.plaintext, b"thanks");
 
     let notifications = owner_ctx
         .list_notifications(None, Some(10))
@@ -296,22 +272,6 @@ async fn wall_bootstrap_posts_friend_share_and_link_suite() {
         link_post.caption_plaintext.as_deref(),
         Some(br#"{"caption":"hello world"}"#.as_slice())
     );
-    let link_comments = link_ctx
-        .list_comments(post_id, None, None)
-        .await
-        .expect("link session should list comments");
-    assert_eq!(link_comments.comments.len(), 2);
-    assert_eq!(link_comments.comments[0].author.wall_id, owner_wall.wall_id);
-    assert!(link_comments.comments[1].author.wall_id.is_empty());
-    assert_eq!(link_comments.comments[1].author.wall_slug, friend_slug);
-    let link_parent = link_ctx
-        .decrypt_comment(&link_post.post_key, &link_comments.comments[1])
-        .expect("link session should decrypt parent comment");
-    let link_reply = link_ctx
-        .decrypt_comment(&link_post.post_key, &link_comments.comments[0])
-        .expect("link session should decrypt reply comment");
-    assert_eq!(link_parent.plaintext, b"looks great");
-    assert_eq!(link_reply.plaintext, b"thanks");
 
     owner_ctx
         .delete_wall_link(&owner_wall.wall_id)

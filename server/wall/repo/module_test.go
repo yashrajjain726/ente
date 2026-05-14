@@ -159,19 +159,6 @@ func TestWallModuleLifecycle(t *testing.T) {
 	err = module.Posts.SetLike(ctx, postID, bobID, true)
 	require.NoError(t, err)
 
-	comment, err := module.Posts.CreateComment(ctx, postID, bobID, "comment-1", nil)
-	require.NoError(t, err)
-	_, err = module.Posts.CreateComment(ctx, postID, aliceID, "reply-1", &comment.CommentID)
-	require.NoError(t, err)
-
-	comments, nextCommentsCursor, err := module.Posts.ListComments(ctx, postID, bobID, "", 20)
-	require.NoError(t, err)
-	require.Len(t, comments, 2)
-	require.Empty(t, nextCommentsCursor)
-	require.Equal(t, comment.CommentID, comments[1].CommentID)
-	require.Equal(t, bobWall.WallID, comments[1].Author.WallID)
-	require.Equal(t, comment.CommentID, comments[0].ParentCommentID.Int64)
-
 	assets, err := module.Posts.ListAssetsByPostIDs(ctx, []int64{postID})
 	require.NoError(t, err)
 	require.Len(t, assets[postID], 2)
@@ -737,70 +724,15 @@ func TestNotificationsIncludeWallSocialEvents(t *testing.T) {
 	require.NoError(t, err)
 	setPostLikeCreatedAt(t, module, 2000, postID, bobID)
 
-	bobComment, err := module.Posts.CreateComment(ctx, postID, bobID, "bob-comment", nil)
-	require.NoError(t, err)
-	setCommentCreatedAt(t, module, 3000, bobComment.CommentID)
-
-	aliceComment, err := module.Posts.CreateComment(ctx, postID, aliceID, "alice-comment", nil)
-	require.NoError(t, err)
-	bobReply, err := module.Posts.CreateComment(ctx, postID, bobID, "bob-reply", &aliceComment.CommentID)
-	require.NoError(t, err)
-	setCommentCreatedAt(t, module, 4000, bobReply.CommentID)
-
-	err = module.Posts.SetCommentLike(ctx, postID, aliceComment.CommentID, bobID, true)
-	require.NoError(t, err)
-	setCommentLikeCreatedAt(t, module, 5000, aliceComment.CommentID, bobID)
-
 	err = module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "alice-share-key", aliceWall.CurrentVersion, "bob-share-key", bobWall.CurrentVersion)
 	require.NoError(t, err)
-	setFriendEventCreatedAt(t, module, 6000, bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 3000, bobID, aliceID)
 
 	page, nextCursor, err := module.Notifications.List(ctx, aliceID, "", 3)
 	require.NoError(t, err)
-	require.Len(t, page, 3)
+	require.Len(t, page, 2)
 	require.Equal(t, "addedYouAsFriend", page[0].Type)
-	require.Equal(t, "likedComment", page[1].Type)
-	require.Equal(t, aliceWall.WallID, page[1].CommentAuthor.WallID)
-	require.Equal(t, "repliedToComment", page[2].Type)
-	require.Equal(t, bobWall.WallID, page[2].CommentAuthor.WallID)
-	require.NotEmpty(t, nextCursor)
-
-	page, nextCursor, err = module.Notifications.List(ctx, aliceID, nextCursor, 3)
-	require.NoError(t, err)
-	require.Len(t, page, 2)
-	require.Equal(t, "commentedOnPost", page[0].Type)
 	require.Equal(t, "likedPost", page[1].Type)
-	require.Empty(t, nextCursor)
-}
-
-func TestListCommentsPaginates(t *testing.T) {
-	ctx := context.Background()
-	module := newWallTestModule(t)
-
-	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
-	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
-	require.NoError(t, err)
-	postID, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key", nil, wall.CurrentVersion, nil)
-	require.NoError(t, err)
-
-	first, err := module.Posts.CreateComment(ctx, postID, aliceID, "comment-1", nil)
-	require.NoError(t, err)
-	second, err := module.Posts.CreateComment(ctx, postID, aliceID, "comment-2", nil)
-	require.NoError(t, err)
-	third, err := module.Posts.CreateComment(ctx, postID, aliceID, "comment-3", nil)
-	require.NoError(t, err)
-
-	page, nextCursor, err := module.Posts.ListComments(ctx, postID, aliceID, "", 2)
-	require.NoError(t, err)
-	require.Len(t, page, 2)
-	require.Equal(t, third.CommentID, page[0].CommentID)
-	require.Equal(t, second.CommentID, page[1].CommentID)
-	require.Equal(t, strconv.FormatInt(second.CommentID, 10), nextCursor)
-
-	page, nextCursor, err = module.Posts.ListComments(ctx, postID, aliceID, nextCursor, 2)
-	require.NoError(t, err)
-	require.Len(t, page, 1)
-	require.Equal(t, first.CommentID, page[0].CommentID)
 	require.Empty(t, nextCursor)
 }
 
@@ -839,36 +771,6 @@ func TestListPostLikersPaginates(t *testing.T) {
 	require.Empty(t, nextCursor)
 }
 
-func TestDeleteCommentRequiresPostAndAuthorMatch(t *testing.T) {
-	ctx := context.Background()
-	module := newWallTestModule(t)
-
-	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
-	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
-	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
-	require.NoError(t, err)
-	_, err = module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
-	require.NoError(t, err)
-	firstPostID, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-1", nil, wall.CurrentVersion, nil)
-	require.NoError(t, err)
-	secondPostID, err := module.Posts.CreatePost(ctx, aliceID, wall.WallID, "post-key-2", nil, wall.CurrentVersion, nil)
-	require.NoError(t, err)
-	comment, err := module.Posts.CreateComment(ctx, firstPostID, bobID, "comment", nil)
-	require.NoError(t, err)
-
-	err = module.Posts.DeleteComment(ctx, secondPostID, comment.CommentID, bobID)
-	require.ErrorIs(t, err, sql.ErrNoRows)
-	require.Equal(t, 1, countActivePostComments(t, module, firstPostID))
-
-	err = module.Posts.DeleteComment(ctx, firstPostID, comment.CommentID, aliceID)
-	require.ErrorIs(t, err, sql.ErrNoRows)
-	require.Equal(t, 1, countActivePostComments(t, module, firstPostID))
-
-	err = module.Posts.DeleteComment(ctx, firstPostID, comment.CommentID, bobID)
-	require.NoError(t, err)
-	require.Equal(t, 0, countActivePostComments(t, module, firstPostID))
-}
-
 func ptr(value string) *string {
 	return &value
 }
@@ -879,14 +781,6 @@ func sqlNullInt64(value int64) sql.NullInt64 {
 
 func sqlNullString(value string) sql.NullString {
 	return sql.NullString{String: value, Valid: value != ""}
-}
-
-func countActivePostComments(t *testing.T, module *Module, postID int64) int {
-	t.Helper()
-	var count int
-	err := module.Posts.DB.QueryRow(`SELECT COUNT(*) FROM wall_post_comments WHERE post_id = $1 AND is_deleted = FALSE`, postID).Scan(&count)
-	require.NoError(t, err)
-	return count
 }
 
 func requireQueuedTempObject(t *testing.T, module *Module, objectKey, purpose, bucketID string) {
@@ -915,18 +809,6 @@ func setPostCreatedAt(t *testing.T, module *Module, createdAt int64, postIDs ...
 func setPostLikeCreatedAt(t *testing.T, module *Module, createdAt, postID, userID int64) {
 	t.Helper()
 	_, err := module.Posts.DB.Exec(`UPDATE wall_post_likes SET created_at = $1 WHERE post_id = $2 AND user_id = $3`, createdAt, postID, userID)
-	require.NoError(t, err)
-}
-
-func setCommentCreatedAt(t *testing.T, module *Module, createdAt, commentID int64) {
-	t.Helper()
-	_, err := module.Posts.DB.Exec(`UPDATE wall_post_comments SET created_at = $1 WHERE comment_id = $2`, createdAt, commentID)
-	require.NoError(t, err)
-}
-
-func setCommentLikeCreatedAt(t *testing.T, module *Module, createdAt, commentID, userID int64) {
-	t.Helper()
-	_, err := module.Posts.DB.Exec(`UPDATE wall_comment_likes SET created_at = $1 WHERE comment_id = $2 AND user_id = $3`, createdAt, commentID, userID)
 	require.NoError(t, err)
 }
 

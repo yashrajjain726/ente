@@ -69,32 +69,3 @@ func (h *Handlers) ListPostLikers(c *gin.Context) {
 func (h *Handlers) DeletePost(c *gin.Context) {
 	respondStatus(c, h.Module.Posts.Delete(c, c.Param("postID")))
 }
-
-func (h *Handlers) ListComments(c *gin.Context) {
-	resp, err := h.Module.Posts.ListComments(c, c.Param("postID"))
-	respondJSON(c, resp, err)
-}
-
-func (h *Handlers) CreateComment(c *gin.Context) {
-	var req models.CreateCommentRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
-		return
-	}
-	resp, err := h.Module.Posts.CreateComment(c, c.Param("postID"), req)
-	respondJSON(c, resp, err)
-}
-
-func (h *Handlers) ToggleCommentLike(c *gin.Context) {
-	var req models.LikeCommentRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
-		return
-	}
-	resp, err := h.Module.Posts.ToggleCommentLike(c, c.Param("postID"), c.Param("commentID"), req)
-	respondJSON(c, resp, err)
-}
-
-func (h *Handlers) DeleteComment(c *gin.Context) {
-	respondStatus(c, h.Module.Posts.DeleteComment(c, c.Param("postID"), c.Param("commentID")))
-}

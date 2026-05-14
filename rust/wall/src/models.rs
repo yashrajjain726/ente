@@ -80,11 +80,6 @@ pub struct DecryptedPost {
 }
 
 #[derive(Debug, Clone)]
-pub struct DecryptedComment {
-    pub plaintext: Vec<u8>,
-}
-
-#[derive(Debug, Clone)]
 pub struct DecryptedFriendShare {
     pub friend: String,
     pub wall_id: String,
@@ -110,7 +105,6 @@ pub struct FeedItem {
     pub created_at: String,
     pub likes: i64,
     pub viewer_liked: bool,
-    pub comments: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

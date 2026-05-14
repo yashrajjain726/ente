@@ -130,17 +130,6 @@ pub struct LikePostResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct LikeCommentRequest {
-    pub like: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LikeCommentResponse {
-    pub liked: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct UpdatePostCaptionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub caption_cipher: Option<String>,
@@ -164,7 +153,6 @@ pub struct PostResponse {
     pub created_at: String,
     pub likes: i64,
     pub viewer_liked: bool,
-    pub comments: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -175,45 +163,10 @@ pub struct PostPage {
     pub next_cursor: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateCommentRequest {
-    pub comment_cipher: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub parent_comment_id: Option<i64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CommentResponse {
-    pub comment_id: i64,
-    pub author: WallActorResponse,
-    pub comment_cipher: String,
-    pub created_at: String,
-    #[serde(default)]
-    pub likes: i64,
-    #[serde(default)]
-    pub viewer_liked: bool,
-    pub viewer_can_delete: bool,
-    #[serde(default)]
-    pub parent_comment_id: Option<i64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ListCommentsResponse {
-    pub comments: Vec<CommentResponse>,
-    #[serde(default)]
-    pub next_cursor: String,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum WallNotificationType {
     LikedPost,
-    CommentedOnPost,
-    LikedComment,
-    RepliedToComment,
     AddedYouAsFriend,
 }
 
@@ -253,19 +206,6 @@ pub struct WallNotificationPost {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct WallNotificationComment {
-    pub comment_id: i64,
-    pub author: WallActorResponse,
-    #[serde(default)]
-    pub comment_cipher: String,
-    #[serde(default)]
-    pub created_at: String,
-    #[serde(default)]
-    pub parent_comment_id: Option<i64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct WallNotification {
     pub id: String,
     #[serde(rename = "type")]
@@ -274,8 +214,6 @@ pub struct WallNotification {
     pub actor: WallActorResponse,
     #[serde(default)]
     pub post: Option<WallNotificationPost>,
-    #[serde(default)]
-    pub comment: Option<WallNotificationComment>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

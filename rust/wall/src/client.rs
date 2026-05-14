@@ -8,22 +8,21 @@ use crate::crypto::{
 };
 use crate::error::{Result, WallError};
 use crate::models::{
-    CreatedWall, CreatedWallLink, DecryptedComment, DecryptedFriendShare, DecryptedPost,
-    DecryptedWallProfile, FeedItem, FeedPage, HydratedKeys, OpenAccountWallCtxInput,
-    OpenWallLinkCtxInput, PrivateKeySource,
+    CreatedWall, CreatedWallLink, DecryptedFriendShare, DecryptedPost, DecryptedWallProfile,
+    FeedItem, FeedPage, HydratedKeys, OpenAccountWallCtxInput, OpenWallLinkCtxInput,
+    PrivateKeySource,
 };
 use crate::transport::{
-    AddFriendPayload, AssetDownloadResponse, CommentResponse, CreateCommentRequest,
-    CreateEntityKeyRequest, CreatePostRequest, CreatePostResponse, CreateWallRequest,
-    EntityKeyPayload, EntityKeyResponse, FriendRelationshipResponse, FriendShareResponse,
-    FriendStatusResponse, FriendTargetPayload, LikeCommentRequest, LikeCommentResponse,
-    LikePostRequest, LikePostResponse, ListCommentsResponse, ListPostLikersResponse,
-    PostObjectPayload, PostPage, PostResponse, PresignUploadRequest, PresignUploadResponse,
-    ProfileAvatarPayload, RefreshFriendSharesRequest, RotateWallKeyRequest, ShareUpdatePayload,
-    UpdatePostCaptionRequest, UpdateWallProfileRequest, UpdateWallProfileResponse,
-    UpdateWallSlugRequest, WallActorResponse, WallFriendResponse, WallKeyResponse,
-    WallKeyVersionResponse, WallLinkCreateRequest, WallLinkLoginRequest, WallLinkLoginResponse,
-    WallLinkStatusResponse, WallLookupResponse, WallNotificationPage, WallProfileResponse,
+    AddFriendPayload, AssetDownloadResponse, CreateEntityKeyRequest, CreatePostRequest,
+    CreatePostResponse, CreateWallRequest, EntityKeyPayload, EntityKeyResponse,
+    FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse, FriendTargetPayload,
+    LikePostRequest, LikePostResponse, ListPostLikersResponse, PostObjectPayload, PostPage,
+    PostResponse, PresignUploadRequest, PresignUploadResponse, ProfileAvatarPayload,
+    RefreshFriendSharesRequest, RotateWallKeyRequest, ShareUpdatePayload, UpdatePostCaptionRequest,
+    UpdateWallProfileRequest, UpdateWallProfileResponse, UpdateWallSlugRequest, WallActorResponse,
+    WallFriendResponse, WallKeyResponse, WallKeyVersionResponse, WallLinkCreateRequest,
+    WallLinkLoginRequest, WallLinkLoginResponse, WallLinkStatusResponse, WallLookupResponse,
+    WallNotificationPage, WallProfileResponse,
 };
 use ente_core::crypto::{sealed, secretbox};
 use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
@@ -794,77 +793,6 @@ impl AccountWallCtx {
             .map_err(Into::into)
     }
 
-    pub async fn like_comment(
-        &self,
-        post_id: i64,
-        comment_id: i64,
-        like: bool,
-    ) -> Result<LikeCommentResponse> {
-        let path = format!("/wall/posts/{post_id}/comments/{comment_id}/like");
-        let request = LikeCommentRequest { like };
-        self.client
-            .post_json(&path, &request)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn list_comments(
-        &self,
-        post_id: i64,
-        limit: Option<i32>,
-        cursor: Option<i64>,
-    ) -> Result<ListCommentsResponse> {
-        let mut query = Vec::new();
-        if let Some(value) = limit {
-            query.push(("limit", value.to_string()));
-        }
-        if let Some(value) = cursor {
-            query.push(("cursor", value.to_string()));
-        }
-        let path = format!("/wall/posts/{post_id}/comments");
-        self.client
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn create_comment(
-        &self,
-        post_id: i64,
-        post_key: &[u8],
-        plaintext: &[u8],
-        parent_comment_id: Option<i64>,
-    ) -> Result<CommentResponse> {
-        let request = CreateCommentRequest {
-            comment_cipher: encode_b64(&encrypt_secretbox_packed(post_key, plaintext)?),
-            parent_comment_id,
-        };
-        let path = format!("/wall/posts/{post_id}/comments");
-        self.client
-            .post_json(&path, &request)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub fn decrypt_comment(
-        &self,
-        post_key: &[u8],
-        comment: &CommentResponse,
-    ) -> Result<DecryptedComment> {
-        let packed = decode_b64(&comment.comment_cipher)?;
-        Ok(DecryptedComment {
-            plaintext: decrypt_secretbox_packed(post_key, &packed)?,
-        })
-    }
-
-    pub async fn delete_comment(&self, post_id: i64, comment_id: i64) -> Result<()> {
-        let path = format!("/wall/posts/{post_id}/comments/{comment_id}");
-        self.client
-            .delete_empty(&path, &[])
-            .await
-            .map_err(Into::into)
-    }
-
     pub async fn add_friend_from_link(&self, link: &WallLinkCtx) -> Result<FriendStatusResponse> {
         if link.owner_public_key().is_empty() {
             return Err(WallError::InvalidInput(
@@ -1073,7 +1001,6 @@ fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
         created_at: item.created_at.clone(),
         likes: item.likes,
         viewer_liked: item.viewer_liked,
-        comments: item.comments,
     }
 }
 
@@ -1252,37 +1179,6 @@ impl WallLinkCtx {
         let decrypted = self.decrypt_post(&post).await?;
         self.download_decrypted_asset(object_key, &decrypted.post_key)
             .await
-    }
-
-    pub async fn list_comments(
-        &self,
-        post_id: i64,
-        limit: Option<i32>,
-        cursor: Option<i64>,
-    ) -> Result<ListCommentsResponse> {
-        let mut query = Vec::new();
-        if let Some(value) = limit {
-            query.push(("limit", value.to_string()));
-        }
-        if let Some(value) = cursor {
-            query.push(("cursor", value.to_string()));
-        }
-        let path = format!("/wall/posts/{post_id}/comments");
-        self.client
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub fn decrypt_comment(
-        &self,
-        post_key: &[u8],
-        comment: &CommentResponse,
-    ) -> Result<DecryptedComment> {
-        let packed = decode_b64(&comment.comment_cipher)?;
-        Ok(DecryptedComment {
-            plaintext: decrypt_secretbox_packed(post_key, &packed)?,
-        })
     }
 
     pub async fn list_post_likers(
@@ -1772,7 +1668,6 @@ mod tests {
             created_at: "2026-04-16T00:00:00Z".to_owned(),
             likes: 0,
             viewer_liked: false,
-            comments: 0,
         };
 
         let decrypted = ctx
@@ -2301,12 +2196,6 @@ mod tests {
             .with_status(200)
             .create_async()
             .await;
-        let delete_comment = server
-            .mock("DELETE", "/wall/posts/42/comments/7")
-            .match_header("x-auth-token", "token")
-            .with_status(200)
-            .create_async()
-            .await;
         let unfriend_wall = server
             .mock("POST", "/wall/friends/unfriend")
             .match_header("x-auth-token", "token")
@@ -2329,9 +2218,6 @@ mod tests {
         ctx.delete_post(42)
             .await
             .expect("delete post should accept empty response");
-        ctx.delete_comment(42, 7)
-            .await
-            .expect("delete comment should accept empty response");
         ctx.unfriend_by_wall("wall_owner_main")
             .await
             .expect("unfriend by wall should accept empty response");
@@ -2340,7 +2226,6 @@ mod tests {
             .expect("unfriend by username should accept empty response");
 
         delete_post.assert_async().await;
-        delete_comment.assert_async().await;
         unfriend_wall.assert_async().await;
         unfriend_username.assert_async().await;
     }
@@ -2387,28 +2272,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn like_comment_uses_comment_like_endpoint() {
-        let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
-        let like = server
-            .mock("POST", "/wall/posts/42/comments/7/like")
-            .match_header("x-auth-token", "token")
-            .match_body(Matcher::JsonString(json!({"like": true}).to_string()))
-            .with_status(200)
-            .with_body(json!({"liked": true}).to_string())
-            .create_async()
-            .await;
-
-        let response = ctx
-            .like_comment(42, 7, true)
-            .await
-            .expect("comment like should succeed");
-
-        assert!(response.liked);
-        like.assert_async().await;
-    }
-
-    #[tokio::test]
     async fn list_post_likers_uses_post_likes_endpoint() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
@@ -2445,52 +2308,6 @@ mod tests {
         assert_eq!(response.likers[0].actor.wall_id, "wall_liker");
         assert_eq!(response.next_cursor, "2000:8");
         likers.assert_async().await;
-    }
-
-    #[tokio::test]
-    async fn list_comments_uses_post_comments_endpoint() {
-        let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
-        let comments = server
-            .mock("GET", "/wall/posts/42/comments")
-            .match_header("x-auth-token", "token")
-            .match_query(Matcher::AllOf(vec![
-                Matcher::UrlEncoded("cursor".into(), "7".into()),
-                Matcher::UrlEncoded("limit".into(), "5".into()),
-            ]))
-            .with_status(200)
-            .with_body(
-                json!({
-                    "comments": [{
-                        "commentId": 7,
-                        "author": {
-                            "userId": 8,
-                            "wallId": "wall_commenter",
-                            "wallSlug": "commenter"
-                        },
-                        "commentCipher": "cGFja2Vk",
-                        "createdAt": "2026-04-16T00:00:00Z",
-                        "likes": 2,
-                        "viewerLiked": true,
-                        "viewerCanDelete": false,
-                        "parentCommentId": 3
-                    }],
-                    "nextCursor": "6"
-                })
-                .to_string(),
-            )
-            .create_async()
-            .await;
-
-        let response = ctx
-            .list_comments(42, Some(5), Some(7))
-            .await
-            .expect("comments should load");
-
-        assert_eq!(response.comments[0].comment_id, 7);
-        assert_eq!(response.comments[0].parent_comment_id, Some(3));
-        assert_eq!(response.next_cursor, "6");
-        comments.assert_async().await;
     }
 
     #[tokio::test]
@@ -2818,8 +2635,7 @@ mod tests {
                         "objects": [],
                         "createdAt": "2026-04-16T00:00:00Z",
                         "likes": 2,
-                        "viewerLiked": true,
-                        "comments": 1
+                        "viewerLiked": true
                     }],
                     "nextCursor": "cursor-2"
                 })
@@ -2928,8 +2744,7 @@ mod tests {
                         "objects": [],
                         "createdAt": "2026-04-16T00:00:00Z",
                         "likes": 2,
-                        "viewerLiked": true,
-                        "comments": 1
+                        "viewerLiked": true
                     }],
                     "nextCursor": "41"
                 })
@@ -3014,8 +2829,7 @@ mod tests {
                     "objects": [],
                     "createdAt": "2026-04-16T00:00:00Z",
                     "likes": 0,
-                    "viewerLiked": false,
-                    "comments": 0
+                    "viewerLiked": false
                 })
                 .to_string(),
             )

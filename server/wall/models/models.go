@@ -249,14 +249,6 @@ type PostLikerResponse struct {
 	CreatedAt string            `json:"createdAt"`
 }
 
-type LikeCommentRequest struct {
-	Like bool `json:"like"`
-}
-
-type LikeCommentResponse struct {
-	Liked bool `json:"liked"`
-}
-
 type UpdatePostCaptionRequest struct {
 	CaptionCipher *string `json:"captionCipher,omitempty"`
 }
@@ -285,7 +277,6 @@ type PostResponse struct {
 	CreatedAt        string              `json:"createdAt"`
 	Likes            int64               `json:"likes"`
 	ViewerLiked      bool                `json:"viewerLiked"`
-	Comments         int64               `json:"comments"`
 }
 
 type PostPage struct {
@@ -298,27 +289,6 @@ type FeedPage struct {
 	NextCursor string         `json:"nextCursor,omitempty"`
 }
 
-type CommentResponse struct {
-	CommentID       int64             `json:"commentId"`
-	Author          WallActorResponse `json:"author"`
-	CommentCipher   string            `json:"commentCipher"`
-	CreatedAt       string            `json:"createdAt"`
-	Likes           int64             `json:"likes"`
-	ViewerLiked     bool              `json:"viewerLiked"`
-	ViewerCanDelete bool              `json:"viewerCanDelete"`
-	ParentCommentID *int64            `json:"parentCommentId,omitempty"`
-}
-
-type ListCommentsResponse struct {
-	Comments   []CommentResponse `json:"comments"`
-	NextCursor string            `json:"nextCursor,omitempty"`
-}
-
-type CreateCommentRequest struct {
-	CommentCipher   string `json:"commentCipher"`
-	ParentCommentID *int64 `json:"parentCommentId,omitempty"`
-}
-
 type NotificationPostResponse struct {
 	PostID      int64               `json:"postId"`
 	WallID      string              `json:"wallId"`
@@ -328,21 +298,12 @@ type NotificationPostResponse struct {
 	Objects     []PostObjectPayload `json:"objects,omitempty"`
 }
 
-type NotificationCommentResponse struct {
-	CommentID       int64             `json:"commentId"`
-	Author          WallActorResponse `json:"author"`
-	CommentCipher   string            `json:"commentCipher,omitempty"`
-	CreatedAt       string            `json:"createdAt,omitempty"`
-	ParentCommentID *int64            `json:"parentCommentId,omitempty"`
-}
-
 type NotificationResponse struct {
-	ID        string                       `json:"id"`
-	Type      string                       `json:"type"`
-	CreatedAt string                       `json:"createdAt"`
-	Actor     WallActorResponse            `json:"actor"`
-	Post      *NotificationPostResponse    `json:"post,omitempty"`
-	Comment   *NotificationCommentResponse `json:"comment,omitempty"`
+	ID        string                    `json:"id"`
+	Type      string                    `json:"type"`
+	CreatedAt string                    `json:"createdAt"`
+	Actor     WallActorResponse         `json:"actor"`
+	Post      *NotificationPostResponse `json:"post,omitempty"`
 }
 
 type NotificationPage struct {

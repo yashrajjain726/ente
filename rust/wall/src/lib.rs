@@ -7,16 +7,15 @@ pub mod transport;
 pub use client::{AccountWallCtx, WallLinkCtx};
 pub use error::{Result, WallError};
 pub use models::{
-    AuthKeyAttributes, CreatedWall, CreatedWallLink, DecryptedComment, DecryptedFriendShare,
-    DecryptedPost, DecryptedWallProfile, FeedItem, FeedPage, HydratedKeys, OpenAccountWallCtxInput,
+    AuthKeyAttributes, CreatedWall, CreatedWallLink, DecryptedFriendShare, DecryptedPost,
+    DecryptedWallProfile, FeedItem, FeedPage, HydratedKeys, OpenAccountWallCtxInput,
     OpenWallLinkCtxInput, PrivateKeySource,
 };
 pub use transport::{
-    CommentResponse, EntityKeyPayload, FriendRelationshipResponse, FriendShareResponse,
-    FriendStatusResponse, LikeCommentResponse, LikePostResponse, ListPostLikersResponse,
-    PostLikerResponse, PostObjectPayload, PostPage, PostResponse, PresignUploadResponse,
-    ProfileAvatarPayload, ProfileAvatarResponse, WallActorResponse, WallFriendResponse,
-    WallKeyResponse, WallKeyVersionResponse, WallLinkLoginResponse, WallLinkStatusResponse,
-    WallLookupResponse, WallNotification, WallNotificationComment, WallNotificationPage,
-    WallNotificationPost, WallNotificationType, WallProfileResponse,
+    EntityKeyPayload, FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse,
+    LikePostResponse, ListPostLikersResponse, PostLikerResponse, PostObjectPayload, PostPage,
+    PostResponse, PresignUploadResponse, ProfileAvatarPayload, ProfileAvatarResponse,
+    WallActorResponse, WallFriendResponse, WallKeyResponse, WallKeyVersionResponse,
+    WallLinkLoginResponse, WallLinkStatusResponse, WallLookupResponse, WallNotification,
+    WallNotificationPage, WallNotificationPost, WallNotificationType, WallProfileResponse,
 };

@@ -2,11 +2,10 @@
 
 use ente_core::http::Error as HttpError;
 use ente_wall::{
-    AccountWallCtx, AuthKeyAttributes, CommentResponse, CreatedWall, CreatedWallLink,
-    DecryptedPost, DecryptedWallProfile, OpenAccountWallCtxInput, OpenWallLinkCtxInput,
-    PostResponse, PrivateKeySource, ProfileAvatarResponse, WallActorResponse,
-    WallError as CoreWallError, WallLinkCtx, WallNotification, WallNotificationComment,
-    WallNotificationPost,
+    AccountWallCtx, AuthKeyAttributes, CreatedWall, CreatedWallLink, DecryptedPost,
+    DecryptedWallProfile, OpenAccountWallCtxInput, OpenWallLinkCtxInput, PostResponse,
+    PrivateKeySource, ProfileAvatarResponse, WallActorResponse, WallError as CoreWallError,
+    WallLinkCtx, WallNotification, WallNotificationPost,
     crypto::{decode_b64, encode_b64},
 };
 use serde::{Deserialize, Serialize};
@@ -162,7 +161,6 @@ struct PostJs {
     created_at: String,
     likes: i64,
     viewer_liked: bool,
-    comments: i64,
 }
 
 #[derive(Serialize)]
@@ -170,36 +168,6 @@ struct PostJs {
 struct PostPageJs {
     items: Vec<PostJs>,
     next_cursor: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct CommentJs {
-    comment_id: i64,
-    author: ActorJs,
-    comment: String,
-    created_at: String,
-    likes: i64,
-    viewer_liked: bool,
-    viewer_can_delete: bool,
-    parent_comment_id: Option<i64>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct CommentPageJs {
-    comments: Vec<CommentJs>,
-    next_cursor: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct NotificationCommentJs {
-    comment_id: i64,
-    author: ActorJs,
-    comment: Option<String>,
-    created_at: String,
-    parent_comment_id: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -222,7 +190,6 @@ struct NotificationJs {
     created_at: String,
     actor: ActorJs,
     post: Option<NotificationPostJs>,
-    comment: Option<NotificationCommentJs>,
 }
 
 #[derive(Serialize)]
@@ -355,7 +322,6 @@ async fn account_post_to_js(
         created_at: post.created_at,
         likes: post.likes,
         viewer_liked: post.viewer_liked,
-        comments: post.comments,
     })
 }
 
@@ -377,43 +343,6 @@ async fn link_post_to_js(
         created_at: post.created_at,
         likes: post.likes,
         viewer_liked: post.viewer_liked,
-        comments: post.comments,
-    })
-}
-
-async fn account_comment_to_js(
-    ctx: &AccountWallCtx,
-    comment: CommentResponse,
-    decrypted: ente_wall::DecryptedComment,
-) -> Result<CommentJs, WasmWallError> {
-    let author = account_actor_to_js(ctx, comment.author).await?;
-    Ok(CommentJs {
-        comment_id: comment.comment_id,
-        author,
-        comment: utf8_field(decrypted.plaintext, "comment")?,
-        created_at: comment.created_at,
-        likes: comment.likes,
-        viewer_liked: comment.viewer_liked,
-        viewer_can_delete: comment.viewer_can_delete,
-        parent_comment_id: comment.parent_comment_id,
-    })
-}
-
-async fn link_comment_to_js(
-    ctx: &WallLinkCtx,
-    comment: CommentResponse,
-    decrypted: ente_wall::DecryptedComment,
-) -> Result<CommentJs, WasmWallError> {
-    let author = link_actor_to_js(ctx, comment.author).await?;
-    Ok(CommentJs {
-        comment_id: comment.comment_id,
-        author,
-        comment: utf8_field(decrypted.plaintext, "comment")?,
-        created_at: comment.created_at,
-        likes: comment.likes,
-        viewer_liked: comment.viewer_liked,
-        viewer_can_delete: comment.viewer_can_delete,
-        parent_comment_id: comment.parent_comment_id,
     })
 }
 
@@ -447,56 +376,12 @@ async fn link_post_page_to_js(
     })
 }
 
-async fn account_comment_page_to_js(
-    ctx: &AccountWallCtx,
-    post_id: i64,
-    limit: Option<i32>,
-    cursor: Option<i64>,
-) -> Result<CommentPageJs, WasmWallError> {
-    let post = ctx.get_post(post_id).await?;
-    let decrypted_post = ctx.decrypt_post_for_wall(&post.wall_id, &post).await?;
-    let page = ctx.list_comments(post_id, limit, cursor).await?;
-    let mut comments = Vec::with_capacity(page.comments.len());
-    for comment in page.comments {
-        let decrypted = ctx.decrypt_comment(&decrypted_post.post_key, &comment)?;
-        comments.push(account_comment_to_js(ctx, comment, decrypted).await?);
-    }
-    Ok(CommentPageJs {
-        comments,
-        next_cursor: page.next_cursor,
-    })
-}
-
-async fn link_comment_page_to_js(
-    ctx: &WallLinkCtx,
-    post_id: i64,
-    limit: Option<i32>,
-    cursor: Option<i64>,
-) -> Result<CommentPageJs, WasmWallError> {
-    let post = ctx.get_post(post_id).await?;
-    let decrypted_post = ctx.decrypt_post(&post).await?;
-    let page = ctx.list_comments(post_id, limit, cursor).await?;
-    let mut comments = Vec::with_capacity(page.comments.len());
-    for comment in page.comments {
-        let decrypted = ctx.decrypt_comment(&decrypted_post.post_key, &comment)?;
-        comments.push(link_comment_to_js(ctx, comment, decrypted).await?);
-    }
-    Ok(CommentPageJs {
-        comments,
-        next_cursor: page.next_cursor,
-    })
-}
-
 async fn notification_to_js(
     ctx: &AccountWallCtx,
     notification: WallNotification,
 ) -> Result<NotificationJs, WasmWallError> {
     let post = match notification.post {
         Some(post) => Some(notification_post_to_js(ctx, post).await?),
-        None => None,
-    };
-    let comment = match notification.comment {
-        Some(comment) => Some(notification_comment_to_js(ctx, post.as_ref(), comment).await?),
         None => None,
     };
     let actor = account_actor_to_js(ctx, notification.actor).await?;
@@ -506,7 +391,6 @@ async fn notification_to_js(
         created_at: notification.created_at,
         actor,
         post,
-        comment,
     })
 }
 
@@ -522,44 +406,6 @@ async fn notification_post_to_js(
         owner_user_id: post.owner_user_id,
         author,
         objects: post.objects,
-    })
-}
-
-async fn notification_comment_to_js(
-    ctx: &AccountWallCtx,
-    post: Option<&NotificationPostJs>,
-    comment: WallNotificationComment,
-) -> Result<NotificationCommentJs, WasmWallError> {
-    let plaintext = if comment.comment_cipher.trim().is_empty() {
-        None
-    } else if let Some(post) = post {
-        let post = ctx.get_post(post.post_id).await?;
-        let decrypted_post = ctx.decrypt_post_for_wall(&post.wall_id, &post).await?;
-        let comment_response = CommentResponse {
-            comment_id: comment.comment_id,
-            author: comment.author.clone(),
-            comment_cipher: comment.comment_cipher.clone(),
-            created_at: comment.created_at.clone(),
-            likes: 0,
-            viewer_liked: false,
-            viewer_can_delete: false,
-            parent_comment_id: comment.parent_comment_id,
-        };
-        Some(utf8_field(
-            ctx.decrypt_comment(&decrypted_post.post_key, &comment_response)?
-                .plaintext,
-            "comment",
-        )?)
-    } else {
-        None
-    };
-    let author = account_actor_to_js(ctx, comment.author).await?;
-    Ok(NotificationCommentJs {
-        comment_id: comment.comment_id,
-        author,
-        comment: plaintext,
-        created_at: comment.created_at,
-        parent_comment_id: comment.parent_comment_id,
     })
 }
 
@@ -780,7 +626,6 @@ impl WallAccountCtxHandle {
                             created_at: item.created_at,
                             likes: item.likes,
                             viewer_liked: item.viewer_liked,
-                            comments: item.comments,
                         })
                         .collect(),
                     next_cursor: page.next_cursor,
@@ -898,64 +743,6 @@ impl WallAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// List comments with plaintext decrypted.
-    pub async fn list_comments(
-        &self,
-        post_id: i64,
-        limit: Option<i32>,
-        cursor: Option<i64>,
-    ) -> Result<JsValue, WasmWallError> {
-        swb::to_value(&account_comment_page_to_js(&self.inner, post_id, limit, cursor).await?)
-            .map_err(Into::into)
-    }
-
-    /// Create a comment or reply.
-    pub async fn create_comment(
-        &self,
-        post_id: i64,
-        comment: String,
-        parent_comment_id: Option<i64>,
-    ) -> Result<JsValue, WasmWallError> {
-        let post = self.inner.get_post(post_id).await?;
-        let decrypted_post = self
-            .inner
-            .decrypt_post_for_wall(&post.wall_id, &post)
-            .await?;
-        let response = self
-            .inner
-            .create_comment(
-                post_id,
-                &decrypted_post.post_key,
-                comment.as_bytes(),
-                parent_comment_id,
-            )
-            .await?;
-        let decrypted = self
-            .inner
-            .decrypt_comment(&decrypted_post.post_key, &response)?;
-        swb::to_value(&account_comment_to_js(&self.inner, response, decrypted).await?)
-            .map_err(Into::into)
-    }
-
-    /// Like or unlike a comment.
-    pub async fn like_comment(
-        &self,
-        post_id: i64,
-        comment_id: i64,
-        like: bool,
-    ) -> Result<JsValue, WasmWallError> {
-        swb::to_value(&self.inner.like_comment(post_id, comment_id, like).await?)
-            .map_err(Into::into)
-    }
-
-    /// Delete a comment.
-    pub async fn delete_comment(&self, post_id: i64, comment_id: i64) -> Result<(), WasmWallError> {
-        self.inner
-            .delete_comment(post_id, comment_id)
-            .await
-            .map_err(Into::into)
-    }
-
     /// Update a post caption.
     pub async fn update_post_caption(
         &self,
@@ -1017,7 +804,7 @@ impl WallAccountCtxHandle {
             .map_err(Into::into)
     }
 
-    /// List notifications with comment plaintext decrypted where present.
+    /// List notifications.
     pub async fn list_notifications(
         &self,
         cursor: Option<String>,
@@ -1081,17 +868,6 @@ impl WallLinkCtxHandle {
         self.inner
             .download_decrypted_asset(&object_key, self.inner.wall_key())
             .await
-            .map_err(Into::into)
-    }
-
-    /// List comments with plaintext decrypted.
-    pub async fn list_comments(
-        &self,
-        post_id: i64,
-        limit: Option<i32>,
-        cursor: Option<i64>,
-    ) -> Result<JsValue, WasmWallError> {
-        swb::to_value(&link_comment_page_to_js(&self.inner, post_id, limit, cursor).await?)
             .map_err(Into::into)
     }
 

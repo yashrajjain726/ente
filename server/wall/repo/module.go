@@ -75,7 +75,6 @@ type WallPostRecord struct {
 	CreatedAt        int64
 	Likes            int64
 	ViewerLiked      bool
-	Comments         int64
 }
 
 type WallPostAssetRecord struct {
@@ -102,18 +101,6 @@ type WallTempObjectRecord struct {
 	ExpectedSize int64
 	ExpiresAt    int64
 	CreatedAt    int64
-}
-
-type WallCommentRecord struct {
-	CommentID       int64
-	PostID          int64
-	Author          WallActorRecord
-	CommentCipher   string
-	ParentCommentID sql.NullInt64
-	CreatedAt       int64
-	Likes           int64
-	ViewerLiked     bool
-	ViewerCanDelete bool
 }
 
 type WallPostLikerRecord struct {
@@ -201,11 +188,6 @@ type WallNotificationRecord struct {
 	PostObjectWidth          sql.NullInt64
 	PostObjectHeight         sql.NullInt64
 	PostObjectMediaType      sql.NullString
-	CommentID                sql.NullInt64
-	ParentCommentID          sql.NullInt64
-	CommentAuthor            WallActorRecord
-	CommentCipher            sql.NullString
-	CommentCreatedAt         sql.NullInt64
 }
 
 func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {

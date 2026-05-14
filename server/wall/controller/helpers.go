@@ -148,30 +148,12 @@ func toPostResponse(post *wallrepo.WallPostRecord, assets []wallrepo.WallPostAss
 		CreatedAt:        formatMicros(post.CreatedAt),
 		Likes:            post.Likes,
 		ViewerLiked:      post.ViewerLiked,
-		Comments:         post.Comments,
 	}
 	if len(assets) > 0 {
 		resp.Objects = make([]models.PostObjectPayload, 0, len(assets))
 		for _, asset := range assets {
 			resp.Objects = append(resp.Objects, toPostObjectPayload(asset))
 		}
-	}
-	return resp
-}
-
-func toCommentResponse(comment wallrepo.WallCommentRecord, includeAuthorPrivate bool) models.CommentResponse {
-	resp := models.CommentResponse{
-		CommentID:       comment.CommentID,
-		Author:          toActorResponse(comment.Author, includeAuthorPrivate),
-		CommentCipher:   comment.CommentCipher,
-		CreatedAt:       formatMicros(comment.CreatedAt),
-		Likes:           comment.Likes,
-		ViewerLiked:     comment.ViewerLiked,
-		ViewerCanDelete: comment.ViewerCanDelete,
-	}
-	if comment.ParentCommentID.Valid {
-		parentID := comment.ParentCommentID.Int64
-		resp.ParentCommentID = &parentID
 	}
 	return resp
 }

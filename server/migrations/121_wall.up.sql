@@ -109,42 +109,8 @@ CREATE TABLE IF NOT EXISTS wall_post_likes (
 CREATE INDEX IF NOT EXISTS idx_wall_post_likes_post_id
     ON wall_post_likes (post_id);
 
-CREATE TABLE IF NOT EXISTS wall_post_comments (
-    comment_id           BIGSERIAL PRIMARY KEY,
-    post_id              BIGINT NOT NULL REFERENCES wall_posts (post_id) ON DELETE CASCADE,
-    parent_comment_id    BIGINT REFERENCES wall_post_comments (comment_id) ON DELETE CASCADE,
-    author_id            BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    comment_cipher       TEXT   NOT NULL,
-    is_deleted           BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at           BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    updated_at           BIGINT NOT NULL DEFAULT now_utc_micro_seconds()
-);
-
-CREATE INDEX IF NOT EXISTS idx_wall_post_comments_post_created
-    ON wall_post_comments (post_id, created_at DESC)
-    WHERE is_deleted = FALSE;
-
-CREATE INDEX IF NOT EXISTS idx_wall_post_comments_parent
-    ON wall_post_comments (parent_comment_id, created_at ASC)
-    WHERE is_deleted = FALSE;
-
-CREATE TRIGGER update_wall_post_comments_updated_at
-    BEFORE UPDATE ON wall_post_comments
-    FOR EACH ROW
-EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
-
-CREATE TABLE IF NOT EXISTS wall_comment_likes (
-    comment_id   BIGINT NOT NULL REFERENCES wall_post_comments (comment_id) ON DELETE CASCADE,
-    user_id      BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    created_at   BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    PRIMARY KEY (comment_id, user_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_wall_comment_likes_comment_id
-    ON wall_comment_likes (comment_id);
-
-CREATE INDEX IF NOT EXISTS idx_wall_comment_likes_user_id
-    ON wall_comment_likes (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wall_post_likes_post_created_user
+    ON wall_post_likes (post_id, created_at DESC, user_id DESC);
 
 CREATE TABLE IF NOT EXISTS wall_friend_shares (
     wall_id              TEXT   NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,

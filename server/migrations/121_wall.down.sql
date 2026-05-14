@@ -8,11 +8,6 @@ DROP TABLE IF EXISTS wall_friend_events;
 DROP TRIGGER IF EXISTS update_wall_friend_shares_updated_at ON wall_friend_shares;
 DROP TABLE IF EXISTS wall_friend_shares;
 
-DROP TABLE IF EXISTS wall_comment_likes;
-
-DROP TRIGGER IF EXISTS update_wall_post_comments_updated_at ON wall_post_comments;
-DROP TABLE IF EXISTS wall_post_comments;
-
 DROP TABLE IF EXISTS wall_post_likes;
 DROP TABLE IF EXISTS wall_temp_objects;
 DROP TABLE IF EXISTS wall_post_assets;

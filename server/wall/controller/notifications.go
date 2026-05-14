@@ -26,9 +26,6 @@ func (c *NotificationsController) List(ctx *gin.Context, req models.ListNotifica
 		if notification.PostID.Valid {
 			actors = append(actors, notification.PostAuthor)
 		}
-		if notification.CommentID.Valid {
-			actors = append(actors, notification.CommentAuthor)
-		}
 	}
 	visible, err := actorVisibility(ctx.Request.Context(), c.auth, &viewerAuth{UserID: userID}, actors...)
 	if err != nil {
@@ -84,23 +81,6 @@ func toNotificationResponse(notification repo.WallNotificationRecord, visible ma
 			post.Objects = []models.PostObjectPayload{object}
 		}
 		resp.Post = post
-	}
-	if notification.CommentID.Valid {
-		comment := &models.NotificationCommentResponse{
-			CommentID: notification.CommentID.Int64,
-			Author:    toActorResponse(notification.CommentAuthor, visibleActor(visible, notification.CommentAuthor)),
-		}
-		if notification.CommentCipher.Valid {
-			comment.CommentCipher = notification.CommentCipher.String
-		}
-		if notification.CommentCreatedAt.Valid {
-			comment.CreatedAt = formatMicros(notification.CommentCreatedAt.Int64)
-		}
-		if notification.ParentCommentID.Valid {
-			parentID := notification.ParentCommentID.Int64
-			comment.ParentCommentID = &parentID
-		}
-		resp.Comment = comment
 	}
 	return resp
 }
