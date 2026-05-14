@@ -222,9 +222,7 @@ struct FriendJs {
 }
 
 fn decode_b64_field(value: &str) -> Result<Vec<u8>, WasmWallError> {
-    decode_b64(value)
-        .map_err(CoreWallError::from)
-        .map_err(Into::into)
+    decode_b64(value).map_err(Into::into)
 }
 
 fn utf8_field(bytes: Vec<u8>, field: &str) -> Result<String, WasmWallError> {

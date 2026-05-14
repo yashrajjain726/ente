@@ -154,7 +154,7 @@ func TestWallModuleLifecycle(t *testing.T) {
 
 	post, err := module.Posts.GetPost(ctx, postID, bobID)
 	require.NoError(t, err)
-	require.Equal(t, "alice", post.Author)
+	require.Equal(t, "alice", post.Author.WallSlug)
 
 	err = module.Posts.SetLike(ctx, postID, bobID, true)
 	require.NoError(t, err)

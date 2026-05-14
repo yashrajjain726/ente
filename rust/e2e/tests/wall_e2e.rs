@@ -1,8 +1,10 @@
 mod support;
+#[path = "support/wall.rs"]
+mod wall;
 
 use ente_wall::{OpenWallLinkCtxInput, WallLinkCtx, WallNotificationType};
 
-use support::{auth, wall};
+use support::auth;
 
 #[tokio::test]
 #[ignore = "requires local Museum at ENTE_E2E_ENDPOINT or http://localhost:8080"]

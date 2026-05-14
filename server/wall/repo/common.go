@@ -12,13 +12,6 @@ func normalizeSlug(input string) string {
 	return strings.ToLower(strings.TrimSpace(input))
 }
 
-func boolToInt64(value bool) int64 {
-	if value {
-		return 1
-	}
-	return 0
-}
-
 func nullString(value string) sql.NullString {
 	value = strings.TrimSpace(value)
 	if value == "" {

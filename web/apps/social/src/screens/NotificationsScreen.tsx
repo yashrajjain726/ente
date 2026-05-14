@@ -254,7 +254,9 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
                             component="button"
                             type="button"
                             aria-label={`Open ${actorFirstName}'s profile`}
-                            onClick={() => onOpenFriend?.(notification.actor.id)}
+                            onClick={() =>
+                                onOpenFriend?.(notification.actor.id)
+                            }
                             sx={{
                                 appearance: "none",
                                 alignItems: "center",
@@ -324,7 +326,9 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
                             component="button"
                             type="button"
                             aria-label={`Open ${actorFirstName}'s profile`}
-                            onClick={() => onOpenFriend?.(notification.actor.id)}
+                            onClick={() =>
+                                onOpenFriend?.(notification.actor.id)
+                            }
                             sx={{
                                 appearance: "none",
                                 bgcolor: "transparent",
