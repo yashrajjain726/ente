@@ -11,6 +11,30 @@ export const SocialRouteFallback: React.FC<SocialRouteFallbackProps> = ({
 }) => (
     <>
         <SocialPageMeta themeColor={background} />
-        <Box sx={{ bgcolor: background, minHeight: "100svh" }} />
+        <Box
+            sx={{
+                bgcolor: background,
+                display: "grid",
+                minHeight: "100svh",
+                placeItems: "center",
+            }}
+        >
+            <Box
+                component="span"
+                role="status"
+                aria-label="Loading"
+                sx={{
+                    animation: "socialRouteFallbackSpin 800ms linear infinite",
+                    border: "3px solid rgba(8, 194, 37, 0.18)",
+                    borderRadius: "50%",
+                    borderTopColor: "#08C225",
+                    height: 32,
+                    width: 32,
+                    "@keyframes socialRouteFallbackSpin": {
+                        to: { transform: "rotate(360deg)" },
+                    },
+                }}
+            />
+        </Box>
     </>
 );

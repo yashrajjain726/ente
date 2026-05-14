@@ -8,13 +8,16 @@ import { socialRoutes } from "utils/socialRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { friends, profile, setFriends } = useSocialAppState();
+    const { friends, profile, profileLoadStatus, setFriends } =
+        useSocialAppState();
 
     useEffect(() => {
-        if (!profile) void router.replace(socialRoutes.onboarding);
-    }, [profile, router]);
+        if (profileLoadStatus == "ready" && !profile) {
+            void router.replace(socialRoutes.onboarding);
+        }
+    }, [profile, profileLoadStatus, router]);
 
-    if (!profile) {
+    if (profileLoadStatus == "loading" || !profile) {
         return <SocialRouteFallback background={friendsBackground} />;
     }
 

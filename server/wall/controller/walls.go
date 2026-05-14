@@ -1,11 +1,13 @@
 package controller
 
 import (
+	"database/sql"
 	"strings"
 
 	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/wall/models"
 	"github.com/ente-io/museum/wall/repo"
+	"github.com/ente-io/stacktrace"
 	"github.com/gin-gonic/gin"
 )
 
@@ -165,6 +167,20 @@ func (c *WallsController) LookupBySlug(ctx *gin.Context, wallSlug string) (*mode
 		Owner:     wall.WallSlug,
 		PublicKey: publicKey,
 	}, nil
+}
+
+func (c *WallsController) SlugAvailability(ctx *gin.Context, wallSlug string) (*models.WallSlugAvailabilityResponse, error) {
+	normalizedSlug, err := repo.ValidateWallSlug(wallSlug)
+	if err != nil {
+		return &models.WallSlugAvailabilityResponse{Available: false}, nil
+	}
+	if _, err := c.WallsRepo.GetWallBySlug(ctx.Request.Context(), normalizedSlug); err != nil {
+		if stacktrace.RootCause(err) == sql.ErrNoRows {
+			return &models.WallSlugAvailabilityResponse{Available: true}, nil
+		}
+		return nil, err
+	}
+	return &models.WallSlugAvailabilityResponse{Available: false}, nil
 }
 
 func (c *WallsController) RotateKey(ctx *gin.Context, req models.RotateWallKeyRequest) (*models.WallKeyResponse, error) {

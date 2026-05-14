@@ -6,7 +6,10 @@ import {
     createAccountBackground,
     type CreateAccountInput,
 } from "screens/CreateAccountScreen";
-import { beginSocialSignup } from "services/socialSignup";
+import {
+    beginSocialSignup,
+    socialSignupErrorMessage,
+} from "services/socialSignup";
 import { useSocialAppState } from "state/socialAppState";
 import { socialRoutes } from "utils/socialRoutes";
 
@@ -25,12 +28,7 @@ const Page: React.FC = () => {
             setIsLiveSignupVerification(true);
             void router.push(socialRoutes.verify);
         } catch (error) {
-            console.error("Social signup failed", error);
-            setSignupError(
-                error instanceof Error
-                    ? error.message
-                    : "Couldn't create account. Please try again.",
-            );
+            setSignupError(await socialSignupErrorMessage(error));
             setIsSubmitting(false);
         }
     };

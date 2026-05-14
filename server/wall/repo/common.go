@@ -153,6 +153,10 @@ func validateWallSlug(input string) (string, error) {
 	return slug, nil
 }
 
+func ValidateWallSlug(input string) (string, error) {
+	return validateWallSlug(input)
+}
+
 func isReservedWallSlug(slug string) bool {
 	if _, ok := reservedWallSlugs[slug]; ok {
 		return true

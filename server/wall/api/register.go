@@ -34,5 +34,6 @@ func Register(privateAPI, publicAPI gin.IRoutes, handlers *Handlers) {
 	publicAPI.GET("/wall/posts/:postID/likes", handlers.ListPostLikers)
 	publicAPI.GET("/wall/versions", handlers.ListWallKeyVersions)
 	publicAPI.GET("/wall/public/by-slug/:wallSlug", handlers.LookupWallBySlug)
+	publicAPI.GET("/wall/public/slug-availability/:wallSlug", handlers.WallSlugAvailability)
 	publicAPI.POST("/wall/links/session", handlers.WallLinkLogin)
 }

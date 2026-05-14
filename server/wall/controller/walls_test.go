@@ -55,3 +55,23 @@ func TestGetProfileRejectsInvalidVersion(t *testing.T) {
 	require.Nil(t, resp)
 	require.Error(t, err)
 }
+
+func TestSlugAvailabilityReturnsFalseForExistingAndReservedSlugs(t *testing.T) {
+	module, repos, _, ctx := setupWallAuthControllerTest(t)
+	aliceID := insertWallControllerUser(t, repos, "alice-availability@example.com", "alice-public")
+	_, err := repos.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	ginCtx := newPublicWallContext()
+
+	existing, err := module.Walls.SlugAvailability(ginCtx, "Alice")
+	require.NoError(t, err)
+	require.False(t, existing.Available)
+
+	reserved, err := module.Walls.SlugAvailability(ginCtx, "support")
+	require.NoError(t, err)
+	require.False(t, reserved.Available)
+
+	free, err := module.Walls.SlugAvailability(ginCtx, "new-person")
+	require.NoError(t, err)
+	require.True(t, free.Available)
+}

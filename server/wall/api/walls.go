@@ -1,8 +1,12 @@
 package api
 
 import (
+	"database/sql"
+	"net/http"
+
 	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/wall/models"
+	"github.com/ente-io/stacktrace"
 	"github.com/gin-gonic/gin"
 )
 
@@ -58,6 +62,15 @@ func (h *Handlers) UpdateWallSlug(c *gin.Context) {
 
 func (h *Handlers) LookupWallBySlug(c *gin.Context) {
 	resp, err := h.Module.Walls.LookupBySlug(c, c.Param("wallSlug"))
+	if err != nil && stacktrace.RootCause(err) == sql.ErrNoRows {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	respondJSON(c, resp, err)
+}
+
+func (h *Handlers) WallSlugAvailability(c *gin.Context) {
+	resp, err := h.Module.Walls.SlugAvailability(c, c.Param("wallSlug"))
 	respondJSON(c, resp, err)
 }
 

@@ -5,7 +5,7 @@ export const initialsFor = (name: string) =>
     name
         .trim()
         .split(/\s+/)
-        .slice(0, 2)
+        .slice(0, 1)
         .map((part) => part[0]?.toUpperCase())
         .join("");
 

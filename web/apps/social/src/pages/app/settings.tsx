@@ -1,5 +1,6 @@
 import { SocialPageMeta } from "components/SocialPageMeta";
 import { SocialRouteFallback } from "components/SocialRouteFallback";
+import { accountLogout } from "ente-accounts-rs/services/logout";
 import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { SettingsScreen, settingsBackground } from "screens/SettingsScreen";
@@ -8,13 +9,16 @@ import { socialRoutes } from "utils/socialRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { profile, resetAfterLogout } = useSocialAppState();
+    const { profile, profileLoadStatus, resetAfterLogout } =
+        useSocialAppState();
 
     useEffect(() => {
-        if (!profile) void router.replace(socialRoutes.onboarding);
-    }, [profile, router]);
+        if (profileLoadStatus == "ready" && !profile) {
+            void router.replace(socialRoutes.onboarding);
+        }
+    }, [profile, profileLoadStatus, router]);
 
-    if (!profile) {
+    if (profileLoadStatus == "loading" || !profile) {
         return <SocialRouteFallback background={settingsBackground} />;
     }
 
@@ -24,8 +28,10 @@ const Page: React.FC = () => {
             <SettingsScreen
                 onBack={() => void router.push(socialRoutes.profile)}
                 onLogout={() => {
-                    resetAfterLogout();
-                    void router.push(socialRoutes.onboarding);
+                    void accountLogout().then(() => {
+                        resetAfterLogout();
+                        void router.push(socialRoutes.onboarding);
+                    });
                 }}
             />
         </>

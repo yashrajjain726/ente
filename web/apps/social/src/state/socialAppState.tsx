@@ -5,6 +5,7 @@ import type { SetupProfile } from "screens/SetupProfileScreen";
 import type { PendingSocialPasskeyVerification } from "services/socialPasskeyVerification";
 
 export type OnboardingEntrySource = "direct" | "add-friend-link";
+export type SocialProfileLoadStatus = "loading" | "ready";
 
 export interface SocialAppState {
     friends: FriendProfile[];
@@ -13,7 +14,9 @@ export interface SocialAppState {
     pendingLoginCredentials: SocialLoginCredentials | null;
     pendingPasskeyVerification: PendingSocialPasskeyVerification | null;
     profile: SetupProfile | null;
+    profileLoadStatus: SocialProfileLoadStatus;
     signupEmail: string;
+    refreshProfile: () => Promise<SetupProfile | null>;
     resetAfterLogout: () => void;
     setFriends: React.Dispatch<React.SetStateAction<FriendProfile[]>>;
     setIsLiveSignupVerification: React.Dispatch<React.SetStateAction<boolean>>;
@@ -26,7 +29,7 @@ export interface SocialAppState {
     setPendingPasskeyVerification: React.Dispatch<
         React.SetStateAction<PendingSocialPasskeyVerification | null>
     >;
-    setProfile: React.Dispatch<React.SetStateAction<SetupProfile | null>>;
+    setProfile: (profile: SetupProfile | null) => void;
     setSignupEmail: React.Dispatch<React.SetStateAction<string>>;
 }
 

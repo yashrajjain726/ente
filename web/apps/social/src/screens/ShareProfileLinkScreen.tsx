@@ -4,6 +4,7 @@ import { Box } from "@mui/material";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { profileLinkForUsername } from "utils/profileLink";
+import { initialsFor } from "utils/socialDisplay";
 
 export const shareProfileLinkBackground = "#FAFAFA";
 
@@ -172,11 +173,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
     const profileLink = profileLinkForUsername(profile.username.trim());
     const displayName = profile.fullName.trim() || profile.username.trim();
     const initialsSource = displayName || profile.username.trim();
-    const initials = initialsSource
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join("");
+    const initials = initialsFor(initialsSource);
 
     const copyProfileLink = async () => {
         await navigator.clipboard.writeText(profileLink);

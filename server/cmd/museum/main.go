@@ -944,6 +944,7 @@ func main() {
 	wallHandlers := wallapi.NewHandlers(wallModule)
 
 	privateAPI.POST("/user-entity/key", userEntityHandler.CreateKey)
+	privateAPI.POST("/user-entity/key/ensure", userEntityHandler.EnsureKey)
 	privateAPI.GET("/user-entity/key", userEntityHandler.GetKey)
 	privateAPI.POST("/user-entity/entity", userEntityHandler.CreateEntity)
 	privateAPI.PUT("/user-entity/entity", userEntityHandler.UpdateEntity)

@@ -20,7 +20,11 @@ import {
     type LocalPostPhotoDimensions,
 } from "utils/localPostPhoto";
 import { profileLinkForUsername } from "utils/profileLink";
-import { firstNameFrom, formatSocialDate } from "utils/socialDisplay";
+import {
+    firstNameFrom,
+    formatSocialDate,
+    initialsFor,
+} from "utils/socialDisplay";
 
 export const homeBackground = "#FFFFFF";
 
@@ -508,11 +512,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             : "When your friends share posts, they'll appear here.";
     const profileLink = profileLinkForUsername(profile.username.trim());
     const initialsSource = profile.fullName.trim() || profile.username.trim();
-    const initials = initialsSource
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join("");
+    const initials = initialsFor(initialsSource);
     const revokeLocalPostObjectUrl = React.useCallback((objectUrl?: string) => {
         if (!objectUrl || !localPostObjectUrlsRef.current.has(objectUrl))
             return;

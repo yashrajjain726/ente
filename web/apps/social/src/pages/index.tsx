@@ -78,8 +78,12 @@ const publicProfileFromLink = (): SetupProfile => ({
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { onboardingEntrySource, setOnboardingEntrySource } =
-        useSocialAppState();
+    const {
+        onboardingEntrySource,
+        profile,
+        profileLoadStatus,
+        setOnboardingEntrySource,
+    } = useSocialAppState();
     const [routeMode, setRouteMode] = useState<RouteMode>({ kind: "checking" });
 
     useEffect(() => {
@@ -95,7 +99,21 @@ const Page: React.FC = () => {
         );
     }, [setOnboardingEntrySource]);
 
-    if (routeMode.kind == "checking") {
+    useEffect(() => {
+        if (
+            routeMode.kind == "app" &&
+            profileLoadStatus == "ready" &&
+            profile
+        ) {
+            void router.replace(socialRoutes.home);
+        }
+    }, [profile, profileLoadStatus, routeMode.kind, router]);
+
+    if (
+        routeMode.kind == "checking" ||
+        (routeMode.kind == "app" &&
+            (profileLoadStatus == "loading" || Boolean(profile)))
+    ) {
         return <SocialRouteFallback background={profileBackground} />;
     }
 

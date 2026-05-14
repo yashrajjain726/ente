@@ -71,6 +71,43 @@ func TestCreateUserEntityKeyReturnsAlreadyExistsForConflictingCreate(t *testing.
 	assertAPIErrorResponse(t, second, http.StatusConflict, ente.AlreadyExists, "Key already exists")
 }
 
+func TestEnsureUserEntityKeyReturnsExistingKeyForConflict(t *testing.T) {
+	handler, db := setupUserEntityHandlerTest(t)
+
+	userID := testutil.InsertUser(t, db, testutil.UserFixture{
+		UserID:       203,
+		Email:        "userentity-key-ensure@ente.io",
+		CreationTime: 1,
+	})
+
+	firstBody := map[string]any{
+		"type":         "wall",
+		"encryptedKey": "encrypted-key",
+		"header":       "header",
+	}
+	secondBody := map[string]any{
+		"type":         "wall",
+		"encryptedKey": "different-encrypted-key",
+		"header":       "different-header",
+	}
+
+	first := performEnsureUserEntityKeyRequest(t, handler, userID, firstBody)
+	if first.Code != http.StatusOK {
+		t.Fatalf("unexpected status code on first ensure: got %d want %d; body=%s", first.Code, http.StatusOK, first.Body.String())
+	}
+	second := performEnsureUserEntityKeyRequest(t, handler, userID, secondBody)
+	if second.Code != http.StatusOK {
+		t.Fatalf("unexpected status code on duplicate ensure: got %d want %d; body=%s", second.Code, http.StatusOK, second.Body.String())
+	}
+	var response map[string]any
+	if err := json.Unmarshal(second.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to decode ensure response: %v", err)
+	}
+	if response["encryptedKey"] != firstBody["encryptedKey"] || response["header"] != firstBody["header"] {
+		t.Fatalf("ensure returned wrong key: got %v", response)
+	}
+}
+
 func setupUserEntityHandlerTest(t *testing.T) (*UserEntityHandler, *sql.DB) {
 	t.Helper()
 
@@ -111,6 +148,33 @@ func performCreateUserEntityKeyRequest(
 
 	router := gin.New()
 	router.POST("/user-entity/key", handler.CreateKey)
+	router.ServeHTTP(recorder, req)
+
+	return recorder
+}
+
+func performEnsureUserEntityKeyRequest(
+	t *testing.T,
+	handler *UserEntityHandler,
+	userID int64,
+	body map[string]any,
+) *httptest.ResponseRecorder {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("failed to marshal request body: %v", err)
+	}
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/user-entity/key/ensure", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
+
+	router := gin.New()
+	router.POST("/user-entity/key/ensure", handler.EnsureKey)
 	router.ServeHTTP(recorder, req)
 
 	return recorder

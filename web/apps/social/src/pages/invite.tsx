@@ -11,13 +11,15 @@ import { socialRoutes } from "utils/socialRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { profile } = useSocialAppState();
+    const { profile, profileLoadStatus } = useSocialAppState();
 
     useEffect(() => {
-        if (!profile) void router.replace(socialRoutes.setupProfile("verify"));
-    }, [profile, router]);
+        if (profileLoadStatus == "ready" && !profile) {
+            void router.replace(socialRoutes.setupProfile("verify"));
+        }
+    }, [profile, profileLoadStatus, router]);
 
-    if (!profile) {
+    if (profileLoadStatus == "loading" || !profile) {
         return <SocialRouteFallback background={shareProfileLinkBackground} />;
     }
 

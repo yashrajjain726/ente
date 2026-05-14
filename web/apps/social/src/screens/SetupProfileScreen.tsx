@@ -9,26 +9,34 @@ const textLight = "#969696";
 const warning = "#F63A3A";
 const paleGreen = "#E7F6E9";
 const setupProfileFormID = "social-setup-profile-form";
-
-const mockSetupProfileData = {
-    avatarUrl: "/images/sample-avatar.jpg",
-    username: "anandbaburajan",
-    fullName: "Anand Baburajan",
-};
+const maxAvatarBytes = 19 * 1024 * 1024;
 
 export interface SetupProfile {
     avatarUrl: string | null;
+    avatarObjectKey?: string;
+    avatarUpdatedAt?: string;
     fullName: string;
     username: string;
+    wallId?: string;
+    wallSlug?: string;
+}
+
+export interface SetupProfileInput extends SetupProfile {
+    avatarFile?: File | null;
 }
 
 interface SetupProfileScreenProps {
     ctaLabel?: string;
+    errorMessage?: string;
+    isSubmitting?: boolean;
     onBack: () => void;
-    onContinue?: (profile: SetupProfile) => void;
+    onContinue?: (profile: SetupProfileInput) => Promise<void> | void;
+    onUsernameChange?: (username: string) => void;
+    usernameStatus?: "available" | "unavailable";
 }
 
 interface TextInputProps {
+    endAdornment?: React.ReactNode;
     label: string;
     onChange?: (value: string) => void;
     placeholder?: string;
@@ -59,7 +67,7 @@ const UploadIcon: React.FC = () => (
         component="svg"
         viewBox="0 0 24 24"
         aria-hidden
-        sx={{ display: "block", height: 20, width: 20 }}
+        sx={{ display: "block", height: 40, width: 40 }}
     >
         <path
             d="M8.5 7.5L9.75 5.75H14.25L15.5 7.5H18C19.1 7.5 20 8.4 20 9.5V17C20 18.1 19.1 19 18 19H6C4.9 19 4 18.1 4 17V9.5C4 8.4 4.9 7.5 6 7.5H8.5Z"
@@ -97,7 +105,72 @@ const PencilIcon: React.FC = () => (
     </Box>
 );
 
+const CheckIcon: React.FC = () => (
+    <Box
+        component="svg"
+        viewBox="0 0 20 20"
+        aria-hidden
+        sx={{ display: "block", height: 18, width: 18 }}
+    >
+        <path
+            d="M4.5 10.25L8.25 14L15.75 6"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2.2"
+        />
+    </Box>
+);
+
+const XIcon: React.FC = () => (
+    <Box
+        component="svg"
+        viewBox="0 0 20 20"
+        aria-hidden
+        sx={{ display: "block", height: 18, width: 18 }}
+    >
+        <path
+            d="M5.75 5.75L14.25 14.25M14.25 5.75L5.75 14.25"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2.2"
+        />
+    </Box>
+);
+
+const UsernameStatusIcon: React.FC<{
+    status?: "available" | "unavailable";
+}> = ({ status }) => {
+    if (!status) return null;
+
+    return (
+        <Box
+            component="span"
+            role="img"
+            aria-label={
+                status == "available"
+                    ? "Username available"
+                    : "Username unavailable"
+            }
+            sx={{
+                alignItems: "center",
+                color: status == "available" ? green : warning,
+                display: "flex",
+                flexShrink: 0,
+                justifyContent: "center",
+                ml: 1,
+            }}
+        >
+            {status == "available" ? <CheckIcon /> : <XIcon />}
+        </Box>
+    );
+};
+
 const TextInput: React.FC<TextInputProps> = ({
+    endAdornment,
     label,
     onChange,
     placeholder,
@@ -157,33 +230,33 @@ const TextInput: React.FC<TextInputProps> = ({
                     "&::placeholder": { color: textLight, opacity: 1 },
                 }}
             />
+            {endAdornment}
         </Box>
     </Box>
 );
 
 export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
     ctaLabel = "Next",
+    errorMessage,
+    isSubmitting = false,
     onBack,
     onContinue,
+    onUsernameChange,
+    usernameStatus,
 }) => {
-    const [avatarUrl, setAvatarUrl] = useState<string | null>(
-        mockSetupProfileData.avatarUrl,
-    );
-    const [username, setUsername] = useState(mockSetupProfileData.username);
-    const [fullName, setFullName] = useState(mockSetupProfileData.fullName);
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [avatarError, setAvatarError] = useState<string>();
+    const [username, setUsername] = useState("");
+    const [fullName, setFullName] = useState("");
     const avatarUrlRef = useRef<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const canContinue =
-        Boolean(avatarUrl) &&
+        !isSubmitting &&
+        usernameStatus != "unavailable" &&
         username.trim().length > 0 &&
         fullName.trim().length > 0;
-    const initialsSource = fullName.trim() || username.trim();
-    const initials = initialsSource
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join("");
 
     useEffect(
         () => () => {
@@ -198,16 +271,35 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
         const file = event.target.files?.[0];
         if (!file) return;
 
+        if (!file.type.startsWith("image/")) {
+            setAvatarError("Choose an image file.");
+            event.target.value = "";
+            return;
+        }
+        if (file.size > maxAvatarBytes) {
+            setAvatarError("Choose an image under 19 MB.");
+            event.target.value = "";
+            return;
+        }
+
         if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current);
         const nextUrl = URL.createObjectURL(file);
         avatarUrlRef.current = nextUrl;
+        setAvatarError(undefined);
+        setAvatarFile(file);
         setAvatarUrl(nextUrl);
         event.target.value = "";
     };
 
+    const handleUsernameChange = (value: string) => {
+        setUsername(value);
+        onUsernameChange?.(value);
+    };
+
     const submitProfile = () => {
         if (canContinue) {
-            onContinue?.({
+            void onContinue?.({
+                avatarFile,
                 avatarUrl,
                 fullName: fullName.trim(),
                 username: username.trim(),
@@ -361,19 +453,6 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                                         width: "100%",
                                     }}
                                 />
-                            ) : initials ? (
-                                <Box
-                                    sx={{
-                                        color: green,
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 32,
-                                        fontWeight: 700,
-                                        lineHeight: 1,
-                                    }}
-                                >
-                                    {initials}
-                                </Box>
                             ) : (
                                 <UploadIcon />
                             )}
@@ -418,8 +497,11 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                         }}
                     >
                         <TextInput
+                            endAdornment={
+                                <UsernameStatusIcon status={usernameStatus} />
+                            }
                             label="Username"
-                            onChange={setUsername}
+                            onChange={handleUsernameChange}
                             placeholder="Choose a username"
                             required
                             value={username}
@@ -431,6 +513,22 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                             required
                             value={fullName}
                         />
+                        {(avatarError || errorMessage) && (
+                            <Box
+                                role="alert"
+                                sx={{
+                                    color: warning,
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 13,
+                                    fontWeight: 500,
+                                    lineHeight: "18px",
+                                    mt: "-8px",
+                                }}
+                            >
+                                {errorMessage ?? avatarError}
+                            </Box>
+                        )}
                     </Box>
                 </Box>
 
@@ -478,7 +576,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                                 : undefined,
                         }}
                     >
-                        {ctaLabel}
+                        {isSubmitting ? "Saving..." : ctaLabel}
                     </Box>
                 </Box>
             </Box>

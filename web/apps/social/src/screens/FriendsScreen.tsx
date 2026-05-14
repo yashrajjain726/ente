@@ -13,6 +13,7 @@ import {
 } from "components/SocialActionFeedback";
 import type { FriendProfile } from "data/friends";
 import React, { useState } from "react";
+import { initialsFor } from "utils/socialDisplay";
 
 export const friendsBackground = "#FFFFFF";
 
@@ -35,14 +36,6 @@ interface FriendRowProps {
     onOpenFriend?: (friendID: string) => void;
     onUnfriend?: (friendID: string) => void;
 }
-
-const initialsFor = (name: string) =>
-    name
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join("");
 
 const FriendRow: React.FC<FriendRowProps> = ({
     friend,

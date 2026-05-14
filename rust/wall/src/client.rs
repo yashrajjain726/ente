@@ -123,6 +123,26 @@ impl AccountWallCtx {
         }
     }
 
+    pub async fn ensure_entity_key(
+        &self,
+        key_type: &str,
+        payload: &EntityKeyPayload,
+    ) -> Result<EntityKeyPayload> {
+        let request = CreateEntityKeyRequest {
+            key_type: key_type.to_owned(),
+            encrypted_key: payload.encrypted_key.clone(),
+            header: payload.header.clone(),
+        };
+        let response = self
+            .client
+            .post_json::<EntityKeyResponse, _>("/user-entity/key/ensure", &request)
+            .await?;
+        Ok(EntityKeyPayload {
+            encrypted_key: response.encrypted_key,
+            header: response.header,
+        })
+    }
+
     pub async fn get_root_wall_key(&self) -> Result<Option<Vec<u8>>> {
         let payload = match self.get_entity_key(ROOT_WALL_KEY_TYPE).await? {
             Some(value) => value,
@@ -132,18 +152,10 @@ impl AccountWallCtx {
     }
 
     pub async fn get_or_create_root_wall_key(&self) -> Result<Vec<u8>> {
-        if let Some(root_wall_key) = self.get_root_wall_key().await? {
-            return Ok(root_wall_key);
-        }
         let root_wall_key = generate_key();
         let payload = encrypt_entity_key(&self.master_key, &root_wall_key)?;
-        match self.create_entity_key(ROOT_WALL_KEY_TYPE, &payload).await {
-            Ok(()) => Ok(root_wall_key),
-            Err(WallError::EntityKeyConflict) => self.get_root_wall_key().await?.ok_or_else(|| {
-                WallError::InvalidInput("root wall key was created but not retrievable".into())
-            }),
-            Err(err) => Err(err),
-        }
+        let ensured = self.ensure_entity_key(ROOT_WALL_KEY_TYPE, &payload).await?;
+        decrypt_entity_key(&self.master_key, &ensured)
     }
 
     pub async fn list_owned_walls(&self) -> Result<Vec<WallKeyResponse>> {
@@ -177,7 +189,10 @@ impl AccountWallCtx {
     }
 
     async fn default_owned_wall_access(&self) -> Result<(WallKeyResponse, Vec<u8>)> {
-        let root_wall_key = self.get_or_create_root_wall_key().await?;
+        let root_wall_key = self
+            .get_root_wall_key()
+            .await?
+            .ok_or_else(|| WallError::InvalidInput("root wall key is missing".into()))?;
         let wall = self
             .list_owned_walls()
             .await?
@@ -1384,20 +1399,12 @@ mod tests {
     async fn get_or_create_root_wall_key_creates_when_missing() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
-        let first_get = server
-            .mock("GET", "/user-entity/key")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_WALL_KEY_TYPE.into(),
-            ))
-            .with_status(404)
-            .create_async()
-            .await;
-        let create = server
-            .mock("POST", "/user-entity/key")
+        let expected_root = generate_key();
+        let ensure = server
+            .mock("POST", "/user-entity/key/ensure")
             .match_header("x-auth-token", "token")
             .with_status(200)
-            .with_body(r#"{"status":"ok"}"#)
+            .with_body(root_entity_response(&ctx.master_key, &expected_root))
             .create_async()
             .await;
 
@@ -1406,49 +1413,20 @@ mod tests {
             .await
             .expect("root wall key should be created");
 
-        assert_eq!(root.len(), 32);
-        first_get.assert_async().await;
-        create.assert_async().await;
+        assert_eq!(root, expected_root);
+        ensure.assert_async().await;
     }
 
     #[tokio::test]
-    async fn get_or_create_root_wall_key_refetches_on_conflict() {
+    async fn get_or_create_root_wall_key_uses_existing_key_from_ensure() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
         let expected_root = generate_key();
-        let payload = encrypt_entity_key(&ctx.master_key, &expected_root).expect("entity key");
 
-        let missing = server
-            .mock("GET", "/user-entity/key")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_WALL_KEY_TYPE.into(),
-            ))
-            .with_status(404)
-            .expect(1)
-            .create_async()
-            .await;
-        let conflict = server
-            .mock("POST", "/user-entity/key")
-            .with_status(409)
-            .with_body("conflict")
-            .create_async()
-            .await;
-        let refetch = server
-            .mock("GET", "/user-entity/key")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_WALL_KEY_TYPE.into(),
-            ))
+        let ensure = server
+            .mock("POST", "/user-entity/key/ensure")
             .with_status(200)
-            .with_body(
-                json!({
-                    "type": ROOT_WALL_KEY_TYPE,
-                    "encryptedKey": payload.encrypted_key,
-                    "header": payload.header,
-                })
-                .to_string(),
-            )
+            .with_body(root_entity_response(&ctx.master_key, &expected_root))
             .expect(1)
             .create_async()
             .await;
@@ -1456,11 +1434,9 @@ mod tests {
         let root = ctx
             .get_or_create_root_wall_key()
             .await
-            .expect("root wall key should refetch on conflict");
+            .expect("root wall key should come from ensure response");
         assert_eq!(root, expected_root);
-        missing.assert_async().await;
-        conflict.assert_async().await;
-        refetch.assert_async().await;
+        ensure.assert_async().await;
     }
 
     #[tokio::test]
@@ -1821,19 +1797,9 @@ mod tests {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
         let wall_key = generate_key();
-        let missing_root = server
-            .mock("GET", "/user-entity/key")
-            .match_header("x-auth-token", "token")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_WALL_KEY_TYPE.into(),
-            ))
-            .with_status(404)
-            .expect(1)
-            .create_async()
-            .await;
-        let create_root = server
-            .mock("POST", "/user-entity/key")
+        let root_wall_key = generate_key();
+        let ensure_root = server
+            .mock("POST", "/user-entity/key/ensure")
             .match_header("x-auth-token", "token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"type\":\"wall\"".into()),
@@ -1841,7 +1807,7 @@ mod tests {
                 Matcher::Regex("\"header\":\"[^\"]+\"".into()),
             ]))
             .with_status(200)
-            .with_body(r#"{"status":"ok"}"#)
+            .with_body(root_entity_response(&ctx.master_key, &root_wall_key))
             .create_async()
             .await;
         let create_wall = server
@@ -1878,8 +1844,7 @@ mod tests {
             decrypt_secretbox_packed(&wall_key, &decode_b64(&created.encrypted_profile).unwrap())
                 .expect("created profile should decrypt");
         assert_eq!(profile_plaintext, b"profile-json");
-        missing_root.assert_async().await;
-        create_root.assert_async().await;
+        ensure_root.assert_async().await;
         create_wall.assert_async().await;
     }
 
@@ -1889,9 +1854,6 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let root_wall_key = generate_key();
         let wall_key = generate_key();
-        let entity_payload =
-            encrypt_entity_key(&ctx.master_key, &root_wall_key).expect("root wall entity");
-
         let entity = server
             .mock("GET", "/user-entity/key")
             .match_header("x-auth-token", "token")
@@ -1900,14 +1862,7 @@ mod tests {
                 ROOT_WALL_KEY_TYPE.into(),
             ))
             .with_status(200)
-            .with_body(
-                json!({
-                    "type": ROOT_WALL_KEY_TYPE,
-                    "encryptedKey": entity_payload.encrypted_key,
-                    "header": entity_payload.header,
-                })
-                .to_string(),
-            )
+            .with_body(root_entity_response(&ctx.master_key, &root_wall_key))
             .create_async()
             .await;
         let walls = server

@@ -189,6 +189,10 @@ type WallLookupResponse struct {
 	PublicKey string `json:"publicKey,omitempty"`
 }
 
+type WallSlugAvailabilityResponse struct {
+	Available bool `json:"available"`
+}
+
 type RotateWallKeyRequest struct {
 	WallID           string  `json:"wallId"`
 	EncryptedWallKey string  `json:"encryptedWallKey"`

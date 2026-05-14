@@ -25,7 +25,7 @@ const backRouteForSource = (
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { friends, profile } = useSocialAppState();
+    const { friends, profile, profileLoadStatus } = useSocialAppState();
     const friendID = friendIDFromQuery(router.query.friendID);
     const backSource = friendProfileSourceFromQuery(router.query.from);
     const selectedFriend =
@@ -34,14 +34,19 @@ const Page: React.FC = () => {
 
     useEffect(() => {
         if (!router.isReady) return;
-        if (!profile) {
+        if (profileLoadStatus == "ready" && !profile) {
             void router.replace(socialRoutes.onboarding);
             return;
         }
         if (!selectedFriend) void router.replace(socialRoutes.friends);
-    }, [profile, router, selectedFriend]);
+    }, [profile, profileLoadStatus, router, selectedFriend]);
 
-    if (!router.isReady || !profile || !selectedFriend) {
+    if (
+        !router.isReady ||
+        profileLoadStatus == "loading" ||
+        !profile ||
+        !selectedFriend
+    ) {
         return <SocialRouteFallback background={friendsBackground} />;
     }
 

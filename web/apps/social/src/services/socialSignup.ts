@@ -27,6 +27,7 @@ import {
     sendOTT,
     verifyEmail,
 } from "ente-accounts-rs/services/user";
+import { isMuseumHTTPError } from "ente-base/http";
 import { saveAuthToken } from "ente-base/token";
 
 export interface SocialSignupInput {
@@ -112,3 +113,12 @@ export const completeSocialSignup = async (email: string, code: string) => {
 
 export const resendSocialSignupCode = (email: string) =>
     sendOTT(email.trim(), "signup");
+
+export const socialSignupErrorMessage = async (error: unknown) => {
+    if (await isMuseumHTTPError(error, 409, "USER_ALREADY_REGISTERED")) {
+        return "This email already has an account. Please sign in.";
+    }
+    return error instanceof Error
+        ? error.message
+        : "Couldn't create account. Please try again.";
+};
