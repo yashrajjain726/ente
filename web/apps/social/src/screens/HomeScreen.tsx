@@ -2,6 +2,7 @@ import {
     AddSquareIcon,
     Comment01Icon,
     FavouriteIcon,
+    NotificationIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
@@ -40,7 +41,7 @@ const headerActionSize = 32;
 const headerActionGap = 8;
 const headerAddIconSize = 24;
 const headerAvatarSize = 23;
-const headerIconSize = 25;
+const headerIconSize = 23;
 const headerSideWidth = headerActionSize * 2 + headerActionGap;
 
 const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
@@ -877,7 +878,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             }}
                         >
                             <HugeiconsIcon
-                                icon={FavouriteIcon}
+                                icon={NotificationIcon}
                                 size={headerIconSize}
                                 strokeWidth={1.8}
                             />
