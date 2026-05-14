@@ -1038,9 +1038,12 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                         boxSizing: "border-box",
                         display: "flex",
                         gap: "8px",
-                        left: "16px",
+                        left: { xs: "16px", sm: 0 },
+                        maxWidth: { sm: 390 },
+                        mx: { sm: "auto" },
                         position: "fixed",
-                        right: "16px",
+                        right: { xs: "16px", sm: 0 },
+                        width: { sm: "calc(100% - 32px)" },
                         zIndex: 2,
                     }}
                 >
