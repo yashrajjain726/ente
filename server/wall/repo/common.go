@@ -45,13 +45,6 @@ var reservedWallSlugs = map[string]struct{}{
 	"docs":           {},
 	"edit":           {},
 	"email":          {},
-	"ente":           {},
-	"enteadmin":      {},
-	"entecom":        {},
-	"entegg":         {},
-	"enteio":         {},
-	"entesupport":    {},
-	"enterprise":     {},
 	"faq":            {},
 	"favicon":        {},
 	"feed":           {},
@@ -164,7 +157,7 @@ func isReservedWallSlug(slug string) bool {
 	if _, ok := reservedWallSlugs[slug]; ok {
 		return true
 	}
-	return strings.HasPrefix(slug, "ente-") || strings.HasPrefix(slug, "ente_")
+	return strings.HasPrefix(slug, "ente")
 }
 
 func nullString(value string) sql.NullString {

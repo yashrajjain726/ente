@@ -43,7 +43,7 @@ func TestCreateWallRejectsReservedSlugs(t *testing.T) {
 	module := newWallTestModule(t)
 	userID := insertWallUser(t, module, "reserved@example.com", "reserved-public")
 
-	for _, slug := range []string{"admin", " EnteCom ", "ente_com", "ente-com", "ente_gg", "ente-photos", "ente_social", "entegg", "images", "two-factor"} {
+	for _, slug := range []string{"admin", " EnteCom ", "ente_com", "ente-com", "ente_gg", "ente-photos", "ente_social", "entegg", "enter", "images", "two-factor"} {
 		_, err := module.Walls.CreateWall(ctx, userID, slug, "wall-key", "profile")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "wallSlug is reserved")
