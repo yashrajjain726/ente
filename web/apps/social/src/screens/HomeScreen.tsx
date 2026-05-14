@@ -43,10 +43,8 @@ const headerAddIconSize = 24;
 const headerAvatarSize = 23;
 const headerIconSize = 23;
 const headerSideWidth = headerActionSize * 2 + headerActionGap;
-const feedLikeActionInset = 6;
+const feedLikeActionInset = 4;
 const feedLikeActionSize = 40;
-const feedLikeActionBackground = "rgba(0, 0, 0, 0.16)";
-const feedLikeActionBackgroundHover = "rgba(0, 0, 0, 0.24)";
 
 const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
 const hoursAgo = (hours: number) => minutesAgo(hours * 60);
@@ -460,7 +458,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     sx={{
                         alignItems: "center",
                         appearance: "none",
-                        bgcolor: feedLikeActionBackground,
+                        bgcolor: "transparent",
                         border: 0,
                         borderRadius: "50%",
                         bottom: feedLikeActionInset,
@@ -475,15 +473,14 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         transform: isLikeButtonPopping
                             ? "scale(0.96)"
                             : "scale(1)",
-                        transition:
-                            "background-color 120ms ease, color 120ms ease, transform 120ms ease",
+                        transition: "color 120ms ease, transform 120ms ease",
                         width: feedLikeActionSize,
                         zIndex: 1,
                         "&:focus-visible": {
                             outline: `2px solid ${green}`,
                             outlineOffset: 2,
                         },
-                        "&:hover": { bgcolor: feedLikeActionBackgroundHover },
+                        "&:hover": { bgcolor: "transparent" },
                     }}
                 >
                     <HugeiconsIcon
