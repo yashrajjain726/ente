@@ -7,13 +7,6 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
 import {
-    SocialActionFeedbackIcon,
-    socialActionBusyDurationMs,
-    socialActionDoneDurationMs,
-    socialActionTransition,
-    type SocialActionPhase,
-} from "components/SocialActionFeedback";
-import {
     SocialFileViewer,
     type SocialViewerPhoto,
     type SocialViewerPostActionMode,
@@ -46,7 +39,6 @@ const photoMasonryGap = "3px";
 const photoMasonryRadius = "12px";
 const showMockProfilePosts =
     process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_PROFILE_POSTS != "true";
-type PostActionPhase = "posting" | "posted";
 
 interface ProfilePhotoDimensions {
     height: number;
@@ -149,6 +141,7 @@ interface SelectedProfilePost {
     id: string;
     localObjectUrl?: string;
     photo: SocialViewerPhoto;
+    postActionMode?: SocialViewerPostActionMode;
 }
 
 interface PostMasonryTile {
@@ -228,8 +221,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         useState<HTMLElement | null>(null);
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
-    const [postActionPhase, setPostActionPhase] =
-        useState<PostActionPhase | null>(null);
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
         () => new Set(),
     );
@@ -237,7 +228,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         useState<Record<string, ProfilePhotoDimensions>>({});
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
-    const pendingPostRef = React.useRef<SelectedProfilePost | null>(null);
     const isPublicProfile = headerVariant == "public";
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
@@ -260,14 +250,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const canOpenFriends =
         isOwnerProfile && friendsCount > 0 && Boolean(onOpenFriends);
     const hasProfilePosts = postsSharedCount > 0;
-    const isPostActionPosting = postActionPhase == "posting";
-    const isPostActionPosted = postActionPhase == "posted";
-    const postActionFeedbackPhase: SocialActionPhase | null =
-        postActionPhase == "posting"
-            ? "busy"
-            : postActionPhase == "posted"
-              ? "done"
-              : null;
     const selectedPostActionMode: SocialViewerPostActionMode = isPublicProfile
         ? "hidden"
         : isOwnerProfile
@@ -284,14 +266,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     }, []);
     const applyLocalPostDimensions = React.useCallback(
         (objectUrl: string, dimensions: LocalPostPhotoDimensions) => {
-            const pendingPost = pendingPostRef.current;
-            if (pendingPost?.localObjectUrl == objectUrl) {
-                pendingPostRef.current = {
-                    ...pendingPost,
-                    photo: { ...pendingPost.photo, ...dimensions },
-                };
-            }
-
             setSelectedPost((currentPost) =>
                 currentPost?.localObjectUrl == objectUrl
                     ? {
@@ -338,9 +312,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         event.target.value = "";
         if (!file) return;
 
-        revokeLocalPostObjectUrl(pendingPostRef.current?.localObjectUrl);
-        pendingPostRef.current = null;
-
         const localPost = createLocalPostPhoto({
             avatarUrl: profile.avatarUrl,
             file,
@@ -348,13 +319,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             onDimensionsLoaded: applyLocalPostDimensions,
         });
         localPostObjectUrlsRef.current.add(localPost.objectUrl);
-        pendingPostRef.current = {
+        setSelectedPost({
             id: `local-${localPost.photo.timestampMs}`,
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
-        };
-
-        setPostActionPhase("posting");
+            postActionMode: "draft-post",
+        });
     };
 
     const copyProfileURL = async () => {
@@ -387,28 +357,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             return nextPostIDs;
         });
     };
-
-    React.useEffect(() => {
-        if (!postActionPhase) return;
-
-        const timeoutID = window.setTimeout(
-            () => {
-                if (postActionPhase == "posting") {
-                    setPostActionPhase("posted");
-                    return;
-                }
-
-                const postedPost = pendingPostRef.current;
-                pendingPostRef.current = null;
-                if (postedPost) setSelectedPost(postedPost);
-                setPostActionPhase(null);
-            },
-            postActionPhase == "posting"
-                ? socialActionBusyDurationMs
-                : socialActionDoneDurationMs,
-        );
-        return () => window.clearTimeout(timeoutID);
-    }, [postActionPhase]);
 
     React.useEffect(
         () => () => {
@@ -1207,14 +1155,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 <Box
                                     component="button"
                                     type="button"
-                                    aria-label={
-                                        isPostActionPosting
-                                            ? "Posting photo"
-                                            : isPostActionPosted
-                                              ? "Photo posted"
-                                              : "Post photo"
-                                    }
-                                    disabled={postActionPhase != null}
+                                    aria-label="Post photo"
                                     onClick={openPostPhotoPicker}
                                     sx={{
                                         appearance: "none",
@@ -1222,13 +1163,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         bgcolor: "transparent",
                                         border: 0,
                                         boxSizing: "border-box",
-                                        color: isPostActionPosted
-                                            ? green
-                                            : textBase,
-                                        cursor:
-                                            postActionPhase == null
-                                                ? "pointer"
-                                                : "default",
+                                        color: textBase,
+                                        cursor: "pointer",
                                         display: "flex",
                                         fontSize: 0,
                                         height: 32,
@@ -1238,7 +1174,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         p: 0,
                                         placeSelf: "center",
                                         placeItems: "center",
-                                        transition: `color ${socialActionTransition}`,
                                         width: 32,
                                         "& svg": { display: "block" },
                                         "&:focus-visible": {
@@ -1248,16 +1183,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         },
                                     }}
                                 >
-                                    <SocialActionFeedbackIcon
-                                        idleIcon={
-                                            <HugeiconsIcon
-                                                icon={AddSquareIcon}
-                                                size={28}
-                                                strokeWidth={1.8}
-                                            />
-                                        }
-                                        phase={postActionFeedbackPhase}
+                                    <HugeiconsIcon
+                                        icon={AddSquareIcon}
                                         size={28}
+                                        strokeWidth={1.8}
                                     />
                                 </Box>
                             )}
@@ -1271,7 +1200,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             name: displayName,
                         }}
                         photo={selectedPost.photo}
-                        postActionMode={selectedPostActionMode}
+                        postActionMode={
+                            selectedPost.postActionMode ??
+                            selectedPostActionMode
+                        }
                         onClose={closeSelectedPost}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined

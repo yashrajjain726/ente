@@ -2,10 +2,13 @@ import {
     Cancel01Icon,
     Delete02Icon,
     FavouriteIcon,
+    Loading03Icon,
     MoreHorizontalIcon,
+    Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
+import { keyframes } from "@mui/material/styles";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
     socialActionBusyDurationMs,
@@ -27,17 +30,28 @@ const textSecondary = "#A6A6A6";
 const textTertiary = "rgba(244, 244, 244, 0.52)";
 const viewerBackground = "#000000";
 const controlBackground = "rgba(36, 36, 36, 0.72)";
+const controlBackgroundActive = "rgba(58, 58, 58, 0.86)";
 const controlBackgroundHover = "rgba(48, 48, 48, 0.86)";
 const controlIcon = "#D8D8D8";
 const dangerColor = "#F63A3A";
 const viewerHeaderHeight = 56;
 const viewerBottomPadding = 72;
+const captionInputMinHeight = 40;
+const captionInputMaxHeight = 112;
 const defaultPhotoWidth = 900;
 const defaultPhotoHeight = 680;
-const viewerExitDurationMs = 200;
-const viewerExitTransition = `${viewerExitDurationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`;
 const viewerPanelBackground = "#202020";
 const viewerPanelMuted = "rgba(244, 244, 244, 0.54)";
+
+const postButtonSpin = keyframes`
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+`;
 
 interface SocialViewerUser {
     avatarUrl?: string | null;
@@ -47,6 +61,7 @@ interface SocialViewerUser {
 export type SocialViewerInitialScreen = "photo" | "likes";
 
 export type SocialViewerPostActionMode =
+    | "draft-post"
     | "hidden"
     | "like-only"
     | "like-with-count";
@@ -60,6 +75,7 @@ const socialViewerPostActionConfigs: Record<
     SocialViewerPostActionMode,
     SocialViewerPostActionConfig
 > = {
+    "draft-post": { showLikeButton: false, showLikeCount: false },
     hidden: { showLikeButton: false, showLikeCount: false },
     "like-only": { showLikeButton: true, showLikeCount: false },
     "like-with-count": { showLikeButton: true, showLikeCount: true },
@@ -152,9 +168,8 @@ const viewerActionButtonSx = {
     height: 48,
     justifyContent: "center",
     p: 0,
-    transition: "background-color 120ms ease, transform 120ms ease",
     width: 48,
-    "&:active": { bgcolor: "#3A3A3A", transform: "scale(0.96)" },
+    "&:active": { bgcolor: "#3A3A3A" },
     "&:focus-visible": { outline: `2px solid ${green}`, outlineOffset: 2 },
     "&:hover": { bgcolor: controlBackgroundHover },
 };
@@ -245,6 +260,16 @@ const HeartFilledIcon: React.FC = () => (
     </svg>
 );
 
+const resizeCaptionInput = (input: HTMLTextAreaElement | null) => {
+    if (!input) return;
+
+    input.style.height = `${captionInputMinHeight}px`;
+    const nextHeight = Math.min(input.scrollHeight, captionInputMaxHeight);
+    input.style.height = `${Math.max(captionInputMinHeight, nextHeight)}px`;
+    input.style.overflowY =
+        input.scrollHeight > captionInputMaxHeight ? "auto" : "hidden";
+};
+
 export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     currentUser,
     initialScreen = "photo",
@@ -255,10 +280,13 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     photo,
     postActionMode = "like-with-count",
 }) => {
+    const [activePostActionMode, setActivePostActionMode] =
+        React.useState(postActionMode);
+    const isDraftPost = activePostActionMode == "draft-post";
     const {
         showLikeButton: showPhotoLikeButton,
         showLikeCount: showPhotoLikeCount,
-    } = socialViewerPostActionConfigs[postActionMode];
+    } = socialViewerPostActionConfigs[activePostActionMode];
     const canOpenLikes = showPhotoLikeCount;
     const resolvedInitialScreen: SocialViewerInitialScreen =
         initialScreen == "likes" && !canOpenLikes ? "photo" : initialScreen;
@@ -266,10 +294,14 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         resolvedInitialScreen,
     );
     const [isPhotoLiked, setIsPhotoLiked] = React.useState(false);
+    const [caption, setCaption] = React.useState("");
+    const [draftPostActionPhase, setDraftPostActionPhase] =
+        React.useState<SocialActionPhase | null>(null);
     const displayName = firstNameFrom(photo.name);
     const dateLabel = formatSocialDate(photo.timestampMs);
     const initials = initialsFor(photo.name);
     const viewerRootRef = React.useRef<HTMLDivElement | null>(null);
+    const captionInputRef = React.useRef<HTMLTextAreaElement | null>(null);
     const likeHoldTimeoutRef = React.useRef<number | null>(null);
     const likeHoldStartPointRef = React.useRef<{ x: number; y: number } | null>(
         null,
@@ -301,6 +333,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     const actionsButtonID = "social-viewer-actions-button";
     const isActionsOpen = Boolean(actionsAnchor);
     const isDeleteActionRunning = deleteActionPhase != null;
+    const isDraftPostActionRunning = draftPostActionPhase != null;
 
     const clearLikeHoldTimeout = () => {
         if (likeHoldTimeoutRef.current != null) {
@@ -412,6 +445,12 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         setDeleteActionPhase("busy");
     };
 
+    const publishDraftPost = () => {
+        if (!isDraftPost || isDraftPostActionRunning || isDeleteExit) return;
+
+        setDraftPostActionPhase("busy");
+    };
+
     const openFriendProfile = (friendID: string) => {
         onOpenFriend?.(friendID);
     };
@@ -425,6 +464,10 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         },
         [],
     );
+
+    React.useLayoutEffect(() => {
+        resizeCaptionInput(captionInputRef.current);
+    }, [caption]);
 
     React.useEffect(() => {
         const suppressDelayedContextMenu = (event: MouseEvent) => {
@@ -472,6 +515,27 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         return () => window.clearTimeout(timeoutID);
     }, [deleteActionPhase, onDeletePost]);
 
+    React.useEffect(() => {
+        if (!draftPostActionPhase) return;
+
+        const timeoutID = window.setTimeout(
+            () => {
+                if (draftPostActionPhase == "busy") {
+                    setDraftPostActionPhase("done");
+                    return;
+                }
+
+                setActivePostActionMode("like-with-count");
+                setDraftPostActionPhase(null);
+            },
+            draftPostActionPhase == "busy"
+                ? socialActionBusyDurationMs
+                : socialActionDoneDurationMs,
+        );
+
+        return () => window.clearTimeout(timeoutID);
+    }, [draftPostActionPhase]);
+
     const handleDeleteSheetExited = () => {
         if (!isDeleteExit) return;
 
@@ -481,8 +545,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     React.useEffect(() => {
         if (!isDeleteExit) return;
 
-        const timeoutID = window.setTimeout(onClose, viewerExitDurationMs);
-        return () => window.clearTimeout(timeoutID);
+        onClose();
     }, [isDeleteExit, onClose]);
 
     React.useEffect(() => {
@@ -603,14 +666,9 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                 isolation: "isolate",
                 maxWidth: "100vw",
                 minHeight: "100svh",
-                opacity: isDeleteExit ? 0 : 1,
                 overflow: "hidden",
                 overflowX: "hidden",
-                pointerEvents: isDeleteExit ? "none" : "auto",
                 position: "fixed",
-                transition: isDeleteExit
-                    ? `opacity ${viewerExitTransition}`
-                    : undefined,
                 width: "100%",
                 zIndex: 1300,
             }}
@@ -635,7 +693,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     sx={{
                         alignItems: "center",
                         display: "flex",
-                        gap: "10px",
+                        gap: "8px",
                         minWidth: 0,
                     }}
                 >
@@ -745,29 +803,35 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                         >
                             {displayName}
                         </Box>
-                        <Box
-                            component="span"
-                            aria-hidden
-                            sx={{
-                                color: textSecondary,
-                                flexShrink: 0,
-                                fontWeight: 500,
-                            }}
-                        >
-                            ·
-                        </Box>
-                        <Box
-                            component="time"
-                            dateTime={new Date(photo.timestampMs).toISOString()}
-                            sx={{
-                                color: textTertiary,
-                                flexShrink: 0,
-                                fontSize: 12,
-                                fontWeight: 500,
-                            }}
-                        >
-                            {dateLabel}
-                        </Box>
+                        {!isDraftPost && (
+                            <>
+                                <Box
+                                    component="span"
+                                    aria-hidden
+                                    sx={{
+                                        color: textSecondary,
+                                        flexShrink: 0,
+                                        fontWeight: 500,
+                                    }}
+                                >
+                                    ·
+                                </Box>
+                                <Box
+                                    component="time"
+                                    dateTime={new Date(
+                                        photo.timestampMs,
+                                    ).toISOString()}
+                                    sx={{
+                                        color: textTertiary,
+                                        flexShrink: 0,
+                                        fontSize: 12,
+                                        fontWeight: 500,
+                                    }}
+                                >
+                                    {dateLabel}
+                                </Box>
+                            </>
+                        )}
                     </Box>
                 </Box>
                 <Box
@@ -965,6 +1029,133 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     zIndex: 1,
                 }}
             />
+            {isDraftPost ? (
+                <Box
+                    data-social-viewer-bottom="true"
+                    sx={{
+                        alignItems: "flex-end",
+                        bottom: "16px",
+                        boxSizing: "border-box",
+                        display: "flex",
+                        gap: "8px",
+                        left: "16px",
+                        position: "fixed",
+                        right: "16px",
+                        zIndex: 2,
+                    }}
+                >
+                    <Box
+                        ref={captionInputRef}
+                        component="textarea"
+                        aria-label="Add a caption"
+                        disabled={isDraftPostActionRunning}
+                        onChange={(event) => {
+                            setCaption(event.target.value);
+                            resizeCaptionInput(event.currentTarget);
+                        }}
+                        placeholder="Add a caption..."
+                        rows={1}
+                        value={caption}
+                        sx={{
+                            bgcolor: controlBackground,
+                            border: 0,
+                            borderRadius: "20px",
+                            boxSizing: "border-box",
+                            color: textBase,
+                            flex: "1 1 auto",
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 14,
+                            fontWeight: 500,
+                            lineHeight: "20px",
+                            maxHeight: captionInputMaxHeight,
+                            minHeight: captionInputMinHeight,
+                            minWidth: 0,
+                            outline: 0,
+                            overflow: "hidden",
+                            px: "14px",
+                            py: "10px",
+                            resize: "none",
+                            "&::placeholder": { color: textSecondary },
+                            "&:disabled": { opacity: 0.74 },
+                            "&:focus": { bgcolor: controlBackgroundActive },
+                        }}
+                    />
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={
+                            draftPostActionPhase == "busy"
+                                ? "Posting"
+                                : draftPostActionPhase == "done"
+                                  ? "Posted"
+                                  : "Post photo"
+                        }
+                        disabled={isDraftPostActionRunning}
+                        onClick={publishDraftPost}
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: "#FFFFFF",
+                            border: 0,
+                            borderRadius: "20px",
+                            boxSizing: "border-box",
+                            boxShadow: "0 10px 28px rgba(0, 0, 0, 0.28)",
+                            color:
+                                draftPostActionPhase == "done"
+                                    ? green
+                                    : "#111111",
+                            cursor: isDraftPostActionRunning
+                                ? "default"
+                                : "pointer",
+                            display: "flex",
+                            flexShrink: 0,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 14,
+                            fontWeight: 750,
+                            height: 40,
+                            justifyContent: "center",
+                            lineHeight: "20px",
+                            minWidth: 70,
+                            px: "20px",
+                            py: "10px",
+                            "&:disabled": { opacity: 1 },
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                            "&:hover": {
+                                bgcolor: isDraftPostActionRunning
+                                    ? "#FFFFFF"
+                                    : "#F0F0F0",
+                            },
+                        }}
+                    >
+                        {draftPostActionPhase == "busy" ? (
+                            <Box
+                                component="span"
+                                sx={{
+                                    animation: `${postButtonSpin} 2.4s linear infinite`,
+                                    display: "flex",
+                                    lineHeight: 0,
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={Loading03Icon}
+                                    size={22}
+                                    strokeWidth={1.8}
+                                />
+                            </Box>
+                        ) : draftPostActionPhase == "done" ? (
+                            <HugeiconsIcon
+                                icon={Tick02Icon}
+                                size={22}
+                                strokeWidth={1.8}
+                            />
+                        ) : (
+                            "Post"
+                        )}
+                    </Box>
+                </Box>
+            ) : null}
             {showPhotoLikeButton && (
                 <Box
                     data-social-viewer-bottom="true"

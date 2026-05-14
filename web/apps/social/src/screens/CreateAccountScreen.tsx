@@ -315,7 +315,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                     <TextInput
                         label="Email"
                         onChange={setEmail}
-                        placeholder="Enter your email id"
+                        placeholder="Enter your email"
                         required
                         type="email"
                         value={email}

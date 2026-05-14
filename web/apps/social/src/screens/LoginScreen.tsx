@@ -288,7 +288,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     <TextInput
                         label="Email"
                         onChange={setEmail}
-                        placeholder="Enter your email id"
+                        placeholder="Enter your email"
                         required
                         type="email"
                         value={email}

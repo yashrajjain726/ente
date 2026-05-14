@@ -6,13 +6,6 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import {
-    SocialActionFeedbackIcon,
-    socialActionBusyDurationMs,
-    socialActionDoneDurationMs,
-    socialActionTransition,
-    type SocialActionPhase,
-} from "components/SocialActionFeedback";
-import {
     SocialFileViewer,
     type SocialViewerInitialScreen,
     type SocialViewerPhoto,
@@ -53,7 +46,6 @@ const sampleFeedLandscapePhotoAspectRatio = 900 / 680;
 const sampleFeedPortraitPhotoAspectRatio = 680 / 1020;
 const showMockFeedData =
     process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_FEED != "true";
-type PostActionPhase = "posting" | "posted";
 
 const sampleFeedItems = [
     {
@@ -505,11 +497,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
-    const [postActionPhase, setPostActionPhase] =
-        useState<PostActionPhase | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
-    const pendingPostViewerRef = React.useRef<SelectedHomeViewer | null>(null);
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
     const feedItems = showMockFeedData ? sampleFeedItems : [];
     const hasFeedItems = feedItems.length > 0;
@@ -518,14 +507,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             ? "When you add friends, their posts will appear here."
             : "When your friends share posts, they'll appear here.";
     const profileLink = profileLinkForUsername(profile.username.trim());
-    const isPostActionPosting = postActionPhase == "posting";
-    const isPostActionPosted = postActionPhase == "posted";
-    const postActionFeedbackPhase: SocialActionPhase | null =
-        postActionPhase == "posting"
-            ? "busy"
-            : postActionPhase == "posted"
-              ? "done"
-              : null;
     const initialsSource = profile.fullName.trim() || profile.username.trim();
     const initials = initialsSource
         .split(/\s+/)
@@ -541,14 +522,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }, []);
     const applyLocalPostDimensions = React.useCallback(
         (objectUrl: string, dimensions: LocalPostPhotoDimensions) => {
-            const pendingViewer = pendingPostViewerRef.current;
-            if (pendingViewer?.localObjectUrl == objectUrl) {
-                pendingPostViewerRef.current = {
-                    ...pendingViewer,
-                    photo: { ...pendingViewer.photo, ...dimensions },
-                };
-            }
-
             setSelectedViewer((currentViewer) =>
                 currentViewer?.localObjectUrl == objectUrl
                     ? {
@@ -598,9 +571,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         event.target.value = "";
         if (!file) return;
 
-        revokeLocalPostObjectUrl(pendingPostViewerRef.current?.localObjectUrl);
-        pendingPostViewerRef.current = null;
-
         const localPost = createLocalPostPhoto({
             avatarUrl: profile.avatarUrl,
             file,
@@ -608,37 +578,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onDimensionsLoaded: applyLocalPostDimensions,
         });
         localPostObjectUrlsRef.current.add(localPost.objectUrl);
-        pendingPostViewerRef.current = {
+        setSelectedViewer({
             initialScreen: "photo",
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
-            postActionMode: "like-with-count",
-        };
-
-        setPostActionPhase("posting");
+            postActionMode: "draft-post",
+        });
     };
-
-    React.useEffect(() => {
-        if (!postActionPhase) return;
-
-        const timeoutID = window.setTimeout(
-            () => {
-                if (postActionPhase == "posting") {
-                    setPostActionPhase("posted");
-                    return;
-                }
-
-                const postedViewer = pendingPostViewerRef.current;
-                pendingPostViewerRef.current = null;
-                if (postedViewer) setSelectedViewer(postedViewer);
-                setPostActionPhase(null);
-            },
-            postActionPhase == "posting"
-                ? socialActionBusyDurationMs
-                : socialActionDoneDurationMs,
-        );
-        return () => window.clearTimeout(timeoutID);
-    }, [postActionPhase]);
 
     React.useEffect(
         () => () => {
@@ -697,14 +643,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <Box
                         component="button"
                         type="button"
-                        aria-label={
-                            isPostActionPosting
-                                ? "Posting photo"
-                                : isPostActionPosted
-                                  ? "Photo posted"
-                                  : "Post photo"
-                        }
-                        disabled={postActionPhase != null}
+                        aria-label="Post photo"
                         onClick={openPostPhotoPicker}
                         sx={{
                             appearance: "none",
@@ -712,9 +651,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             bgcolor: "transparent",
                             border: 0,
                             boxSizing: "border-box",
-                            color: isPostActionPosted ? green : textBase,
-                            cursor:
-                                postActionPhase == null ? "pointer" : "default",
+                            color: textBase,
+                            cursor: "pointer",
                             display: "flex",
                             fontSize: 0,
                             height: headerActionSize,
@@ -725,7 +663,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             p: 0,
                             placeSelf: "center start",
                             width: headerActionSize,
-                            transition: `color ${socialActionTransition}`,
                             "& svg": { display: "block" },
                             "&:focus-visible": {
                                 borderRadius: "50%",
@@ -734,16 +671,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             },
                         }}
                     >
-                        <SocialActionFeedbackIcon
-                            idleIcon={
-                                <HugeiconsIcon
-                                    icon={AddSquareIcon}
-                                    size={headerAddIconSize}
-                                    strokeWidth={1.8}
-                                />
-                            }
-                            phase={postActionFeedbackPhase}
+                        <HugeiconsIcon
+                            icon={AddSquareIcon}
                             size={headerAddIconSize}
+                            strokeWidth={1.8}
                         />
                     </Box>
                     <Box
@@ -892,7 +823,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         justifyContent: hasFeedItems ? "flex-start" : "center",
                         minHeight: "calc(100svh - 64px)",
                         pb: hasFeedItems ? "16px" : "56px",
-                        pt: hasFeedItems ? "22px" : 0,
+                        pt: hasFeedItems ? "12px" : 0,
                         width: "100%",
                     }}
                 >
