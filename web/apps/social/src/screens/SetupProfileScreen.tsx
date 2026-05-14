@@ -8,6 +8,7 @@ const textBase = "#000";
 const textLight = "#969696";
 const warning = "#F63A3A";
 const paleGreen = "#E7F6E9";
+const setupProfileFormID = "social-setup-profile-form";
 
 const mockSetupProfileData = {
     avatarUrl: "/images/sample-avatar.jpg",
@@ -300,6 +301,8 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
 
                 <Box
                     component="form"
+                    id={setupProfileFormID}
+                    noValidate
                     onSubmit={handleSubmit}
                     sx={{
                         alignItems: "center",
@@ -447,9 +450,9 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                     <Box
                         className={canContinue ? "green-bg" : undefined}
                         component="button"
-                        type="button"
+                        form={setupProfileFormID}
+                        type="submit"
                         disabled={!canContinue}
-                        onClick={submitProfile}
                         sx={{
                             alignItems: "center",
                             bgcolor: canContinue ? green : "#F5F5F5",

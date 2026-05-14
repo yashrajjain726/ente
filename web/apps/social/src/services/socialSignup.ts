@@ -42,6 +42,7 @@ export const beginSocialSignup = async ({
 }: SocialSignupInput) => {
     const cleanedEmail = email.trim();
     const cleanedReferralSource = referralSource.trim();
+    unstashReferralSource();
     if (cleanedReferralSource) stashReferralSource(cleanedReferralSource);
 
     await sendOTT(cleanedEmail, "signup");
@@ -58,6 +59,8 @@ export const beginSocialSignup = async ({
     );
     await saveMasterKeyInSessionAndSafeStore(masterKey);
     saveJustSignedUp();
+
+    return { email: cleanedEmail };
 };
 
 export const completeSocialSignup = async (email: string, code: string) => {
@@ -108,4 +111,4 @@ export const completeSocialSignup = async (email: string, code: string) => {
 };
 
 export const resendSocialSignupCode = (email: string) =>
-    sendOTT(email, undefined);
+    sendOTT(email.trim(), "signup");

@@ -7,6 +7,7 @@ const green = "#08C225";
 const textBase = "#000";
 const textLight = "#969696";
 const warning = "#F63A3A";
+const createAccountFormID = "social-create-account-form";
 
 export interface CreateAccountInput {
     email: string;
@@ -15,6 +16,7 @@ export interface CreateAccountInput {
 }
 
 interface CreateAccountScreenProps {
+    errorMessage?: string;
     isSubmitting?: boolean;
     onBack: () => void;
     onCreateAccount: (input: CreateAccountInput) => void;
@@ -193,6 +195,7 @@ const TextInput: React.FC<TextInputProps> = ({
 };
 
 export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
+    errorMessage,
     isSubmitting = false,
     onBack,
     onCreateAccount,
@@ -303,6 +306,8 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
 
                 <Box
                     component="form"
+                    id={createAccountFormID}
+                    noValidate
                     onSubmit={handleSubmit}
                     sx={{
                         display: "flex",
@@ -341,6 +346,22 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                         onChange={setReferralSource}
                         value={referralSource}
                     />
+                    {errorMessage && (
+                        <Box
+                            role="alert"
+                            sx={{
+                                color: warning,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 13,
+                                fontWeight: 500,
+                                lineHeight: "18px",
+                                mt: "-8px",
+                            }}
+                        >
+                            {errorMessage}
+                        </Box>
+                    )}
                     <Box
                         component="label"
                         sx={{
@@ -446,9 +467,9 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                     <Box
                         className={canCreateAccount ? "green-bg" : undefined}
                         component="button"
-                        type="button"
+                        form={createAccountFormID}
+                        type="submit"
                         disabled={!canCreateAccount}
-                        onClick={submitCreateAccount}
                         sx={{
                             alignItems: "center",
                             bgcolor: canCreateAccount ? green : "#F5F5F5",

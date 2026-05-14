@@ -1,6 +1,8 @@
 import { sampleFriends, type FriendProfile } from "data/friends";
 import React, { createContext, useContext } from "react";
+import type { SocialLoginCredentials } from "screens/LoginScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import type { PendingSocialPasskeyVerification } from "services/socialPasskeyVerification";
 
 export type OnboardingEntrySource = "direct" | "add-friend-link";
 
@@ -8,6 +10,8 @@ export interface SocialAppState {
     friends: FriendProfile[];
     isLiveSignupVerification: boolean;
     onboardingEntrySource: OnboardingEntrySource;
+    pendingLoginCredentials: SocialLoginCredentials | null;
+    pendingPasskeyVerification: PendingSocialPasskeyVerification | null;
     profile: SetupProfile | null;
     signupEmail: string;
     resetAfterLogout: () => void;
@@ -15,6 +19,12 @@ export interface SocialAppState {
     setIsLiveSignupVerification: React.Dispatch<React.SetStateAction<boolean>>;
     setOnboardingEntrySource: React.Dispatch<
         React.SetStateAction<OnboardingEntrySource>
+    >;
+    setPendingLoginCredentials: React.Dispatch<
+        React.SetStateAction<SocialLoginCredentials | null>
+    >;
+    setPendingPasskeyVerification: React.Dispatch<
+        React.SetStateAction<PendingSocialPasskeyVerification | null>
     >;
     setProfile: React.Dispatch<React.SetStateAction<SetupProfile | null>>;
     setSignupEmail: React.Dispatch<React.SetStateAction<string>>;

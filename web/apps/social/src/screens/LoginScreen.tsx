@@ -7,6 +7,7 @@ const green = "#08C225";
 const textBase = "#000";
 const textLight = "#969696";
 const warning = "#F63A3A";
+const loginFormID = "social-login-form";
 
 export interface SocialLoginCredentials {
     email: string;
@@ -276,6 +277,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
                 <Box
                     component="form"
+                    id={loginFormID}
+                    noValidate
                     onSubmit={handleSubmit}
                     sx={{
                         display: "flex",
@@ -338,9 +341,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     <Box
                         className={canContinue ? "green-bg" : undefined}
                         component="button"
-                        type="button"
+                        form={loginFormID}
+                        type="submit"
                         disabled={!canContinue}
-                        onClick={submitLogin}
                         sx={{
                             alignItems: "center",
                             bgcolor: canContinue ? green : "#F5F5F5",

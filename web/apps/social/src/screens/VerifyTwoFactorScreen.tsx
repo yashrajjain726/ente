@@ -1,7 +1,9 @@
+import { Shield01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import React, { useEffect, useRef, useState } from "react";
 
-export const verifyEmailBackground = "#FAFAFA";
+export const verifyTwoFactorBackground = "#FAFAFA";
 
 const green = "#08C225";
 const activeFill = "rgba(8, 194, 37, 0.08)";
@@ -10,17 +12,13 @@ const textBase = "#000";
 const textMuted = "#666";
 const textLight = "#969696";
 const warning = "#F63A3A";
-const mockVerificationCode = "888888";
-const verifyEmailFormID = "social-verify-email-form";
+const verifyTwoFactorFormID = "social-verify-two-factor-form";
 
-interface VerifyEmailScreenProps {
-    email: string;
+interface VerifyTwoFactorScreenProps {
     errorMessage?: string;
     initialCode?: string;
     isSubmitting?: boolean;
     onBack: () => void;
-    onChangeEmail: () => void;
-    onResendCode?: () => void;
     onVerify?: (code: string) => void;
 }
 
@@ -89,7 +87,7 @@ const OtpInput: React.FC<OtpInputProps> = ({
             <Box
                 component="input"
                 ref={inputRef}
-                aria-label={`Verification code digit ${index + 1}`}
+                aria-label={`2FA code digit ${index + 1}`}
                 autoComplete={index == 0 ? "one-time-code" : "off"}
                 inputMode="numeric"
                 maxLength={1}
@@ -118,14 +116,11 @@ const OtpInput: React.FC<OtpInputProps> = ({
     );
 };
 
-export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
-    email,
+export const VerifyTwoFactorScreen: React.FC<VerifyTwoFactorScreenProps> = ({
     errorMessage,
-    initialCode = mockVerificationCode,
+    initialCode = "",
     isSubmitting = false,
     onBack,
-    onChangeEmail,
-    onResendCode,
     onVerify,
 }) => {
     const [otp, setOtp] = useState<string[]>(
@@ -151,13 +146,11 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
     };
 
     useEffect(() => {
+        const initialCodeLength = initialCode
+            .replace(/\D/g, "")
+            .slice(0, 6).length;
         const initialFocusIndex =
-            initialCode.replace(/\D/g, "").slice(0, 6).length >= 6
-                ? 5
-                : Math.max(
-                      0,
-                      initialCode.replace(/\D/g, "").slice(0, 6).length,
-                  );
+            initialCodeLength >= 6 ? 5 : Math.max(0, initialCodeLength);
         const animationFrame = window.requestAnimationFrame(() =>
             focusInput(initialFocusIndex),
         );
@@ -216,12 +209,6 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
         setDigitsFrom(index, event.clipboardData.getData("text"));
     };
 
-    const handleResendCode = () => {
-        setOtp(Array(6).fill(""));
-        focusInput(0);
-        onResendCode?.();
-    };
-
     const submitVerification = () => {
         if (canVerify) onVerify?.(otp.join(""));
     };
@@ -235,7 +222,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
         <Box
             component="main"
             sx={{
-                bgcolor: verifyEmailBackground,
+                bgcolor: verifyTwoFactorBackground,
                 color: textBase,
                 display: "grid",
                 minHeight: "100svh",
@@ -245,7 +232,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
         >
             <Box
                 sx={{
-                    bgcolor: verifyEmailBackground,
+                    bgcolor: verifyTwoFactorBackground,
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
@@ -305,14 +292,14 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                             whiteSpace: "nowrap",
                         }}
                     >
-                        Verify email
+                        2FA verification
                     </Box>
                     <Box />
                 </Box>
 
                 <Box
                     component="form"
-                    id={verifyEmailFormID}
+                    id={verifyTwoFactorFormID}
                     noValidate
                     onSubmit={handleSubmit}
                     sx={{
@@ -325,11 +312,21 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                     }}
                 >
                     <Box
-                        component="img"
-                        alt=""
-                        src="/images/verify-email.svg"
-                        sx={{ height: 82, objectFit: "contain", width: 101 }}
-                    />
+                        sx={{
+                            alignItems: "center",
+                            color: green,
+                            display: "flex",
+                            height: 82,
+                            justifyContent: "center",
+                            width: 101,
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={Shield01Icon}
+                            size={64}
+                            strokeWidth={1.6}
+                        />
+                    </Box>
 
                     <Box
                         sx={{
@@ -341,32 +338,19 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                     >
                         <Box
                             sx={{
-                                display: "flex",
-                                flexDirection: "column",
+                                color: textMuted,
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
                                 fontSize: 14,
                                 fontWeight: 500,
-                                gap: "4px",
                                 lineHeight: "20px",
+                                mx: "auto",
+                                maxWidth: 298,
                                 textAlign: "center",
                                 width: "100%",
                             }}
                         >
-                            <Box sx={{ color: textBase }}>
-                                We have sent a code to{" "}
-                                {email || "example@example.com"}
-                            </Box>
-                            <Box
-                                sx={{
-                                    color: textMuted,
-                                    mx: "auto",
-                                    maxWidth: 298,
-                                }}
-                            >
-                                Please check your inbox (and spam) to complete
-                                verification
-                            </Box>
+                            Enter the 6-digit code from your authenticator app
                         </Box>
 
                         <Box sx={{ width: "100%" }}>
@@ -412,66 +396,13 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                                     {errorMessage}
                                 </Box>
                             )}
-
-                            <Box
-                                sx={{
-                                    alignItems: "center",
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    mt: "24px",
-                                    width: "100%",
-                                }}
-                            >
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    onClick={onChangeEmail}
-                                    sx={{
-                                        bgcolor: "transparent",
-                                        border: 0,
-                                        color: textLight,
-                                        cursor: "pointer",
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 14,
-                                        fontWeight: 500,
-                                        lineHeight: "20px",
-                                        p: 0,
-                                        textDecoration: "underline",
-                                    }}
-                                >
-                                    Change email
-                                </Box>
-                                {onResendCode && (
-                                    <Box
-                                        component="button"
-                                        type="button"
-                                        onClick={handleResendCode}
-                                        sx={{
-                                            bgcolor: "transparent",
-                                            border: 0,
-                                            color: green,
-                                            cursor: "pointer",
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 14,
-                                            fontWeight: 500,
-                                            lineHeight: "20px",
-                                            p: 0,
-                                            textDecoration: "underline",
-                                        }}
-                                    >
-                                        Resend code
-                                    </Box>
-                                )}
-                            </Box>
                         </Box>
                     </Box>
                 </Box>
 
                 <Box
                     sx={{
-                        bgcolor: verifyEmailBackground,
+                        bgcolor: verifyTwoFactorBackground,
                         bottom: 0,
                         boxSizing: "border-box",
                         left: "50%",
@@ -485,7 +416,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                     <Box
                         className={canVerify ? "green-bg" : undefined}
                         component="button"
-                        form={verifyEmailFormID}
+                        form={verifyTwoFactorFormID}
                         type="submit"
                         disabled={!canVerify}
                         sx={{

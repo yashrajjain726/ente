@@ -13,17 +13,24 @@ import { socialRoutes } from "utils/socialRoutes";
 const Page: React.FC = () => {
     const router = useRouter();
     const { setIsLiveSignupVerification, setSignupEmail } = useSocialAppState();
+    const [signupError, setSignupError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const createAccount = async (input: CreateAccountInput) => {
         setIsSubmitting(true);
+        setSignupError(undefined);
         try {
-            await beginSocialSignup(input);
-            setSignupEmail(input.email);
+            const { email } = await beginSocialSignup(input);
+            setSignupEmail(email);
             setIsLiveSignupVerification(true);
             void router.push(socialRoutes.verify);
         } catch (error) {
             console.error("Social signup failed", error);
+            setSignupError(
+                error instanceof Error
+                    ? error.message
+                    : "Couldn't create account. Please try again.",
+            );
             setIsSubmitting(false);
         }
     };
@@ -32,6 +39,7 @@ const Page: React.FC = () => {
         <>
             <SocialPageMeta themeColor={createAccountBackground} />
             <CreateAccountScreen
+                errorMessage={signupError}
                 isSubmitting={isSubmitting}
                 onBack={() => void router.push(socialRoutes.onboarding)}
                 onCreateAccount={(input) => void createAccount(input)}

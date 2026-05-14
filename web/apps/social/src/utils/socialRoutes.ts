@@ -4,6 +4,7 @@ export type FriendProfileSource =
     | "home"
     | "notifications"
     | "profile";
+export type VerifyFlow = "login" | "signup";
 
 export const onboardingSourceSearchParam = "onboardingSource";
 export const addFriendLinkOnboardingSource = "add-friend-link";
@@ -20,13 +21,21 @@ export const socialRoutes = {
     login: "/login",
     notifications: "/app/notifications",
     onboarding: "/",
+    passkeysFinish: "/passkeys/finish",
+    passkeysVerify: "/passkeys/verify",
     profile: "/app/profile",
     settings: "/app/settings",
     setupProfile: (from: SetupProfileSource = "verify") =>
         `/setup-profile?from=${from}`,
     signup: "/signup",
+    twoFactorVerify: "/two-factor/verify",
     verify: "/verify",
+    verifyLogin: "/verify?flow=login",
 } as const;
+
+export const verifyFlowFromQuery = (
+    value: string | string[] | undefined,
+): VerifyFlow => (valueFromQuery(value) == "login" ? "login" : "signup");
 
 export const setupProfileSourceFromQuery = (
     value: string | string[] | undefined,

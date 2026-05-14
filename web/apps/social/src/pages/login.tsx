@@ -1,14 +1,59 @@
 import { SocialPageMeta } from "components/SocialPageMeta";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
-import { LoginScreen, loginBackground } from "screens/LoginScreen";
-import { completeSocialLogin } from "services/socialLogin";
+import {
+    LoginScreen,
+    loginBackground,
+    type SocialLoginCredentials,
+} from "screens/LoginScreen";
+import { beginSocialLogin, type SocialLoginResult } from "services/socialLogin";
+import { savePendingSocialPasskeyVerification } from "services/socialPasskeyVerification";
+import { useSocialAppState } from "state/socialAppState";
 import { socialRoutes } from "utils/socialRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
+    const { setPendingLoginCredentials, setPendingPasskeyVerification } =
+        useSocialAppState();
     const [loginError, setLoginError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleLoginResult = (
+        result: SocialLoginResult,
+        credentials: SocialLoginCredentials,
+    ) => {
+        switch (result.status) {
+            case "complete":
+                setPendingLoginCredentials(null);
+                void router.push(socialRoutes.setupProfile("login"));
+                break;
+            case "email-otp":
+                setPendingLoginCredentials({
+                    email: result.email,
+                    password: credentials.password,
+                });
+                void router.push(socialRoutes.verifyLogin);
+                break;
+            case "totp":
+                setPendingLoginCredentials(null);
+                void router.push(socialRoutes.twoFactorVerify);
+                break;
+            case "passkey":
+                setPendingLoginCredentials(null);
+                setPendingPasskeyVerification({
+                    hasTwoFactorFallback: result.hasTwoFactorFallback,
+                    passkeySessionID: result.passkeySessionID,
+                    url: result.url,
+                });
+                savePendingSocialPasskeyVerification({
+                    hasTwoFactorFallback: result.hasTwoFactorFallback,
+                    passkeySessionID: result.passkeySessionID,
+                    url: result.url,
+                });
+                void router.push(socialRoutes.passkeysVerify);
+                break;
+        }
+    };
 
     return (
         <>
@@ -21,8 +66,10 @@ const Page: React.FC = () => {
                     setIsSubmitting(true);
                     setLoginError(undefined);
                     try {
-                        await completeSocialLogin(credentials);
-                        void router.push(socialRoutes.setupProfile("login"));
+                        handleLoginResult(
+                            await beginSocialLogin(credentials),
+                            credentials,
+                        );
                     } catch (error) {
                         console.error("Social login failed", error);
                         setLoginError(
