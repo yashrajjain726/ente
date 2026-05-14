@@ -10,6 +10,10 @@ import (
 )
 
 func (r *WallsRepository) CreateWall(ctx context.Context, ownerID int64, wallSlug, encryptedWallKey, encryptedProfile string) (*WallRecord, error) {
+	normalizedWallSlug, err := validateWallSlug(wallSlug)
+	if err != nil {
+		return nil, err
+	}
 	wallID := base.MustNewID("wal")
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -20,7 +24,7 @@ func (r *WallsRepository) CreateWall(ctx context.Context, ownerID int64, wallSlu
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO walls (wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version)
 		VALUES ($1, $2, $3, $4, $5, 1)
-	`, wallID, ownerID, normalizeSlug(wallSlug), encryptedWallKey, encryptedProfile); err != nil {
+	`, wallID, ownerID, normalizedWallSlug, encryptedWallKey, encryptedProfile); err != nil {
 		return nil, wrapUnique(err, "wall already exists")
 	}
 	if _, err := tx.ExecContext(ctx, `
@@ -172,13 +176,17 @@ func (r *WallsRepository) UpdateProfile(ctx context.Context, ownerID int64, wall
 }
 
 func (r *WallsRepository) UpdateSlug(ctx context.Context, ownerID int64, wallID, wallSlug string) (*WallRecord, error) {
+	normalizedWallSlug, err := validateWallSlug(wallSlug)
+	if err != nil {
+		return nil, err
+	}
 	rec, err := scanWallRecord(r.DB.QueryRowContext(ctx, `
 		UPDATE walls
 		SET wall_slug = $1
 		WHERE owner_id = $2 AND wall_id = $3
 		RETURNING wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version,
 		          avatar_object_key, avatar_bucket_id, avatar_size, created_at, updated_at
-	`, normalizeSlug(wallSlug), ownerID, wallID))
+	`, normalizedWallSlug, ownerID, wallID))
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "duplicate key value") {
 			return nil, stacktrace.Propagate(err, "wall slug already exists")

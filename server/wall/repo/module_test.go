@@ -38,6 +38,34 @@ func insertWallUser(t *testing.T, module *Module, email string, publicKey string
 	return userID
 }
 
+func TestCreateWallRejectsReservedSlugs(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+	userID := insertWallUser(t, module, "reserved@example.com", "reserved-public")
+
+	for _, slug := range []string{"admin", " EnteCom ", "ente_com", "ente-com", "ente_gg", "ente-photos", "ente_social", "entegg", "images", "two-factor"} {
+		_, err := module.Walls.CreateWall(ctx, userID, slug, "wall-key", "profile")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "wallSlug is reserved")
+	}
+}
+
+func TestUpdateSlugRejectsReservedSlug(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+	userID := insertWallUser(t, module, "rename@example.com", "rename-public")
+	wall, err := module.Walls.CreateWall(ctx, userID, "rename-user", "wall-key", "profile")
+	require.NoError(t, err)
+
+	_, err = module.Walls.UpdateSlug(ctx, userID, wall.WallID, "support")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "wallSlug is reserved")
+
+	unchanged, err := module.Walls.GetWallByID(ctx, wall.WallID)
+	require.NoError(t, err)
+	require.Equal(t, "rename-user", unchanged.WallSlug)
+}
+
 func TestWallModuleLifecycle(t *testing.T) {
 	ctx := context.Background()
 	module := newWallTestModule(t)
@@ -742,19 +770,19 @@ func TestListPostLikersPaginates(t *testing.T) {
 
 	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
 	bobID := insertWallUser(t, module, "bob@example.com", "bob-public")
-	devID := insertWallUser(t, module, "dev@example.com", "dev-public")
+	charlieID := insertWallUser(t, module, "charlie@example.com", "charlie-public")
 	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
 	require.NoError(t, err)
 	bobWall, err := module.Walls.CreateWall(ctx, bobID, "bob", "bob-wall-key", "bob-profile")
 	require.NoError(t, err)
-	devWall, err := module.Walls.CreateWall(ctx, devID, "dev", "dev-wall-key", "dev-profile")
+	charlieWall, err := module.Walls.CreateWall(ctx, charlieID, "charlie", "charlie-wall-key", "charlie-profile")
 	require.NoError(t, err)
 	postID, err := module.Posts.CreatePost(ctx, aliceID, aliceWall.WallID, "post-key", nil, aliceWall.CurrentVersion, nil)
 	require.NoError(t, err)
 	require.NoError(t, module.Posts.SetLike(ctx, postID, bobID, true))
-	require.NoError(t, module.Posts.SetLike(ctx, postID, devID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, postID, charlieID, true))
 	setPostLikeCreatedAt(t, module, 3000, postID, bobID)
-	setPostLikeCreatedAt(t, module, 2000, postID, devID)
+	setPostLikeCreatedAt(t, module, 2000, postID, charlieID)
 
 	page, nextCursor, err := module.Posts.ListPostLikers(ctx, postID, "", 1)
 	require.NoError(t, err)
@@ -766,8 +794,8 @@ func TestListPostLikersPaginates(t *testing.T) {
 	page, nextCursor, err = module.Posts.ListPostLikers(ctx, postID, nextCursor, 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
-	require.Equal(t, devID, page[0].Actor.UserID)
-	require.Equal(t, devWall.WallID, page[0].Actor.WallID)
+	require.Equal(t, charlieID, page[0].Actor.UserID)
+	require.Equal(t, charlieWall.WallID, page[0].Actor.WallID)
 	require.Empty(t, nextCursor)
 }
 
