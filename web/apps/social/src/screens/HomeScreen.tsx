@@ -1,6 +1,5 @@
 import {
     AddSquareIcon,
-    Comment01Icon,
     FavouriteIcon,
     NotificationIcon,
 } from "@hugeicons/core-free-icons";
@@ -17,6 +16,7 @@ import {
     SocialFileViewer,
     type SocialViewerInitialScreen,
     type SocialViewerPhoto,
+    type SocialViewerPostActionMode,
 } from "components/SocialFileViewer";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
@@ -43,6 +43,10 @@ const headerAddIconSize = 24;
 const headerAvatarSize = 23;
 const headerIconSize = 23;
 const headerSideWidth = headerActionSize * 2 + headerActionGap;
+const feedLikeActionInset = 6;
+const feedLikeActionSize = 40;
+const feedLikeActionBackground = "rgba(0, 0, 0, 0.16)";
+const feedLikeActionBackgroundHover = "rgba(0, 0, 0, 0.24)";
 
 const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
 const hoursAgo = (hours: number) => minutesAgo(hours * 60);
@@ -203,16 +207,15 @@ interface SelectedHomeViewer {
     initialScreen: SocialViewerInitialScreen;
     localObjectUrl?: string;
     photo: SocialViewerPhoto;
+    postActionMode?: SocialViewerPostActionMode;
     showPostCaptionInput?: boolean;
 }
 
 interface FeedItemProps {
     aspectRatio: number;
     avatarUrl: string;
-    commentCount: number;
     friendID: string;
     imageUrl: string;
-    likeCount: number;
     name: string;
     onOpenFriend?: (friendID: string) => void;
     onOpenPhoto?: (
@@ -235,10 +238,8 @@ const dimensionsFromAspectRatio = (
 const FeedItem: React.FC<FeedItemProps> = ({
     aspectRatio,
     avatarUrl,
-    commentCount,
     friendID,
     imageUrl,
-    likeCount,
     name,
     onOpenFriend,
     onOpenPhoto,
@@ -285,9 +286,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
             },
             initialScreen,
         );
-    const visibleLikeCount = likeCount + (isLiked ? 1 : 0);
-    const hasVisibleLikes = visibleLikeCount > 0;
-    const hasComments = commentCount > 0;
     const handleLikeClick = () => {
         if (likePopTimeoutRef.current != null)
             window.clearTimeout(likePopTimeoutRef.current);
@@ -424,51 +422,49 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 </Box>
             </Box>
             <Box
-                component="button"
-                type="button"
-                aria-label={`Open ${name} photo`}
-                onClick={() => openPhoto()}
                 sx={{
-                    appearance: "none",
                     aspectRatio: `${photoDimensions.width} / ${photoDimensions.height}`,
                     bgcolor: paleGreen,
-                    border: 0,
                     borderRadius: "12px",
-                    display: "block",
-                    cursor: onOpenPhoto ? "pointer" : "default",
                     overflow: "hidden",
-                    p: 0,
+                    position: "relative",
                     width: "100%",
-                    "&:focus-visible": {
-                        outline: `2px solid ${green}`,
-                        outlineOffset: 2,
-                    },
                 }}
             >
                 <Box
-                    component="img"
-                    alt={`${name} post`}
-                    src={imageUrl}
-                    onLoad={rememberLoadedPhotoDimensions}
+                    component="button"
+                    type="button"
+                    aria-label={`Open ${name} photo`}
+                    onClick={() => openPhoto()}
                     sx={{
+                        appearance: "none",
+                        bgcolor: "transparent",
+                        border: 0,
+                        cursor: onOpenPhoto ? "pointer" : "default",
                         display: "block",
                         height: "100%",
-                        objectFit: "cover",
-                        objectPosition: "center",
+                        p: 0,
                         width: "100%",
+                        "&:focus-visible": {
+                            outline: `2px solid ${green}`,
+                            outlineOffset: -2,
+                        },
                     }}
-                />
-            </Box>
-            <Box
-                sx={{
-                    alignItems: "center",
-                    display: "flex",
-                    gap: "2px",
-                    justifyContent: "flex-start",
-                    mt: "10px",
-                    px: "4px",
-                }}
-            >
+                >
+                    <Box
+                        component="img"
+                        alt={`${name} post`}
+                        src={imageUrl}
+                        onLoad={rememberLoadedPhotoDimensions}
+                        sx={{
+                            display: "block",
+                            height: "100%",
+                            objectFit: "cover",
+                            objectPosition: "center",
+                            width: "100%",
+                        }}
+                    />
+                </Box>
                 <Box
                     component="button"
                     type="button"
@@ -478,97 +474,41 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     sx={{
                         alignItems: "center",
                         appearance: "none",
-                        bgcolor: "transparent",
+                        bgcolor: feedLikeActionBackground,
                         border: 0,
-                        borderRadius: 0,
-                        color: isLiked ? green : textBase,
+                        borderRadius: "50%",
+                        bottom: feedLikeActionInset,
+                        color: "#FFFFFF",
                         cursor: "pointer",
                         display: "inline-flex",
-                        height: 24,
+                        height: feedLikeActionSize,
                         justifyContent: "center",
                         p: 0,
+                        position: "absolute",
+                        right: feedLikeActionInset,
                         transform: isLikeButtonPopping
                             ? "scale(0.96)"
                             : "scale(1)",
-                        transition: "color 120ms ease, transform 120ms ease",
-                        width: 24,
+                        transition:
+                            "background-color 120ms ease, color 120ms ease, transform 120ms ease",
+                        width: feedLikeActionSize,
+                        zIndex: 1,
                         "&:focus-visible": {
                             outline: `2px solid ${green}`,
                             outlineOffset: 2,
                         },
-                        "&:hover": { bgcolor: "transparent" },
+                        "&:hover": {
+                            bgcolor: feedLikeActionBackgroundHover,
+                        },
                     }}
                 >
                     <HugeiconsIcon
                         fill={isLiked ? green : "none"}
                         icon={FavouriteIcon}
-                        primaryColor={isLiked ? green : undefined}
-                        size={22}
+                        primaryColor={isLiked ? green : "#FFFFFF"}
+                        size={23}
                         strokeWidth={1.8}
                     />
-                </Box>
-                {hasVisibleLikes && (
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label={`View ${visibleLikeCount} ${
-                            visibleLikeCount == 1 ? "like" : "likes"
-                        }`}
-                        onClick={() => openPhoto("likes")}
-                        sx={{
-                            appearance: "none",
-                            bgcolor: "transparent",
-                            border: 0,
-                            borderRadius: "8px",
-                            color: textBase,
-                            cursor: onOpenPhoto ? "pointer" : "default",
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 13,
-                            fontWeight: 500,
-                            lineHeight: "18px",
-                            p: "4px 0",
-                            "&:hover": { color: green },
-                        }}
-                    >
-                        {visibleLikeCount}
-                    </Box>
-                )}
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label={
-                        hasComments
-                            ? `View ${commentCount} ${
-                                  commentCount == 1 ? "comment" : "comments"
-                              }`
-                            : "Comment on post"
-                    }
-                    onClick={() => openPhoto("comments")}
-                    sx={{
-                        alignItems: "center",
-                        appearance: "none",
-                        bgcolor: "transparent",
-                        border: 0,
-                        borderRadius: "8px",
-                        color: textBase,
-                        cursor: onOpenPhoto ? "pointer" : "default",
-                        display: "inline-flex",
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 13,
-                        fontWeight: 500,
-                        gap: "4px",
-                        lineHeight: "18px",
-                        ml: "12px",
-                        p: "4px 2px",
-                        "&:hover": { color: green },
-                    }}
-                >
-                    <HugeiconsIcon
-                        icon={Comment01Icon}
-                        size={20}
-                        strokeWidth={1.8}
-                    />
-                    {hasComments && commentCount}
                 </Box>
             </Box>
         </Box>
@@ -644,7 +584,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         photo: SocialViewerPhoto,
         initialScreen: SocialViewerInitialScreen = "photo",
     ) => {
-        setSelectedViewer({ initialScreen, photo });
+        setSelectedViewer({
+            initialScreen,
+            photo,
+            postActionMode: "like-only",
+        });
     };
     const closeSelectedPhoto = () => {
         const localObjectUrl = selectedViewer?.localObjectUrl;
@@ -687,6 +631,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             initialScreen: "photo",
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
+            postActionMode: "like-with-count",
             showPostCaptionInput: true,
         };
 
@@ -977,10 +922,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 key={`${item.name}-${item.imageUrl}`}
                                 aspectRatio={item.aspectRatio}
                                 avatarUrl={item.avatarUrl}
-                                commentCount={item.commentCount}
                                 friendID={item.friendID}
                                 imageUrl={item.imageUrl}
-                                likeCount={item.likeCount}
                                 name={item.name}
                                 onOpenFriend={onOpenFriend}
                                 onOpenPhoto={openFeedPhoto}
@@ -1072,6 +1015,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         }}
                         initialScreen={selectedViewer.initialScreen}
                         photo={selectedViewer.photo}
+                        postActionMode={
+                            selectedViewer.postActionMode ?? "like-with-count"
+                        }
                         showPostCaptionInput={
                             selectedViewer.showPostCaptionInput
                         }

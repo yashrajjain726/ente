@@ -15,6 +15,7 @@ import {
 } from "components/SocialActionFeedback";
 import {
     SocialFileViewer,
+    type SocialViewerPostActionMode,
     type SocialViewerPhoto,
 } from "components/SocialFileViewer";
 import { EnteLogo } from "ente-base/components/EnteLogo";
@@ -268,6 +269,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             : postActionPhase == "posted"
               ? "done"
               : null;
+    const selectedPostActionMode: SocialViewerPostActionMode = isPublicProfile
+        ? "hidden"
+        : isOwnerProfile
+          ? "like-with-count"
+          : "like-only";
 
     const closeProfileActions = () => setProfileActionsAnchor(null);
     const revokeLocalPostObjectUrl = React.useCallback((objectUrl?: string) => {
@@ -1267,6 +1273,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             name: displayName,
                         }}
                         photo={selectedPost.photo}
+                        postActionMode={selectedPostActionMode}
                         showPostCaptionInput={selectedPost.showPostCaptionInput}
                         onClose={closeSelectedPost}
                         onDeletePost={

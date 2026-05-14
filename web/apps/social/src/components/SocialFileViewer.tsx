@@ -71,6 +71,38 @@ interface SocialViewerUser {
 
 export type SocialViewerInitialScreen = "photo" | "comments" | "likes";
 
+export type SocialViewerPostActionMode =
+    | "hidden"
+    | "like-only"
+    | "like-with-count";
+
+interface SocialViewerPostActionConfig {
+    showCommentButton: boolean;
+    showLikeButton: boolean;
+    showLikeCount: boolean;
+}
+
+const socialViewerPostActionConfigs: Record<
+    SocialViewerPostActionMode,
+    SocialViewerPostActionConfig
+> = {
+    hidden: {
+        showCommentButton: false,
+        showLikeButton: false,
+        showLikeCount: false,
+    },
+    "like-only": {
+        showCommentButton: false,
+        showLikeButton: true,
+        showLikeCount: false,
+    },
+    "like-with-count": {
+        showCommentButton: false,
+        showLikeButton: true,
+        showLikeCount: true,
+    },
+};
+
 export interface SocialViewerPhoto {
     alt?: string;
     avatarUrl?: string | null;
@@ -90,6 +122,7 @@ interface SocialFileViewerProps {
     onOpenFriend?: (friendID: string) => void;
     onOpenProfile?: () => void;
     photo: SocialViewerPhoto;
+    postActionMode?: SocialViewerPostActionMode;
     showPostCaptionInput?: boolean;
 }
 
@@ -1063,10 +1096,24 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     onOpenFriend,
     onOpenProfile,
     photo,
+    postActionMode = "like-with-count",
     showPostCaptionInput = false,
 }) => {
+    const {
+        showCommentButton: showPhotoCommentButton,
+        showLikeButton: showPhotoLikeButton,
+        showLikeCount: showPhotoLikeCount,
+    } = socialViewerPostActionConfigs[postActionMode];
+    const canOpenLikes = showPhotoLikeCount;
+    const canOpenComments = showPhotoCommentButton;
+    const resolvedInitialScreen: SocialViewerInitialScreen =
+        showPostCaptionInput ||
+        (initialScreen == "likes" && !canOpenLikes) ||
+        (initialScreen == "comments" && !canOpenComments)
+            ? "photo"
+            : initialScreen;
     const [screen, setScreen] = React.useState<SocialViewerInitialScreen>(
-        showPostCaptionInput ? "photo" : initialScreen,
+        resolvedInitialScreen,
     );
     const [isIntroVisible, setIsIntroVisible] =
         React.useState(!showPostCaptionInput);
@@ -1181,6 +1228,8 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     };
 
     const openLikes = () => {
+        if (!canOpenLikes) return;
+
         clearLikeHoldTimeout();
         setCommentContextMenu(null);
         setScreen("likes");
@@ -1209,6 +1258,8 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     ) => {
         event.preventDefault();
         event.stopPropagation();
+        if (!canOpenLikes) return;
+
         ignoreNextLikeClickRef.current = false;
         openLikes();
     };
@@ -1220,6 +1271,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     };
 
     const startPhotoLikeHold = (event: React.PointerEvent<HTMLElement>) => {
+        if (!canOpenLikes) return;
         if (event.pointerType == "mouse" && event.button != 0) return;
 
         clearLikeHoldTimeout();
@@ -1268,6 +1320,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     };
 
     const openComments = () => {
+        if (!canOpenComments) return;
         if (isCommentButtonPopping) return;
 
         setIsCommentButtonPopping(true);
@@ -2044,7 +2097,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     zIndex: 1,
                 }}
             />
-            {arePhotoActionsMounted && (
+            {arePhotoActionsMounted && showPhotoLikeButton && (
                 <Box
                     data-social-viewer-bottom="true"
                     sx={{
@@ -2093,7 +2146,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                 strokeWidth={1.8}
                             />
                         </Box>
-                        {likeCount > 0 && (
+                        {showPhotoLikeCount && (
                             <Box
                                 component="button"
                                 type="button"
@@ -2113,30 +2166,32 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                             </Box>
                         )}
                     </Box>
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label={commentButtonLabel}
-                        onClick={openComments}
-                        sx={{
-                            ...viewerActionButtonSx,
-                            position: "relative",
-                            transform: isCommentButtonPopping
-                                ? "scale(0.96)"
-                                : "scale(1)",
-                        }}
-                    >
-                        <HugeiconsIcon
-                            icon={Comment01Icon}
-                            size={26}
-                            strokeWidth={1.8}
-                        />
-                        {commentCount > 0 && (
-                            <Box aria-hidden sx={viewerCountBadgeSx}>
-                                {commentCount}
-                            </Box>
-                        )}
-                    </Box>
+                    {showPhotoCommentButton && (
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={commentButtonLabel}
+                            onClick={openComments}
+                            sx={{
+                                ...viewerActionButtonSx,
+                                position: "relative",
+                                transform: isCommentButtonPopping
+                                    ? "scale(0.96)"
+                                    : "scale(1)",
+                            }}
+                        >
+                            <HugeiconsIcon
+                                icon={Comment01Icon}
+                                size={26}
+                                strokeWidth={1.8}
+                            />
+                            {commentCount > 0 && (
+                                <Box aria-hidden sx={viewerCountBadgeSx}>
+                                    {commentCount}
+                                </Box>
+                            )}
+                        </Box>
+                    )}
                 </Box>
             )}
             {isPostCaptionInputVisible && screen == "photo" && (
@@ -2186,7 +2241,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     />
                 </Box>
             )}
-            {screen == "likes" && (
+            {screen == "likes" && canOpenLikes && (
                 <Box
                     sx={{
                         bgcolor: commentsBackground,
@@ -2412,7 +2467,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     </Box>
                 </Box>
             )}
-            {screen == "comments" && (
+            {screen == "comments" && canOpenComments && (
                 <Box
                     sx={{
                         bgcolor: commentsBackground,
