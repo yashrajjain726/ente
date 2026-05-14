@@ -64,7 +64,6 @@ const sampleFeedItems = [
         friendID: "aparna-bhatnagar",
         imageUrl: "/images/sample-feed-1.jpg",
         likeCount: 18,
-        commentCount: 6,
         name: "Aparna Bhatnagar",
         timestampMs: minutesAgo(22),
     },
@@ -74,7 +73,6 @@ const sampleFeedItems = [
         friendID: "mira-sen",
         imageUrl: "/images/sample-feed-portrait-2.jpg",
         likeCount: 24,
-        commentCount: 9,
         name: "Mira Sen",
         timestampMs: hoursAgo(2),
     },
@@ -84,7 +82,6 @@ const sampleFeedItems = [
         friendID: "mira-sen",
         imageUrl: "/images/sample-feed-2.jpg",
         likeCount: 15,
-        commentCount: 4,
         name: "Mira Sen",
         timestampMs: hoursAgo(3),
     },
@@ -94,7 +91,6 @@ const sampleFeedItems = [
         friendID: "nikhil-rao",
         imageUrl: "/images/sample-feed-portrait-3.jpg",
         likeCount: 31,
-        commentCount: 12,
         name: "Nikhil Rao",
         timestampMs: hoursAgo(7),
     },
@@ -104,7 +100,6 @@ const sampleFeedItems = [
         friendID: "nikhil-rao",
         imageUrl: "/images/sample-feed-3.jpg",
         likeCount: 11,
-        commentCount: 3,
         name: "Nikhil Rao",
         timestampMs: daysAgo(1),
     },
@@ -114,7 +109,6 @@ const sampleFeedItems = [
         friendID: "riya-kapoor",
         imageUrl: "/images/sample-feed-portrait-4.jpg",
         likeCount: 28,
-        commentCount: 8,
         name: "Riya Kapoor",
         timestampMs: daysAgo(1) - 3 * 60 * 60 * 1000,
     },
@@ -124,7 +118,6 @@ const sampleFeedItems = [
         friendID: "riya-kapoor",
         imageUrl: "/images/sample-feed-4.jpg",
         likeCount: 16,
-        commentCount: 5,
         name: "Riya Kapoor",
         timestampMs: daysAgo(2),
     },
@@ -134,7 +127,6 @@ const sampleFeedItems = [
         friendID: "aparna-bhatnagar",
         imageUrl: "/images/sample-feed-portrait-1.jpg",
         likeCount: 22,
-        commentCount: 7,
         name: "Aparna Bhatnagar",
         timestampMs: daysAgo(3),
     },
@@ -144,7 +136,6 @@ const sampleFeedItems = [
         friendID: "aparna-bhatnagar",
         imageUrl: "/images/sample-feed-5.jpg",
         likeCount: 13,
-        commentCount: 4,
         name: "Aparna Bhatnagar",
         timestampMs: daysAgo(4),
     },
@@ -154,7 +145,6 @@ const sampleFeedItems = [
         friendID: "mira-sen",
         imageUrl: "/images/sample-feed-portrait-5.jpg",
         likeCount: 36,
-        commentCount: 14,
         name: "Mira Sen",
         timestampMs: daysAgo(6),
     },
@@ -164,7 +154,6 @@ const sampleFeedItems = [
         friendID: "mira-sen",
         imageUrl: "/images/sample-feed-6.jpg",
         likeCount: 19,
-        commentCount: 6,
         name: "Mira Sen",
         timestampMs: daysAgo(8),
     },
@@ -174,7 +163,6 @@ const sampleFeedItems = [
         friendID: "nikhil-rao",
         imageUrl: "/images/sample-feed-portrait-6.jpg",
         likeCount: 27,
-        commentCount: 10,
         name: "Nikhil Rao",
         timestampMs: daysAgo(12),
     },
@@ -184,7 +172,6 @@ const sampleFeedItems = [
         friendID: "nikhil-rao",
         imageUrl: "/images/sample-feed-2.jpg",
         likeCount: 43,
-        commentCount: 17,
         name: "Nikhil Rao",
         timestampMs: new Date(new Date().getFullYear() - 1, 10, 18).getTime(),
     },
@@ -208,7 +195,6 @@ interface SelectedHomeViewer {
     localObjectUrl?: string;
     photo: SocialViewerPhoto;
     postActionMode?: SocialViewerPostActionMode;
-    showPostCaptionInput?: boolean;
 }
 
 interface FeedItemProps {
@@ -497,9 +483,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             outline: `2px solid ${green}`,
                             outlineOffset: 2,
                         },
-                        "&:hover": {
-                            bgcolor: feedLikeActionBackgroundHover,
-                        },
+                        "&:hover": { bgcolor: feedLikeActionBackgroundHover },
                     }}
                 >
                     <HugeiconsIcon
@@ -632,7 +616,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
             postActionMode: "like-with-count",
-            showPostCaptionInput: true,
         };
 
         setPostActionPhase("posting");
@@ -1017,9 +1000,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         photo={selectedViewer.photo}
                         postActionMode={
                             selectedViewer.postActionMode ?? "like-with-count"
-                        }
-                        showPostCaptionInput={
-                            selectedViewer.showPostCaptionInput
                         }
                         onClose={closeSelectedPhoto}
                         onOpenFriend={

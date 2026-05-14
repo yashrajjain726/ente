@@ -15,8 +15,8 @@ import {
 } from "components/SocialActionFeedback";
 import {
     SocialFileViewer,
-    type SocialViewerPostActionMode,
     type SocialViewerPhoto,
+    type SocialViewerPostActionMode,
 } from "components/SocialFileViewer";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
@@ -149,7 +149,6 @@ interface SelectedProfilePost {
     id: string;
     localObjectUrl?: string;
     photo: SocialViewerPhoto;
-    showPostCaptionInput?: boolean;
 }
 
 interface PostMasonryTile {
@@ -353,7 +352,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             id: `local-${localPost.photo.timestampMs}`,
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
-            showPostCaptionInput: true,
         };
 
         setPostActionPhase("posting");
@@ -1274,7 +1272,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         }}
                         photo={selectedPost.photo}
                         postActionMode={selectedPostActionMode}
-                        showPostCaptionInput={selectedPost.showPostCaptionInput}
                         onClose={closeSelectedPost}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
