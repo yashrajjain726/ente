@@ -31,6 +31,7 @@ const Page: React.FC = () => {
                         socialRoutes.friend(friendID, "notifications"),
                     )
                 }
+                profile={profile}
             />
         </>
     );
