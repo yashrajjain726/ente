@@ -1,5 +1,9 @@
 import { Box } from "@mui/material";
 import React, { useEffect, useRef, useState } from "react";
+import {
+    prepareSocialAvatarImage,
+    socialAvatarImageInputAccept,
+} from "utils/socialPostImage";
 
 export const setupProfileBackground = "#FAFAFA";
 
@@ -250,6 +254,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
     const [username, setUsername] = useState("");
     const [fullName, setFullName] = useState("");
     const avatarUrlRef = useRef<string | null>(null);
+    const avatarSelectionIDRef = useRef(0);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const canContinue =
@@ -265,30 +270,40 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
         [],
     );
 
+    const prepareSelectedAvatar = async (file: File, selectionID: number) => {
+        try {
+            const avatar = await prepareSocialAvatarImage(file);
+            if (avatarSelectionIDRef.current != selectionID) return;
+            if (avatar.file.size > maxAvatarBytes) {
+                setAvatarError("Choose an image under 19 MB.");
+                return;
+            }
+
+            if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current);
+            const nextUrl = URL.createObjectURL(avatar.file);
+            avatarUrlRef.current = nextUrl;
+            setAvatarError(undefined);
+            setAvatarFile(avatar.file);
+            setAvatarUrl(nextUrl);
+        } catch (error) {
+            if (avatarSelectionIDRef.current != selectionID) return;
+            console.error("Failed to prepare social avatar", error);
+            setAvatarError("Choose a JPEG, PNG, WebP, HEIC, or HEIF image.");
+        }
+    };
+
     const handleAvatarChange: React.ChangeEventHandler<HTMLInputElement> = (
         event,
     ) => {
         const file = event.target.files?.[0];
+        event.target.value = "";
         if (!file) return;
 
-        if (!file.type.startsWith("image/")) {
-            setAvatarError("Choose an image file.");
-            event.target.value = "";
-            return;
-        }
-        if (file.size > maxAvatarBytes) {
-            setAvatarError("Choose an image under 19 MB.");
-            event.target.value = "";
-            return;
-        }
-
-        if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current);
-        const nextUrl = URL.createObjectURL(file);
-        avatarUrlRef.current = nextUrl;
+        const selectionID = avatarSelectionIDRef.current + 1;
+        avatarSelectionIDRef.current = selectionID;
         setAvatarError(undefined);
-        setAvatarFile(file);
-        setAvatarUrl(nextUrl);
-        event.target.value = "";
+
+        void prepareSelectedAvatar(file, selectionID);
     };
 
     const handleUsernameChange = (value: string) => {
@@ -407,7 +422,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                     <Box
                         component="input"
                         ref={fileInputRef}
-                        accept="image/*"
+                        accept={socialAvatarImageInputAccept}
                         onChange={handleAvatarChange}
                         type="file"
                         sx={{ display: "none" }}

@@ -414,21 +414,27 @@ export const loadCurrentWallPostsPage = async (
 export const createCurrentPhotoPost = async ({
     caption,
     file,
+    height,
     wallId,
+    width,
 }: {
     caption?: string;
     file: File;
+    height?: number;
     wallId: string;
+    width?: number;
 }) => {
     const ctx = await ensureCurrentWallContext();
     try {
         const bytes = new Uint8Array(await file.arrayBuffer());
+        const normalizedWidth = normalizedImageDimension(width);
+        const normalizedHeight = normalizedImageDimension(height);
         const created = (await ctx.create_photo_post(
             wallId,
             bytes,
             caption?.trim() || null,
-            null,
-            null,
+            normalizedWidth,
+            normalizedHeight,
             file.type || null,
         )) as WallPost;
         return await postFromAccountPost(ctx, created);
@@ -436,6 +442,11 @@ export const createCurrentPhotoPost = async ({
         ctx.free();
     }
 };
+
+const normalizedImageDimension = (dimension: number | undefined) =>
+    typeof dimension == "number" && Number.isFinite(dimension) && dimension > 0
+        ? Math.round(dimension)
+        : null;
 
 export const setCurrentPostLiked = async (postId: number, liked: boolean) => {
     const ctx = await ensureCurrentWallContext();

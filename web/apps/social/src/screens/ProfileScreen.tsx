@@ -18,11 +18,13 @@ import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { LinkIcon, ShareIcon } from "screens/ShareProfileLinkScreen";
-import {
-    createLocalPostPhoto,
-    type LocalPostPhotoDimensions,
-} from "utils/localPostPhoto";
+import { createLocalPostPhoto } from "utils/localPostPhoto";
 import { firstNameFrom, initialsFor } from "utils/socialDisplay";
+import {
+    prepareSocialPostImage,
+    socialPostImageInputAccept,
+    type PreparedSocialPostImage,
+} from "utils/socialPostImage";
 
 export const profileBackground = "#FFFFFF";
 
@@ -68,7 +70,7 @@ export interface ProfilePostGroup {
 }
 
 interface SelectedProfilePost {
-    draftFile?: File;
+    draftImage?: PreparedSocialPostImage;
     id: string;
     localObjectUrl?: string;
     photo: SocialViewerPhoto;
@@ -136,7 +138,10 @@ interface ProfileScreenProps {
     isPostsLoading?: boolean;
     onAddFriend?: () => void;
     onBack?: () => void;
-    onCreatePost?: (file: File, caption: string) => Promise<SocialViewerPhoto>;
+    onCreatePost?: (
+        image: PreparedSocialPostImage,
+        caption: string,
+    ) => Promise<SocialViewerPhoto>;
     onDeletePost?: (postId: number) => Promise<void> | void;
     onLoadPostLikers?: (postId: number) => Promise<SocialLiker[]>;
     onOpenFriend?: (friendID: string) => void;
@@ -229,19 +234,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         URL.revokeObjectURL(objectUrl);
         localPostObjectUrlsRef.current.delete(objectUrl);
     }, []);
-    const applyLocalPostDimensions = React.useCallback(
-        (objectUrl: string, dimensions: LocalPostPhotoDimensions) => {
-            setSelectedPost((currentPost) =>
-                currentPost?.localObjectUrl == objectUrl
-                    ? {
-                          ...currentPost,
-                          photo: { ...currentPost.photo, ...dimensions },
-                      }
-                    : currentPost,
-            );
-        },
-        [],
-    );
     const openPostPhotoPicker = () => postInputRef.current?.click();
     const closeSelectedPost = () => {
         const localObjectUrl = selectedPost?.localObjectUrl;
@@ -270,6 +262,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         });
     };
 
+    const prepareSelectedPostPhoto = async (file: File) => {
+        const image = await prepareSocialPostImage(file);
+        const localPost = createLocalPostPhoto({
+            avatarUrl: profile.avatarUrl,
+            dimensions: image,
+            file: image.file,
+            name: displayName || "You",
+        });
+        localPostObjectUrlsRef.current.add(localPost.objectUrl);
+        setSelectedPost({
+            draftImage: image,
+            id: `local-${localPost.photo.timestampMs}`,
+            localObjectUrl: localPost.objectUrl,
+            photo: localPost.photo,
+            postActionMode: "draft-post",
+        });
+    };
+
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
         event,
     ) => {
@@ -277,20 +287,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         event.target.value = "";
         if (!file) return;
 
-        const localPost = createLocalPostPhoto({
-            avatarUrl: profile.avatarUrl,
-            file,
-            name: displayName || "You",
-            onDimensionsLoaded: applyLocalPostDimensions,
-        });
-        localPostObjectUrlsRef.current.add(localPost.objectUrl);
-        setSelectedPost({
-            draftFile: file,
-            id: `local-${localPost.photo.timestampMs}`,
-            localObjectUrl: localPost.objectUrl,
-            photo: localPost.photo,
-            postActionMode: "draft-post",
-        });
+        void prepareSelectedPostPhoto(file).catch((error: unknown) =>
+            console.error("Failed to prepare post photo", error),
+        );
     };
 
     const copyProfileURL = async () => {
@@ -379,7 +378,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         ref={postInputRef}
                         component="input"
                         type="file"
-                        accept="image/*"
+                        accept={socialPostImageInputAccept}
                         onChange={handlePostPhotoSelect}
                         sx={{ display: "none" }}
                     />
@@ -1028,8 +1027,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                             likeCount:
                                                                                 item.likeCount,
                                                                             name: displayName,
-                                                                            postId:
-                                                                                item.postId,
+                                                                            postId: item.postId,
                                                                             timestampMs:
                                                                                 item.timestampMs,
                                                                             viewerLiked:
@@ -1223,12 +1221,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         }
                         onOpenProfile={closeSelectedPost}
                         onPublishDraftPost={
-                            selectedPost.draftFile && onCreatePost
+                            selectedPost.draftImage && onCreatePost
                                 ? async (caption) => {
                                       const localObjectUrl =
                                           selectedPost.localObjectUrl;
                                       const post = await onCreatePost(
-                                          selectedPost.draftFile!,
+                                          selectedPost.draftImage!,
                                           caption,
                                       );
                                       revokeLocalPostObjectUrl(localObjectUrl);

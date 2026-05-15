@@ -26,7 +26,10 @@ const Page: React.FC = () => {
         useSocialAppState();
     const [posts, setPosts] = useState<SocialWallPost[]>([]);
     const [isPostsLoading, setIsPostsLoading] = useState(true);
-    const postGroups = useMemo(() => profilePostGroupsFromPosts(posts), [posts]);
+    const postGroups = useMemo(
+        () => profilePostGroupsFromPosts(posts),
+        [posts],
+    );
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -79,12 +82,14 @@ const Page: React.FC = () => {
                 postGroups={postGroups}
                 profile={profile}
                 onBack={() => void router.push(socialRoutes.home)}
-                onCreatePost={async (file, caption) => {
+                onCreatePost={async (image, caption) => {
                     if (!profile.wallId) throw new Error("Missing wall.");
                     const post = await createCurrentPhotoPost({
                         caption,
-                        file,
+                        file: image.file,
+                        height: image.height,
                         wallId: profile.wallId,
+                        width: image.width,
                     });
                     if (!post) throw new Error("Couldn't create post.");
                     setPosts((currentPosts) => [post, ...currentPosts]);

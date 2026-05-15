@@ -12,6 +12,7 @@ export interface LocalPostPhoto {
 
 interface CreateLocalPostPhotoAttributes {
     avatarUrl?: string | null;
+    dimensions?: LocalPostPhotoDimensions;
     file: File;
     name: string;
     onDimensionsLoaded?: (
@@ -22,6 +23,7 @@ interface CreateLocalPostPhotoAttributes {
 
 export const createLocalPostPhoto = ({
     avatarUrl,
+    dimensions,
     file,
     name,
     onDimensionsLoaded,
@@ -30,10 +32,14 @@ export const createLocalPostPhoto = ({
     const photo: SocialViewerPhoto = {
         alt: `${name} post`,
         avatarUrl,
+        height: dimensions?.height,
         imageUrl: objectUrl,
         name,
         timestampMs: Date.now(),
+        width: dimensions?.width,
     };
+
+    if (dimensions) return { objectUrl, photo };
 
     const image = new Image();
     image.onload = () => {

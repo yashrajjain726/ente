@@ -20,15 +20,17 @@ import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type { SocialWallPost } from "services/socialWall";
-import {
-    createLocalPostPhoto,
-    type LocalPostPhotoDimensions,
-} from "utils/localPostPhoto";
+import { createLocalPostPhoto } from "utils/localPostPhoto";
 import {
     firstNameFrom,
     formatSocialDate,
     initialsFor,
 } from "utils/socialDisplay";
+import {
+    prepareSocialPostImage,
+    socialPostImageInputAccept,
+    type PreparedSocialPostImage,
+} from "utils/socialPostImage";
 
 export const homeBackground = "#FFFFFF";
 
@@ -54,7 +56,10 @@ interface HomeScreenProps {
     friendsCount: number;
     isFeedLoading?: boolean;
     onAddedFriendToastClose?: () => void;
-    onCreatePost?: (file: File, caption: string) => Promise<SocialViewerPhoto>;
+    onCreatePost?: (
+        image: PreparedSocialPostImage,
+        caption: string,
+    ) => Promise<SocialViewerPhoto>;
     onOpenFriend?: (friendID: string) => void;
     onOpenNotifications?: () => void;
     onOpenProfile?: () => void;
@@ -70,7 +75,7 @@ interface FeedPhotoDimensions {
 }
 
 interface SelectedHomeViewer {
-    draftFile?: File;
+    draftImage?: PreparedSocialPostImage;
     initialScreen: SocialViewerInitialScreen;
     localObjectUrl?: string;
     photo: SocialViewerPhoto;
@@ -563,19 +568,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         URL.revokeObjectURL(objectUrl);
         localPostObjectUrlsRef.current.delete(objectUrl);
     }, []);
-    const applyLocalPostDimensions = React.useCallback(
-        (objectUrl: string, dimensions: LocalPostPhotoDimensions) => {
-            setSelectedViewer((currentViewer) =>
-                currentViewer?.localObjectUrl == objectUrl
-                    ? {
-                          ...currentViewer,
-                          photo: { ...currentViewer.photo, ...dimensions },
-                      }
-                    : currentViewer,
-            );
-        },
-        [],
-    );
     const openPostPhotoPicker = () => postInputRef.current?.click();
     const openFeedPhoto = (
         photo: SocialViewerPhoto,
@@ -609,6 +601,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await navigator.clipboard.writeText(profileLink);
     };
 
+    const prepareSelectedPostPhoto = async (file: File) => {
+        const image = await prepareSocialPostImage(file);
+        const localPost = createLocalPostPhoto({
+            avatarUrl: profile.avatarUrl,
+            dimensions: image,
+            file: image.file,
+            name: initialsSource || "You",
+        });
+        localPostObjectUrlsRef.current.add(localPost.objectUrl);
+        setSelectedViewer({
+            draftImage: image,
+            initialScreen: "photo",
+            localObjectUrl: localPost.objectUrl,
+            photo: localPost.photo,
+            postActionMode: "draft-post",
+        });
+    };
+
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
         event,
     ) => {
@@ -616,20 +626,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         event.target.value = "";
         if (!file) return;
 
-        const localPost = createLocalPostPhoto({
-            avatarUrl: profile.avatarUrl,
-            file,
-            name: initialsSource || "You",
-            onDimensionsLoaded: applyLocalPostDimensions,
-        });
-        localPostObjectUrlsRef.current.add(localPost.objectUrl);
-        setSelectedViewer({
-            draftFile: file,
-            initialScreen: "photo",
-            localObjectUrl: localPost.objectUrl,
-            photo: localPost.photo,
-            postActionMode: "draft-post",
-        });
+        void prepareSelectedPostPhoto(file).catch((error: unknown) =>
+            console.error("Failed to prepare post photo", error),
+        );
     };
 
     React.useEffect(
@@ -682,7 +681,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         ref={postInputRef}
                         component="input"
                         type="file"
-                        accept="image/*"
+                        accept={socialPostImageInputAccept}
                         onChange={handlePostPhotoSelect}
                         sx={{ display: "none" }}
                     />
@@ -1009,12 +1008,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         }
                         onLoadPostLikers={onLoadPostLikers}
                         onPublishDraftPost={
-                            selectedViewer.draftFile && onCreatePost
+                            selectedViewer.draftImage && onCreatePost
                                 ? async (caption) => {
                                       const localObjectUrl =
                                           selectedViewer.localObjectUrl;
                                       const post = await onCreatePost(
-                                          selectedViewer.draftFile!,
+                                          selectedViewer.draftImage!,
                                           caption,
                                       );
                                       revokeLocalPostObjectUrl(localObjectUrl);

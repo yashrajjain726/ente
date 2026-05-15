@@ -18,18 +18,13 @@ import { firstNameFrom } from "utils/socialDisplay";
 import { socialRoutes } from "utils/socialRoutes";
 import { socialPostToViewerPhoto } from "utils/socialWallDisplay";
 
-const loadingHomeProfile = {
-    avatarUrl: null,
-    fullName: "",
-    username: "",
-};
+const loadingHomeProfile = { avatarUrl: null, fullName: "", username: "" };
 
 const Page: React.FC = () => {
     const router = useRouter();
     const { friends, profile, profileLoadStatus, setFriends } =
         useSocialAppState();
-    const [addedFriendToastName, setAddedFriendToastName] =
-        useState<string>();
+    const [addedFriendToastName, setAddedFriendToastName] = useState<string>();
     const [feedItems, setFeedItems] = useState<SocialWallPost[]>([]);
     const [isFeedLoading, setIsFeedLoading] = useState(true);
     const closeAddedFriendToast = React.useCallback(
@@ -102,12 +97,14 @@ const Page: React.FC = () => {
                 isFeedLoading={isFeedLoading}
                 profile={screenProfile}
                 onAddedFriendToastClose={closeAddedFriendToast}
-                onCreatePost={async (file, caption) => {
+                onCreatePost={async (image, caption) => {
                     if (!profile?.wallId) throw new Error("Missing wall.");
                     const post = await createCurrentPhotoPost({
                         caption,
-                        file,
+                        file: image.file,
+                        height: image.height,
                         wallId: profile.wallId,
+                        width: image.width,
                     });
                     if (!post) throw new Error("Couldn't create post.");
                     setFeedItems((currentItems) => [post, ...currentItems]);
