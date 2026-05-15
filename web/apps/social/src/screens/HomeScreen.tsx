@@ -805,8 +805,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 sx={{
                                     display: "block",
                                     height: "auto",
-                                    width: 196,
-                                    "@media (max-width: 340px)": { width: 176 },
+                                    width: 220,
+                                    "@media (max-width: 340px)": { width: 196 },
                                 }}
                             />
                             <Box

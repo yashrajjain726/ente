@@ -1126,6 +1126,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     sx={{
                                         display: "block",
                                         height: "auto",
+                                        mt: "28px",
                                         width: 160,
                                     }}
                                 />
