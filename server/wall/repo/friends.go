@@ -86,8 +86,8 @@ func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, re
 
 	if !alreadyFriends {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO wall_friend_events (actor_id, actor_wall_id, target_id, target_wall_id)
-			VALUES ($1, $2, $3, $4)
+			INSERT INTO wall_friend_events (event_type, actor_id, actor_wall_id, target_id, target_wall_id)
+			VALUES ('friend_add', $1, $2, $3, $4)
 		`, requesterID, requesterWallID, targetOwnerID, targetWallID); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -165,22 +165,41 @@ func (r *FriendsRepository) DeleteFriendship(ctx context.Context, userID int64, 
 	defer tx.Rollback()
 
 	var targetOwnerID int64
-	if err := tx.QueryRowContext(ctx, `SELECT owner_id FROM walls WHERE wall_id = $1`, targetWallID).Scan(&targetOwnerID); err != nil {
+	var actorWallID string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT target_wall.owner_id, actor_wall.wall_id
+		FROM walls target_wall
+		JOIN walls actor_wall ON actor_wall.owner_id = $2
+		WHERE target_wall.wall_id = $1
+	`, targetWallID, userID).Scan(&targetOwnerID, &actorWallID); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	if targetOwnerID == userID {
 		return nil
 	}
 
-	if _, err := tx.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 		DELETE FROM wall_friend_shares
 		WHERE (wall_id = $1 AND friend_id = $2)
 		   OR (
 		       friend_id = $3
 		       AND wall_id IN (SELECT wall_id FROM walls WHERE owner_id = $2)
 		   )
-	`, targetWallID, userID, targetOwnerID); err != nil {
+	`, targetWallID, userID, targetOwnerID)
+	if err != nil {
 		return stacktrace.Propagate(err, "")
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if affected > 0 {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO wall_friend_events (event_type, actor_id, actor_wall_id, target_id, target_wall_id)
+			VALUES ('friend_remove', $1, $2, $3, $4)
+		`, userID, actorWallID, targetOwnerID, targetWallID); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
 	}
 
 	return stacktrace.Propagate(tx.Commit(), "")

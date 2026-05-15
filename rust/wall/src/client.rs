@@ -2643,28 +2643,38 @@ mod tests {
             .with_status(200)
             .with_body(
                 json!({
-                    "items": [{
-                        "id": "post_like:42:9",
-                        "type": "likedPost",
-                        "createdAt": "2026-04-16T00:00:00Z",
-                        "actor": {
-                            "userId": 9,
-                            "username": "mira",
-                            "wallId": "wall_mira",
-                            "wallSlug": "mira"
-                        },
-                        "post": {
-                            "postId": 42,
-                            "wallId": "wall_owner_gallery",
-                            "wallSlug": "owner-gallery",
-                            "ownerUserId": 7,
-                            "author": {
-                                "userId": 7,
+                    "items": [
+                        {
+                            "id": "post_like:42:9",
+                            "type": "likedPost",
+                            "createdAt": "2026-04-16T00:00:00Z",
+                            "actor": {
+                                "userId": 9,
+                                "username": "mira",
+                                "wallId": "wall_mira",
+                                "wallSlug": "mira"
+                            },
+                            "post": {
+                                "postId": 42,
                                 "wallId": "wall_owner_gallery",
-                                "wallSlug": "owner-gallery"
+                                "wallSlug": "owner-gallery",
+                                "ownerUserId": 7,
+                                "author": {
+                                    "userId": 7,
+                                    "wallId": "wall_owner_gallery",
+                                    "wallSlug": "owner-gallery"
+                                }
+                            }
+                        },
+                        {
+                            "id": "friend_remove:12",
+                            "type": "removedYouAsFriend",
+                            "createdAt": "2026-04-17T00:00:00Z",
+                            "actor": {
+                                "wallSlug": "mira"
                             }
                         }
-                    }],
+                    ],
                     "nextCursor": "cursor-2"
                 })
                 .to_string(),
@@ -2677,10 +2687,14 @@ mod tests {
             .await
             .expect("notifications should load");
 
-        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items.len(), 2);
         assert_eq!(
             page.items[0].notification_type,
             crate::transport::WallNotificationType::LikedPost
+        );
+        assert_eq!(
+            page.items[1].notification_type,
+            crate::transport::WallNotificationType::RemovedYouAsFriend
         );
         assert_eq!(page.items[0].actor.wall_slug, "mira");
         assert_eq!(page.next_cursor, "cursor-2");

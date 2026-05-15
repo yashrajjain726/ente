@@ -132,16 +132,21 @@ EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
 CREATE TABLE IF NOT EXISTS wall_friend_events (
     event_id        BIGSERIAL PRIMARY KEY,
+    event_type      TEXT   NOT NULL DEFAULT 'friend_add',
     actor_id        BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     actor_wall_id   TEXT   NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,
     target_id       BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     target_wall_id  TEXT   NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,
     created_at      BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    CONSTRAINT chk_wall_friend_events_distinct_users CHECK (actor_id <> target_id)
+    CONSTRAINT chk_wall_friend_events_distinct_users CHECK (actor_id <> target_id),
+    CONSTRAINT chk_wall_friend_events_type CHECK (event_type IN ('friend_add', 'friend_remove'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_wall_friend_events_target_created
     ON wall_friend_events (target_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_wall_friend_events_target_type_created
+    ON wall_friend_events (target_id, event_type, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS wall_links (
     wall_id              TEXT PRIMARY KEY REFERENCES walls (wall_id) ON DELETE CASCADE,

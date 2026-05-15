@@ -168,6 +168,7 @@ pub struct PostPage {
 pub enum WallNotificationType {
     LikedPost,
     AddedYouAsFriend,
+    RemovedYouAsFriend,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]

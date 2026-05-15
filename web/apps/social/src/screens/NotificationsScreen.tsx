@@ -1,4 +1,8 @@
-import { ArrowLeft02Icon, UserAdd01Icon } from "@hugeicons/core-free-icons";
+import {
+    ArrowLeft02Icon,
+    UserAdd01Icon,
+    UserRemove01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import {
@@ -28,7 +32,7 @@ const timelineLineTop = iconCircleTopOffset + iconCircleSize;
 const timelineListInset = "12px";
 const thumbnailRightInset = "16px";
 
-type NotificationType = "liked-post" | "added-friend";
+type NotificationType = "liked-post" | "added-friend" | "removed-friend";
 
 interface SocialNotification {
     actor: Pick<FriendProfile, "avatarUrl" | "fullName" | "id" | "username">;
@@ -80,6 +84,10 @@ const UserAddNotificationIcon: React.FC = () => (
     <HugeiconsIcon icon={UserAdd01Icon} size={17} strokeWidth={1.8} />
 );
 
+const UserRemoveNotificationIcon: React.FC = () => (
+    <HugeiconsIcon icon={UserRemove01Icon} size={17} strokeWidth={1.8} />
+);
+
 const actionForNotification = (
     type: NotificationType,
 ): { icon: React.ReactNode; label: string } => {
@@ -90,6 +98,11 @@ const actionForNotification = (
             return {
                 icon: <UserAddNotificationIcon />,
                 label: "added you as a friend",
+            };
+        case "removed-friend":
+            return {
+                icon: <UserRemoveNotificationIcon />,
+                label: "removed you as a friend",
             };
     }
 };
@@ -535,7 +548,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                                 maxWidth: 240,
                             }}
                         >
-                            Likes, replies and new friends will appear here.
+                            Likes and friend updates will appear here.
                         </Box>
                     </Box>
                 )}

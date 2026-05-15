@@ -56,8 +56,14 @@ const wallNotificationRows = `
 	UNION ALL
 
 	SELECT
-		'friend_add:' || fe.event_id::text AS notification_id,
-		'addedYouAsFriend' AS notification_type,
+		CASE fe.event_type
+			WHEN 'friend_remove' THEN 'friend_remove:'
+			ELSE 'friend_add:'
+		END || fe.event_id::text AS notification_id,
+		CASE fe.event_type
+			WHEN 'friend_remove' THEN 'removedYouAsFriend'
+			ELSE 'addedYouAsFriend'
+		END AS notification_type,
 		fe.created_at,
 		actor_wall.owner_id, actor_wall.wall_id, actor_wall.wall_slug, actor_ka.public_key,
 		actor_wall.current_version, actor_wall.encrypted_profile, actor_wall.avatar_object_key,

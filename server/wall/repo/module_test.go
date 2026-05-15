@@ -346,7 +346,7 @@ func TestAddFriendCreatesReciprocalSharesAndEvent(t *testing.T) {
 	require.Equal(t, bobWall.CurrentVersion, reciprocalShare.KeyVersion)
 
 	var eventCount int
-	err = module.Friends.DB.QueryRow(`SELECT COUNT(*) FROM wall_friend_events WHERE actor_id = $1 AND target_id = $2`, bobID, aliceID).Scan(&eventCount)
+	err = module.Friends.DB.QueryRow(`SELECT COUNT(*) FROM wall_friend_events WHERE event_type = 'friend_add' AND actor_id = $1 AND target_id = $2`, bobID, aliceID).Scan(&eventCount)
 	require.NoError(t, err)
 	require.Equal(t, 1, eventCount)
 }
@@ -371,7 +371,7 @@ func TestAddFriendIsIdempotentForExistingFriends(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "alice-share-key-v2", share.EncryptedWallKey)
 	var eventCount int
-	err = module.Friends.DB.QueryRow(`SELECT COUNT(*) FROM wall_friend_events WHERE actor_id = $1 AND target_id = $2`, bobID, aliceID).Scan(&eventCount)
+	err = module.Friends.DB.QueryRow(`SELECT COUNT(*) FROM wall_friend_events WHERE event_type = 'friend_add' AND actor_id = $1 AND target_id = $2`, bobID, aliceID).Scan(&eventCount)
 	require.NoError(t, err)
 	require.Equal(t, 1, eventCount)
 }
@@ -415,6 +415,31 @@ func TestDeleteFriendshipRemovesReciprocalShares(t *testing.T) {
 	relationship, err := module.Friends.GetRelationship(ctx, aliceID, bobID, bobWall.WallID)
 	require.NoError(t, err)
 	require.Empty(t, relationship)
+
+	var removeEventCount int
+	err = module.Friends.DB.QueryRow(`
+		SELECT COUNT(*)
+		FROM wall_friend_events
+		WHERE event_type = 'friend_remove'
+		  AND actor_id = $1
+		  AND actor_wall_id = $2
+		  AND target_id = $3
+		  AND target_wall_id = $4
+	`, aliceID, aliceWall.WallID, bobID, bobWall.WallID).Scan(&removeEventCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, removeEventCount)
+
+	err = module.Friends.DeleteFriendship(ctx, aliceID, bobWall.WallID)
+	require.NoError(t, err)
+	err = module.Friends.DB.QueryRow(`
+		SELECT COUNT(*)
+		FROM wall_friend_events
+		WHERE event_type = 'friend_remove'
+		  AND actor_id = $1
+		  AND target_id = $2
+	`, aliceID, bobID).Scan(&removeEventCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, removeEventCount)
 }
 
 func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
@@ -777,13 +802,24 @@ func TestNotificationsIncludeWallSocialEvents(t *testing.T) {
 
 	err = module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "alice-share-key", aliceWall.CurrentVersion, "bob-share-key", bobWall.CurrentVersion)
 	require.NoError(t, err)
-	setFriendEventCreatedAt(t, module, 3000, bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 3000, "friend_add", bobID, aliceID)
 
 	page, nextCursor, err := module.Notifications.List(ctx, aliceID, "", 3)
 	require.NoError(t, err)
 	require.Len(t, page, 2)
 	require.Equal(t, "addedYouAsFriend", page[0].Type)
 	require.Equal(t, "likedPost", page[1].Type)
+	require.Empty(t, nextCursor)
+
+	err = module.Friends.DeleteFriendship(ctx, aliceID, bobWall.WallID)
+	require.NoError(t, err)
+	setFriendEventCreatedAt(t, module, 4000, "friend_remove", aliceID, bobID)
+
+	page, nextCursor, err = module.Notifications.List(ctx, bobID, "", 3)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
+	require.Equal(t, "removedYouAsFriend", page[0].Type)
+	require.Equal(t, aliceID, page[0].Actor.UserID)
 	require.Empty(t, nextCursor)
 }
 
@@ -863,8 +899,8 @@ func setPostLikeCreatedAt(t *testing.T, module *Module, createdAt, postID, userI
 	require.NoError(t, err)
 }
 
-func setFriendEventCreatedAt(t *testing.T, module *Module, createdAt, actorID, targetID int64) {
+func setFriendEventCreatedAt(t *testing.T, module *Module, createdAt int64, eventType string, actorID, targetID int64) {
 	t.Helper()
-	_, err := module.Friends.DB.Exec(`UPDATE wall_friend_events SET created_at = $1 WHERE actor_id = $2 AND target_id = $3`, createdAt, actorID, targetID)
+	_, err := module.Friends.DB.Exec(`UPDATE wall_friend_events SET created_at = $1 WHERE event_type = $2 AND actor_id = $3 AND target_id = $4`, createdAt, eventType, actorID, targetID)
 	require.NoError(t, err)
 }

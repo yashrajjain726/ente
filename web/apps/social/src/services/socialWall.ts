@@ -1,8 +1,8 @@
+import type { FriendProfile } from "data/friends";
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
 import { apiOrigin } from "ente-base/origins";
 import type { WallAccountCtxHandle, WallLinkCtxHandle } from "ente-wasm";
 import { loadEnteWasm } from "ente-wasm/load";
-import type { FriendProfile } from "data/friends";
 import type { PendingSocialInvite } from "services/socialInvite";
 import { socialInviteURL } from "services/socialInvite";
 import { ensureCurrentWallContext } from "services/socialProfile";
@@ -80,7 +80,7 @@ interface WallNotification {
         wallId: string;
         wallSlug: string;
     };
-    type: "likedPost" | "addedYouAsFriend";
+    type: "likedPost" | "addedYouAsFriend" | "removedYouAsFriend";
 }
 
 interface WallNotificationPage {
@@ -118,7 +118,7 @@ export interface SocialWallNotification {
     id: string;
     post?: SocialWallPost;
     timestampMs: number;
-    type: "added-friend" | "liked-post";
+    type: "added-friend" | "liked-post" | "removed-friend";
 }
 
 export interface SocialWallNotificationPage {
@@ -519,7 +519,9 @@ export const loadCurrentNotificationsPage =
                     const notificationType: SocialWallNotification["type"] =
                         notification.type == "addedYouAsFriend"
                             ? "added-friend"
-                            : "liked-post";
+                            : notification.type == "removedYouAsFriend"
+                              ? "removed-friend"
+                              : "liked-post";
                     return {
                         actor,
                         id: notification.id,
@@ -550,7 +552,8 @@ export const loadPublicSocialInvite = async ({
         wallUsername,
     });
     try {
-        const wallProfile = (await ctx.get_wall_profile()) as WallProfileResponse;
+        const wallProfile =
+            (await ctx.get_wall_profile()) as WallProfileResponse;
         const profile = profileFromWallProfile(wallProfile);
         profile.avatarUrl = await linkAvatarURL(ctx, wallProfile.avatar);
         const posts = await postPageFromLinkPage(
