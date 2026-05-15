@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
 use crate::crypto::{
-    decode_b64, decrypt_entity_key, decrypt_secretbox_packed, derive_wall_link_auth_key,
-    derive_wall_link_wrap_key, encode_b64, encrypt_asset_payload, encrypt_entity_key,
-    encrypt_secretbox_packed, generate_key, generate_wall_link_access_key, pack_payload,
-    unpack_payload, wall_link_access_key_material,
+    decode_b64, decrypt_entity_key, decrypt_secretbox_packed, derive_wall_link_access_key,
+    derive_wall_link_auth_key, derive_wall_link_wrap_key, encode_b64, encrypt_asset_payload,
+    encrypt_entity_key, encrypt_secretbox_packed, generate_key, pack_payload, unpack_payload,
+    wall_link_access_key_material,
 };
 use crate::error::{Result, WallError};
 use crate::models::{
@@ -920,7 +920,7 @@ impl AccountWallCtx {
             .ok_or_else(|| {
                 WallError::InvalidInput(format!("wall {wall_id} is not owned by the account"))
             })?;
-        let access_key = generate_wall_link_access_key();
+        let access_key = derive_wall_link_access_key(wall_id, &access.wall_key)?;
         let access_key_material = wall_link_access_key_material(&access_key)?;
         let auth_key = derive_wall_link_auth_key(&access_key_material)?;
         let wrap_key = derive_wall_link_wrap_key(&access_key_material)?;

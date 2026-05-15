@@ -13,12 +13,17 @@ pub fn generate_key() -> Vec<u8> {
     keys::generate_key_secure().into_vec()
 }
 
-pub fn generate_wall_link_access_key() -> String {
+fn wall_link_access_key_from_hash_input(input: &[u8]) -> Result<String> {
     let max_unbiased_value = 256 - (256 % WALL_LINK_ACCESS_KEY_ALPHABET.len());
     let mut out = String::with_capacity(WALL_LINK_ACCESS_KEY_LEN);
+    let mut counter = 0u8;
 
     while out.len() < WALL_LINK_ACCESS_KEY_LEN {
-        for value in generate_key() {
+        let mut hash_input = Vec::with_capacity(input.len() + 1);
+        hash_input.extend_from_slice(input);
+        hash_input.push(counter);
+        let digest = hash::hash(&hash_input, Some(64), None)?;
+        for value in digest {
             if usize::from(value) >= max_unbiased_value {
                 continue;
             }
@@ -30,9 +35,26 @@ pub fn generate_wall_link_access_key() -> String {
                 break;
             }
         }
+        counter = counter.wrapping_add(1);
     }
 
-    out
+    Ok(out)
+}
+
+pub fn derive_wall_link_access_key(wall_id: &str, wall_key: &[u8]) -> Result<String> {
+    let wall_id = wall_id.trim();
+    if wall_id.is_empty() || wall_key.is_empty() {
+        return Err(WallError::InvalidInput(
+            "wall id and wall key are required".into(),
+        ));
+    }
+    let mut input = Vec::with_capacity(wall_id.len() + wall_key.len() + 32);
+    input.extend_from_slice(b"ente.wall.link.access-key.v1");
+    input.push(0);
+    input.extend_from_slice(wall_id.as_bytes());
+    input.push(0);
+    input.extend_from_slice(wall_key);
+    wall_link_access_key_from_hash_input(&input)
 }
 
 pub fn wall_link_access_key_material(access_key: &str) -> Result<Vec<u8>> {
@@ -172,9 +194,12 @@ mod tests {
     }
 
     #[test]
-    fn wall_link_access_key_is_short_base62() {
-        let access_key = generate_wall_link_access_key();
+    fn wall_link_access_key_is_stable_short_base62() {
+        let wall_key = generate_key();
+        let access_key = derive_wall_link_access_key("wall_owner_main", &wall_key).unwrap();
+        let repeated = derive_wall_link_access_key("wall_owner_main", &wall_key).unwrap();
         assert_eq!(access_key.len(), 12);
+        assert_eq!(access_key, repeated);
         assert!(
             access_key
                 .bytes()
@@ -183,6 +208,13 @@ mod tests {
 
         let material = wall_link_access_key_material(&access_key).unwrap();
         assert_eq!(material.len(), 32);
+    }
+
+    #[test]
+    fn wall_link_access_key_changes_with_wall_key() {
+        let access_key_a = derive_wall_link_access_key("wall_owner_main", b"wall-key-a").unwrap();
+        let access_key_b = derive_wall_link_access_key("wall_owner_main", b"wall-key-b").unwrap();
+        assert_ne!(access_key_a, access_key_b);
     }
 
     #[test]

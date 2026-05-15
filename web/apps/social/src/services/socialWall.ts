@@ -1,5 +1,4 @@
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
-import { getKV, removeKV, setKV } from "ente-base/kv";
 import { apiOrigin } from "ente-base/origins";
 import type { WallAccountCtxHandle, WallLinkCtxHandle } from "ente-wasm";
 import { loadEnteWasm } from "ente-wasm/load";
@@ -94,21 +93,6 @@ interface WallPostLikerPage {
     nextCursor?: string;
 }
 
-interface WallLinkStatus {
-    active?: boolean;
-    keyVersion?: number;
-    wallId?: string;
-    wallSlug?: string;
-}
-
-interface StoredSocialWallLink {
-    accessKey: string;
-    keyVersion: number;
-    wallId: string;
-    wallSlug: string;
-    wallUsername: string;
-}
-
 export interface SocialWallPost {
     avatarUrl?: string | null;
     caption?: string;
@@ -156,38 +140,6 @@ export interface SocialLiker {
     id: string;
     name: string;
 }
-
-const socialWallLinkKey = (wallId: string) =>
-    `social:wall-link:${encodeURIComponent(wallId)}`;
-
-const isStoredSocialWallLink = (
-    value: unknown,
-    wallId: string,
-): value is StoredSocialWallLink => {
-    if (!value || typeof value != "object") return false;
-    const link = value as Partial<StoredSocialWallLink>;
-    return (
-        link.wallId == wallId &&
-        typeof link.accessKey == "string" &&
-        /^[0-9A-Za-z]{12}$/.test(link.accessKey) &&
-        typeof link.keyVersion == "number" &&
-        typeof link.wallSlug == "string" &&
-        typeof link.wallUsername == "string"
-    );
-};
-
-const socialWallLinkFromStored = (
-    stored: StoredSocialWallLink,
-): SocialWallLink => ({
-    accessKey: stored.accessKey,
-    url: socialInviteURL({
-        accessKey: stored.accessKey,
-        wallUsername: stored.wallUsername || stored.wallSlug,
-    }),
-    wallId: stored.wallId,
-    wallSlug: stored.wallSlug,
-    wallUsername: stored.wallUsername || stored.wallSlug,
-});
 
 const parseWallProfilePayload = (profile: string): WallProfilePayload => {
     if (!profile.trim()) return {};
@@ -366,19 +318,6 @@ export const createCurrentProfileLink = async (
 ): Promise<SocialWallLink> => {
     const ctx = await ensureCurrentWallContext();
     try {
-        const status = (await ctx.get_wall_link_status(
-            wallId,
-        )) as WallLinkStatus;
-        const stored = await getKV(socialWallLinkKey(wallId));
-        if (
-            status.active &&
-            isStoredSocialWallLink(stored, wallId) &&
-            stored.keyVersion == status.keyVersion
-        ) {
-            return socialWallLinkFromStored(stored);
-        }
-        if (!status.active) await removeKV(socialWallLinkKey(wallId));
-
         const created = (await ctx.create_wall_link(wallId)) as {
             accessKey: string;
             keyVersion: number;
@@ -386,20 +325,16 @@ export const createCurrentProfileLink = async (
             wallSlug: string;
             wallUsername: string;
         };
-        const storedLink: StoredSocialWallLink = {
+        const invite: PendingSocialInvite = {
             accessKey: created.accessKey,
-            keyVersion: created.keyVersion,
-            wallId: created.wallId,
-            wallSlug: created.wallSlug,
             wallUsername: created.wallUsername || created.wallSlug,
         };
-        await setKV(socialWallLinkKey(wallId), storedLink);
         return {
             accessKey: created.accessKey,
-            url: socialInviteURL(storedLink),
+            url: socialInviteURL(invite),
             wallId: created.wallId,
             wallSlug: created.wallSlug,
-            wallUsername: storedLink.wallUsername,
+            wallUsername: invite.wallUsername,
         };
     } finally {
         ctx.free();

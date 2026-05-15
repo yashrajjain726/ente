@@ -1,8 +1,10 @@
 package repo
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/ente-io/stacktrace"
 )
@@ -27,13 +29,51 @@ func (r *LinksRepository) UpsertLink(ctx context.Context, wallID string, authKey
 	if currentVersion != keyVersion {
 		return nil, sql.ErrNoRows
 	}
+
+	var existingAuthKeyHash []byte
+	var existingKeyVersion int
+	var existingActive bool
+	err = tx.QueryRowContext(ctx, `
+		SELECT auth_key_hash, key_version, active
+		FROM wall_links
+		WHERE wall_id = $1
+		FOR UPDATE
+	`, wallID).Scan(&existingAuthKeyHash, &existingKeyVersion, &existingActive)
+	if err == nil && bytes.Equal(existingAuthKeyHash, authKeyHash) && existingKeyVersion == keyVersion && existingActive {
+		return scanLinkRecord(tx.QueryRowContext(ctx, `
+			SELECT l.wall_id, $2::text, $3::bigint, $2::text, l.auth_key_hash, l.key_version, l.encrypted_wall_key, l.active, l.created_at, l.updated_at
+			FROM wall_links l
+			WHERE l.wall_id = $1
+		`, wallID, wallSlug, ownerID))
+	}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if err == nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM wall_link_sessions WHERE wall_id = $1`, wallID); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		link, err := scanLinkRecord(tx.QueryRowContext(ctx, `
+			UPDATE wall_links
+			SET auth_key_hash = $2,
+			    key_version = $3,
+			    encrypted_wall_key = $4,
+			    active = TRUE
+			WHERE wall_id = $1
+			RETURNING wall_id, $5::text, $6::bigint, $5::text, auth_key_hash, key_version, encrypted_wall_key, active, created_at, updated_at
+		`, wallID, authKeyHash, keyVersion, encryptedWallKey, wallSlug, ownerID))
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		return link, nil
+	}
+
 	link, err := scanLinkRecord(tx.QueryRowContext(ctx, `
 		INSERT INTO wall_links (wall_id, auth_key_hash, key_version, encrypted_wall_key, active)
 		VALUES ($1, $2, $3, $4, TRUE)
-		ON CONFLICT (wall_id, auth_key_hash) DO UPDATE
-		SET key_version = EXCLUDED.key_version,
-		    encrypted_wall_key = EXCLUDED.encrypted_wall_key,
-		    active = TRUE
 		RETURNING wall_id, $5::text, $6::bigint, $5::text, auth_key_hash, key_version, encrypted_wall_key, active, created_at, updated_at
 	`, wallID, authKeyHash, keyVersion, encryptedWallKey, wallSlug, ownerID))
 	if err != nil {
@@ -51,8 +91,6 @@ func (r *LinksRepository) GetLink(ctx context.Context, wallID string) (*WallLink
 		FROM wall_links l
 		JOIN walls w ON w.wall_id = l.wall_id
 		WHERE l.wall_id = $1 AND l.active = TRUE
-		ORDER BY l.updated_at DESC
-		LIMIT 1
 	`, wallID))
 }
 
