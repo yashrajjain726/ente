@@ -1,3 +1,4 @@
+import { Box } from "@mui/material";
 import { SocialPageMeta } from "components/SocialPageMeta";
 import { SocialRouteFallback } from "components/SocialRouteFallback";
 import { useRouter } from "next/router";
@@ -37,6 +38,55 @@ type RouteMode =
     | { kind: "checking" }
     | { kind: "app" }
     | ({ kind: "public-profile" } & PendingSocialInvite);
+
+const PublicProfileUnavailable: React.FC = () => (
+    <Box
+        className="green-bg"
+        component="main"
+        sx={{
+            alignItems: "center",
+            bgcolor: onboardingGreen,
+            boxSizing: "border-box",
+            color: "white",
+            display: "grid",
+            minHeight: "100svh",
+            placeItems: "center",
+            px: 3,
+            textAlign: "center",
+        }}
+    >
+        <Box sx={{ maxWidth: 314 }}>
+            <Box
+                component="h1"
+                sx={{
+                    fontFamily: "Nunito, sans-serif",
+                    fontSize: 24,
+                    fontWeight: 800,
+                    letterSpacing: 0,
+                    lineHeight: "29px",
+                    m: 0,
+                    whiteSpace: "nowrap",
+                }}
+            >
+                Profile unavailable
+            </Box>
+            <Box
+                component="p"
+                sx={{
+                    color: "#AAFFB8",
+                    fontFamily: '"Inter Variable", Inter, sans-serif',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    lineHeight: "20px",
+                    m: 0,
+                    mt: "6px",
+                }}
+            >
+                This profile link is invalid or expired.
+            </Box>
+        </Box>
+    </Box>
+);
 
 const parseOnboardingEntrySource = (): OnboardingEntrySource => {
     const params = new URLSearchParams(window.location.search);
@@ -111,7 +161,8 @@ const Page: React.FC = () => {
             })
             .catch((error: unknown) => {
                 console.error("Failed to load public social invite", error);
-                if (!cancelled) setPublicError("This invite link is invalid or expired.");
+                if (!cancelled)
+                    setPublicError("This profile link is invalid or expired.");
             });
 
         return () => {
@@ -146,12 +197,7 @@ const Page: React.FC = () => {
             return (
                 <>
                     <SocialPageMeta themeColor={profileBackground} />
-                    <OnboardingScreen
-                        description={publicError}
-                        onCreateAccount={() => void router.push(socialRoutes.signup)}
-                        onLogin={() => void router.push(socialRoutes.login)}
-                        title="Invite unavailable"
-                    />
+                    <PublicProfileUnavailable />
                 </>
             );
         }

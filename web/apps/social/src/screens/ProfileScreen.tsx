@@ -3,6 +3,7 @@ import {
     ArrowLeft02Icon,
     MoreHorizontalIcon,
     Settings01Icon,
+    Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
@@ -165,6 +166,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
     const [profileActionsAnchor, setProfileActionsAnchor] =
         useState<HTMLElement | null>(null);
+    const [isProfileLinkCopied, setIsProfileLinkCopied] = useState(false);
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
@@ -174,6 +176,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         useState<Record<string, ProfilePhotoDimensions>>({});
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
+    const profileLinkCopiedTimerRef = React.useRef<number | undefined>(
+        undefined,
+    );
     const isPublicProfile = headerVariant == "public";
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
@@ -201,7 +206,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           ? "like-with-count"
           : "like-only";
 
-    const closeProfileActions = () => setProfileActionsAnchor(null);
+    const clearProfileLinkCopiedTimer = () => {
+        if (profileLinkCopiedTimerRef.current == undefined) return;
+        window.clearTimeout(profileLinkCopiedTimerRef.current);
+        profileLinkCopiedTimerRef.current = undefined;
+    };
+    const openProfileActions = (anchor: HTMLElement) => {
+        clearProfileLinkCopiedTimer();
+        setIsProfileLinkCopied(false);
+        setProfileActionsAnchor(anchor);
+    };
+    const closeProfileActions = ({ resetCopied = true } = {}) => {
+        clearProfileLinkCopiedTimer();
+        if (resetCopied) setIsProfileLinkCopied(false);
+        setProfileActionsAnchor(null);
+    };
     const revokeLocalPostObjectUrl = React.useCallback((objectUrl?: string) => {
         if (!objectUrl || !localPostObjectUrlsRef.current.has(objectUrl))
             return;
@@ -274,9 +293,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     };
 
     const copyProfileURL = async () => {
-        closeProfileActions();
-        if (!onShareProfileLink) return;
+        clearProfileLinkCopiedTimer();
+        if (!onShareProfileLink) {
+            closeProfileActions();
+            return;
+        }
         await navigator.clipboard.writeText(await onShareProfileLink());
+        setIsProfileLinkCopied(true);
+        profileLinkCopiedTimerRef.current = window.setTimeout(() => {
+            closeProfileActions({ resetCopied: false });
+        }, 1200);
     };
 
     const shareProfile = async () => {
@@ -312,6 +338,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
     React.useEffect(
         () => () => {
+            clearProfileLinkCopiedTimer();
             localPostObjectUrlsRef.current.forEach((objectUrl) =>
                 URL.revokeObjectURL(objectUrl),
             );
@@ -661,9 +688,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     }
                                     aria-haspopup="menu"
                                     onClick={(event) =>
-                                        setProfileActionsAnchor(
-                                            event.currentTarget,
-                                        )
+                                        openProfileActions(event.currentTarget)
                                     }
                                     sx={{
                                         alignItems: "center",
@@ -699,7 +724,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 id="profile-actions-menu"
                                 anchorEl={profileActionsAnchor}
                                 open={isProfileActionsOpen}
-                                onClose={closeProfileActions}
+                                onClose={() => closeProfileActions()}
                                 anchorOrigin={{
                                     horizontal: "center",
                                     vertical: "bottom",
@@ -757,12 +782,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     <Box
                                         sx={{
                                             alignItems: "center",
-                                            color: textBase,
+                                            color: isProfileLinkCopied
+                                                ? green
+                                                : textBase,
                                             display: "flex",
                                             flexShrink: 0,
                                         }}
                                     >
-                                        <LinkIcon />
+                                        {isProfileLinkCopied ? (
+                                            <HugeiconsIcon
+                                                icon={Tick02Icon}
+                                                size={20}
+                                                strokeWidth={2}
+                                            />
+                                        ) : (
+                                            <LinkIcon />
+                                        )}
                                     </Box>
                                     <Box
                                         sx={{
@@ -1069,12 +1104,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 alignItems: "center",
                                 boxSizing: "border-box",
                                 display: "flex",
-                                flex: 1,
                                 flexDirection: "column",
                                 justifyContent: "center",
                                 minHeight: 0,
-                                pb: "12px",
+                                pb: 0,
+                                pointerEvents: "none",
+                                position: "absolute",
                                 px: 3,
+                                top: `${profileCoverHeight}px`,
+                                bottom: 0,
+                                insetInline: 0,
                                 textAlign: "center",
                                 width: "100%",
                             }}
@@ -1087,7 +1126,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     sx={{
                                         display: "block",
                                         height: "auto",
-                                        width: 128,
+                                        width: 160,
                                     }}
                                 />
                             )}
@@ -1101,7 +1140,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     fontWeight: 500,
                                     lineHeight: "20px",
                                     m: 0,
-                                    mt: isOwnerProfile ? "28px" : 0,
+                                    mt: isOwnerProfile ? "30px" : 0,
                                     maxWidth: isOwnerProfile ? 230 : 250,
                                 }}
                             >
@@ -1130,8 +1169,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         height: 32,
                                         justifyContent: "center",
                                         lineHeight: 0,
-                                        mt: "20px",
+                                        mt: "26px",
                                         p: 0,
+                                        pointerEvents: "auto",
                                         placeSelf: "center",
                                         placeItems: "center",
                                         width: 32,

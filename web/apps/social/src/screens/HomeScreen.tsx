@@ -805,8 +805,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 sx={{
                                     display: "block",
                                     height: "auto",
-                                    width: 156,
-                                    "@media (max-width: 340px)": { width: 140 },
+                                    width: 196,
+                                    "@media (max-width: 340px)": { width: 176 },
                                 }}
                             />
                             <Box
@@ -819,7 +819,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     fontWeight: 500,
                                     lineHeight: "20px",
                                     m: 0,
-                                    mt: "36px",
+                                    mt: "30px",
                                     maxWidth: 220,
                                 }}
                             >
@@ -846,7 +846,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                         height: 36,
                                         justifyContent: "center",
                                         lineHeight: "18px",
-                                        mt: "18px",
+                                        mt: "30px",
                                         px: "14px",
                                         whiteSpace: "nowrap",
                                         "&:focus-visible": {
@@ -857,7 +857,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     }}
                                 >
                                     <ShareIcon />
-                                    Share link
+                                    Share profile
                                 </Box>
                             )}
                         </Box>

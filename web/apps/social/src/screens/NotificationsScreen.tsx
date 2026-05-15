@@ -351,6 +351,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
     const [selectedPost, setSelectedPost] =
         React.useState<SocialViewerPhoto | null>(null);
     const profileName = profile.fullName.trim() || profile.username.trim();
+    const hasNotifications = notifications.length > 0;
     const openPost = (notification: SocialNotification) => {
         if (!notification.postThumbnailUrl) return;
 
@@ -384,6 +385,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                     boxSizing: "border-box",
                     minHeight: "100svh",
                     mx: "auto",
+                    position: "relative",
                     width: "100%",
                     "@media (min-width: 600px)": { maxWidth: 390 },
                 }}
@@ -445,30 +447,79 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                     </Box>
                 </Box>
 
-                <Box
-                    component="ul"
-                    sx={{
-                        boxSizing: "border-box",
-                        display: "flex",
-                        flexDirection: "column",
-                        m: 0,
-                        mt: "21px",
-                        pb: "28px",
-                        pl: timelineListInset,
-                        pr: thumbnailRightInset,
-                        pt: 0,
-                        width: "100%",
-                    }}
-                >
-                    {notifications.map((notification) => (
-                        <NotificationRow
-                            key={notification.id}
-                            notification={notification}
-                            onOpenFriend={onOpenFriend}
-                            onOpenPost={openPost}
-                        />
-                    ))}
-                </Box>
+                {hasNotifications ? (
+                    <Box
+                        component="ul"
+                        sx={{
+                            boxSizing: "border-box",
+                            display: "flex",
+                            flexDirection: "column",
+                            m: 0,
+                            mt: "21px",
+                            pb: "28px",
+                            pl: timelineListInset,
+                            pr: thumbnailRightInset,
+                            pt: 0,
+                            width: "100%",
+                        }}
+                    >
+                        {notifications.map((notification) => (
+                            <NotificationRow
+                                key={notification.id}
+                                notification={notification}
+                                onOpenFriend={onOpenFriend}
+                                onOpenPost={openPost}
+                            />
+                        ))}
+                    </Box>
+                ) : (
+                    <Box
+                        sx={{
+                            alignItems: "center",
+                            boxSizing: "border-box",
+                            display: "flex",
+                            flexDirection: "column",
+                            inset: 0,
+                            justifyContent: "center",
+                            pointerEvents: "none",
+                            position: "absolute",
+                            px: 3,
+                            textAlign: "center",
+                        }}
+                    >
+                        <Box
+                            component="h2"
+                            sx={{
+                                color: textBase,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 16,
+                                fontWeight: 700,
+                                letterSpacing: 0,
+                                lineHeight: "22px",
+                                m: 0,
+                            }}
+                        >
+                            No notifications yet
+                        </Box>
+                        <Box
+                            component="p"
+                            sx={{
+                                color: textSoft,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 500,
+                                lineHeight: "20px",
+                                m: 0,
+                                mt: "8px",
+                                maxWidth: 240,
+                            }}
+                        >
+                            Likes, replies and new friends will appear here.
+                        </Box>
+                    </Box>
+                )}
             </Box>
             {selectedPost && (
                 <SocialFileViewer
