@@ -17,6 +17,40 @@ const textBase = "#000";
 const rowBackground = "#FFFFFF";
 const dangerColor = "#F63A3A";
 const iconMuted = "#8C8C8C";
+const helpURL = "https://ente.com/help/photos/features/profile";
+const supportMailURL = "mailto:support@ente.com";
+const socialLinks = [
+    {
+        label: "Discord",
+        src: "/images/discord.svg",
+        url: "https://ente.com/discord",
+    },
+    {
+        label: "YouTube",
+        src: "/images/youtube.svg",
+        url: "https://www.youtube.com/@entestudio",
+    },
+    {
+        label: "GitHub",
+        src: "/images/github.svg",
+        url: "https://github.com/ente-io/ente",
+    },
+    {
+        label: "X",
+        src: "/images/new-twitter.svg",
+        url: "https://twitter.com/enteio",
+    },
+    {
+        label: "Mastodon",
+        src: "/images/mastodon.svg",
+        url: "https://fosstodon.org/@ente",
+    },
+    {
+        label: "Reddit",
+        src: "/images/reddit.svg",
+        url: "https://reddit.com/r/enteio",
+    },
+] as const;
 
 interface SettingsScreenProps {
     onLogout: () => void;
@@ -25,6 +59,7 @@ interface SettingsScreenProps {
 
 interface SettingsRowProps {
     danger?: boolean;
+    href?: string;
     icon: IconSvgElement;
     label: string;
     onClick?: () => void;
@@ -33,28 +68,35 @@ interface SettingsRowProps {
 interface SocialIconProps {
     label: string;
     src: string;
+    url: string;
 }
 
 const SettingsRow: React.FC<SettingsRowProps> = ({
     danger,
+    href,
     icon,
     label,
     onClick,
 }) => (
     <Box
-        component="button"
-        type="button"
+        component={href ? "a" : "button"}
+        href={href}
+        rel={href?.startsWith("http") ? "noopener noreferrer" : undefined}
+        target={href?.startsWith("http") ? "_blank" : undefined}
+        type={href ? undefined : "button"}
         onClick={onClick}
         sx={{
             alignItems: "center",
             bgcolor: rowBackground,
             border: 0,
             borderRadius: "20px",
+            boxSizing: "border-box",
             cursor: "pointer",
             display: "flex",
             justifyContent: "space-between",
             minHeight: 56,
             p: "8px",
+            textDecoration: "none",
             textAlign: "left",
             transition: "background-color 120ms ease",
             width: "100%",
@@ -114,11 +156,13 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
     </Box>
 );
 
-const SocialIcon: React.FC<SocialIconProps> = ({ label, src }) => (
+const SocialIcon: React.FC<SocialIconProps> = ({ label, src, url }) => (
     <Box
         aria-label={label}
-        component="button"
-        type="button"
+        component="a"
+        href={url}
+        rel="noopener noreferrer"
+        target="_blank"
         sx={{
             alignItems: "center",
             bgcolor: "transparent",
@@ -129,6 +173,7 @@ const SocialIcon: React.FC<SocialIconProps> = ({ label, src }) => (
             height: 36,
             justifyContent: "center",
             p: 0,
+            textDecoration: "none",
             transition: "background-color 120ms ease",
             width: 36,
             "&:active": { bgcolor: "rgba(0, 0, 0, 0.025)" },
@@ -252,8 +297,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                         width: "100%",
                     }}
                 >
-                    <SettingsRow icon={HelpCircleIcon} label="Help" />
-                    <SettingsRow icon={CustomerSupportIcon} label="Support" />
+                    <SettingsRow
+                        href={helpURL}
+                        icon={HelpCircleIcon}
+                        label="Help"
+                    />
+                    <SettingsRow
+                        href={supportMailURL}
+                        icon={CustomerSupportIcon}
+                        label="Support"
+                    />
                     <SettingsRow
                         danger
                         icon={Logout05Icon}
@@ -273,12 +326,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                         pb: "18px",
                     }}
                 >
-                    <SocialIcon label="Discord" src="/images/discord.svg" />
-                    <SocialIcon label="YouTube" src="/images/youtube.svg" />
-                    <SocialIcon label="GitHub" src="/images/github.svg" />
-                    <SocialIcon label="X" src="/images/new-twitter.svg" />
-                    <SocialIcon label="Mastodon" src="/images/mastodon.svg" />
-                    <SocialIcon label="Reddit" src="/images/reddit.svg" />
+                    {socialLinks.map((link) => (
+                        <SocialIcon
+                            key={link.label}
+                            label={link.label}
+                            src={link.src}
+                            url={link.url}
+                        />
+                    ))}
                 </Box>
             </Box>
             <ConfirmationActionSheet
