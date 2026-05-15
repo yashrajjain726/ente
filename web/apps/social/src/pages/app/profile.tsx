@@ -25,7 +25,7 @@ const Page: React.FC = () => {
     const { friends, profile, profileLoadStatus, setFriends } =
         useSocialAppState();
     const [posts, setPosts] = useState<SocialWallPost[]>([]);
-    const [isPostsLoading, setIsPostsLoading] = useState(false);
+    const [isPostsLoading, setIsPostsLoading] = useState(true);
     const postGroups = useMemo(() => profilePostGroupsFromPosts(posts), [posts]);
 
     useEffect(() => {
@@ -35,13 +35,19 @@ const Page: React.FC = () => {
     }, [profile, profileLoadStatus, router]);
 
     useEffect(() => {
-        if (!profile?.wallId) return;
+        if (profileLoadStatus == "loading") return;
+
+        const wallId = profile?.wallId;
+        if (!wallId) {
+            setIsPostsLoading(false);
+            return;
+        }
 
         let cancelled = false;
         setIsPostsLoading(true);
         void Promise.all([
-            loadCurrentWallPostsPage(profile.wallId),
-            loadCurrentWallFriends(profile.wallId),
+            loadCurrentWallPostsPage(wallId),
+            loadCurrentWallFriends(wallId),
         ])
             .then(([page, nextFriends]) => {
                 if (cancelled) return;
@@ -58,7 +64,7 @@ const Page: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, [profile?.wallId, setFriends]);
+    }, [profile?.wallId, profileLoadStatus, setFriends]);
 
     if (profileLoadStatus == "loading" || !profile) {
         return <SocialRouteFallback background={profileBackground} />;

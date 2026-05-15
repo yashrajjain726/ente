@@ -22,6 +22,7 @@ const Page: React.FC = () => {
     const [notifications, setNotifications] = useState<
         SocialWallNotification[]
     >([]);
+    const [isNotificationsLoading, setIsNotificationsLoading] = useState(true);
     const screenNotifications = useMemo(
         () => notifications.map(notificationForScreen),
         [notifications],
@@ -36,11 +37,23 @@ const Page: React.FC = () => {
     useEffect(() => {
         if (!profile) return;
 
+        let cancelled = false;
+        setIsNotificationsLoading(true);
         void loadCurrentNotificationsPage()
-            .then((page) => setNotifications(page.items))
+            .then((page) => {
+                if (cancelled) return;
+                setNotifications(page.items);
+            })
             .catch((error: unknown) =>
                 console.error("Failed to load notifications", error),
-            );
+            )
+            .finally(() => {
+                if (!cancelled) setIsNotificationsLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
     }, [profile]);
 
     if (profileLoadStatus == "loading" || !profile) {
@@ -51,6 +64,7 @@ const Page: React.FC = () => {
         <>
             <SocialPageMeta themeColor={notificationsBackground} />
             <NotificationsScreen
+                isNotificationsLoading={isNotificationsLoading}
                 notifications={screenNotifications}
                 onBack={() => void router.push(socialRoutes.home)}
                 onOpenFriend={(friendID) =>

@@ -13,6 +13,7 @@ import {
     type SocialViewerPhoto,
     type SocialViewerPostActionMode,
 } from "components/SocialFileViewer";
+import { SocialLoadingSpinner } from "components/SocialRouteFallback";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -1118,78 +1119,84 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 width: "100%",
                             }}
                         >
-                            {isOwnerProfile && (
-                                <Box
-                                    component="img"
-                                    alt=""
-                                    src="/images/ducky-camera.svg"
-                                    sx={{
-                                        display: "block",
-                                        height: "auto",
-                                        mt: "28px",
-                                        width: 160,
-                                    }}
-                                />
-                            )}
-                            <Box
-                                component="p"
-                                sx={{
-                                    color: textSoft,
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 14,
-                                    fontWeight: 500,
-                                    lineHeight: "20px",
-                                    m: 0,
-                                    mt: isOwnerProfile ? "30px" : 0,
-                                    maxWidth: isOwnerProfile ? 230 : 250,
-                                }}
-                            >
-                                {isPostsLoading
-                                    ? "Loading posts..."
-                                    : isOwnerProfile
-                                      ? "Your profile is looking empty. Share something with your friends."
-                                      : `${firstName} hasn't posted anything yet.`}
-                            </Box>
-                            {isOwnerProfile && !isPostsLoading && (
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    aria-label="Post photo"
-                                    onClick={openPostPhotoPicker}
-                                    sx={{
-                                        appearance: "none",
-                                        alignItems: "center",
-                                        bgcolor: "transparent",
-                                        border: 0,
-                                        boxSizing: "border-box",
-                                        color: textBase,
-                                        cursor: "pointer",
-                                        display: "flex",
-                                        fontSize: 0,
-                                        height: 32,
-                                        justifyContent: "center",
-                                        lineHeight: 0,
-                                        mt: "26px",
-                                        p: 0,
-                                        pointerEvents: "auto",
-                                        placeSelf: "center",
-                                        placeItems: "center",
-                                        width: 32,
-                                        "& svg": { display: "block" },
-                                        "&:focus-visible": {
-                                            borderRadius: "6px",
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                    }}
-                                >
-                                    <HugeiconsIcon
-                                        icon={AddSquareIcon}
-                                        size={28}
-                                        strokeWidth={1.8}
-                                    />
-                                </Box>
+                            {isPostsLoading ? (
+                                <SocialLoadingSpinner ariaLabel="Loading posts" />
+                            ) : (
+                                <>
+                                    {isOwnerProfile && (
+                                        <Box
+                                            component="img"
+                                            alt=""
+                                            src="/images/ducky-camera.svg"
+                                            sx={{
+                                                display: "block",
+                                                height: "auto",
+                                                mt: "28px",
+                                                width: 160,
+                                            }}
+                                        />
+                                    )}
+                                    <Box
+                                        component="p"
+                                        sx={{
+                                            color: textSoft,
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 14,
+                                            fontWeight: 500,
+                                            lineHeight: "20px",
+                                            m: 0,
+                                            mt: isOwnerProfile ? "30px" : 0,
+                                            maxWidth: isOwnerProfile
+                                                ? 230
+                                                : 250,
+                                        }}
+                                    >
+                                        {isOwnerProfile
+                                            ? "Your profile is looking empty. Share something with your friends."
+                                            : `${firstName} hasn't posted anything yet.`}
+                                    </Box>
+                                    {isOwnerProfile && (
+                                        <Box
+                                            component="button"
+                                            type="button"
+                                            aria-label="Post photo"
+                                            onClick={openPostPhotoPicker}
+                                            sx={{
+                                                appearance: "none",
+                                                alignItems: "center",
+                                                bgcolor: "transparent",
+                                                border: 0,
+                                                boxSizing: "border-box",
+                                                color: textBase,
+                                                cursor: "pointer",
+                                                display: "flex",
+                                                fontSize: 0,
+                                                height: 32,
+                                                justifyContent: "center",
+                                                lineHeight: 0,
+                                                mt: "26px",
+                                                p: 0,
+                                                pointerEvents: "auto",
+                                                placeSelf: "center",
+                                                placeItems: "center",
+                                                width: 32,
+                                                "& svg": { display: "block" },
+                                                "&:focus-visible": {
+                                                    borderRadius: "6px",
+                                                    outline: `2px solid ${green}`,
+                                                    outlineOffset: 2,
+                                                },
+                                            }}
+                                        >
+                                            <HugeiconsIcon
+                                                icon={AddSquareIcon}
+                                                size={28}
+                                                strokeWidth={1.8}
+                                            />
+                                        </Box>
+                                    )}
+                                </>
                             )}
                         </Box>
                     )}

@@ -6,6 +6,7 @@ import {
     type SocialLiker,
     type SocialViewerPhoto,
 } from "components/SocialFileViewer";
+import { SocialLoadingSpinner } from "components/SocialRouteFallback";
 import type { FriendProfile } from "data/friends";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
@@ -39,6 +40,7 @@ interface SocialNotification {
 }
 
 interface NotificationsScreenProps {
+    isNotificationsLoading?: boolean;
     onBack?: () => void;
     onOpenFriend?: (friendID: string) => void;
     profile: SetupProfile;
@@ -341,6 +343,7 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
 };
 
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
+    isNotificationsLoading = false,
     notifications,
     onBack,
     onLoadPostLikers,
@@ -472,6 +475,22 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                             />
                         ))}
                     </Box>
+                ) : isNotificationsLoading ? (
+                    <Box
+                        sx={{
+                            alignItems: "center",
+                            boxSizing: "border-box",
+                            display: "flex",
+                            inset: 0,
+                            justifyContent: "center",
+                            pointerEvents: "none",
+                            position: "absolute",
+                            px: 3,
+                            textAlign: "center",
+                        }}
+                    >
+                        <SocialLoadingSpinner ariaLabel="Loading notifications" />
+                    </Box>
                 ) : (
                     <Box
                         sx={{
@@ -516,7 +535,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                                 maxWidth: 240,
                             }}
                         >
-                            Likes and replies on your posts will appear here.
+                            Likes, replies and new friends will appear here.
                         </Box>
                     </Box>
                 )}

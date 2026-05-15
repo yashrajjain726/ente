@@ -18,6 +18,12 @@ import { firstNameFrom } from "utils/socialDisplay";
 import { socialRoutes } from "utils/socialRoutes";
 import { socialPostToViewerPhoto } from "utils/socialWallDisplay";
 
+const loadingHomeProfile = {
+    avatarUrl: null,
+    fullName: "",
+    username: "",
+};
+
 const Page: React.FC = () => {
     const router = useRouter();
     const { friends, profile, profileLoadStatus, setFriends } =
@@ -80,9 +86,11 @@ const Page: React.FC = () => {
         };
     }, [profile?.wallId, profileLoadStatus, setFriends]);
 
-    if (profileLoadStatus == "loading" || !profile || isFeedLoading) {
+    if (profileLoadStatus == "ready" && !profile) {
         return <SocialRouteFallback background={homeBackground} />;
     }
+
+    const screenProfile = profile ?? loadingHomeProfile;
 
     return (
         <>
@@ -92,10 +100,10 @@ const Page: React.FC = () => {
                 friendsCount={friends.length}
                 addedFriendToastName={addedFriendToastName}
                 isFeedLoading={isFeedLoading}
-                profile={profile}
+                profile={screenProfile}
                 onAddedFriendToastClose={closeAddedFriendToast}
                 onCreatePost={async (file, caption) => {
-                    if (!profile.wallId) throw new Error("Missing wall.");
+                    if (!profile?.wallId) throw new Error("Missing wall.");
                     const post = await createCurrentPhotoPost({
                         caption,
                         file,
@@ -115,7 +123,7 @@ const Page: React.FC = () => {
                 onLoadPostLikers={loadCurrentPostLikers}
                 onSetPostLiked={setCurrentPostLiked}
                 onShareProfileLink={async () => {
-                    if (!profile.wallId) throw new Error("Missing wall.");
+                    if (!profile?.wallId) throw new Error("Missing wall.");
                     return (await createCurrentProfileLink(profile.wallId)).url;
                 }}
             />
