@@ -150,12 +150,10 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor s
 			JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
 			JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
 			WHERE p.is_deleted = FALSE
-		  AND (
-		    p.owner_id = $1 OR
-		    EXISTS (
-		      SELECT 1 FROM wall_friend_shares fs
-		      WHERE fs.friend_id = $1 AND fs.wall_id = p.wall_id
-		    )
+			  AND p.owner_id <> $1
+			  AND EXISTS (
+			    SELECT 1 FROM wall_friend_shares fs
+			    WHERE fs.friend_id = $1 AND fs.wall_id = p.wall_id
 			  )`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorPostID)

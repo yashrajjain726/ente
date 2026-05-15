@@ -39,6 +39,7 @@ const profileAvatarTopOffset = 54;
 const profileAvatarSize = 120;
 const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
+const ownerEmptyStateGap = "18px";
 const photoMasonryGap = "3px";
 const photoMasonryRadius = "12px";
 interface ProfilePhotoDimensions {
@@ -1129,7 +1130,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                             sx={{
                                                 display: "block",
                                                 height: "auto",
-                                                mt: "28px",
+                                                mt: ownerEmptyStateGap,
                                                 width: 160,
                                             }}
                                         />
@@ -1144,7 +1145,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                             fontWeight: 500,
                                             lineHeight: "20px",
                                             m: 0,
-                                            mt: isOwnerProfile ? "30px" : 0,
+                                            mt: isOwnerProfile
+                                                ? ownerEmptyStateGap
+                                                : 0,
                                             maxWidth: isOwnerProfile
                                                 ? 230
                                                 : 250,
@@ -1173,7 +1176,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                 height: 32,
                                                 justifyContent: "center",
                                                 lineHeight: 0,
-                                                mt: "26px",
+                                                mt: ownerEmptyStateGap,
                                                 p: 0,
                                                 pointerEvents: "auto",
                                                 placeSelf: "center",

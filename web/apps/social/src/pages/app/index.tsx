@@ -107,7 +107,6 @@ const Page: React.FC = () => {
                         width: image.width,
                     });
                     if (!post) throw new Error("Couldn't create post.");
-                    setFeedItems((currentItems) => [post, ...currentItems]);
                     return socialPostToViewerPhoto(post);
                 }}
                 onOpenFriend={(friendID) =>
