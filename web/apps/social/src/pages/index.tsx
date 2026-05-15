@@ -14,7 +14,10 @@ import { PublicProfileScreen } from "screens/PublicProfileScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import {
     clearPendingSocialInvite,
+    clearPendingSocialInviteFriend,
+    saveAcceptedSocialInviteFriend,
     savePendingSocialInvite,
+    savePendingSocialInviteFriend,
     socialInviteFromLocation,
     type PendingSocialInvite,
 } from "services/socialInvite";
@@ -24,8 +27,8 @@ import {
     type SocialWallPost,
 } from "services/socialWall";
 import {
-    type OnboardingEntrySource,
     useSocialAppState,
+    type OnboardingEntrySource,
 } from "state/socialAppState";
 import {
     addFriendLinkOnboardingSource,
@@ -210,12 +213,22 @@ const Page: React.FC = () => {
                     postGroups={publicPostGroups}
                     profile={publicProfile}
                     onAddFriend={() => {
+                        const inviteFriend = {
+                            fullName: publicProfile.fullName,
+                            username: publicProfile.username,
+                        };
+
                         savePendingSocialInvite(routeMode);
+                        savePendingSocialInviteFriend(inviteFriend);
                         setOnboardingEntrySource("add-friend-link");
                         if (profile) {
                             void joinSocialInvite(routeMode)
                                 .then(() => {
                                     clearPendingSocialInvite();
+                                    clearPendingSocialInviteFriend();
+                                    saveAcceptedSocialInviteFriend(
+                                        inviteFriend,
+                                    );
                                     void router.push(socialRoutes.home);
                                 })
                                 .catch((error: unknown) =>

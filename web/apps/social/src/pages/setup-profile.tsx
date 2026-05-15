@@ -8,7 +8,10 @@ import {
 } from "screens/SetupProfileScreen";
 import {
     clearPendingSocialInvite,
+    clearPendingSocialInviteFriend,
+    saveAcceptedSocialInviteFriend,
     savedPendingSocialInvite,
+    savedPendingSocialInviteFriend,
 } from "services/socialInvite";
 import {
     saveSocialProfile,
@@ -50,8 +53,14 @@ const Page: React.FC = () => {
         const pendingInvite = savedPendingSocialInvite();
         if (!pendingInvite) return;
 
+        const pendingFriend = savedPendingSocialInviteFriend() ?? {
+            fullName: "",
+            username: pendingInvite.wallUsername,
+        };
         await joinSocialInvite(pendingInvite);
         clearPendingSocialInvite();
+        clearPendingSocialInviteFriend();
+        saveAcceptedSocialInviteFriend(pendingFriend);
     }, []);
 
     useEffect(() => {

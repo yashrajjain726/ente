@@ -1,7 +1,9 @@
 import {
     AddSquareIcon,
     FavouriteIcon,
+    MultiplicationSignIcon,
     NotificationIcon,
+    UserCheck01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
@@ -12,6 +14,7 @@ import {
     type SocialViewerPhoto,
     type SocialViewerPostActionMode,
 } from "components/SocialFileViewer";
+import { SocialLoadingSpinner } from "components/SocialRouteFallback";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -43,11 +46,14 @@ const headerIconSize = 23;
 const headerSideWidth = headerActionSize * 2 + headerActionGap;
 const feedLikeActionInset = 4;
 const feedLikeActionSize = 40;
+const emptyFeedItemGap = "22px";
 
 interface HomeScreenProps {
+    addedFriendToastName?: string;
     feedItems: SocialWallPost[];
     friendsCount: number;
     isFeedLoading?: boolean;
+    onAddedFriendToastClose?: () => void;
     onCreatePost?: (file: File, caption: string) => Promise<SocialViewerPhoto>;
     onOpenFriend?: (friendID: string) => void;
     onOpenNotifications?: () => void;
@@ -87,6 +93,11 @@ interface FeedItemProps {
     postId: number;
     timestampMs: number;
     viewerLiked: boolean;
+}
+
+interface AddedFriendToastProps {
+    name: string;
+    onClose?: () => void;
 }
 
 const dimensionsFromAspectRatio = (
@@ -165,9 +176,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
         setIsLikeButtonPopping(true);
         const nextLiked = !isLiked;
         setIsLiked(nextLiked);
-        setLocalLikeCount((count) =>
-            Math.max(0, count + (nextLiked ? 1 : -1)),
-        );
+        setLocalLikeCount((count) => Math.max(0, count + (nextLiked ? 1 : -1)));
         void onSetPostLiked?.(postId, nextLiked).catch((error: unknown) => {
             console.error("Failed to update post like", error);
             setIsLiked(!nextLiked);
@@ -420,10 +429,111 @@ const FeedItem: React.FC<FeedItemProps> = ({
     );
 };
 
+const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
+    name,
+    onClose,
+}) => (
+    <Box
+        sx={{
+            bottom: "calc(env(safe-area-inset-bottom) + 16px)",
+            boxSizing: "border-box",
+            left: "50%",
+            maxWidth: 390,
+            px: 2,
+            pointerEvents: "none",
+            position: "fixed",
+            transform: "translateX(-50%)",
+            width: "100%",
+            zIndex: 20,
+        }}
+    >
+        <Box
+            className="green-bg"
+            role="status"
+            aria-live="polite"
+            sx={{
+                alignItems: "center",
+                bgcolor: green,
+                borderRadius: "18px",
+                boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
+                boxSizing: "border-box",
+                color: "#FFFFFF",
+                display: "flex",
+                fontFamily: '"Inter Variable", Inter, sans-serif',
+                fontSize: 14,
+                fontWeight: 650,
+                gap: "10px",
+                lineHeight: "20px",
+                minHeight: 48,
+                pointerEvents: "auto",
+                pl: "16px",
+                pr: "10px",
+                py: "10px",
+                width: "100%",
+            }}
+        >
+            <Box component="span" sx={{ display: "flex", flexShrink: 0 }}>
+                <HugeiconsIcon
+                    icon={UserCheck01Icon}
+                    size={20}
+                    strokeWidth={1.8}
+                />
+            </Box>
+            <Box
+                component="span"
+                sx={{
+                    flex: "1 1 auto",
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                }}
+            >
+                You&apos;re now friends with {name}!
+            </Box>
+            <Box
+                component="button"
+                type="button"
+                aria-label="Close"
+                onClick={onClose}
+                sx={{
+                    alignItems: "center",
+                    appearance: "none",
+                    bgcolor: "transparent",
+                    border: 0,
+                    borderRadius: "50%",
+                    color: "#FFFFFF",
+                    cursor: onClose ? "pointer" : "default",
+                    display: "flex",
+                    flexShrink: 0,
+                    height: 24,
+                    justifyContent: "center",
+                    opacity: 0.9,
+                    p: 0,
+                    width: 24,
+                    "&:focus-visible": {
+                        outline: "2px solid rgba(255 255 255 / 0.9)",
+                        outlineOffset: 2,
+                    },
+                    "&:hover": { bgcolor: "rgba(255, 255, 255, 0.12)" },
+                }}
+            >
+                <HugeiconsIcon
+                    icon={MultiplicationSignIcon}
+                    size={16}
+                    strokeWidth={2}
+                />
+            </Box>
+        </Box>
+    </Box>
+);
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
+    addedFriendToastName,
     feedItems,
     friendsCount,
     isFeedLoading = false,
+    onAddedFriendToastClose,
     onCreatePost,
     onLoadPostLikers,
     onOpenFriend,
@@ -439,12 +549,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
     const hasFeedItems = feedItems.length > 0;
+    const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
     const emptyFeedMessage =
-        isFeedLoading
-            ? "Loading posts..."
-            : friendsCount == 0
-              ? "When you add friends, their posts will appear here."
-              : "When your friends share posts, they'll appear here.";
+        friendsCount == 0
+            ? "When you add friends, their posts will appear here."
+            : "When your friends share posts, they'll appear here.";
     const initialsSource = profile.fullName.trim() || profile.username.trim();
     const initials = initialsFor(initialsSource);
     const revokeLocalPostObjectUrl = React.useCallback((objectUrl?: string) => {
@@ -786,6 +895,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 viewerLiked={item.viewerLiked}
                             />
                         ))
+                    ) : isEmptyFeedLoading ? (
+                        <Box
+                            sx={{
+                                alignItems: "center",
+                                display: "flex",
+                                justifyContent: "center",
+                                width: "100%",
+                            }}
+                        >
+                            <SocialLoadingSpinner ariaLabel="Loading posts" />
+                        </Box>
                     ) : (
                         <Box
                             sx={{
@@ -819,7 +939,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     fontWeight: 500,
                                     lineHeight: "20px",
                                     m: 0,
-                                    mt: "30px",
+                                    mt: emptyFeedItemGap,
                                     maxWidth: 220,
                                 }}
                             >
@@ -846,7 +966,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                         height: 36,
                                         justifyContent: "center",
                                         lineHeight: "18px",
-                                        mt: "30px",
+                                        mt: emptyFeedItemGap,
                                         px: "14px",
                                         whiteSpace: "nowrap",
                                         "&:focus-visible": {
@@ -912,6 +1032,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 : undefined
                         }
                         onSetPostLiked={onSetPostLiked}
+                    />
+                )}
+                {addedFriendToastName && (
+                    <AddedFriendToast
+                        name={addedFriendToastName}
+                        onClose={onAddedFriendToastClose}
                     />
                 )}
             </Box>
