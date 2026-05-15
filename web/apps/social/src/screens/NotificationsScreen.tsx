@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import {
     SocialFileViewer,
+    type SocialLiker,
     type SocialViewerPhoto,
 } from "components/SocialFileViewer";
 import type { FriendProfile } from "data/friends";
@@ -31,6 +32,7 @@ type NotificationType = "liked-post" | "added-friend";
 interface SocialNotification {
     actor: Pick<FriendProfile, "avatarUrl" | "fullName" | "id" | "username">;
     id: string;
+    post?: SocialViewerPhoto;
     postThumbnailUrl?: string;
     timestampMs: number;
     type: NotificationType;
@@ -40,6 +42,9 @@ interface NotificationsScreenProps {
     onBack?: () => void;
     onOpenFriend?: (friendID: string) => void;
     profile: SetupProfile;
+    notifications: SocialNotification[];
+    onLoadPostLikers?: (postId: number) => Promise<SocialLiker[]>;
+    onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
 }
 
 interface NotificationRowProps {
@@ -48,84 +53,7 @@ interface NotificationRowProps {
     onOpenPost?: (notification: SocialNotification) => void;
 }
 
-const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
-const hoursAgo = (hours: number) => minutesAgo(hours * 60);
-const daysAgo = (days: number) => hoursAgo(days * 24);
 const microsForTimestamp = (timestampMs: number) => timestampMs * 1000;
-
-const sampleActors = {
-    aparna: {
-        avatarUrl: "/images/sample-feed-4.jpg",
-        fullName: "Aparna Bhatnagar",
-        id: "aparna-bhatnagar",
-        username: "aparnab",
-    },
-    dev: {
-        avatarUrl: "/images/sample-feed-1.jpg",
-        fullName: "Dev Shah",
-        id: "dev-shah",
-        username: "devshah",
-    },
-    isha: {
-        avatarUrl: "/images/sample-feed-2.jpg",
-        fullName: "Isha Mehta",
-        id: "isha-mehta",
-        username: "ishamehta",
-    },
-    kabir: {
-        avatarUrl: "/images/sample-avatar.jpg",
-        fullName: "Kabir Menon",
-        id: "kabir-menon",
-        username: "kabirmenon",
-    },
-    mira: {
-        avatarUrl: "/images/sample-feed-3.jpg",
-        fullName: "Mira Sen",
-        id: "mira-sen",
-        username: "mirasen",
-    },
-    nikhil: {
-        avatarUrl: "/images/sample-feed-5.jpg",
-        fullName: "Nikhil Rao",
-        id: "nikhil-rao",
-        username: "nikhilrao",
-    },
-    riya: {
-        avatarUrl: "/images/sample-feed-6.jpg",
-        fullName: "Riya Kapoor",
-        id: "riya-kapoor",
-        username: "riyakapoor",
-    },
-} satisfies Record<string, SocialNotification["actor"]>;
-
-const sampleNotifications: SocialNotification[] = [
-    {
-        actor: sampleActors.mira,
-        id: "mira-liked-post",
-        postThumbnailUrl: "/images/sample-feed-1.jpg",
-        timestampMs: minutesAgo(12),
-        type: "liked-post",
-    },
-    {
-        actor: sampleActors.dev,
-        id: "dev-added-friend",
-        timestampMs: hoursAgo(8),
-        type: "added-friend",
-    },
-    {
-        actor: sampleActors.kabir,
-        id: "kabir-liked-post",
-        postThumbnailUrl: "/images/sample-feed-portrait-1.jpg",
-        timestampMs: daysAgo(2),
-        type: "liked-post",
-    },
-    {
-        actor: sampleActors.mira,
-        id: "mira-added-friend",
-        timestampMs: daysAgo(8),
-        type: "added-friend",
-    },
-];
 
 const LikedPhotoIcon: React.FC = () => (
     <svg
@@ -413,8 +341,11 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
 };
 
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
+    notifications,
     onBack,
+    onLoadPostLikers,
     onOpenFriend,
+    onSetPostLiked,
     profile,
 }) => {
     const [selectedPost, setSelectedPost] =
@@ -423,13 +354,15 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
     const openPost = (notification: SocialNotification) => {
         if (!notification.postThumbnailUrl) return;
 
-        setSelectedPost({
-            alt: `${profileName} post`,
-            avatarUrl: profile.avatarUrl,
-            imageUrl: notification.postThumbnailUrl,
-            name: profileName,
-            timestampMs: notification.timestampMs,
-        });
+        setSelectedPost(
+            notification.post ?? {
+                alt: `${profileName} post`,
+                avatarUrl: profile.avatarUrl,
+                imageUrl: notification.postThumbnailUrl,
+                name: profileName,
+                timestampMs: notification.timestampMs,
+            },
+        );
     };
 
     return (
@@ -527,7 +460,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                         width: "100%",
                     }}
                 >
-                    {sampleNotifications.map((notification) => (
+                    {notifications.map((notification) => (
                         <NotificationRow
                             key={notification.id}
                             notification={notification}
@@ -539,13 +472,11 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
             </Box>
             {selectedPost && (
                 <SocialFileViewer
-                    currentUser={{
-                        avatarUrl: profile.avatarUrl,
-                        name: profileName,
-                    }}
                     onClose={() => setSelectedPost(null)}
+                    onLoadPostLikers={onLoadPostLikers}
                     photo={selectedPost}
                     postActionMode="like-with-count"
+                    onSetPostLiked={onSetPostLiked}
                 />
             )}
         </Box>

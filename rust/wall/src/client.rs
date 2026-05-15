@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
 use crate::crypto::{
-    decode_b64, decode_b64_url, decrypt_entity_key, decrypt_secretbox_packed,
-    derive_wall_link_auth_key, derive_wall_link_wrap_key, encode_b64, encode_b64_url,
-    encrypt_asset_payload, encrypt_entity_key, encrypt_secretbox_packed, generate_key,
-    pack_payload, unpack_payload,
+    decode_b64, decrypt_entity_key, decrypt_secretbox_packed, derive_wall_link_auth_key,
+    derive_wall_link_wrap_key, encode_b64, encrypt_asset_payload, encrypt_entity_key,
+    encrypt_secretbox_packed, generate_key, generate_wall_link_access_key, pack_payload,
+    unpack_payload, wall_link_access_key_material,
 };
 use crate::error::{Result, WallError};
 use crate::models::{
@@ -920,9 +920,10 @@ impl AccountWallCtx {
             .ok_or_else(|| {
                 WallError::InvalidInput(format!("wall {wall_id} is not owned by the account"))
             })?;
-        let access_key = generate_key();
-        let auth_key = derive_wall_link_auth_key(&access_key)?;
-        let wrap_key = derive_wall_link_wrap_key(&access_key)?;
+        let access_key = generate_wall_link_access_key();
+        let access_key_material = wall_link_access_key_material(&access_key)?;
+        let auth_key = derive_wall_link_auth_key(&access_key_material)?;
+        let wrap_key = derive_wall_link_wrap_key(&access_key_material)?;
         let request = WallLinkCreateRequest {
             wall_id: wall_id.to_owned(),
             auth_key: encode_b64(&auth_key),
@@ -931,7 +932,7 @@ impl AccountWallCtx {
         };
         let status: WallLinkStatusResponse = self.client.post_json("/wall/links", &request).await?;
         Ok(CreatedWallLink {
-            access_key: encode_b64_url(&access_key),
+            access_key,
             wall_username: status.wall_slug.clone(),
             wall_id: wall_id.to_owned(),
             wall_slug: status.wall_slug,
@@ -1021,9 +1022,9 @@ fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
 
 impl WallLinkCtx {
     pub async fn open(input: OpenWallLinkCtxInput) -> Result<Self> {
-        let access_key = decode_b64_url(&input.access_key)?;
-        let auth_key = derive_wall_link_auth_key(&access_key)?;
-        let wrap_key = derive_wall_link_wrap_key(&access_key)?;
+        let access_key_material = wall_link_access_key_material(&input.access_key)?;
+        let auth_key = derive_wall_link_auth_key(&access_key_material)?;
+        let wrap_key = derive_wall_link_wrap_key(&access_key_material)?;
         let client = build_http_client(
             &input.base_url,
             None,
@@ -1309,6 +1310,7 @@ fn decrypt_wall_profile(
         wall_id: profile.wall_id.clone(),
         wall_slug: profile.wall_slug.clone(),
         version: profile.version,
+        friends: profile.friends,
         profile: profile_bytes,
         avatar: profile.avatar.clone(),
         updated_at: if profile.updated_at.is_empty() {
@@ -1443,9 +1445,11 @@ mod tests {
     async fn wall_link_open_decrypts_current_wall_key() {
         let mut server = Server::new_async().await;
         let wall_key = generate_key();
-        let access_key = generate_key();
-        let auth_key = derive_wall_link_auth_key(&access_key).expect("auth key");
-        let wrap_key = derive_wall_link_wrap_key(&access_key).expect("wrap key");
+        let access_key = "AbC123xYz789";
+        let access_key_material =
+            wall_link_access_key_material(access_key).expect("access key material");
+        let auth_key = derive_wall_link_auth_key(&access_key_material).expect("auth key");
+        let wrap_key = derive_wall_link_wrap_key(&access_key_material).expect("wrap key");
         let encrypted_wall_key = encode_b64(
             &encrypt_secretbox_packed(&wrap_key, &wall_key).expect("encrypted wall key"),
         );
@@ -1492,7 +1496,7 @@ mod tests {
         let ctx = WallLinkCtx::open(OpenWallLinkCtxInput {
             base_url: server.url(),
             wall_username: "@owner-gallery".to_owned(),
-            access_key: encode_b64_url(&access_key),
+            access_key: access_key.to_owned(),
             user_agent: None,
             client_package: None,
             client_version: None,
@@ -1512,10 +1516,16 @@ mod tests {
     async fn wall_link_open_rejects_wrong_access_key() {
         let mut server = Server::new_async().await;
         let wall_key = generate_key();
-        let correct_access_key = generate_key();
-        let wrong_access_key = generate_key();
-        let wrong_auth_key = derive_wall_link_auth_key(&wrong_access_key).expect("auth key");
-        let correct_wrap_key = derive_wall_link_wrap_key(&correct_access_key).expect("wrap key");
+        let correct_access_key = "CorrectKey12";
+        let wrong_access_key = "WrongKey1234";
+        let correct_access_key_material =
+            wall_link_access_key_material(correct_access_key).expect("correct access key material");
+        let wrong_access_key_material =
+            wall_link_access_key_material(wrong_access_key).expect("wrong access key material");
+        let wrong_auth_key =
+            derive_wall_link_auth_key(&wrong_access_key_material).expect("auth key");
+        let correct_wrap_key =
+            derive_wall_link_wrap_key(&correct_access_key_material).expect("wrap key");
         let encrypted_wall_key = encode_b64(
             &encrypt_secretbox_packed(&correct_wrap_key, &wall_key).expect("encrypted wall key"),
         );
@@ -1561,7 +1571,7 @@ mod tests {
         let err = match WallLinkCtx::open(OpenWallLinkCtxInput {
             base_url: server.url(),
             wall_username: "owner-gallery".to_owned(),
-            access_key: encode_b64_url(&wrong_access_key),
+            access_key: wrong_access_key.to_owned(),
             user_agent: None,
             client_package: None,
             client_version: None,
@@ -2004,6 +2014,7 @@ mod tests {
                     "wallId": "wall_owner_main",
                     "wallSlug": "owner-main",
                     "version": 3,
+                    "friends": 2,
                     "encryptedProfile": encrypted_profile,
                     "updatedAt": "2026-04-16T00:00:00Z"
                 })
@@ -2044,6 +2055,7 @@ mod tests {
         assert_eq!(decrypted.wall_id, "wall_owner_main");
         assert_eq!(decrypted.wall_slug, "owner-main");
         assert_eq!(decrypted.version, 3);
+        assert_eq!(decrypted.friends, 2);
         assert_eq!(decrypted.profile, b"profile-json");
         profile.assert_async().await;
         entity.assert_async().await;
@@ -2552,6 +2564,13 @@ mod tests {
         assert!(status_response.active);
         assert_eq!(created.wall_id, "wall_owner_main");
         assert_eq!(created.wall_username, "owner-main");
+        assert_eq!(created.access_key.len(), 12);
+        assert!(
+            created
+                .access_key
+                .bytes()
+                .all(|value| value.is_ascii_alphanumeric())
+        );
         assert_eq!(created.key_version, 3);
         status.assert_async().await;
         entity.assert_async().await;

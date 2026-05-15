@@ -1,17 +1,22 @@
 import { SocialPageMeta } from "components/SocialPageMeta";
 import { SocialRouteFallback } from "components/SocialRouteFallback";
 import { useRouter } from "next/router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     SetupProfileScreen,
     setupProfileBackground,
 } from "screens/SetupProfileScreen";
+import {
+    clearPendingSocialInvite,
+    savedPendingSocialInvite,
+} from "services/socialInvite";
 import {
     saveSocialProfile,
     socialProfileErrorMessage,
     socialUsernameAvailability,
     socialUsernameValidationError,
 } from "services/socialProfile";
+import { joinSocialInvite } from "services/socialWall";
 import { useSocialAppState } from "state/socialAppState";
 import { setupProfileSourceFromQuery, socialRoutes } from "utils/socialRoutes";
 
@@ -41,15 +46,33 @@ const Page: React.FC = () => {
         [backSource, isAddFriendLinkOnboarding],
     );
 
+    const acceptPendingInvite = useCallback(async () => {
+        const pendingInvite = savedPendingSocialInvite();
+        if (!pendingInvite) return;
+
+        await joinSocialInvite(pendingInvite);
+        clearPendingSocialInvite();
+    }, []);
+
     useEffect(() => {
         if (router.isReady) void refreshProfile();
     }, [refreshProfile, router.isReady]);
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && profile) {
-            void router.replace(existingProfileRoute);
+            void acceptPendingInvite()
+                .catch((error: unknown) =>
+                    console.error("Failed to accept pending invite", error),
+                )
+                .finally(() => void router.replace(existingProfileRoute));
         }
-    }, [existingProfileRoute, profile, profileLoadStatus, router]);
+    }, [
+        acceptPendingInvite,
+        existingProfileRoute,
+        profile,
+        profileLoadStatus,
+        router,
+    ]);
 
     useEffect(() => {
         if (profileLoadStatus != "ready" || profile) return;
@@ -115,6 +138,7 @@ const Page: React.FC = () => {
                     try {
                         const savedProfile =
                             await saveSocialProfile(nextProfile);
+                        await acceptPendingInvite();
                         setProfile(savedProfile);
                         void router.push(
                             isAddFriendLinkOnboarding

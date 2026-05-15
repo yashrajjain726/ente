@@ -176,6 +176,7 @@ type WallProfileResponse struct {
 	EncryptedProfile string                 `json:"encryptedProfile,omitempty"`
 	UpdatedAt        string                 `json:"updatedAt,omitempty"`
 	Avatar           *ProfileAvatarResponse `json:"avatar,omitempty"`
+	Friends          int64                  `json:"friends"`
 }
 
 type UpdateWallSlugRequest struct {

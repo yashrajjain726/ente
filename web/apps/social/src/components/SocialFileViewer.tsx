@@ -53,11 +53,6 @@ const postButtonSpin = keyframes`
     }
 `;
 
-interface SocialViewerUser {
-    avatarUrl?: string | null;
-    name: string;
-}
-
 export type SocialViewerInitialScreen = "photo" | "likes";
 
 export type SocialViewerPostActionMode =
@@ -84,77 +79,37 @@ const socialViewerPostActionConfigs: Record<
 export interface SocialViewerPhoto {
     alt?: string;
     avatarUrl?: string | null;
+    caption?: string;
     friendID?: string;
     height?: number;
     imageUrl: string;
+    likeCount?: number;
     name: string;
+    postId?: number;
     timestampMs: number;
+    viewerLiked?: boolean;
     width?: number;
 }
 
 interface SocialFileViewerProps {
-    currentUser?: SocialViewerUser;
     initialScreen?: SocialViewerInitialScreen;
     onClose: () => void;
-    onDeletePost?: () => void;
+    onDeletePost?: () => Promise<void> | void;
+    onLoadPostLikers?: (postId: number) => Promise<SocialLiker[]>;
     onOpenFriend?: (friendID: string) => void;
     onOpenProfile?: () => void;
+    onPublishDraftPost?: (caption: string) => Promise<void>;
+    onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     photo: SocialViewerPhoto;
     postActionMode?: SocialViewerPostActionMode;
 }
 
-interface SocialLiker {
+export interface SocialLiker {
     id: string;
     avatarUrl?: string | null;
     friendID?: string;
     name: string;
 }
-
-const mockPhotoLikers: SocialLiker[] = [
-    {
-        id: "mira",
-        avatarUrl: "/images/sample-feed-3.jpg",
-        friendID: "mira-sen",
-        name: "Mira Sen",
-    },
-    {
-        id: "kabir",
-        avatarUrl: "/images/sample-feed-1.jpg",
-        friendID: "kabir-menon",
-        name: "Kabir Menon",
-    },
-    {
-        id: "devika",
-        avatarUrl: "/images/sample-feed-2.jpg",
-        friendID: "isha-mehta",
-        name: "Isha Mehta",
-    },
-    {
-        id: "nikhil",
-        avatarUrl: "/images/sample-feed-5.jpg",
-        friendID: "nikhil-rao",
-        name: "Nikhil Rao",
-    },
-];
-
-const friendIDForPersonName = (name: string): string | undefined => {
-    switch (name.trim()) {
-        case "Aparna Bhatnagar":
-            return "aparna-bhatnagar";
-        case "Isha Mehta":
-            return "isha-mehta";
-        case "Kabir Menon":
-            return "kabir-menon";
-        case "Riya Kapoor":
-            return "riya-kapoor";
-        case "Mira Sen":
-            return "mira-sen";
-        case "Nikhil Rao":
-            return "nikhil-rao";
-        default:
-            return undefined;
-    }
-};
 
 const viewerActionButtonSx = {
     alignItems: "center",
@@ -270,13 +225,18 @@ const resizeCaptionInput = (input: HTMLTextAreaElement | null) => {
         input.scrollHeight > captionInputMaxHeight ? "auto" : "hidden";
 };
 
+const wait = (durationMs: number) =>
+    new Promise((resolve) => window.setTimeout(resolve, durationMs));
+
 export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
-    currentUser,
     initialScreen = "photo",
     onClose,
     onDeletePost,
+    onLoadPostLikers,
     onOpenFriend,
     onOpenProfile,
+    onPublishDraftPost,
+    onSetPostLiked,
     photo,
     postActionMode = "like-with-count",
 }) => {
@@ -293,8 +253,15 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     const [screen, setScreen] = React.useState<SocialViewerInitialScreen>(
         resolvedInitialScreen,
     );
-    const [isPhotoLiked, setIsPhotoLiked] = React.useState(false);
-    const [caption, setCaption] = React.useState("");
+    const [isPhotoLiked, setIsPhotoLiked] = React.useState(
+        photo.viewerLiked ?? false,
+    );
+    const [caption, setCaption] = React.useState(photo.caption ?? "");
+    const [serverLikeCount, setServerLikeCount] = React.useState(
+        photo.likeCount ?? 0,
+    );
+    const [photoLikers, setPhotoLikers] = React.useState<SocialLiker[]>([]);
+    const [isLoadingLikers, setIsLoadingLikers] = React.useState(false);
     const [draftPostActionPhase, setDraftPostActionPhase] =
         React.useState<SocialActionPhase | null>(null);
     const displayName = firstNameFrom(photo.name);
@@ -309,19 +276,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     const ignoreNextLikeClickRef = React.useRef(false);
     const suppressNextLikeContextMenuRef = React.useRef(false);
     const suppressLikeContextMenuTimeoutRef = React.useRef<number | null>(null);
-    const photoLikers = React.useMemo(() => {
-        if (!isPhotoLiked) return mockPhotoLikers;
-
-        return [
-            {
-                id: "current-user",
-                avatarUrl: currentUser?.avatarUrl,
-                name: "You",
-            },
-            ...mockPhotoLikers,
-        ];
-    }, [currentUser?.avatarUrl, isPhotoLiked]);
-    const likeCount = photoLikers.length;
+    const likeCount = serverLikeCount;
     const likeCountLabel = `${likeCount} ${likeCount == 1 ? "like" : "likes"}`;
     const [actionsAnchor, setActionsAnchor] =
         React.useState<HTMLElement | null>(null);
@@ -359,6 +314,15 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
 
         clearLikeHoldTimeout();
         setScreen("likes");
+        if (!photo.postId || !onLoadPostLikers) return;
+
+        setIsLoadingLikers(true);
+        void onLoadPostLikers(photo.postId)
+            .then(setPhotoLikers)
+            .catch((error: unknown) =>
+                console.error("Failed to load post likers", error),
+            )
+            .finally(() => setIsLoadingLikers(false));
     };
 
     const closeLikes = React.useCallback(() => {
@@ -376,7 +340,23 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
             return;
         }
 
-        setIsPhotoLiked((isLiked) => !isLiked);
+        if (!photo.postId || !onSetPostLiked) {
+            setIsPhotoLiked((isLiked) => !isLiked);
+            return;
+        }
+
+        const nextLiked = !isPhotoLiked;
+        setIsPhotoLiked(nextLiked);
+        setServerLikeCount((count) =>
+            Math.max(0, count + (nextLiked ? 1 : -1)),
+        );
+        void onSetPostLiked(photo.postId, nextLiked).catch((error: unknown) => {
+            console.error("Failed to update post like", error);
+            setIsPhotoLiked(!nextLiked);
+            setServerLikeCount((count) =>
+                Math.max(0, count + (nextLiked ? -1 : 1)),
+            );
+        });
     };
 
     const handlePhotoLikeContextMenu = (
@@ -443,12 +423,42 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     const confirmDeletePost = () => {
         if (isDeleteActionRunning || isDeleteExit) return;
         setDeleteActionPhase("busy");
+        void (async () => {
+            try {
+                await Promise.all([
+                    Promise.resolve(onDeletePost?.()),
+                    wait(socialActionBusyDurationMs),
+                ]);
+                setDeleteActionPhase("done");
+            } catch (error) {
+                console.error("Failed to delete social post", error);
+                setDeleteActionPhase(null);
+            }
+        })();
     };
 
     const publishDraftPost = () => {
-        if (!isDraftPost || isDraftPostActionRunning || isDeleteExit) return;
+        if (
+            !isDraftPost ||
+            isDraftPostActionRunning ||
+            isDeleteExit ||
+            !onPublishDraftPost
+        )
+            return;
 
         setDraftPostActionPhase("busy");
+        void (async () => {
+            try {
+                await Promise.all([
+                    onPublishDraftPost(caption),
+                    wait(socialActionBusyDurationMs),
+                ]);
+                setDraftPostActionPhase("done");
+            } catch (error) {
+                console.error("Failed to publish social post", error);
+                setDraftPostActionPhase(null);
+            }
+        })();
     };
 
     const openFriendProfile = (friendID: string) => {
@@ -494,47 +504,41 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     }, []);
 
     React.useEffect(() => {
-        if (!deleteActionPhase) return;
+        if (deleteActionPhase != "done") return;
 
-        const timeoutID = window.setTimeout(
-            () => {
-                if (deleteActionPhase == "busy") {
-                    setDeleteActionPhase("done");
-                    return;
-                }
-
-                setDeleteSheetOpen(false);
-                onDeletePost?.();
-                setIsDeleteExit(true);
-            },
-            deleteActionPhase == "busy"
-                ? socialActionBusyDurationMs
-                : socialActionDoneDurationMs,
-        );
+        const timeoutID = window.setTimeout(() => {
+            setDeleteSheetOpen(false);
+            setIsDeleteExit(true);
+        }, socialActionDoneDurationMs);
 
         return () => window.clearTimeout(timeoutID);
-    }, [deleteActionPhase, onDeletePost]);
+    }, [deleteActionPhase]);
 
     React.useEffect(() => {
-        if (!draftPostActionPhase) return;
+        if (draftPostActionPhase != "done") return;
 
-        const timeoutID = window.setTimeout(
-            () => {
-                if (draftPostActionPhase == "busy") {
-                    setDraftPostActionPhase("done");
-                    return;
-                }
-
-                setActivePostActionMode("like-with-count");
-                setDraftPostActionPhase(null);
-            },
-            draftPostActionPhase == "busy"
-                ? socialActionBusyDurationMs
-                : socialActionDoneDurationMs,
-        );
+        const timeoutID = window.setTimeout(() => {
+            setActivePostActionMode("like-with-count");
+            setDraftPostActionPhase(null);
+        }, socialActionDoneDurationMs);
 
         return () => window.clearTimeout(timeoutID);
     }, [draftPostActionPhase]);
+
+    React.useEffect(() => {
+        setIsPhotoLiked(photo.viewerLiked ?? false);
+        setCaption(photo.caption ?? "");
+        setServerLikeCount(photo.likeCount ?? 0);
+        setPhotoLikers([]);
+        setScreen(resolvedInitialScreen);
+    }, [
+        photo.caption,
+        photo.imageUrl,
+        photo.likeCount,
+        photo.postId,
+        photo.viewerLiked,
+        resolvedInitialScreen,
+    ]);
 
     const handleDeleteSheetExited = () => {
         if (!isDeleteExit) return;
@@ -1318,7 +1322,25 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                             width: "100%",
                         }}
                     >
-                        {photoLikers.length == 0 ? (
+                        {isLoadingLikers ? (
+                            <Box
+                                sx={{
+                                    alignItems: "center",
+                                    color: viewerPanelMuted,
+                                    display: "flex",
+                                    flex: "1 1 auto",
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    justifyContent: "center",
+                                    lineHeight: "20px",
+                                    minHeight: "100%",
+                                }}
+                            >
+                                Loading likes...
+                            </Box>
+                        ) : photoLikers.length == 0 ? (
                             <Box
                                 sx={{
                                     alignItems: "center",
@@ -1339,9 +1361,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                         ) : (
                             photoLikers.map((liker) => {
                                 const likerName = firstNameFrom(liker.name);
-                                const friendID =
-                                    liker.friendID ??
-                                    friendIDForPersonName(liker.name);
+                                const friendID = liker.friendID;
                                 const canOpenFriend = Boolean(
                                     friendID && onOpenFriend,
                                 );

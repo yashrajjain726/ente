@@ -7,6 +7,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import {
     SocialFileViewer,
+    type SocialLiker,
     type SocialViewerInitialScreen,
     type SocialViewerPhoto,
     type SocialViewerPostActionMode,
@@ -15,11 +16,11 @@ import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
+import type { SocialWallPost } from "services/socialWall";
 import {
     createLocalPostPhoto,
     type LocalPostPhotoDimensions,
 } from "utils/localPostPhoto";
-import { profileLinkForUsername } from "utils/profileLink";
 import {
     firstNameFrom,
     formatSocialDate,
@@ -43,139 +44,17 @@ const headerSideWidth = headerActionSize * 2 + headerActionGap;
 const feedLikeActionInset = 4;
 const feedLikeActionSize = 40;
 
-const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
-const hoursAgo = (hours: number) => minutesAgo(hours * 60);
-const daysAgo = (days: number) => hoursAgo(days * 24);
-const sampleFeedLandscapePhotoAspectRatio = 900 / 680;
-const sampleFeedPortraitPhotoAspectRatio = 680 / 1020;
-const showMockFeedData =
-    process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_FEED != "true";
-
-const sampleFeedItems = [
-    {
-        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-4.jpg",
-        friendID: "aparna-bhatnagar",
-        imageUrl: "/images/sample-feed-1.jpg",
-        likeCount: 18,
-        name: "Aparna Bhatnagar",
-        timestampMs: minutesAgo(22),
-    },
-    {
-        aspectRatio: sampleFeedPortraitPhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-3.jpg",
-        friendID: "mira-sen",
-        imageUrl: "/images/sample-feed-portrait-2.jpg",
-        likeCount: 24,
-        name: "Mira Sen",
-        timestampMs: hoursAgo(2),
-    },
-    {
-        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-3.jpg",
-        friendID: "mira-sen",
-        imageUrl: "/images/sample-feed-2.jpg",
-        likeCount: 15,
-        name: "Mira Sen",
-        timestampMs: hoursAgo(3),
-    },
-    {
-        aspectRatio: sampleFeedPortraitPhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-5.jpg",
-        friendID: "nikhil-rao",
-        imageUrl: "/images/sample-feed-portrait-3.jpg",
-        likeCount: 31,
-        name: "Nikhil Rao",
-        timestampMs: hoursAgo(7),
-    },
-    {
-        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-5.jpg",
-        friendID: "nikhil-rao",
-        imageUrl: "/images/sample-feed-3.jpg",
-        likeCount: 11,
-        name: "Nikhil Rao",
-        timestampMs: daysAgo(1),
-    },
-    {
-        aspectRatio: sampleFeedPortraitPhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-6.jpg",
-        friendID: "riya-kapoor",
-        imageUrl: "/images/sample-feed-portrait-4.jpg",
-        likeCount: 28,
-        name: "Riya Kapoor",
-        timestampMs: daysAgo(1) - 3 * 60 * 60 * 1000,
-    },
-    {
-        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-6.jpg",
-        friendID: "riya-kapoor",
-        imageUrl: "/images/sample-feed-4.jpg",
-        likeCount: 16,
-        name: "Riya Kapoor",
-        timestampMs: daysAgo(2),
-    },
-    {
-        aspectRatio: sampleFeedPortraitPhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-4.jpg",
-        friendID: "aparna-bhatnagar",
-        imageUrl: "/images/sample-feed-portrait-1.jpg",
-        likeCount: 22,
-        name: "Aparna Bhatnagar",
-        timestampMs: daysAgo(3),
-    },
-    {
-        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-4.jpg",
-        friendID: "aparna-bhatnagar",
-        imageUrl: "/images/sample-feed-5.jpg",
-        likeCount: 13,
-        name: "Aparna Bhatnagar",
-        timestampMs: daysAgo(4),
-    },
-    {
-        aspectRatio: sampleFeedPortraitPhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-3.jpg",
-        friendID: "mira-sen",
-        imageUrl: "/images/sample-feed-portrait-5.jpg",
-        likeCount: 36,
-        name: "Mira Sen",
-        timestampMs: daysAgo(6),
-    },
-    {
-        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-3.jpg",
-        friendID: "mira-sen",
-        imageUrl: "/images/sample-feed-6.jpg",
-        likeCount: 19,
-        name: "Mira Sen",
-        timestampMs: daysAgo(8),
-    },
-    {
-        aspectRatio: sampleFeedPortraitPhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-5.jpg",
-        friendID: "nikhil-rao",
-        imageUrl: "/images/sample-feed-portrait-6.jpg",
-        likeCount: 27,
-        name: "Nikhil Rao",
-        timestampMs: daysAgo(12),
-    },
-    {
-        aspectRatio: sampleFeedLandscapePhotoAspectRatio,
-        avatarUrl: "/images/sample-feed-5.jpg",
-        friendID: "nikhil-rao",
-        imageUrl: "/images/sample-feed-2.jpg",
-        likeCount: 43,
-        name: "Nikhil Rao",
-        timestampMs: new Date(new Date().getFullYear() - 1, 10, 18).getTime(),
-    },
-];
-
 interface HomeScreenProps {
+    feedItems: SocialWallPost[];
     friendsCount: number;
+    isFeedLoading?: boolean;
+    onCreatePost?: (file: File, caption: string) => Promise<SocialViewerPhoto>;
     onOpenFriend?: (friendID: string) => void;
     onOpenNotifications?: () => void;
     onOpenProfile?: () => void;
+    onLoadPostLikers?: (postId: number) => Promise<SocialLiker[]>;
+    onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
+    onShareProfileLink?: () => Promise<string>;
     profile: SetupProfile;
 }
 
@@ -185,6 +64,7 @@ interface FeedPhotoDimensions {
 }
 
 interface SelectedHomeViewer {
+    draftFile?: File;
     initialScreen: SocialViewerInitialScreen;
     localObjectUrl?: string;
     photo: SocialViewerPhoto;
@@ -193,16 +73,20 @@ interface SelectedHomeViewer {
 
 interface FeedItemProps {
     aspectRatio: number;
-    avatarUrl: string;
+    avatarUrl?: string | null;
     friendID: string;
     imageUrl: string;
+    likeCount: number;
     name: string;
     onOpenFriend?: (friendID: string) => void;
     onOpenPhoto?: (
         photo: SocialViewerPhoto,
         initialScreen?: SocialViewerInitialScreen,
     ) => void;
+    onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
+    postId: number;
     timestampMs: number;
+    viewerLiked: boolean;
 }
 
 const dimensionsFromAspectRatio = (
@@ -220,12 +104,17 @@ const FeedItem: React.FC<FeedItemProps> = ({
     avatarUrl,
     friendID,
     imageUrl,
+    likeCount,
     name,
     onOpenFriend,
     onOpenPhoto,
+    onSetPostLiked,
+    postId,
     timestampMs,
+    viewerLiked,
 }) => {
-    const [isLiked, setIsLiked] = useState(false);
+    const [isLiked, setIsLiked] = useState(viewerLiked);
+    const [localLikeCount, setLocalLikeCount] = useState(likeCount);
     const [isLikeButtonPopping, setIsLikeButtonPopping] = useState(false);
     const firstName = firstNameFrom(name);
     const dateLabel = formatSocialDate(timestampMs);
@@ -260,8 +149,11 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 friendID,
                 height: photoDimensions.height,
                 imageUrl,
+                likeCount: localLikeCount,
                 name,
+                postId,
                 timestampMs,
+                viewerLiked: isLiked,
                 width: photoDimensions.width,
             },
             initialScreen,
@@ -271,12 +163,31 @@ const FeedItem: React.FC<FeedItemProps> = ({
             window.clearTimeout(likePopTimeoutRef.current);
 
         setIsLikeButtonPopping(true);
-        setIsLiked((current) => !current);
+        const nextLiked = !isLiked;
+        setIsLiked(nextLiked);
+        setLocalLikeCount((count) =>
+            Math.max(0, count + (nextLiked ? 1 : -1)),
+        );
+        void onSetPostLiked?.(postId, nextLiked).catch((error: unknown) => {
+            console.error("Failed to update post like", error);
+            setIsLiked(!nextLiked);
+            setLocalLikeCount((count) =>
+                Math.max(0, count + (nextLiked ? -1 : 1)),
+            );
+        });
         likePopTimeoutRef.current = window.setTimeout(() => {
             likePopTimeoutRef.current = null;
             setIsLikeButtonPopping(false);
         }, 120);
     };
+
+    React.useEffect(() => {
+        setIsLiked(viewerLiked);
+    }, [viewerLiked]);
+
+    React.useEffect(() => {
+        setLocalLikeCount(likeCount);
+    }, [likeCount]);
 
     React.useEffect(
         () => () => {
@@ -328,9 +239,11 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         borderRadius: "50%",
                         border: 0,
                         cursor: onOpenFriend ? "pointer" : "default",
-                        display: "block",
+                        display: "flex",
                         flexShrink: 0,
                         height: feedAvatarSize,
+                        alignItems: "center",
+                        justifyContent: "center",
                         overflow: "hidden",
                         p: 0,
                         width: feedAvatarSize,
@@ -340,18 +253,33 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         },
                     }}
                 >
-                    <Box
-                        component="img"
-                        alt=""
-                        src={avatarUrl}
-                        sx={{
-                            display: "block",
-                            height: "100%",
-                            objectFit: "cover",
-                            objectPosition: "center",
-                            width: "100%",
-                        }}
-                    />
+                    {avatarUrl ? (
+                        <Box
+                            component="img"
+                            alt=""
+                            src={avatarUrl}
+                            sx={{
+                                display: "block",
+                                height: "100%",
+                                objectFit: "cover",
+                                objectPosition: "center",
+                                width: "100%",
+                            }}
+                        />
+                    ) : (
+                        <Box
+                            sx={{
+                                color: green,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 9,
+                                fontWeight: 800,
+                                lineHeight: 1,
+                            }}
+                        >
+                            {initialsFor(name)}
+                        </Box>
+                    )}
                 </Box>
                 <Box
                     component="button"
@@ -493,10 +421,16 @@ const FeedItem: React.FC<FeedItemProps> = ({
 };
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
+    feedItems,
     friendsCount,
+    isFeedLoading = false,
+    onCreatePost,
+    onLoadPostLikers,
     onOpenFriend,
     onOpenNotifications,
     onOpenProfile,
+    onSetPostLiked,
+    onShareProfileLink,
     profile,
 }) => {
     const [selectedViewer, setSelectedViewer] =
@@ -504,13 +438,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
-    const feedItems = showMockFeedData ? sampleFeedItems : [];
     const hasFeedItems = feedItems.length > 0;
     const emptyFeedMessage =
-        friendsCount == 0
-            ? "When you add friends, their posts will appear here."
-            : "When your friends share posts, they'll appear here.";
-    const profileLink = profileLinkForUsername(profile.username.trim());
+        isFeedLoading
+            ? "Loading posts..."
+            : friendsCount == 0
+              ? "When you add friends, their posts will appear here."
+              : "When your friends share posts, they'll appear here.";
     const initialsSource = profile.fullName.trim() || profile.username.trim();
     const initials = initialsFor(initialsSource);
     const revokeLocalPostObjectUrl = React.useCallback((objectUrl?: string) => {
@@ -551,6 +485,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
 
     const shareProfileLink = async () => {
+        if (!onShareProfileLink) return;
+        const profileLink = await onShareProfileLink();
         if (typeof navigator.share == "function") {
             try {
                 await navigator.share({ url: profileLink });
@@ -579,6 +515,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         });
         localPostObjectUrlsRef.current.add(localPost.objectUrl);
         setSelectedViewer({
+            draftFile: file,
             initialScreen: "photo",
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
@@ -823,7 +760,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         justifyContent: hasFeedItems ? "flex-start" : "center",
                         minHeight: "calc(100svh - 64px)",
                         pb: hasFeedItems ? "16px" : "56px",
-                        pt: hasFeedItems ? "12px" : 0,
+                        pt: 0,
                         width: "100%",
                     }}
                 >
@@ -831,14 +768,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         feedItems.map((item) => (
                             <FeedItem
                                 key={`${item.name}-${item.imageUrl}`}
-                                aspectRatio={item.aspectRatio}
-                                avatarUrl={item.avatarUrl}
+                                aspectRatio={
+                                    item.width && item.height
+                                        ? item.width / item.height
+                                        : 1
+                                }
+                                avatarUrl={item.avatarUrl ?? ""}
                                 friendID={item.friendID}
                                 imageUrl={item.imageUrl}
+                                likeCount={item.likeCount}
                                 name={item.name}
                                 onOpenFriend={onOpenFriend}
                                 onOpenPhoto={openFeedPhoto}
+                                onSetPostLiked={onSetPostLiked}
+                                postId={item.postId}
                                 timestampMs={item.timestampMs}
+                                viewerLiked={item.viewerLiked}
                             />
                         ))
                     ) : (
@@ -920,10 +865,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Box>
                 {selectedViewer && (
                     <SocialFileViewer
-                        currentUser={{
-                            avatarUrl: profile.avatarUrl,
-                            name: initialsSource,
-                        }}
                         initialScreen={selectedViewer.initialScreen}
                         photo={selectedViewer.photo}
                         postActionMode={
@@ -946,6 +887,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                   }
                                 : undefined
                         }
+                        onLoadPostLikers={onLoadPostLikers}
+                        onPublishDraftPost={
+                            selectedViewer.draftFile && onCreatePost
+                                ? async (caption) => {
+                                      const localObjectUrl =
+                                          selectedViewer.localObjectUrl;
+                                      const post = await onCreatePost(
+                                          selectedViewer.draftFile!,
+                                          caption,
+                                      );
+                                      revokeLocalPostObjectUrl(localObjectUrl);
+                                      setSelectedViewer((currentViewer) =>
+                                          currentViewer
+                                              ? {
+                                                    initialScreen: "photo",
+                                                    photo: post,
+                                                    postActionMode:
+                                                        "like-with-count",
+                                                }
+                                              : currentViewer,
+                                      );
+                                  }
+                                : undefined
+                        }
+                        onSetPostLiked={onSetPostLiked}
                     />
                 )}
             </Box>

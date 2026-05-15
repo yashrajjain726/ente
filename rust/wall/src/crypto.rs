@@ -1,16 +1,51 @@
-use base64::{
-    Engine,
-    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
-};
-use ente_core::crypto::{kdf, keys, secretbox};
+use base64::{Engine, engine::general_purpose::STANDARD};
+use ente_core::crypto::{hash, kdf, keys, secretbox};
 
 use crate::error::{Result, WallError};
 use crate::transport::EntityKeyPayload;
 
 pub const SECRETBOX_NONCE_BYTES: usize = secretbox::NONCE_BYTES;
+const WALL_LINK_ACCESS_KEY_LEN: usize = 12;
+const WALL_LINK_ACCESS_KEY_ALPHABET: &[u8] =
+    b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 pub fn generate_key() -> Vec<u8> {
     keys::generate_key_secure().into_vec()
+}
+
+pub fn generate_wall_link_access_key() -> String {
+    let max_unbiased_value = 256 - (256 % WALL_LINK_ACCESS_KEY_ALPHABET.len());
+    let mut out = String::with_capacity(WALL_LINK_ACCESS_KEY_LEN);
+
+    while out.len() < WALL_LINK_ACCESS_KEY_LEN {
+        for value in generate_key() {
+            if usize::from(value) >= max_unbiased_value {
+                continue;
+            }
+            out.push(char::from(
+                WALL_LINK_ACCESS_KEY_ALPHABET
+                    [usize::from(value) % WALL_LINK_ACCESS_KEY_ALPHABET.len()],
+            ));
+            if out.len() == WALL_LINK_ACCESS_KEY_LEN {
+                break;
+            }
+        }
+    }
+
+    out
+}
+
+pub fn wall_link_access_key_material(access_key: &str) -> Result<Vec<u8>> {
+    let trimmed = access_key.trim();
+    let is_base62 = trimmed
+        .bytes()
+        .all(|value| WALL_LINK_ACCESS_KEY_ALPHABET.contains(&value));
+    if trimmed.len() != WALL_LINK_ACCESS_KEY_LEN || !is_base62 {
+        return Err(WallError::InvalidInput(
+            "invalid wall link access key".into(),
+        ));
+    }
+    hash::hash_default(trimmed.as_bytes()).map_err(Into::into)
 }
 
 pub fn encode_b64(bytes: &[u8]) -> String {
@@ -19,14 +54,6 @@ pub fn encode_b64(bytes: &[u8]) -> String {
 
 pub fn decode_b64(value: &str) -> Result<Vec<u8>> {
     Ok(STANDARD.decode(value.trim())?)
-}
-
-pub fn encode_b64_url(bytes: &[u8]) -> String {
-    URL_SAFE_NO_PAD.encode(bytes)
-}
-
-pub fn decode_b64_url(value: &str) -> Result<Vec<u8>> {
-    Ok(URL_SAFE_NO_PAD.decode(value.trim())?)
 }
 
 pub fn derive_wall_link_auth_key(access_key: &[u8]) -> Result<Vec<u8>> {
@@ -142,6 +169,26 @@ mod tests {
         assert_eq!(auth_key.len(), 32);
         assert_eq!(wrap_key.len(), 32);
         assert_ne!(auth_key, wrap_key);
+    }
+
+    #[test]
+    fn wall_link_access_key_is_short_base62() {
+        let access_key = generate_wall_link_access_key();
+        assert_eq!(access_key.len(), 12);
+        assert!(
+            access_key
+                .bytes()
+                .all(|value| value.is_ascii_alphanumeric())
+        );
+
+        let material = wall_link_access_key_material(&access_key).unwrap();
+        assert_eq!(material.len(), 32);
+    }
+
+    #[test]
+    fn wall_link_access_key_rejects_legacy_b64_url_key() {
+        let old_key = "LqUerMGZjrvdfkd6TayOiDa9pM0pYeGcakjhhsB47Hc";
+        assert!(wall_link_access_key_material(old_key).is_err());
     }
 
     #[test]

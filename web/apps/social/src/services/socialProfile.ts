@@ -108,7 +108,7 @@ const wallHTTPStatus = (error: unknown) => {
     return typeof status == "number" ? status : undefined;
 };
 
-const openCurrentWallContext = async () => {
+export const openCurrentWallContext = async () => {
     const [authToken, baseUrl, masterKeyB64] = await Promise.all([
         savedAuthToken(),
         apiOrigin(),
@@ -134,7 +134,7 @@ const openCurrentWallContext = async () => {
     });
 };
 
-const ensureCurrentWallContext = async () => {
+export const ensureCurrentWallContext = async () => {
     const ctx = await openCurrentWallContext();
     if (!ctx) throw new Error("Please sign in again.");
     return ctx;

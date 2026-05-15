@@ -268,6 +268,8 @@ pub struct WallProfileResponse {
     pub wall_slug: String,
     pub version: i32,
     #[serde(default)]
+    pub friends: i64,
+    #[serde(default)]
     pub encrypted_profile: String,
     #[serde(default)]
     pub updated_at: String,

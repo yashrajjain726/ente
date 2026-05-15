@@ -1,4 +1,4 @@
-import { sampleFriends, type FriendProfile } from "data/friends";
+import type { FriendProfile } from "data/friends";
 import React, { createContext, useContext } from "react";
 import type { SocialLoginCredentials } from "screens/LoginScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -33,10 +33,7 @@ export interface SocialAppState {
     setSignupEmail: React.Dispatch<React.SetStateAction<string>>;
 }
 
-export const showMockFriends =
-    process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_FRIENDS != "true";
-
-export const initialFriends = () => (showMockFriends ? sampleFriends : []);
+export const initialFriends = (): FriendProfile[] => [];
 
 export const SocialAppStateContext = createContext<SocialAppState | null>(null);
 

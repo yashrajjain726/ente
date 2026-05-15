@@ -68,6 +68,7 @@ pub struct DecryptedWallProfile {
     pub wall_id: String,
     pub wall_slug: String,
     pub version: i32,
+    pub friends: i64,
     pub profile: Vec<u8>,
     pub avatar: Option<ProfileAvatarResponse>,
     pub updated_at: Option<String>,

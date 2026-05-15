@@ -27,15 +27,11 @@ func (r *LinksRepository) UpsertLink(ctx context.Context, wallID string, authKey
 	if currentVersion != keyVersion {
 		return nil, sql.ErrNoRows
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM wall_link_sessions WHERE wall_id = $1`, wallID); err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
 	link, err := scanLinkRecord(tx.QueryRowContext(ctx, `
 		INSERT INTO wall_links (wall_id, auth_key_hash, key_version, encrypted_wall_key, active)
 		VALUES ($1, $2, $3, $4, TRUE)
-		ON CONFLICT (wall_id) DO UPDATE
-		SET auth_key_hash = EXCLUDED.auth_key_hash,
-		    key_version = EXCLUDED.key_version,
+		ON CONFLICT (wall_id, auth_key_hash) DO UPDATE
+		SET key_version = EXCLUDED.key_version,
 		    encrypted_wall_key = EXCLUDED.encrypted_wall_key,
 		    active = TRUE
 		RETURNING wall_id, $5::text, $6::bigint, $5::text, auth_key_hash, key_version, encrypted_wall_key, active, created_at, updated_at
@@ -54,7 +50,9 @@ func (r *LinksRepository) GetLink(ctx context.Context, wallID string) (*WallLink
 		SELECT l.wall_id, w.wall_slug, w.owner_id, w.wall_slug, l.auth_key_hash, l.key_version, l.encrypted_wall_key, l.active, l.created_at, l.updated_at
 		FROM wall_links l
 		JOIN walls w ON w.wall_id = l.wall_id
-		WHERE l.wall_id = $1
+		WHERE l.wall_id = $1 AND l.active = TRUE
+		ORDER BY l.updated_at DESC
+		LIMIT 1
 	`, wallID))
 }
 

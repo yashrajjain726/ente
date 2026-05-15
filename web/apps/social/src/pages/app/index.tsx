@@ -1,20 +1,59 @@
 import { SocialPageMeta } from "components/SocialPageMeta";
 import { SocialRouteFallback } from "components/SocialRouteFallback";
 import { useRouter } from "next/router";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { HomeScreen, homeBackground } from "screens/HomeScreen";
+import {
+    createCurrentPhotoPost,
+    createCurrentProfileLink,
+    loadCurrentFeedPage,
+    loadCurrentPostLikers,
+    loadCurrentWallFriends,
+    setCurrentPostLiked,
+    type SocialWallPost,
+} from "services/socialWall";
 import { useSocialAppState } from "state/socialAppState";
 import { socialRoutes } from "utils/socialRoutes";
+import { socialPostToViewerPhoto } from "utils/socialWallDisplay";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { friends, profile, profileLoadStatus } = useSocialAppState();
+    const { friends, profile, profileLoadStatus, setFriends } =
+        useSocialAppState();
+    const [feedItems, setFeedItems] = useState<SocialWallPost[]>([]);
+    const [isFeedLoading, setIsFeedLoading] = useState(false);
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
             void router.replace(socialRoutes.onboarding);
         }
     }, [profile, profileLoadStatus, router]);
+
+    useEffect(() => {
+        if (!profile?.wallId) return;
+
+        let cancelled = false;
+        setIsFeedLoading(true);
+        void Promise.all([
+            loadCurrentFeedPage(),
+            loadCurrentWallFriends(profile.wallId),
+        ])
+            .then(([feed, nextFriends]) => {
+                if (cancelled) return;
+                setFeedItems(feed.items);
+                setFriends(nextFriends);
+            })
+            .catch((error: unknown) =>
+                console.error("Failed to load social home", error),
+            )
+            .finally(() => {
+                if (!cancelled) setIsFeedLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [profile?.wallId, setFriends]);
 
     if (profileLoadStatus == "loading" || !profile) {
         return <SocialRouteFallback background={homeBackground} />;
@@ -24,8 +63,21 @@ const Page: React.FC = () => {
         <>
             <SocialPageMeta themeColor={homeBackground} />
             <HomeScreen
+                feedItems={feedItems}
                 friendsCount={friends.length}
+                isFeedLoading={isFeedLoading}
                 profile={profile}
+                onCreatePost={async (file, caption) => {
+                    if (!profile.wallId) throw new Error("Missing wall.");
+                    const post = await createCurrentPhotoPost({
+                        caption,
+                        file,
+                        wallId: profile.wallId,
+                    });
+                    if (!post) throw new Error("Couldn't create post.");
+                    setFeedItems((currentItems) => [post, ...currentItems]);
+                    return socialPostToViewerPhoto(post);
+                }}
                 onOpenFriend={(friendID) =>
                     void router.push(socialRoutes.friend(friendID, "home"))
                 }
@@ -33,6 +85,12 @@ const Page: React.FC = () => {
                     void router.push(socialRoutes.notifications)
                 }
                 onOpenProfile={() => void router.push(socialRoutes.profile)}
+                onLoadPostLikers={loadCurrentPostLikers}
+                onSetPostLiked={setCurrentPostLiked}
+                onShareProfileLink={async () => {
+                    if (!profile.wallId) throw new Error("Missing wall.");
+                    return (await createCurrentProfileLink(profile.wallId)).url;
+                }}
             />
         </>
     );

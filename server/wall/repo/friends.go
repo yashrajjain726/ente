@@ -265,6 +265,18 @@ func (r *FriendsRepository) ListFriendsForWall(ctx context.Context, wallID strin
 	return out, stacktrace.Propagate(rows.Err(), "")
 }
 
+func (r *FriendsRepository) CountFriendsForWall(ctx context.Context, wallID string) (int64, error) {
+	var count int64
+	if err := r.DB.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM wall_friend_shares
+		WHERE wall_id = $1
+	`, wallID).Scan(&count); err != nil {
+		return 0, stacktrace.Propagate(err, "")
+	}
+	return count, nil
+}
+
 func (r *FriendsRepository) ListAccessibleWallIDs(ctx context.Context, viewerID int64, wallIDs []string) (map[string]bool, error) {
 	out := make(map[string]bool, len(wallIDs))
 	if viewerID <= 0 || len(wallIDs) == 0 {

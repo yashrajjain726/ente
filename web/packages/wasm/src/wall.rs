@@ -128,6 +128,7 @@ struct WallProfileJs {
     wall_id: String,
     wall_slug: String,
     version: i32,
+    friends: i64,
     profile: String,
     avatar: Option<ProfileAvatarResponse>,
     updated_at: Option<String>,
@@ -263,6 +264,7 @@ fn profile_to_js(value: DecryptedWallProfile) -> Result<WallProfileJs, WasmWallE
         wall_id: value.wall_id,
         wall_slug: value.wall_slug,
         version: value.version,
+        friends: value.friends,
         profile: utf8_field(value.profile, "profile")?,
         avatar: value.avatar,
         updated_at: value.updated_at,
@@ -558,7 +560,7 @@ impl WallAccountCtxHandle {
         swb::to_value(&self.inner.get_relationship(&target_wall_id).await?).map_err(Into::into)
     }
 
-    /// Create or rotate a shareable wall link.
+    /// Create a shareable wall link.
     pub async fn create_wall_link(&self, wall_id: String) -> Result<JsValue, WasmWallError> {
         swb::to_value(&created_link_to_js(
             self.inner.create_wall_link(&wall_id).await?,

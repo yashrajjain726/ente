@@ -10,7 +10,6 @@ const textBase = "#000";
 const textMuted = "#666";
 const textLight = "#969696";
 const warning = "#F63A3A";
-const mockVerificationCode = "888888";
 const verifyEmailFormID = "social-verify-email-form";
 
 interface VerifyEmailScreenProps {
@@ -121,7 +120,7 @@ const OtpInput: React.FC<OtpInputProps> = ({
 export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
     email,
     errorMessage,
-    initialCode = mockVerificationCode,
+    initialCode = "",
     isSubmitting = false,
     onBack,
     onChangeEmail,

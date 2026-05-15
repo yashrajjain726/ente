@@ -3,7 +3,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import { profileLinkForUsername } from "utils/profileLink";
 import { initialsFor } from "utils/socialDisplay";
 
 export const shareProfileLinkBackground = "#FAFAFA";
@@ -17,9 +16,13 @@ const iconFill = "#F0F0F0";
 const actionRowHover = "#F5F5F5";
 
 interface ShareProfileLinkScreenProps {
+    errorMessage?: string;
+    isLinkLoading?: boolean;
     onBack: () => void;
     onDone?: () => void;
+    onRetry?: () => void;
     profile: SetupProfile;
+    profileLink?: string;
 }
 
 interface ActionRowProps {
@@ -165,23 +168,28 @@ const ActionRow: React.FC<ActionRowProps> = ({
 );
 
 export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
+    errorMessage,
+    isLinkLoading = false,
     onBack,
     onDone,
+    onRetry,
     profile,
+    profileLink,
 }) => {
     const [copied, setCopied] = useState(false);
-    const profileLink = profileLinkForUsername(profile.username.trim());
     const displayName = profile.fullName.trim() || profile.username.trim();
     const initialsSource = displayName || profile.username.trim();
     const initials = initialsFor(initialsSource);
 
     const copyProfileLink = async () => {
+        if (!profileLink) return;
         await navigator.clipboard.writeText(profileLink);
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1200);
     };
 
     const shareProfileLink = async () => {
+        if (!profileLink) return;
         const shareData = { url: profileLink };
 
         if (typeof navigator.share == "function") {
@@ -376,8 +384,32 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             width: "100%",
                         }}
                     >
-                        {profileLink}
+                        {isLinkLoading
+                            ? "Creating invite link..."
+                            : profileLink || "Invite link unavailable"}
                     </Box>
+                    {errorMessage && (
+                        <Box
+                            component="button"
+                            type="button"
+                            onClick={onRetry}
+                            sx={{
+                                bgcolor: "transparent",
+                                border: 0,
+                                color: green,
+                                cursor: onRetry ? "pointer" : "default",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 13,
+                                fontWeight: 600,
+                                lineHeight: "18px",
+                                mt: "10px",
+                                p: 0,
+                            }}
+                        >
+                            {errorMessage}
+                        </Box>
+                    )}
                     <Box
                         component="p"
                         sx={{

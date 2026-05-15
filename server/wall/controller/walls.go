@@ -60,6 +60,14 @@ func (c *WallsController) GetProfile(ctx *gin.Context, req models.GetWallProfile
 	if err := c.auth.canViewWall(ctx.Request.Context(), viewer, wall); err != nil {
 		return nil, err
 	}
+	friendsCount := int64(0)
+	if c.auth.FriendsRepo != nil {
+		var err error
+		friendsCount, err = c.auth.FriendsRepo.CountFriendsForWall(ctx.Request.Context(), wall.WallID)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if req.Version != nil {
 		if *req.Version <= 0 {
 			return nil, ente.NewBadRequestWithMessage("invalid version")
@@ -75,6 +83,7 @@ func (c *WallsController) GetProfile(ctx *gin.Context, req models.GetWallProfile
 				Version:          version.Version,
 				EncryptedProfile: version.EncryptedProfile,
 				UpdatedAt:        formatMicros(version.CreatedAt),
+				Friends:          friendsCount,
 			}, nil
 		}
 	}
@@ -85,6 +94,7 @@ func (c *WallsController) GetProfile(ctx *gin.Context, req models.GetWallProfile
 		EncryptedProfile: wall.EncryptedProfile,
 		UpdatedAt:        formatMicros(wall.UpdatedAt),
 		Avatar:           toAvatarResponse(wall),
+		Friends:          friendsCount,
 	}, nil
 }
 

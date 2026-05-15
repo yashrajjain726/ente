@@ -1,23 +1,47 @@
 import { SocialPageMeta } from "components/SocialPageMeta";
 import { SocialRouteFallback } from "components/SocialRouteFallback";
 import { useRouter } from "next/router";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     NotificationsScreen,
     notificationsBackground,
 } from "screens/NotificationsScreen";
+import {
+    loadCurrentNotificationsPage,
+    loadCurrentPostLikers,
+    setCurrentPostLiked,
+    type SocialWallNotification,
+} from "services/socialWall";
 import { useSocialAppState } from "state/socialAppState";
 import { socialRoutes } from "utils/socialRoutes";
+import { notificationForScreen } from "utils/socialWallDisplay";
 
 const Page: React.FC = () => {
     const router = useRouter();
     const { profile, profileLoadStatus } = useSocialAppState();
+    const [notifications, setNotifications] = useState<
+        SocialWallNotification[]
+    >([]);
+    const screenNotifications = useMemo(
+        () => notifications.map(notificationForScreen),
+        [notifications],
+    );
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
             void router.replace(socialRoutes.onboarding);
         }
     }, [profile, profileLoadStatus, router]);
+
+    useEffect(() => {
+        if (!profile) return;
+
+        void loadCurrentNotificationsPage()
+            .then((page) => setNotifications(page.items))
+            .catch((error: unknown) =>
+                console.error("Failed to load notifications", error),
+            );
+    }, [profile]);
 
     if (profileLoadStatus == "loading" || !profile) {
         return <SocialRouteFallback background={notificationsBackground} />;
@@ -27,12 +51,15 @@ const Page: React.FC = () => {
         <>
             <SocialPageMeta themeColor={notificationsBackground} />
             <NotificationsScreen
+                notifications={screenNotifications}
                 onBack={() => void router.push(socialRoutes.home)}
                 onOpenFriend={(friendID) =>
                     void router.push(
                         socialRoutes.friend(friendID, "notifications"),
                     )
                 }
+                onLoadPostLikers={loadCurrentPostLikers}
+                onSetPostLiked={setCurrentPostLiked}
                 profile={profile}
             />
         </>

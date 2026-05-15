@@ -251,13 +251,18 @@ func TestWallModuleLifecycle(t *testing.T) {
 
 	newLink, err := module.Links.UpsertLink(ctx, aliceWall.WallID, []byte("new-hash"), rotatedWall.CurrentVersion, "new-wall-link-key")
 	require.NoError(t, err)
-	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
-	require.Error(t, err)
+	session, err = module.Links.GetSession(ctx, []byte("token-hash"))
+	require.NoError(t, err)
+	require.Equal(t, link.AuthKeyHash, session.AuthKeyHash)
 
-	err = module.Links.CreateSession(ctx, []byte("token-hash"), newLink.WallID, newLink.AuthKeyHash, newLink.KeyVersion, timeutil.NMinFromNow(30))
+	err = module.Links.CreateSession(ctx, []byte("new-token-hash"), newLink.WallID, newLink.AuthKeyHash, newLink.KeyVersion, timeutil.NMinFromNow(30))
 	require.NoError(t, err)
 	err = module.Links.DeleteLink(ctx, aliceWall.WallID)
 	require.NoError(t, err)
+	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
+	require.Error(t, err)
+	_, err = module.Links.GetSession(ctx, []byte("new-token-hash"))
+	require.Error(t, err)
 
 	lookup, err := module.Walls.GetWallBySlug(ctx, "alice")
 	require.NoError(t, err)
@@ -569,7 +574,7 @@ func TestGetVersionReturnsHistoricalProfile(t *testing.T) {
 	require.Equal(t, "alice-profile-v2", v2.EncryptedProfile)
 }
 
-func TestCreateSessionRejectsStaleLinkAuthHash(t *testing.T) {
+func TestCreateSessionAcceptsMultipleActiveLinkAuthHashes(t *testing.T) {
 	ctx := context.Background()
 	module := newWallTestModule(t)
 
@@ -582,12 +587,16 @@ func TestCreateSessionRejectsStaleLinkAuthHash(t *testing.T) {
 	newLink, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("new-hash"), wall.CurrentVersion, "new-wall-link-key")
 	require.NoError(t, err)
 
-	err = module.Links.CreateSession(ctx, []byte("stale-token"), oldLink.WallID, oldLink.AuthKeyHash, oldLink.KeyVersion, timeutil.NMinFromNow(30))
-	require.Error(t, err)
+	err = module.Links.CreateSession(ctx, []byte("old-token"), oldLink.WallID, oldLink.AuthKeyHash, oldLink.KeyVersion, timeutil.NMinFromNow(30))
+	require.NoError(t, err)
+	session, err := module.Links.GetSession(ctx, []byte("old-token"))
+	require.NoError(t, err)
+	require.Equal(t, oldLink.KeyVersion, session.KeyVersion)
+	require.Equal(t, oldLink.AuthKeyHash, session.AuthKeyHash)
 
 	err = module.Links.CreateSession(ctx, []byte("fresh-token"), newLink.WallID, newLink.AuthKeyHash, newLink.KeyVersion, timeutil.NMinFromNow(30))
 	require.NoError(t, err)
-	session, err := module.Links.GetSession(ctx, []byte("fresh-token"))
+	session, err = module.Links.GetSession(ctx, []byte("fresh-token"))
 	require.NoError(t, err)
 	require.Equal(t, newLink.KeyVersion, session.KeyVersion)
 	require.Equal(t, newLink.AuthKeyHash, session.AuthKeyHash)
@@ -609,10 +618,11 @@ func TestGetSessionRejectsStaleLinkMetadata(t *testing.T) {
 	_, err = module.Links.DB.Exec(`
 		INSERT INTO wall_link_sessions (token_hash, wall_id, owner_id, auth_key_hash, key_version, expires_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
-	`, []byte("stale-auth-token"), oldLink.WallID, oldLink.OwnerID, oldLink.AuthKeyHash, oldLink.KeyVersion, timeutil.NMinFromNow(30))
+	`, []byte("old-auth-token"), oldLink.WallID, oldLink.OwnerID, oldLink.AuthKeyHash, oldLink.KeyVersion, timeutil.NMinFromNow(30))
 	require.NoError(t, err)
-	_, err = module.Links.GetSession(ctx, []byte("stale-auth-token"))
-	require.Error(t, err)
+	session, err := module.Links.GetSession(ctx, []byte("old-auth-token"))
+	require.NoError(t, err)
+	require.Equal(t, oldLink.AuthKeyHash, session.AuthKeyHash)
 
 	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)

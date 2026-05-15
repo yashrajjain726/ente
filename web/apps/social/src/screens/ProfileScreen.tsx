@@ -8,6 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
 import {
     SocialFileViewer,
+    type SocialLiker,
     type SocialViewerPhoto,
     type SocialViewerPostActionMode,
 } from "components/SocialFileViewer";
@@ -19,7 +20,6 @@ import {
     createLocalPostPhoto,
     type LocalPostPhotoDimensions,
 } from "utils/localPostPhoto";
-import { profileLinkForUsername } from "utils/profileLink";
 import { firstNameFrom, initialsFor } from "utils/socialDisplay";
 
 export const profileBackground = "#FFFFFF";
@@ -37,107 +37,36 @@ const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
 const photoMasonryGap = "3px";
 const photoMasonryRadius = "12px";
-const showMockProfilePosts =
-    process.env.NEXT_PUBLIC_HIDE_SOCIAL_MOCK_PROFILE_POSTS != "true";
-
 interface ProfilePhotoDimensions {
     height: number;
     width: number;
 }
 
-interface SampleProfilePhoto extends ProfilePhotoDimensions {
-    imageUrl: string;
-}
-
-const samplePhotos = [
-    { height: 680, imageUrl: "/images/sample-feed-1.jpg", width: 900 },
-    {
-        height: 1020,
-        imageUrl: "/images/sample-feed-portrait-1.jpg",
-        width: 680,
-    },
-    { height: 680, imageUrl: "/images/sample-feed-5.jpg", width: 900 },
-    {
-        height: 1020,
-        imageUrl: "/images/sample-feed-portrait-2.jpg",
-        width: 680,
-    },
-    { height: 680, imageUrl: "/images/sample-feed-2.jpg", width: 900 },
-    {
-        height: 1020,
-        imageUrl: "/images/sample-feed-portrait-3.jpg",
-        width: 680,
-    },
-    { height: 680, imageUrl: "/images/sample-feed-6.jpg", width: 900 },
-    {
-        height: 1020,
-        imageUrl: "/images/sample-feed-portrait-4.jpg",
-        width: 680,
-    },
-    { height: 680, imageUrl: "/images/sample-feed-3.jpg", width: 900 },
-    {
-        height: 1020,
-        imageUrl: "/images/sample-feed-portrait-5.jpg",
-        width: 680,
-    },
-    { height: 680, imageUrl: "/images/sample-feed-4.jpg", width: 900 },
-    {
-        height: 1020,
-        imageUrl: "/images/sample-feed-portrait-6.jpg",
-        width: 680,
-    },
-] as const satisfies readonly SampleProfilePhoto[];
-
-const samplePostDateLabels = [
-    "Today",
-    "Yesterday",
-    "Wed, Apr 29",
-    "Tue, Apr 28",
-    "Mon, Apr 27",
-    "Sun, Apr 26",
-    "Sat, Apr 25",
-    "Fri, Apr 24",
-    "Thu, Apr 23",
-    "Wed, Apr 22",
-];
-
-const samplePostPhotoCounts = [4, 2, 1, 6, 10, 3, 8, 5, 7, 9];
-const minutesAgo = (minutes: number) => Date.now() - minutes * 60 * 1000;
-const hoursAgo = (hours: number) => minutesAgo(hours * 60);
-const daysAgo = (days: number) => hoursAgo(days * 24);
-
-const samplePostTimestampAt = (groupIndex: number, itemIndex: number) => {
-    if (groupIndex == 0) return minutesAgo(18 + itemIndex * 12);
-    if (groupIndex == 1) return hoursAgo(26 + itemIndex * 3);
-    return daysAgo(groupIndex + 1) - itemIndex * 20 * 60 * 1000;
-};
-
-const samplePhotoAt = (index: number): SampleProfilePhoto =>
-    samplePhotos[index % samplePhotos.length] ?? samplePhotos[0];
-
 const photoAspectRatio = ({ height, width }: ProfilePhotoDimensions): number =>
     height > 0 && width > 0 ? width / height : 1;
 
-const samplePostGroups = samplePostDateLabels.map((label, groupIndex) => ({
-    label,
-    items: Array.from(
-        { length: samplePostPhotoCounts[groupIndex] ?? 1 },
-        (_, itemIndex) => {
-            const photo = samplePhotoAt(groupIndex + itemIndex);
-            return {
-                height: photo.height,
-                id: `${groupIndex}-${itemIndex}`,
-                imageUrl: photo.imageUrl,
-                timestampMs: samplePostTimestampAt(groupIndex, itemIndex),
-                width: photo.width,
-            };
-        },
-    ),
-}));
+export interface ProfilePostItem {
+    avatarUrl?: string | null;
+    caption?: string;
+    friendID?: string;
+    height?: number;
+    id: string;
+    imageUrl: string;
+    likeCount?: number;
+    name?: string;
+    postId?: number;
+    timestampMs: number;
+    viewerLiked?: boolean;
+    width?: number;
+}
 
-type SamplePostItem = (typeof samplePostGroups)[number]["items"][number];
+export interface ProfilePostGroup {
+    items: ProfilePostItem[];
+    label: string;
+}
 
 interface SelectedProfilePost {
+    draftFile?: File;
     id: string;
     localObjectUrl?: string;
     photo: SocialViewerPhoto;
@@ -148,7 +77,7 @@ interface PostMasonryTile {
     aspectRatio: number;
     dimensions: ProfilePhotoDimensions;
     index: number;
-    item: SamplePostItem;
+    item: ProfilePostItem;
 }
 
 interface PostMasonryRow {
@@ -157,11 +86,14 @@ interface PostMasonryRow {
 }
 
 const buildPostMasonryRows = (
-    items: SamplePostItem[],
+    items: ProfilePostItem[],
     loadedDimensionsByURL: Record<string, ProfilePhotoDimensions>,
 ): PostMasonryRow[] => {
     const tiles = items.map((item, index) => {
-        const dimensions = loadedDimensionsByURL[item.imageUrl] ?? item;
+        const dimensions = loadedDimensionsByURL[item.imageUrl] ?? {
+            height: item.height ?? 1,
+            width: item.width ?? 1,
+        };
         return {
             aspectRatio: Math.max(0.1, photoAspectRatio(dimensions)),
             dimensions,
@@ -199,22 +131,36 @@ const preferredPostMasonryRowSize = (remainingTiles: number) => {
 interface ProfileScreenProps {
     friendsCount?: number;
     headerVariant?: "friend" | "owner" | "public";
+    isPostsLoading?: boolean;
     onAddFriend?: () => void;
     onBack?: () => void;
+    onCreatePost?: (file: File, caption: string) => Promise<SocialViewerPhoto>;
+    onDeletePost?: (postId: number) => Promise<void> | void;
+    onLoadPostLikers?: (postId: number) => Promise<SocialLiker[]>;
     onOpenFriend?: (friendID: string) => void;
     onOpenFriends?: () => void;
     onOpenSettings?: () => void;
+    onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
+    onShareProfileLink?: () => Promise<string>;
+    postGroups?: ProfilePostGroup[];
     profile: SetupProfile;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
-    friendsCount = 7,
+    friendsCount = 0,
     headerVariant = "owner",
+    isPostsLoading = false,
     onAddFriend,
     onBack,
+    onCreatePost,
+    onDeletePost,
+    onLoadPostLikers,
     onOpenFriend,
     onOpenFriends,
     onOpenSettings,
+    onSetPostLiked,
+    onShareProfileLink,
+    postGroups = [],
     profile,
 }) => {
     const [profileActionsAnchor, setProfileActionsAnchor] =
@@ -232,11 +178,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
     const displayName = profile.fullName.trim() || profile.username.trim();
-    const profileLink = profileLinkForUsername(profile.username.trim());
     const firstName = firstNameFrom(displayName);
     const initialsSource = displayName || profile.username.trim();
     const initials = initialsFor(initialsSource);
-    const visiblePostGroups = (showMockProfilePosts ? samplePostGroups : [])
+    const visiblePostGroups = postGroups
         .map((group) => ({
             ...group,
             items: group.items.filter((item) => !deletedPostIDs.has(item.id)),
@@ -320,6 +265,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         });
         localPostObjectUrlsRef.current.add(localPost.objectUrl);
         setSelectedPost({
+            draftFile: file,
             id: `local-${localPost.photo.timestampMs}`,
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
@@ -329,11 +275,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
     const copyProfileURL = async () => {
         closeProfileActions();
-        await navigator.clipboard.writeText(profileLink);
+        if (!onShareProfileLink) return;
+        await navigator.clipboard.writeText(await onShareProfileLink());
     };
 
     const shareProfile = async () => {
         closeProfileActions();
+        if (!onShareProfileLink) return;
+        const profileLink = await onShareProfileLink();
 
         if (typeof navigator.share == "function") {
             try {
@@ -348,9 +297,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         await navigator.clipboard.writeText(profileLink);
     };
 
-    const deleteSelectedPost = () => {
+    const deleteSelectedPost = async () => {
         if (!selectedPost) return;
 
+        if (selectedPost.photo.postId && onDeletePost) {
+            await onDeletePost(selectedPost.photo.postId);
+        }
         setDeletedPostIDs((currentPostIDs) => {
             const nextPostIDs = new Set(currentPostIDs);
             nextPostIDs.add(selectedPost.id);
@@ -1037,9 +989,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                             height: dimensions.height,
                                                                             imageUrl:
                                                                                 item.imageUrl,
+                                                                            likeCount:
+                                                                                item.likeCount,
                                                                             name: displayName,
+                                                                            postId:
+                                                                                item.postId,
                                                                             timestampMs:
                                                                                 item.timestampMs,
+                                                                            viewerLiked:
+                                                                                item.viewerLiked,
                                                                             width: dimensions.width,
                                                                         },
                                                                     },
@@ -1147,11 +1105,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     maxWidth: isOwnerProfile ? 230 : 250,
                                 }}
                             >
-                                {isOwnerProfile
-                                    ? "Your profile is looking empty. Share something with your friends."
-                                    : `${firstName} hasn't posted anything yet.`}
+                                {isPostsLoading
+                                    ? "Loading posts..."
+                                    : isOwnerProfile
+                                      ? "Your profile is looking empty. Share something with your friends."
+                                      : `${firstName} hasn't posted anything yet.`}
                             </Box>
-                            {isOwnerProfile && (
+                            {isOwnerProfile && !isPostsLoading && (
                                 <Box
                                     component="button"
                                     type="button"
@@ -1195,10 +1155,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </Box>
                 {selectedPost && (
                     <SocialFileViewer
-                        currentUser={{
-                            avatarUrl: profile.avatarUrl,
-                            name: displayName,
-                        }}
                         photo={selectedPost.photo}
                         postActionMode={
                             selectedPost.postActionMode ??
@@ -1208,6 +1164,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
                         }
+                        onLoadPostLikers={onLoadPostLikers}
                         onOpenFriend={
                             onOpenFriend
                                 ? (friendID) => {
@@ -1217,6 +1174,27 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 : undefined
                         }
                         onOpenProfile={closeSelectedPost}
+                        onPublishDraftPost={
+                            selectedPost.draftFile && onCreatePost
+                                ? async (caption) => {
+                                      const localObjectUrl =
+                                          selectedPost.localObjectUrl;
+                                      const post = await onCreatePost(
+                                          selectedPost.draftFile!,
+                                          caption,
+                                      );
+                                      revokeLocalPostObjectUrl(localObjectUrl);
+                                      setSelectedPost({
+                                          id: String(
+                                              post.postId ?? post.imageUrl,
+                                          ),
+                                          photo: post,
+                                          postActionMode: "like-with-count",
+                                      });
+                                  }
+                                : undefined
+                        }
+                        onSetPostLiked={onSetPostLiked}
                     />
                 )}
             </Box>
