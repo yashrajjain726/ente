@@ -548,7 +548,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                                 maxWidth: 240,
                             }}
                         >
-                            Likes and friend updates will appear here.
+                            Likes, replies, and new friends will appear here.
                         </Box>
                     </Box>
                 )}
