@@ -342,6 +342,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     boxSizing: "border-box",
                     minHeight: "100svh",
                     mx: "auto",
+                    position: "relative",
                     width: "100%",
                     "@media (min-width: 600px)": { maxWidth: 390 },
                 }}
@@ -428,13 +429,18 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 ) : (
                     <Box
                         sx={{
+                            alignItems: "center",
                             color: textSoft,
+                            display: "flex",
+                            inset: 0,
+                            justifyContent: "center",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 14,
                             fontWeight: 600,
                             lineHeight: "20px",
+                            pointerEvents: "none",
+                            position: "absolute",
                             px: "24px",
-                            py: "44px",
                             textAlign: "center",
                         }}
                     >

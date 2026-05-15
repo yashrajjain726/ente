@@ -18,6 +18,11 @@ const Page: React.FC = () => {
     const [loginError, setLoginError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const loginErrorMessage = (error: unknown) =>
+        error instanceof Error
+            ? error.message
+            : "Couldn't sign in. Please try again.";
+
     const handleLoginResult = (
         result: SocialLoginResult,
         credentials: SocialLoginCredentials,
@@ -71,12 +76,7 @@ const Page: React.FC = () => {
                             credentials,
                         );
                     } catch (error) {
-                        console.error("Social login failed", error);
-                        setLoginError(
-                            error instanceof Error
-                                ? error.message
-                                : "Couldn't sign in. Please try again.",
-                        );
+                        setLoginError(loginErrorMessage(error));
                         setIsSubmitting(false);
                     }
                 }}
