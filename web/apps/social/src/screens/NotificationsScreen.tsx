@@ -1,5 +1,6 @@
 import {
     ArrowLeft02Icon,
+    Message01Icon,
     UserAdd01Icon,
     UserRemove01Icon,
 } from "@hugeicons/core-free-icons";
@@ -32,7 +33,11 @@ const timelineLineTop = iconCircleTopOffset + iconCircleSize;
 const timelineListInset = "12px";
 const thumbnailRightInset = "16px";
 
-type NotificationType = "liked-post" | "added-friend" | "removed-friend";
+type NotificationType =
+    | "liked-post"
+    | "replied-post"
+    | "added-friend"
+    | "removed-friend";
 
 interface SocialNotification {
     actor: Pick<FriendProfile, "avatarUrl" | "fullName" | "id" | "username">;
@@ -50,6 +55,7 @@ interface NotificationsScreenProps {
     profile: SetupProfile;
     notifications: SocialNotification[];
     onLoadPostLikers?: (postId: number) => Promise<SocialLiker[]>;
+    onOpenMessages?: () => void;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
 }
 
@@ -80,6 +86,25 @@ const LikedPhotoIcon: React.FC = () => (
     </svg>
 );
 
+const RepliedPostNotificationIcon: React.FC = () => (
+    <svg
+        width="15"
+        height="12"
+        viewBox="0 0 12 9"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="M4.5241 0.242677C4.62341 0.34442 4.67919 0.482337 4.67919 0.626134C4.67919 0.76993 4.62341 0.907847 4.5241 1.00959L1.89369 3.70102H7.68483C8.3587 3.70102 9.35854 3.9036 10.2042 4.52653C11.0775 5.17045 11.7507 6.23762 11.7507 7.86116C11.7507 8.00507 11.6948 8.14309 11.5953 8.24485C11.4959 8.34661 11.361 8.40378 11.2203 8.40378C11.0797 8.40378 10.9448 8.34661 10.8453 8.24485C10.7459 8.14309 10.69 8.00507 10.69 7.86116C10.69 6.59069 10.1844 5.84982 9.58481 5.40776C8.95761 4.94544 8.18899 4.78627 7.68483 4.78627H1.89369L4.5241 7.4777C4.5762 7.52738 4.61799 7.58728 4.64698 7.65384C4.67597 7.72041 4.69155 7.79226 4.69281 7.86512C4.69406 7.93798 4.68096 8.01035 4.65429 8.07791C4.62762 8.14548 4.58792 8.20686 4.53756 8.25839C4.4872 8.30991 4.42722 8.35053 4.36118 8.37782C4.29515 8.40512 4.22442 8.41852 4.15321 8.41723C4.082 8.41595 4.01178 8.4 3.94673 8.37034C3.88167 8.34068 3.82313 8.29792 3.77457 8.24461L0.23908 4.6271C0.139767 4.52536 0.0839844 4.38744 0.0839844 4.24364C0.0839844 4.09985 0.139767 3.96193 0.23908 3.86019L3.77457 0.242677C3.87401 0.141061 4.0088 0.0839844 4.14934 0.0839844C4.28987 0.0839844 4.42466 0.141061 4.5241 0.242677Z"
+            fill="currentColor"
+            stroke="currentColor"
+            strokeWidth="0.166667"
+        />
+    </svg>
+);
+
 const UserAddNotificationIcon: React.FC = () => (
     <HugeiconsIcon icon={UserAdd01Icon} size={17} strokeWidth={1.8} />
 );
@@ -94,6 +119,11 @@ const actionForNotification = (
     switch (type) {
         case "liked-post":
             return { icon: <LikedPhotoIcon />, label: "liked your post" };
+        case "replied-post":
+            return {
+                icon: <RepliedPostNotificationIcon />,
+                label: "replied to your post",
+            };
         case "added-friend":
             return {
                 icon: <UserAddNotificationIcon />,
@@ -360,6 +390,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
     notifications,
     onBack,
     onLoadPostLikers,
+    onOpenMessages,
     onOpenFriend,
     onSetPostLiked,
     profile,
@@ -461,6 +492,35 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                     >
                         Notifications
                     </Box>
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label="Open messages"
+                        onClick={onOpenMessages}
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: "transparent",
+                            border: 0,
+                            color: textBase,
+                            cursor: onOpenMessages ? "pointer" : "default",
+                            display: "flex",
+                            height: 24,
+                            justifyContent: "flex-end",
+                            p: 0,
+                            width: 24,
+                            "&:focus-visible": {
+                                borderRadius: "50%",
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={Message01Icon}
+                            size={24}
+                            strokeWidth={1.8}
+                        />
+                    </Box>
                 </Box>
 
                 {hasNotifications ? (
@@ -548,7 +608,8 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                                 maxWidth: 240,
                             }}
                         >
-                            Likes, replies, and new friends will appear here.
+                            Likes and replies to posts, and new friends will
+                            appear here.
                         </Box>
                     </Box>
                 )}

@@ -10,6 +10,7 @@ import {
     loadCurrentFeedPage,
     loadCurrentPostLikers,
     loadCurrentWallFriends,
+    replyToCurrentPost,
     setCurrentPostLiked,
     type SocialWallPost,
 } from "services/socialWall";
@@ -117,6 +118,7 @@ const Page: React.FC = () => {
                 }
                 onOpenProfile={() => void router.push(socialRoutes.profile)}
                 onLoadPostLikers={loadCurrentPostLikers}
+                onReplyToPost={replyToCurrentPost}
                 onSetPostLiked={setCurrentPostLiked}
                 onShareProfileLink={async () => {
                     if (!profile?.wallId) throw new Error("Missing wall.");

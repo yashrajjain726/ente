@@ -66,6 +66,63 @@ func TestUpdateSlugRejectsReservedSlug(t *testing.T) {
 	require.Equal(t, "rename-user", unchanged.WallSlug)
 }
 
+func TestWallMessagesThreadAndConversations(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice-messages@example.com", "alice-public")
+	bobID := insertWallUser(t, module, "bob-messages@example.com", "bob-public")
+
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice-messages", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	bobWall, err := module.Walls.CreateWall(ctx, bobID, "bob-messages", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+
+	err = module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "alice-share-key", aliceWall.CurrentVersion, "bob-share-key", bobWall.CurrentVersion)
+	require.NoError(t, err)
+
+	message, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     bobID,
+		SenderWallID:                 bobWall.WallID,
+		RecipientID:                  aliceID,
+		RecipientWallID:              aliceWall.WallID,
+		MessageCipher:                "cipher",
+		SenderEncryptedMessageKey:    "sender-key",
+		RecipientEncryptedMessageKey: "recipient-key",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "regular", message.Kind)
+	require.Equal(t, "sender-key", message.EncryptedMessageKey)
+
+	aliceThread, nextCursor, err := module.Messages.ListThread(ctx, aliceID, bobWall.WallID, "", 10)
+	require.NoError(t, err)
+	require.Empty(t, nextCursor)
+	require.Len(t, aliceThread, 1)
+	require.Equal(t, "recipient-key", aliceThread[0].EncryptedMessageKey)
+	require.Equal(t, bobWall.WallID, aliceThread[0].Sender.WallID)
+
+	conversations, nextCursor, err := module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Empty(t, nextCursor)
+	require.Len(t, conversations, 1)
+	require.Equal(t, bobWall.WallID, conversations[0].Friend.WallID)
+	require.Equal(t, message.MessageID, conversations[0].LastMessage.MessageID)
+
+	_, err = module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     bobID,
+		SenderWallID:                 bobWall.WallID,
+		RecipientID:                  aliceID,
+		RecipientWallID:              aliceWall.WallID,
+		MessageCipher:                "cipher",
+		SenderEncryptedMessageKey:    "sender-key",
+		RecipientEncryptedMessageKey: "recipient-key",
+		ReplyPostID:                  sql.NullInt64{Int64: 1, Valid: true},
+	})
+	require.Error(t, err)
+}
+
 func TestWallModuleLifecycle(t *testing.T) {
 	ctx := context.Background()
 	module := newWallTestModule(t)
@@ -825,11 +882,28 @@ func TestNotificationsIncludeWallSocialEvents(t *testing.T) {
 	require.NoError(t, err)
 	setFriendEventCreatedAt(t, module, 3000, "friend_add", bobID, aliceID)
 
-	page, nextCursor, err := module.Notifications.List(ctx, aliceID, "", 3)
+	reply, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "post_reply",
+		SenderID:                     bobID,
+		SenderWallID:                 bobWall.WallID,
+		RecipientID:                  aliceID,
+		RecipientWallID:              aliceWall.WallID,
+		MessageCipher:                "reply-cipher",
+		SenderEncryptedMessageKey:    "sender-reply-key",
+		RecipientEncryptedMessageKey: "recipient-reply-key",
+		ReplyPostID:                  sql.NullInt64{Int64: postID, Valid: true},
+	})
 	require.NoError(t, err)
-	require.Len(t, page, 2)
-	require.Equal(t, "addedYouAsFriend", page[0].Type)
-	require.Equal(t, "likedPost", page[1].Type)
+	setMessageCreatedAt(t, module, 3500, reply.MessageID)
+
+	page, nextCursor, err := module.Notifications.List(ctx, aliceID, "", 5)
+	require.NoError(t, err)
+	require.Len(t, page, 3)
+	require.Equal(t, "repliedToPost", page[0].Type)
+	require.Equal(t, bobID, page[0].Actor.UserID)
+	require.Equal(t, postID, page[0].PostID.Int64)
+	require.Equal(t, "addedYouAsFriend", page[1].Type)
+	require.Equal(t, "likedPost", page[2].Type)
 	require.Empty(t, nextCursor)
 
 	err = module.Friends.DeleteFriendship(ctx, aliceID, bobWall.WallID)
@@ -923,5 +997,11 @@ func setPostLikeCreatedAt(t *testing.T, module *Module, createdAt, postID, userI
 func setFriendEventCreatedAt(t *testing.T, module *Module, createdAt int64, eventType string, actorID, targetID int64) {
 	t.Helper()
 	_, err := module.Friends.DB.Exec(`UPDATE wall_friend_events SET created_at = $1 WHERE event_type = $2 AND actor_id = $3 AND target_id = $4`, createdAt, eventType, actorID, targetID)
+	require.NoError(t, err)
+}
+
+func setMessageCreatedAt(t *testing.T, module *Module, createdAt int64, messageID string) {
+	t.Helper()
+	_, err := module.Messages.DB.Exec(`UPDATE wall_messages SET created_at = $1 WHERE message_id = $2`, createdAt, messageID)
 	require.NoError(t, err)
 }

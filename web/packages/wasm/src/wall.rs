@@ -2,10 +2,10 @@
 
 use ente_core::http::Error as HttpError;
 use ente_wall::{
-    AccountWallCtx, AuthKeyAttributes, CreatedWall, CreatedWallLink, DecryptedPost,
-    DecryptedWallProfile, OpenAccountWallCtxInput, OpenWallLinkCtxInput, PostResponse,
-    PrivateKeySource, ProfileAvatarResponse, WallActorResponse, WallError as CoreWallError,
-    WallLinkCtx, WallNotification, WallNotificationPost,
+    AccountWallCtx, AuthKeyAttributes, CreatedWall, CreatedWallLink, DecryptedMessage,
+    DecryptedPost, DecryptedWallProfile, MessageResponse, OpenAccountWallCtxInput,
+    OpenWallLinkCtxInput, PostResponse, PrivateKeySource, ProfileAvatarResponse, WallActorResponse,
+    WallError as CoreWallError, WallLinkCtx, WallNotification, WallNotificationPost,
     crypto::{decode_b64, encode_b64},
 };
 use serde::{Deserialize, Serialize};
@@ -216,6 +216,54 @@ struct PostLikerPageJs {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct MessageQuoteJs {
+    post_id: i64,
+    wall_id: String,
+    caption: Option<String>,
+    object_key: Option<String>,
+    width: Option<i32>,
+    height: Option<i32>,
+    media_type: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MessageJs {
+    message_id: String,
+    kind: String,
+    sender: ActorJs,
+    recipient: ActorJs,
+    text: String,
+    quote: Option<MessageQuoteJs>,
+    reply_post_id: Option<i64>,
+    is_deleted: bool,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MessagePageJs {
+    items: Vec<MessageJs>,
+    next_cursor: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MessageConversationJs {
+    friend: ActorJs,
+    last_message: MessageJs,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MessageConversationPageJs {
+    items: Vec<MessageConversationJs>,
+    next_cursor: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct FriendJs {
     friend: ActorJs,
     share_key_version: i32,
@@ -406,6 +454,36 @@ async fn notification_post_to_js(
         owner_user_id: post.owner_user_id,
         author,
         objects: post.objects,
+    })
+}
+
+async fn account_message_to_js(
+    ctx: &AccountWallCtx,
+    message: MessageResponse,
+    decrypted: DecryptedMessage,
+) -> Result<MessageJs, WasmWallError> {
+    let sender = account_actor_to_js(ctx, message.sender).await?;
+    let recipient = account_actor_to_js(ctx, message.recipient).await?;
+    let quote = decrypted.payload.quote.map(|quote| MessageQuoteJs {
+        post_id: quote.post_id,
+        wall_id: quote.wall_id,
+        caption: quote.caption,
+        object_key: quote.object_key,
+        width: quote.width,
+        height: quote.height,
+        media_type: quote.media_type,
+    });
+    Ok(MessageJs {
+        message_id: message.message_id,
+        kind: message.kind,
+        sender,
+        recipient,
+        text: decrypted.payload.text,
+        quote,
+        reply_post_id: message.reply_post_id,
+        is_deleted: message.is_deleted,
+        created_at: message.created_at,
+        updated_at: message.updated_at,
     })
 }
 
@@ -738,6 +816,81 @@ impl WallAccountCtxHandle {
         }
         swb::to_value(&PostLikerPageJs {
             likers,
+            next_cursor: page.next_cursor,
+        })
+        .map_err(Into::into)
+    }
+
+    /// Send a regular 1:1 message to a friend wall.
+    pub async fn send_message(
+        &self,
+        wall_id: String,
+        text: String,
+    ) -> Result<JsValue, WasmWallError> {
+        let message = self.inner.send_message(&wall_id, &text).await?;
+        let decrypted = self.inner.decrypt_message(&message)?;
+        swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
+            .map_err(Into::into)
+    }
+
+    /// Send a private post reply message to the post owner.
+    pub async fn reply_to_post(
+        &self,
+        post_id: i64,
+        text: String,
+    ) -> Result<JsValue, WasmWallError> {
+        let message = self.inner.reply_to_post(post_id, &text).await?;
+        let decrypted = self.inner.decrypt_message(&message)?;
+        swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
+            .map_err(Into::into)
+    }
+
+    /// List 1:1 message conversations with decrypted last messages.
+    pub async fn list_message_conversations(
+        &self,
+        cursor: Option<String>,
+        limit: Option<i32>,
+    ) -> Result<JsValue, WasmWallError> {
+        let page = self.inner.list_message_conversations(cursor, limit).await?;
+        let mut items = Vec::with_capacity(page.items.len());
+        for conversation in page.items {
+            let friend = account_actor_to_js(&self.inner, conversation.friend).await?;
+            let decrypted = self.inner.decrypt_message(&conversation.last_message)?;
+            items.push(MessageConversationJs {
+                friend,
+                last_message: account_message_to_js(
+                    &self.inner,
+                    conversation.last_message,
+                    decrypted,
+                )
+                .await?,
+            });
+        }
+        swb::to_value(&MessageConversationPageJs {
+            items,
+            next_cursor: page.next_cursor,
+        })
+        .map_err(Into::into)
+    }
+
+    /// List a 1:1 message thread with decrypted messages.
+    pub async fn list_message_thread(
+        &self,
+        wall_id: String,
+        cursor: Option<String>,
+        limit: Option<i32>,
+    ) -> Result<JsValue, WasmWallError> {
+        let page = self
+            .inner
+            .list_message_thread(&wall_id, cursor, limit)
+            .await?;
+        let mut items = Vec::with_capacity(page.items.len());
+        for message in page.items {
+            let decrypted = self.inner.decrypt_message(&message)?;
+            items.push(account_message_to_js(&self.inner, message, decrypted).await?);
+        }
+        swb::to_value(&MessagePageJs {
+            items,
             next_cursor: page.next_cursor,
         })
         .map_err(Into::into)

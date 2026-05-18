@@ -48,7 +48,28 @@ const headerIconSize = 23;
 const headerSideWidth = headerActionSize * 2 + headerActionGap;
 const feedLikeActionInset = 4;
 const feedLikeActionSize = 40;
+const feedActionIconSize = 23;
+const feedReplyIconSize = 20;
 const emptyFeedItemGap = "22px";
+
+const FeedReplyIcon: React.FC = () => (
+    <svg
+        width={feedReplyIconSize}
+        height={feedReplyIconSize}
+        viewBox="0 0 12 9"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="M4.5241 0.242677C4.62341 0.34442 4.67919 0.482337 4.67919 0.626134C4.67919 0.76993 4.62341 0.907847 4.5241 1.00959L1.89369 3.70102H7.68483C8.3587 3.70102 9.35854 3.9036 10.2042 4.52653C11.0775 5.17045 11.7507 6.23762 11.7507 7.86116C11.7507 8.00507 11.6948 8.14309 11.5953 8.24485C11.4959 8.34661 11.361 8.40378 11.2203 8.40378C11.0797 8.40378 10.9448 8.34661 10.8453 8.24485C10.7459 8.14309 10.69 8.00507 10.69 7.86116C10.69 6.59069 10.1844 5.84982 9.58481 5.40776C8.95761 4.94544 8.18899 4.78627 7.68483 4.78627H1.89369L4.5241 7.4777C4.5762 7.52738 4.61799 7.58728 4.64698 7.65384C4.67597 7.72041 4.69155 7.79226 4.69281 7.86512C4.69406 7.93798 4.68096 8.01035 4.65429 8.07791C4.62762 8.14548 4.58792 8.20686 4.53756 8.25839C4.4872 8.30991 4.42722 8.35053 4.36118 8.37782C4.29515 8.40512 4.22442 8.41852 4.15321 8.41723C4.082 8.41595 4.01178 8.4 3.94673 8.37034C3.88167 8.34068 3.82313 8.29792 3.77457 8.24461L0.23908 4.6271C0.139767 4.52536 0.0839844 4.38744 0.0839844 4.24364C0.0839844 4.09985 0.139767 3.96193 0.23908 3.86019L3.77457 0.242677C3.87401 0.141061 4.0088 0.0839844 4.14934 0.0839844C4.28987 0.0839844 4.42466 0.141061 4.5241 0.242677Z"
+            fill="currentColor"
+            stroke="currentColor"
+            strokeWidth="0.166667"
+        />
+    </svg>
+);
 
 interface HomeScreenProps {
     addedFriendToastName?: string;
@@ -64,6 +85,7 @@ interface HomeScreenProps {
     onOpenNotifications?: () => void;
     onOpenProfile?: () => void;
     onLoadPostLikers?: (postId: number) => Promise<SocialLiker[]>;
+    onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onShareProfileLink?: () => Promise<string>;
     profile: SetupProfile;
@@ -76,6 +98,7 @@ interface FeedPhotoDimensions {
 
 interface SelectedHomeViewer {
     draftImage?: PreparedSocialPostImage;
+    focusReplyOnOpen?: boolean;
     initialScreen: SocialViewerInitialScreen;
     localObjectUrl?: string;
     photo: SocialViewerPhoto;
@@ -85,6 +108,7 @@ interface SelectedHomeViewer {
 interface FeedItemProps {
     aspectRatio: number;
     avatarUrl?: string | null;
+    caption?: string;
     friendID: string;
     imageUrl: string;
     likeCount: number;
@@ -93,6 +117,7 @@ interface FeedItemProps {
     onOpenPhoto?: (
         photo: SocialViewerPhoto,
         initialScreen?: SocialViewerInitialScreen,
+        focusReplyOnOpen?: boolean,
     ) => void;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     postId: number;
@@ -118,6 +143,7 @@ const dimensionsFromAspectRatio = (
 const FeedItem: React.FC<FeedItemProps> = ({
     aspectRatio,
     avatarUrl,
+    caption,
     friendID,
     imageUrl,
     likeCount,
@@ -131,11 +157,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
 }) => {
     const [isLiked, setIsLiked] = useState(viewerLiked);
     const [localLikeCount, setLocalLikeCount] = useState(likeCount);
-    const [isLikeButtonPopping, setIsLikeButtonPopping] = useState(false);
     const firstName = firstNameFrom(name);
     const dateLabel = formatSocialDate(timestampMs);
     const openFriend = () => onOpenFriend?.(friendID);
-    const likePopTimeoutRef = React.useRef<number | null>(null);
     const [loadedPhotoDimensions, setLoadedPhotoDimensions] =
         useState<FeedPhotoDimensions | null>(null);
     const photoDimensions =
@@ -157,11 +181,15 @@ const FeedItem: React.FC<FeedItemProps> = ({
             return { height: naturalHeight, width: naturalWidth };
         });
     };
-    const openPhoto = (initialScreen?: SocialViewerInitialScreen) =>
+    const openPhoto = (
+        initialScreen?: SocialViewerInitialScreen,
+        focusReplyOnOpen = false,
+    ) =>
         onOpenPhoto?.(
             {
                 alt: `${name} post`,
                 avatarUrl,
+                caption,
                 friendID,
                 height: photoDimensions.height,
                 imageUrl,
@@ -173,12 +201,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 width: photoDimensions.width,
             },
             initialScreen,
+            focusReplyOnOpen,
         );
     const handleLikeClick = () => {
-        if (likePopTimeoutRef.current != null)
-            window.clearTimeout(likePopTimeoutRef.current);
-
-        setIsLikeButtonPopping(true);
         const nextLiked = !isLiked;
         setIsLiked(nextLiked);
         setLocalLikeCount((count) => Math.max(0, count + (nextLiked ? 1 : -1)));
@@ -189,10 +214,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 Math.max(0, count + (nextLiked ? -1 : 1)),
             );
         });
-        likePopTimeoutRef.current = window.setTimeout(() => {
-            likePopTimeoutRef.current = null;
-            setIsLikeButtonPopping(false);
-        }, 120);
     };
 
     React.useEffect(() => {
@@ -202,14 +223,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     React.useEffect(() => {
         setLocalLikeCount(likeCount);
     }, [likeCount]);
-
-    React.useEffect(
-        () => () => {
-            if (likePopTimeoutRef.current != null)
-                window.clearTimeout(likePopTimeoutRef.current);
-        },
-        [],
-    );
 
     return (
         <Box
@@ -390,6 +403,38 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 <Box
                     component="button"
                     type="button"
+                    aria-label={`Reply to ${firstName}'s post`}
+                    onClick={() => openPhoto("photo", true)}
+                    sx={{
+                        alignItems: "center",
+                        appearance: "none",
+                        bgcolor: "transparent",
+                        border: 0,
+                        borderRadius: "50%",
+                        bottom: feedLikeActionInset,
+                        color: "#FFFFFF",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        height: feedLikeActionSize,
+                        justifyContent: "center",
+                        p: 0,
+                        position: "absolute",
+                        right: feedLikeActionInset + feedLikeActionSize - 4,
+                        transition: "color 120ms ease, transform 120ms ease",
+                        width: feedLikeActionSize,
+                        zIndex: 1,
+                        "&:focus-visible": {
+                            outline: `2px solid ${green}`,
+                            outlineOffset: 2,
+                        },
+                        "&:hover": { bgcolor: "transparent" },
+                    }}
+                >
+                    <FeedReplyIcon />
+                </Box>
+                <Box
+                    component="button"
+                    type="button"
                     aria-label={isLiked ? "Unlike post" : "Like post"}
                     aria-pressed={isLiked}
                     onClick={handleLikeClick}
@@ -408,10 +453,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         p: 0,
                         position: "absolute",
                         right: feedLikeActionInset,
-                        transform: isLikeButtonPopping
-                            ? "scale(0.96)"
-                            : "scale(1)",
-                        transition: "color 120ms ease, transform 120ms ease",
+                        transition: "color 120ms ease",
                         width: feedLikeActionSize,
                         zIndex: 1,
                         "&:focus-visible": {
@@ -425,7 +467,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         fill={isLiked ? green : "none"}
                         icon={FavouriteIcon}
                         primaryColor={isLiked ? green : "#FFFFFF"}
-                        size={23}
+                        size={feedActionIconSize}
                         strokeWidth={1.8}
                     />
                 </Box>
@@ -544,6 +586,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onOpenFriend,
     onOpenNotifications,
     onOpenProfile,
+    onReplyToPost,
     onSetPostLiked,
     onShareProfileLink,
     profile,
@@ -572,8 +615,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const openFeedPhoto = (
         photo: SocialViewerPhoto,
         initialScreen: SocialViewerInitialScreen = "photo",
+        focusReplyOnOpen = false,
     ) => {
         setSelectedViewer({
+            focusReplyOnOpen,
             initialScreen,
             photo,
             postActionMode: "like-only",
@@ -882,6 +927,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                         : 1
                                 }
                                 avatarUrl={item.avatarUrl ?? ""}
+                                caption={item.caption}
                                 friendID={item.friendID}
                                 imageUrl={item.imageUrl}
                                 likeCount={item.likeCount}
@@ -985,6 +1031,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {selectedViewer && (
                     <SocialFileViewer
                         initialScreen={selectedViewer.initialScreen}
+                        focusReplyOnOpen={selectedViewer.focusReplyOnOpen}
                         photo={selectedViewer.photo}
                         postActionMode={
                             selectedViewer.postActionMode ?? "like-with-count"
@@ -1007,6 +1054,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 : undefined
                         }
                         onLoadPostLikers={onLoadPostLikers}
+                        onReplyToPost={
+                            selectedViewer.photo.friendID != profile.wallId
+                                ? onReplyToPost
+                                : undefined
+                        }
                         onPublishDraftPost={
                             selectedViewer.draftImage && onCreatePost
                                 ? async (caption) => {

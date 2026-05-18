@@ -130,6 +130,58 @@ pub struct LikePostResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CreateMessageRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_id: Option<String>,
+    pub message_cipher: String,
+    pub sender_encrypted_message_key: String,
+    pub recipient_encrypted_message_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageResponse {
+    pub message_id: String,
+    pub kind: String,
+    pub sender: WallActorResponse,
+    pub recipient: WallActorResponse,
+    #[serde(default)]
+    pub message_cipher: String,
+    #[serde(default)]
+    pub encrypted_message_key: String,
+    #[serde(default)]
+    pub reply_post_id: Option<i64>,
+    #[serde(default)]
+    pub is_deleted: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessagePage {
+    pub items: Vec<MessageResponse>,
+    #[serde(default)]
+    pub next_cursor: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageConversationResponse {
+    pub friend: WallActorResponse,
+    pub last_message: MessageResponse,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageConversationPage {
+    pub items: Vec<MessageConversationResponse>,
+    #[serde(default)]
+    pub next_cursor: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdatePostCaptionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub caption_cipher: Option<String>,
@@ -167,6 +219,7 @@ pub struct PostPage {
 #[serde(rename_all = "camelCase")]
 pub enum WallNotificationType {
     LikedPost,
+    RepliedToPost,
     AddedYouAsFriend,
     RemovedYouAsFriend,
 }

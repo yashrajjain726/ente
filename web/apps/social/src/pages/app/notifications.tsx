@@ -72,6 +72,7 @@ const Page: React.FC = () => {
                         socialRoutes.friend(friendID, "notifications"),
                     )
                 }
+                onOpenMessages={() => void router.push(socialRoutes.messages)}
                 onLoadPostLikers={loadCurrentPostLikers}
                 onSetPostLiked={setCurrentPostLiked}
                 profile={profile}

@@ -80,6 +80,39 @@ pub struct DecryptedPost {
     pub caption_plaintext: Option<Vec<u8>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageQuote {
+    pub post_id: i64,
+    pub wall_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caption: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub object_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MessagePayload {
+    pub version: i32,
+    pub kind: String,
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quote: Option<MessageQuote>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DecryptedMessage {
+    pub message_key: Vec<u8>,
+    pub payload: MessagePayload,
+}
+
 #[derive(Debug, Clone)]
 pub struct DecryptedFriendShare {
     pub friend: String,

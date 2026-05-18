@@ -8,27 +8,30 @@ use crate::crypto::{
 };
 use crate::error::{Result, WallError};
 use crate::models::{
-    CreatedWall, CreatedWallLink, DecryptedFriendShare, DecryptedPost, DecryptedWallProfile,
-    FeedItem, FeedPage, HydratedKeys, OpenAccountWallCtxInput, OpenWallLinkCtxInput,
-    PrivateKeySource,
+    CreatedWall, CreatedWallLink, DecryptedFriendShare, DecryptedMessage, DecryptedPost,
+    DecryptedWallProfile, FeedItem, FeedPage, HydratedKeys, MessagePayload, MessageQuote,
+    OpenAccountWallCtxInput, OpenWallLinkCtxInput, PrivateKeySource,
 };
 use crate::transport::{
-    AddFriendPayload, AssetDownloadResponse, CreateEntityKeyRequest, CreatePostRequest,
-    CreatePostResponse, CreateWallRequest, EntityKeyPayload, EntityKeyResponse,
+    AddFriendPayload, AssetDownloadResponse, CreateEntityKeyRequest, CreateMessageRequest,
+    CreatePostRequest, CreatePostResponse, CreateWallRequest, EntityKeyPayload, EntityKeyResponse,
     FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse, FriendTargetPayload,
-    LikePostRequest, LikePostResponse, ListPostLikersResponse, PostObjectPayload, PostPage,
-    PostResponse, PresignUploadRequest, PresignUploadResponse, ProfileAvatarPayload,
-    RefreshFriendSharesRequest, RotateWallKeyRequest, ShareUpdatePayload, UpdatePostCaptionRequest,
-    UpdateWallProfileRequest, UpdateWallProfileResponse, UpdateWallSlugRequest, WallActorResponse,
-    WallFriendResponse, WallKeyResponse, WallKeyVersionResponse, WallLinkCreateRequest,
-    WallLinkLoginRequest, WallLinkLoginResponse, WallLinkStatusResponse, WallLookupResponse,
-    WallNotificationPage, WallProfileResponse,
+    LikePostRequest, LikePostResponse, ListPostLikersResponse, MessageConversationPage,
+    MessagePage, MessageResponse, PostObjectPayload, PostPage, PostResponse, PresignUploadRequest,
+    PresignUploadResponse, ProfileAvatarPayload, RefreshFriendSharesRequest, RotateWallKeyRequest,
+    ShareUpdatePayload, UpdatePostCaptionRequest, UpdateWallProfileRequest,
+    UpdateWallProfileResponse, UpdateWallSlugRequest, WallActorResponse, WallFriendResponse,
+    WallKeyResponse, WallKeyVersionResponse, WallLinkCreateRequest, WallLinkLoginRequest,
+    WallLinkLoginResponse, WallLinkStatusResponse, WallLookupResponse, WallNotificationPage,
+    WallProfileResponse,
 };
 use ente_core::crypto::{sealed, secretbox};
 use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
 
 const ROOT_WALL_KEY_TYPE: &str = "wall";
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
+const MESSAGE_KIND_REGULAR: &str = "regular";
+const MESSAGE_KIND_POST_REPLY: &str = "post_reply";
 
 #[derive(Debug, Clone)]
 struct ResolvedWallAccess {
@@ -808,6 +811,143 @@ impl AccountWallCtx {
             .map_err(Into::into)
     }
 
+    pub async fn list_message_conversations(
+        &self,
+        cursor: Option<String>,
+        limit: Option<i32>,
+    ) -> Result<MessageConversationPage> {
+        let mut query = Vec::new();
+        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
+            query.push(("cursor", value));
+        }
+        if let Some(value) = limit {
+            query.push(("limit", value.to_string()));
+        }
+        self.client
+            .get_json("/wall/messages", &query)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn list_message_thread(
+        &self,
+        wall_id: &str,
+        cursor: Option<String>,
+        limit: Option<i32>,
+    ) -> Result<MessagePage> {
+        let mut query = Vec::new();
+        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
+            query.push(("cursor", value));
+        }
+        if let Some(value) = limit {
+            query.push(("limit", value.to_string()));
+        }
+        let path = format!("/wall/messages/{wall_id}");
+        self.client
+            .get_json(&path, &query)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn send_message(&self, wall_id: &str, text: &str) -> Result<MessageResponse> {
+        let friend = self.friend_actor_for_wall(wall_id).await?;
+        let payload = MessagePayload {
+            version: 1,
+            kind: MESSAGE_KIND_REGULAR.to_owned(),
+            text: text.to_owned(),
+            quote: None,
+        };
+        let request = self.message_request_for_payload(&friend.public_key, &payload)?;
+        let path = format!("/wall/messages/{wall_id}");
+        self.client
+            .post_json(&path, &request)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn reply_to_post(&self, post_id: i64, text: &str) -> Result<MessageResponse> {
+        let post = self.get_post(post_id).await?;
+        if Some(post.owner_user_id) == self.user_id {
+            return Err(WallError::InvalidInput(
+                "cannot reply to your own post".into(),
+            ));
+        }
+        if post.author.public_key.trim().is_empty() {
+            return Err(WallError::InvalidInput(
+                "post author public key is missing".into(),
+            ));
+        }
+        let decrypted = self.decrypt_post_for_wall(&post.wall_id, &post).await?;
+        let caption = optional_utf8(decrypted.caption_plaintext, "caption")?;
+        let object = post.objects.first();
+        let payload = MessagePayload {
+            version: 1,
+            kind: MESSAGE_KIND_POST_REPLY.to_owned(),
+            text: text.to_owned(),
+            quote: Some(MessageQuote {
+                post_id,
+                wall_id: post.wall_id.clone(),
+                caption,
+                object_key: object.map(|value| value.object_key.clone()),
+                width: object.and_then(|value| value.width),
+                height: object.and_then(|value| value.height),
+                media_type: object.and_then(|value| value.media_type.clone()),
+            }),
+        };
+        let request = self.message_request_for_payload(&post.author.public_key, &payload)?;
+        let path = format!("/wall/posts/{post_id}/reply");
+        self.client
+            .post_json(&path, &request)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub fn decrypt_message(&self, message: &MessageResponse) -> Result<DecryptedMessage> {
+        if message.is_deleted {
+            return Err(WallError::InvalidInput("message is deleted".into()));
+        }
+        let packed_key = decode_b64(&message.encrypted_message_key)?;
+        let (sealed_key, _) = unpack_payload(&packed_key)?;
+        let message_key = sealed::open(&sealed_key, &self.public_key, &self.private_key)?;
+        let packed_message = decode_b64(&message.message_cipher)?;
+        let plaintext = decrypt_secretbox_packed(&message_key, &packed_message)?;
+        let payload: MessagePayload = serde_json::from_slice(&plaintext)
+            .map_err(|err| WallError::InvalidInput(format!("invalid message payload: {err}")))?;
+        Ok(DecryptedMessage {
+            message_key,
+            payload,
+        })
+    }
+
+    async fn friend_actor_for_wall(&self, wall_id: &str) -> Result<WallActorResponse> {
+        let (owned_wall, _) = self.default_owned_wall_access().await?;
+        let friends = self.list_wall_friends(&owned_wall.wall_id).await?;
+        friends
+            .into_iter()
+            .map(|value| value.friend)
+            .find(|friend| friend.wall_id == wall_id)
+            .ok_or_else(|| WallError::InvalidInput(format!("wall {wall_id} is not a friend")))
+    }
+
+    fn message_request_for_payload(
+        &self,
+        recipient_public_key: &str,
+        payload: &MessagePayload,
+    ) -> Result<CreateMessageRequest> {
+        let recipient_public_key = decode_b64(recipient_public_key)?;
+        let message_key = generate_key();
+        let plaintext = serde_json::to_vec(payload)
+            .map_err(|err| WallError::InvalidInput(format!("invalid message payload: {err}")))?;
+        let sender_key = sealed::seal(&message_key, &self.public_key)?;
+        let recipient_key = sealed::seal(&message_key, &recipient_public_key)?;
+        Ok(CreateMessageRequest {
+            message_id: None,
+            message_cipher: encode_b64(&encrypt_secretbox_packed(&message_key, &plaintext)?),
+            sender_encrypted_message_key: encode_b64(&pack_payload(&sender_key, &[])),
+            recipient_encrypted_message_key: encode_b64(&pack_payload(&recipient_key, &[])),
+        })
+    }
+
     pub async fn add_friend_from_link(&self, link: &WallLinkCtx) -> Result<FriendStatusResponse> {
         if link.owner_public_key().is_empty() {
             return Err(WallError::InvalidInput(
@@ -1018,6 +1158,15 @@ fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
         likes: item.likes,
         viewer_liked: item.viewer_liked,
     }
+}
+
+fn optional_utf8(bytes: Option<Vec<u8>>, field: &str) -> Result<Option<String>> {
+    bytes
+        .map(|value| {
+            String::from_utf8(value)
+                .map_err(|err| WallError::InvalidInput(format!("invalid {field} utf8: {err}")))
+        })
+        .transpose()
 }
 
 impl WallLinkCtx {
@@ -2667,6 +2816,28 @@ mod tests {
                             }
                         },
                         {
+                            "id": "post_reply:wmsg_1",
+                            "type": "repliedToPost",
+                            "createdAt": "2026-04-16T12:00:00Z",
+                            "actor": {
+                                "userId": 9,
+                                "username": "mira",
+                                "wallId": "wall_mira",
+                                "wallSlug": "mira"
+                            },
+                            "post": {
+                                "postId": 42,
+                                "wallId": "wall_owner_gallery",
+                                "wallSlug": "owner-gallery",
+                                "ownerUserId": 7,
+                                "author": {
+                                    "userId": 7,
+                                    "wallId": "wall_owner_gallery",
+                                    "wallSlug": "owner-gallery"
+                                }
+                            }
+                        },
+                        {
                             "id": "friend_remove:12",
                             "type": "removedYouAsFriend",
                             "createdAt": "2026-04-17T00:00:00Z",
@@ -2687,13 +2858,17 @@ mod tests {
             .await
             .expect("notifications should load");
 
-        assert_eq!(page.items.len(), 2);
+        assert_eq!(page.items.len(), 3);
         assert_eq!(
             page.items[0].notification_type,
             crate::transport::WallNotificationType::LikedPost
         );
         assert_eq!(
             page.items[1].notification_type,
+            crate::transport::WallNotificationType::RepliedToPost
+        );
+        assert_eq!(
+            page.items[2].notification_type,
             crate::transport::WallNotificationType::RemovedYouAsFriend
         );
         assert_eq!(page.items[0].actor.wall_slug, "mira");

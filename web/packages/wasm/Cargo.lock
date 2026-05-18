@@ -355,6 +355,7 @@ dependencies = [
  "base64",
  "ente-core",
  "serde",
+ "serde_json",
  "thiserror",
  "url",
  "urlencoding",

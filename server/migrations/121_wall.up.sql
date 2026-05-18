@@ -148,6 +148,78 @@ CREATE INDEX IF NOT EXISTS idx_wall_friend_events_target_created
 CREATE INDEX IF NOT EXISTS idx_wall_friend_events_target_type_created
     ON wall_friend_events (target_id, event_type, created_at DESC);
 
+CREATE OR REPLACE FUNCTION tg_wall_messages_null_cipher_on_delete() RETURNS trigger AS $$
+BEGIN
+    IF NEW.is_deleted THEN
+        NEW.message_cipher := NULL;
+        NEW.sender_encrypted_message_key := NULL;
+        NEW.recipient_encrypted_message_key := NULL;
+    END IF;
+    RETURN NEW;
+END; $$ LANGUAGE plpgsql;
+
+CREATE TABLE IF NOT EXISTS wall_messages (
+    message_id                      TEXT PRIMARY KEY,
+    sender_id                       BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    sender_wall_id                  TEXT   NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,
+    recipient_id                    BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    recipient_wall_id               TEXT   NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,
+    thread_key                      TEXT GENERATED ALWAYS AS (
+        CASE
+            WHEN sender_wall_id < recipient_wall_id
+                THEN sender_wall_id || ':' || recipient_wall_id
+            ELSE recipient_wall_id || ':' || sender_wall_id
+        END
+    ) STORED,
+    kind                            TEXT   NOT NULL,
+    message_cipher                  TEXT,
+    sender_encrypted_message_key    TEXT,
+    recipient_encrypted_message_key TEXT,
+    reply_post_id                   BIGINT REFERENCES wall_posts (post_id) ON DELETE SET NULL,
+    is_deleted                      BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at                      BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
+    updated_at                      BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
+    CONSTRAINT chk_wall_messages_distinct_users CHECK (sender_id <> recipient_id),
+    CONSTRAINT chk_wall_messages_kind CHECK (kind IN ('regular', 'post_reply')),
+    CONSTRAINT chk_wall_messages_regular_shape CHECK (kind <> 'regular' OR reply_post_id IS NULL),
+    CONSTRAINT chk_wall_messages_cipher_on_delete CHECK (
+        (
+            is_deleted = FALSE
+            AND message_cipher IS NOT NULL
+            AND sender_encrypted_message_key IS NOT NULL
+            AND recipient_encrypted_message_key IS NOT NULL
+        ) OR (
+            is_deleted = TRUE
+            AND message_cipher IS NULL
+            AND sender_encrypted_message_key IS NULL
+            AND recipient_encrypted_message_key IS NULL
+        )
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_wall_messages_sender_updated
+    ON wall_messages (sender_id, updated_at DESC, message_id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_wall_messages_recipient_updated
+    ON wall_messages (recipient_id, updated_at DESC, message_id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_wall_messages_thread_created
+    ON wall_messages (thread_key, created_at DESC, message_id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_wall_messages_reply_post
+    ON wall_messages (reply_post_id)
+    WHERE reply_post_id IS NOT NULL;
+
+CREATE TRIGGER wall_messages_null_cipher_on_delete
+    BEFORE INSERT OR UPDATE ON wall_messages
+    FOR EACH ROW
+EXECUTE PROCEDURE tg_wall_messages_null_cipher_on_delete();
+
+CREATE TRIGGER update_wall_messages_updated_at
+    BEFORE UPDATE ON wall_messages
+    FOR EACH ROW
+EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
+
 CREATE TABLE IF NOT EXISTS wall_links (
     wall_id              TEXT PRIMARY KEY REFERENCES walls (wall_id) ON DELETE CASCADE,
     auth_key_hash        BYTEA   NOT NULL UNIQUE,

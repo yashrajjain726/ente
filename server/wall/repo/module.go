@@ -10,6 +10,7 @@ type Module struct {
 	Walls         *WallsRepository
 	Posts         *PostsRepository
 	Friends       *FriendsRepository
+	Messages      *MessagesRepository
 	Notifications *NotificationsRepository
 	Links         *LinksRepository
 	Assets        *AssetsRepository
@@ -24,6 +25,10 @@ type PostsRepository struct {
 }
 
 type FriendsRepository struct {
+	DB *sql.DB
+}
+
+type MessagesRepository struct {
 	DB *sql.DB
 }
 
@@ -106,6 +111,41 @@ type WallTempObjectRecord struct {
 type WallPostLikerRecord struct {
 	Actor     WallActorRecord
 	CreatedAt int64
+}
+
+type WallMessageRecord struct {
+	MessageID           string
+	Kind                string
+	SenderID            int64
+	SenderWallID        string
+	RecipientID         int64
+	RecipientWallID     string
+	MessageCipher       string
+	EncryptedMessageKey string
+	ReplyPostID         sql.NullInt64
+	IsDeleted           bool
+	CreatedAt           int64
+	UpdatedAt           int64
+	Sender              WallActorRecord
+	Recipient           WallActorRecord
+}
+
+type WallMessageConversationRecord struct {
+	Friend      WallActorRecord
+	LastMessage WallMessageRecord
+}
+
+type CreateWallMessageRecord struct {
+	MessageID                    string
+	Kind                         string
+	SenderID                     int64
+	SenderWallID                 string
+	RecipientID                  int64
+	RecipientWallID              string
+	MessageCipher                string
+	SenderEncryptedMessageKey    string
+	RecipientEncryptedMessageKey string
+	ReplyPostID                  sql.NullInt64
 }
 
 type WallActorRecord struct {
@@ -195,6 +235,7 @@ func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {
 		Walls:         &WallsRepository{DB: db},
 		Posts:         &PostsRepository{DB: db},
 		Friends:       &FriendsRepository{DB: db},
+		Messages:      &MessagesRepository{DB: db},
 		Notifications: &NotificationsRepository{DB: db},
 		Links:         &LinksRepository{DB: db},
 		Assets:        &AssetsRepository{DB: db, S3Config: s3Config},

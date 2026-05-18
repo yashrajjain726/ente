@@ -31,6 +31,16 @@ type ListNotificationsRequest struct {
 	Limit  int    `form:"limit"`
 }
 
+type ListMessagesRequest struct {
+	Cursor string `form:"cursor"`
+	Limit  int    `form:"limit"`
+}
+
+type ListMessageThreadRequest struct {
+	Cursor string `form:"cursor"`
+	Limit  int    `form:"limit"`
+}
+
 type ListWallFriendsRequest struct {
 	WallID string `form:"wallId"`
 }
@@ -256,6 +266,41 @@ type PostLikerResponse struct {
 
 type UpdatePostCaptionRequest struct {
 	CaptionCipher *string `json:"captionCipher,omitempty"`
+}
+
+type CreateMessageRequest struct {
+	MessageID                    string `json:"messageId,omitempty"`
+	MessageCipher                string `json:"messageCipher"`
+	SenderEncryptedMessageKey    string `json:"senderEncryptedMessageKey"`
+	RecipientEncryptedMessageKey string `json:"recipientEncryptedMessageKey"`
+}
+
+type MessageResponse struct {
+	MessageID           string            `json:"messageId"`
+	Kind                string            `json:"kind"`
+	Sender              WallActorResponse `json:"sender"`
+	Recipient           WallActorResponse `json:"recipient"`
+	MessageCipher       string            `json:"messageCipher,omitempty"`
+	EncryptedMessageKey string            `json:"encryptedMessageKey,omitempty"`
+	ReplyPostID         *int64            `json:"replyPostId,omitempty"`
+	IsDeleted           bool              `json:"isDeleted"`
+	CreatedAt           string            `json:"createdAt"`
+	UpdatedAt           string            `json:"updatedAt"`
+}
+
+type MessagePage struct {
+	Items      []MessageResponse `json:"items"`
+	NextCursor string            `json:"nextCursor,omitempty"`
+}
+
+type MessageConversationResponse struct {
+	Friend      WallActorResponse `json:"friend"`
+	LastMessage MessageResponse   `json:"lastMessage"`
+}
+
+type MessageConversationPage struct {
+	Items      []MessageConversationResponse `json:"items"`
+	NextCursor string                        `json:"nextCursor,omitempty"`
 }
 
 type PostObjectPayload struct {

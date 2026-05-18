@@ -19,6 +19,7 @@ export const socialRoutes = {
     home: "/app",
     invite: "/invite",
     login: "/login",
+    messages: "/app/messages",
     notifications: "/app/notifications",
     onboarding: "/",
     passkeysFinish: "/passkeys/finish",

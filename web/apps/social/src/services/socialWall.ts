@@ -34,6 +34,7 @@ interface WallActor {
     friends?: number;
     posts?: number;
     profile?: string;
+    publicKey?: string;
     userId?: number;
     wallId: string;
     wallSlug: string;
@@ -80,7 +81,11 @@ interface WallNotification {
         wallId: string;
         wallSlug: string;
     };
-    type: "likedPost" | "addedYouAsFriend" | "removedYouAsFriend";
+    type:
+        | "likedPost"
+        | "repliedToPost"
+        | "addedYouAsFriend"
+        | "removedYouAsFriend";
 }
 
 interface WallNotificationPage {
@@ -90,6 +95,47 @@ interface WallNotificationPage {
 
 interface WallPostLikerPage {
     likers?: { actor: WallActor; createdAt: string }[];
+    nextCursor?: string;
+}
+
+type WallMessageKind = "post_reply" | "regular";
+
+interface WallMessageQuote {
+    caption?: string;
+    height?: number;
+    mediaType?: string;
+    objectKey?: string;
+    postId: number;
+    wallId: string;
+    width?: number;
+}
+
+interface WallMessage {
+    createdAt: string;
+    id?: string;
+    isDeleted?: boolean;
+    kind: WallMessageKind;
+    messageId: string;
+    quote?: WallMessageQuote;
+    recipient: WallActor;
+    replyPostId?: number;
+    sender: WallActor;
+    text: string;
+    updatedAt: string;
+}
+
+interface WallMessagePage {
+    items?: WallMessage[];
+    nextCursor?: string;
+}
+
+interface WallMessageConversation {
+    friend: WallActor;
+    lastMessage: WallMessage;
+}
+
+interface WallMessageConversationPage {
+    items?: WallMessageConversation[];
     nextCursor?: string;
 }
 
@@ -118,7 +164,7 @@ export interface SocialWallNotification {
     id: string;
     post?: SocialWallPost;
     timestampMs: number;
-    type: "added-friend" | "liked-post" | "removed-friend";
+    type: "added-friend" | "liked-post" | "removed-friend" | "replied-post";
 }
 
 export interface SocialWallNotificationPage {
@@ -139,6 +185,48 @@ export interface SocialLiker {
     friendID?: string;
     id: string;
     name: string;
+}
+
+export type SocialWallMessageKind = WallMessageKind;
+
+export interface SocialWallMessageQuote {
+    caption?: string;
+    height?: number;
+    imageUrl?: string;
+    isUnavailable?: boolean;
+    mediaType?: string;
+    objectKey?: string;
+    postId: number;
+    wallId: string;
+    width?: number;
+}
+
+export interface SocialWallMessage {
+    createdAtMs: number;
+    id: string;
+    isDeleted: boolean;
+    kind: SocialWallMessageKind;
+    quote?: SocialWallMessageQuote;
+    recipient: FriendProfile;
+    replyPostId?: number;
+    sender: FriendProfile;
+    text: string;
+    updatedAtMs: number;
+}
+
+export interface SocialWallMessagePage {
+    items: SocialWallMessage[];
+    nextCursor?: string;
+}
+
+export interface SocialWallMessageConversation {
+    friend: FriendProfile;
+    lastMessage: SocialWallMessage;
+}
+
+export interface SocialWallMessageConversationPage {
+    items: SocialWallMessageConversation[];
+    nextCursor?: string;
 }
 
 const parseWallProfilePayload = (profile: string): WallProfilePayload => {
@@ -311,6 +399,71 @@ const postPageFromLinkPage = async (
         )
     ).filter((post): post is SocialWallPost => Boolean(post));
     return { items, nextCursor: page.nextCursor || undefined };
+};
+
+const messageQuoteFromWallQuote = async (
+    ctx: WallAccountCtxHandle,
+    quote: WallMessageQuote | undefined,
+    includeImage: boolean,
+): Promise<SocialWallMessageQuote | undefined> => {
+    if (!quote) return undefined;
+
+    const socialQuote: SocialWallMessageQuote = {
+        caption: quote.caption,
+        height: quote.height,
+        mediaType: quote.mediaType,
+        objectKey: quote.objectKey,
+        postId: quote.postId,
+        wallId: quote.wallId,
+        width: quote.width,
+    };
+    if (!includeImage || !quote.objectKey) return socialQuote;
+
+    try {
+        socialQuote.imageUrl = blobURLForBytes(
+            await ctx.download_post_asset(
+                BigInt(quote.postId),
+                quote.objectKey,
+            ),
+            quote.mediaType,
+        );
+    } catch (error) {
+        console.warn("Failed to load quoted post image", error);
+        socialQuote.isUnavailable = true;
+    }
+    return socialQuote;
+};
+
+const messageFromWallMessage = async (
+    ctx: WallAccountCtxHandle,
+    message: WallMessage,
+    includeQuoteImage: boolean,
+): Promise<SocialWallMessage> => {
+    const sender = actorProfile(message.sender);
+    const recipient = actorProfile(message.recipient);
+    const [senderAvatarUrl, recipientAvatarUrl, quote] = await Promise.all([
+        accountAvatarURL(ctx, message.sender.wallId, message.sender.avatar),
+        accountAvatarURL(
+            ctx,
+            message.recipient.wallId,
+            message.recipient.avatar,
+        ),
+        messageQuoteFromWallQuote(ctx, message.quote, includeQuoteImage),
+    ]);
+    sender.avatarUrl = senderAvatarUrl;
+    recipient.avatarUrl = recipientAvatarUrl;
+    return {
+        createdAtMs: timestampMsFromWallDate(message.createdAt),
+        id: message.messageId || message.id || `${message.createdAt}`,
+        isDeleted: Boolean(message.isDeleted),
+        kind: message.kind,
+        quote,
+        recipient,
+        replyPostId: message.replyPostId,
+        sender,
+        text: message.text,
+        updatedAtMs: timestampMsFromWallDate(message.updatedAt),
+    };
 };
 
 export const createCurrentProfileLink = async (
@@ -486,6 +639,83 @@ export const loadCurrentPostLikers = async (postId: number) => {
     }
 };
 
+export const replyToCurrentPost = async (postId: number, text: string) => {
+    const ctx = await ensureCurrentWallContext();
+    try {
+        await ctx.reply_to_post(BigInt(postId), text.trim());
+    } finally {
+        ctx.free();
+    }
+};
+
+export const sendCurrentMessage = async (wallId: string, text: string) => {
+    const ctx = await ensureCurrentWallContext();
+    try {
+        return await messageFromWallMessage(
+            ctx,
+            (await ctx.send_message(wallId, text.trim())) as WallMessage,
+            true,
+        );
+    } finally {
+        ctx.free();
+    }
+};
+
+export const loadCurrentMessageConversations =
+    async (): Promise<SocialWallMessageConversationPage> => {
+        const ctx = await ensureCurrentWallContext();
+        try {
+            const page = (await ctx.list_message_conversations(
+                null,
+                50,
+            )) as WallMessageConversationPage;
+            const items = await Promise.all(
+                (page.items ?? []).map(async (conversation) => {
+                    const friend = actorProfile(conversation.friend);
+                    friend.avatarUrl = await accountAvatarURL(
+                        ctx,
+                        conversation.friend.wallId,
+                        conversation.friend.avatar,
+                    );
+                    return {
+                        friend,
+                        lastMessage: await messageFromWallMessage(
+                            ctx,
+                            conversation.lastMessage,
+                            false,
+                        ),
+                    };
+                }),
+            );
+            return { items, nextCursor: page.nextCursor || undefined };
+        } finally {
+            ctx.free();
+        }
+    };
+
+export const loadCurrentMessageThread = async (
+    wallId: string,
+): Promise<SocialWallMessagePage> => {
+    const ctx = await ensureCurrentWallContext();
+    try {
+        const page = (await ctx.list_message_thread(
+            wallId,
+            null,
+            100,
+        )) as WallMessagePage;
+        const items = (
+            await Promise.all(
+                (page.items ?? []).map((message) =>
+                    messageFromWallMessage(ctx, message, true),
+                ),
+            )
+        ).reverse();
+        return { items, nextCursor: page.nextCursor || undefined };
+    } finally {
+        ctx.free();
+    }
+};
+
 export const deleteCurrentPost = async (postId: number) => {
     const ctx = await ensureCurrentWallContext();
     try {
@@ -527,12 +757,15 @@ export const loadCurrentNotificationsPage =
                                   wallSlug: notification.post.wallSlug,
                               })
                             : undefined;
-                    const notificationType: SocialWallNotification["type"] =
-                        notification.type == "addedYouAsFriend"
-                            ? "added-friend"
-                            : notification.type == "removedYouAsFriend"
-                              ? "removed-friend"
-                              : "liked-post";
+                    let notificationType: SocialWallNotification["type"] =
+                        "liked-post";
+                    if (notification.type == "addedYouAsFriend") {
+                        notificationType = "added-friend";
+                    } else if (notification.type == "removedYouAsFriend") {
+                        notificationType = "removed-friend";
+                    } else if (notification.type == "repliedToPost") {
+                        notificationType = "replied-post";
+                    }
                     return {
                         actor,
                         id: notification.id,

@@ -40,7 +40,7 @@ const wallNotificationRows = `
 	JOIN walls actor_wall ON actor_wall.owner_id = pl.user_id
 	JOIN key_attributes actor_ka ON actor_ka.user_id = pl.user_id
 	JOIN walls post_wall ON post_wall.wall_id = p.wall_id
-	JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
+	JOIN walls owner_wall ON owner_wall.wall_id = p.wall_id
 	JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
 	LEFT JOIN LATERAL (
 		SELECT object_key, size, position, variant, blur_hash_cipher, width, height, media_type
@@ -88,6 +88,56 @@ const wallNotificationRows = `
 	JOIN key_attributes actor_ka ON actor_ka.user_id = actor_wall.owner_id
 	WHERE fe.target_id = $1
 	  AND fe.actor_id <> $1
+
+	UNION ALL
+
+	SELECT
+		'post_reply:' || m.message_id AS notification_id,
+		'repliedToPost' AS notification_type,
+		m.created_at,
+		actor_wall.owner_id, actor_wall.wall_id, actor_wall.wall_slug, actor_ka.public_key,
+		actor_wall.current_version, actor_wall.encrypted_profile, actor_wall.avatar_object_key,
+		actor_wall.avatar_size, actor_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = actor_wall.wall_id) AS actor_friends,
+		(SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = actor_wall.wall_id AND ap.is_deleted = FALSE) AS actor_posts,
+		p.post_id,
+		p.wall_id AS post_wall_id,
+		post_wall.wall_slug AS post_wall_slug,
+		p.owner_id AS post_owner_id,
+		owner_wall.owner_id, owner_wall.wall_id, owner_wall.wall_slug, owner_ka.public_key,
+		owner_wall.current_version, owner_wall.encrypted_profile, owner_wall.avatar_object_key,
+		owner_wall.avatar_size, owner_wall.updated_at,
+		(SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = owner_wall.wall_id) AS post_author_friends,
+		(SELECT COUNT(*) FROM wall_posts op WHERE op.wall_id = owner_wall.wall_id AND op.is_deleted = FALSE) AS post_author_posts,
+		asset.object_key AS post_object_key,
+		asset.size AS post_object_size,
+		asset.position AS post_object_position,
+		asset.variant AS post_object_variant,
+		asset.blur_hash_cipher AS post_object_blur_hash_cipher,
+		asset.width AS post_object_width,
+		asset.height AS post_object_height,
+		asset.media_type AS post_object_media_type
+	FROM wall_messages m
+	JOIN wall_posts p ON p.post_id = m.reply_post_id
+	JOIN walls actor_wall ON actor_wall.wall_id = m.sender_wall_id AND actor_wall.owner_id = m.sender_id
+	JOIN key_attributes actor_ka ON actor_ka.user_id = m.sender_id
+	JOIN walls post_wall ON post_wall.wall_id = p.wall_id
+	JOIN walls owner_wall ON owner_wall.wall_id = p.wall_id
+	JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
+	LEFT JOIN LATERAL (
+		SELECT object_key, size, position, variant, blur_hash_cipher, width, height, media_type
+		FROM wall_post_assets
+		WHERE post_id = p.post_id
+		ORDER BY position ASC, asset_id ASC
+		LIMIT 1
+	) asset ON TRUE
+	WHERE m.recipient_id = $1
+	  AND m.sender_id <> $1
+	  AND m.kind = 'post_reply'
+	  AND m.is_deleted = FALSE
+	  AND m.reply_post_id IS NOT NULL
+	  AND p.owner_id = $1
+	  AND p.is_deleted = FALSE
 `
 
 func (r *NotificationsRepository) List(ctx context.Context, userID int64, cursor string, limit int) ([]WallNotificationRecord, string, error) {
