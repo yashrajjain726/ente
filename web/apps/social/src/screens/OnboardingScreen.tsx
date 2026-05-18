@@ -5,10 +5,10 @@ import React from "react";
 export const onboardingGreen = "#08C225";
 export const onboardingTitle = "Share your life";
 export const onboardingDescription =
-    "A truly private, beautiful way to share your life with the people you care about";
+    "A truly private, beautiful way to share your life with friends and family";
 export const addFriendOnboardingTitle = "Follow their life";
 export const addFriendOnboardingDescription =
-    "A truly private, beautiful way to see everyday moments from the people you care about";
+    "A truly private, beautiful way to see everyday moments from your friends and family";
 
 const softGreen = "#E7F6E9";
 const copyGreen = "#AAFFB8";
