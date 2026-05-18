@@ -16,6 +16,7 @@ import {
     socialActionDoneDurationMs,
     type SocialActionPhase,
 } from "components/SocialActionFeedback";
+import { SocialLoadingSpinner } from "components/SocialRouteFallback";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
 import {
@@ -1548,6 +1549,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                             overflowX: "hidden",
                             overflowY: "auto",
                             p: "14px 16px 18px",
+                            position: "relative",
                             width: "100%",
                         }}
                     >
@@ -1555,19 +1557,17 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                             <Box
                                 sx={{
                                     alignItems: "center",
-                                    color: viewerPanelMuted,
+                                    bottom: 0,
                                     display: "flex",
-                                    flex: "1 1 auto",
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 14,
-                                    fontWeight: 600,
                                     justifyContent: "center",
-                                    lineHeight: "20px",
-                                    minHeight: "100%",
+                                    left: 0,
+                                    position: "fixed",
+                                    right: 0,
+                                    top: 0,
+                                    zIndex: 1,
                                 }}
                             >
-                                Loading likes...
+                                <SocialLoadingSpinner ariaLabel="Loading likes" />
                             </Box>
                         ) : photoLikers.length == 0 ? (
                             <Box
@@ -1582,7 +1582,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                     fontWeight: 600,
                                     justifyContent: "center",
                                     lineHeight: "20px",
-                                    minHeight: "100%",
+                                    minHeight: "calc(100svh - 56px - 32px)",
                                 }}
                             >
                                 No likes yet

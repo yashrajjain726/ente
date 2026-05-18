@@ -123,6 +123,9 @@ type WallMessageRecord struct {
 	MessageCipher       string
 	EncryptedMessageKey string
 	ReplyPostID         sql.NullInt64
+	ReplyMessageID      sql.NullString
+	Likes               int64
+	ViewerLiked         bool
 	IsDeleted           bool
 	CreatedAt           int64
 	UpdatedAt           int64
@@ -146,6 +149,7 @@ type CreateWallMessageRecord struct {
 	SenderEncryptedMessageKey    string
 	RecipientEncryptedMessageKey string
 	ReplyPostID                  sql.NullInt64
+	ReplyMessageID               sql.NullString
 }
 
 type WallActorRecord struct {

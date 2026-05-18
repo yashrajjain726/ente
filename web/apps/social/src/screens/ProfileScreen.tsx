@@ -988,112 +988,128 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                             width: "calc(100% - 32px)",
                                         }}
                                     >
-                                        {masonryRows.map((row, rowIndex) => (
-                                            <Box
-                                                key={`${group.label}-row-${rowIndex}`}
-                                                sx={{
-                                                    display: "flex",
-                                                    gap: photoMasonryGap,
-                                                    aspectRatio: `${row.aspectRatio} / 1`,
-                                                    width: "100%",
-                                                }}
-                                            >
+                                        {masonryRows.map((row, rowIndex) => {
+                                            const isSingleItemRow =
+                                                row.tiles.length == 1;
+                                            return (
+                                                <Box
+                                                    key={`${group.label}-row-${rowIndex}`}
+                                                    sx={{
+                                                        display: "flex",
+                                                        gap: photoMasonryGap,
+                                                        aspectRatio:
+                                                            isSingleItemRow
+                                                                ? undefined
+                                                                : `${row.aspectRatio} / 1`,
+                                                        width: "100%",
+                                                    }}
+                                                >
                                                 {row.tiles.map(
                                                     ({
                                                         aspectRatio,
                                                         dimensions,
                                                         item,
                                                         index,
-                                                    }) => (
-                                                        <Box
-                                                            component="button"
-                                                            type="button"
-                                                            aria-label={`Open ${displayName} post ${
-                                                                index + 1
-                                                            }`}
-                                                            onClick={() =>
-                                                                setSelectedPost(
-                                                                    {
-                                                                        id: item.id,
-                                                                        photo: {
-                                                                            alt: `${displayName} post ${
-                                                                                index +
-                                                                                1
-                                                                            }`,
-                                                                            avatarUrl:
-                                                                                profile.avatarUrl,
-                                                                            height: dimensions.height,
-                                                                            imageUrl:
-                                                                                item.imageUrl,
-                                                                            likeCount:
-                                                                                item.likeCount,
-                                                                            name: displayName,
-                                                                            postId: item.postId,
-                                                                            timestampMs:
-                                                                                item.timestampMs,
-                                                                            viewerLiked:
-                                                                                item.viewerLiked,
-                                                                            width: dimensions.width,
-                                                                        },
-                                                                    },
-                                                                )
-                                                            }
-                                                            key={`${group.label}-${item.imageUrl}-${index}`}
-                                                            sx={{
-                                                                appearance:
-                                                                    "none",
-                                                                bgcolor:
-                                                                    paleGreen,
-                                                                border: 0,
-                                                                cursor: "pointer",
-                                                                display:
-                                                                    "block",
-                                                                flex: `${aspectRatio} 1 0`,
-                                                                height: "100%",
-                                                                minWidth: 0,
-                                                                overflow:
-                                                                    "hidden",
-                                                                p: 0,
-                                                                "&:focus-visible":
-                                                                    {
-                                                                        outline: `2px solid ${green}`,
-                                                                        outlineOffset:
-                                                                            -2,
-                                                                    },
-                                                            }}
-                                                        >
+                                                    }) => {
+                                                        return (
                                                             <Box
-                                                                component="img"
-                                                                alt={`${group.label} post ${
+                                                                component="button"
+                                                                type="button"
+                                                                aria-label={`Open ${displayName} post ${
                                                                     index + 1
                                                                 }`}
-                                                                onLoad={(
-                                                                    event,
-                                                                ) =>
-                                                                    rememberLoadedPhotoDimensions(
-                                                                        item.imageUrl,
-                                                                        event.currentTarget,
+                                                                onClick={() =>
+                                                                    setSelectedPost(
+                                                                        {
+                                                                            id: item.id,
+                                                                            photo: {
+                                                                                alt: `${displayName} post ${
+                                                                                    index +
+                                                                                    1
+                                                                                }`,
+                                                                                avatarUrl:
+                                                                                    profile.avatarUrl,
+                                                                                height: dimensions.height,
+                                                                                imageUrl:
+                                                                                    item.imageUrl,
+                                                                                likeCount:
+                                                                                    item.likeCount,
+                                                                                name: displayName,
+                                                                                postId: item.postId,
+                                                                                timestampMs:
+                                                                                    item.timestampMs,
+                                                                                viewerLiked:
+                                                                                    item.viewerLiked,
+                                                                                width: dimensions.width,
+                                                                            },
+                                                                        },
                                                                     )
                                                                 }
-                                                                src={
-                                                                    item.imageUrl
-                                                                }
+                                                                key={`${group.label}-${item.imageUrl}-${index}`}
                                                                 sx={{
+                                                                    appearance:
+                                                                        "none",
+                                                                    bgcolor:
+                                                                        paleGreen,
+                                                                    border: 0,
+                                                                    cursor: "pointer",
                                                                     display:
                                                                         "block",
-                                                                    height: "100%",
-                                                                    objectFit:
-                                                                        "cover",
-                                                                    objectPosition:
-                                                                        "center",
-                                                                    width: "100%",
+                                                                    flex: isSingleItemRow
+                                                                        ? "0 0 100%"
+                                                                        : `${aspectRatio} 1 0`,
+                                                                    height: isSingleItemRow
+                                                                        ? "auto"
+                                                                        : "100%",
+                                                                    minWidth: 0,
+                                                                    overflow:
+                                                                        "hidden",
+                                                                    p: 0,
+                                                                    "&:focus-visible":
+                                                                        {
+                                                                            outline: `2px solid ${green}`,
+                                                                            outlineOffset:
+                                                                                -2,
+                                                                        },
                                                                 }}
-                                                            />
-                                                        </Box>
-                                                    ),
+                                                            >
+                                                                <Box
+                                                                    component="img"
+                                                                    alt={`${group.label} post ${
+                                                                        index +
+                                                                        1
+                                                                    }`}
+                                                                    onLoad={(
+                                                                        event,
+                                                                    ) =>
+                                                                        rememberLoadedPhotoDimensions(
+                                                                            item.imageUrl,
+                                                                            event.currentTarget,
+                                                                        )
+                                                                    }
+                                                                    src={
+                                                                        item.imageUrl
+                                                                    }
+                                                                    sx={{
+                                                                        display:
+                                                                            "block",
+                                                                        height: isSingleItemRow
+                                                                            ? "auto"
+                                                                            : "100%",
+                                                                        objectFit:
+                                                                            "cover",
+                                                                        objectPosition:
+                                                                            "center",
+                                                                        width: "100%",
+                                                                    }}
+                                                                />
+                                                            </Box>
+                                                        );
+                                                    },
                                                 )}
                                             </Box>
-                                        ))}
+                                            );
+                                        })}
                                     </Box>
                                 </Box>
                             );
@@ -1155,7 +1171,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     >
                                         {isOwnerProfile
                                             ? "Your profile is looking empty. Share something with your friends."
-                                            : `${firstName} hasn't posted anything yet.`}
+                                            : isPublicProfile
+                                              ? `${firstName} hasn't posted anything yet. Add them as a friend to get their latest posts.`
+                                              : `${firstName} hasn't posted anything yet.`}
                                     </Box>
                                     {isOwnerProfile && (
                                         <Box

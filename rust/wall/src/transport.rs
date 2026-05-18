@@ -130,12 +130,25 @@ pub struct LikePostResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct LikeMessageRequest {
+    pub like: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LikeMessageResponse {
+    pub liked: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateMessageRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message_id: Option<String>,
     pub message_cipher: String,
     pub sender_encrypted_message_key: String,
     pub recipient_encrypted_message_key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reply_message_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,6 +164,12 @@ pub struct MessageResponse {
     pub encrypted_message_key: String,
     #[serde(default)]
     pub reply_post_id: Option<i64>,
+    #[serde(default)]
+    pub reply_message_id: Option<String>,
+    #[serde(default)]
+    pub likes: i64,
+    #[serde(default)]
+    pub viewer_liked: bool,
     #[serde(default)]
     pub is_deleted: bool,
     pub created_at: String,

@@ -176,12 +176,14 @@ CREATE TABLE IF NOT EXISTS wall_messages (
     sender_encrypted_message_key    TEXT,
     recipient_encrypted_message_key TEXT,
     reply_post_id                   BIGINT REFERENCES wall_posts (post_id) ON DELETE SET NULL,
+    reply_message_id                TEXT REFERENCES wall_messages (message_id) ON DELETE SET NULL,
     is_deleted                      BOOLEAN NOT NULL DEFAULT FALSE,
     created_at                      BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
     updated_at                      BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
     CONSTRAINT chk_wall_messages_distinct_users CHECK (sender_id <> recipient_id),
     CONSTRAINT chk_wall_messages_kind CHECK (kind IN ('regular', 'post_reply')),
     CONSTRAINT chk_wall_messages_regular_shape CHECK (kind <> 'regular' OR reply_post_id IS NULL),
+    CONSTRAINT chk_wall_messages_single_reply_target CHECK (reply_post_id IS NULL OR reply_message_id IS NULL),
     CONSTRAINT chk_wall_messages_cipher_on_delete CHECK (
         (
             is_deleted = FALSE
@@ -209,6 +211,20 @@ CREATE INDEX IF NOT EXISTS idx_wall_messages_thread_created
 CREATE INDEX IF NOT EXISTS idx_wall_messages_reply_post
     ON wall_messages (reply_post_id)
     WHERE reply_post_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_wall_messages_reply_message
+    ON wall_messages (reply_message_id)
+    WHERE reply_message_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS wall_message_likes (
+    message_id  TEXT   NOT NULL REFERENCES wall_messages (message_id) ON DELETE CASCADE,
+    user_id     BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    created_at  BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    PRIMARY KEY (message_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wall_message_likes_user_created
+    ON wall_message_likes (user_id, created_at DESC, message_id DESC);
 
 CREATE TRIGGER wall_messages_null_cipher_on_delete
     BEFORE INSERT OR UPDATE ON wall_messages

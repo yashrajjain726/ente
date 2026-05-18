@@ -16,14 +16,14 @@ use crate::transport::{
     AddFriendPayload, AssetDownloadResponse, CreateEntityKeyRequest, CreateMessageRequest,
     CreatePostRequest, CreatePostResponse, CreateWallRequest, EntityKeyPayload, EntityKeyResponse,
     FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse, FriendTargetPayload,
-    LikePostRequest, LikePostResponse, ListPostLikersResponse, MessageConversationPage,
-    MessagePage, MessageResponse, PostObjectPayload, PostPage, PostResponse, PresignUploadRequest,
-    PresignUploadResponse, ProfileAvatarPayload, RefreshFriendSharesRequest, RotateWallKeyRequest,
-    ShareUpdatePayload, UpdatePostCaptionRequest, UpdateWallProfileRequest,
-    UpdateWallProfileResponse, UpdateWallSlugRequest, WallActorResponse, WallFriendResponse,
-    WallKeyResponse, WallKeyVersionResponse, WallLinkCreateRequest, WallLinkLoginRequest,
-    WallLinkLoginResponse, WallLinkStatusResponse, WallLookupResponse, WallNotificationPage,
-    WallProfileResponse,
+    LikeMessageRequest, LikeMessageResponse, LikePostRequest, LikePostResponse,
+    ListPostLikersResponse, MessageConversationPage, MessagePage, MessageResponse,
+    PostObjectPayload, PostPage, PostResponse, PresignUploadRequest, PresignUploadResponse,
+    ProfileAvatarPayload, RefreshFriendSharesRequest, RotateWallKeyRequest, ShareUpdatePayload,
+    UpdatePostCaptionRequest, UpdateWallProfileRequest, UpdateWallProfileResponse,
+    UpdateWallSlugRequest, WallActorResponse, WallFriendResponse, WallKeyResponse,
+    WallKeyVersionResponse, WallLinkCreateRequest, WallLinkLoginRequest, WallLinkLoginResponse,
+    WallLinkStatusResponse, WallLookupResponse, WallNotificationPage, WallProfileResponse,
 };
 use ente_core::crypto::{sealed, secretbox};
 use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
@@ -857,7 +857,33 @@ impl AccountWallCtx {
             text: text.to_owned(),
             quote: None,
         };
-        let request = self.message_request_for_payload(&friend.public_key, &payload)?;
+        let request = self.message_request_for_payload(&friend.public_key, &payload, None)?;
+        let path = format!("/wall/messages/{wall_id}");
+        self.client
+            .post_json(&path, &request)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn reply_to_message(
+        &self,
+        wall_id: &str,
+        message_id: &str,
+        text: &str,
+    ) -> Result<MessageResponse> {
+        let reply_message_id = message_id.trim();
+        if reply_message_id.is_empty() {
+            return Err(WallError::InvalidInput("message id is required".into()));
+        }
+        let friend = self.friend_actor_for_wall(wall_id).await?;
+        let payload = MessagePayload {
+            version: 1,
+            kind: MESSAGE_KIND_REGULAR.to_owned(),
+            text: text.to_owned(),
+            quote: None,
+        };
+        let request =
+            self.message_request_for_payload(&friend.public_key, &payload, Some(reply_message_id))?;
         let path = format!("/wall/messages/{wall_id}");
         self.client
             .post_json(&path, &request)
@@ -894,7 +920,7 @@ impl AccountWallCtx {
                 media_type: object.and_then(|value| value.media_type.clone()),
             }),
         };
-        let request = self.message_request_for_payload(&post.author.public_key, &payload)?;
+        let request = self.message_request_for_payload(&post.author.public_key, &payload, None)?;
         let path = format!("/wall/posts/{post_id}/reply");
         self.client
             .post_json(&path, &request)
@@ -919,6 +945,31 @@ impl AccountWallCtx {
         })
     }
 
+    pub async fn like_message(&self, message_id: &str, like: bool) -> Result<LikeMessageResponse> {
+        let message_id = message_id.trim();
+        if message_id.is_empty() {
+            return Err(WallError::InvalidInput("message id is required".into()));
+        }
+        let request = LikeMessageRequest { like };
+        let path = format!("/wall/message/{message_id}/like");
+        self.client
+            .post_json(&path, &request)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn delete_message(&self, message_id: &str) -> Result<()> {
+        let message_id = message_id.trim();
+        if message_id.is_empty() {
+            return Err(WallError::InvalidInput("message id is required".into()));
+        }
+        let path = format!("/wall/message/{message_id}");
+        self.client
+            .delete_empty(&path, &[])
+            .await
+            .map_err(Into::into)
+    }
+
     async fn friend_actor_for_wall(&self, wall_id: &str) -> Result<WallActorResponse> {
         let (owned_wall, _) = self.default_owned_wall_access().await?;
         let friends = self.list_wall_friends(&owned_wall.wall_id).await?;
@@ -933,6 +984,7 @@ impl AccountWallCtx {
         &self,
         recipient_public_key: &str,
         payload: &MessagePayload,
+        reply_message_id: Option<&str>,
     ) -> Result<CreateMessageRequest> {
         let recipient_public_key = decode_b64(recipient_public_key)?;
         let message_key = generate_key();
@@ -945,6 +997,7 @@ impl AccountWallCtx {
             message_cipher: encode_b64(&encrypt_secretbox_packed(&message_key, &plaintext)?),
             sender_encrypted_message_key: encode_b64(&pack_payload(&sender_key, &[])),
             recipient_encrypted_message_key: encode_b64(&pack_payload(&recipient_key, &[])),
+            reply_message_id: reply_message_id.map(ToOwned::to_owned),
         })
     }
 
@@ -2385,6 +2438,140 @@ mod tests {
 
         assert!(response.liked);
         like.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn message_actions_use_message_endpoints() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let root_wall_key = generate_key();
+        let wall_key = generate_key();
+        let (friend_public_key, _) = keys::generate_keypair().expect("valid friend keypair");
+
+        let entity = server
+            .mock("GET", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "type".into(),
+                ROOT_WALL_KEY_TYPE.into(),
+            ))
+            .with_status(200)
+            .with_body(root_entity_response(&ctx.master_key, &root_wall_key))
+            .create_async()
+            .await;
+        let walls = server
+            .mock("GET", "/wall")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(owned_wall_response(
+                &root_wall_key,
+                &wall_key,
+                "wall_owner_main",
+                "owner-main",
+                3,
+            ))
+            .create_async()
+            .await;
+        let friends = server
+            .mock("GET", "/wall/friends")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "wallId".into(),
+                "wall_owner_main".into(),
+            ))
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "friend": {
+                        "userId": 7,
+                        "wallId": "wall_friend",
+                        "wallSlug": "friend",
+                        "publicKey": encode_b64(&friend_public_key),
+                        "keyVersion": 2
+                    },
+                    "shareKeyVersion": 2,
+                    "createdAt": "2026-04-16T00:00:00Z"
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let reply = server
+            .mock("POST", "/wall/messages/wall_friend")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"replyMessageId\":\"wmsg_parent\"".into()),
+                Matcher::Regex("\"messageCipher\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"senderEncryptedMessageKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"recipientEncryptedMessageKey\":\"[^\"]+\"".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "messageId": "wmsg_reply",
+                    "kind": "regular",
+                    "sender": {
+                        "userId": 1,
+                        "wallId": "wall_owner_main",
+                        "wallSlug": "owner-main",
+                        "publicKey": encode_b64(&ctx.public_key),
+                        "keyVersion": 3
+                    },
+                    "recipient": {
+                        "userId": 7,
+                        "wallId": "wall_friend",
+                        "wallSlug": "friend",
+                        "publicKey": encode_b64(&friend_public_key),
+                        "keyVersion": 2
+                    },
+                    "messageCipher": "cipher",
+                    "encryptedMessageKey": "key",
+                    "replyMessageId": "wmsg_parent",
+                    "likes": 0,
+                    "viewerLiked": false,
+                    "isDeleted": false,
+                    "createdAt": "2026-04-16T00:00:00Z",
+                    "updatedAt": "2026-04-16T00:00:00Z"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let like = server
+            .mock("POST", "/wall/message/wmsg_reply/like")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::JsonString(json!({"like": true}).to_string()))
+            .with_status(200)
+            .with_body(json!({"liked": true}).to_string())
+            .create_async()
+            .await;
+        let delete = server
+            .mock("DELETE", "/wall/message/wmsg_reply")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .create_async()
+            .await;
+
+        let created = ctx
+            .reply_to_message("wall_friend", "wmsg_parent", "hello")
+            .await
+            .expect("message reply should be sent");
+        let liked = ctx
+            .like_message("wmsg_reply", true)
+            .await
+            .expect("message like should be sent");
+        ctx.delete_message("wmsg_reply")
+            .await
+            .expect("message delete should be sent");
+
+        assert_eq!(created.reply_message_id.as_deref(), Some("wmsg_parent"));
+        assert!(liked.liked);
+        entity.assert_async().await;
+        walls.assert_async().await;
+        friends.assert_async().await;
+        reply.assert_async().await;
+        like.assert_async().await;
+        delete.assert_async().await;
     }
 
     #[tokio::test]

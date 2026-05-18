@@ -116,11 +116,14 @@ interface WallMessage {
     isDeleted?: boolean;
     kind: WallMessageKind;
     messageId: string;
+    likes?: number;
     quote?: WallMessageQuote;
     recipient: WallActor;
+    replyMessageId?: string;
     replyPostId?: number;
     sender: WallActor;
     text: string;
+    viewerLiked?: boolean;
     updatedAt: string;
 }
 
@@ -206,12 +209,15 @@ export interface SocialWallMessage {
     id: string;
     isDeleted: boolean;
     kind: SocialWallMessageKind;
+    likeCount: number;
     quote?: SocialWallMessageQuote;
     recipient: FriendProfile;
+    replyMessageId?: string;
     replyPostId?: number;
     sender: FriendProfile;
     text: string;
     updatedAtMs: number;
+    viewerLiked: boolean;
 }
 
 export interface SocialWallMessagePage {
@@ -454,15 +460,18 @@ const messageFromWallMessage = async (
     recipient.avatarUrl = recipientAvatarUrl;
     return {
         createdAtMs: timestampMsFromWallDate(message.createdAt),
-        id: message.messageId || message.id || `${message.createdAt}`,
+        id: message.messageId || message.id || message.createdAt,
         isDeleted: Boolean(message.isDeleted),
         kind: message.kind,
+        likeCount: message.likes ?? 0,
         quote,
         recipient,
+        replyMessageId: message.replyMessageId,
         replyPostId: message.replyPostId,
         sender,
         text: message.text,
         updatedAtMs: timestampMsFromWallDate(message.updatedAt),
+        viewerLiked: Boolean(message.viewerLiked),
     };
 };
 
@@ -656,6 +665,48 @@ export const sendCurrentMessage = async (wallId: string, text: string) => {
             (await ctx.send_message(wallId, text.trim())) as WallMessage,
             true,
         );
+    } finally {
+        ctx.free();
+    }
+};
+
+export const replyToCurrentMessage = async (
+    wallId: string,
+    messageId: string,
+    text: string,
+) => {
+    const ctx = await ensureCurrentWallContext();
+    try {
+        return await messageFromWallMessage(
+            ctx,
+            (await ctx.reply_to_message(
+                wallId,
+                messageId,
+                text.trim(),
+            )) as WallMessage,
+            true,
+        );
+    } finally {
+        ctx.free();
+    }
+};
+
+export const setCurrentMessageLiked = async (
+    messageId: string,
+    liked: boolean,
+) => {
+    const ctx = await ensureCurrentWallContext();
+    try {
+        await ctx.like_message(messageId, liked);
+    } finally {
+        ctx.free();
+    }
+};
+
+export const deleteCurrentMessage = async (messageId: string) => {
+    const ctx = await ensureCurrentWallContext();
+    try {
+        await ctx.delete_message(messageId);
     } finally {
         ctx.free();
     }

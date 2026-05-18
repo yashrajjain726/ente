@@ -4,9 +4,12 @@ import { useRouter } from "next/router";
 import React from "react";
 import { MessagesScreen, messagesBackground } from "screens/MessagesScreen";
 import {
+    deleteCurrentMessage,
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
+    replyToCurrentMessage,
     sendCurrentMessage,
+    setCurrentMessageLiked,
     type SocialWallMessage,
     type SocialWallMessageConversation,
 } from "services/socialWall";
@@ -95,6 +98,45 @@ const Page: React.FC = () => {
                         ...currentMessages,
                         message,
                     ]);
+                    refreshConversations();
+                }}
+                onReplyToMessage={async (wallId, messageId, text) => {
+                    const message = await replyToCurrentMessage(
+                        wallId,
+                        messageId,
+                        text,
+                    );
+                    setMessages((currentMessages) => [
+                        ...currentMessages,
+                        message,
+                    ]);
+                    refreshConversations();
+                }}
+                onSetMessageLiked={async (messageId, liked) => {
+                    await setCurrentMessageLiked(messageId, liked);
+                    setMessages((currentMessages) =>
+                        currentMessages.map((message) =>
+                            message.id == messageId
+                                ? {
+                                      ...message,
+                                      likeCount: Math.max(
+                                          0,
+                                          message.likeCount + (liked ? 1 : -1),
+                                      ),
+                                      viewerLiked: liked,
+                                  }
+                                : message,
+                        ),
+                    );
+                    refreshConversations();
+                }}
+                onDeleteMessage={async (messageId) => {
+                    await deleteCurrentMessage(messageId);
+                    setMessages((currentMessages) =>
+                        currentMessages.filter(
+                            (message) => message.id != messageId,
+                        ),
+                    );
                     refreshConversations();
                 }}
                 profile={profile}

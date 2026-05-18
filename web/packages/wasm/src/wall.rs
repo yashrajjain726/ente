@@ -236,6 +236,9 @@ struct MessageJs {
     text: String,
     quote: Option<MessageQuoteJs>,
     reply_post_id: Option<i64>,
+    reply_message_id: Option<String>,
+    likes: i64,
+    viewer_liked: bool,
     is_deleted: bool,
     created_at: String,
     updated_at: String,
@@ -481,6 +484,9 @@ async fn account_message_to_js(
         text: decrypted.payload.text,
         quote,
         reply_post_id: message.reply_post_id,
+        reply_message_id: message.reply_message_id,
+        likes: message.likes,
+        viewer_liked: message.viewer_liked,
         is_deleted: message.is_deleted,
         created_at: message.created_at,
         updated_at: message.updated_at,
@@ -833,6 +839,22 @@ impl WallAccountCtxHandle {
             .map_err(Into::into)
     }
 
+    /// Send a 1:1 reply to an existing message.
+    pub async fn reply_to_message(
+        &self,
+        wall_id: String,
+        message_id: String,
+        text: String,
+    ) -> Result<JsValue, WasmWallError> {
+        let message = self
+            .inner
+            .reply_to_message(&wall_id, &message_id, &text)
+            .await?;
+        let decrypted = self.inner.decrypt_message(&message)?;
+        swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
+            .map_err(Into::into)
+    }
+
     /// Send a private post reply message to the post owner.
     pub async fn reply_to_post(
         &self,
@@ -842,6 +864,23 @@ impl WallAccountCtxHandle {
         let message = self.inner.reply_to_post(post_id, &text).await?;
         let decrypted = self.inner.decrypt_message(&message)?;
         swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
+            .map_err(Into::into)
+    }
+
+    /// Like or unlike a message.
+    pub async fn like_message(
+        &self,
+        message_id: String,
+        like: bool,
+    ) -> Result<JsValue, WasmWallError> {
+        swb::to_value(&self.inner.like_message(&message_id, like).await?).map_err(Into::into)
+    }
+
+    /// Delete a message sent by the current account.
+    pub async fn delete_message(&self, message_id: String) -> Result<(), WasmWallError> {
+        self.inner
+            .delete_message(&message_id)
+            .await
             .map_err(Into::into)
     }
 

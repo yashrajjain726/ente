@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 	"strconv"
 	"strings"
 
@@ -22,6 +23,9 @@ const wallMessageSelectColumns = `
 		ELSE COALESCE(m.recipient_encrypted_message_key, '')
 	END AS encrypted_message_key,
 	m.reply_post_id,
+	m.reply_message_id,
+	(SELECT COUNT(*) FROM wall_message_likes ml WHERE ml.message_id = m.message_id) AS likes,
+	EXISTS (SELECT 1 FROM wall_message_likes ml WHERE ml.message_id = m.message_id AND ml.user_id = %s) AS viewer_liked,
 	m.is_deleted,
 	m.created_at,
 	m.updated_at,
@@ -65,6 +69,10 @@ func (r *MessagesRepository) CreateMessage(ctx context.Context, input CreateWall
 	if input.ReplyPostID.Valid {
 		replyPostID = input.ReplyPostID.Int64
 	}
+	var replyMessageID any
+	if input.ReplyMessageID.Valid {
+		replyMessageID = input.ReplyMessageID.String
+	}
 	if _, err := r.DB.ExecContext(ctx, `
 		INSERT INTO wall_messages (
 			message_id,
@@ -76,10 +84,11 @@ func (r *MessagesRepository) CreateMessage(ctx context.Context, input CreateWall
 			message_cipher,
 			sender_encrypted_message_key,
 			recipient_encrypted_message_key,
-			reply_post_id
+			reply_post_id,
+			reply_message_id
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-	`, messageID, input.SenderID, input.SenderWallID, input.RecipientID, input.RecipientWallID, input.Kind, input.MessageCipher, input.SenderEncryptedMessageKey, input.RecipientEncryptedMessageKey, replyPostID); err != nil {
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	`, messageID, input.SenderID, input.SenderWallID, input.RecipientID, input.RecipientWallID, input.Kind, input.MessageCipher, input.SenderEncryptedMessageKey, input.RecipientEncryptedMessageKey, replyPostID, replyMessageID); err != nil {
 		return nil, wrapUnique(err, "message already exists")
 	}
 	return r.GetMessage(ctx, messageID, input.SenderID)
@@ -140,6 +149,41 @@ func (r *MessagesRepository) ListThread(ctx context.Context, viewerID int64, oth
 		out = out[:limit]
 	}
 	return out, nextCursor, nil
+}
+
+func (r *MessagesRepository) SetLike(ctx context.Context, messageID string, userID int64, like bool) error {
+	if like {
+		_, err := r.DB.ExecContext(ctx, `INSERT INTO wall_message_likes (message_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, messageID, userID)
+		return stacktrace.Propagate(err, "")
+	}
+	_, err := r.DB.ExecContext(ctx, `DELETE FROM wall_message_likes WHERE message_id = $1 AND user_id = $2`, messageID, userID)
+	return stacktrace.Propagate(err, "")
+}
+
+func (r *MessagesRepository) DeleteMessage(ctx context.Context, messageID string, senderID int64) error {
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `UPDATE wall_messages SET is_deleted = TRUE WHERE message_id = $1 AND sender_id = $2 AND is_deleted = FALSE`, messageID, senderID)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM wall_message_likes WHERE message_id = $1`, messageID); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if err := tx.Commit(); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	return nil
 }
 
 func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int64, cursor string, limit int) ([]WallMessageConversationRecord, string, error) {
@@ -219,6 +263,9 @@ func scanMessageRecord(scanner interface{ Scan(dest ...any) error }) (*WallMessa
 		&rec.MessageCipher,
 		&rec.EncryptedMessageKey,
 		&rec.ReplyPostID,
+		&rec.ReplyMessageID,
+		&rec.Likes,
+		&rec.ViewerLiked,
 		&rec.IsDeleted,
 		&rec.CreatedAt,
 		&rec.UpdatedAt,

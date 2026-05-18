@@ -273,6 +273,15 @@ type CreateMessageRequest struct {
 	MessageCipher                string `json:"messageCipher"`
 	SenderEncryptedMessageKey    string `json:"senderEncryptedMessageKey"`
 	RecipientEncryptedMessageKey string `json:"recipientEncryptedMessageKey"`
+	ReplyMessageID               string `json:"replyMessageId,omitempty"`
+}
+
+type LikeMessageRequest struct {
+	Like bool `json:"like"`
+}
+
+type LikeMessageResponse struct {
+	Liked bool `json:"liked"`
 }
 
 type MessageResponse struct {
@@ -283,6 +292,9 @@ type MessageResponse struct {
 	MessageCipher       string            `json:"messageCipher,omitempty"`
 	EncryptedMessageKey string            `json:"encryptedMessageKey,omitempty"`
 	ReplyPostID         *int64            `json:"replyPostId,omitempty"`
+	ReplyMessageID      *string           `json:"replyMessageId,omitempty"`
+	Likes               int64             `json:"likes"`
+	ViewerLiked         bool              `json:"viewerLiked"`
 	IsDeleted           bool              `json:"isDeleted"`
 	CreatedAt           string            `json:"createdAt"`
 	UpdatedAt           string            `json:"updatedAt"`

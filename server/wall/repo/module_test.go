@@ -94,20 +94,64 @@ func TestWallMessagesThreadAndConversations(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "regular", message.Kind)
 	require.Equal(t, "sender-key", message.EncryptedMessageKey)
+	require.Equal(t, int64(0), message.Likes)
+	require.False(t, message.ViewerLiked)
+
+	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceID, true))
+	likedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, aliceID)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), likedMessage.Likes)
+	require.True(t, likedMessage.ViewerLiked)
+	bobViewedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, bobID)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), bobViewedMessage.Likes)
+	require.False(t, bobViewedMessage.ViewerLiked)
+
+	reply, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     aliceID,
+		SenderWallID:                 aliceWall.WallID,
+		RecipientID:                  bobID,
+		RecipientWallID:              bobWall.WallID,
+		MessageCipher:                "reply-cipher",
+		SenderEncryptedMessageKey:    "reply-sender-key",
+		RecipientEncryptedMessageKey: "reply-recipient-key",
+		ReplyMessageID:               sql.NullString{String: message.MessageID, Valid: true},
+	})
+	require.NoError(t, err)
+	require.Equal(t, message.MessageID, reply.ReplyMessageID.String)
+	setMessageCreatedAt(t, module, 1000, message.MessageID)
+	setMessageCreatedAt(t, module, 2000, reply.MessageID)
 
 	aliceThread, nextCursor, err := module.Messages.ListThread(ctx, aliceID, bobWall.WallID, "", 10)
 	require.NoError(t, err)
 	require.Empty(t, nextCursor)
-	require.Len(t, aliceThread, 1)
-	require.Equal(t, "recipient-key", aliceThread[0].EncryptedMessageKey)
-	require.Equal(t, bobWall.WallID, aliceThread[0].Sender.WallID)
+	require.Len(t, aliceThread, 2)
+	require.Equal(t, reply.MessageID, aliceThread[0].MessageID)
+	require.Equal(t, message.MessageID, aliceThread[0].ReplyMessageID.String)
+	require.Equal(t, "recipient-key", aliceThread[1].EncryptedMessageKey)
+	require.Equal(t, bobWall.WallID, aliceThread[1].Sender.WallID)
 
 	conversations, nextCursor, err := module.Messages.ListConversations(ctx, aliceID, "", 10)
 	require.NoError(t, err)
 	require.Empty(t, nextCursor)
 	require.Len(t, conversations, 1)
 	require.Equal(t, bobWall.WallID, conversations[0].Friend.WallID)
-	require.Equal(t, message.MessageID, conversations[0].LastMessage.MessageID)
+	require.Equal(t, reply.MessageID, conversations[0].LastMessage.MessageID)
+
+	require.NoError(t, module.Messages.DeleteMessage(ctx, message.MessageID, bobID))
+	deletedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, bobID)
+	require.NoError(t, err)
+	require.True(t, deletedMessage.IsDeleted)
+	require.Empty(t, deletedMessage.MessageCipher)
+	require.Empty(t, deletedMessage.EncryptedMessageKey)
+	require.Equal(t, int64(0), deletedMessage.Likes)
+	aliceThread, nextCursor, err = module.Messages.ListThread(ctx, aliceID, bobWall.WallID, "", 10)
+	require.NoError(t, err)
+	require.Empty(t, nextCursor)
+	require.Len(t, aliceThread, 1)
+	require.Equal(t, reply.MessageID, aliceThread[0].MessageID)
+	require.Equal(t, message.MessageID, aliceThread[0].ReplyMessageID.String)
 
 	_, err = module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
 		Kind:                         "regular",

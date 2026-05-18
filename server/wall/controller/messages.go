@@ -38,6 +38,10 @@ func (c *MessagesController) Create(ctx *gin.Context, targetWallID string, req m
 	if err != nil {
 		return nil, err
 	}
+	replyMessageID, err := c.validateReplyMessage(ctx, userID, req.ReplyMessageID, senderWall.WallID, recipientWall.WallID)
+	if err != nil {
+		return nil, err
+	}
 	message, err := c.MessagesRepo.CreateMessage(ctx.Request.Context(), repo.CreateWallMessageRecord{
 		MessageID:                    req.MessageID,
 		Kind:                         wallMessageKindRegular,
@@ -48,6 +52,7 @@ func (c *MessagesController) Create(ctx *gin.Context, targetWallID string, req m
 		MessageCipher:                req.MessageCipher,
 		SenderEncryptedMessageKey:    req.SenderEncryptedMessageKey,
 		RecipientEncryptedMessageKey: req.RecipientEncryptedMessageKey,
+		ReplyMessageID:               replyMessageID,
 	})
 	if err != nil {
 		return nil, err
@@ -62,6 +67,9 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 	}
 	if err := validateCreateMessageRequest(req); err != nil {
 		return nil, err
+	}
+	if strings.TrimSpace(req.ReplyMessageID) != "" {
+		return nil, ente.NewBadRequestWithMessage("replyMessageId is not supported for post replies")
 	}
 	id, err := strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
 	if err != nil || id <= 0 {
@@ -144,6 +152,50 @@ func (c *MessagesController) ListThread(ctx *gin.Context, targetWallID string, r
 	return &models.MessagePage{Items: items, NextCursor: nextCursor}, nil
 }
 
+func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req models.LikeMessageRequest) (*models.LikeMessageResponse, error) {
+	userID, err := c.auth.requireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	messageID = strings.TrimSpace(messageID)
+	if messageID == "" {
+		return nil, ente.NewBadRequestWithMessage("messageId is required")
+	}
+	message, err := c.MessagesRepo.GetMessage(ctx.Request.Context(), messageID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if message.IsDeleted {
+		return nil, ente.NewBadRequestWithMessage("cannot like a deleted message")
+	}
+	if err := c.MessagesRepo.SetLike(ctx.Request.Context(), messageID, userID, req.Like); err != nil {
+		return nil, err
+	}
+	return &models.LikeMessageResponse{Liked: req.Like}, nil
+}
+
+func (c *MessagesController) Delete(ctx *gin.Context, messageID string) error {
+	userID, err := c.auth.requireUser(ctx)
+	if err != nil {
+		return err
+	}
+	messageID = strings.TrimSpace(messageID)
+	if messageID == "" {
+		return ente.NewBadRequestWithMessage("messageId is required")
+	}
+	message, err := c.MessagesRepo.GetMessage(ctx.Request.Context(), messageID, userID)
+	if err != nil {
+		return err
+	}
+	if message.SenderID != userID {
+		return ente.ErrPermissionDenied
+	}
+	if message.IsDeleted {
+		return nil
+	}
+	return c.MessagesRepo.DeleteMessage(ctx.Request.Context(), messageID, userID)
+}
+
 func (c *MessagesController) requireFriendMessageTarget(ctx *gin.Context, userID int64, targetWallID string) (*repo.WallRecord, *repo.WallRecord, error) {
 	targetWallID = strings.TrimSpace(targetWallID)
 	if targetWallID == "" {
@@ -173,6 +225,29 @@ func (c *MessagesController) requireFriendMessageTarget(ctx *gin.Context, userID
 	return &senderWall, recipientWall, nil
 }
 
+func (c *MessagesController) validateReplyMessage(ctx *gin.Context, userID int64, replyMessageID, senderWallID, recipientWallID string) (sql.NullString, error) {
+	replyMessageID = strings.TrimSpace(replyMessageID)
+	if replyMessageID == "" {
+		return sql.NullString{}, nil
+	}
+	parent, err := c.MessagesRepo.GetMessage(ctx.Request.Context(), replyMessageID, userID)
+	if err != nil {
+		return sql.NullString{}, err
+	}
+	if parent.IsDeleted {
+		return sql.NullString{}, ente.NewBadRequestWithMessage("cannot reply to a deleted message")
+	}
+	if !sameMessageThread(parent, senderWallID, recipientWallID) {
+		return sql.NullString{}, ente.ErrPermissionDenied
+	}
+	return sql.NullString{String: replyMessageID, Valid: true}, nil
+}
+
+func sameMessageThread(message *repo.WallMessageRecord, firstWallID, secondWallID string) bool {
+	return (message.SenderWallID == firstWallID && message.RecipientWallID == secondWallID) ||
+		(message.SenderWallID == secondWallID && message.RecipientWallID == firstWallID)
+}
+
 func validateCreateMessageRequest(req models.CreateMessageRequest) error {
 	if strings.TrimSpace(req.MessageCipher) == "" ||
 		strings.TrimSpace(req.SenderEncryptedMessageKey) == "" ||
@@ -190,6 +265,8 @@ func toMessageResponse(message repo.WallMessageRecord) *models.MessageResponse {
 		Recipient:           toActorResponse(message.Recipient, true),
 		MessageCipher:       message.MessageCipher,
 		EncryptedMessageKey: message.EncryptedMessageKey,
+		Likes:               message.Likes,
+		ViewerLiked:         message.ViewerLiked,
 		IsDeleted:           message.IsDeleted,
 		CreatedAt:           formatMicros(message.CreatedAt),
 		UpdatedAt:           formatMicros(message.UpdatedAt),
@@ -197,6 +274,10 @@ func toMessageResponse(message repo.WallMessageRecord) *models.MessageResponse {
 	if message.ReplyPostID.Valid {
 		replyPostID := message.ReplyPostID.Int64
 		resp.ReplyPostID = &replyPostID
+	}
+	if message.ReplyMessageID.Valid {
+		replyMessageID := message.ReplyMessageID.String
+		resp.ReplyMessageID = &replyMessageID
 	}
 	return resp
 }
