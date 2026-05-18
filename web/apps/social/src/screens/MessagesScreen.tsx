@@ -126,6 +126,29 @@ const messagePreview = (message: SocialWallMessage) => {
     return message.text;
 };
 
+const isCurrentProfileMessage = (
+    message: SocialWallMessage,
+    profile: SetupProfile,
+) => {
+    if (message.sender.wallId && profile.wallId) {
+        return message.sender.wallId == profile.wallId;
+    }
+    if (message.sender.wallSlug && profile.wallSlug) {
+        return message.sender.wallSlug == profile.wallSlug;
+    }
+    return message.sender.username == profile.username;
+};
+
+const conversationPreview = (
+    message: SocialWallMessage,
+    profile: SetupProfile,
+) => {
+    const preview = messagePreview(message);
+    return isCurrentProfileMessage(message, profile)
+        ? `You: ${preview}`
+        : preview;
+};
+
 const sameMessageSender = (
     first: SocialWallMessage | undefined,
     second: SocialWallMessage | undefined,
@@ -174,8 +197,7 @@ const QuotePreview: React.FC<{
                     <Box
                         sx={{
                             color: "rgba(244, 244, 244, 0.92)",
-                            fontFamily:
-                                '"Inter Variable", Inter, sans-serif',
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 12,
                             fontWeight: 750,
                             lineHeight: "18px",
@@ -189,8 +211,7 @@ const QuotePreview: React.FC<{
                     <Box
                         sx={{
                             color: "rgba(244, 244, 244, 0.82)",
-                            fontFamily:
-                                '"Inter Variable", Inter, sans-serif',
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 12,
                             fontWeight: 500,
                             lineHeight: "17px",
@@ -238,12 +259,7 @@ const MessageBubble: React.FC<{
     message: SocialWallMessage;
     ownWallID?: string;
     showTimestamp: boolean;
-}> = ({
-    isLastInSequence,
-    message,
-    ownWallID,
-    showTimestamp,
-}) => {
+}> = ({ isLastInSequence, message, ownWallID, showTimestamp }) => {
     const isOwn = message.sender.wallId == ownWallID;
     const timestampLabel = formatTimeAgo(
         microsForTimestamp(message.createdAtMs),
@@ -518,8 +534,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     }}
                                 >
                                     {messages.map((message, index) => {
-                                        const nextMessage =
-                                            messages[index + 1];
+                                        const nextMessage = messages[index + 1];
                                         const isSameSequenceAsNext =
                                             sameMessageSender(
                                                 message,
@@ -539,9 +554,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 }
                                                 message={message}
                                                 ownWallID={profile.wallId}
-                                                showTimestamp={
-                                                    isLastInSequence
-                                                }
+                                                showTimestamp={isLastInSequence}
                                             />
                                         );
                                     })}
@@ -822,7 +835,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                     display: "grid",
                                                     gap: "10px",
                                                     gridTemplateColumns:
-                                                        "44px minmax(0, 1fr) auto",
+                                                        "44px minmax(0, 1fr)",
                                                     minHeight: 64,
                                                     p: "8px 0",
                                                     textAlign: "left",
@@ -844,19 +857,55 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 <Box sx={{ minWidth: 0 }}>
                                                     <Box
                                                         sx={{
-                                                            fontFamily:
-                                                                '"Inter Variable", Inter, sans-serif',
-                                                            fontSize: 14,
-                                                            fontWeight: 700,
-                                                            lineHeight: "20px",
-                                                            overflow: "hidden",
-                                                            textOverflow:
-                                                                "ellipsis",
-                                                            whiteSpace:
-                                                                "nowrap",
+                                                            alignItems:
+                                                                "center",
+                                                            display: "flex",
+                                                            gap: "8px",
+                                                            minWidth: 0,
                                                         }}
                                                     >
-                                                        {firstNameFrom(name)}
+                                                        <Box
+                                                            sx={{
+                                                                flex: "1 1 auto",
+                                                                fontFamily:
+                                                                    '"Inter Variable", Inter, sans-serif',
+                                                                fontSize: 14,
+                                                                fontWeight: 700,
+                                                                lineHeight:
+                                                                    "20px",
+                                                                minWidth: 0,
+                                                                overflow:
+                                                                    "hidden",
+                                                                textOverflow:
+                                                                    "ellipsis",
+                                                                whiteSpace:
+                                                                    "nowrap",
+                                                            }}
+                                                        >
+                                                            {firstNameFrom(
+                                                                name,
+                                                            )}
+                                                        </Box>
+                                                        <Box
+                                                            component="time"
+                                                            dateTime={new Date(
+                                                                conversation.lastMessage.createdAtMs,
+                                                            ).toISOString()}
+                                                            sx={{
+                                                                color: textSecondary,
+                                                                flexShrink: 0,
+                                                                fontFamily:
+                                                                    '"Inter Variable", Inter, sans-serif',
+                                                                fontSize: 12,
+                                                                fontWeight: 600,
+                                                                lineHeight:
+                                                                    "16px",
+                                                                whiteSpace:
+                                                                    "nowrap",
+                                                            }}
+                                                        >
+                                                            {timestampLabel}
+                                                        </Box>
                                                     </Box>
                                                     <Box
                                                         sx={{
@@ -873,23 +922,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                                 "nowrap",
                                                         }}
                                                     >
-                                                        {messagePreview(
+                                                        {conversationPreview(
                                                             conversation.lastMessage,
+                                                            profile,
                                                         )}
                                                     </Box>
-                                                </Box>
-                                                <Box
-                                                    sx={{
-                                                        color: textSecondary,
-                                                        fontFamily:
-                                                            '"Inter Variable", Inter, sans-serif',
-                                                        fontSize: 12,
-                                                        fontWeight: 600,
-                                                        lineHeight: "16px",
-                                                        whiteSpace: "nowrap",
-                                                    }}
-                                                >
-                                                    {timestampLabel}
                                                 </Box>
                                             </Box>
                                         </Box>
