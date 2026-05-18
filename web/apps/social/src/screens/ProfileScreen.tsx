@@ -1029,6 +1029,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                                 }`,
                                                                                 avatarUrl:
                                                                                     profile.avatarUrl,
+                                                                                caption:
+                                                                                    item.caption,
                                                                                 height: dimensions.height,
                                                                                 imageUrl:
                                                                                     item.imageUrl,

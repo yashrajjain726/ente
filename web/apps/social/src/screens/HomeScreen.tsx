@@ -46,10 +46,9 @@ const headerAddIconSize = 24;
 const headerAvatarSize = 23;
 const headerIconSize = 23;
 const headerSideWidth = headerActionSize * 2 + headerActionGap;
-const feedLikeActionInset = 4;
-const feedLikeActionSize = 40;
-const feedActionIconSize = 23;
-const feedReplyIconSize = 20;
+const feedLikeActionSize = 28;
+const feedActionIconSize = 20;
+const feedReplyIconSize = 17;
 const emptyFeedItemGap = "22px";
 
 const FeedReplyIcon: React.FC = () => (
@@ -159,6 +158,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const [localLikeCount, setLocalLikeCount] = useState(likeCount);
     const firstName = firstNameFrom(name);
     const dateLabel = formatSocialDate(timestampMs);
+    const displayCaption = caption?.trim();
     const openFriend = () => onOpenFriend?.(friendID);
     const [loadedPhotoDimensions, setLoadedPhotoDimensions] =
         useState<FeedPhotoDimensions | null>(null);
@@ -400,76 +400,113 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         }}
                     />
                 </Box>
+            </Box>
+            <Box
+                sx={{
+                    alignItems: "center",
+                    boxSizing: "border-box",
+                    display: "grid",
+                    gap: "8px",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    minHeight: feedLikeActionSize,
+                    mt: "8px",
+                    pl: "4px",
+                    pr: 0,
+                    width: "100%",
+                }}
+            >
                 <Box
-                    component="button"
-                    type="button"
-                    aria-label={`Reply to ${firstName}'s post`}
-                    onClick={() => openPhoto("photo", true)}
+                    component="p"
+                    title={displayCaption || undefined}
                     sx={{
-                        alignItems: "center",
-                        appearance: "none",
-                        bgcolor: "transparent",
-                        border: 0,
-                        borderRadius: "50%",
-                        bottom: feedLikeActionInset,
-                        color: "#FFFFFF",
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        height: feedLikeActionSize,
-                        justifyContent: "center",
-                        p: 0,
-                        position: "absolute",
-                        right: feedLikeActionInset + feedLikeActionSize - 4,
-                        transition: "color 120ms ease, transform 120ms ease",
-                        width: feedLikeActionSize,
-                        zIndex: 1,
-                        "&:focus-visible": {
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
-                        "&:hover": { bgcolor: "transparent" },
+                        color: textBase,
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        lineHeight: "18px",
+                        m: 0,
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
                     }}
                 >
-                    <FeedReplyIcon />
+                    {displayCaption || ""}
                 </Box>
                 <Box
-                    component="button"
-                    type="button"
-                    aria-label={isLiked ? "Unlike post" : "Like post"}
-                    aria-pressed={isLiked}
-                    onClick={handleLikeClick}
                     sx={{
                         alignItems: "center",
-                        appearance: "none",
-                        bgcolor: "transparent",
-                        border: 0,
-                        borderRadius: "50%",
-                        bottom: feedLikeActionInset,
-                        color: "#FFFFFF",
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        height: feedLikeActionSize,
-                        justifyContent: "center",
-                        p: 0,
-                        position: "absolute",
-                        right: feedLikeActionInset,
-                        transition: "color 120ms ease",
-                        width: feedLikeActionSize,
-                        zIndex: 1,
-                        "&:focus-visible": {
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
-                        "&:hover": { bgcolor: "transparent" },
+                        display: "flex",
+                        gap: "8px",
+                        justifyContent: "flex-end",
                     }}
                 >
-                    <HugeiconsIcon
-                        fill={isLiked ? green : "none"}
-                        icon={FavouriteIcon}
-                        primaryColor={isLiked ? green : "#FFFFFF"}
-                        size={feedActionIconSize}
-                        strokeWidth={1.8}
-                    />
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={`Reply to ${firstName}'s post`}
+                        onClick={() => openPhoto("photo", true)}
+                        sx={{
+                            alignItems: "center",
+                            appearance: "none",
+                            bgcolor: "transparent",
+                            border: 0,
+                            borderRadius: "50%",
+                            color: textBase,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            height: feedLikeActionSize,
+                            justifyContent: "center",
+                            p: 0,
+                            flexShrink: 0,
+                            transition:
+                                "color 120ms ease, transform 120ms ease",
+                            width: feedLikeActionSize,
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                            "&:hover": { bgcolor: "transparent" },
+                        }}
+                    >
+                        <FeedReplyIcon />
+                    </Box>
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={isLiked ? "Unlike post" : "Like post"}
+                        aria-pressed={isLiked}
+                        onClick={handleLikeClick}
+                        sx={{
+                            alignItems: "center",
+                            appearance: "none",
+                            bgcolor: "transparent",
+                            border: 0,
+                            borderRadius: "50%",
+                            color: textBase,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            flexShrink: 0,
+                            height: feedLikeActionSize,
+                            justifyContent: "center",
+                            p: 0,
+                            transition: "color 120ms ease",
+                            width: feedLikeActionSize,
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                            "&:hover": { bgcolor: "transparent" },
+                        }}
+                    >
+                        <HugeiconsIcon
+                            fill={isLiked ? green : "none"}
+                            icon={FavouriteIcon}
+                            primaryColor={isLiked ? green : textBase}
+                            size={feedActionIconSize}
+                            strokeWidth={1.8}
+                        />
+                    </Box>
                 </Box>
             </Box>
         </Box>

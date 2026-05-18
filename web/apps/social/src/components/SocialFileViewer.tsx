@@ -284,6 +284,8 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     const displayName = firstNameFrom(photo.name);
     const dateLabel = formatSocialDate(photo.timestampMs);
     const initials = initialsFor(photo.name);
+    const displayCaption = isDraftPost ? "" : caption.trim();
+    const hasDisplayCaption = displayCaption.length > 0;
     const viewerRootRef = React.useRef<HTMLDivElement | null>(null);
     const captionInputRef = React.useRef<HTMLTextAreaElement | null>(null);
     const replyInputRef = React.useRef<HTMLTextAreaElement | null>(null);
@@ -1251,14 +1253,49 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                     </Box>
                 </Box>
             ) : null}
+            {hasDisplayCaption && (
+                <Box
+                    component="p"
+                    data-social-viewer-chrome="true"
+                    title={displayCaption}
+                    sx={{
+                        boxSizing: "border-box",
+                        color: textBase,
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 14,
+                        fontWeight: 650,
+                        bgcolor: "rgba(48, 48, 48, 0.82)",
+                        borderRadius: "10px",
+                        left: "50%",
+                        lineHeight: "20px",
+                        m: 0,
+                        maxWidth: "calc(100vw - 32px)",
+                        minWidth: 0,
+                        overflow: "hidden",
+                        px: "8px",
+                        py: "2px",
+                        position: "fixed",
+                        textAlign: "center",
+                        textOverflow: "ellipsis",
+                        textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
+                        top: "85%",
+                        transform: "translateX(-50%)",
+                        whiteSpace: "nowrap",
+                        zIndex: 2,
+                    }}
+                >
+                    {displayCaption}
+                </Box>
+            )}
             {showPhotoLikeButton && (
                 <Box
                     data-social-viewer-bottom="true"
                     sx={{
-                        alignItems: "flex-end",
+                        alignItems: "stretch",
                         bottom: "16px",
                         display: "flex",
-                        gap: "8px",
+                        flexDirection: "column",
+                        gap: 0,
                         left: canReplyToPost ? { xs: "16px", sm: 0 } : "auto",
                         maxWidth: canReplyToPost ? { sm: 390 } : undefined,
                         mx: canReplyToPost ? { sm: "auto" } : undefined,
@@ -1270,191 +1307,210 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                         zIndex: 2,
                     }}
                 >
-                    {canReplyToPost && (
+                    <Box
+                        sx={{
+                            alignItems: "flex-end",
+                            display: "flex",
+                            gap: "8px",
+                            justifyContent: "flex-end",
+                            width: "100%",
+                        }}
+                    >
+                        {canReplyToPost && (
+                            <Box
+                                ref={replyInputRef}
+                                component="textarea"
+                                aria-label="Reply to post"
+                                disabled={isReplyActionRunning}
+                                onBlur={() => setIsReplyFocused(false)}
+                                onChange={(event) => {
+                                    setReplyText(event.target.value);
+                                    resizeCaptionInput(
+                                        event.currentTarget,
+                                        replyInputMinHeight,
+                                    );
+                                }}
+                                onFocus={() => setIsReplyFocused(true)}
+                                onKeyDown={handleReplyKeyDown}
+                                placeholder="Reply"
+                                rows={1}
+                                value={replyText}
+                                sx={{
+                                    bgcolor: controlBackground,
+                                    border: 0,
+                                    borderRadius: "24px",
+                                    boxSizing: "border-box",
+                                    color: textBase,
+                                    flex: "1 1 auto",
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    lineHeight: "20px",
+                                    maxHeight: captionInputMaxHeight,
+                                    minHeight: replyInputMinHeight,
+                                    minWidth: 0,
+                                    outline: 0,
+                                    overflow: "hidden",
+                                    pb: `${replyInputPadding}px`,
+                                    pl: `${replyInputPaddingLeft}px`,
+                                    pr: `${replyInputPadding}px`,
+                                    pt: `${replyInputPadding}px`,
+                                    resize: "none",
+                                    "&::placeholder": { color: textSecondary },
+                                    "&:disabled": { opacity: 0.74 },
+                                    "&:focus": {
+                                        bgcolor: controlBackgroundActive,
+                                    },
+                                }}
+                            />
+                        )}
                         <Box
-                            ref={replyInputRef}
-                            component="textarea"
-                            aria-label="Reply to post"
-                            disabled={isReplyActionRunning}
-                            onBlur={() => setIsReplyFocused(false)}
-                            onChange={(event) => {
-                                setReplyText(event.target.value);
-                                resizeCaptionInput(
-                                    event.currentTarget,
-                                    replyInputMinHeight,
-                                );
-                            }}
-                            onFocus={() => setIsReplyFocused(true)}
-                            onKeyDown={handleReplyKeyDown}
-                            placeholder="Reply"
-                            rows={1}
-                            value={replyText}
-                            sx={{
-                                bgcolor: controlBackground,
-                                border: 0,
-                                borderRadius: "24px",
-                                boxSizing: "border-box",
-                                color: textBase,
-                                flex: "1 1 auto",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 14,
-                                fontWeight: 500,
-                                lineHeight: "20px",
-                                maxHeight: captionInputMaxHeight,
-                                minHeight: replyInputMinHeight,
-                                minWidth: 0,
-                                outline: 0,
-                                overflow: "hidden",
-                                pb: `${replyInputPadding}px`,
-                                pl: `${replyInputPaddingLeft}px`,
-                                pr: `${replyInputPadding}px`,
-                                pt: `${replyInputPadding}px`,
-                                resize: "none",
-                                "&::placeholder": { color: textSecondary },
-                                "&:disabled": { opacity: 0.74 },
-                                "&:focus": { bgcolor: controlBackgroundActive },
-                            }}
-                        />
-                    )}
-                    <Box sx={{ height: 48, position: "relative", width: 48 }}>
-                        <Box
-                            component="button"
-                            type="button"
-                            aria-label={
-                                isReplyMode
-                                    ? replyActionPhase == "busy"
-                                        ? "Sending reply"
-                                        : replyActionPhase == "done"
-                                          ? "Reply sent"
-                                          : "Send reply"
-                                    : isPhotoLiked
-                                      ? "Unlike photo"
-                                      : "Like photo"
-                            }
-                            aria-pressed={
-                                isReplyMode ? undefined : isPhotoLiked
-                            }
-                            aria-disabled={
-                                isReplyMode && !canSendReply ? true : undefined
-                            }
-                            onClick={
-                                isReplyMode ? sendReply : handlePhotoLikeClick
-                            }
-                            onContextMenuCapture={
-                                isReplyMode
-                                    ? undefined
-                                    : handlePhotoLikeContextMenu
-                            }
-                            onPointerCancel={
-                                isReplyMode ? undefined : clearLikeHoldTimeout
-                            }
-                            onPointerDown={
-                                isReplyMode
-                                    ? handleReplyActionPointerDown
-                                    : startPhotoLikeHold
-                            }
-                            onPointerLeave={
-                                isReplyMode ? undefined : clearLikeHoldTimeout
-                            }
-                            onPointerMove={
-                                isReplyMode
-                                    ? undefined
-                                    : cancelPhotoLikeHoldOnMove
-                            }
-                            onPointerUp={
-                                isReplyMode ? undefined : clearLikeHoldTimeout
-                            }
-                            sx={{
-                                ...viewerActionButtonSx,
-                                bgcolor:
-                                    isReplyMode && canSendReply
-                                        ? "#FFFFFF"
-                                        : controlBackground,
-                                color:
-                                    isReplyMode && canSendReply
-                                        ? "#111111"
-                                        : controlIcon,
-                                opacity:
-                                    isReplyMode && !canSendReply
-                                        ? replyActionPhase == "done"
-                                            ? 1
-                                            : 0.52
-                                        : 1,
-                                cursor:
-                                    isReplyMode && !canSendReply
-                                        ? "default"
-                                        : "pointer",
-                                touchAction: "manipulation",
-                                userSelect: "none",
-                                WebkitTouchCallout: "none",
-                                WebkitUserSelect: "none",
-                            }}
+                            sx={{ height: 48, position: "relative", width: 48 }}
                         >
-                            {isReplyMode ? (
-                                replyActionPhase == "busy" ? (
-                                    <Box
-                                        component="span"
-                                        sx={{
-                                            animation: `${postButtonSpin} 2.4s linear infinite`,
-                                            display: "flex",
-                                            lineHeight: 0,
-                                        }}
-                                    >
-                                        <HugeiconsIcon
-                                            icon={Loading03Icon}
-                                            size={22}
-                                            strokeWidth={1.8}
-                                        />
-                                    </Box>
-                                ) : replyActionPhase == "done" ? (
-                                    <HugeiconsIcon
-                                        icon={Tick02Icon}
-                                        primaryColor={green}
-                                        size={22}
-                                        strokeWidth={1.8}
-                                    />
-                                ) : (
-                                    <HugeiconsIcon
-                                        icon={Navigation03Icon}
-                                        size={24}
-                                        strokeWidth={1.8}
-                                        style={{
-                                            transform: "translate(-1px, 1px)",
-                                        }}
-                                    />
-                                )
-                            ) : (
-                                <HugeiconsIcon
-                                    fill={isPhotoLiked ? green : "none"}
-                                    icon={FavouriteIcon}
-                                    primaryColor={
-                                        isPhotoLiked ? green : undefined
-                                    }
-                                    size={26}
-                                    strokeWidth={1.8}
-                                />
-                            )}
-                        </Box>
-                        {!isReplyMode && showPhotoLikeCount && (
                             <Box
                                 component="button"
                                 type="button"
-                                aria-label={`View ${likeCountLabel}`}
-                                onClick={handleLikeCountClick}
+                                aria-label={
+                                    isReplyMode
+                                        ? replyActionPhase == "busy"
+                                            ? "Sending reply"
+                                            : replyActionPhase == "done"
+                                              ? "Reply sent"
+                                              : "Send reply"
+                                        : isPhotoLiked
+                                          ? "Unlike photo"
+                                          : "Like photo"
+                                }
+                                aria-pressed={
+                                    isReplyMode ? undefined : isPhotoLiked
+                                }
+                                aria-disabled={
+                                    isReplyMode && !canSendReply
+                                        ? true
+                                        : undefined
+                                }
+                                onClick={
+                                    isReplyMode
+                                        ? sendReply
+                                        : handlePhotoLikeClick
+                                }
+                                onContextMenuCapture={
+                                    isReplyMode
+                                        ? undefined
+                                        : handlePhotoLikeContextMenu
+                                }
+                                onPointerCancel={
+                                    isReplyMode
+                                        ? undefined
+                                        : clearLikeHoldTimeout
+                                }
+                                onPointerDown={
+                                    isReplyMode
+                                        ? handleReplyActionPointerDown
+                                        : startPhotoLikeHold
+                                }
+                                onPointerLeave={
+                                    isReplyMode
+                                        ? undefined
+                                        : clearLikeHoldTimeout
+                                }
+                                onPointerMove={
+                                    isReplyMode
+                                        ? undefined
+                                        : cancelPhotoLikeHoldOnMove
+                                }
+                                onPointerUp={
+                                    isReplyMode
+                                        ? undefined
+                                        : clearLikeHoldTimeout
+                                }
                                 sx={{
-                                    ...viewerCountBadgeSx,
-                                    cursor: "pointer",
-                                    p: 0,
-                                    "&:focus-visible": {
-                                        outline: `2px solid ${green}`,
-                                        outlineOffset: 2,
-                                    },
+                                    ...viewerActionButtonSx,
+                                    bgcolor:
+                                        isReplyMode && canSendReply
+                                            ? "#FFFFFF"
+                                            : controlBackground,
+                                    color:
+                                        isReplyMode && canSendReply
+                                            ? "#111111"
+                                            : controlIcon,
+                                    cursor:
+                                        isReplyMode && !canSendReply
+                                            ? "default"
+                                            : "pointer",
+                                    touchAction: "manipulation",
+                                    userSelect: "none",
+                                    WebkitTouchCallout: "none",
+                                    WebkitUserSelect: "none",
                                 }}
                             >
-                                {likeCount}
+                                {isReplyMode ? (
+                                    replyActionPhase == "busy" ? (
+                                        <Box
+                                            component="span"
+                                            sx={{
+                                                animation: `${postButtonSpin} 2.4s linear infinite`,
+                                                display: "flex",
+                                                lineHeight: 0,
+                                            }}
+                                        >
+                                            <HugeiconsIcon
+                                                icon={Loading03Icon}
+                                                size={22}
+                                                strokeWidth={1.8}
+                                            />
+                                        </Box>
+                                    ) : replyActionPhase == "done" ? (
+                                        <HugeiconsIcon
+                                            icon={Tick02Icon}
+                                            primaryColor={green}
+                                            size={22}
+                                            strokeWidth={1.8}
+                                        />
+                                    ) : (
+                                        <HugeiconsIcon
+                                            icon={Navigation03Icon}
+                                            size={24}
+                                            strokeWidth={1.8}
+                                            style={{
+                                                transform:
+                                                    "translate(-1px, 1px)",
+                                            }}
+                                        />
+                                    )
+                                ) : (
+                                    <HugeiconsIcon
+                                        fill={isPhotoLiked ? green : "none"}
+                                        icon={FavouriteIcon}
+                                        primaryColor={
+                                            isPhotoLiked ? green : undefined
+                                        }
+                                        size={26}
+                                        strokeWidth={1.8}
+                                    />
+                                )}
                             </Box>
-                        )}
+                            {!isReplyMode && showPhotoLikeCount && (
+                                <Box
+                                    component="button"
+                                    type="button"
+                                    aria-label={`View ${likeCountLabel}`}
+                                    onClick={handleLikeCountClick}
+                                    sx={{
+                                        ...viewerCountBadgeSx,
+                                        cursor: "pointer",
+                                        p: 0,
+                                        "&:focus-visible": {
+                                            outline: `2px solid ${green}`,
+                                            outlineOffset: 2,
+                                        },
+                                    }}
+                                >
+                                    {likeCount}
+                                </Box>
+                            )}
+                        </Box>
                     </Box>
                 </Box>
             )}
