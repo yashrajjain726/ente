@@ -134,8 +134,31 @@ type WallMessageRecord struct {
 }
 
 type WallMessageConversationRecord struct {
-	Friend      WallActorRecord
-	LastMessage WallMessageRecord
+	Friend         WallActorRecord
+	LatestActivity WallMessageConversationActivityRecord
+}
+
+type WallMessageConversationActivityRecord struct {
+	ID        string
+	Type      string
+	CreatedAt int64
+	Message   *WallMessageRecord
+	Post      *WallMessageConversationPostRecord
+}
+
+type WallMessageConversationPostRecord struct {
+	PostID               int64
+	WallID               string
+	WallSlug             string
+	OwnerID              int64
+	ObjectKey            sql.NullString
+	ObjectSize           sql.NullInt64
+	ObjectPosition       sql.NullInt64
+	ObjectVariant        sql.NullString
+	ObjectBlurHashCipher sql.NullString
+	ObjectWidth          sql.NullInt64
+	ObjectHeight         sql.NullInt64
+	ObjectMediaType      sql.NullString
 }
 
 type CreateWallMessageRecord struct {

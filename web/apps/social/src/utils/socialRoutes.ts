@@ -1,9 +1,5 @@
 export type SetupProfileSource = "login" | "verify";
-export type FriendProfileSource =
-    | "friends"
-    | "home"
-    | "notifications"
-    | "profile";
+export type FriendProfileSource = "friends" | "home" | "profile";
 export type VerifyFlow = "login" | "signup";
 
 export const onboardingSourceSearchParam = "onboardingSource";
@@ -19,7 +15,6 @@ export const socialRoutes = {
     home: "/app",
     invite: "/invite",
     login: "/login",
-    messages: "/app/messages",
     notifications: "/app/notifications",
     onboarding: "/",
     passkeysFinish: "/passkeys/finish",
@@ -47,10 +42,7 @@ export const friendProfileSourceFromQuery = (
     value: string | string[] | undefined,
 ): FriendProfileSource => {
     const from = valueFromQuery(value);
-    return from == "home" ||
-        from == "notifications" ||
-        from == "profile" ||
-        from == "friends"
+    return from == "home" || from == "profile" || from == "friends"
         ? from
         : "friends";
 };

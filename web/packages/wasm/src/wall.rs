@@ -3,9 +3,10 @@
 use ente_core::http::Error as HttpError;
 use ente_wall::{
     AccountWallCtx, AuthKeyAttributes, CreatedWall, CreatedWallLink, DecryptedMessage,
-    DecryptedPost, DecryptedWallProfile, MessageResponse, OpenAccountWallCtxInput,
-    OpenWallLinkCtxInput, PostResponse, PrivateKeySource, ProfileAvatarResponse, WallActorResponse,
-    WallError as CoreWallError, WallLinkCtx, WallNotification, WallNotificationPost,
+    DecryptedPost, DecryptedWallProfile, MessageConversationActivity, MessageConversationPost,
+    MessageResponse, OpenAccountWallCtxInput, OpenWallLinkCtxInput, PostResponse, PrivateKeySource,
+    ProfileAvatarResponse, WallActorResponse, WallError as CoreWallError, WallLinkCtx,
+    WallNotification, WallNotificationPost,
     crypto::{decode_b64, encode_b64},
 };
 use serde::{Deserialize, Serialize};
@@ -255,7 +256,28 @@ struct MessagePageJs {
 #[serde(rename_all = "camelCase")]
 struct MessageConversationJs {
     friend: ActorJs,
-    last_message: MessageJs,
+    latest_activity: MessageConversationActivityJs,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MessageConversationActivityJs {
+    id: String,
+    #[serde(rename = "type")]
+    activity_type: String,
+    created_at: String,
+    message: Option<MessageJs>,
+    post: Option<MessageConversationPostJs>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MessageConversationPostJs {
+    post_id: i64,
+    wall_id: String,
+    wall_slug: String,
+    owner_user_id: i64,
+    objects: Vec<ente_wall::PostObjectPayload>,
 }
 
 #[derive(Serialize)]
@@ -491,6 +513,36 @@ async fn account_message_to_js(
         created_at: message.created_at,
         updated_at: message.updated_at,
     })
+}
+
+async fn message_conversation_activity_to_js(
+    ctx: &AccountWallCtx,
+    activity: MessageConversationActivity,
+) -> Result<MessageConversationActivityJs, WasmWallError> {
+    let message = match activity.message {
+        Some(message) => {
+            let decrypted = ctx.decrypt_message(&message)?;
+            Some(account_message_to_js(ctx, message, decrypted).await?)
+        }
+        None => None,
+    };
+    Ok(MessageConversationActivityJs {
+        id: activity.id,
+        activity_type: activity.activity_type,
+        created_at: activity.created_at,
+        message,
+        post: activity.post.map(message_conversation_post_to_js),
+    })
+}
+
+fn message_conversation_post_to_js(post: MessageConversationPost) -> MessageConversationPostJs {
+    MessageConversationPostJs {
+        post_id: post.post_id,
+        wall_id: post.wall_id,
+        wall_slug: post.wall_slug,
+        owner_user_id: post.owner_user_id,
+        objects: post.objects,
+    }
 }
 
 /// Open an authenticated wall context for web.
@@ -884,7 +936,7 @@ impl WallAccountCtxHandle {
             .map_err(Into::into)
     }
 
-    /// List 1:1 message conversations with decrypted last messages.
+    /// List 1:1 message conversations with decrypted latest activity messages.
     pub async fn list_message_conversations(
         &self,
         cursor: Option<String>,
@@ -894,13 +946,11 @@ impl WallAccountCtxHandle {
         let mut items = Vec::with_capacity(page.items.len());
         for conversation in page.items {
             let friend = account_actor_to_js(&self.inner, conversation.friend).await?;
-            let decrypted = self.inner.decrypt_message(&conversation.last_message)?;
             items.push(MessageConversationJs {
                 friend,
-                last_message: account_message_to_js(
+                latest_activity: message_conversation_activity_to_js(
                     &self.inner,
-                    conversation.last_message,
-                    decrypted,
+                    conversation.latest_activity,
                 )
                 .await?,
             });

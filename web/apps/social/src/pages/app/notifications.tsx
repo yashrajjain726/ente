@@ -1,81 +1,146 @@
 import { SocialPageMeta } from "components/SocialPageMeta";
 import { SocialRouteFallback } from "components/SocialRouteFallback";
 import { useRouter } from "next/router";
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
+import { MessagesScreen, messagesBackground } from "screens/MessagesScreen";
 import {
-    NotificationsScreen,
-    notificationsBackground,
-} from "screens/NotificationsScreen";
-import {
-    loadCurrentNotificationsPage,
-    loadCurrentPostLikers,
-    setCurrentPostLiked,
-    type SocialWallNotification,
+    deleteCurrentMessage,
+    loadCurrentMessageConversations,
+    loadCurrentMessageThread,
+    replyToCurrentMessage,
+    sendCurrentMessage,
+    setCurrentMessageLiked,
+    type SocialWallMessage,
+    type SocialWallMessageConversation,
 } from "services/socialWall";
 import { useSocialAppState } from "state/socialAppState";
 import { socialRoutes } from "utils/socialRoutes";
-import { notificationForScreen } from "utils/socialWallDisplay";
 
 const Page: React.FC = () => {
     const router = useRouter();
     const { profile, profileLoadStatus } = useSocialAppState();
-    const [notifications, setNotifications] = useState<
-        SocialWallNotification[]
+    const [conversations, setConversations] = React.useState<
+        SocialWallMessageConversation[]
     >([]);
-    const [isNotificationsLoading, setIsNotificationsLoading] = useState(true);
-    const screenNotifications = useMemo(
-        () => notifications.map(notificationForScreen),
-        [notifications],
-    );
+    const [isConversationsLoading, setIsConversationsLoading] =
+        React.useState(true);
+    const [isThreadLoading, setIsThreadLoading] = React.useState(false);
+    const [messages, setMessages] = React.useState<SocialWallMessage[]>([]);
+    const [selectedFriend, setSelectedFriend] = React.useState<
+        SocialWallMessageConversation["friend"] | undefined
+    >();
 
-    useEffect(() => {
+    const refreshConversations = React.useCallback(() => {
+        setIsConversationsLoading(true);
+        void loadCurrentMessageConversations()
+            .then((page) => setConversations(page.items))
+            .catch((error: unknown) =>
+                console.error("Failed to load message conversations", error),
+            )
+            .finally(() => setIsConversationsLoading(false));
+    }, []);
+
+    React.useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
             void router.replace(socialRoutes.onboarding);
         }
     }, [profile, profileLoadStatus, router]);
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (!profile) return;
+        refreshConversations();
+    }, [profile, refreshConversations]);
+
+    React.useEffect(() => {
+        if (!selectedFriend) {
+            setMessages([]);
+            return;
+        }
 
         let cancelled = false;
-        setIsNotificationsLoading(true);
-        void loadCurrentNotificationsPage()
+        setIsThreadLoading(true);
+        void loadCurrentMessageThread(
+            selectedFriend.wallId ?? selectedFriend.id,
+        )
             .then((page) => {
-                if (cancelled) return;
-                setNotifications(page.items);
+                if (!cancelled) setMessages(page.items);
             })
             .catch((error: unknown) =>
-                console.error("Failed to load notifications", error),
+                console.error("Failed to load message thread", error),
             )
             .finally(() => {
-                if (!cancelled) setIsNotificationsLoading(false);
+                if (!cancelled) setIsThreadLoading(false);
             });
 
         return () => {
             cancelled = true;
         };
-    }, [profile]);
+    }, [selectedFriend]);
 
     if (profileLoadStatus == "loading" || !profile) {
-        return <SocialRouteFallback background={notificationsBackground} />;
+        return <SocialRouteFallback background={messagesBackground} />;
     }
 
     return (
         <>
-            <SocialPageMeta themeColor={notificationsBackground} />
-            <NotificationsScreen
-                isNotificationsLoading={isNotificationsLoading}
-                notifications={screenNotifications}
+            <SocialPageMeta themeColor={messagesBackground} />
+            <MessagesScreen
+                conversations={conversations}
+                isConversationsLoading={isConversationsLoading}
+                isThreadLoading={isThreadLoading}
+                messages={messages}
                 onBack={() => void router.push(socialRoutes.home)}
-                onOpenFriend={(friendID) =>
-                    void router.push(
-                        socialRoutes.friend(friendID, "notifications"),
-                    )
-                }
-                onOpenMessages={() => void router.push(socialRoutes.messages)}
-                onLoadPostLikers={loadCurrentPostLikers}
-                onSetPostLiked={setCurrentPostLiked}
+                onCloseThread={() => setSelectedFriend(undefined)}
+                onOpenThread={setSelectedFriend}
+                onSendMessage={async (wallId, text) => {
+                    const message = await sendCurrentMessage(wallId, text);
+                    setMessages((currentMessages) => [
+                        ...currentMessages,
+                        message,
+                    ]);
+                    refreshConversations();
+                }}
+                onReplyToMessage={async (wallId, messageId, text) => {
+                    const message = await replyToCurrentMessage(
+                        wallId,
+                        messageId,
+                        text,
+                    );
+                    setMessages((currentMessages) => [
+                        ...currentMessages,
+                        message,
+                    ]);
+                    refreshConversations();
+                }}
+                onSetMessageLiked={async (messageId, liked) => {
+                    await setCurrentMessageLiked(messageId, liked);
+                    setMessages((currentMessages) =>
+                        currentMessages.map((message) =>
+                            message.id == messageId
+                                ? {
+                                      ...message,
+                                      likeCount: Math.max(
+                                          0,
+                                          message.likeCount + (liked ? 1 : -1),
+                                      ),
+                                      viewerLiked: liked,
+                                  }
+                                : message,
+                        ),
+                    );
+                    refreshConversations();
+                }}
+                onDeleteMessage={async (messageId) => {
+                    await deleteCurrentMessage(messageId);
+                    setMessages((currentMessages) =>
+                        currentMessages.filter(
+                            (message) => message.id != messageId,
+                        ),
+                    );
+                    refreshConversations();
+                }}
                 profile={profile}
+                selectedFriend={selectedFriend}
             />
         </>
     );

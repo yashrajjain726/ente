@@ -64,33 +64,34 @@ interface WallPostPage {
     nextCursor?: string;
 }
 
+type WallMessageConversationActivityType =
+    | "friend_add"
+    | "friend_remove"
+    | "message"
+    | "message_like"
+    | "post_like"
+    | "post_like_and_reply"
+    | "post_reply";
+
+interface WallMessageConversationPost {
+    objects?: WallPostObject[];
+    postId: number;
+    wallId: string;
+    wallSlug: string;
+}
+
+interface WallMessageConversationActivity {
+    createdAt: string;
+    id: string;
+    message?: WallMessage;
+    post?: WallMessageConversationPost;
+    type: WallMessageConversationActivityType;
+}
+
 interface WallFriend {
     createdAt: string;
     friend: WallActor;
     shareKeyVersion: number;
-}
-
-interface WallNotification {
-    actor: WallActor;
-    createdAt: string;
-    id: string;
-    post?: {
-        author: WallActor;
-        objects?: WallPostObject[];
-        postId: number;
-        wallId: string;
-        wallSlug: string;
-    };
-    type:
-        | "likedPost"
-        | "repliedToPost"
-        | "addedYouAsFriend"
-        | "removedYouAsFriend";
-}
-
-interface WallNotificationPage {
-    items?: WallNotification[];
-    nextCursor?: string;
 }
 
 interface WallPostLikerPage {
@@ -134,7 +135,7 @@ interface WallMessagePage {
 
 interface WallMessageConversation {
     friend: WallActor;
-    lastMessage: WallMessage;
+    latestActivity: WallMessageConversationActivity;
 }
 
 interface WallMessageConversationPage {
@@ -159,19 +160,6 @@ export interface SocialWallPost {
 
 export interface SocialWallPostPage {
     items: SocialWallPost[];
-    nextCursor?: string;
-}
-
-export interface SocialWallNotification {
-    actor: FriendProfile;
-    id: string;
-    post?: SocialWallPost;
-    timestampMs: number;
-    type: "added-friend" | "liked-post" | "removed-friend" | "replied-post";
-}
-
-export interface SocialWallNotificationPage {
-    items: SocialWallNotification[];
     nextCursor?: string;
 }
 
@@ -220,6 +208,27 @@ export interface SocialWallMessage {
     viewerLiked: boolean;
 }
 
+export type SocialWallMessageActivityType = WallMessageConversationActivityType;
+
+export interface SocialWallMessageActivityPost {
+    height?: number;
+    imageUrl?: string;
+    mediaType?: string;
+    objectKey?: string;
+    postId: number;
+    wallId: string;
+    wallSlug: string;
+    width?: number;
+}
+
+export interface SocialWallMessageActivity {
+    createdAtMs: number;
+    id: string;
+    message?: SocialWallMessage;
+    post?: SocialWallMessageActivityPost;
+    type: SocialWallMessageActivityType;
+}
+
 export interface SocialWallMessagePage {
     items: SocialWallMessage[];
     nextCursor?: string;
@@ -227,7 +236,7 @@ export interface SocialWallMessagePage {
 
 export interface SocialWallMessageConversation {
     friend: FriendProfile;
-    lastMessage: SocialWallMessage;
+    latestActivity: SocialWallMessageActivity;
 }
 
 export interface SocialWallMessageConversationPage {
@@ -303,9 +312,14 @@ const accountAvatarURL = async (
     avatar: WallAvatar | undefined,
 ) => {
     if (!wallId || !avatar?.objectKey) return null;
-    return blobURLForBytes(
-        await ctx.download_wall_avatar(wallId, avatar.objectKey),
-    );
+    try {
+        return blobURLForBytes(
+            await ctx.download_wall_avatar(wallId, avatar.objectKey),
+        );
+    } catch (error) {
+        console.warn("Failed to load wall avatar", error);
+        return null;
+    }
 };
 
 const linkAvatarURL = async (
@@ -472,6 +486,57 @@ const messageFromWallMessage = async (
         text: message.text,
         updatedAtMs: timestampMsFromWallDate(message.updatedAt),
         viewerLiked: Boolean(message.viewerLiked),
+    };
+};
+
+const messageActivityPostFromWallPost = async (
+    ctx: WallAccountCtxHandle,
+    post: WallMessageConversationPost | undefined,
+): Promise<SocialWallMessageActivityPost | undefined> => {
+    if (!post) return undefined;
+
+    const object = firstObject(post);
+    const socialPost: SocialWallMessageActivityPost = {
+        height: object?.height,
+        mediaType: object?.mediaType,
+        objectKey: object?.objectKey,
+        postId: post.postId,
+        wallId: post.wallId,
+        wallSlug: post.wallSlug,
+        width: object?.width,
+    };
+    if (!object?.objectKey) return socialPost;
+
+    try {
+        socialPost.imageUrl = blobURLForBytes(
+            await ctx.download_post_asset(
+                BigInt(post.postId),
+                object.objectKey,
+            ),
+            object.mediaType,
+        );
+    } catch (error) {
+        console.warn("Failed to load message activity post image", error);
+    }
+    return socialPost;
+};
+
+const messageActivityFromWallActivity = async (
+    ctx: WallAccountCtxHandle,
+    activity: WallMessageConversationActivity,
+): Promise<SocialWallMessageActivity> => {
+    const [message, post] = await Promise.all([
+        activity.message
+            ? messageFromWallMessage(ctx, activity.message, false)
+            : undefined,
+        messageActivityPostFromWallPost(ctx, activity.post),
+    ]);
+    return {
+        createdAtMs: timestampMsFromWallDate(activity.createdAt),
+        id: activity.id,
+        message,
+        post,
+        type: activity.type,
     };
 };
 
@@ -730,10 +795,9 @@ export const loadCurrentMessageConversations =
                     );
                     return {
                         friend,
-                        lastMessage: await messageFromWallMessage(
+                        latestActivity: await messageActivityFromWallActivity(
                             ctx,
-                            conversation.lastMessage,
-                            false,
+                            conversation.latestActivity,
                         ),
                     };
                 }),
@@ -775,64 +839,6 @@ export const deleteCurrentPost = async (postId: number) => {
         ctx.free();
     }
 };
-
-export const loadCurrentNotificationsPage =
-    async (): Promise<SocialWallNotificationPage> => {
-        const ctx = await ensureCurrentWallContext();
-        try {
-            const page = (await ctx.list_notifications(
-                null,
-                50,
-            )) as WallNotificationPage;
-            const items = await Promise.all(
-                (page.items ?? []).map(async (notification) => {
-                    const actor = actorProfile(notification.actor);
-                    actor.avatarUrl = await accountAvatarURL(
-                        ctx,
-                        notification.actor.wallId,
-                        notification.actor.avatar,
-                    );
-                    const postObject = notification.post
-                        ? firstObject(notification.post)
-                        : null;
-                    const post =
-                        notification.post && postObject
-                            ? await postFromAccountPost(ctx, {
-                                  author: notification.post.author,
-                                  createdAt: notification.createdAt,
-                                  likes: 0,
-                                  objects: notification.post.objects,
-                                  postId: notification.post.postId,
-                                  viewerLiked: false,
-                                  wallId: notification.post.wallId,
-                                  wallSlug: notification.post.wallSlug,
-                              })
-                            : undefined;
-                    let notificationType: SocialWallNotification["type"] =
-                        "liked-post";
-                    if (notification.type == "addedYouAsFriend") {
-                        notificationType = "added-friend";
-                    } else if (notification.type == "removedYouAsFriend") {
-                        notificationType = "removed-friend";
-                    } else if (notification.type == "repliedToPost") {
-                        notificationType = "replied-post";
-                    }
-                    return {
-                        actor,
-                        id: notification.id,
-                        post: post ?? undefined,
-                        timestampMs: timestampMsFromWallDate(
-                            notification.createdAt,
-                        ),
-                        type: notificationType,
-                    };
-                }),
-            );
-            return { items, nextCursor: page.nextCursor || undefined };
-        } finally {
-            ctx.free();
-        }
-    };
 
 export const loadPublicSocialInvite = async ({
     accessKey,

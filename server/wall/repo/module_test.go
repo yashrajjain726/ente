@@ -137,7 +137,8 @@ func TestWallMessagesThreadAndConversations(t *testing.T) {
 	require.Empty(t, nextCursor)
 	require.Len(t, conversations, 1)
 	require.Equal(t, bobWall.WallID, conversations[0].Friend.WallID)
-	require.Equal(t, reply.MessageID, conversations[0].LastMessage.MessageID)
+	require.Equal(t, "message", conversations[0].LatestActivity.Type)
+	require.Equal(t, reply.MessageID, conversations[0].LatestActivity.Message.MessageID)
 
 	require.NoError(t, module.Messages.DeleteMessage(ctx, message.MessageID, bobID))
 	deletedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, bobID)
@@ -165,6 +166,141 @@ func TestWallMessagesThreadAndConversations(t *testing.T) {
 		ReplyPostID:                  sql.NullInt64{Int64: 1, Valid: true},
 	})
 	require.Error(t, err)
+}
+
+func TestWallMessageConversationsUseLatestActivity(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice-activity@example.com", "alice-activity-public")
+	bobID := insertWallUser(t, module, "bob-activity@example.com", "bob-activity-public")
+
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice-activity", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	bobWall, err := module.Walls.CreateWall(ctx, bobID, "bob-activity", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+
+	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "alice-share-key", aliceWall.CurrentVersion, "bob-share-key", bobWall.CurrentVersion))
+	setFriendEventCreatedAt(t, module, 1000, "friend_add", bobID, aliceID)
+
+	conversations, nextCursor, err := module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Empty(t, nextCursor)
+	require.Len(t, conversations, 1)
+	require.Equal(t, bobWall.WallID, conversations[0].Friend.WallID)
+	require.Equal(t, "friend_add", conversations[0].LatestActivity.Type)
+	require.Nil(t, conversations[0].LatestActivity.Message)
+	require.Nil(t, conversations[0].LatestActivity.Post)
+
+	bobMessage, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     bobID,
+		SenderWallID:                 bobWall.WallID,
+		RecipientID:                  aliceID,
+		RecipientWallID:              aliceWall.WallID,
+		MessageCipher:                "bob-message-cipher",
+		SenderEncryptedMessageKey:    "bob-message-sender-key",
+		RecipientEncryptedMessageKey: "bob-message-recipient-key",
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 2000, bobMessage.MessageID)
+
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Equal(t, "message", conversations[0].LatestActivity.Type)
+	require.Equal(t, bobMessage.MessageID, conversations[0].LatestActivity.Message.MessageID)
+
+	aliceMessage, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     aliceID,
+		SenderWallID:                 aliceWall.WallID,
+		RecipientID:                  bobID,
+		RecipientWallID:              bobWall.WallID,
+		MessageCipher:                "alice-message-cipher",
+		SenderEncryptedMessageKey:    "alice-message-sender-key",
+		RecipientEncryptedMessageKey: "alice-message-recipient-key",
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 2500, aliceMessage.MessageID)
+	require.NoError(t, module.Messages.SetLike(ctx, aliceMessage.MessageID, bobID, true))
+	setMessageLikeCreatedAt(t, module, 3000, aliceMessage.MessageID, bobID)
+	require.NoError(t, module.Messages.SetLike(ctx, bobMessage.MessageID, aliceID, true))
+	setMessageLikeCreatedAt(t, module, 3500, bobMessage.MessageID, aliceID)
+
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Equal(t, "message_like", conversations[0].LatestActivity.Type)
+	require.Equal(t, aliceMessage.MessageID, conversations[0].LatestActivity.Message.MessageID)
+
+	postID, err := module.Posts.CreatePost(ctx, aliceID, aliceWall.WallID, "post-key", nil, aliceWall.CurrentVersion, nil)
+	require.NoError(t, err)
+	_, err = module.Posts.DB.Exec(`
+		INSERT INTO wall_post_assets (post_id, object_key, bucket_id, width, height, media_type)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, postID, "activity-post-object", "bucket", 320, 240, "image/jpeg")
+	require.NoError(t, err)
+	require.NoError(t, module.Posts.SetLike(ctx, postID, bobID, true))
+	setPostLikeCreatedAt(t, module, 4000, postID, bobID)
+
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Equal(t, "post_like", conversations[0].LatestActivity.Type)
+	require.NotNil(t, conversations[0].LatestActivity.Post)
+	require.Equal(t, postID, conversations[0].LatestActivity.Post.PostID)
+	require.Equal(t, "activity-post-object", conversations[0].LatestActivity.Post.ObjectKey.String)
+
+	postReply, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "post_reply",
+		SenderID:                     bobID,
+		SenderWallID:                 bobWall.WallID,
+		RecipientID:                  aliceID,
+		RecipientWallID:              aliceWall.WallID,
+		MessageCipher:                "post-reply-cipher",
+		SenderEncryptedMessageKey:    "post-reply-sender-key",
+		RecipientEncryptedMessageKey: "post-reply-recipient-key",
+		ReplyPostID:                  sql.NullInt64{Int64: postID, Valid: true},
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 5000, postReply.MessageID)
+
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Equal(t, "post_like_and_reply", conversations[0].LatestActivity.Type)
+	require.NotNil(t, conversations[0].LatestActivity.Message)
+	require.Equal(t, postReply.MessageID, conversations[0].LatestActivity.Message.MessageID)
+	require.Equal(t, postID, conversations[0].LatestActivity.Post.PostID)
+
+	replyOnlyPostID, err := module.Posts.CreatePost(ctx, aliceID, aliceWall.WallID, "reply-only-post-key", nil, aliceWall.CurrentVersion, nil)
+	require.NoError(t, err)
+	replyOnly, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "post_reply",
+		SenderID:                     bobID,
+		SenderWallID:                 bobWall.WallID,
+		RecipientID:                  aliceID,
+		RecipientWallID:              aliceWall.WallID,
+		MessageCipher:                "reply-only-cipher",
+		SenderEncryptedMessageKey:    "reply-only-sender-key",
+		RecipientEncryptedMessageKey: "reply-only-recipient-key",
+		ReplyPostID:                  sql.NullInt64{Int64: replyOnlyPostID, Valid: true},
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 5500, replyOnly.MessageID)
+
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Equal(t, "post_reply", conversations[0].LatestActivity.Type)
+	require.NotNil(t, conversations[0].LatestActivity.Message)
+	require.Equal(t, replyOnly.MessageID, conversations[0].LatestActivity.Message.MessageID)
+	require.Equal(t, replyOnlyPostID, conversations[0].LatestActivity.Post.PostID)
+
+	require.NoError(t, module.Friends.DeleteFriendship(ctx, bobID, aliceWall.WallID))
+	setFriendEventCreatedAt(t, module, 6000, "friend_remove", bobID, aliceID)
+
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Equal(t, "friend_remove", conversations[0].LatestActivity.Type)
+	require.Nil(t, conversations[0].LatestActivity.Message)
+	require.Nil(t, conversations[0].LatestActivity.Post)
 }
 
 func TestWallModuleLifecycle(t *testing.T) {
@@ -1047,5 +1183,11 @@ func setFriendEventCreatedAt(t *testing.T, module *Module, createdAt int64, even
 func setMessageCreatedAt(t *testing.T, module *Module, createdAt int64, messageID string) {
 	t.Helper()
 	_, err := module.Messages.DB.Exec(`UPDATE wall_messages SET created_at = $1 WHERE message_id = $2`, createdAt, messageID)
+	require.NoError(t, err)
+}
+
+func setMessageLikeCreatedAt(t *testing.T, module *Module, createdAt int64, messageID string, userID int64) {
+	t.Helper()
+	_, err := module.Messages.DB.Exec(`UPDATE wall_message_likes SET created_at = $1 WHERE message_id = $2 AND user_id = $3`, createdAt, messageID, userID)
 	require.NoError(t, err)
 }

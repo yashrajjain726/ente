@@ -188,7 +188,32 @@ pub struct MessagePage {
 #[serde(rename_all = "camelCase")]
 pub struct MessageConversationResponse {
     pub friend: WallActorResponse,
-    pub last_message: MessageResponse,
+    pub latest_activity: MessageConversationActivity,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageConversationActivity {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub activity_type: String,
+    pub created_at: String,
+    #[serde(default)]
+    pub message: Option<MessageResponse>,
+    #[serde(default)]
+    pub post: Option<MessageConversationPost>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageConversationPost {
+    pub post_id: i64,
+    pub wall_id: String,
+    pub wall_slug: String,
+    #[serde(default)]
+    pub owner_user_id: i64,
+    #[serde(default)]
+    pub objects: Vec<PostObjectPayload>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

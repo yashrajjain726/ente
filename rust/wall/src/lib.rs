@@ -13,11 +13,11 @@ pub use models::{
 };
 pub use transport::{
     EntityKeyPayload, FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse,
-    LikeMessageResponse, LikePostResponse, ListPostLikersResponse, MessageConversationPage,
-    MessageConversationResponse, MessagePage, MessageResponse, PostLikerResponse,
-    PostObjectPayload, PostPage, PostResponse, PresignUploadResponse, ProfileAvatarPayload,
-    ProfileAvatarResponse, WallActorResponse, WallFriendResponse, WallKeyResponse,
-    WallKeyVersionResponse, WallLinkLoginResponse, WallLinkStatusResponse, WallLookupResponse,
-    WallNotification, WallNotificationPage, WallNotificationPost, WallNotificationType,
-    WallProfileResponse,
+    LikeMessageResponse, LikePostResponse, ListPostLikersResponse, MessageConversationActivity,
+    MessageConversationPage, MessageConversationPost, MessageConversationResponse, MessagePage,
+    MessageResponse, PostLikerResponse, PostObjectPayload, PostPage, PostResponse,
+    PresignUploadResponse, ProfileAvatarPayload, ProfileAvatarResponse, WallActorResponse,
+    WallFriendResponse, WallKeyResponse, WallKeyVersionResponse, WallLinkLoginResponse,
+    WallLinkStatusResponse, WallLookupResponse, WallNotification, WallNotificationPage,
+    WallNotificationPost, WallNotificationType, WallProfileResponse,
 };

@@ -2,7 +2,7 @@ import {
     AddSquareIcon,
     FavouriteIcon,
     MultiplicationSignIcon,
-    NotificationIcon,
+    Notification01Icon,
     UserCheck01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -824,7 +824,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             }}
                         >
                             <HugeiconsIcon
-                                icon={NotificationIcon}
+                                icon={Notification01Icon}
                                 size={headerIconSize}
                                 strokeWidth={1.8}
                             />

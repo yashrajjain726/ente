@@ -123,8 +123,8 @@ func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesReque
 	items := make([]models.MessageConversationResponse, 0, len(conversations))
 	for _, conversation := range conversations {
 		items = append(items, models.MessageConversationResponse{
-			Friend:      toActorResponse(conversation.Friend, true),
-			LastMessage: *toMessageResponse(conversation.LastMessage),
+			Friend:         toActorResponse(conversation.Friend, true),
+			LatestActivity: toMessageConversationActivityResponse(conversation.LatestActivity),
 		})
 	}
 	return &models.MessageConversationPage{Items: items, NextCursor: nextCursor}, nil
@@ -278,6 +278,41 @@ func toMessageResponse(message repo.WallMessageRecord) *models.MessageResponse {
 	if message.ReplyMessageID.Valid {
 		replyMessageID := message.ReplyMessageID.String
 		resp.ReplyMessageID = &replyMessageID
+	}
+	return resp
+}
+
+func toMessageConversationActivityResponse(activity repo.WallMessageConversationActivityRecord) models.MessageConversationActivityResponse {
+	resp := models.MessageConversationActivityResponse{
+		ID:        activity.ID,
+		Type:      activity.Type,
+		CreatedAt: formatMicros(activity.CreatedAt),
+	}
+	if activity.Message != nil {
+		resp.Message = toMessageResponse(*activity.Message)
+	}
+	if activity.Post != nil {
+		resp.Post = &models.MessageConversationPostResponse{
+			PostID:      activity.Post.PostID,
+			WallID:      activity.Post.WallID,
+			WallSlug:    activity.Post.WallSlug,
+			OwnerUserID: activity.Post.OwnerID,
+		}
+		if activity.Post.ObjectKey.Valid {
+			resp.Post.Objects = []models.PostObjectPayload{
+				toPostObjectPayload(repo.WallPostAssetRecord{
+					PostID:         activity.Post.PostID,
+					ObjectKey:      activity.Post.ObjectKey.String,
+					Size:           activity.Post.ObjectSize,
+					Position:       int(activity.Post.ObjectPosition.Int64),
+					Variant:        activity.Post.ObjectVariant,
+					BlurHashCipher: activity.Post.ObjectBlurHashCipher,
+					Width:          activity.Post.ObjectWidth,
+					Height:         activity.Post.ObjectHeight,
+					MediaType:      activity.Post.ObjectMediaType,
+				}),
+			}
+		}
 	}
 	return resp
 }

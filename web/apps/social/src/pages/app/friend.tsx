@@ -24,11 +24,9 @@ const backRouteForSource = (
 ) =>
     source == "home"
         ? socialRoutes.home
-        : source == "notifications"
-          ? socialRoutes.notifications
-          : source == "profile"
-            ? socialRoutes.profile
-            : socialRoutes.friends;
+        : source == "profile"
+          ? socialRoutes.profile
+          : socialRoutes.friends;
 
 const Page: React.FC = () => {
     const router = useRouter();
@@ -39,7 +37,10 @@ const Page: React.FC = () => {
     const selectedFriend = friends.find((friend) => friend.id == friendID);
     const [friendsLoadAttempted, setFriendsLoadAttempted] = useState(false);
     const [posts, setPosts] = useState<SocialWallPost[]>([]);
-    const postGroups = useMemo(() => profilePostGroupsFromPosts(posts), [posts]);
+    const postGroups = useMemo(
+        () => profilePostGroupsFromPosts(posts),
+        [posts],
+    );
 
     useEffect(() => {
         if (!router.isReady) return;

@@ -1,6 +1,6 @@
 import type { SocialViewerPhoto } from "components/SocialFileViewer";
 import type { ProfilePostGroup } from "screens/ProfileScreen";
-import type { SocialWallNotification, SocialWallPost } from "services/socialWall";
+import type { SocialWallPost } from "services/socialWall";
 
 export const socialPostToViewerPhoto = (
     post: SocialWallPost,
@@ -57,16 +57,3 @@ export const profilePostGroupsFromPosts = (
     });
     return [...groups.values()];
 };
-
-export const notificationForScreen = (
-    notification: SocialWallNotification,
-) => ({
-    actor: notification.actor,
-    id: notification.id,
-    post: notification.post
-        ? socialPostToViewerPhoto(notification.post)
-        : undefined,
-    postThumbnailUrl: notification.post?.imageUrl,
-    timestampMs: notification.timestampMs,
-    type: notification.type,
-});

@@ -306,8 +306,24 @@ type MessagePage struct {
 }
 
 type MessageConversationResponse struct {
-	Friend      WallActorResponse `json:"friend"`
-	LastMessage MessageResponse   `json:"lastMessage"`
+	Friend         WallActorResponse                   `json:"friend"`
+	LatestActivity MessageConversationActivityResponse `json:"latestActivity"`
+}
+
+type MessageConversationActivityResponse struct {
+	ID        string                           `json:"id"`
+	Type      string                           `json:"type"`
+	CreatedAt string                           `json:"createdAt"`
+	Message   *MessageResponse                 `json:"message,omitempty"`
+	Post      *MessageConversationPostResponse `json:"post,omitempty"`
+}
+
+type MessageConversationPostResponse struct {
+	PostID      int64               `json:"postId"`
+	WallID      string              `json:"wallId"`
+	WallSlug    string              `json:"wallSlug"`
+	OwnerUserID int64               `json:"ownerUserId"`
+	Objects     []PostObjectPayload `json:"objects,omitempty"`
 }
 
 type MessageConversationPage struct {

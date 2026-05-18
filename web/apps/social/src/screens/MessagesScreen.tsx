@@ -6,7 +6,7 @@ import {
     Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Menu, MenuItem } from "@mui/material";
+import { Box, Menu, MenuItem, Tooltip } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import { SocialLoadingSpinner } from "components/SocialRouteFallback";
 import { formatTimeAgo } from "ente-base/date";
@@ -87,24 +87,7 @@ const resizeComposer = (input: HTMLTextAreaElement | null) => {
 };
 
 const copyTextToClipboard = async (text: string) => {
-    if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        return;
-    }
-
-    const input = document.createElement("textarea");
-    input.value = text;
-    input.setAttribute("readonly", "");
-    input.style.left = "-9999px";
-    input.style.opacity = "0";
-    input.style.position = "fixed";
-    input.style.top = "0";
-    document.body.appendChild(input);
-    input.focus();
-    input.select();
-    const copied = document.execCommand("copy");
-    input.remove();
-    if (!copied) throw new Error("Copy failed");
+    await navigator.clipboard.writeText(text);
 };
 
 const Avatar: React.FC<{
@@ -164,40 +147,153 @@ const messagePreview = (message: SocialWallMessage) => {
     return message.text;
 };
 
-const isCurrentProfileMessage = (
-    message: SocialWallMessage,
-    profile: SetupProfile,
-) => {
-    if (message.sender.wallId && profile.wallId) {
-        return message.sender.wallId == profile.wallId;
-    }
-    if (message.sender.wallSlug && profile.wallSlug) {
-        return message.sender.wallSlug == profile.wallSlug;
-    }
-    return message.sender.username == profile.username;
-};
-
-const conversationPreview = (
-    message: SocialWallMessage,
-    profile: SetupProfile,
-) => {
-    const preview = messagePreview(message);
-    return isCurrentProfileMessage(message, profile)
-        ? `You: ${preview}`
-        : preview;
-};
-
-const sameMessageSender = (
-    first: SocialWallMessage | undefined,
-    second: SocialWallMessage | undefined,
-) => Boolean(first && second && first.sender.wallId == second.sender.wallId);
-
 const truncateMessageText = (text: string): string => {
     const lines = text.split("\n");
     const firstLine = lines[0] ?? text;
     if (firstLine.length > 100) return `${firstLine.slice(0, 100)}...`;
     return lines.length > 1 ? `${firstLine}...` : firstLine;
 };
+
+const isCurrentProfileMessage = (
+    message: SocialWallMessage,
+    profile: SetupProfile,
+) => isCurrentProfileActor(message.sender, profile);
+
+const isCurrentProfileActor = (
+    actor: SocialWallMessage["sender"],
+    profile: SetupProfile,
+) => {
+    if (actor.wallId && profile.wallId) {
+        return actor.wallId == profile.wallId;
+    }
+    if (actor.wallSlug && profile.wallSlug) {
+        return actor.wallSlug == profile.wallSlug;
+    }
+    return actor.username == profile.username;
+};
+
+const actorName = (actor: SocialWallMessage["sender"]) =>
+    firstNameFrom(actor.fullName.trim() || actor.username);
+
+const messageLikeTooltipLabel = (
+    message: SocialWallMessage,
+    profile: SetupProfile,
+) => {
+    const otherParticipant = isCurrentProfileActor(message.sender, profile)
+        ? message.recipient
+        : message.sender;
+    const likerNames: string[] = [];
+    if (message.viewerLiked) likerNames.push("You");
+    if (message.likeCount > likerNames.length) {
+        likerNames.push(actorName(otherParticipant));
+    }
+    if (message.likeCount > likerNames.length) {
+        likerNames.push(`${message.likeCount - likerNames.length} others`);
+    }
+    return likerNames.filter(Boolean).join(" and ") || "Liked";
+};
+
+const conversationPreview = (
+    conversation: SocialWallMessageConversation,
+    profile: SetupProfile,
+) => {
+    const activity = conversation.latestActivity;
+    if (activity.type == "friend_add") return "Added you as a friend";
+    if (activity.type == "friend_remove") return "Removed you as a friend";
+    if (activity.type == "post_like") return "Liked your post";
+    if (activity.type == "post_reply") {
+        return "Replied";
+    }
+    if (activity.type == "post_like_and_reply") {
+        return "Liked and replied";
+    }
+    if (activity.type == "message_like") {
+        const text = activity.message?.text.trim();
+        return text
+            ? `Liked "${truncateMessageText(text)}"`
+            : "Liked a message";
+    }
+
+    const message = activity.message;
+    if (!message) return "";
+    const preview = messagePreview(message);
+    return isCurrentProfileMessage(message, profile)
+        ? `You: ${preview}`
+        : preview;
+};
+
+const quotedConversationActivityPreview = (
+    activity: SocialWallMessageConversation["latestActivity"],
+) => {
+    const text = activity.message?.text.trim();
+    if (!text) return undefined;
+    const previewText = truncateMessageText(text);
+
+    if (activity.type == "message_like") {
+        return { prefix: 'Liked "', previewText, suffix: '"' };
+    }
+    if (activity.type == "post_reply") {
+        return { prefix: 'Replied "', previewText, suffix: '"' };
+    }
+    if (activity.type == "post_like_and_reply") {
+        return { prefix: 'Liked and replied "', previewText, suffix: '"' };
+    }
+    return undefined;
+};
+
+const ConversationPreviewLine: React.FC<{
+    conversation: SocialWallMessageConversation;
+    profile: SetupProfile;
+}> = ({ conversation, profile }) => {
+    const activity = conversation.latestActivity;
+    const quotedPreview = quotedConversationActivityPreview(activity);
+    const previewLineSx = {
+        color: textSecondary,
+        fontFamily: '"Inter Variable", Inter, sans-serif',
+        fontSize: 13,
+        fontWeight: 500,
+        lineHeight: "18px",
+        minWidth: 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+    };
+
+    if (!quotedPreview) {
+        return (
+            <Box sx={previewLineSx}>
+                {conversationPreview(conversation, profile)}
+            </Box>
+        );
+    }
+
+    return (
+        <Box sx={{ ...previewLineSx, alignItems: "baseline", display: "flex" }}>
+            <Box component="span" sx={{ flexShrink: 0 }}>
+                {quotedPreview.prefix}
+            </Box>
+            <Box
+                component="span"
+                sx={{
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                }}
+            >
+                {quotedPreview.previewText}
+            </Box>
+            <Box component="span" sx={{ flexShrink: 0 }}>
+                {quotedPreview.suffix}
+            </Box>
+        </Box>
+    );
+};
+
+const sameMessageSender = (
+    first: SocialWallMessage | undefined,
+    second: SocialWallMessage | undefined,
+) => Boolean(first && second && first.sender.wallId == second.sender.wallId);
 
 const ReplyIcon: React.FC = () => (
     <svg
@@ -482,6 +578,26 @@ const MessageBubble: React.FC<{
           : "6px 20px 20px 6px";
     const hasMessageReply = Boolean(message.replyMessageId);
     const hasInlinePreview = message.kind == "post_reply" || hasMessageReply;
+    const [isLikeTooltipOpen, setIsLikeTooltipOpen] = React.useState(false);
+    const likeTooltipTimerRef = React.useRef<number | undefined>(undefined);
+    const likeTooltipLabel = messageLikeTooltipLabel(message, profile);
+
+    const clearLikeTooltipTimer = React.useCallback(() => {
+        if (likeTooltipTimerRef.current == undefined) return;
+        window.clearTimeout(likeTooltipTimerRef.current);
+        likeTooltipTimerRef.current = undefined;
+    }, []);
+
+    const showLikeTooltip = (event: React.MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        clearLikeTooltipTimer();
+        setIsLikeTooltipOpen(true);
+        likeTooltipTimerRef.current = window.setTimeout(() => {
+            setIsLikeTooltipOpen(false);
+            likeTooltipTimerRef.current = undefined;
+        }, 1800);
+    };
 
     const handleContextMenu = (
         event: React.MouseEvent,
@@ -492,6 +608,18 @@ const MessageBubble: React.FC<{
         window.getSelection()?.removeAllRanges();
         onOpenActions(message, bubbleElement);
     };
+
+    React.useEffect(() => clearLikeTooltipTimer, [clearLikeTooltipTimer]);
+
+    React.useEffect(() => {
+        clearLikeTooltipTimer();
+        setIsLikeTooltipOpen(false);
+    }, [
+        clearLikeTooltipTimer,
+        message.id,
+        message.likeCount,
+        message.viewerLiked,
+    ]);
 
     return (
         <Box
@@ -580,38 +708,77 @@ const MessageBubble: React.FC<{
                         {message.text}
                     </Box>
                     {message.likeCount > 0 && (
-                        <Box
-                            aria-label="Liked"
-                            role="img"
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: "#2B2B2B",
-                                border: `2px solid ${threadBackground}`,
-                                borderRadius: "999px",
-                                bottom: -11,
-                                boxShadow: "0 4px 10px rgba(0, 0, 0, 0.2)",
-                                boxSizing: "border-box",
-                                color: green,
-                                display: "inline-flex",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 10,
-                                fontWeight: 800,
-                                gap: "4px",
-                                height: 22,
-                                justifyContent: "center",
-                                lineHeight: 1,
-                                minWidth: message.likeCount > 1 ? 34 : 28,
-                                pb: "1px",
-                                px: "7px",
-                                position: "absolute",
-                                zIndex: 2,
-                                ...(isOwn ? { left: 8 } : { right: 8 }),
+                        <Tooltip
+                            arrow
+                            disableFocusListener
+                            disableHoverListener
+                            disableTouchListener
+                            open={isLikeTooltipOpen}
+                            placement={isOwn ? "left" : "right"}
+                            title={likeTooltipLabel}
+                            slotProps={{
+                                tooltip: {
+                                    sx: {
+                                        bgcolor: "#111111",
+                                        borderRadius: "6px",
+                                        color: threadText,
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        lineHeight: "16px",
+                                        px: "8px",
+                                        py: "5px",
+                                    },
+                                },
+                                arrow: { sx: { color: "#111111" } },
                             }}
                         >
-                            <HeartIcon filled small />
-                            {message.likeCount > 1 ? message.likeCount : null}
-                        </Box>
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label={`Liked by ${likeTooltipLabel}`}
+                                onClick={showLikeTooltip}
+                                onContextMenu={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                }}
+                                sx={{
+                                    alignItems: "center",
+                                    appearance: "none",
+                                    bgcolor: "#2B2B2B",
+                                    border: `2px solid ${threadBackground}`,
+                                    borderRadius: "999px",
+                                    bottom: -11,
+                                    boxShadow: "0 4px 10px rgba(0, 0, 0, 0.2)",
+                                    boxSizing: "border-box",
+                                    color: green,
+                                    cursor: "pointer",
+                                    display: "inline-flex",
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    gap: "4px",
+                                    height: 22,
+                                    justifyContent: "center",
+                                    lineHeight: 1,
+                                    minWidth: 34,
+                                    pb: "1px",
+                                    px: "7px",
+                                    position: "absolute",
+                                    zIndex: 2,
+                                    ...(isOwn ? { left: 8 } : { right: 8 }),
+                                    "&:focus-visible": {
+                                        outline: `2px solid ${green}`,
+                                        outlineOffset: 2,
+                                    },
+                                }}
+                            >
+                                <HeartIcon filled small />
+                                {message.likeCount}
+                            </Box>
+                        </Tooltip>
                     )}
                 </Box>
             </Box>
@@ -807,7 +974,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     <Box
                         component="button"
                         type="button"
-                        aria-label={isThreadOpen ? "Back to messages" : "Back"}
+                        aria-label={
+                            isThreadOpen ? "Back to notifications" : "Back"
+                        }
                         onClick={isThreadOpen ? onCloseThread : onBack}
                         sx={{
                             alignItems: "center",
@@ -853,7 +1022,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     >
                         {isThreadOpen
                             ? firstNameFrom(selectedName)
-                            : "Messages"}
+                            : "Notifications"}
                     </Box>
                     <Box aria-hidden />
                 </Box>
@@ -882,6 +1051,32 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     }}
                                 >
                                     <SocialLoadingSpinner ariaLabel="Loading messages" />
+                                </Box>
+                            ) : messages.length == 0 ? (
+                                <Box
+                                    sx={{
+                                        alignItems: "center",
+                                        display: "flex",
+                                        height: "100%",
+                                        justifyContent: "center",
+                                        pointerEvents: "none",
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    <Box
+                                        component="p"
+                                        sx={{
+                                            color: threadTimestamp,
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 14,
+                                            fontWeight: 650,
+                                            lineHeight: "20px",
+                                            m: 0,
+                                        }}
+                                    >
+                                        No messages yet
+                                    </Box>
                                 </Box>
                             ) : (
                                 <Box
@@ -1387,21 +1582,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                 }}
                             >
                                 <Box
-                                    component="h2"
-                                    sx={{
-                                        color: textBase,
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 16,
-                                        fontWeight: 700,
-                                        letterSpacing: 0,
-                                        lineHeight: "22px",
-                                        m: 0,
-                                    }}
-                                >
-                                    No messages yet
-                                </Box>
-                                <Box
                                     component="p"
                                     sx={{
                                         color: textSecondary,
@@ -1411,12 +1591,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         fontWeight: 500,
                                         lineHeight: "20px",
                                         m: 0,
-                                        mt: "8px",
-                                        maxWidth: 260,
                                     }}
                                 >
-                                    Replies to posts and messages from friends
-                                    will appear here.
+                                    No messages yet
                                 </Box>
                             </Box>
                         ) : (
@@ -1435,10 +1612,13 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         conversation.friend.username;
                                     const timestampLabel = formatTimeAgo(
                                         microsForTimestamp(
-                                            conversation.lastMessage
+                                            conversation.latestActivity
                                                 .createdAtMs,
                                         ),
                                     );
+                                    const postThumbnailUrl =
+                                        conversation.latestActivity.post
+                                            ?.imageUrl;
                                     return (
                                         <Box
                                             component="li"
@@ -1464,7 +1644,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                     display: "grid",
                                                     gap: "10px",
                                                     gridTemplateColumns:
-                                                        "44px minmax(0, 1fr)",
+                                                        postThumbnailUrl
+                                                            ? "44px minmax(0, 1fr) 44px"
+                                                            : "44px minmax(0, 1fr)",
                                                     minHeight: 64,
                                                     p: "8px 0",
                                                     textAlign: "left",
@@ -1489,13 +1671,13 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                             alignItems:
                                                                 "center",
                                                             display: "flex",
-                                                            gap: "8px",
+                                                            gap: "4px",
                                                             minWidth: 0,
                                                         }}
                                                     >
                                                         <Box
                                                             sx={{
-                                                                flex: "1 1 auto",
+                                                                flex: "0 1 auto",
                                                                 fontFamily:
                                                                     '"Inter Variable", Inter, sans-serif',
                                                                 fontSize: 14,
@@ -1516,9 +1698,25 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                             )}
                                                         </Box>
                                                         <Box
+                                                            aria-hidden
+                                                            component="span"
+                                                            sx={{
+                                                                color: textSecondary,
+                                                                flexShrink: 0,
+                                                                fontFamily:
+                                                                    '"Inter Variable", Inter, sans-serif',
+                                                                fontSize: 12,
+                                                                fontWeight: 600,
+                                                                lineHeight:
+                                                                    "16px",
+                                                            }}
+                                                        >
+                                                            &middot;
+                                                        </Box>
+                                                        <Box
                                                             component="time"
                                                             dateTime={new Date(
-                                                                conversation.lastMessage.createdAtMs,
+                                                                conversation.latestActivity.createdAtMs,
                                                             ).toISOString()}
                                                             sx={{
                                                                 color: textSecondary,
@@ -1536,27 +1734,29 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                             {timestampLabel}
                                                         </Box>
                                                     </Box>
-                                                    <Box
-                                                        sx={{
-                                                            color: textSecondary,
-                                                            fontFamily:
-                                                                '"Inter Variable", Inter, sans-serif',
-                                                            fontSize: 13,
-                                                            fontWeight: 500,
-                                                            lineHeight: "18px",
-                                                            overflow: "hidden",
-                                                            textOverflow:
-                                                                "ellipsis",
-                                                            whiteSpace:
-                                                                "nowrap",
-                                                        }}
-                                                    >
-                                                        {conversationPreview(
-                                                            conversation.lastMessage,
-                                                            profile,
-                                                        )}
-                                                    </Box>
+                                                    <ConversationPreviewLine
+                                                        conversation={
+                                                            conversation
+                                                        }
+                                                        profile={profile}
+                                                    />
                                                 </Box>
+                                                {postThumbnailUrl && (
+                                                    <Box
+                                                        component="img"
+                                                        alt=""
+                                                        src={postThumbnailUrl}
+                                                        sx={{
+                                                            borderRadius: "6px",
+                                                            display: "block",
+                                                            height: 44,
+                                                            objectFit: "cover",
+                                                            objectPosition:
+                                                                "center",
+                                                            width: 44,
+                                                        }}
+                                                    />
+                                                )}
                                             </Box>
                                         </Box>
                                     );
