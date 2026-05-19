@@ -18,5 +18,5 @@ pub use transport::{
     MessageResponse, PostLikerResponse, PostObjectPayload, PostPage, PostResponse,
     PresignUploadResponse, ProfileAvatarPayload, ProfileAvatarResponse, WallActorResponse,
     WallFriendResponse, WallKeyResponse, WallKeyVersionResponse, WallLinkLoginResponse,
-    WallLinkStatusResponse, WallLookupResponse, WallProfileResponse,
+    WallLinkStatusResponse, WallLookupResponse, WallProfileResponse, WallUnreadStatusResponse,
 };

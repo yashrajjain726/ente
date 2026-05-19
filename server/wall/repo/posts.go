@@ -67,7 +67,8 @@ func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID in
 		       p.encrypted_post_key, p.caption_cipher,
 		       p.key_version, p.created_at,
 		       (SELECT COUNT(*) FROM wall_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-		       EXISTS (SELECT 1 FROM wall_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $2) AS viewer_liked
+		       EXISTS (SELECT 1 FROM wall_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $2) AS viewer_liked,
+		       FALSE AS viewer_unread
 			FROM wall_posts p
 			JOIN walls w ON w.wall_id = p.wall_id
 			JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
@@ -92,7 +93,8 @@ func (r *PostsRepository) ListPostsByWall(ctx context.Context, wallID string, vi
 			       p.encrypted_post_key, p.caption_cipher,
 			       p.key_version, p.created_at,
 			       (SELECT COUNT(*) FROM wall_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-			       EXISTS (SELECT 1 FROM wall_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $2) AS viewer_liked
+			       EXISTS (SELECT 1 FROM wall_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $2) AS viewer_liked,
+			       FALSE AS viewer_unread
 				FROM wall_posts p
 				JOIN walls w ON w.wall_id = p.wall_id
 				JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
@@ -128,12 +130,12 @@ func (r *PostsRepository) ListPostsByWall(ctx context.Context, wallID string, vi
 	return out, nextCursor, nil
 }
 
-func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor string, limit int) ([]WallPostRecord, string, error) {
+func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor string, limit int, readCreatedAt int64, readPostID int64) ([]WallPostRecord, string, error) {
 	limit = optionalInt(limit, 25)
 	if limit > 100 {
 		limit = 100
 	}
-	args := []any{viewerID}
+	args := []any{viewerID, readCreatedAt, readPostID}
 	query := `
 			SELECT p.post_id, p.wall_id, w.wall_slug, p.owner_id,
 			       owner_wall.owner_id, owner_wall.wall_id, owner_wall.wall_slug, owner_ka.public_key,
@@ -144,7 +146,8 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor s
 			       p.encrypted_post_key, p.caption_cipher,
 			       p.key_version, p.created_at,
 			       (SELECT COUNT(*) FROM wall_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-			       EXISTS (SELECT 1 FROM wall_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $1) AS viewer_liked
+			       EXISTS (SELECT 1 FROM wall_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $1) AS viewer_liked,
+			       ((p.created_at, p.post_id) > ($2::bigint, $3::bigint)) AS viewer_unread
 			FROM wall_posts p
 			JOIN walls w ON w.wall_id = p.wall_id
 			JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
@@ -157,7 +160,7 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor s
 			  )`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorPostID)
-		query += ` AND (p.created_at, p.post_id) < ($2, $3)`
+		query += ` AND (p.created_at, p.post_id) < ($4, $5)`
 	}
 	args = append(args, limit+1)
 	query += ` ORDER BY p.created_at DESC, p.post_id DESC LIMIT $` + strconv.Itoa(len(args))
@@ -183,6 +186,45 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor s
 		out = out[:limit]
 	}
 	return out, nextCursor, nil
+}
+
+func (r *PostsRepository) GetFeedPostMarker(ctx context.Context, viewerID, postID int64) (int64, int64, error) {
+	var createdAt int64
+	if err := r.DB.QueryRowContext(ctx, `
+		SELECT p.created_at
+		FROM wall_posts p
+		WHERE p.post_id = $2
+		  AND p.is_deleted = FALSE
+		  AND p.owner_id <> $1
+		  AND EXISTS (
+		    SELECT 1 FROM wall_friend_shares fs
+		    WHERE fs.friend_id = $1 AND fs.wall_id = p.wall_id
+		  )
+	`, viewerID, postID).Scan(&createdAt); err != nil {
+		return 0, 0, stacktrace.Propagate(err, "")
+	}
+	return createdAt, postID, nil
+}
+
+func (r *PostsRepository) HasUnreadFeed(ctx context.Context, viewerID, readCreatedAt, readPostID int64) (bool, error) {
+	var exists bool
+	if err := r.DB.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM wall_posts p
+			WHERE p.is_deleted = FALSE
+			  AND p.owner_id <> $1
+			  AND (p.created_at, p.post_id) > ($2::bigint, $3::bigint)
+			  AND EXISTS (
+			    SELECT 1 FROM wall_friend_shares fs
+			    WHERE fs.friend_id = $1 AND fs.wall_id = p.wall_id
+			  )
+			LIMIT 1
+		)
+	`, viewerID, readCreatedAt, readPostID).Scan(&exists); err != nil {
+		return false, stacktrace.Propagate(err, "")
+	}
+	return exists, nil
 }
 
 func (r *PostsRepository) ListAssetsByPostIDs(ctx context.Context, postIDs []int64) (map[int64][]WallPostAssetRecord, error) {
@@ -349,7 +391,7 @@ func scanPostRecord(scanner interface{ Scan(dest ...any) error }) (*WallPostReco
 	var rec WallPostRecord
 	dest := []any{&rec.PostID, &rec.WallID, &rec.WallSlug, &rec.OwnerID}
 	dest = append(dest, wallActorScanDest(&rec.Author)...)
-	dest = append(dest, &rec.EncryptedPostKey, &rec.CaptionCipher, &rec.KeyVersion, &rec.CreatedAt, &rec.Likes, &rec.ViewerLiked)
+	dest = append(dest, &rec.EncryptedPostKey, &rec.CaptionCipher, &rec.KeyVersion, &rec.CreatedAt, &rec.Likes, &rec.ViewerLiked, &rec.ViewerUnread)
 	if err := scanner.Scan(dest...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

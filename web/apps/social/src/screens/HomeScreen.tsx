@@ -74,6 +74,7 @@ interface HomeScreenProps {
     addedFriendToastName?: string;
     feedItems: SocialWallPost[];
     friendsCount: number;
+    hasUnreadNotifications?: boolean;
     isFeedLoading?: boolean;
     onAddedFriendToastClose?: () => void;
     onCreatePost?: (
@@ -122,6 +123,7 @@ interface FeedItemProps {
     postId: number;
     timestampMs: number;
     viewerLiked: boolean;
+    viewerUnread: boolean;
 }
 
 interface AddedFriendToastProps {
@@ -153,6 +155,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     postId,
     timestampMs,
     viewerLiked,
+    viewerUnread,
 }) => {
     const [isLiked, setIsLiked] = useState(viewerLiked);
     const [localLikeCount, setLocalLikeCount] = useState(likeCount);
@@ -247,7 +250,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     fontFamily: '"Inter Variable", Inter, sans-serif',
                     fontSize: 14,
                     gap: "8px",
-                    gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr) auto`,
+                    gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr) auto${viewerUnread ? " 8px" : ""}`,
                     lineHeight: "20px",
                     mb: "10px",
                     minHeight: 32,
@@ -355,6 +358,18 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 >
                     {dateLabel}
                 </Box>
+                {viewerUnread && (
+                    <Box
+                        aria-hidden
+                        sx={{
+                            bgcolor: green,
+                            borderRadius: "50%",
+                            height: 8,
+                            justifySelf: "end",
+                            width: 8,
+                        }}
+                    />
+                )}
             </Box>
             <Box
                 sx={{
@@ -616,6 +631,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     addedFriendToastName,
     feedItems,
     friendsCount,
+    hasUnreadNotifications = false,
     isFeedLoading = false,
     onAddedFriendToastClose,
     onCreatePost,
@@ -833,7 +849,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         <Box
                             component="button"
                             type="button"
-                            aria-label="Open notifications"
+                            aria-label={
+                                hasUnreadNotifications
+                                    ? "Open notifications with unread activity"
+                                    : "Open notifications"
+                            }
                             onClick={onOpenNotifications}
                             sx={{
                                 appearance: "none",
@@ -851,6 +871,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 justifyContent: "center",
                                 lineHeight: 0,
                                 p: 0,
+                                position: "relative",
                                 width: headerActionSize,
                                 "& svg": { display: "block" },
                                 "&:focus-visible": {
@@ -865,6 +886,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 size={headerIconSize}
                                 strokeWidth={1.8}
                             />
+                            {hasUnreadNotifications && (
+                                <Box
+                                    aria-hidden
+                                    sx={{
+                                        bgcolor: green,
+                                        border: `2px solid ${homeBackground}`,
+                                        borderRadius: "50%",
+                                        height: 11,
+                                        position: "absolute",
+                                        right: 4,
+                                        top: 6,
+                                        width: 11,
+                                    }}
+                                />
+                            )}
                         </Box>
                         <Box
                             component="button"
@@ -975,6 +1011,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 postId={item.postId}
                                 timestampMs={item.timestampMs}
                                 viewerLiked={item.viewerLiked}
+                                viewerUnread={item.viewerUnread}
                             />
                         ))
                     ) : isEmptyFeedLoading ? (

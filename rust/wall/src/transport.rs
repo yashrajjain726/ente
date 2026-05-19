@@ -130,6 +130,25 @@ pub struct LikePostResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MarkFeedReadRequest {
+    pub post_id: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarkNotificationsReadRequest {
+    pub friend_wall_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WallUnreadStatusResponse {
+    pub feed_unread: bool,
+    pub notifications_unread: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LikeMessageRequest {
     pub like: bool,
 }
@@ -189,6 +208,8 @@ pub struct MessagePage {
 pub struct MessageConversationResponse {
     pub friend: WallActorResponse,
     pub latest_activity: MessageConversationActivity,
+    #[serde(default)]
+    pub unread: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -249,6 +270,8 @@ pub struct PostResponse {
     pub created_at: String,
     pub likes: i64,
     pub viewer_liked: bool,
+    #[serde(default)]
+    pub viewer_unread: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -24,5 +24,11 @@ DROP TABLE IF EXISTS wall_posts;
 
 DROP TABLE IF EXISTS wall_key_versions;
 
+DROP TRIGGER IF EXISTS update_wall_notification_read_markers_updated_at ON wall_notification_read_markers;
+DROP TABLE IF EXISTS wall_notification_read_markers;
+
+DROP TRIGGER IF EXISTS update_wall_read_markers_updated_at ON wall_read_markers;
+DROP TABLE IF EXISTS wall_read_markers;
+
 DROP TRIGGER IF EXISTS update_walls_updated_at ON walls;
 DROP TABLE IF EXISTS walls;

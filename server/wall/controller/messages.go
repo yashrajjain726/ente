@@ -19,11 +19,12 @@ const (
 )
 
 type MessagesController struct {
-	MessagesRepo *repo.MessagesRepository
-	PostsRepo    *repo.PostsRepository
-	WallsRepo    *repo.WallsRepository
-	FriendsRepo  *repo.FriendsRepository
-	auth         authDeps
+	MessagesRepo    *repo.MessagesRepository
+	PostsRepo       *repo.PostsRepository
+	WallsRepo       *repo.WallsRepository
+	FriendsRepo     *repo.FriendsRepository
+	ReadMarkersRepo *repo.ReadMarkersRepository
+	auth            authDeps
 }
 
 func (c *MessagesController) Create(ctx *gin.Context, targetWallID string, req models.CreateMessageRequest) (*models.MessageResponse, error) {
@@ -125,6 +126,7 @@ func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesReque
 		items = append(items, models.MessageConversationResponse{
 			Friend:         toActorResponse(conversation.Friend, true),
 			LatestActivity: toMessageConversationActivityResponse(conversation.LatestActivity),
+			Unread:         conversation.Unread,
 		})
 	}
 	return &models.MessageConversationPage{Items: items, NextCursor: nextCursor}, nil

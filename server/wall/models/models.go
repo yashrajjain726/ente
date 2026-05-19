@@ -303,6 +303,7 @@ type MessagePage struct {
 type MessageConversationResponse struct {
 	Friend         WallActorResponse                   `json:"friend"`
 	LatestActivity MessageConversationActivityResponse `json:"latestActivity"`
+	Unread         bool                                `json:"unread"`
 }
 
 type MessageConversationActivityResponse struct {
@@ -350,6 +351,20 @@ type PostResponse struct {
 	CreatedAt        string              `json:"createdAt"`
 	Likes            int64               `json:"likes"`
 	ViewerLiked      bool                `json:"viewerLiked"`
+	ViewerUnread     bool                `json:"viewerUnread"`
+}
+
+type WallUnreadStatusResponse struct {
+	FeedUnread          bool `json:"feedUnread"`
+	NotificationsUnread bool `json:"notificationsUnread"`
+}
+
+type MarkFeedReadRequest struct {
+	PostID int64 `json:"postId"`
+}
+
+type MarkNotificationsReadRequest struct {
+	FriendWallID string `json:"friendWallId"`
 }
 
 type PostPage struct {

@@ -9,7 +9,9 @@ import {
     createCurrentProfileLink,
     loadCurrentFeedPage,
     loadCurrentPostLikers,
+    loadCurrentUnreadStatus,
     loadCurrentWallFriends,
+    markCurrentFeedRead,
     replyToCurrentPost,
     setCurrentPostLiked,
     type SocialWallPost,
@@ -27,6 +29,8 @@ const Page: React.FC = () => {
         useSocialAppState();
     const [addedFriendToastName, setAddedFriendToastName] = useState<string>();
     const [feedItems, setFeedItems] = useState<SocialWallPost[]>([]);
+    const [hasUnreadNotifications, setHasUnreadNotifications] =
+        useState(false);
     const [isFeedLoading, setIsFeedLoading] = useState(true);
     const closeAddedFriendToast = React.useCallback(
         () => setAddedFriendToastName(undefined),
@@ -55,6 +59,7 @@ const Page: React.FC = () => {
 
         const wallId = profile?.wallId;
         if (!wallId) {
+            setHasUnreadNotifications(false);
             setIsFeedLoading(false);
             return;
         }
@@ -63,12 +68,21 @@ const Page: React.FC = () => {
         setIsFeedLoading(true);
         void Promise.all([
             loadCurrentFeedPage(),
+            loadCurrentUnreadStatus(),
             loadCurrentWallFriends(wallId),
         ])
-            .then(([feed, nextFriends]) => {
+            .then(([feed, unreadStatus, nextFriends]) => {
                 if (cancelled) return;
                 setFeedItems(feed.items);
+                setHasUnreadNotifications(unreadStatus.notificationsUnread);
                 setFriends(nextFriends);
+                const latestFeedPost = feed.items[0];
+                if (latestFeedPost) {
+                    void markCurrentFeedRead(latestFeedPost.postId).catch(
+                        (error: unknown) =>
+                            console.warn("Failed to mark feed read", error),
+                    );
+                }
             })
             .catch((error: unknown) =>
                 console.error("Failed to load social home", error),
@@ -95,6 +109,7 @@ const Page: React.FC = () => {
                 feedItems={feedItems}
                 friendsCount={friends.length}
                 addedFriendToastName={addedFriendToastName}
+                hasUnreadNotifications={hasUnreadNotifications}
                 isFeedLoading={isFeedLoading}
                 profile={screenProfile}
                 onAddedFriendToastClose={closeAddedFriendToast}

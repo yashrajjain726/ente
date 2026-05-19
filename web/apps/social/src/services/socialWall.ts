@@ -55,6 +55,7 @@ interface WallPost {
     objects?: WallPostObject[];
     postId: number;
     viewerLiked: boolean;
+    viewerUnread?: boolean;
     wallId: string;
     wallSlug: string;
 }
@@ -136,6 +137,7 @@ interface WallMessagePage {
 interface WallMessageConversation {
     friend: WallActor;
     latestActivity: WallMessageConversationActivity;
+    unread?: boolean;
 }
 
 interface WallMessageConversationPage {
@@ -154,6 +156,7 @@ export interface SocialWallPost {
     postId: number;
     timestampMs: number;
     viewerLiked: boolean;
+    viewerUnread: boolean;
     wallId: string;
     width?: number;
 }
@@ -237,11 +240,17 @@ export interface SocialWallMessagePage {
 export interface SocialWallMessageConversation {
     friend: FriendProfile;
     latestActivity: SocialWallMessageActivity;
+    unread: boolean;
 }
 
 export interface SocialWallMessageConversationPage {
     items: SocialWallMessageConversation[];
     nextCursor?: string;
+}
+
+export interface SocialWallUnreadStatus {
+    feedUnread: boolean;
+    notificationsUnread: boolean;
 }
 
 const parseWallProfilePayload = (profile: string): WallProfilePayload => {
@@ -362,6 +371,7 @@ const postFromAccountPost = async (
         postId: post.postId,
         timestampMs: timestampMsFromWallDate(post.createdAt),
         viewerLiked: post.viewerLiked,
+        viewerUnread: Boolean(post.viewerUnread),
         wallId: post.wallId,
         width: object.width,
     };
@@ -392,6 +402,7 @@ const postFromLinkPost = async (
         postId: post.postId,
         timestampMs: timestampMsFromWallDate(post.createdAt),
         viewerLiked: post.viewerLiked,
+        viewerUnread: Boolean(post.viewerUnread),
         wallId: post.wallId,
         width: object.width,
     };
@@ -623,6 +634,26 @@ export const loadCurrentFeedPage = async (
     }
 };
 
+export const loadCurrentUnreadStatus =
+    async (): Promise<SocialWallUnreadStatus> => {
+        const ctx = await ensureCurrentWallContext();
+        try {
+            return (await ctx.unread_status()) as SocialWallUnreadStatus;
+        } finally {
+            ctx.free();
+        }
+    };
+
+export const markCurrentFeedRead = async (postId: number) => {
+    if (postId <= 0) return;
+    const ctx = await ensureCurrentWallContext();
+    try {
+        await ctx.mark_feed_read(BigInt(postId));
+    } finally {
+        ctx.free();
+    }
+};
+
 export const loadCurrentWallPostsPage = async (
     wallId: string,
     cursor?: string,
@@ -799,6 +830,7 @@ export const loadCurrentMessageConversations =
                             ctx,
                             conversation.latestActivity,
                         ),
+                        unread: Boolean(conversation.unread),
                     };
                 }),
             );
@@ -826,6 +858,16 @@ export const loadCurrentMessageThread = async (
             )
         ).reverse();
         return { items, nextCursor: page.nextCursor || undefined };
+    } finally {
+        ctx.free();
+    }
+};
+
+export const markCurrentNotificationsRead = async (friendWallId: string) => {
+    if (!friendWallId.trim()) return;
+    const ctx = await ensureCurrentWallContext();
+    try {
+        await ctx.mark_notifications_read(friendWallId);
     } finally {
         ctx.free();
     }

@@ -7,6 +7,7 @@ import {
     deleteCurrentMessage,
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
+    markCurrentNotificationsRead,
     replyToCurrentMessage,
     sendCurrentMessage,
     setCurrentMessageLiked,
@@ -33,12 +34,37 @@ const Page: React.FC = () => {
     const refreshConversations = React.useCallback(() => {
         setIsConversationsLoading(true);
         void loadCurrentMessageConversations()
-            .then((page) => setConversations(page.items))
+            .then((page) => {
+                setConversations(page.items);
+            })
             .catch((error: unknown) =>
                 console.error("Failed to load message conversations", error),
             )
             .finally(() => setIsConversationsLoading(false));
     }, []);
+
+    const openConversation = React.useCallback(
+        (conversation: SocialWallMessageConversation) => {
+            setSelectedFriend(conversation.friend);
+            const friendWallId = conversation.friend.wallId ?? conversation.friend.id;
+            setConversations((currentConversations) =>
+                currentConversations.map((currentConversation) =>
+                    (currentConversation.friend.wallId ??
+                        currentConversation.friend.id) == friendWallId
+                        ? { ...currentConversation, unread: false }
+                        : currentConversation,
+                ),
+            );
+            void markCurrentNotificationsRead(friendWallId).catch(
+                (error: unknown) =>
+                    console.warn(
+                        "Failed to mark notification conversation read",
+                        error,
+                    ),
+            );
+        },
+        [],
+    );
 
     React.useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -91,7 +117,7 @@ const Page: React.FC = () => {
                 messages={messages}
                 onBack={() => void router.push(socialRoutes.home)}
                 onCloseThread={() => setSelectedFriend(undefined)}
-                onOpenThread={setSelectedFriend}
+                onOpenThread={openConversation}
                 onSendMessage={async (wallId, text) => {
                     const message = await sendCurrentMessage(wallId, text);
                     setMessages((currentMessages) => [

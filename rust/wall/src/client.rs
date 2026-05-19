@@ -17,13 +17,14 @@ use crate::transport::{
     CreatePostRequest, CreatePostResponse, CreateWallRequest, EntityKeyPayload, EntityKeyResponse,
     FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse, FriendTargetPayload,
     LikeMessageRequest, LikeMessageResponse, LikePostRequest, LikePostResponse,
-    ListPostLikersResponse, MessageConversationPage, MessagePage, MessageResponse,
-    PostObjectPayload, PostPage, PostResponse, PresignUploadRequest, PresignUploadResponse,
-    ProfileAvatarPayload, RefreshFriendSharesRequest, RotateWallKeyRequest, ShareUpdatePayload,
-    UpdatePostCaptionRequest, UpdateWallProfileRequest, UpdateWallProfileResponse,
-    UpdateWallSlugRequest, WallActorResponse, WallFriendResponse, WallKeyResponse,
-    WallKeyVersionResponse, WallLinkCreateRequest, WallLinkLoginRequest, WallLinkLoginResponse,
-    WallLinkStatusResponse, WallLookupResponse, WallProfileResponse,
+    ListPostLikersResponse, MarkFeedReadRequest, MarkNotificationsReadRequest,
+    MessageConversationPage, MessagePage, MessageResponse, PostObjectPayload, PostPage,
+    PostResponse, PresignUploadRequest, PresignUploadResponse, ProfileAvatarPayload,
+    RefreshFriendSharesRequest, RotateWallKeyRequest, ShareUpdatePayload, UpdatePostCaptionRequest,
+    UpdateWallProfileRequest, UpdateWallProfileResponse, UpdateWallSlugRequest, WallActorResponse,
+    WallFriendResponse, WallKeyResponse, WallKeyVersionResponse, WallLinkCreateRequest,
+    WallLinkLoginRequest, WallLinkLoginResponse, WallLinkStatusResponse, WallLookupResponse,
+    WallProfileResponse, WallUnreadStatusResponse,
 };
 use ente_core::crypto::{sealed, secretbox};
 use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
@@ -624,6 +625,40 @@ impl AccountWallCtx {
             .map_err(Into::into)
     }
 
+    pub async fn unread_status(&self) -> Result<WallUnreadStatusResponse> {
+        self.client
+            .get_json("/wall/unread", &[])
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn mark_feed_read(&self, post_id: i64) -> Result<WallUnreadStatusResponse> {
+        if post_id <= 0 {
+            return Err(WallError::InvalidInput("post id is required".into()));
+        }
+        self.client
+            .post_json("/wall/feed/read", &MarkFeedReadRequest { post_id })
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn mark_notifications_read(
+        &self,
+        friend_wall_id: impl Into<String>,
+    ) -> Result<WallUnreadStatusResponse> {
+        let friend_wall_id = friend_wall_id.into();
+        if friend_wall_id.trim().is_empty() {
+            return Err(WallError::InvalidInput("friend wall id is required".into()));
+        }
+        self.client
+            .post_json(
+                "/wall/messages/read",
+                &MarkNotificationsReadRequest { friend_wall_id },
+            )
+            .await
+            .map_err(Into::into)
+    }
+
     pub async fn get_post(&self, post_id: i64) -> Result<PostResponse> {
         let path = format!("/wall/posts/{post_id}");
         self.client.get_json(&path, &[]).await.map_err(Into::into)
@@ -1192,6 +1227,7 @@ fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
         created_at: item.created_at.clone(),
         likes: item.likes,
         viewer_liked: item.viewer_liked,
+        viewer_unread: item.viewer_unread,
     }
 }
 
@@ -1838,6 +1874,7 @@ mod tests {
             created_at: "2026-04-16T00:00:00Z".to_owned(),
             likes: 0,
             viewer_liked: false,
+            viewer_unread: false,
         };
 
         let decrypted = ctx
@@ -2420,6 +2457,55 @@ mod tests {
 
         assert!(response.liked);
         like.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn unread_methods_use_read_marker_endpoints() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let status = server
+            .mock("GET", "/wall/unread")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(json!({"feedUnread": true, "notificationsUnread": false}).to_string())
+            .create_async()
+            .await;
+        let feed_read = server
+            .mock("POST", "/wall/feed/read")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::JsonString(json!({"postId": 42}).to_string()))
+            .with_status(200)
+            .with_body(json!({"feedUnread": false, "notificationsUnread": false}).to_string())
+            .create_async()
+            .await;
+        let notifications_read = server
+            .mock("POST", "/wall/messages/read")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::JsonString(
+                json!({"friendWallId": "wall_friend"}).to_string(),
+            ))
+            .with_status(200)
+            .with_body(json!({"feedUnread": false, "notificationsUnread": false}).to_string())
+            .create_async()
+            .await;
+
+        let unread = ctx
+            .unread_status()
+            .await
+            .expect("unread status should load");
+        assert!(unread.feed_unread);
+        assert!(!unread.notifications_unread);
+        assert!(!ctx.mark_feed_read(42).await.expect("feed read").feed_unread);
+        assert!(
+            !ctx.mark_notifications_read("wall_friend")
+                .await
+                .expect("notifications read")
+                .notifications_unread
+        );
+
+        status.assert_async().await;
+        feed_read.assert_async().await;
+        notifications_read.assert_async().await;
     }
 
     #[tokio::test]

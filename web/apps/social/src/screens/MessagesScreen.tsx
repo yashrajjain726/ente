@@ -57,7 +57,7 @@ interface MessagesScreenProps {
     onBack?: () => void;
     onCloseThread: () => void;
     onDeleteMessage: (messageId: string) => Promise<void>;
-    onOpenThread: (friend: SocialWallMessageConversation["friend"]) => void;
+    onOpenThread: (conversation: SocialWallMessageConversation) => void;
     onReplyToMessage: (
         wallId: string,
         messageId: string,
@@ -251,7 +251,7 @@ const ConversationPreviewLine: React.FC<{
         color: textSecondary,
         fontFamily: '"Inter Variable", Inter, sans-serif',
         fontSize: 13,
-        fontWeight: 500,
+        fontWeight: conversation.unread ? 650 : 500,
         lineHeight: "18px",
         minWidth: 0,
         overflow: "hidden",
@@ -1629,9 +1629,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 component="button"
                                                 type="button"
                                                 onClick={() =>
-                                                    onOpenThread(
-                                                        conversation.friend,
-                                                    )
+                                                    onOpenThread(conversation)
                                                 }
                                                 sx={{
                                                     alignItems: "center",
@@ -1733,6 +1731,19 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                         >
                                                             {timestampLabel}
                                                         </Box>
+                                                        {conversation.unread && (
+                                                            <Box
+                                                                aria-hidden
+                                                                sx={{
+                                                                    bgcolor: green,
+                                                                    borderRadius:
+                                                                        "50%",
+                                                                    flexShrink: 0,
+                                                                    height: 8,
+                                                                    width: 8,
+                                                                }}
+                                                            />
+                                                        )}
                                                     </Box>
                                                     <ConversationPreviewLine
                                                         conversation={

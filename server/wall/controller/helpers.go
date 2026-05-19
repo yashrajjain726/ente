@@ -148,6 +148,7 @@ func toPostResponse(post *wallrepo.WallPostRecord, assets []wallrepo.WallPostAss
 		CreatedAt:        formatMicros(post.CreatedAt),
 		Likes:            post.Likes,
 		ViewerLiked:      post.ViewerLiked,
+		ViewerUnread:     post.ViewerUnread,
 	}
 	if len(assets) > 0 {
 		resp.Objects = make([]models.PostObjectPayload, 0, len(assets))

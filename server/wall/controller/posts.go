@@ -14,10 +14,11 @@ import (
 )
 
 type PostsController struct {
-	PostsRepo  *repo.PostsRepository
-	WallsRepo  *repo.WallsRepository
-	AssetsRepo *repo.AssetsRepository
-	auth       authDeps
+	PostsRepo       *repo.PostsRepository
+	WallsRepo       *repo.WallsRepository
+	AssetsRepo      *repo.AssetsRepository
+	ReadMarkersRepo *repo.ReadMarkersRepository
+	auth            authDeps
 }
 
 func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest) (*models.CreatePostResponse, error) {
@@ -109,7 +110,11 @@ func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest)
 	if err != nil {
 		return nil, err
 	}
-	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx.Request.Context(), userID, req.Cursor, req.Limit)
+	marker, err := c.ReadMarkersRepo.Get(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx.Request.Context(), userID, req.Cursor, req.Limit, marker.FeedReadCreatedAt, marker.FeedReadPostID)
 	if err != nil {
 		return nil, err
 	}

@@ -22,6 +22,36 @@ CREATE TRIGGER update_walls_updated_at
     FOR EACH ROW
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
+CREATE TABLE IF NOT EXISTS wall_read_markers (
+    user_id                  BIGINT PRIMARY KEY REFERENCES users (user_id) ON DELETE CASCADE,
+    feed_read_created_at     BIGINT NOT NULL DEFAULT 0,
+    feed_read_post_id        BIGINT NOT NULL DEFAULT 0,
+    created_at               BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    updated_at               BIGINT NOT NULL DEFAULT now_utc_micro_seconds()
+);
+
+CREATE TRIGGER update_wall_read_markers_updated_at
+    BEFORE UPDATE ON wall_read_markers
+    FOR EACH ROW
+EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
+
+CREATE TABLE IF NOT EXISTS wall_notification_read_markers (
+    user_id        BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    friend_wall_id TEXT   NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,
+    read_at        BIGINT NOT NULL DEFAULT 0,
+    created_at     BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    updated_at     BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    PRIMARY KEY (user_id, friend_wall_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wall_notification_read_markers_user
+    ON wall_notification_read_markers (user_id, read_at DESC);
+
+CREATE TRIGGER update_wall_notification_read_markers_updated_at
+    BEFORE UPDATE ON wall_notification_read_markers
+    FOR EACH ROW
+EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
+
 CREATE TABLE IF NOT EXISTS wall_key_versions (
     wall_id             TEXT    NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,
     version             INTEGER NOT NULL,

@@ -205,7 +205,8 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				m.created_at AS activity_created_at,
 				CASE WHEN m.sender_id = $1 THEN m.recipient_wall_id ELSE m.sender_wall_id END AS friend_wall_id,
 				m.message_id,
-				NULL::bigint AS post_id
+				NULL::bigint AS post_id,
+				CASE WHEN m.recipient_id = $1 THEN m.created_at ELSE NULL::bigint END AS unread_created_at
 			FROM wall_messages m
 			WHERE (m.sender_id = $1 OR m.recipient_id = $1)
 			  AND m.is_deleted = FALSE
@@ -219,7 +220,8 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				ml.created_at AS activity_created_at,
 				liker_wall.wall_id AS friend_wall_id,
 				m.message_id,
-				NULL::bigint AS post_id
+				NULL::bigint AS post_id,
+				ml.created_at AS unread_created_at
 			FROM wall_message_likes ml
 			JOIN wall_messages m ON m.message_id = ml.message_id
 			JOIN walls liker_wall ON liker_wall.owner_id = ml.user_id
@@ -269,7 +271,8 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				GREATEST(COALESCE(l.liked_at, 0), COALESCE(r.replied_at, 0)) AS activity_created_at,
 				COALESCE(l.friend_wall_id, r.friend_wall_id) AS friend_wall_id,
 				r.message_id,
-				COALESCE(l.post_id, r.post_id) AS post_id
+				COALESCE(l.post_id, r.post_id) AS post_id,
+				GREATEST(COALESCE(l.liked_at, 0), COALESCE(r.replied_at, 0)) AS unread_created_at
 			FROM post_like_events l
 			FULL OUTER JOIN post_reply_events r
 			  ON r.friend_wall_id = l.friend_wall_id
@@ -285,7 +288,8 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				fe.created_at AS activity_created_at,
 				fe.actor_wall_id AS friend_wall_id,
 				NULL::text AS message_id,
-				NULL::bigint AS post_id
+				NULL::bigint AS post_id,
+				fe.created_at AS unread_created_at
 			FROM wall_friend_events fe
 			WHERE fe.target_id = $1
 			  AND fe.actor_id <> $1
@@ -307,9 +311,10 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			FROM candidates c
 		)
 		SELECT
-			c.activity_type,
-			c.activity_id,
-			c.activity_created_at,
+				c.activity_type,
+				c.activity_id,
+				c.activity_created_at,
+				(c.unread_created_at IS NOT NULL AND c.unread_created_at > COALESCE(nrm.read_at, 0)) AS unread,
 			friend_wall.owner_id,
 			friend_wall.wall_id,
 			friend_wall.wall_slug,
@@ -374,8 +379,11 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			asset.width AS post_object_width,
 			asset.height AS post_object_height,
 			asset.media_type AS post_object_media_type
-		FROM ranked c
-		JOIN walls friend_wall ON friend_wall.wall_id = c.friend_wall_id
+			FROM ranked c
+			LEFT JOIN wall_notification_read_markers nrm
+			  ON nrm.user_id = $1
+			 AND nrm.friend_wall_id = c.friend_wall_id
+			JOIN walls friend_wall ON friend_wall.wall_id = c.friend_wall_id
 		JOIN key_attributes friend_ka ON friend_ka.user_id = friend_wall.owner_id
 		LEFT JOIN wall_messages m ON m.message_id = c.message_id
 		LEFT JOIN walls sender_wall ON sender_wall.wall_id = m.sender_wall_id
@@ -391,11 +399,11 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			ORDER BY position ASC, asset_id ASC
 			LIMIT 1
 		) asset ON TRUE
-		WHERE c.rn = 1
-		  AND ($2::bigint IS NULL OR (c.activity_created_at, c.activity_id) < ($2::bigint, $3::text))
-		ORDER BY c.activity_created_at DESC, c.activity_id DESC
-		LIMIT $4
-	`, viewerID, cursorCreatedAt, cursorID, limit+1)
+			WHERE c.rn = 1
+			  AND ($2::bigint IS NULL OR (c.activity_created_at, c.activity_id) < ($2::bigint, $3::text))
+			ORDER BY c.activity_created_at DESC, c.activity_id DESC
+			LIMIT $4
+		`, viewerID, cursorCreatedAt, cursorID, limit+1)
 	if err != nil {
 		return nil, "", stacktrace.Propagate(err, "")
 	}
@@ -417,6 +425,195 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 		out = out[:limit]
 	}
 	return out, nextCursor, nil
+}
+
+func (r *MessagesRepository) GetLatestConversationActivityAt(ctx context.Context, viewerID int64, friendWallID string) (int64, error) {
+	var activityCreatedAt int64
+	if err := r.DB.QueryRowContext(ctx, `
+		WITH candidates AS (
+			SELECT
+				m.created_at AS activity_created_at,
+				'message:' || m.message_id AS activity_id,
+				CASE WHEN m.sender_id = $1 THEN m.recipient_wall_id ELSE m.sender_wall_id END AS friend_wall_id
+			FROM wall_messages m
+			WHERE (m.sender_id = $1 OR m.recipient_id = $1)
+			  AND m.is_deleted = FALSE
+			  AND NOT (m.kind = 'post_reply' AND m.recipient_id = $1)
+
+			UNION ALL
+
+			SELECT
+				ml.created_at AS activity_created_at,
+				'message_like:' || ml.message_id || ':' || ml.user_id::text AS activity_id,
+				liker_wall.wall_id AS friend_wall_id
+			FROM wall_message_likes ml
+			JOIN wall_messages m ON m.message_id = ml.message_id
+			JOIN walls liker_wall ON liker_wall.owner_id = ml.user_id
+			WHERE m.sender_id = $1
+			  AND m.recipient_id = ml.user_id
+			  AND ml.user_id <> $1
+			  AND m.is_deleted = FALSE
+
+			UNION ALL
+
+			SELECT
+				pl.created_at AS activity_created_at,
+				'post_like:' || pl.post_id::text || ':' || pl.user_id::text AS activity_id,
+				actor_wall.wall_id AS friend_wall_id
+			FROM wall_post_likes pl
+			JOIN wall_posts p ON p.post_id = pl.post_id
+			JOIN walls actor_wall ON actor_wall.owner_id = pl.user_id
+			WHERE p.owner_id = $1
+			  AND pl.user_id <> $1
+			  AND p.is_deleted = FALSE
+
+			UNION ALL
+
+			SELECT
+				m.created_at AS activity_created_at,
+				'post_reply:' || m.message_id AS activity_id,
+				m.sender_wall_id AS friend_wall_id
+			FROM wall_messages m
+			JOIN wall_posts p ON p.post_id = m.reply_post_id
+			WHERE m.recipient_id = $1
+			  AND m.sender_id <> $1
+			  AND m.kind = 'post_reply'
+			  AND m.is_deleted = FALSE
+			  AND m.reply_post_id IS NOT NULL
+			  AND p.owner_id = $1
+			  AND p.is_deleted = FALSE
+
+			UNION ALL
+
+			SELECT
+				fe.created_at AS activity_created_at,
+				'friend_event:' || fe.event_id::text AS activity_id,
+				fe.actor_wall_id AS friend_wall_id
+			FROM wall_friend_events fe
+			WHERE fe.target_id = $1
+			  AND fe.actor_id <> $1
+		)
+		SELECT c.activity_created_at
+		FROM candidates c
+		WHERE c.friend_wall_id = $2
+		ORDER BY c.activity_created_at DESC, c.activity_id DESC
+		LIMIT 1
+	`, viewerID, strings.TrimSpace(friendWallID)).Scan(&activityCreatedAt); err != nil {
+		return 0, stacktrace.Propagate(err, "")
+	}
+	return activityCreatedAt, nil
+}
+
+func (r *MessagesRepository) HasUnreadNotifications(ctx context.Context, viewerID int64) (bool, error) {
+	var exists bool
+	if err := r.DB.QueryRowContext(ctx, `
+		WITH message_candidates AS (
+			SELECT
+				m.created_at AS activity_created_at,
+				'message:' || m.message_id AS activity_id,
+				CASE WHEN m.sender_id = $1 THEN m.recipient_wall_id ELSE m.sender_wall_id END AS friend_wall_id,
+				CASE WHEN m.recipient_id = $1 THEN m.created_at ELSE NULL::bigint END AS unread_created_at
+			FROM wall_messages m
+			WHERE (m.sender_id = $1 OR m.recipient_id = $1)
+			  AND m.is_deleted = FALSE
+			  AND NOT (m.kind = 'post_reply' AND m.recipient_id = $1)
+
+			UNION ALL
+
+			SELECT
+				ml.created_at AS activity_created_at,
+				'message_like:' || ml.message_id || ':' || ml.user_id::text AS activity_id,
+				liker_wall.wall_id AS friend_wall_id,
+				ml.created_at AS unread_created_at
+			FROM wall_message_likes ml
+			JOIN wall_messages m ON m.message_id = ml.message_id
+			JOIN walls liker_wall ON liker_wall.owner_id = ml.user_id
+			WHERE m.sender_id = $1
+			  AND m.recipient_id = ml.user_id
+			  AND ml.user_id <> $1
+			  AND m.is_deleted = FALSE
+		),
+		post_like_events AS (
+			SELECT
+				actor_wall.wall_id AS friend_wall_id,
+				p.post_id,
+				MAX(pl.created_at) AS liked_at
+			FROM wall_post_likes pl
+			JOIN wall_posts p ON p.post_id = pl.post_id
+			JOIN walls actor_wall ON actor_wall.owner_id = pl.user_id
+			WHERE p.owner_id = $1
+			  AND pl.user_id <> $1
+			  AND p.is_deleted = FALSE
+			GROUP BY actor_wall.wall_id, p.post_id
+		),
+		post_reply_events AS (
+			SELECT DISTINCT ON (m.sender_wall_id, m.reply_post_id)
+				m.sender_wall_id AS friend_wall_id,
+				m.reply_post_id AS post_id,
+				m.created_at AS replied_at
+			FROM wall_messages m
+			JOIN wall_posts p ON p.post_id = m.reply_post_id
+			WHERE m.recipient_id = $1
+			  AND m.sender_id <> $1
+			  AND m.kind = 'post_reply'
+			  AND m.is_deleted = FALSE
+			  AND m.reply_post_id IS NOT NULL
+			  AND p.owner_id = $1
+			  AND p.is_deleted = FALSE
+			ORDER BY m.sender_wall_id, m.reply_post_id, m.created_at DESC, m.message_id DESC
+		),
+		post_candidates AS (
+			SELECT
+				GREATEST(COALESCE(l.liked_at, 0), COALESCE(r.replied_at, 0)) AS activity_created_at,
+				'post_activity:' || COALESCE(l.post_id, r.post_id)::text || ':' || COALESCE(l.friend_wall_id, r.friend_wall_id) AS activity_id,
+				COALESCE(l.friend_wall_id, r.friend_wall_id) AS friend_wall_id,
+				GREATEST(COALESCE(l.liked_at, 0), COALESCE(r.replied_at, 0)) AS unread_created_at
+			FROM post_like_events l
+			FULL OUTER JOIN post_reply_events r
+			  ON r.friend_wall_id = l.friend_wall_id
+			 AND r.post_id = l.post_id
+		),
+		friend_candidates AS (
+			SELECT
+				fe.created_at AS activity_created_at,
+				'friend_event:' || fe.event_id::text AS activity_id,
+				fe.actor_wall_id AS friend_wall_id,
+				fe.created_at AS unread_created_at
+			FROM wall_friend_events fe
+			WHERE fe.target_id = $1
+			  AND fe.actor_id <> $1
+		),
+		candidates AS (
+			SELECT * FROM message_candidates
+			UNION ALL
+			SELECT * FROM post_candidates
+			UNION ALL
+			SELECT * FROM friend_candidates
+		),
+		ranked AS (
+			SELECT
+				c.*,
+				ROW_NUMBER() OVER (
+					PARTITION BY c.friend_wall_id
+					ORDER BY c.activity_created_at DESC, c.activity_id DESC
+				) AS rn
+			FROM candidates c
+		)
+		SELECT EXISTS (
+			SELECT 1
+			FROM ranked c
+			LEFT JOIN wall_notification_read_markers nrm
+			  ON nrm.user_id = $1
+			 AND nrm.friend_wall_id = c.friend_wall_id
+			WHERE c.rn = 1
+			  AND c.unread_created_at IS NOT NULL
+			  AND c.unread_created_at > COALESCE(nrm.read_at, 0)
+			LIMIT 1
+		)
+	`, viewerID).Scan(&exists); err != nil {
+		return false, stacktrace.Propagate(err, "")
+	}
+	return exists, nil
 }
 
 func sprintfWallMessageColumns(viewerPlaceholder string) string {
@@ -459,6 +656,7 @@ func scanMessageConversationRecord(scanner interface{ Scan(dest ...any) error })
 		&rec.LatestActivity.Type,
 		&rec.LatestActivity.ID,
 		&rec.LatestActivity.CreatedAt,
+		&rec.Unread,
 	}
 	dest = append(dest, wallActorScanDest(&rec.Friend)...)
 	dest = append(dest,

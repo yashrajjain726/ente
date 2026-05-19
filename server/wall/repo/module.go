@@ -13,6 +13,7 @@ type Module struct {
 	Messages *MessagesRepository
 	Links    *LinksRepository
 	Assets   *AssetsRepository
+	Read     *ReadMarkersRepository
 }
 
 type WallsRepository struct {
@@ -38,6 +39,10 @@ type LinksRepository struct {
 type AssetsRepository struct {
 	DB       *sql.DB
 	S3Config *s3config.S3Config
+}
+
+type ReadMarkersRepository struct {
+	DB *sql.DB
 }
 
 type WallRecord struct {
@@ -75,6 +80,7 @@ type WallPostRecord struct {
 	CreatedAt        int64
 	Likes            int64
 	ViewerLiked      bool
+	ViewerUnread     bool
 }
 
 type WallPostAssetRecord struct {
@@ -131,6 +137,7 @@ type WallMessageRecord struct {
 type WallMessageConversationRecord struct {
 	Friend         WallActorRecord
 	LatestActivity WallMessageConversationActivityRecord
+	Unread         bool
 }
 
 type WallMessageConversationActivityRecord struct {
@@ -232,6 +239,14 @@ type WallLinkSessionRecord struct {
 	EncryptedWallKey string
 }
 
+type WallReadMarkerRecord struct {
+	UserID            int64
+	FeedReadCreatedAt int64
+	FeedReadPostID    int64
+	CreatedAt         int64
+	UpdatedAt         int64
+}
+
 func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {
 	return &Module{
 		Walls:    &WallsRepository{DB: db},
@@ -240,5 +255,6 @@ func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {
 		Messages: &MessagesRepository{DB: db},
 		Links:    &LinksRepository{DB: db},
 		Assets:   &AssetsRepository{DB: db, S3Config: s3Config},
+		Read:     &ReadMarkersRepository{DB: db},
 	}
 }

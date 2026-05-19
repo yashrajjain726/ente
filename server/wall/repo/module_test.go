@@ -1022,23 +1022,248 @@ func TestListFeedCursorUsesCreatedAtSortOrder(t *testing.T) {
 	setPostCreatedAt(t, module, 2000, second)
 	setPostCreatedAt(t, module, 1000, third)
 
-	page, nextCursor, err := module.Posts.ListFeed(ctx, aliceID, "", 1)
+	page, nextCursor, err := module.Posts.ListFeed(ctx, aliceID, "", 1, 0, 0)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, first, page[0].PostID)
 	require.Equal(t, "3000:"+strconv.FormatInt(first, 10), nextCursor)
 
-	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceID, nextCursor, 1)
+	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceID, nextCursor, 1, 0, 0)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, second, page[0].PostID)
 	require.Equal(t, "2000:"+strconv.FormatInt(second, 10), nextCursor)
 
-	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceID, nextCursor, 1)
+	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceID, nextCursor, 1, 0, 0)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, third, page[0].PostID)
 	require.Empty(t, nextCursor)
+}
+
+func TestWallReadMarkersDriveUnreadState(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice-unread@example.com", "alice-unread-public")
+	bobID := insertWallUser(t, module, "bob-unread@example.com", "bob-unread-public")
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice-unread", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	bobWall, err := module.Walls.CreateWall(ctx, bobID, "bob-unread", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "alice-share-key", aliceWall.CurrentVersion, "bob-share-key", bobWall.CurrentVersion))
+	setFriendEventCreatedAt(t, module, 500, "friend_add", bobID, aliceID)
+
+	postID, err := module.Posts.CreatePost(ctx, bobID, bobWall.WallID, "post-key", nil, bobWall.CurrentVersion, nil)
+	require.NoError(t, err)
+	setPostCreatedAt(t, module, 1000, postID)
+	feed, _, err := module.Posts.ListFeed(ctx, aliceID, "", 10, 0, 0)
+	require.NoError(t, err)
+	require.Len(t, feed, 1)
+	require.True(t, feed[0].ViewerUnread)
+	feedUnread, err := module.Posts.HasUnreadFeed(ctx, aliceID, 0, 0)
+	require.NoError(t, err)
+	require.True(t, feedUnread)
+
+	createdAt, markerPostID, err := module.Posts.GetFeedPostMarker(ctx, aliceID, postID)
+	require.NoError(t, err)
+	require.NoError(t, module.Read.UpsertFeedReadMarker(ctx, aliceID, createdAt, markerPostID))
+	marker, err := module.Read.Get(ctx, aliceID)
+	require.NoError(t, err)
+	feed, _, err = module.Posts.ListFeed(ctx, aliceID, "", 10, marker.FeedReadCreatedAt, marker.FeedReadPostID)
+	require.NoError(t, err)
+	require.False(t, feed[0].ViewerUnread)
+	feedUnread, err = module.Posts.HasUnreadFeed(ctx, aliceID, marker.FeedReadCreatedAt, marker.FeedReadPostID)
+	require.NoError(t, err)
+	require.False(t, feedUnread)
+
+	incoming, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     bobID,
+		SenderWallID:                 bobWall.WallID,
+		RecipientID:                  aliceID,
+		RecipientWallID:              aliceWall.WallID,
+		MessageCipher:                "incoming-cipher",
+		SenderEncryptedMessageKey:    "incoming-sender-key",
+		RecipientEncryptedMessageKey: "incoming-recipient-key",
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 2000, incoming.MessageID)
+	conversations, _, err := module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, conversations, 1)
+	require.True(t, conversations[0].Unread)
+	notificationsUnread, err := module.Messages.HasUnreadNotifications(ctx, aliceID)
+	require.NoError(t, err)
+	require.True(t, notificationsUnread)
+
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, bobWall.WallID, 2000))
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.False(t, conversations[0].Unread)
+	notificationsUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceID)
+	require.NoError(t, err)
+	require.False(t, notificationsUnread)
+
+	outgoing, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     aliceID,
+		SenderWallID:                 aliceWall.WallID,
+		RecipientID:                  bobID,
+		RecipientWallID:              bobWall.WallID,
+		MessageCipher:                "outgoing-cipher",
+		SenderEncryptedMessageKey:    "outgoing-sender-key",
+		RecipientEncryptedMessageKey: "outgoing-recipient-key",
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 3000, outgoing.MessageID)
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Equal(t, outgoing.MessageID, conversations[0].LatestActivity.Message.MessageID)
+	require.False(t, conversations[0].Unread)
+	notificationsUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceID)
+	require.NoError(t, err)
+	require.False(t, notificationsUnread)
+}
+
+func TestWallNotificationReadMarkersArePerFriend(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice-per-friend-unread@example.com", "alice-per-friend-public")
+	bobID := insertWallUser(t, module, "bob-per-friend-unread@example.com", "bob-per-friend-public")
+	charlieID := insertWallUser(t, module, "charlie-per-friend-unread@example.com", "charlie-per-friend-public")
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice-per-friend-unread", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	bobWall, err := module.Walls.CreateWall(ctx, bobID, "bob-per-friend-unread", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+	charlieWall, err := module.Walls.CreateWall(ctx, charlieID, "charlie-per-friend-unread", "charlie-wall-key", "charlie-profile")
+	require.NoError(t, err)
+	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "alice-bob-share-key", aliceWall.CurrentVersion, "bob-share-key", bobWall.CurrentVersion))
+	require.NoError(t, module.Friends.AddFriend(ctx, charlieID, charlieWall.WallID, aliceWall.WallID, "alice-charlie-share-key", aliceWall.CurrentVersion, "charlie-share-key", charlieWall.CurrentVersion))
+	setFriendEventCreatedAt(t, module, 100, "friend_add", bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 200, "friend_add", charlieID, aliceID)
+
+	bobMessage, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     bobID,
+		SenderWallID:                 bobWall.WallID,
+		RecipientID:                  aliceID,
+		RecipientWallID:              aliceWall.WallID,
+		MessageCipher:                "bob-cipher",
+		SenderEncryptedMessageKey:    "bob-sender-key",
+		RecipientEncryptedMessageKey: "bob-recipient-key",
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 1000, bobMessage.MessageID)
+	aliceMessageToBob, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     aliceID,
+		SenderWallID:                 aliceWall.WallID,
+		RecipientID:                  bobID,
+		RecipientWallID:              bobWall.WallID,
+		MessageCipher:                "alice-bob-cipher",
+		SenderEncryptedMessageKey:    "alice-bob-sender-key",
+		RecipientEncryptedMessageKey: "alice-bob-recipient-key",
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 1001, aliceMessageToBob.MessageID)
+	require.NoError(t, module.Messages.SetLike(ctx, aliceMessageToBob.MessageID, bobID, true))
+	setMessageLikeCreatedAt(t, module, 1002, aliceMessageToBob.MessageID, bobID)
+	charlieMessage, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     charlieID,
+		SenderWallID:                 charlieWall.WallID,
+		RecipientID:                  aliceID,
+		RecipientWallID:              aliceWall.WallID,
+		MessageCipher:                "charlie-cipher",
+		SenderEncryptedMessageKey:    "charlie-sender-key",
+		RecipientEncryptedMessageKey: "charlie-recipient-key",
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 2000, charlieMessage.MessageID)
+
+	conversationByWallID := func(wallID string) WallMessageConversationRecord {
+		t.Helper()
+		conversations, _, err := module.Messages.ListConversations(ctx, aliceID, "", 10)
+		require.NoError(t, err)
+		for _, conversation := range conversations {
+			if conversation.Friend.WallID == wallID {
+				return conversation
+			}
+		}
+		require.FailNowf(t, "conversation not found", "wallID=%s", wallID)
+		return WallMessageConversationRecord{}
+	}
+
+	require.True(t, conversationByWallID(bobWall.WallID).Unread)
+	require.True(t, conversationByWallID(charlieWall.WallID).Unread)
+	notificationsUnread, err := module.Messages.HasUnreadNotifications(ctx, aliceID)
+	require.NoError(t, err)
+	require.True(t, notificationsUnread)
+
+	bobLatestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, bobWall.WallID)
+	require.NoError(t, err)
+	require.Equal(t, int64(1002), bobLatestActivityAt)
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, bobWall.WallID, bobLatestActivityAt))
+	require.False(t, conversationByWallID(bobWall.WallID).Unread)
+	require.True(t, conversationByWallID(charlieWall.WallID).Unread)
+	notificationsUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceID)
+	require.NoError(t, err)
+	require.True(t, notificationsUnread)
+
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, charlieWall.WallID, 2000))
+	notificationsUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceID)
+	require.NoError(t, err)
+	require.False(t, notificationsUnread)
+}
+
+func TestUnreadNotificationsFollowLatestConversationActivity(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice-latest-unread@example.com", "alice-latest-unread-public")
+	bobID := insertWallUser(t, module, "bob-latest-unread@example.com", "bob-latest-unread-public")
+	aliceWall, err := module.Walls.CreateWall(ctx, aliceID, "alice-latest-unread", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+	bobWall, err := module.Walls.CreateWall(ctx, bobID, "bob-latest-unread", "bob-wall-key", "bob-profile")
+	require.NoError(t, err)
+	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobWall.WallID, aliceWall.WallID, "alice-share-key", aliceWall.CurrentVersion, "bob-share-key", bobWall.CurrentVersion))
+	setFriendEventCreatedAt(t, module, 100, "friend_add", bobID, aliceID)
+
+	incoming, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     bobID,
+		SenderWallID:                 bobWall.WallID,
+		RecipientID:                  aliceID,
+		RecipientWallID:              aliceWall.WallID,
+		MessageCipher:                "incoming-cipher",
+		SenderEncryptedMessageKey:    "incoming-sender-key",
+		RecipientEncryptedMessageKey: "incoming-recipient-key",
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 1000, incoming.MessageID)
+	outgoing, err := module.Messages.CreateMessage(ctx, CreateWallMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     aliceID,
+		SenderWallID:                 aliceWall.WallID,
+		RecipientID:                  bobID,
+		RecipientWallID:              bobWall.WallID,
+		MessageCipher:                "outgoing-cipher",
+		SenderEncryptedMessageKey:    "outgoing-sender-key",
+		RecipientEncryptedMessageKey: "outgoing-recipient-key",
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 2000, outgoing.MessageID)
+
+	conversations, _, err := module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, conversations, 1)
+	require.Equal(t, outgoing.MessageID, conversations[0].LatestActivity.Message.MessageID)
+	require.False(t, conversations[0].Unread)
+	notificationsUnread, err := module.Messages.HasUnreadNotifications(ctx, aliceID)
+	require.NoError(t, err)
+	require.False(t, notificationsUnread)
 }
 
 func TestListPostLikersPaginates(t *testing.T) {
