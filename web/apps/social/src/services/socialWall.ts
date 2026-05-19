@@ -75,6 +75,7 @@ type WallMessageConversationActivityType =
     | "post_reply";
 
 interface WallMessageConversationPost {
+    isDeleted?: boolean;
     objects?: WallPostObject[];
     postId: number;
     wallId: string;
@@ -216,6 +217,7 @@ export type SocialWallMessageActivityType = WallMessageConversationActivityType;
 export interface SocialWallMessageActivityPost {
     height?: number;
     imageUrl?: string;
+    isDeleted?: boolean;
     mediaType?: string;
     objectKey?: string;
     postId: number;
@@ -510,13 +512,14 @@ const messageActivityPostFromWallPost = async (
     const socialPost: SocialWallMessageActivityPost = {
         height: object?.height,
         mediaType: object?.mediaType,
+        isDeleted: Boolean(post.isDeleted),
         objectKey: object?.objectKey,
         postId: post.postId,
         wallId: post.wallId,
         wallSlug: post.wallSlug,
         width: object?.width,
     };
-    if (!object?.objectKey) return socialPost;
+    if (post.isDeleted || !object?.objectKey) return socialPost;
 
     try {
         socialPost.imageUrl = blobURLForBytes(

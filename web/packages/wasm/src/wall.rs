@@ -249,6 +249,7 @@ struct MessageConversationPostJs {
     wall_id: String,
     wall_slug: String,
     owner_user_id: i64,
+    is_deleted: bool,
     objects: Vec<ente_wall::PostObjectPayload>,
 }
 
@@ -482,6 +483,7 @@ fn message_conversation_post_to_js(post: MessageConversationPost) -> MessageConv
         wall_id: post.wall_id,
         wall_slug: post.wall_slug,
         owner_user_id: post.owner_user_id,
+        is_deleted: post.is_deleted,
         objects: post.objects,
     }
 }

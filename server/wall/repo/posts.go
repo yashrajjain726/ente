@@ -251,7 +251,7 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `UPDATE wall_posts SET is_deleted = TRUE WHERE post_id = $1 AND owner_id = $2`, postID, ownerID)
+	res, err := tx.ExecContext(ctx, `UPDATE wall_posts SET is_deleted = TRUE WHERE post_id = $1 AND owner_id = $2 AND is_deleted = FALSE`, postID, ownerID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
@@ -260,7 +260,20 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 		return nil, stacktrace.Propagate(err, "")
 	}
 	if affected == 0 {
-		return nil, sql.ErrNoRows
+		var isDeleted bool
+		if err := tx.QueryRowContext(ctx, `SELECT is_deleted FROM wall_posts WHERE post_id = $1 AND owner_id = $2`, postID, ownerID).Scan(&isDeleted); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		if !isDeleted {
+			return nil, sql.ErrNoRows
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM wall_post_likes WHERE post_id = $1`, postID); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		return nil, nil
 	}
 	rows, err := tx.QueryContext(ctx, `
 		SELECT a.object_key, a.bucket_id, COALESCE(a.size, 1), p.wall_id
@@ -300,6 +313,9 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 			return nil, err
 		}
 		keys = append(keys, object.key)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM wall_post_likes WHERE post_id = $1`, postID); err != nil {
+		return nil, stacktrace.Propagate(err, "")
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, stacktrace.Propagate(err, "")

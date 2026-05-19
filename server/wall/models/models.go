@@ -319,6 +319,7 @@ type MessageConversationPostResponse struct {
 	WallID      string              `json:"wallId"`
 	WallSlug    string              `json:"wallSlug"`
 	OwnerUserID int64               `json:"ownerUserId"`
+	IsDeleted   bool                `json:"isDeleted"`
 	Objects     []PostObjectPayload `json:"objects,omitempty"`
 }
 

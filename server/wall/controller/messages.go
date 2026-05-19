@@ -308,6 +308,7 @@ func toMessageConversationActivityResponse(activity repo.WallMessageConversation
 			WallID:      activity.Post.WallID,
 			WallSlug:    activity.Post.WallSlug,
 			OwnerUserID: activity.Post.OwnerID,
+			IsDeleted:   activity.Post.IsDeleted,
 		}
 		if activity.Post.ObjectKey.Valid {
 			resp.Post.Objects = []models.PostObjectPayload{

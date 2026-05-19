@@ -234,6 +234,8 @@ pub struct MessageConversationPost {
     #[serde(default)]
     pub owner_user_id: i64,
     #[serde(default)]
+    pub is_deleted: bool,
+    #[serde(default)]
     pub objects: Vec<PostObjectPayload>,
 }
 

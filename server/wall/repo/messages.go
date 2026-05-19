@@ -257,7 +257,6 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			  AND m.is_deleted = FALSE
 			  AND m.reply_post_id IS NOT NULL
 			  AND p.owner_id = $1
-			  AND p.is_deleted = FALSE
 			ORDER BY m.sender_wall_id, m.reply_post_id, m.created_at DESC, m.message_id DESC
 		),
 		post_candidates AS (
@@ -371,6 +370,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			COALESCE(p.wall_id, '') AS post_wall_id,
 			COALESCE(post_wall.wall_slug, '') AS post_wall_slug,
 			COALESCE(p.owner_id, 0) AS post_owner_id,
+			COALESCE(p.is_deleted, FALSE) AS post_is_deleted,
 			asset.object_key AS post_object_key,
 			asset.size AS post_object_size,
 			asset.position AS post_object_position,
@@ -390,12 +390,12 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 		LEFT JOIN key_attributes sender_ka ON sender_ka.user_id = sender_wall.owner_id
 		LEFT JOIN walls recipient_wall ON recipient_wall.wall_id = m.recipient_wall_id
 		LEFT JOIN key_attributes recipient_ka ON recipient_ka.user_id = recipient_wall.owner_id
-		LEFT JOIN wall_posts p ON p.post_id = c.post_id AND p.is_deleted = FALSE
+		LEFT JOIN wall_posts p ON p.post_id = c.post_id
 		LEFT JOIN walls post_wall ON post_wall.wall_id = p.wall_id
 		LEFT JOIN LATERAL (
 			SELECT object_key, size, position, variant, blur_hash_cipher, width, height, media_type
 			FROM wall_post_assets
-			WHERE post_id = p.post_id
+			WHERE post_id = p.post_id AND p.is_deleted = FALSE
 			ORDER BY position ASC, asset_id ASC
 			LIMIT 1
 		) asset ON TRUE
@@ -481,7 +481,6 @@ func (r *MessagesRepository) GetLatestConversationActivityAt(ctx context.Context
 			  AND m.is_deleted = FALSE
 			  AND m.reply_post_id IS NOT NULL
 			  AND p.owner_id = $1
-			  AND p.is_deleted = FALSE
 
 			UNION ALL
 
@@ -559,7 +558,6 @@ func (r *MessagesRepository) HasUnreadNotifications(ctx context.Context, viewerI
 			  AND m.is_deleted = FALSE
 			  AND m.reply_post_id IS NOT NULL
 			  AND p.owner_id = $1
-			  AND p.is_deleted = FALSE
 			ORDER BY m.sender_wall_id, m.reply_post_id, m.created_at DESC, m.message_id DESC
 		),
 		post_candidates AS (
@@ -683,6 +681,7 @@ func scanMessageConversationRecord(scanner interface{ Scan(dest ...any) error })
 		&post.WallID,
 		&post.WallSlug,
 		&post.OwnerID,
+		&post.IsDeleted,
 		&post.ObjectKey,
 		&post.ObjectSize,
 		&post.ObjectPosition,

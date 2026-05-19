@@ -437,7 +437,7 @@ const QuotePreview: React.FC<{
                             whiteSpace: "nowrap",
                         }}
                     >
-                        {isUnavailable ? "(deleted)" : quote.caption || "Photo"}
+                        {isUnavailable ? "Deleted post" : quote.caption || "Photo"}
                     </Box>
                 </Box>
                 {isUnavailable ? (

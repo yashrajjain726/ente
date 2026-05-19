@@ -153,6 +153,7 @@ type WallMessageConversationPostRecord struct {
 	WallID               string
 	WallSlug             string
 	OwnerID              int64
+	IsDeleted            bool
 	ObjectKey            sql.NullString
 	ObjectSize           sql.NullInt64
 	ObjectPosition       sql.NullInt64

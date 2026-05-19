@@ -293,6 +293,26 @@ func TestWallMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Equal(t, replyOnly.MessageID, conversations[0].LatestActivity.Message.MessageID)
 	require.Equal(t, replyOnlyPostID, conversations[0].LatestActivity.Post.PostID)
 
+	deletedReplyOnlyPostKeys, err := module.Posts.DeletePost(ctx, replyOnlyPostID, aliceID)
+	require.NoError(t, err)
+	require.Empty(t, deletedReplyOnlyPostKeys)
+
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Equal(t, "post_reply", conversations[0].LatestActivity.Type)
+	require.NotNil(t, conversations[0].LatestActivity.Message)
+	require.Equal(t, replyOnly.MessageID, conversations[0].LatestActivity.Message.MessageID)
+	require.NotNil(t, conversations[0].LatestActivity.Post)
+	require.Equal(t, replyOnlyPostID, conversations[0].LatestActivity.Post.PostID)
+	require.True(t, conversations[0].LatestActivity.Post.IsDeleted)
+	require.False(t, conversations[0].LatestActivity.Post.ObjectKey.Valid)
+	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, bobWall.WallID)
+	require.NoError(t, err)
+	require.Equal(t, int64(5500), latestActivityAt)
+	notificationsUnread, err := module.Messages.HasUnreadNotifications(ctx, aliceID)
+	require.NoError(t, err)
+	require.True(t, notificationsUnread)
+
 	require.NoError(t, module.Friends.DeleteFriendship(ctx, bobID, aliceWall.WallID))
 	setFriendEventCreatedAt(t, module, 6000, "friend_remove", bobID, aliceID)
 
@@ -457,6 +477,14 @@ func TestWallModuleLifecycle(t *testing.T) {
 	require.ElementsMatch(t, []string{"wall/alice/post1/full", "wall/alice/post1/thumb"}, deletedKeys)
 	requireQueuedTempObject(t, module, "wall/alice/post1/full", TempObjectPurposePost, "b2-eu-cen")
 	requireQueuedTempObject(t, module, "wall/alice/post1/thumb", TempObjectPurposePost, "b2-eu-cen")
+	var likeCount int
+	err = module.Posts.DB.QueryRow(`SELECT COUNT(*) FROM wall_post_likes WHERE post_id = $1`, postID).Scan(&likeCount)
+	require.NoError(t, err)
+	require.Zero(t, likeCount)
+
+	deletedKeys, err = module.Posts.DeletePost(ctx, postID, aliceID)
+	require.NoError(t, err)
+	require.Empty(t, deletedKeys)
 
 	_, err = module.Posts.GetPost(ctx, postID, bobID)
 	require.Error(t, err)
