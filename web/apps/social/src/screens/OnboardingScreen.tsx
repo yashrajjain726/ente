@@ -91,16 +91,15 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                 boxSizing: "border-box",
                 display: "flex",
                 flexDirection: "column",
-                minHeight: "max(100svh, 812px)",
+                height: "100svh",
+                minHeight: "100svh",
                 mx: "auto",
                 overflow: "hidden",
                 px: 3,
                 width: "100%",
                 "@media (min-width: 600px)": {
                     maxWidth: 390,
-                    minHeight: "100svh",
                 },
-                "@media (max-height: 760px)": { minHeight: "100svh" },
             }}
         >
             <Box
@@ -111,7 +110,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                     flexShrink: 0,
                     gridTemplateColumns: "40px 1fr 40px",
                     height: 40,
-                    mt: "44px",
+                    mt: "clamp(24px, 5.5svh, 44px)",
                     width: "100%",
                 }}
             >
@@ -132,13 +131,11 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                     alignItems: "center",
                     display: "flex",
                     flexDirection: "column",
-                    flexShrink: 0,
+                    flex: "1 1 auto",
+                    justifyContent: "center",
+                    minHeight: 0,
+                    overflow: "hidden",
                     width: "100%",
-                    "@media (min-width: 600px)": {
-                        flex: "1 1 auto",
-                        justifyContent: "center",
-                        minHeight: 0,
-                    },
                 }}
             >
                 <Box
@@ -147,19 +144,13 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                     src="/images/share-memories.svg"
                     sx={{
                         flexShrink: 0,
-                        height: 245.189,
-                        mt: "112px",
-                        width: 282,
-                        "@media (max-height: 760px)": {
-                            height: 219,
-                            mt: "68px",
-                            width: 252,
-                        },
+                        height: "clamp(132px, 29svh, 245.189px)",
+                        maxWidth: "min(282px, 76vw)",
+                        width: "auto",
                         "@media (max-width: 340px)": {
                             height: "auto",
                             width: "76vw",
                         },
-                        "@media (min-width: 600px)": { mt: 0 },
                     }}
                 />
                 <Box
@@ -168,9 +159,9 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                         display: "flex",
                         flexDirection: "column",
                         flexShrink: 0,
-                        mt: "92px",
+                        mt: "clamp(28px, 7svh, 60px)",
                         textAlign: "center",
-                        "@media (max-height: 760px)": { mt: "60px" },
+                        "@media (min-height: 760px)": { mt: "92px" },
                     }}
                 >
                     <Box
@@ -210,10 +201,9 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                     flexDirection: "column",
                     flexShrink: 0,
                     gap: "12px",
-                    mt: "52px",
+                    mb: "calc(32px + env(safe-area-inset-bottom))",
                     width: "100%",
-                    "@media (max-height: 760px)": { mt: "40px" },
-                    "@media (min-width: 600px)": { mb: "44px", mt: 0 },
+                    "@media (min-width: 600px)": { mb: "44px" },
                 }}
             >
                 <ActionButton variant="primary" onClick={onCreateAccount}>
