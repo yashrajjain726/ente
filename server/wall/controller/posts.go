@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strconv"
@@ -11,13 +12,16 @@ import (
 	"github.com/ente-io/museum/wall/repo"
 	"github.com/ente-io/stacktrace"
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 )
 
 type PostsController struct {
 	PostsRepo       *repo.PostsRepository
 	WallsRepo       *repo.WallsRepository
+	FriendsRepo     *repo.FriendsRepository
 	AssetsRepo      *repo.AssetsRepository
 	ReadMarkersRepo *repo.ReadMarkersRepository
+	EmailNotifier   WallPostEmailNotifier
 	auth            authDeps
 }
 
@@ -64,7 +68,31 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 		}
 		return nil, err
 	}
+	c.notifyFriendsOfNewPost(wall.WallID, wall.WallSlug)
 	return &models.CreatePostResponse{PostID: postID}, nil
+}
+
+func (c *PostsController) notifyFriendsOfNewPost(wallID, wallSlug string) {
+	if c.EmailNotifier == nil || c.FriendsRepo == nil {
+		return
+	}
+	go func() {
+		friends, err := c.FriendsRepo.ListFriendsForWall(context.Background(), wallID)
+		if err != nil {
+			log.WithField("wall_id", wallID).WithError(err).Error("Failed to list friends for wall post email")
+			return
+		}
+		recipientUserIDs := make([]int64, 0, len(friends))
+		for _, friend := range friends {
+			if friend.Friend.UserID > 0 {
+				recipientUserIDs = append(recipientUserIDs, friend.Friend.UserID)
+			}
+		}
+		if len(recipientUserIDs) == 0 {
+			return
+		}
+		c.EmailNotifier.OnWallPostCreated(wallSlug, recipientUserIDs)
+	}()
 }
 
 func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*models.PostPage, error) {

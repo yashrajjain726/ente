@@ -113,6 +113,7 @@ func main() {
 	viper.SetDefault("apps.accounts", "https://accounts.ente.io")
 	viper.SetDefault("apps.cast", "https://cast.ente.io")
 	viper.SetDefault("apps.family", "https://family.ente.io")
+	viper.SetDefault("apps.social", "https://ente.gg")
 
 	setupLogger(environment)
 	log.Infof("Booting up %s server with commit #%s", environment, os.Getenv("GIT_COMMIT"))
@@ -940,7 +941,7 @@ func main() {
 	userEntityController := &userEntityCtrl.Controller{Repo: userEntityRepo}
 	userEntityHandler := &api.UserEntityHandler{Controller: userEntityController}
 	wallRepos := wallrepo.NewModule(db, s3Config)
-	wallModule := wallcontroller.NewModule(wallRepos, userAuthRepo)
+	wallModule := wallcontroller.NewModule(wallRepos, userAuthRepo, &wallcontroller.WallEmailNotifier{UserRepo: userRepo})
 	wallHandlers := wallapi.NewHandlers(wallModule)
 
 	privateAPI.POST("/user-entity/key", userEntityHandler.CreateKey)

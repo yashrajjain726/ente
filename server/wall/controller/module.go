@@ -17,7 +17,11 @@ type Module struct {
 	UserAuth *baserepo.UserAuthRepository
 }
 
-func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository) *Module {
+func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, emailNotifiers ...WallPostEmailNotifier) *Module {
+	var emailNotifier WallPostEmailNotifier
+	if len(emailNotifiers) > 0 {
+		emailNotifier = emailNotifiers[0]
+	}
 	authDeps := authDeps{
 		UserAuthRepo: userAuthRepo,
 		LinksRepo:    repos.Links,
@@ -26,7 +30,7 @@ func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository) *M
 	}
 	return &Module{
 		Walls:    &WallsController{WallsRepo: repos.Walls, AssetsRepo: repos.Assets, auth: authDeps},
-		Posts:    &PostsController{PostsRepo: repos.Posts, WallsRepo: repos.Walls, AssetsRepo: repos.Assets, ReadMarkersRepo: repos.Read, auth: authDeps},
+		Posts:    &PostsController{PostsRepo: repos.Posts, WallsRepo: repos.Walls, FriendsRepo: repos.Friends, AssetsRepo: repos.Assets, ReadMarkersRepo: repos.Read, EmailNotifier: emailNotifier, auth: authDeps},
 		Friends:  &FriendsController{FriendsRepo: repos.Friends, WallsRepo: repos.Walls, auth: authDeps},
 		Messages: &MessagesController{MessagesRepo: repos.Messages, PostsRepo: repos.Posts, WallsRepo: repos.Walls, FriendsRepo: repos.Friends, ReadMarkersRepo: repos.Read, auth: authDeps},
 		Links:    &LinksController{LinksRepo: repos.Links, WallsRepo: repos.Walls, auth: authDeps},

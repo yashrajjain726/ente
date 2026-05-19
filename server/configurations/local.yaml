@@ -108,6 +108,9 @@ apps:
     accounts:
     # Default is https://family.ente.io
     family:
+    # Default is https://ente.gg
+    # Set this to the URL where your social web app is running.
+    social:
     # Default is https://memories.ente.io
     #
     # If you're running a self-hosted instance and wish to serve public memory shares,
