@@ -1,5 +1,4 @@
 export type SetupProfileSource = "login" | "verify";
-export type FriendProfileSource = "friends" | "home" | "profile";
 export type VerifyFlow = "login" | "signup";
 
 export const onboardingSourceSearchParam = "onboardingSource";
@@ -9,8 +8,7 @@ const valueFromQuery = (value: string | string[] | undefined) =>
     Array.isArray(value) ? value[0] : value;
 
 export const socialRoutes = {
-    friend: (friendID: string, from: FriendProfileSource) =>
-        `/app/friend?friendID=${encodeURIComponent(friendID)}&from=${from}`,
+    friend: (wallId: string) => `/app/friends/${encodeURIComponent(wallId)}`,
     friends: "/app/friends",
     home: "/app",
     invite: "/invite",
@@ -38,14 +36,5 @@ export const setupProfileSourceFromQuery = (
 ): SetupProfileSource =>
     valueFromQuery(value) == "login" ? "login" : "verify";
 
-export const friendProfileSourceFromQuery = (
-    value: string | string[] | undefined,
-): FriendProfileSource => {
-    const from = valueFromQuery(value);
-    return from == "home" || from == "profile" || from == "friends"
-        ? from
-        : "friends";
-};
-
-export const friendIDFromQuery = (value: string | string[] | undefined) =>
+export const friendWallIdFromQuery = (value: string | string[] | undefined) =>
     valueFromQuery(value) ?? "";

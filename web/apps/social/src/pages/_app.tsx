@@ -19,11 +19,11 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
             defaultMode="light"
             storageManager={null}
         >
-            <CustomHead title="Ente Social">
-                <meta name="application-name" content="Ente Social" />
+            <CustomHead title="Ente Space">
+                <meta name="application-name" content="Ente Space" />
                 <meta name="mobile-web-app-capable" content="yes" />
                 <meta name="apple-mobile-web-app-capable" content="yes" />
-                <meta name="apple-mobile-web-app-title" content="Ente Social" />
+                <meta name="apple-mobile-web-app-title" content="Ente Space" />
                 <meta
                     name="apple-mobile-web-app-status-bar-style"
                     content="default"

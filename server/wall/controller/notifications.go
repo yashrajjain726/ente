@@ -86,7 +86,7 @@ func uniqueUserIDs(userIDs []int64) []int64 {
 func socialAppURL() string {
 	origin := strings.TrimRight(strings.TrimSpace(viper.GetString("apps.social")), "/")
 	if origin == "" {
-		origin = "https://ente.gg"
+		origin = "https://ente.space"
 	}
 	return origin + "/app"
 }

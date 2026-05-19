@@ -102,7 +102,7 @@ const Page: React.FC = () => {
                     );
                 }}
                 onOpenFriend={(friendID) =>
-                    void router.push(socialRoutes.friend(friendID, "profile"))
+                    void router.push(socialRoutes.friend(friendID))
                 }
                 onOpenFriends={() => void router.push(socialRoutes.friends)}
                 onOpenSettings={() => void router.push(socialRoutes.settings)}

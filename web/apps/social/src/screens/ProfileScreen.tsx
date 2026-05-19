@@ -1,8 +1,8 @@
 import {
     AddSquareIcon,
     ArrowLeft02Icon,
+    Menu01Icon,
     MoreHorizontalIcon,
-    Settings01Icon,
     Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -559,9 +559,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             }}
                         >
                             <HugeiconsIcon
-                                icon={Settings01Icon}
-                                size={19}
-                                strokeWidth={1.8}
+                                icon={Menu01Icon}
+                                size={20}
+                                strokeWidth={2.4}
                             />
                         </Box>
                     ) : (

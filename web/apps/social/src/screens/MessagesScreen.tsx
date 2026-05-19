@@ -57,6 +57,9 @@ interface MessagesScreenProps {
     onBack?: () => void;
     onCloseThread: () => void;
     onDeleteMessage: (messageId: string) => Promise<void>;
+    onOpenSelectedFriendProfile: (
+        friend: SocialWallMessageConversation["friend"],
+    ) => void;
     onOpenThread: (conversation: SocialWallMessageConversation) => void;
     onReplyToMessage: (
         wallId: string,
@@ -812,6 +815,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     onBack,
     onCloseThread,
     onDeleteMessage,
+    onOpenSelectedFriendProfile,
     onOpenThread,
     onReplyToMessage,
     onSendMessage,
@@ -1004,26 +1008,79 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                             strokeWidth={1.8}
                         />
                     </Box>
-                    <Box
-                        component="h1"
-                        sx={{
-                            color: "inherit",
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 18,
-                            fontWeight: 700,
-                            justifySelf: "center",
-                            lineHeight: "24px",
-                            m: 0,
-                            minWidth: 0,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                        }}
-                    >
-                        {isThreadOpen
-                            ? firstNameFrom(selectedName)
-                            : "Notifications"}
-                    </Box>
+                    {isThreadOpen && selectedFriend ? (
+                        <Box
+                            component="h1"
+                            sx={{
+                                justifySelf: "center",
+                                m: 0,
+                                minWidth: 0,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label={
+                                    selectedName
+                                        ? `Open ${selectedName}'s profile`
+                                        : "Open friend profile"
+                                }
+                                onClick={() =>
+                                    onOpenSelectedFriendProfile(selectedFriend)
+                                }
+                                sx={{
+                                    appearance: "none",
+                                    bgcolor: "transparent",
+                                    border: 0,
+                                    color: "inherit",
+                                    cursor: "pointer",
+                                    display: "block",
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 18,
+                                    fontWeight: 700,
+                                    lineHeight: "24px",
+                                    m: 0,
+                                    maxWidth: "100%",
+                                    minWidth: 0,
+                                    overflow: "hidden",
+                                    p: 0,
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    "&:focus-visible": {
+                                        borderRadius: "4px",
+                                        outline: `2px solid ${green}`,
+                                        outlineOffset: 3,
+                                    },
+                                }}
+                            >
+                                {firstNameFrom(selectedName)}
+                            </Box>
+                        </Box>
+                    ) : (
+                        <Box
+                            component="h1"
+                            sx={{
+                                color: "inherit",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 18,
+                                fontWeight: 700,
+                                justifySelf: "center",
+                                lineHeight: "24px",
+                                m: 0,
+                                minWidth: 0,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            Notifications
+                        </Box>
+                    )}
                     <Box aria-hidden />
                 </Box>
 

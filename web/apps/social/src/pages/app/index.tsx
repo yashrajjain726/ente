@@ -126,7 +126,7 @@ const Page: React.FC = () => {
                     return socialPostToViewerPhoto(post);
                 }}
                 onOpenFriend={(friendID) =>
-                    void router.push(socialRoutes.friend(friendID, "home"))
+                    void router.push(socialRoutes.friend(friendID))
                 }
                 onOpenNotifications={() =>
                     void router.push(socialRoutes.notifications)

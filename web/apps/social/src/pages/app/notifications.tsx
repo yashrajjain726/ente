@@ -46,7 +46,8 @@ const Page: React.FC = () => {
     const openConversation = React.useCallback(
         (conversation: SocialWallMessageConversation) => {
             setSelectedFriend(conversation.friend);
-            const friendWallId = conversation.friend.wallId ?? conversation.friend.id;
+            const friendWallId =
+                conversation.friend.wallId ?? conversation.friend.id;
             setConversations((currentConversations) =>
                 currentConversations.map((currentConversation) =>
                     (currentConversation.friend.wallId ??
@@ -117,6 +118,11 @@ const Page: React.FC = () => {
                 messages={messages}
                 onBack={() => void router.push(socialRoutes.home)}
                 onCloseThread={() => setSelectedFriend(undefined)}
+                onOpenSelectedFriendProfile={(friend) =>
+                    void router.push(
+                        socialRoutes.friend(friend.wallId ?? friend.id),
+                    )
+                }
                 onOpenThread={openConversation}
                 onSendMessage={async (wallId, text) => {
                     const message = await sendCurrentMessage(wallId, text);
