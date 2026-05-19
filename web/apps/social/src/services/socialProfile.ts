@@ -108,6 +108,8 @@ const wallHTTPStatus = (error: unknown) => {
     return typeof status == "number" ? status : undefined;
 };
 
+const defaultOwnedWall = (walls: OwnedWall[]) => walls[0];
+
 export const openCurrentWallContext = async () => {
     const [authToken, baseUrl, masterKeyB64] = await Promise.all([
         savedAuthToken(),
@@ -176,7 +178,7 @@ export const loadExistingSocialProfile = async () => {
 
     try {
         const walls = (await ctx.list_owned_walls()) as OwnedWall[];
-        const wall = walls[0];
+        const wall = defaultOwnedWall(walls);
         if (!wall) return null;
 
         const wallProfile = (await ctx.get_wall_profile(
@@ -238,7 +240,7 @@ export const saveSocialProfile = async (
         const existingWall =
             (profile.wallId &&
                 walls.find((wall) => wall.wallId == profile.wallId)) ||
-            walls[0];
+            defaultOwnedWall(walls);
         const profilePayload = wallProfilePayloadFor({ ...profile, username });
 
         let wallId: string;

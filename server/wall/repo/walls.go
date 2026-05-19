@@ -70,6 +70,17 @@ func (r *WallsRepository) ListWallsByOwner(ctx context.Context, ownerID int64) (
 	return walls, stacktrace.Propagate(rows.Err(), "")
 }
 
+func (r *WallsRepository) GetDefaultWallByOwner(ctx context.Context, ownerID int64) (*WallRecord, error) {
+	return scanWallRecord(r.DB.QueryRowContext(ctx, `
+		SELECT wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version,
+		       avatar_object_key, avatar_bucket_id, avatar_size, created_at, updated_at
+		FROM walls
+		WHERE owner_id = $1
+		ORDER BY created_at ASC
+		LIMIT 1
+	`, ownerID))
+}
+
 func (r *WallsRepository) GetWallByID(ctx context.Context, wallID string) (*WallRecord, error) {
 	return scanWallRecord(r.DB.QueryRowContext(ctx, `
 		SELECT wall_id, owner_id, wall_slug, encrypted_wall_key, encrypted_profile, current_version,

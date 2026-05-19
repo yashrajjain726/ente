@@ -203,14 +203,13 @@ func (c *MessagesController) requireFriendMessageTarget(ctx *gin.Context, userID
 	if targetWallID == "" {
 		return nil, nil, ente.NewBadRequestWithMessage("wallId is required")
 	}
-	ownedWalls, err := c.WallsRepo.ListWallsByOwner(ctx.Request.Context(), userID)
+	senderWall, err := c.WallsRepo.GetDefaultWallByOwner(ctx.Request.Context(), userID)
 	if err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, nil, ente.NewBadRequestWithMessage("sender wall is missing")
+		}
 		return nil, nil, err
 	}
-	if len(ownedWalls) == 0 {
-		return nil, nil, ente.NewBadRequestWithMessage("sender wall is missing")
-	}
-	senderWall := ownedWalls[0]
 	recipientWall, err := c.WallsRepo.GetWallByID(ctx.Request.Context(), targetWallID)
 	if err != nil {
 		return nil, nil, err
@@ -224,7 +223,7 @@ func (c *MessagesController) requireFriendMessageTarget(ctx *gin.Context, userID
 		}
 		return nil, nil, err
 	}
-	return &senderWall, recipientWall, nil
+	return senderWall, recipientWall, nil
 }
 
 func (c *MessagesController) validateReplyMessage(ctx *gin.Context, userID int64, replyMessageID, senderWallID, recipientWallID string) (sql.NullString, error) {

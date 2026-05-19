@@ -169,7 +169,13 @@ func (r *FriendsRepository) DeleteFriendship(ctx context.Context, userID int64, 
 	if err := tx.QueryRowContext(ctx, `
 		SELECT target_wall.owner_id, actor_wall.wall_id
 		FROM walls target_wall
-		JOIN walls actor_wall ON actor_wall.owner_id = $2
+		JOIN LATERAL (
+			SELECT wall_id
+			FROM walls
+			WHERE owner_id = $2
+			ORDER BY created_at ASC
+			LIMIT 1
+		) actor_wall ON TRUE
 		WHERE target_wall.wall_id = $1
 	`, targetWallID, userID).Scan(&targetOwnerID, &actorWallID); err != nil {
 		return stacktrace.Propagate(err, "")
@@ -212,10 +218,9 @@ func (r *FriendsRepository) DeleteShareByWallAndFriend(ctx context.Context, wall
 
 func (r *FriendsRepository) GetShareForFriendAndWall(ctx context.Context, friendID int64, wallID string) (*WallShareRecord, error) {
 	return scanShareRecord(r.DB.QueryRowContext(ctx, `
-		SELECT s.wall_id, s.friend_id, w.owner_id, owner_wall.wall_slug, s.encrypted_wall_key, s.key_version, s.created_at, ka.public_key
+		SELECT s.wall_id, s.friend_id, w.owner_id, w.wall_slug, s.encrypted_wall_key, s.key_version, s.created_at, ka.public_key
 		FROM wall_friend_shares s
 		JOIN walls w ON w.wall_id = s.wall_id
-		JOIN walls owner_wall ON owner_wall.owner_id = w.owner_id
 		JOIN key_attributes ka ON ka.user_id = w.owner_id
 		WHERE s.friend_id = $1 AND s.wall_id = $2
 	`, friendID, wallID))
@@ -223,10 +228,9 @@ func (r *FriendsRepository) GetShareForFriendAndWall(ctx context.Context, friend
 
 func (r *FriendsRepository) ListSharesForFriend(ctx context.Context, friendID int64) ([]WallShareRecord, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT s.wall_id, s.friend_id, w.owner_id, owner_wall.wall_slug, s.encrypted_wall_key, s.key_version, s.created_at, ka.public_key
+		SELECT s.wall_id, s.friend_id, w.owner_id, w.wall_slug, s.encrypted_wall_key, s.key_version, s.created_at, ka.public_key
 		FROM wall_friend_shares s
 		JOIN walls w ON w.wall_id = s.wall_id
-		JOIN walls owner_wall ON owner_wall.owner_id = w.owner_id
 		JOIN key_attributes ka ON ka.user_id = w.owner_id
 		WHERE s.friend_id = $1
 		ORDER BY s.created_at ASC

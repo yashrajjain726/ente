@@ -152,10 +152,9 @@ func (r *LinksRepository) CreateSession(ctx context.Context, tokenHash []byte, w
 func (r *LinksRepository) GetSession(ctx context.Context, tokenHash []byte) (*WallLinkSessionRecord, error) {
 	row := r.DB.QueryRowContext(ctx, `
 		SELECT s.token_hash, s.wall_id, s.owner_id, s.auth_key_hash, s.key_version, s.expires_at, s.created_at,
-		       w.wall_slug, owner_wall.wall_slug, l.encrypted_wall_key
+		       w.wall_slug, w.wall_slug, l.encrypted_wall_key
 		FROM wall_link_sessions s
 		JOIN walls w ON w.wall_id = s.wall_id
-		JOIN walls owner_wall ON owner_wall.owner_id = s.owner_id
 		JOIN wall_links l ON l.wall_id = s.wall_id
 		                 AND l.auth_key_hash = s.auth_key_hash
 		                 AND l.key_version = s.key_version

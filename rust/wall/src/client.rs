@@ -192,7 +192,7 @@ impl AccountWallCtx {
         })
     }
 
-    async fn default_owned_wall_access(&self) -> Result<(WallKeyResponse, Vec<u8>)> {
+    async fn default_profile_wall_access(&self) -> Result<(WallKeyResponse, Vec<u8>)> {
         let root_wall_key = self
             .get_root_wall_key()
             .await?
@@ -988,7 +988,7 @@ impl AccountWallCtx {
     }
 
     async fn friend_actor_for_wall(&self, wall_id: &str) -> Result<WallActorResponse> {
-        let (owned_wall, _) = self.default_owned_wall_access().await?;
+        let (owned_wall, _) = self.default_profile_wall_access().await?;
         let friends = self.list_wall_friends(&owned_wall.wall_id).await?;
         friends
             .into_iter()
@@ -1024,7 +1024,7 @@ impl AccountWallCtx {
                 "target public key is required".into(),
             ));
         }
-        let (requester_wall, requester_wall_key) = self.default_owned_wall_access().await?;
+        let (requester_wall, requester_wall_key) = self.default_profile_wall_access().await?;
         let target_share = sealed::seal(link.wall_key(), &self.public_key)?;
         let requester_share = sealed::seal(&requester_wall_key, link.owner_public_key())?;
         let payload = AddFriendPayload {

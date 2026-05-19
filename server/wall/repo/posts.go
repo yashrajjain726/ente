@@ -59,11 +59,11 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, wallID,
 func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID int64) (*WallPostRecord, error) {
 	return scanPostRecord(r.DB.QueryRowContext(ctx, `
 		SELECT p.post_id, p.wall_id, w.wall_slug, p.owner_id,
-		       owner_wall.owner_id, owner_wall.wall_id, owner_wall.wall_slug, owner_ka.public_key,
-		       owner_wall.current_version, owner_wall.encrypted_profile, owner_wall.avatar_object_key,
-		       owner_wall.avatar_size, owner_wall.updated_at,
-		       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = owner_wall.wall_id) AS author_friends,
-		       (SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = owner_wall.wall_id AND ap.is_deleted = FALSE) AS author_posts,
+		       w.owner_id, w.wall_id, w.wall_slug, owner_ka.public_key,
+		       w.current_version, w.encrypted_profile, w.avatar_object_key,
+		       w.avatar_size, w.updated_at,
+		       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = w.wall_id) AS author_friends,
+		       (SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = w.wall_id AND ap.is_deleted = FALSE) AS author_posts,
 		       p.encrypted_post_key, p.caption_cipher,
 		       p.key_version, p.created_at,
 		       (SELECT COUNT(*) FROM wall_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
@@ -71,8 +71,7 @@ func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID in
 		       FALSE AS viewer_unread
 			FROM wall_posts p
 			JOIN walls w ON w.wall_id = p.wall_id
-			JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
-			JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
+			JOIN key_attributes owner_ka ON owner_ka.user_id = w.owner_id
 			WHERE p.post_id = $1 AND p.is_deleted = FALSE
 		`, postID, viewerID))
 }
@@ -85,11 +84,11 @@ func (r *PostsRepository) ListPostsByWall(ctx context.Context, wallID string, vi
 	args := []any{wallID, viewerID}
 	query := `
 			SELECT p.post_id, p.wall_id, w.wall_slug, p.owner_id,
-			       owner_wall.owner_id, owner_wall.wall_id, owner_wall.wall_slug, owner_ka.public_key,
-			       owner_wall.current_version, owner_wall.encrypted_profile, owner_wall.avatar_object_key,
-			       owner_wall.avatar_size, owner_wall.updated_at,
-			       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = owner_wall.wall_id) AS author_friends,
-			       (SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = owner_wall.wall_id AND ap.is_deleted = FALSE) AS author_posts,
+			       w.owner_id, w.wall_id, w.wall_slug, owner_ka.public_key,
+			       w.current_version, w.encrypted_profile, w.avatar_object_key,
+			       w.avatar_size, w.updated_at,
+			       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = w.wall_id) AS author_friends,
+			       (SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = w.wall_id AND ap.is_deleted = FALSE) AS author_posts,
 			       p.encrypted_post_key, p.caption_cipher,
 			       p.key_version, p.created_at,
 			       (SELECT COUNT(*) FROM wall_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
@@ -97,8 +96,7 @@ func (r *PostsRepository) ListPostsByWall(ctx context.Context, wallID string, vi
 			       FALSE AS viewer_unread
 				FROM wall_posts p
 				JOIN walls w ON w.wall_id = p.wall_id
-				JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
-				JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
+				JOIN key_attributes owner_ka ON owner_ka.user_id = w.owner_id
 				WHERE p.wall_id = $1 AND p.is_deleted = FALSE`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorPostID)
@@ -138,11 +136,11 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor s
 	args := []any{viewerID, readCreatedAt, readPostID}
 	query := `
 			SELECT p.post_id, p.wall_id, w.wall_slug, p.owner_id,
-			       owner_wall.owner_id, owner_wall.wall_id, owner_wall.wall_slug, owner_ka.public_key,
-			       owner_wall.current_version, owner_wall.encrypted_profile, owner_wall.avatar_object_key,
-			       owner_wall.avatar_size, owner_wall.updated_at,
-			       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = owner_wall.wall_id) AS author_friends,
-			       (SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = owner_wall.wall_id AND ap.is_deleted = FALSE) AS author_posts,
+			       w.owner_id, w.wall_id, w.wall_slug, owner_ka.public_key,
+			       w.current_version, w.encrypted_profile, w.avatar_object_key,
+			       w.avatar_size, w.updated_at,
+			       (SELECT COUNT(*) FROM wall_friend_shares fs WHERE fs.wall_id = w.wall_id) AS author_friends,
+			       (SELECT COUNT(*) FROM wall_posts ap WHERE ap.wall_id = w.wall_id AND ap.is_deleted = FALSE) AS author_posts,
 			       p.encrypted_post_key, p.caption_cipher,
 			       p.key_version, p.created_at,
 			       (SELECT COUNT(*) FROM wall_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
@@ -150,8 +148,7 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor s
 			       ((p.created_at, p.post_id) > ($2::bigint, $3::bigint)) AS viewer_unread
 			FROM wall_posts p
 			JOIN walls w ON w.wall_id = p.wall_id
-			JOIN walls owner_wall ON owner_wall.owner_id = p.owner_id
-			JOIN key_attributes owner_ka ON owner_ka.user_id = p.owner_id
+			JOIN key_attributes owner_ka ON owner_ka.user_id = w.owner_id
 			WHERE p.is_deleted = FALSE
 			  AND p.owner_id <> $1
 			  AND EXISTS (
