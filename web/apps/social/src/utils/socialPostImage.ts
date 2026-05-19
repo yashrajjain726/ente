@@ -11,6 +11,17 @@ export interface PreparedSocialImage {
 export type PreparedSocialAvatarImage = PreparedSocialImage;
 export type PreparedSocialPostImage = PreparedSocialImage;
 
+export interface SocialAvatarCropImage {
+    url: string;
+}
+
+export interface SocialImageCropArea {
+    height: number;
+    width: number;
+    x: number;
+    y: number;
+}
+
 export const socialAvatarImageInputAccept =
     "image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif";
 export const socialPostImageInputAccept =
@@ -59,6 +70,42 @@ export const prepareSocialAvatarImage = async (
     };
 };
 
+export const socialAvatarCropImageForFile = async (
+    file: File,
+): Promise<SocialAvatarCropImage> => {
+    const renderableBlob = await renderableBlobForSocialImage(file);
+    const imageURL = URL.createObjectURL(renderableBlob);
+
+    try {
+        await loadImage(imageURL);
+        return { url: imageURL };
+    } catch (error) {
+        URL.revokeObjectURL(imageURL);
+        throw error;
+    }
+};
+
+export const prepareSocialAvatarImageFromCrop = async (
+    file: File,
+    imageURL: string,
+    cropArea: SocialImageCropArea,
+): Promise<PreparedSocialAvatarImage> => {
+    const { blob, height, width } = await webPBlobFromImage(
+        imageURL,
+        (width, height) => avatarCanvasPlanForCrop(width, height, cropArea),
+        false,
+    );
+
+    return {
+        file: new File([blob], webPFileName(file.name), {
+            lastModified: file.lastModified || Date.now(),
+            type: socialPostImageMimeType,
+        }),
+        height,
+        width,
+    };
+};
+
 const renderableBlobForSocialImage = async (file: File): Promise<Blob> => {
     const extension = lowercaseExtension(file.name);
     const mediaType = file.type.toLowerCase();
@@ -80,10 +127,14 @@ interface CanvasPlan {
 }
 
 const webPBlobFromImage = async (
-    blob: Blob,
+    imageSource: Blob | string,
     planForSource: (width: number, height: number) => CanvasPlan,
+    revokeImageURL = true,
 ): Promise<{ blob: Blob; height: number; width: number }> => {
-    const imageURL = URL.createObjectURL(blob);
+    const imageURL =
+        typeof imageSource == "string"
+            ? imageSource
+            : URL.createObjectURL(imageSource);
     try {
         const image = await loadImage(imageURL);
         const plan = planForSource(
@@ -119,7 +170,7 @@ const webPBlobFromImage = async (
             width: plan.width,
         };
     } finally {
-        URL.revokeObjectURL(imageURL);
+        if (revokeImageURL) URL.revokeObjectURL(imageURL);
     }
 };
 
@@ -171,6 +222,39 @@ const avatarCanvasPlan = (width: number, height: number): CanvasPlan => {
     };
 };
 
+const avatarCanvasPlanForCrop = (
+    width: number,
+    height: number,
+    cropArea: SocialImageCropArea,
+): CanvasPlan => {
+    if (width <= 0 || height <= 0) {
+        return {
+            height: 0,
+            sourceHeight: 0,
+            sourceWidth: 0,
+            sourceX: 0,
+            sourceY: 0,
+            width: 0,
+        };
+    }
+
+    const sourceEdge = Math.min(
+        Math.max(1, Math.min(cropArea.width, cropArea.height)),
+        width,
+        height,
+    );
+    const outputEdge = socialAvatarImageMaxEdge;
+
+    return {
+        height: outputEdge,
+        sourceHeight: sourceEdge,
+        sourceWidth: sourceEdge,
+        sourceX: clampNumber(cropArea.x, 0, Math.max(0, width - sourceEdge)),
+        sourceY: clampNumber(cropArea.y, 0, Math.max(0, height - sourceEdge)),
+        width: outputEdge,
+    };
+};
+
 const scaledDimensions = (
     width: number,
     height: number,
@@ -189,6 +273,9 @@ const scaledDimensions = (
         width: Math.max(1, Math.round(width * scale)),
     };
 };
+
+const clampNumber = (value: number, min: number, max: number) =>
+    Math.min(Math.max(value, min), max);
 
 const canvasToBlob = async (
     canvas: HTMLCanvasElement,
