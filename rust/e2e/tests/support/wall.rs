@@ -30,3 +30,11 @@ pub fn assert_http_status<T>(result: Result<T, WallError>, expected_status: u16)
         Ok(_) => panic!("expected HTTP {expected_status}, got success"),
     }
 }
+
+pub fn assert_invalid_input_contains<T>(result: Result<T, WallError>, expected: &str) {
+    match result {
+        Err(WallError::InvalidInput(message)) if message.contains(expected) => {}
+        Err(error) => panic!("expected invalid input containing {expected:?}, got {error:?}"),
+        Ok(_) => panic!("expected invalid input containing {expected:?}, got success"),
+    }
+}

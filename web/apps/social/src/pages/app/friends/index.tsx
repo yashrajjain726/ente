@@ -44,12 +44,13 @@ const Page: React.FC = () => {
                 onOpenFriend={(friendID) =>
                     void router.push(socialRoutes.friend(friendID))
                 }
-                onUnfriend={(friendID) => {
+                onUnfriend={async (friendID) => {
                     const friend = friends.find(
                         (candidate) => candidate.id == friendID,
                     );
-                    if (friend?.wallId)
-                        void removeCurrentWallFriend(friend.wallId);
+                    if (!friend?.wallId) return;
+
+                    await removeCurrentWallFriend(friend.wallId);
                     setFriends((currentFriends) =>
                         currentFriends.filter(
                             (candidate) => candidate.id != friendID,

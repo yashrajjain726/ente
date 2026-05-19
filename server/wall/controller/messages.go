@@ -170,6 +170,16 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 	if message.IsDeleted {
 		return nil, ente.NewBadRequestWithMessage("cannot like a deleted message")
 	}
+	otherWallID := message.SenderWallID
+	if message.SenderID == userID {
+		otherWallID = message.RecipientWallID
+	}
+	if _, err := c.FriendsRepo.GetShareForFriendAndWall(ctx.Request.Context(), userID, otherWallID); err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, ente.ErrPermissionDenied
+		}
+		return nil, err
+	}
 	if err := c.MessagesRepo.SetLike(ctx.Request.Context(), messageID, userID, req.Like); err != nil {
 		return nil, err
 	}

@@ -16,6 +16,7 @@ interface ConfirmationActionSheetProps {
     confirmLabel: string;
     confirmActionPhase?: SocialActionPhase | null;
     confirmDisabled?: boolean;
+    errorMessage?: string | null;
     cancelLabel?: string;
     cancelDisabled?: boolean;
     onCancel: () => void;
@@ -32,6 +33,7 @@ export const ConfirmationActionSheet: React.FC<
     confirmLabel,
     confirmActionPhase = null,
     confirmDisabled = false,
+    errorMessage = null,
     cancelLabel = "Cancel",
     cancelDisabled = false,
     onCancel,
@@ -130,6 +132,22 @@ export const ConfirmationActionSheet: React.FC<
                     disabled={cancelDisabled}
                     onClick={onCancel}
                 />
+                {errorMessage && (
+                    <Box
+                        role="alert"
+                        sx={{
+                            color: dangerColor,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            lineHeight: "18px",
+                            px: "12px",
+                            textAlign: "center",
+                        }}
+                    >
+                        {errorMessage}
+                    </Box>
+                )}
             </Box>
         </Dialog>
     );

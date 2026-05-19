@@ -264,6 +264,232 @@ async fn wall_bootstrap_posts_friend_share_and_link_suite() {
 
 #[tokio::test]
 #[ignore = "requires local Museum at ENTE_E2E_ENDPOINT or http://localhost:8080"]
+async fn wall_unfriend_revokes_reciprocal_account_access_suite() {
+    let endpoint = support::endpoint();
+    if !support::assert_server_or_skip(&endpoint, "wall unfriend e2e suite").await {
+        return;
+    }
+
+    let owner = auth::create_account(
+        &endpoint,
+        support::unique_test_email("wall-unfriend-owner"),
+        support::unique_password("WallUnfriendOwner"),
+    )
+    .await;
+    let friend = auth::create_account(
+        &endpoint,
+        support::unique_test_email("wall-unfriend-friend"),
+        support::unique_password("WallUnfriendFriender"),
+    )
+    .await;
+
+    let owner_ctx = wall::open_ctx(&endpoint, &owner);
+    let friend_ctx = wall::open_ctx(&endpoint, &friend);
+
+    let owner_slug = format!("unfriend-owner-{}", owner.user_id);
+    let friend_slug = format!("unfriend-friend-{}", friend.user_id);
+    let owner_profile = wall::profile_payload("Unfriend Owner", "Owner bio");
+    let friend_profile = wall::profile_payload("Unfriend Friend", "Friend bio");
+    let owner_wall = owner_ctx
+        .create_wall(&owner_slug, &owner_profile)
+        .await
+        .expect("owner wall creation failed");
+    let friend_wall = friend_ctx
+        .create_wall(&friend_slug, &friend_profile)
+        .await
+        .expect("friend wall creation failed");
+
+    let post_key = owner_ctx.generate_post_key();
+    let object = owner_ctx
+        .upload_post_asset(&post_key, b"unfriend revocation post asset", Some(0))
+        .await
+        .expect("post asset upload should succeed");
+    let (post_id, _post_key) = owner_ctx
+        .create_post(
+            &owner_wall.wall_id,
+            &[object],
+            Some(br#"{"caption":"before unfriend"}"#),
+            Some(&post_key),
+        )
+        .await
+        .expect("post creation should succeed");
+
+    let link = owner_ctx
+        .create_wall_link(&owner_wall.wall_id)
+        .await
+        .expect("wall link should be created");
+    let link_ctx = WallLinkCtx::open(OpenWallLinkCtxInput {
+        base_url: endpoint.clone(),
+        wall_username: link.wall_username.clone(),
+        access_key: link.access_key.clone(),
+        user_agent: Some("ente-e2e".to_string()),
+        client_package: Some("io.ente.photos".to_string()),
+        client_version: Some("ente-e2e".to_string()),
+    })
+    .await
+    .expect("wall link should open");
+    friend_ctx
+        .add_friend_from_link(&link_ctx)
+        .await
+        .expect("friend add should succeed");
+
+    let friend_owner_profile = friend_ctx
+        .get_wall_profile_decrypted(&owner_wall.wall_id, None)
+        .await
+        .expect("friend should decrypt owner profile before unfriend");
+    assert_eq!(friend_owner_profile.profile, owner_profile);
+    let owner_friend_profile = owner_ctx
+        .get_wall_profile_decrypted(&friend_wall.wall_id, None)
+        .await
+        .expect("owner should decrypt friend profile before unfriend");
+    assert_eq!(owner_friend_profile.profile, friend_profile);
+    let feed = friend_ctx
+        .list_feed(None, Some(10))
+        .await
+        .expect("friend feed should load before unfriend");
+    assert!(feed.items.iter().any(|item| item.post_id == post_id));
+    friend_ctx
+        .like_post(post_id, true)
+        .await
+        .expect("friend should like owner post before unfriend");
+    let direct_message = friend_ctx
+        .send_message(&owner_wall.wall_id, "hello before unfriend")
+        .await
+        .expect("friend should send owner a direct message before unfriend");
+    let owner_thread = owner_ctx
+        .list_message_thread(&friend_wall.wall_id, None, Some(10))
+        .await
+        .expect("owner should read direct message thread before unfriend");
+    let owner_thread_message = owner_thread
+        .items
+        .iter()
+        .find(|message| message.message_id == direct_message.message_id)
+        .expect("direct message should be in owner thread before unfriend");
+    let decrypted_message = owner_ctx
+        .decrypt_message(owner_thread_message)
+        .expect("owner should decrypt direct message before unfriend");
+    assert_eq!(decrypted_message.payload.text, "hello before unfriend");
+    owner_ctx
+        .like_message(&direct_message.message_id, true)
+        .await
+        .expect("owner should like direct message before unfriend");
+
+    owner_ctx
+        .unfriend_by_wall(&friend_wall.wall_id)
+        .await
+        .expect("owner should unfriend friend");
+
+    let owner_shares = owner_ctx
+        .list_friend_shares()
+        .await
+        .expect("owner friend shares should load after unfriend");
+    assert!(owner_shares.is_empty());
+    let friend_shares = friend_ctx
+        .list_friend_shares()
+        .await
+        .expect("friend shares should load after unfriend");
+    assert!(friend_shares.is_empty());
+    let owner_friends = owner_ctx
+        .list_wall_friends(&owner_wall.wall_id)
+        .await
+        .expect("owner friend list should load after unfriend");
+    assert!(owner_friends.is_empty());
+    let friend_friends = friend_ctx
+        .list_wall_friends(&friend_wall.wall_id)
+        .await
+        .expect("friend friend list should load after unfriend");
+    assert!(friend_friends.is_empty());
+
+    let owner_relationship = owner_ctx
+        .get_relationship(&friend_wall.wall_id)
+        .await
+        .expect("owner relationship should load after unfriend");
+    assert!(owner_relationship.relationship.is_empty());
+    let friend_relationship = friend_ctx
+        .get_relationship(&owner_wall.wall_id)
+        .await
+        .expect("friend relationship should load after unfriend");
+    assert!(friend_relationship.relationship.is_empty());
+
+    let hydrated = friend_ctx
+        .hydrate_wall_keys()
+        .await
+        .expect("friend wall keys should hydrate after unfriend");
+    assert_eq!(hydrated.owned.len(), 1);
+    assert!(hydrated.friends.is_empty());
+    let feed = friend_ctx
+        .list_feed(None, Some(10))
+        .await
+        .expect("friend feed should load after unfriend");
+    assert!(
+        feed.items
+            .iter()
+            .all(|item| item.wall_id != owner_wall.wall_id)
+    );
+    let owner_thread = owner_ctx
+        .list_message_thread(&friend_wall.wall_id, None, Some(10))
+        .await
+        .expect("owner should still read direct message thread after unfriend");
+    let owner_thread_message = owner_thread
+        .items
+        .iter()
+        .find(|message| message.message_id == direct_message.message_id)
+        .expect("direct message should remain in owner thread after unfriend");
+    let decrypted_message = owner_ctx
+        .decrypt_message(owner_thread_message)
+        .expect("owner should still decrypt old direct message after unfriend");
+    assert_eq!(decrypted_message.payload.text, "hello before unfriend");
+    wall::assert_invalid_input_contains(
+        friend_ctx
+            .send_message(&owner_wall.wall_id, "should fail")
+            .await,
+        "not a friend",
+    );
+    wall::assert_invalid_input_contains(
+        owner_ctx
+            .reply_to_message(
+                &friend_wall.wall_id,
+                &direct_message.message_id,
+                "should fail",
+            )
+            .await,
+        "not a friend",
+    );
+    wall::assert_http_status(
+        owner_ctx
+            .like_message(&direct_message.message_id, false)
+            .await,
+        403,
+    );
+
+    wall::assert_http_status(
+        friend_ctx
+            .get_wall_profile_raw(&owner_wall.wall_id, None)
+            .await,
+        403,
+    );
+    wall::assert_http_status(
+        owner_ctx
+            .get_wall_profile_raw(&friend_wall.wall_id, None)
+            .await,
+        403,
+    );
+    wall::assert_http_status(friend_ctx.fetch_post_decrypted(post_id).await, 403);
+    wall::assert_http_status(friend_ctx.like_post(post_id, true).await, 403);
+    wall::assert_http_status(friend_ctx.reply_to_post(post_id, "should fail").await, 403);
+
+    let likers = owner_ctx
+        .list_post_likers(post_id, None, Some(10))
+        .await
+        .expect("owner should still load post likers after unfriend");
+    assert_eq!(likers.likers.len(), 1);
+    assert_eq!(likers.likers[0].actor.wall_slug, friend_slug);
+    assert!(likers.likers[0].actor.wall_id.is_empty());
+    assert!(likers.likers[0].actor.public_key.is_empty());
+}
+
+#[tokio::test]
+#[ignore = "requires local Museum at ENTE_E2E_ENDPOINT or http://localhost:8080"]
 async fn wall_rotation_history_refresh_and_link_suite() {
     let endpoint = support::endpoint();
     if !support::assert_server_or_skip(&endpoint, "wall rotation e2e suite").await {

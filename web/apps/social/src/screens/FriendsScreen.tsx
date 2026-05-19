@@ -27,7 +27,7 @@ interface FriendsScreenProps {
     friends: FriendProfile[];
     onBack?: () => void;
     onOpenFriend?: (friendID: string) => void;
-    onUnfriend?: (friendID: string) => void;
+    onUnfriend?: (friendID: string) => Promise<void> | void;
 }
 
 interface FriendRowProps {
@@ -284,17 +284,31 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         React.useState<FriendProfile | null>(null);
     const [unfriendActionPhase, setUnfriendActionPhase] =
         React.useState<SocialActionPhase | null>(null);
+    const [unfriendErrorMessage, setUnfriendErrorMessage] = React.useState<
+        string | null
+    >(null);
     const isUnfriendActionRunning = unfriendActionPhase != null;
 
     const cancelUnfriend = () => {
         if (isUnfriendActionRunning) return;
+        setUnfriendErrorMessage(null);
         setFriendToUnfriend(null);
     };
 
     const confirmUnfriend = () => {
         if (!friendToUnfriend || isUnfriendActionRunning) return;
-        onUnfriend?.(friendToUnfriend.id);
-        setUnfriendActionPhase("done");
+        setUnfriendErrorMessage(null);
+        setUnfriendActionPhase("busy");
+        void (async () => {
+            try {
+                await Promise.resolve(onUnfriend?.(friendToUnfriend.id));
+                setUnfriendActionPhase("done");
+            } catch (error) {
+                console.error("Failed to unfriend social friend", error);
+                setUnfriendActionPhase(null);
+                setUnfriendErrorMessage("Couldn't unfriend. Please try again.");
+            }
+        })();
     };
 
     React.useEffect(() => {
@@ -308,8 +322,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     }, [unfriendActionPhase]);
 
     const handleUnfriendSheetExited = () => {
-        if (!unfriendActionPhase) return;
         setUnfriendActionPhase(null);
+        setUnfriendErrorMessage(null);
     };
 
     return (
@@ -411,7 +425,10 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                 key={friend.id}
                                 friend={friend}
                                 onOpenFriend={onOpenFriend}
-                                onUnfriend={() => setFriendToUnfriend(friend)}
+                                onUnfriend={() => {
+                                    setUnfriendErrorMessage(null);
+                                    setFriendToUnfriend(friend);
+                                }}
                             />
                         ))}
                     </Box>
@@ -443,6 +460,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 confirmLabel="Yes, unfriend"
                 confirmActionPhase={unfriendActionPhase}
                 confirmDisabled={isUnfriendActionRunning}
+                errorMessage={unfriendErrorMessage}
                 cancelDisabled={isUnfriendActionRunning}
                 onCancel={cancelUnfriend}
                 onConfirm={confirmUnfriend}

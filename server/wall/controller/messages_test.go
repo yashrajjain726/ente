@@ -2,8 +2,10 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/internal/testutil"
 	"github.com/ente-io/museum/wall/models"
 	wallrepo "github.com/ente-io/museum/wall/repo"
@@ -78,6 +80,13 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), viewed.Likes)
 	require.True(t, viewed.ViewerLiked)
+
+	require.NoError(t, repos.Friends.DeleteFriendship(ctx, aliceID, bobWall.WallID))
+	_, err = controller.ToggleLike(newWallControllerContext(aliceID), message.MessageID, models.LikeMessageRequest{Like: false})
+	require.True(t, errors.Is(err, ente.ErrPermissionDenied))
+	thread, _, err := repos.Messages.ListThread(ctx, aliceID, bobWall.WallID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, thread, 1)
 
 	require.Error(t, controller.Delete(newWallControllerContext(aliceID), message.MessageID))
 	require.NoError(t, controller.Delete(newWallControllerContext(bobID), message.MessageID))
