@@ -23,7 +23,7 @@ use crate::transport::{
     UpdatePostCaptionRequest, UpdateWallProfileRequest, UpdateWallProfileResponse,
     UpdateWallSlugRequest, WallActorResponse, WallFriendResponse, WallKeyResponse,
     WallKeyVersionResponse, WallLinkCreateRequest, WallLinkLoginRequest, WallLinkLoginResponse,
-    WallLinkStatusResponse, WallLookupResponse, WallNotificationPage, WallProfileResponse,
+    WallLinkStatusResponse, WallLookupResponse, WallProfileResponse,
 };
 use ente_core::crypto::{sealed, secretbox};
 use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
@@ -620,24 +620,6 @@ impl AccountWallCtx {
         }
         self.client
             .get_json("/wall/feed", &query)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn list_notifications(
-        &self,
-        cursor: Option<String>,
-        limit: Option<i32>,
-    ) -> Result<WallNotificationPage> {
-        let mut query = Vec::new();
-        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
-            query.push(("cursor", value));
-        }
-        if let Some(value) = limit {
-            query.push(("limit", value.to_string()));
-        }
-        self.client
-            .get_json("/wall/notifications", &query)
             .await
             .map_err(Into::into)
     }
@@ -2963,104 +2945,6 @@ mod tests {
         assert_eq!(page.items[0].post_id, 42);
         assert_eq!(page.next_cursor, "cursor-2");
         feed.assert_async().await;
-    }
-
-    #[tokio::test]
-    async fn list_notifications_uses_wall_notifications_endpoint() {
-        let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
-        let notifications = server
-            .mock("GET", "/wall/notifications")
-            .match_header("x-auth-token", "token")
-            .match_query(Matcher::AllOf(vec![
-                Matcher::UrlEncoded("cursor".into(), "cursor-1".into()),
-                Matcher::UrlEncoded("limit".into(), "5".into()),
-            ]))
-            .with_status(200)
-            .with_body(
-                json!({
-                    "items": [
-                        {
-                            "id": "post_like:42:9",
-                            "type": "likedPost",
-                            "createdAt": "2026-04-16T00:00:00Z",
-                            "actor": {
-                                "userId": 9,
-                                "username": "mira",
-                                "wallId": "wall_mira",
-                                "wallSlug": "mira"
-                            },
-                            "post": {
-                                "postId": 42,
-                                "wallId": "wall_owner_gallery",
-                                "wallSlug": "owner-gallery",
-                                "ownerUserId": 7,
-                                "author": {
-                                    "userId": 7,
-                                    "wallId": "wall_owner_gallery",
-                                    "wallSlug": "owner-gallery"
-                                }
-                            }
-                        },
-                        {
-                            "id": "post_reply:wmsg_1",
-                            "type": "repliedToPost",
-                            "createdAt": "2026-04-16T12:00:00Z",
-                            "actor": {
-                                "userId": 9,
-                                "username": "mira",
-                                "wallId": "wall_mira",
-                                "wallSlug": "mira"
-                            },
-                            "post": {
-                                "postId": 42,
-                                "wallId": "wall_owner_gallery",
-                                "wallSlug": "owner-gallery",
-                                "ownerUserId": 7,
-                                "author": {
-                                    "userId": 7,
-                                    "wallId": "wall_owner_gallery",
-                                    "wallSlug": "owner-gallery"
-                                }
-                            }
-                        },
-                        {
-                            "id": "friend_remove:12",
-                            "type": "removedYouAsFriend",
-                            "createdAt": "2026-04-17T00:00:00Z",
-                            "actor": {
-                                "wallSlug": "mira"
-                            }
-                        }
-                    ],
-                    "nextCursor": "cursor-2"
-                })
-                .to_string(),
-            )
-            .create_async()
-            .await;
-
-        let page = ctx
-            .list_notifications(Some("cursor-1".to_owned()), Some(5))
-            .await
-            .expect("notifications should load");
-
-        assert_eq!(page.items.len(), 3);
-        assert_eq!(
-            page.items[0].notification_type,
-            crate::transport::WallNotificationType::LikedPost
-        );
-        assert_eq!(
-            page.items[1].notification_type,
-            crate::transport::WallNotificationType::RepliedToPost
-        );
-        assert_eq!(
-            page.items[2].notification_type,
-            crate::transport::WallNotificationType::RemovedYouAsFriend
-        );
-        assert_eq!(page.items[0].actor.wall_slug, "mira");
-        assert_eq!(page.next_cursor, "cursor-2");
-        notifications.assert_async().await;
     }
 
     #[tokio::test]

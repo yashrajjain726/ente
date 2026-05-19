@@ -259,15 +259,6 @@ pub struct PostPage {
     pub next_cursor: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum WallNotificationType {
-    LikedPost,
-    RepliedToPost,
-    AddedYouAsFriend,
-    RemovedYouAsFriend,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct WallActorResponse {
@@ -288,38 +279,6 @@ pub struct WallActorResponse {
     pub friends: Option<i64>,
     #[serde(default)]
     pub posts: Option<i64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WallNotificationPost {
-    pub post_id: i64,
-    pub wall_id: String,
-    pub wall_slug: String,
-    pub owner_user_id: i64,
-    pub author: WallActorResponse,
-    #[serde(default)]
-    pub objects: Vec<PostObjectPayload>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WallNotification {
-    pub id: String,
-    #[serde(rename = "type")]
-    pub notification_type: WallNotificationType,
-    pub created_at: String,
-    pub actor: WallActorResponse,
-    #[serde(default)]
-    pub post: Option<WallNotificationPost>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WallNotificationPage {
-    pub items: Vec<WallNotification>,
-    #[serde(default)]
-    pub next_cursor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

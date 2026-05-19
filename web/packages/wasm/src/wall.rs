@@ -6,7 +6,6 @@ use ente_wall::{
     DecryptedPost, DecryptedWallProfile, MessageConversationActivity, MessageConversationPost,
     MessageResponse, OpenAccountWallCtxInput, OpenWallLinkCtxInput, PostResponse, PrivateKeySource,
     ProfileAvatarResponse, WallActorResponse, WallError as CoreWallError, WallLinkCtx,
-    WallNotification, WallNotificationPost,
     crypto::{decode_b64, encode_b64},
 };
 use serde::{Deserialize, Serialize};
@@ -169,35 +168,6 @@ struct PostJs {
 #[serde(rename_all = "camelCase")]
 struct PostPageJs {
     items: Vec<PostJs>,
-    next_cursor: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct NotificationPostJs {
-    post_id: i64,
-    wall_id: String,
-    wall_slug: String,
-    owner_user_id: i64,
-    author: ActorJs,
-    objects: Vec<ente_wall::PostObjectPayload>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct NotificationJs {
-    id: String,
-    #[serde(rename = "type")]
-    notification_type: ente_wall::WallNotificationType,
-    created_at: String,
-    actor: ActorJs,
-    post: Option<NotificationPostJs>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct NotificationPageJs {
-    items: Vec<NotificationJs>,
     next_cursor: String,
 }
 
@@ -446,39 +416,6 @@ async fn link_post_page_to_js(
     Ok(PostPageJs {
         items,
         next_cursor: page.next_cursor,
-    })
-}
-
-async fn notification_to_js(
-    ctx: &AccountWallCtx,
-    notification: WallNotification,
-) -> Result<NotificationJs, WasmWallError> {
-    let post = match notification.post {
-        Some(post) => Some(notification_post_to_js(ctx, post).await?),
-        None => None,
-    };
-    let actor = account_actor_to_js(ctx, notification.actor).await?;
-    Ok(NotificationJs {
-        id: notification.id,
-        notification_type: notification.notification_type,
-        created_at: notification.created_at,
-        actor,
-        post,
-    })
-}
-
-async fn notification_post_to_js(
-    ctx: &AccountWallCtx,
-    post: WallNotificationPost,
-) -> Result<NotificationPostJs, WasmWallError> {
-    let author = account_actor_to_js(ctx, post.author).await?;
-    Ok(NotificationPostJs {
-        post_id: post.post_id,
-        wall_id: post.wall_id,
-        wall_slug: post.wall_slug,
-        owner_user_id: post.owner_user_id,
-        author,
-        objects: post.objects,
     })
 }
 
@@ -1044,24 +981,6 @@ impl WallAccountCtxHandle {
             .refresh_friend_shares(&wall_id)
             .await
             .map_err(Into::into)
-    }
-
-    /// List notifications.
-    pub async fn list_notifications(
-        &self,
-        cursor: Option<String>,
-        limit: Option<i32>,
-    ) -> Result<JsValue, WasmWallError> {
-        let page = self.inner.list_notifications(cursor, limit).await?;
-        let mut items = Vec::with_capacity(page.items.len());
-        for item in page.items {
-            items.push(notification_to_js(&self.inner, item).await?);
-        }
-        swb::to_value(&NotificationPageJs {
-            items,
-            next_cursor: page.next_cursor,
-        })
-        .map_err(Into::into)
     }
 }
 

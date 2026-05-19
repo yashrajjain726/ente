@@ -7,13 +7,12 @@ import (
 )
 
 type Module struct {
-	Walls         *WallsRepository
-	Posts         *PostsRepository
-	Friends       *FriendsRepository
-	Messages      *MessagesRepository
-	Notifications *NotificationsRepository
-	Links         *LinksRepository
-	Assets        *AssetsRepository
+	Walls    *WallsRepository
+	Posts    *PostsRepository
+	Friends  *FriendsRepository
+	Messages *MessagesRepository
+	Links    *LinksRepository
+	Assets   *AssetsRepository
 }
 
 type WallsRepository struct {
@@ -29,10 +28,6 @@ type FriendsRepository struct {
 }
 
 type MessagesRepository struct {
-	DB *sql.DB
-}
-
-type NotificationsRepository struct {
 	DB *sql.DB
 }
 
@@ -237,34 +232,13 @@ type WallLinkSessionRecord struct {
 	EncryptedWallKey string
 }
 
-type WallNotificationRecord struct {
-	ID                       string
-	Type                     string
-	CreatedAt                int64
-	Actor                    WallActorRecord
-	PostID                   sql.NullInt64
-	PostWallID               sql.NullString
-	PostWallSlug             sql.NullString
-	PostOwnerID              sql.NullInt64
-	PostAuthor               WallActorRecord
-	PostObjectKey            sql.NullString
-	PostObjectSize           sql.NullInt64
-	PostObjectPosition       sql.NullInt64
-	PostObjectVariant        sql.NullString
-	PostObjectBlurHashCipher sql.NullString
-	PostObjectWidth          sql.NullInt64
-	PostObjectHeight         sql.NullInt64
-	PostObjectMediaType      sql.NullString
-}
-
 func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {
 	return &Module{
-		Walls:         &WallsRepository{DB: db},
-		Posts:         &PostsRepository{DB: db},
-		Friends:       &FriendsRepository{DB: db},
-		Messages:      &MessagesRepository{DB: db},
-		Notifications: &NotificationsRepository{DB: db},
-		Links:         &LinksRepository{DB: db},
-		Assets:        &AssetsRepository{DB: db, S3Config: s3Config},
+		Walls:    &WallsRepository{DB: db},
+		Posts:    &PostsRepository{DB: db},
+		Friends:  &FriendsRepository{DB: db},
+		Messages: &MessagesRepository{DB: db},
+		Links:    &LinksRepository{DB: db},
+		Assets:   &AssetsRepository{DB: db, S3Config: s3Config},
 	}
 }

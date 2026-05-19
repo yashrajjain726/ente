@@ -2,7 +2,7 @@ mod support;
 #[path = "support/wall.rs"]
 mod wall;
 
-use ente_wall::{OpenWallLinkCtxInput, WallLinkCtx, WallNotificationType};
+use ente_wall::{OpenWallLinkCtxInput, WallLinkCtx};
 
 use support::auth;
 
@@ -222,26 +222,6 @@ async fn wall_bootstrap_posts_friend_share_and_link_suite() {
     assert_eq!(
         liker_profile.as_deref(),
         Some(friend_profile_payload.as_slice())
-    );
-
-    let notifications = owner_ctx
-        .list_notifications(None, Some(10))
-        .await
-        .expect("owner notifications should load");
-    let liked_notification = notifications
-        .items
-        .iter()
-        .find(|item| item.notification_type == WallNotificationType::LikedPost)
-        .expect("liked post notification should exist");
-    assert_eq!(liked_notification.actor.wall_id, friend_wall.wall_id);
-    assert_eq!(
-        liked_notification
-            .post
-            .as_ref()
-            .expect("liked post notification should include post")
-            .author
-            .wall_id,
-        owner_wall.wall_id
     );
 
     wall::assert_http_status(outsider_ctx.fetch_post_decrypted(post_id).await, 403);

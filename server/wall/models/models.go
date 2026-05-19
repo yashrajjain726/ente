@@ -26,11 +26,6 @@ type ListFeedRequest struct {
 	Limit  int    `form:"limit"`
 }
 
-type ListNotificationsRequest struct {
-	Cursor string `form:"cursor"`
-	Limit  int    `form:"limit"`
-}
-
 type ListMessagesRequest struct {
 	Cursor string `form:"cursor"`
 	Limit  int    `form:"limit"`
@@ -365,28 +360,6 @@ type PostPage struct {
 type FeedPage struct {
 	Items      []PostResponse `json:"items"`
 	NextCursor string         `json:"nextCursor,omitempty"`
-}
-
-type NotificationPostResponse struct {
-	PostID      int64               `json:"postId"`
-	WallID      string              `json:"wallId"`
-	WallSlug    string              `json:"wallSlug"`
-	OwnerUserID int64               `json:"ownerUserId"`
-	Author      WallActorResponse   `json:"author"`
-	Objects     []PostObjectPayload `json:"objects,omitempty"`
-}
-
-type NotificationResponse struct {
-	ID        string                    `json:"id"`
-	Type      string                    `json:"type"`
-	CreatedAt string                    `json:"createdAt"`
-	Actor     WallActorResponse         `json:"actor"`
-	Post      *NotificationPostResponse `json:"post,omitempty"`
-}
-
-type NotificationPage struct {
-	Items      []NotificationResponse `json:"items"`
-	NextCursor string                 `json:"nextCursor,omitempty"`
 }
 
 type UpdatedCountResponse struct {

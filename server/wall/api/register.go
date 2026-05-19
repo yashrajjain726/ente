@@ -21,7 +21,6 @@ func Register(privateAPI, publicAPI gin.IRoutes, handlers *Handlers) {
 	privateAPI.POST("/wall/messages/:wallID", handlers.CreateMessage)
 	privateAPI.POST("/wall/message/:messageID/like", handlers.ToggleMessageLike)
 	privateAPI.DELETE("/wall/message/:messageID", handlers.DeleteMessage)
-	privateAPI.GET("/wall/notifications", handlers.ListNotifications)
 	privateAPI.POST("/wall/friends/add", handlers.AddFriend)
 	privateAPI.POST("/wall/friends/unfriend", handlers.Unfriend)
 	privateAPI.GET("/wall/friends", handlers.ListWallFriends)
