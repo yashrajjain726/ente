@@ -7,7 +7,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
-    socialActionBusyDurationMs,
     socialActionDoneDurationMs,
     type SocialActionPhase,
 } from "components/SocialActionFeedback";
@@ -294,29 +293,19 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
 
     const confirmUnfriend = () => {
         if (!friendToUnfriend || isUnfriendActionRunning) return;
-        setUnfriendActionPhase("busy");
+        onUnfriend?.(friendToUnfriend.id);
+        setUnfriendActionPhase("done");
     };
 
     React.useEffect(() => {
-        if (!unfriendActionPhase) return;
+        if (unfriendActionPhase != "done") return;
 
-        const timeoutID = window.setTimeout(
-            () => {
-                if (unfriendActionPhase == "busy") {
-                    setUnfriendActionPhase("done");
-                    return;
-                }
-
-                if (friendToUnfriend) onUnfriend?.(friendToUnfriend.id);
-                setFriendToUnfriend(null);
-            },
-            unfriendActionPhase == "busy"
-                ? socialActionBusyDurationMs
-                : socialActionDoneDurationMs,
-        );
+        const timeoutID = window.setTimeout(() => {
+            setFriendToUnfriend(null);
+        }, socialActionDoneDurationMs);
 
         return () => window.clearTimeout(timeoutID);
-    }, [friendToUnfriend, onUnfriend, unfriendActionPhase]);
+    }, [unfriendActionPhase]);
 
     const handleUnfriendSheetExited = () => {
         if (!unfriendActionPhase) return;

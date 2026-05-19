@@ -4,7 +4,6 @@ import { Box } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import React from "react";
 
-export const socialActionBusyDurationMs = 2000;
 export const socialActionDoneDurationMs = 2400;
 export const socialActionTransition = "220ms cubic-bezier(0.4, 0, 0.2, 1)";
 

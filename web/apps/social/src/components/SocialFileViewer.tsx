@@ -12,7 +12,6 @@ import { Box, Menu, MenuItem } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
-    socialActionBusyDurationMs,
     socialActionDoneDurationMs,
     type SocialActionPhase,
 } from "components/SocialActionFeedback";
@@ -235,9 +234,6 @@ const resizeCaptionInput = (
         input.scrollHeight > captionInputMaxHeight ? "auto" : "hidden";
 };
 
-const wait = (durationMs: number) =>
-    new Promise((resolve) => window.setTimeout(resolve, durationMs));
-
 export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
     focusReplyOnOpen = false,
     initialScreen = "photo",
@@ -457,10 +453,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         setDeleteActionPhase("busy");
         void (async () => {
             try {
-                await Promise.all([
-                    Promise.resolve(onDeletePost?.()),
-                    wait(socialActionBusyDurationMs),
-                ]);
+                await Promise.resolve(onDeletePost?.());
                 setDeleteActionPhase("done");
             } catch (error) {
                 console.error("Failed to delete social post", error);
@@ -481,10 +474,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         setDraftPostActionPhase("busy");
         void (async () => {
             try {
-                await Promise.all([
-                    onPublishDraftPost(caption),
-                    wait(socialActionBusyDurationMs),
-                ]);
+                await onPublishDraftPost(caption);
                 setDraftPostActionPhase("done");
             } catch (error) {
                 console.error("Failed to publish social post", error);
@@ -500,10 +490,7 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
         setReplyActionPhase("busy");
         void (async () => {
             try {
-                await Promise.all([
-                    onReplyToPost(photo.postId!, text),
-                    wait(socialActionBusyDurationMs),
-                ]);
+                await onReplyToPost(photo.postId!, text);
                 setReplyText("");
                 setReplyActionPhase("done");
             } catch (error) {
