@@ -18,6 +18,7 @@ import {
     saveAcceptedSocialInviteFriend,
     savePendingSocialInvite,
     savePendingSocialInviteFriend,
+    savedPendingSocialInvite,
     socialInviteFromLocation,
     type PendingSocialInvite,
 } from "services/socialInvite";
@@ -30,11 +31,7 @@ import {
     useSocialAppState,
     type OnboardingEntrySource,
 } from "state/socialAppState";
-import {
-    addFriendLinkOnboardingSource,
-    onboardingSourceSearchParam,
-    socialRoutes,
-} from "utils/socialRoutes";
+import { socialRoutes } from "utils/socialRoutes";
 import { profilePostGroupsFromPosts } from "utils/socialWallDisplay";
 
 type RouteMode =
@@ -91,25 +88,8 @@ const PublicProfileUnavailable: React.FC = () => (
     </Box>
 );
 
-const parseOnboardingEntrySource = (): OnboardingEntrySource => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get(onboardingSourceSearchParam) ==
-        addFriendLinkOnboardingSource
-        ? "add-friend-link"
-        : "direct";
-};
-
-const removeOnboardingEntrySourceFromURL = () => {
-    const url = new URL(window.location.href);
-    if (!url.searchParams.has(onboardingSourceSearchParam)) return;
-
-    url.searchParams.delete(onboardingSourceSearchParam);
-    window.history.replaceState(
-        window.history.state,
-        "",
-        `${url.pathname}${url.search}${url.hash}`,
-    );
-};
+const onboardingEntrySourceFromPendingInvite = (): OnboardingEntrySource =>
+    savedPendingSocialInvite() ? "add-friend-link" : "direct";
 
 const Page: React.FC = () => {
     const router = useRouter();
@@ -134,8 +114,7 @@ const Page: React.FC = () => {
     useEffect(() => {
         const publicInvite = socialInviteFromLocation();
         if (!publicInvite) {
-            setOnboardingEntrySource(parseOnboardingEntrySource());
-            removeOnboardingEntrySourceFromURL();
+            setOnboardingEntrySource(onboardingEntrySourceFromPendingInvite());
         }
         setRouteMode(
             publicInvite
@@ -239,9 +218,7 @@ const Page: React.FC = () => {
                                 );
                             return;
                         }
-                        window.location.assign(
-                            `/?${onboardingSourceSearchParam}=${addFriendLinkOnboardingSource}`,
-                        );
+                        window.location.assign("/");
                     }}
                 />
             </>

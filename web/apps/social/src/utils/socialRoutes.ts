@@ -1,9 +1,6 @@
 export type SetupProfileSource = "login" | "verify";
 export type VerifyFlow = "login" | "signup";
 
-export const onboardingSourceSearchParam = "onboardingSource";
-export const addFriendLinkOnboardingSource = "add-friend-link";
-
 const valueFromQuery = (value: string | string[] | undefined) =>
     Array.isArray(value) ? value[0] : value;
 

@@ -254,7 +254,7 @@ const ConversationPreviewLine: React.FC<{
         color: textSecondary,
         fontFamily: '"Inter Variable", Inter, sans-serif',
         fontSize: 13,
-        fontWeight: conversation.unread ? 650 : 500,
+        fontWeight: conversation.unread ? 700 : 500,
         lineHeight: "18px",
         minWidth: 0,
         overflow: "hidden",
@@ -1650,7 +1650,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         m: 0,
                                     }}
                                 >
-                                    No messages yet
+                                    No notifications yet
                                 </Box>
                             </Box>
                         ) : (
