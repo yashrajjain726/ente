@@ -2,11 +2,19 @@ package repo
 
 import (
 	"database/sql"
+	"regexp"
 	"strings"
 
 	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/stacktrace"
 )
+
+const (
+	minWallSlugLength = 3
+	maxWallSlugLength = 30
+)
+
+var wallSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
 
 func normalizeSlug(input string) string {
 	return strings.ToLower(strings.TrimSpace(input))
@@ -146,6 +154,12 @@ func validateWallSlug(input string) (string, error) {
 	slug := normalizeSlug(input)
 	if slug == "" {
 		return "", ente.NewBadRequestWithMessage("wallSlug is required")
+	}
+	if len(slug) < minWallSlugLength || len(slug) > maxWallSlugLength {
+		return "", ente.NewBadRequestWithMessage("wallSlug must be 3-30 characters")
+	}
+	if !wallSlugPattern.MatchString(slug) {
+		return "", ente.NewBadRequestWithMessage("wallSlug can only contain lowercase letters, numbers, dots, dashes, or underscores, and must start with a letter or number")
 	}
 	if isReservedWallSlug(slug) {
 		return "", ente.NewBadRequestWithMessage("wallSlug is reserved")
