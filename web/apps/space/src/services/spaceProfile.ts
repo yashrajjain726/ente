@@ -110,7 +110,7 @@ const spaceHTTPStatus = (error: unknown) => {
 
 const defaultOwnedSpace = (spaces: OwnedSpace[]) => spaces[0];
 
-export const openCurrentSpaceContext = async () => {
+const currentSpaceContextConfig = async () => {
     const [authToken, baseUrl, masterKeyB64] = await Promise.all([
         savedAuthToken(),
         apiOrigin(),
@@ -123,23 +123,94 @@ export const openCurrentSpaceContext = async () => {
         return undefined;
     }
 
+    return {
+        cacheKey: [
+            user.id,
+            authToken,
+            baseUrl,
+            keyAttributes.publicKey,
+        ].join(":"),
+        input: {
+            authToken,
+            baseUrl,
+            clientPackage: clientPackageName,
+            clientVersion: isDesktop ? desktopAppVersion : undefined,
+            keyAttributes,
+            masterKeyB64,
+            publicKeyB64: keyAttributes.publicKey,
+            userId: user.id,
+        },
+    };
+};
+
+let currentSpaceContext:
+    | { cacheKey: string; ctx: SpaceAccountCtxHandle }
+    | undefined;
+let pendingCurrentSpaceContext:
+    | { cacheKey: string; promise: Promise<SpaceAccountCtxHandle> }
+    | undefined;
+let currentSpaceContextGeneration = 0;
+
+export const openCurrentSpaceContext = async () => {
+    const config = await currentSpaceContextConfig();
+    if (!config) return undefined;
+
     const { space_open_account_ctx } = await loadEnteWasm();
-    return await space_open_account_ctx({
-        authToken,
-        baseUrl,
-        clientPackage: clientPackageName,
-        clientVersion: isDesktop ? desktopAppVersion : undefined,
-        keyAttributes,
-        masterKeyB64,
-        publicKeyB64: keyAttributes.publicKey,
-        userId: user.id,
-    });
+    return await space_open_account_ctx(config.input);
+};
+
+export const clearCurrentSpaceContext = () => {
+    const cached = currentSpaceContext;
+    currentSpaceContextGeneration += 1;
+    currentSpaceContext = undefined;
+    pendingCurrentSpaceContext = undefined;
+    cached?.ctx.free();
 };
 
 export const ensureCurrentSpaceContext = async () => {
-    const ctx = await openCurrentSpaceContext();
-    if (!ctx) throw new Error("Please sign in again.");
-    return ctx;
+    const config = await currentSpaceContextConfig();
+    if (!config) throw new Error("Please sign in again.");
+
+    if (currentSpaceContext?.cacheKey == config.cacheKey) {
+        return currentSpaceContext.ctx;
+    }
+
+    if (currentSpaceContext) {
+        clearCurrentSpaceContext();
+    }
+
+    if (pendingCurrentSpaceContext?.cacheKey == config.cacheKey) {
+        return await pendingCurrentSpaceContext.promise;
+    }
+
+    const { space_open_account_ctx } = await loadEnteWasm();
+    const generation = currentSpaceContextGeneration;
+    const promise = space_open_account_ctx(config.input)
+        .then((ctx) => {
+            if (
+                currentSpaceContextGeneration != generation ||
+                pendingCurrentSpaceContext?.cacheKey != config.cacheKey
+            ) {
+                ctx.free();
+                throw new Error("Space context changed.");
+            }
+            currentSpaceContext = { cacheKey: config.cacheKey, ctx };
+            pendingCurrentSpaceContext = undefined;
+            return ctx;
+        })
+        .catch((error: unknown) => {
+            if (pendingCurrentSpaceContext?.cacheKey == config.cacheKey) {
+                pendingCurrentSpaceContext = undefined;
+            }
+            throw error;
+        });
+
+    pendingCurrentSpaceContext = { cacheKey: config.cacheKey, promise };
+    return await promise;
+};
+
+export const releaseCurrentSpaceContext = (_ctx: SpaceAccountCtxHandle) => {
+    // Shared context is freed by clearCurrentSpaceContext on logout/session change.
 };
 
 const avatarURLForRemoteAvatar = async (
@@ -302,7 +373,7 @@ export const saveSpaceProfile = async (
         }
         throw error;
     } finally {
-        ctx.free();
+        releaseCurrentSpaceContext(ctx);
     }
 };
 

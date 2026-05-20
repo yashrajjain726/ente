@@ -9,6 +9,8 @@ import {
     verifyTwoFactorBackground,
 } from "screens/VerifyTwoFactorScreen";
 import { completeSpaceLoginSecondFactor } from "services/spaceLogin";
+import { useSpaceAppState } from "state/spaceAppState";
+import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
 import { spaceRoutes } from "utils/spaceRoutes";
 
 const twoFactorErrorMessage = (error: unknown) => {
@@ -25,6 +27,7 @@ const twoFactorErrorMessage = (error: unknown) => {
 
 const Page: React.FC = () => {
     const router = useRouter();
+    const { refreshProfile } = useSpaceAppState();
     const [twoFactorSessionID, setTwoFactorSessionID] = useState("");
     const [errorMessage, setErrorMessage] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,7 +49,7 @@ const Page: React.FC = () => {
         setErrorMessage(undefined);
         try {
             await completeSpaceLoginSecondFactor(code, twoFactorSessionID);
-            void router.push(spaceRoutes.setupProfile("login"));
+            await routeAfterCompletedLogin(router, refreshProfile);
         } catch (error) {
             console.error("Space 2FA verification failed", error);
             setErrorMessage(twoFactorErrorMessage(error));

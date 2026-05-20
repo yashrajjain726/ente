@@ -1,4 +1,7 @@
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::{Mutex, MutexGuard},
+};
 
 use crate::crypto::{
     PACKED_SECRETBOX_OVERHEAD_BYTES, decode_b64, decrypt_entity_key, decrypt_secretbox_packed,
@@ -64,6 +67,9 @@ pub struct AccountSpaceCtx {
     public_key: Vec<u8>,
     private_key: Vec<u8>,
     user_id: Option<i64>,
+    root_space_key_cache: Mutex<Option<Option<Vec<u8>>>>,
+    owned_spaces_cache: Mutex<Option<Vec<SpaceKeyResponse>>>,
+    friend_shares_cache: Mutex<Option<Vec<DecryptedFriendShare>>>,
 }
 
 pub struct SpaceLinkCtx {
@@ -93,6 +99,9 @@ impl AccountSpaceCtx {
             public_key: input.public_key,
             private_key,
             user_id: input.user_id,
+            root_space_key_cache: Mutex::new(None),
+            owned_spaces_cache: Mutex::new(None),
+            friend_shares_cache: Mutex::new(None),
         })
     }
 
@@ -179,7 +188,10 @@ impl AccountSpaceCtx {
         let ensured = self
             .ensure_entity_key(ROOT_SPACE_KEY_TYPE, &payload)
             .await?;
-        decrypt_entity_key(&self.master_key, &ensured)
+        let root_space_key = decrypt_entity_key(&self.master_key, &ensured)?;
+        *cache_lock(&self.root_space_key_cache, "root space key")? =
+            Some(Some(root_space_key.clone()));
+        Ok(root_space_key)
     }
 
     pub async fn list_owned_spaces(&self) -> Result<Vec<SpaceKeyResponse>> {
@@ -270,6 +282,7 @@ impl AccountSpaceCtx {
             .client
             .post_json::<SpaceKeyResponse, _>("/space", &request)
             .await?;
+        self.clear_owned_space_cache()?;
         Ok(CreatedSpace {
             space_id: response.space_id,
             space_slug: response.space_slug,
@@ -309,10 +322,9 @@ impl AccountSpaceCtx {
         let request = UpdateSpaceSlugRequest {
             space_slug: space_slug.to_owned(),
         };
-        self.client
-            .put_json(&path, &request)
-            .await
-            .map_err(Into::into)
+        let response = self.client.put_json(&path, &request).await?;
+        self.clear_owned_space_cache()?;
+        Ok(response)
     }
 
     pub async fn get_space_profile_decrypted(
@@ -437,6 +449,7 @@ impl AccountSpaceCtx {
             .client
             .post_json::<SpaceKeyResponse, _>("/space/rotate", &request)
             .await?;
+        self.clear_owned_space_cache()?;
         Ok(CreatedSpace {
             space_id: response.space_id,
             space_slug: response.space_slug,
@@ -709,6 +722,21 @@ impl AccountSpaceCtx {
             .await
     }
 
+    pub async fn download_post_asset_with_key(
+        &self,
+        space_id: &str,
+        post_id: i64,
+        encrypted_post_key: &str,
+        key_version: i32,
+        object_key: &str,
+    ) -> Result<Vec<u8>> {
+        let post_key = self
+            .decrypt_post_key_fields(space_id, post_id, encrypted_post_key, key_version)
+            .await?;
+        self.download_decrypted_asset(space_id, object_key, &post_key)
+            .await
+    }
+
     pub async fn hydrate_space_keys(&self) -> Result<HydratedKeys> {
         let root_space_key = self.get_root_space_key().await?;
         let owned_records = self.list_owned_spaces().await?;
@@ -733,6 +761,23 @@ impl AccountSpaceCtx {
     pub fn decrypt_post_key(&self, space_key: &[u8], post: &PostResponse) -> Result<Vec<u8>> {
         let packed = decode_b64(&post.encrypted_post_key)?;
         decrypt_secretbox_packed(space_key, &packed)
+    }
+
+    pub async fn decrypt_post_key_fields(
+        &self,
+        space_id: &str,
+        post_id: i64,
+        encrypted_post_key: &str,
+        key_version: i32,
+    ) -> Result<Vec<u8>> {
+        let space_key = self
+            .resolve_space_key_for_version(space_id, Some(key_version))
+            .await?
+            .ok_or_else(|| {
+                SpaceError::InvalidInput(format!("missing space key for post {post_id}"))
+            })?;
+        let packed = decode_b64(encrypted_post_key)?;
+        decrypt_secretbox_packed(&space_key, &packed)
     }
 
     pub fn decrypt_post(&self, space_key: &[u8], post: &PostResponse) -> Result<DecryptedPost> {
@@ -966,6 +1011,8 @@ impl AccountSpaceCtx {
             quote: Some(MessageQuote {
                 post_id,
                 space_id: post.space_id.clone(),
+                encrypted_post_key: Some(post.encrypted_post_key.clone()),
+                key_version: Some(post.key_version),
                 caption,
                 object_key: object.map(|value| value.object_key.clone()),
                 width: object.and_then(|value| value.width),
@@ -1073,10 +1120,12 @@ impl AccountSpaceCtx {
             requester_encrypted_space_key: encode_b64(&pack_payload(&requester_share, &[])),
             requester_key_version: requester_space.key_version,
         };
-        self.client
+        let response = self
+            .client
             .post_json("/space/friends/add", &payload)
-            .await
-            .map_err(Into::into)
+            .await?;
+        self.clear_friend_share_cache()?;
+        Ok(response)
     }
 
     pub async fn unfriend_by_space(&self, space_id: &str) -> Result<()> {
@@ -1086,8 +1135,9 @@ impl AccountSpaceCtx {
         };
         self.client
             .post_empty("/space/friends/unfriend", &request)
-            .await
-            .map_err(Into::into)
+            .await?;
+        self.clear_friend_share_cache()?;
+        Ok(())
     }
 
     pub async fn unfriend_by_username(&self, username: &str) -> Result<()> {
@@ -1097,8 +1147,9 @@ impl AccountSpaceCtx {
         };
         self.client
             .post_empty("/space/friends/unfriend", &request)
-            .await
-            .map_err(Into::into)
+            .await?;
+        self.clear_friend_share_cache()?;
+        Ok(())
     }
 
     pub async fn list_space_friends(&self, space_id: &str) -> Result<Vec<SpaceFriendResponse>> {
@@ -1152,6 +1203,7 @@ impl AccountSpaceCtx {
         self.client
             .post_empty("/space/friends/shares/refresh", &payload)
             .await?;
+        self.clear_friend_share_cache()?;
         Ok(updated)
     }
 
@@ -1269,11 +1321,11 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
     ) -> Result<Option<ResolvedOwnedSpaceAccess>> {
-        let root_space_key = match self.get_root_space_key().await? {
+        let root_space_key = match self.get_root_space_key_cached().await? {
             Some(value) => value,
             None => return Ok(None),
         };
-        let spaces = self.list_owned_spaces().await?;
+        let spaces = self.list_owned_spaces_cached().await?;
         let Some(record) = spaces.into_iter().find(|value| value.space_id == space_id) else {
             return Ok(None);
         };
@@ -1290,11 +1342,10 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
     ) -> Result<Option<ResolvedSpaceAccess>> {
-        let shares = self.list_friend_shares().await?;
-        let Some(record) = shares.into_iter().find(|value| value.space_id == space_id) else {
+        let shares = self.list_decrypted_friend_shares_cached().await?;
+        let Some(share) = shares.into_iter().find(|value| value.space_id == space_id) else {
             return Ok(None);
         };
-        let share = self.decrypt_friend_share(&record)?;
         Ok(Some(ResolvedSpaceAccess {
             space_key: share.space_key,
             key_version: share.key_version,
@@ -1323,6 +1374,48 @@ impl AccountSpaceCtx {
         }
         let history = self.build_space_key_history_for_space(space_id).await?;
         Ok(history.get(&target_version).cloned())
+    }
+
+    async fn get_root_space_key_cached(&self) -> Result<Option<Vec<u8>>> {
+        if let Some(value) = cache_lock(&self.root_space_key_cache, "root space key")?.clone() {
+            return Ok(value);
+        }
+        let value = self.get_root_space_key().await?;
+        *cache_lock(&self.root_space_key_cache, "root space key")? = Some(value.clone());
+        Ok(value)
+    }
+
+    async fn list_owned_spaces_cached(&self) -> Result<Vec<SpaceKeyResponse>> {
+        if let Some(value) = cache_lock(&self.owned_spaces_cache, "owned spaces")?.clone() {
+            return Ok(value);
+        }
+        let value = self.list_owned_spaces().await?;
+        *cache_lock(&self.owned_spaces_cache, "owned spaces")? = Some(value.clone());
+        Ok(value)
+    }
+
+    async fn list_decrypted_friend_shares_cached(&self) -> Result<Vec<DecryptedFriendShare>> {
+        if let Some(value) = cache_lock(&self.friend_shares_cache, "friend shares")?.clone() {
+            return Ok(value);
+        }
+        let value = self
+            .list_friend_shares()
+            .await?
+            .into_iter()
+            .map(|share| self.decrypt_friend_share(&share))
+            .collect::<Result<Vec<_>>>()?;
+        *cache_lock(&self.friend_shares_cache, "friend shares")? = Some(value.clone());
+        Ok(value)
+    }
+
+    fn clear_owned_space_cache(&self) -> Result<()> {
+        *cache_lock(&self.owned_spaces_cache, "owned spaces")? = None;
+        Ok(())
+    }
+
+    fn clear_friend_share_cache(&self) -> Result<()> {
+        *cache_lock(&self.friend_shares_cache, "friend shares")? = None;
+        Ok(())
     }
 }
 
@@ -1674,6 +1767,12 @@ fn build_http_client(
         timeout_secs: Some(30),
     })
     .map_err(Into::into)
+}
+
+fn cache_lock<'a, T>(cache: &'a Mutex<T>, name: &str) -> Result<MutexGuard<'a, T>> {
+    cache
+        .lock()
+        .map_err(|_| SpaceError::InvalidInput(format!("{name} cache poisoned")))
 }
 
 fn decrypt_private_key(master_key: &[u8], source: PrivateKeySource) -> Result<Vec<u8>> {
@@ -2116,6 +2215,87 @@ mod tests {
         assert_eq!(bytes, b"post-image");
         redirect.assert_async().await;
         object.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn account_space_key_resolution_is_cached_within_context() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let root_space_key = generate_key();
+        let friend_space_key = generate_key();
+        let encrypted_profile = encode_b64(
+            &encrypt_secretbox_packed(&friend_space_key, b"friend-profile").expect("profile wrap"),
+        );
+        let sealed_share =
+            sealed::seal(&friend_space_key, ctx.public_key()).expect("friend share seal");
+        let encrypted_space_key = encode_b64(&pack_payload(&sealed_share, &[]));
+
+        let entity = server
+            .mock("GET", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "type".into(),
+                ROOT_SPACE_KEY_TYPE.into(),
+            ))
+            .with_status(200)
+            .with_body(root_entity_response(&ctx.master_key, &root_space_key))
+            .expect(1)
+            .create_async()
+            .await;
+        let spaces = server
+            .mock("GET", "/space")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(owned_space_response(
+                &root_space_key,
+                &generate_key(),
+                "space_owner_main",
+                "owner",
+                1,
+            ))
+            .expect(1)
+            .create_async()
+            .await;
+        let shares = server
+            .mock("GET", "/space/friends/shares")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "friend": "friend",
+                    "spaceId": "space_friend",
+                    "spaceSlug": "friend",
+                    "encryptedSpaceKey": encrypted_space_key,
+                    "keyVersion": 1
+                }])
+                .to_string(),
+            )
+            .expect(1)
+            .create_async()
+            .await;
+        let actor = SpaceActorResponse {
+            user_id: 7,
+            space_id: "space_friend".to_owned(),
+            space_slug: "friend".to_owned(),
+            key_version: 1,
+            encrypted_profile,
+            ..Default::default()
+        };
+
+        let first = ctx
+            .decrypt_actor_profile(&actor)
+            .await
+            .expect("first profile decrypt");
+        let second = ctx
+            .decrypt_actor_profile(&actor)
+            .await
+            .expect("second profile decrypt");
+
+        assert_eq!(first.as_deref(), Some(b"friend-profile".as_slice()));
+        assert_eq!(second.as_deref(), Some(b"friend-profile".as_slice()));
+        entity.assert_async().await;
+        spaces.assert_async().await;
+        shares.assert_async().await;
     }
 
     #[tokio::test]
@@ -2928,6 +3108,8 @@ mod tests {
             quote: Some(MessageQuote {
                 post_id: 1,
                 space_id: "space_owner_main".to_owned(),
+                encrypted_post_key: None,
+                key_version: None,
                 caption: Some("a".repeat(MAX_SPACE_MESSAGE_PAYLOAD_BYTES)),
                 object_key: None,
                 width: None,
@@ -3191,7 +3373,7 @@ mod tests {
             ))
             .with_status(200)
             .with_body(root_entity_response(&ctx.master_key, &root_space_key))
-            .expect(2)
+            .expect(1)
             .create_async()
             .await;
         let spaces = server
@@ -3205,7 +3387,7 @@ mod tests {
                 "owner-main",
                 3,
             ))
-            .expect(2)
+            .expect(1)
             .create_async()
             .await;
         let status = server

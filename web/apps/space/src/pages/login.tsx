@@ -9,12 +9,16 @@ import {
 import { beginSpaceLogin, type SpaceLoginResult } from "services/spaceLogin";
 import { savePendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
 import { useSpaceAppState } from "state/spaceAppState";
+import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
 import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { setPendingLoginCredentials, setPendingPasskeyVerification } =
-        useSpaceAppState();
+    const {
+        refreshProfile,
+        setPendingLoginCredentials,
+        setPendingPasskeyVerification,
+    } = useSpaceAppState();
     const [loginError, setLoginError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -23,14 +27,14 @@ const Page: React.FC = () => {
             ? error.message
             : "Couldn't sign in. Please try again.";
 
-    const handleLoginResult = (
+    const handleLoginResult = async (
         result: SpaceLoginResult,
         credentials: SpaceLoginCredentials,
     ) => {
         switch (result.status) {
             case "complete":
                 setPendingLoginCredentials(null);
-                void router.push(spaceRoutes.setupProfile("login"));
+                await routeAfterCompletedLogin(router, refreshProfile);
                 break;
             case "email-otp":
                 setPendingLoginCredentials({
@@ -71,7 +75,7 @@ const Page: React.FC = () => {
                     setIsSubmitting(true);
                     setLoginError(undefined);
                     try {
-                        handleLoginResult(
+                        await handleLoginResult(
                             await beginSpaceLogin(credentials),
                             credentials,
                         );

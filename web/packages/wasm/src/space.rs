@@ -193,6 +193,8 @@ struct PostLikerPageJs {
 struct MessageQuoteJs {
     post_id: i64,
     space_id: String,
+    encrypted_post_key: Option<String>,
+    key_version: Option<i32>,
     caption: Option<String>,
     object_key: Option<String>,
     width: Option<i32>,
@@ -438,6 +440,8 @@ async fn account_message_to_js(
     let quote = decrypted.payload.quote.map(|quote| MessageQuoteJs {
         post_id: quote.post_id,
         space_id: quote.space_id,
+        encrypted_post_key: quote.encrypted_post_key,
+        key_version: quote.key_version,
         caption: quote.caption,
         object_key: quote.object_key,
         width: quote.width,
@@ -815,6 +819,27 @@ impl SpaceAccountCtxHandle {
     ) -> Result<Vec<u8>, WasmSpaceError> {
         self.inner
             .download_post_asset(post_id, &object_key)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Download and decrypt one object from an already fetched space post.
+    pub async fn download_post_asset_with_key(
+        &self,
+        space_id: String,
+        post_id: i64,
+        encrypted_post_key: String,
+        key_version: i32,
+        object_key: String,
+    ) -> Result<Vec<u8>, WasmSpaceError> {
+        self.inner
+            .download_post_asset_with_key(
+                &space_id,
+                post_id,
+                &encrypted_post_key,
+                key_version,
+                &object_key,
+            )
             .await
             .map_err(Into::into)
     }

@@ -9,6 +9,11 @@ import type { SpaceLoginCredentials } from "screens/LoginScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import type { PendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
 import {
+    clearSpaceFriendsCache,
+    clearSpaceMediaURLCache,
+} from "services/space";
+import {
+    clearCurrentSpaceContext,
     loadExistingSpaceAvatar,
     loadExistingSpaceProfile,
 } from "services/spaceProfile";
@@ -114,6 +119,9 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
 
     const resetAfterLogout = useCallback(() => {
         profileLoadGenerationRef.current += 1;
+        clearCurrentSpaceContext();
+        clearSpaceFriendsCache();
+        clearSpaceMediaURLCache();
         applyProfile(null);
         setProfileLoadStatus("ready");
         setPendingLoginCredentials(null);

@@ -20,6 +20,7 @@ import {
     resendSpaceSignupCode,
 } from "services/spaceSignup";
 import { useSpaceAppState } from "state/spaceAppState";
+import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
 import { spaceRoutes, verifyFlowFromQuery } from "utils/spaceRoutes";
 
 const verificationErrorMessage = (error: unknown) => {
@@ -39,6 +40,7 @@ const Page: React.FC = () => {
     const {
         isLiveSignupVerification,
         pendingLoginCredentials,
+        refreshProfile,
         setIsLiveSignupVerification,
         setPendingLoginCredentials,
         setPendingPasskeyVerification,
@@ -91,12 +93,12 @@ const Page: React.FC = () => {
         signupEmail,
     ]);
 
-    const handleLoginResult = (result: SpaceLoginResult) => {
+    const handleLoginResult = async (result: SpaceLoginResult) => {
         switch (result.status) {
             case "complete":
                 setLoginCredentials(null);
                 setPendingLoginCredentials(null);
-                void router.push(spaceRoutes.setupProfile("login"));
+                await routeAfterCompletedLogin(router, refreshProfile);
                 break;
             case "totp":
                 setLoginCredentials(null);
@@ -149,7 +151,7 @@ const Page: React.FC = () => {
         }
 
         try {
-            handleLoginResult(
+            await handleLoginResult(
                 await completeSpaceLoginEmailVerification({
                     ...loginCredentials,
                     code,

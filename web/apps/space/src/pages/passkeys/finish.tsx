@@ -5,11 +5,13 @@ import { verifyEmailBackground } from "screens/VerifyEmailScreen";
 import { completeSpaceLoginPasskey } from "services/spaceLogin";
 import { clearPendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
 import { useSpaceAppState } from "state/spaceAppState";
+import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
 import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { setPendingPasskeyVerification } = useSpaceAppState();
+    const { refreshProfile, setPendingPasskeyVerification } =
+        useSpaceAppState();
 
     useEffect(() => {
         const searchParams = new URLSearchParams(window.location.search);
@@ -26,13 +28,17 @@ const Page: React.FC = () => {
                 await completeSpaceLoginPasskey(passkeySessionID, response);
                 clearPendingSpacePasskeyVerification();
                 setPendingPasskeyVerification(null);
-                void router.replace(spaceRoutes.setupProfile("login"));
+                await routeAfterCompletedLogin(
+                    router,
+                    refreshProfile,
+                    "replace",
+                );
             } catch (error) {
                 console.error("Space passkey verification failed", error);
                 void router.replace(spaceRoutes.login);
             }
         })();
-    }, [router, setPendingPasskeyVerification]);
+    }, [refreshProfile, router, setPendingPasskeyVerification]);
 
     return <SpaceRouteFallback background={verifyEmailBackground} />;
 };

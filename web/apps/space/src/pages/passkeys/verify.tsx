@@ -22,6 +22,7 @@ import {
     type PendingSpacePasskeyVerification,
 } from "services/spacePasskeyVerification";
 import { useSpaceAppState } from "state/spaceAppState";
+import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
 import { spaceRoutes } from "utils/spaceRoutes";
 
 const passkeyErrorMessage = (error: unknown) => {
@@ -38,8 +39,11 @@ const passkeyErrorMessage = (error: unknown) => {
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { pendingPasskeyVerification, setPendingPasskeyVerification } =
-        useSpaceAppState();
+    const {
+        pendingPasskeyVerification,
+        refreshProfile,
+        setPendingPasskeyVerification,
+    } = useSpaceAppState();
     const [verification, setVerification] =
         useState<PendingSpacePasskeyVerification>();
     const [status, setStatus] = useState<PasskeyVerificationStatus>("waiting");
@@ -102,7 +106,7 @@ const Page: React.FC = () => {
             }
 
             clearPasskeyVerification();
-            void router.push(spaceRoutes.setupProfile("login"));
+            await routeAfterCompletedLogin(router, refreshProfile);
         } catch (error) {
             console.error("Space passkey status check failed", error);
             setErrorMessage(passkeyErrorMessage(error));

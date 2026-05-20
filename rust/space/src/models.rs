@@ -86,6 +86,10 @@ pub struct MessageQuote {
     pub post_id: i64,
     pub space_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub encrypted_post_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_version: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub caption: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_key: Option<String>,
