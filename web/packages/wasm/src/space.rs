@@ -158,6 +158,7 @@ struct PostJs {
     owner_user_id: i64,
     author: ActorJs,
     caption: Option<String>,
+    encrypted_post_key: String,
     key_version: i32,
     objects: Vec<ente_space::PostObjectPayload>,
     created_at: String,
@@ -364,6 +365,7 @@ async fn account_post_to_js(
         owner_user_id: post.owner_user_id,
         author,
         caption: optional_utf8_field(decrypted.caption_plaintext, "caption")?,
+        encrypted_post_key: post.encrypted_post_key,
         key_version: post.key_version,
         objects: post.objects,
         created_at: post.created_at,
@@ -386,6 +388,7 @@ async fn link_post_to_js(
         owner_user_id: post.owner_user_id,
         author,
         caption: optional_utf8_field(decrypted.caption_plaintext, "caption")?,
+        encrypted_post_key: post.encrypted_post_key,
         key_version: post.key_version,
         objects: post.objects,
         created_at: post.created_at,
@@ -1067,6 +1070,20 @@ impl SpaceLinkCtxHandle {
     ) -> Result<Vec<u8>, WasmSpaceError> {
         self.inner
             .download_post_asset(post_id, &object_key)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Download and decrypt one object from an already fetched public space post.
+    pub async fn download_post_asset_with_key(
+        &self,
+        post_id: i64,
+        encrypted_post_key: String,
+        key_version: i32,
+        object_key: String,
+    ) -> Result<Vec<u8>, WasmSpaceError> {
+        self.inner
+            .download_post_asset_with_key(post_id, &encrypted_post_key, key_version, &object_key)
             .await
             .map_err(Into::into)
     }

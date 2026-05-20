@@ -1508,15 +1508,25 @@ impl SpaceLinkCtx {
         self.client.get_json(&path, &[]).await.map_err(Into::into)
     }
 
-    pub async fn decrypt_post_key(&self, post: &PostResponse) -> Result<Vec<u8>> {
+    pub async fn decrypt_post_key_fields(
+        &self,
+        post_id: i64,
+        encrypted_post_key: &str,
+        key_version: i32,
+    ) -> Result<Vec<u8>> {
         let space_key = self
-            .resolve_space_key_for_version(Some(post.key_version))
+            .resolve_space_key_for_version(Some(key_version))
             .await?
             .ok_or_else(|| {
-                SpaceError::InvalidInput(format!("missing space key for post {}", post.post_id))
+                SpaceError::InvalidInput(format!("missing space key for post {post_id}"))
             })?;
-        let packed = decode_b64(&post.encrypted_post_key)?;
+        let packed = decode_b64(encrypted_post_key)?;
         decrypt_secretbox_packed(&space_key, &packed)
+    }
+
+    pub async fn decrypt_post_key(&self, post: &PostResponse) -> Result<Vec<u8>> {
+        self.decrypt_post_key_fields(post.post_id, &post.encrypted_post_key, post.key_version)
+            .await
     }
 
     pub async fn decrypt_post(&self, post: &PostResponse) -> Result<DecryptedPost> {
@@ -1562,6 +1572,19 @@ impl SpaceLinkCtx {
         let decrypted = self.decrypt_post(&post).await?;
         self.download_decrypted_asset(object_key, &decrypted.post_key)
             .await
+    }
+
+    pub async fn download_post_asset_with_key(
+        &self,
+        post_id: i64,
+        encrypted_post_key: &str,
+        key_version: i32,
+        object_key: &str,
+    ) -> Result<Vec<u8>> {
+        let post_key = self
+            .decrypt_post_key_fields(post_id, encrypted_post_key, key_version)
+            .await?;
+        self.download_decrypted_asset(object_key, &post_key).await
     }
 
     pub async fn list_post_likers(
@@ -2031,6 +2054,68 @@ mod tests {
 
         assert_eq!(decrypted, post_key);
         versions.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn space_link_download_post_asset_with_key_skips_post_fetch() {
+        let mut server = Server::new_async().await;
+        let space_key = generate_key();
+        let post_key = generate_key();
+        let object_key = "space/1/posts/post-object";
+        let encrypted_post_key =
+            encode_b64(&encrypt_secretbox_packed(&space_key, &post_key).expect("post key wrap"));
+        let encrypted_asset =
+            encrypt_asset_payload(&post_key, b"post-image").expect("asset encryption");
+
+        let redirect = server
+            .mock("GET", "/space/assets/redirect")
+            .match_header("x-auth-token", "link-token")
+            .match_query(Matcher::AllOf(vec![
+                Matcher::UrlEncoded("spaceId".into(), "space_owner_gallery".into()),
+                Matcher::UrlEncoded("objectKey".into(), object_key.into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "url": format!("{}/objects/post-object", server.url()),
+                    "expiresIn": 900
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let object = server
+            .mock("GET", "/objects/post-object")
+            .with_status(200)
+            .with_body(encrypted_asset)
+            .create_async()
+            .await;
+        let ctx = SpaceLinkCtx {
+            client: build_http_client(
+                &server.url(),
+                Some("link-token".to_owned()),
+                None,
+                None,
+                None,
+            )
+            .expect("http client"),
+            session_token: "link-token".to_owned(),
+            owner_handle: "owner".to_owned(),
+            space_id: "space_owner_gallery".to_owned(),
+            space_slug: "owner-gallery".to_owned(),
+            owner_public_key: Vec::new(),
+            space_key,
+            key_version: 1,
+        };
+
+        let bytes = ctx
+            .download_post_asset_with_key(42, &encrypted_post_key, 1, object_key)
+            .await
+            .expect("asset should decrypt");
+
+        assert_eq!(bytes, b"post-image");
+        redirect.assert_async().await;
+        object.assert_async().await;
     }
 
     #[tokio::test]

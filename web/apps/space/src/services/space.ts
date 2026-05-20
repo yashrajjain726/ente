@@ -52,6 +52,8 @@ interface SpacePostResponse {
     author: SpaceActor;
     caption?: string;
     createdAt: string;
+    encryptedPostKey: string;
+    keyVersion: number;
     likes: number;
     objects?: SpacePostObject[];
     postId: number;
@@ -337,9 +339,17 @@ const accountAvatarURL = async (
 const linkAvatarURL = async (
     ctx: SpaceLinkCtxHandle,
     avatar: SpaceAvatar | undefined,
+    cache?: Map<string, Promise<string | null>>,
 ) => {
     if (!avatar?.objectKey) return null;
-    return blobURLForBytes(await ctx.download_space_avatar(avatar.objectKey));
+    const cached = cache?.get(avatar.objectKey);
+    if (cached) return cached;
+
+    const promise = ctx
+        .download_space_avatar(avatar.objectKey)
+        .then((bytes) => blobURLForBytes(bytes));
+    cache?.set(avatar.objectKey, promise);
+    return promise;
 };
 
 const firstObject = (post: { objects?: SpacePostObject[] }) =>
@@ -383,15 +393,21 @@ const postFromAccountPost = async (
 const postFromLinkPost = async (
     ctx: SpaceLinkCtxHandle,
     post: SpacePostResponse,
+    avatarCache: Map<string, Promise<string | null>>,
 ): Promise<SpacePost | null> => {
     const object = firstObject(post);
     if (!object) return null;
 
     const author = actorProfile(post.author);
-    author.avatarUrl = await linkAvatarURL(ctx, post.author.avatar);
+    author.avatarUrl = await linkAvatarURL(ctx, post.author.avatar, avatarCache);
 
     const imageUrl = blobURLForBytes(
-        await ctx.download_post_asset(BigInt(post.postId), object.objectKey),
+        await ctx.download_post_asset_with_key(
+            BigInt(post.postId),
+            post.encryptedPostKey,
+            post.keyVersion,
+            object.objectKey,
+        ),
         object.mediaType,
     );
     return {
@@ -426,10 +442,13 @@ const postPageFromAccountPage = async (
 const postPageFromLinkPage = async (
     ctx: SpaceLinkCtxHandle,
     page: SpacePostPageResponse,
+    avatarCache = new Map<string, Promise<string | null>>(),
 ): Promise<SpacePostPage> => {
     const items = (
         await Promise.all(
-            (page.items ?? []).map((post) => postFromLinkPost(ctx, post)),
+            (page.items ?? []).map((post) =>
+                postFromLinkPost(ctx, post, avatarCache),
+            ),
         )
     ).filter((post): post is SpacePost => Boolean(post));
     return { items, nextCursor: page.nextCursor || undefined };
@@ -910,13 +929,19 @@ export const loadPublicSpaceInvite = async ({
         spaceUsername,
     });
     try {
+        const avatarCache = new Map<string, Promise<string | null>>();
         const spaceProfile =
             (await ctx.get_space_profile()) as SpaceProfileResponse;
         const profile = profileFromSpaceProfile(spaceProfile);
-        profile.avatarUrl = await linkAvatarURL(ctx, spaceProfile.avatar);
+        profile.avatarUrl = await linkAvatarURL(
+            ctx,
+            spaceProfile.avatar,
+            avatarCache,
+        );
         const posts = await postPageFromLinkPage(
             ctx,
             (await ctx.list_posts(null, 60)) as SpacePostPageResponse,
+            avatarCache,
         );
         return { posts: posts.items, profile };
     } finally {

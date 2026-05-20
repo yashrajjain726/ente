@@ -36,6 +36,7 @@ func (h *Handlers) DeleteSpaceLink(c *gin.Context) {
 }
 
 func (h *Handlers) SpaceLinkLogin(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	var req models.SpaceLinkLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondJSON(c, nil, ente.ErrBadRequest)
