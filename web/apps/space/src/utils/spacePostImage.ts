@@ -28,8 +28,10 @@ export const maxSpaceAvatarImageBytes =
     spaceAvatarUploadMaxBytes - spaceAssetEncryptionOverheadBytes;
 export const maxSpacePostImageBytes =
     spacePostUploadMaxBytes - spaceAssetEncryptionOverheadBytes;
-export const spaceAvatarImageMaxSizeMessage = "Choose an image under 2 MiB.";
-export const spacePostImageMaxSizeMessage = "Choose an image under 10 MiB.";
+export const spaceAvatarImageMaxSizeMessage =
+    "This photo is too large. Try a smaller one.";
+export const spacePostImageMaxSizeMessage =
+    "This photo is too large. Try a smaller one.";
 
 export const prepareSpacePostImage = async (
     file: File,
