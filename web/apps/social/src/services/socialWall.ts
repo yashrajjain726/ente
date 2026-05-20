@@ -6,6 +6,7 @@ import { loadEnteWasm } from "ente-wasm/load";
 import type { PendingSocialInvite } from "services/socialInvite";
 import { socialInviteURL } from "services/socialInvite";
 import { ensureCurrentWallContext } from "services/socialProfile";
+import { normalizeSocialWallMessageText } from "utils/socialMessageLimits";
 
 interface WallAvatar {
     objectKey: string;
@@ -748,20 +749,22 @@ export const loadCurrentPostLikers = async (postId: number) => {
 };
 
 export const replyToCurrentPost = async (postId: number, text: string) => {
+    const messageText = normalizeSocialWallMessageText(text);
     const ctx = await ensureCurrentWallContext();
     try {
-        await ctx.reply_to_post(BigInt(postId), text.trim());
+        await ctx.reply_to_post(BigInt(postId), messageText);
     } finally {
         ctx.free();
     }
 };
 
 export const sendCurrentMessage = async (wallId: string, text: string) => {
+    const messageText = normalizeSocialWallMessageText(text);
     const ctx = await ensureCurrentWallContext();
     try {
         return await messageFromWallMessage(
             ctx,
-            (await ctx.send_message(wallId, text.trim())) as WallMessage,
+            (await ctx.send_message(wallId, messageText)) as WallMessage,
             true,
         );
     } finally {
@@ -774,6 +777,7 @@ export const replyToCurrentMessage = async (
     messageId: string,
     text: string,
 ) => {
+    const messageText = normalizeSocialWallMessageText(text);
     const ctx = await ensureCurrentWallContext();
     try {
         return await messageFromWallMessage(
@@ -781,7 +785,7 @@ export const replyToCurrentMessage = async (
             (await ctx.reply_to_message(
                 wallId,
                 messageId,
-                text.trim(),
+                messageText,
             )) as WallMessage,
             true,
         );

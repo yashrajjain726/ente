@@ -2,6 +2,7 @@ package controller
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"strconv"
 	"strings"
@@ -16,6 +17,11 @@ import (
 const (
 	wallMessageKindRegular   = "regular"
 	wallMessageKindPostReply = "post_reply"
+
+	maxWallMessageCipherEncodedBytes = 8 * 1024
+	maxWallMessageCipherDecodedBytes = 6 * 1024
+	maxWallMessageKeyEncodedBytes    = 1024
+	maxWallMessageKeyDecodedBytes    = 768
 )
 
 type MessagesController struct {
@@ -264,6 +270,30 @@ func validateCreateMessageRequest(req models.CreateMessageRequest) error {
 		strings.TrimSpace(req.SenderEncryptedMessageKey) == "" ||
 		strings.TrimSpace(req.RecipientEncryptedMessageKey) == "" {
 		return ente.NewBadRequestWithMessage("messageCipher and encrypted message keys are required")
+	}
+	if err := validateEncodedWallMessageField("messageCipher", req.MessageCipher, maxWallMessageCipherEncodedBytes, maxWallMessageCipherDecodedBytes); err != nil {
+		return err
+	}
+	if err := validateEncodedWallMessageField("senderEncryptedMessageKey", req.SenderEncryptedMessageKey, maxWallMessageKeyEncodedBytes, maxWallMessageKeyDecodedBytes); err != nil {
+		return err
+	}
+	if err := validateEncodedWallMessageField("recipientEncryptedMessageKey", req.RecipientEncryptedMessageKey, maxWallMessageKeyEncodedBytes, maxWallMessageKeyDecodedBytes); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateEncodedWallMessageField(field string, value string, maxEncodedBytes int, maxDecodedBytes int) error {
+	trimmed := strings.TrimSpace(value)
+	if len(trimmed) > maxEncodedBytes {
+		return ente.NewBadRequestWithMessage(field + " is too large")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(trimmed)
+	if err != nil || len(decoded) == 0 {
+		return ente.NewBadRequestWithMessage(field + " must be valid base64")
+	}
+	if len(decoded) > maxDecodedBytes {
+		return ente.NewBadRequestWithMessage(field + " is too large")
 	}
 	return nil
 }

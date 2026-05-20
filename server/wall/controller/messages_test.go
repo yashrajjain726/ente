@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"testing"
 
@@ -38,17 +39,17 @@ func TestMessageReplyValidation(t *testing.T) {
 	charlieMessage := createRepoMessage(t, repos, charlieID, charlieWall.WallID, aliceID, aliceWall.WallID, "")
 
 	_, err := controller.Create(newWallControllerContext(aliceID), bobWall.WallID, models.CreateMessageRequest{
-		MessageCipher:                "reply-cipher",
-		SenderEncryptedMessageKey:    "reply-sender-key",
-		RecipientEncryptedMessageKey: "reply-recipient-key",
+		MessageCipher:                wallTestB64("reply-cipher"),
+		SenderEncryptedMessageKey:    wallTestB64("reply-sender-key"),
+		RecipientEncryptedMessageKey: wallTestB64("reply-recipient-key"),
 		ReplyMessageID:               charlieMessage.MessageID,
 	})
 	require.Error(t, err)
 
 	reply, err := controller.Create(newWallControllerContext(aliceID), bobWall.WallID, models.CreateMessageRequest{
-		MessageCipher:                "reply-cipher",
-		SenderEncryptedMessageKey:    "reply-sender-key",
-		RecipientEncryptedMessageKey: "reply-recipient-key",
+		MessageCipher:                wallTestB64("reply-cipher"),
+		SenderEncryptedMessageKey:    wallTestB64("reply-sender-key"),
+		RecipientEncryptedMessageKey: wallTestB64("reply-recipient-key"),
 		ReplyMessageID:               bobMessage.MessageID,
 	})
 	require.NoError(t, err)
@@ -57,9 +58,9 @@ func TestMessageReplyValidation(t *testing.T) {
 
 	require.NoError(t, repos.Messages.DeleteMessage(ctx, bobMessage.MessageID, bobID))
 	_, err = controller.Create(newWallControllerContext(aliceID), bobWall.WallID, models.CreateMessageRequest{
-		MessageCipher:                "reply-after-delete-cipher",
-		SenderEncryptedMessageKey:    "reply-after-delete-sender-key",
-		RecipientEncryptedMessageKey: "reply-after-delete-recipient-key",
+		MessageCipher:                wallTestB64("reply-after-delete-cipher"),
+		SenderEncryptedMessageKey:    wallTestB64("reply-after-delete-sender-key"),
+		RecipientEncryptedMessageKey: wallTestB64("reply-after-delete-recipient-key"),
 		ReplyMessageID:               bobMessage.MessageID,
 	})
 	require.Error(t, err)
@@ -95,6 +96,31 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	require.Contains(t, err.Error(), "cannot like a deleted message")
 }
 
+func TestValidateCreateMessageRequestLimits(t *testing.T) {
+	valid := models.CreateMessageRequest{
+		MessageCipher:                wallTestB64("cipher"),
+		SenderEncryptedMessageKey:    wallTestB64("sender-key"),
+		RecipientEncryptedMessageKey: wallTestB64("recipient-key"),
+	}
+	require.NoError(t, validateCreateMessageRequest(valid))
+
+	invalidBase64 := valid
+	invalidBase64.MessageCipher = "not-base64"
+	require.Error(t, validateCreateMessageRequest(invalidBase64))
+
+	tooLargeCipher := valid
+	tooLargeCipher.MessageCipher = base64.StdEncoding.EncodeToString(make([]byte, maxWallMessageCipherDecodedBytes+1))
+	err := validateCreateMessageRequest(tooLargeCipher)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "messageCipher is too large")
+
+	tooLargeKey := valid
+	tooLargeKey.SenderEncryptedMessageKey = base64.StdEncoding.EncodeToString(make([]byte, maxWallMessageKeyDecodedBytes+1))
+	err = validateCreateMessageRequest(tooLargeKey)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "senderEncryptedMessageKey is too large")
+}
+
 func createMessageControllerUserAndWall(t *testing.T, repos *wallrepo.Module, slug string, publicKey string) (int64, *wallrepo.WallRecord) {
 	t.Helper()
 	userID := insertWallControllerUser(t, repos, slug+"@example.com", publicKey)
@@ -122,4 +148,8 @@ func createRepoMessage(t *testing.T, repos *wallrepo.Module, senderID int64, sen
 	message, err := repos.Messages.CreateMessage(context.Background(), input)
 	require.NoError(t, err)
 	return message
+}
+
+func wallTestB64(value string) string {
+	return base64.StdEncoding.EncodeToString([]byte(value))
 }

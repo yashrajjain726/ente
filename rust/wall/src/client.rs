@@ -39,6 +39,11 @@ pub const MAX_WALL_POST_PLAINTEXT_BYTES: usize =
     MAX_WALL_POST_UPLOAD_BYTES - PACKED_SECRETBOX_OVERHEAD_BYTES;
 pub const MAX_WALL_AVATAR_PLAINTEXT_BYTES: usize =
     MAX_WALL_AVATAR_UPLOAD_BYTES - PACKED_SECRETBOX_OVERHEAD_BYTES;
+pub const MAX_WALL_MESSAGE_TEXT_CHARS: usize = 1000;
+pub const MAX_WALL_MESSAGE_TEXT_BYTES: usize = 4 * 1024;
+pub const MAX_WALL_MESSAGE_CIPHER_DECODED_BYTES: usize = 6 * 1024;
+pub const MAX_WALL_MESSAGE_PAYLOAD_BYTES: usize =
+    MAX_WALL_MESSAGE_CIPHER_DECODED_BYTES - PACKED_SECRETBOX_OVERHEAD_BYTES;
 
 #[derive(Debug, Clone)]
 struct ResolvedWallAccess {
@@ -1022,6 +1027,7 @@ impl AccountWallCtx {
         let message_key = generate_key();
         let plaintext = serde_json::to_vec(payload)
             .map_err(|err| WallError::InvalidInput(format!("invalid message payload: {err}")))?;
+        validate_message_payload(payload, plaintext.len())?;
         let sender_key = sealed::seal(&message_key, &self.public_key)?;
         let recipient_key = sealed::seal(&message_key, &recipient_public_key)?;
         Ok(CreateMessageRequest {
@@ -1302,6 +1308,25 @@ fn ensure_wall_upload_size(purpose: &str, encrypted_size: usize, max_bytes: usiz
     if encrypted_size == 0 || encrypted_size > max_bytes {
         return Err(WallError::InvalidInput(format!(
             "{purpose} upload size must be between 1 and {max_bytes} bytes"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_message_payload(payload: &MessagePayload, plaintext_len: usize) -> Result<()> {
+    if payload.text.chars().count() > MAX_WALL_MESSAGE_TEXT_CHARS {
+        return Err(WallError::InvalidInput(format!(
+            "message text must be {MAX_WALL_MESSAGE_TEXT_CHARS} characters or fewer"
+        )));
+    }
+    if payload.text.len() > MAX_WALL_MESSAGE_TEXT_BYTES {
+        return Err(WallError::InvalidInput(format!(
+            "message text must be {MAX_WALL_MESSAGE_TEXT_BYTES} bytes or fewer"
+        )));
+    }
+    if plaintext_len > MAX_WALL_MESSAGE_PAYLOAD_BYTES {
+        return Err(WallError::InvalidInput(format!(
+            "message payload must be {MAX_WALL_MESSAGE_PAYLOAD_BYTES} bytes or fewer"
         )));
     }
     Ok(())
@@ -2762,6 +2787,46 @@ mod tests {
         reply.assert_async().await;
         like.assert_async().await;
         delete.assert_async().await;
+    }
+
+    #[test]
+    fn message_payload_limits_reject_oversized_text_and_payload() {
+        let valid = MessagePayload {
+            version: 1,
+            kind: MESSAGE_KIND_REGULAR.to_owned(),
+            text: "hello".to_owned(),
+            quote: None,
+        };
+        let valid_plaintext = serde_json::to_vec(&valid).expect("valid payload json");
+        validate_message_payload(&valid, valid_plaintext.len())
+            .expect("short message should be accepted");
+
+        let too_many_chars = MessagePayload {
+            text: "a".repeat(MAX_WALL_MESSAGE_TEXT_CHARS + 1),
+            ..valid.clone()
+        };
+        let plaintext = serde_json::to_vec(&too_many_chars).expect("long text json");
+        let err = validate_message_payload(&too_many_chars, plaintext.len())
+            .expect_err("long message text should be rejected");
+        assert!(err.to_string().contains("characters or fewer"));
+
+        let oversized_payload = MessagePayload {
+            text: "ok".to_owned(),
+            quote: Some(MessageQuote {
+                post_id: 1,
+                wall_id: "wall_owner_main".to_owned(),
+                caption: Some("a".repeat(MAX_WALL_MESSAGE_PAYLOAD_BYTES)),
+                object_key: None,
+                width: None,
+                height: None,
+                media_type: None,
+            }),
+            ..valid
+        };
+        let plaintext = serde_json::to_vec(&oversized_payload).expect("large payload json");
+        let err = validate_message_payload(&oversized_payload, plaintext.len())
+            .expect_err("large serialized payload should be rejected");
+        assert!(err.to_string().contains("payload must be"));
     }
 
     #[tokio::test]

@@ -17,6 +17,7 @@ import type {
     SocialWallMessageConversation,
 } from "services/socialWall";
 import { firstNameFrom, initialsFor } from "utils/socialDisplay";
+import { clampSocialWallMessageText } from "utils/socialMessageLimits";
 
 export const messagesBackground = "#FFFFFF";
 
@@ -1457,7 +1458,12 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     component="textarea"
                                     aria-label={`Message ${selectedName}`}
                                     onChange={(event) => {
-                                        setMessageText(event.target.value);
+                                        const nextText =
+                                            clampSocialWallMessageText(
+                                                event.target.value,
+                                            );
+                                        event.currentTarget.value = nextText;
+                                        setMessageText(nextText);
                                         resizeComposer(event.currentTarget);
                                     }}
                                     onKeyDown={handleComposerKeyDown}

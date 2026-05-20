@@ -23,6 +23,7 @@ import {
     formatSocialDate,
     initialsFor,
 } from "utils/socialDisplay";
+import { clampSocialWallMessageText } from "utils/socialMessageLimits";
 
 const green = "#08C225";
 const paleGreen = "#E7F6E9";
@@ -1311,7 +1312,11 @@ export const SocialFileViewer: React.FC<SocialFileViewerProps> = ({
                                 disabled={isReplyActionRunning}
                                 onBlur={() => setIsReplyFocused(false)}
                                 onChange={(event) => {
-                                    setReplyText(event.target.value);
+                                    const nextText = clampSocialWallMessageText(
+                                        event.target.value,
+                                    );
+                                    event.currentTarget.value = nextText;
+                                    setReplyText(nextText);
                                     resizeCaptionInput(
                                         event.currentTarget,
                                         replyInputMinHeight,
