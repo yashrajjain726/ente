@@ -11,6 +11,17 @@ export interface PreparedSpaceImage {
 export type PreparedSpaceAvatarImage = PreparedSpaceImage;
 export type PreparedSpacePostImage = PreparedSpaceImage;
 
+export interface SpaceAvatarCropImage {
+    url: string;
+}
+
+export interface SpaceImageCropArea {
+    height: number;
+    width: number;
+    x: number;
+    y: number;
+}
+
 export const spaceAvatarImageInputAccept =
     "image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif";
 export const spacePostImageInputAccept =
@@ -64,6 +75,47 @@ export const prepareSpaceAvatarImage = async (
     const { blob, height, width } = await webPBlobFromImage(
         renderableBlob,
         avatarCanvasPlan,
+    );
+    assertSpaceImageSize(
+        blob,
+        maxSpaceAvatarImageBytes,
+        spaceAvatarImageMaxSizeMessage,
+    );
+
+    return {
+        file: new File([blob], webPFileName(file.name), {
+            lastModified: file.lastModified || Date.now(),
+            type: spacePostImageMimeType,
+        }),
+        height,
+        width,
+    };
+};
+
+export const spaceAvatarCropImageForFile = async (
+    file: File,
+): Promise<SpaceAvatarCropImage> => {
+    const renderableBlob = await renderableBlobForSpaceImage(file);
+    const imageURL = URL.createObjectURL(renderableBlob);
+
+    try {
+        await loadImage(imageURL);
+        return { url: imageURL };
+    } catch (error) {
+        URL.revokeObjectURL(imageURL);
+        throw error;
+    }
+};
+
+export const prepareSpaceAvatarImageFromCrop = async (
+    file: File,
+    imageURL: string,
+    cropArea: SpaceImageCropArea,
+): Promise<PreparedSpaceAvatarImage> => {
+    const { blob, height, width } = await webPBlobFromImage(
+        imageURL,
+        (width, height) => avatarCanvasPlanForCrop(width, height, cropArea),
+        false,
     );
     assertSpaceImageSize(
         blob,
@@ -222,6 +274,39 @@ const avatarCanvasPlan = (width: number, height: number): CanvasPlan => {
     };
 };
 
+const avatarCanvasPlanForCrop = (
+    width: number,
+    height: number,
+    cropArea: SpaceImageCropArea,
+): CanvasPlan => {
+    if (width <= 0 || height <= 0) {
+        return {
+            height: 0,
+            sourceHeight: 0,
+            sourceWidth: 0,
+            sourceX: 0,
+            sourceY: 0,
+            width: 0,
+        };
+    }
+
+    const sourceEdge = Math.min(
+        Math.max(1, Math.min(cropArea.width, cropArea.height)),
+        width,
+        height,
+    );
+    const outputEdge = spaceAvatarImageMaxEdge;
+
+    return {
+        height: outputEdge,
+        sourceHeight: sourceEdge,
+        sourceWidth: sourceEdge,
+        sourceX: clampNumber(cropArea.x, 0, Math.max(0, width - sourceEdge)),
+        sourceY: clampNumber(cropArea.y, 0, Math.max(0, height - sourceEdge)),
+        width: outputEdge,
+    };
+};
+
 const scaledDimensions = (
     width: number,
     height: number,
@@ -240,6 +325,9 @@ const scaledDimensions = (
         width: Math.max(1, Math.round(width * scale)),
     };
 };
+
+const clampNumber = (value: number, min: number, max: number) =>
+    Math.min(Math.max(value, min), max);
 
 const canvasToBlob = async (
     canvas: HTMLCanvasElement,
