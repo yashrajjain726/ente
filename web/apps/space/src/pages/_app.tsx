@@ -7,7 +7,6 @@ import { shareTheme } from "ente-base/components/utils/theme";
 import type { AppProps } from "next/app";
 import "photoswipe/dist/photoswipe.css";
 import React from "react";
-import "react-easy-crop/react-easy-crop.css";
 import { SpaceAppStateProvider } from "state/SpaceAppStateProvider";
 import "styles/globals.css";
 

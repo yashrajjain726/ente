@@ -9,8 +9,7 @@
         "ente-base": "*",
         "ente-media": "*",
         "ente-wasm": "*",
-        "photoswipe": "^5.4.4",
-        "react-easy-crop": "^5.5.7"
+        "photoswipe": "^5.4.4"
     },
     "devDependencies": {
         "ente-build-config": "*"

@@ -1,9 +1,7 @@
 import { Box } from "@mui/material";
 import React, { useEffect, useRef, useState } from "react";
-import Cropper, { type Area, type Point } from "react-easy-crop";
 import {
-    prepareSpaceAvatarImageFromCrop,
-    spaceAvatarCropImageForFile,
+    prepareSpaceAvatarImage,
     spaceAvatarImageErrorMessage,
     spaceAvatarImageInputAccept,
 } from "utils/spacePostImage";
@@ -31,11 +29,6 @@ export interface SetupProfileInput extends SetupProfile {
     avatarFile?: File | null;
 }
 
-interface AvatarCropImage {
-    file: File;
-    url: string;
-}
-
 interface SetupProfileScreenProps {
     ctaLabel?: string;
     errorMessage?: string;
@@ -53,21 +46,6 @@ interface TextInputProps {
     placeholder?: string;
     required?: boolean;
     value?: string;
-}
-
-interface AvatarCropDialogProps {
-    crop: Point;
-    errorMessage?: string;
-    imageURL: string;
-    isDoneDisabled?: boolean;
-    isSaving?: boolean;
-    onCancel: () => void;
-    onChooseAnother: () => void;
-    onCropChange: (crop: Point) => void;
-    onCropComplete: (croppedArea: Area, croppedAreaPixels: Area) => void;
-    onDone: () => void;
-    onZoomChange: (zoom: number) => void;
-    zoom: number;
 }
 
 const BackIcon: React.FC = () => (
@@ -261,220 +239,6 @@ const TextInput: React.FC<TextInputProps> = ({
     </Box>
 );
 
-const AvatarCropDialogButton: React.FC<{
-    children: React.ReactNode;
-    disabled?: boolean;
-    onClick?: () => void;
-    variant: "primary" | "secondary";
-}> = ({ children, disabled = false, onClick, variant }) => (
-    <Box
-        className={variant == "primary" && !disabled ? "green-bg" : undefined}
-        component="button"
-        type="button"
-        disabled={disabled}
-        onClick={onClick}
-        sx={{
-            alignItems: "center",
-            bgcolor:
-                variant == "primary"
-                    ? disabled
-                        ? "#F5F5F5"
-                        : green
-                    : "transparent",
-            border: variant == "primary" ? 0 : "1px solid #E6E6E6",
-            borderRadius: "20px",
-            color:
-                variant == "primary"
-                    ? disabled
-                        ? textLight
-                        : "white"
-                    : textBase,
-            cursor: disabled ? "default" : "pointer",
-            display: "flex",
-            flex: "1 1 0",
-            fontFamily: '"Inter Variable", Inter, sans-serif',
-            fontSize: 14,
-            fontWeight: 500,
-            height: 44,
-            justifyContent: "center",
-            lineHeight: "20px",
-            minWidth: 0,
-            px: 2,
-            "&:focus-visible": {
-                outline: `2px solid ${green}`,
-                outlineOffset: 3,
-            },
-            "&:hover":
-                !disabled && variant == "primary"
-                    ? { bgcolor: "#07AE22" }
-                    : undefined,
-        }}
-    >
-        {children}
-    </Box>
-);
-
-const AvatarCropDialog: React.FC<AvatarCropDialogProps> = ({
-    crop,
-    errorMessage,
-    imageURL,
-    isDoneDisabled = false,
-    isSaving = false,
-    onCancel,
-    onChooseAnother,
-    onCropChange,
-    onCropComplete,
-    onDone,
-    onZoomChange,
-    zoom,
-}) => (
-    <Box
-        aria-labelledby="space-avatar-editor-title"
-        aria-modal="true"
-        role="dialog"
-        sx={{
-            alignItems: "center",
-            bgcolor: "rgba(0, 0, 0, 0.42)",
-            boxSizing: "border-box",
-            display: "flex",
-            inset: 0,
-            justifyContent: "center",
-            p: 3,
-            position: "fixed",
-            zIndex: 20,
-        }}
-    >
-        <Box
-            sx={{
-                bgcolor: "white",
-                borderRadius: "8px",
-                boxShadow: "0 20px 60px rgba(0, 0, 0, 0.24)",
-                boxSizing: "border-box",
-                maxWidth: 342,
-                p: 3,
-                width: "100%",
-            }}
-        >
-            <Box
-                component="h2"
-                id="space-avatar-editor-title"
-                sx={{
-                    color: textBase,
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 18,
-                    fontWeight: 600,
-                    lineHeight: "24px",
-                    m: 0,
-                    textAlign: "center",
-                }}
-            >
-                Profile picture
-            </Box>
-
-            <Box
-                sx={{
-                    bgcolor: "#111",
-                    borderRadius: "8px",
-                    height: 282,
-                    mt: 3,
-                    overflow: "hidden",
-                    position: "relative",
-                    width: "100%",
-                }}
-            >
-                <Cropper
-                    aspect={1}
-                    crop={crop}
-                    cropShape="round"
-                    disableAutomaticStylesInjection
-                    image={imageURL}
-                    maxZoom={3}
-                    minZoom={1}
-                    objectFit="cover"
-                    onCropChange={onCropChange}
-                    onCropComplete={onCropComplete}
-                    onZoomChange={onZoomChange}
-                    showGrid={false}
-                    zoom={zoom}
-                />
-            </Box>
-
-            <Box sx={{ mt: 3, width: "100%" }}>
-                <Box
-                    component="label"
-                    htmlFor="space-avatar-zoom"
-                    sx={{
-                        color: textBase,
-                        display: "block",
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 13,
-                        fontWeight: 500,
-                        lineHeight: "18px",
-                        mb: "10px",
-                    }}
-                >
-                    Zoom
-                </Box>
-                <Box
-                    component="input"
-                    id="space-avatar-zoom"
-                    type="range"
-                    min={1}
-                    max={3}
-                    step={0.01}
-                    value={zoom}
-                    onChange={(event) =>
-                        onZoomChange(Number(event.target.value))
-                    }
-                    sx={{ accentColor: green, display: "block", width: "100%" }}
-                />
-            </Box>
-            {errorMessage && (
-                <Box
-                    role="alert"
-                    sx={{
-                        color: warning,
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 13,
-                        fontWeight: 500,
-                        lineHeight: "18px",
-                        mt: 2,
-                        textAlign: "center",
-                    }}
-                >
-                    {errorMessage}
-                </Box>
-            )}
-
-            <Box sx={{ display: "flex", gap: "10px", mt: 3, width: "100%" }}>
-                <AvatarCropDialogButton
-                    disabled={isSaving}
-                    variant="secondary"
-                    onClick={onChooseAnother}
-                >
-                    Choose another
-                </AvatarCropDialogButton>
-                <AvatarCropDialogButton
-                    disabled={isSaving}
-                    variant="secondary"
-                    onClick={onCancel}
-                >
-                    Cancel
-                </AvatarCropDialogButton>
-            </Box>
-            <Box sx={{ display: "flex", mt: "10px", width: "100%" }}>
-                <AvatarCropDialogButton
-                    disabled={isSaving || isDoneDisabled}
-                    variant="primary"
-                    onClick={onDone}
-                >
-                    {isSaving ? "Saving..." : "Done"}
-                </AvatarCropDialogButton>
-            </Box>
-        </Box>
-    </Box>
-);
-
 export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
     ctaLabel = "Next",
     errorMessage,
@@ -486,83 +250,41 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
 }) => {
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-    const [avatarCropImage, setAvatarCropImage] =
-        useState<AvatarCropImage | null>(null);
-    const [avatarCrop, setAvatarCrop] = useState<Point>({ x: 0, y: 0 });
-    const [avatarCropPixels, setAvatarCropPixels] = useState<Area | null>(null);
     const [avatarError, setAvatarError] = useState<string>();
-    const [avatarZoom, setAvatarZoom] = useState(1);
     const [username, setUsername] = useState("");
     const [fullName, setFullName] = useState("");
-    const [isApplyingAvatarCrop, setIsApplyingAvatarCrop] = useState(false);
-    const [isPreparingAvatar, setIsPreparingAvatar] = useState(false);
-    const avatarCropUrlRef = useRef<string | null>(null);
     const avatarUrlRef = useRef<string | null>(null);
     const avatarSelectionIDRef = useRef(0);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const canContinue =
         !isSubmitting &&
-        !avatarCropImage &&
-        !isApplyingAvatarCrop &&
-        !isPreparingAvatar &&
         usernameStatus != "unavailable" &&
         username.trim().length > 0 &&
         fullName.trim().length > 0;
 
     useEffect(
         () => () => {
-            if (avatarCropUrlRef.current) {
-                URL.revokeObjectURL(avatarCropUrlRef.current);
-            }
             if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current);
         },
         [],
     );
 
-    const clearAvatarCropImage = () => {
-        avatarSelectionIDRef.current += 1;
-        if (avatarCropUrlRef.current) {
-            URL.revokeObjectURL(avatarCropUrlRef.current);
-            avatarCropUrlRef.current = null;
-        }
-        setAvatarCropImage(null);
-        setAvatarCrop({ x: 0, y: 0 });
-        setAvatarCropPixels(null);
-        setAvatarZoom(1);
-        setIsApplyingAvatarCrop(false);
-        setIsPreparingAvatar(false);
-    };
-
     const prepareSelectedAvatar = async (file: File, selectionID: number) => {
-        setIsPreparingAvatar(true);
-        if (avatarCropUrlRef.current) {
-            URL.revokeObjectURL(avatarCropUrlRef.current);
-            avatarCropUrlRef.current = null;
-        }
-        setAvatarCropImage(null);
-        setAvatarCropPixels(null);
         try {
-            const cropImage = await spaceAvatarCropImageForFile(file);
-            if (avatarSelectionIDRef.current != selectionID) {
-                URL.revokeObjectURL(cropImage.url);
-                return;
-            }
+            const avatar = await prepareSpaceAvatarImage(file);
+            if (avatarSelectionIDRef.current != selectionID) return;
 
-            avatarCropUrlRef.current = cropImage.url;
-            setAvatarCrop({ x: 0, y: 0 });
-            setAvatarCropImage({ file, url: cropImage.url });
-            setAvatarCropPixels(null);
+            if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current);
+            const nextUrl = URL.createObjectURL(avatar.file);
+            avatarUrlRef.current = nextUrl;
             setAvatarError(undefined);
-            setAvatarZoom(1);
+            setAvatarFile(avatar.file);
+            setAvatarUrl(nextUrl);
         } catch (error) {
             if (avatarSelectionIDRef.current != selectionID) return;
             console.error("Failed to prepare space avatar", error);
             setAvatarError(spaceAvatarImageErrorMessage(error));
-        } finally {
-            if (avatarSelectionIDRef.current == selectionID) {
-                setIsPreparingAvatar(false);
-            }
         }
     };
 
@@ -578,31 +300,6 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
         setAvatarError(undefined);
 
         void prepareSelectedAvatar(file, selectionID);
-    };
-
-    const applyAvatarCrop = async () => {
-        if (!avatarCropImage || !avatarCropPixels) return;
-
-        setIsApplyingAvatarCrop(true);
-        try {
-            const avatar = await prepareSpaceAvatarImageFromCrop(
-                avatarCropImage.file,
-                avatarCropImage.url,
-                avatarCropPixels,
-            );
-
-            if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current);
-            const nextUrl = URL.createObjectURL(avatar.file);
-            avatarUrlRef.current = nextUrl;
-            setAvatarError(undefined);
-            setAvatarFile(avatar.file);
-            setAvatarUrl(nextUrl);
-            clearAvatarCropImage();
-        } catch (error) {
-            console.error("Failed to crop space avatar", error);
-            setAvatarError(spaceAvatarImageErrorMessage(error));
-            setIsApplyingAvatarCrop(false);
-        }
     };
 
     const handleUsernameChange = (value: string) => {
@@ -736,7 +433,6 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                                     ? "Change profile picture"
                                     : "Upload profile picture"
                             }
-                            disabled={isPreparingAvatar}
                             onClick={() => fileInputRef.current?.click()}
                             sx={{
                                 alignItems: "center",
@@ -745,9 +441,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                                 border: 0,
                                 borderRadius: "50%",
                                 color: green,
-                                cursor: isPreparingAvatar
-                                    ? "default"
-                                    : "pointer",
+                                cursor: "pointer",
                                 display: "flex",
                                 height: 112,
                                 justifyContent: "center",
@@ -761,21 +455,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                                 },
                             }}
                         >
-                            {isPreparingAvatar ? (
-                                <Box
-                                    component="span"
-                                    sx={{
-                                        color: green,
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 13,
-                                        fontWeight: 600,
-                                        lineHeight: "18px",
-                                    }}
-                                >
-                                    Preparing...
-                                </Box>
-                            ) : avatarUrl ? (
+                            {avatarUrl ? (
                                 <Box
                                     component="img"
                                     alt=""
@@ -795,8 +475,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                         <Box
                             component="button"
                             type="button"
-                            aria-label="Edit profile picture"
-                            disabled={isPreparingAvatar}
+                            aria-label="Change profile picture"
                             onClick={() => fileInputRef.current?.click()}
                             sx={{
                                 alignItems: "center",
@@ -806,9 +485,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                                 bottom: 6,
                                 boxShadow: "0 4px 10px rgba(0, 0, 0, 0.12)",
                                 color: textBase,
-                                cursor: isPreparingAvatar
-                                    ? "default"
-                                    : "pointer",
+                                cursor: "pointer",
                                 display: "flex",
                                 height: 30,
                                 justifyContent: "center",
@@ -869,25 +546,6 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                         )}
                     </Box>
                 </Box>
-
-                {avatarCropImage && (
-                    <AvatarCropDialog
-                        crop={avatarCrop}
-                        errorMessage={avatarError}
-                        imageURL={avatarCropImage.url}
-                        isDoneDisabled={!avatarCropPixels}
-                        isSaving={isApplyingAvatarCrop}
-                        onCancel={clearAvatarCropImage}
-                        onChooseAnother={() => fileInputRef.current?.click()}
-                        onCropChange={setAvatarCrop}
-                        onCropComplete={(_croppedArea, croppedAreaPixels) =>
-                            setAvatarCropPixels(croppedAreaPixels)
-                        }
-                        onDone={() => void applyAvatarCrop()}
-                        onZoomChange={setAvatarZoom}
-                        zoom={avatarZoom}
-                    />
-                )}
 
                 <Box
                     sx={{

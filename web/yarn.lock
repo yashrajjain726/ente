@@ -4245,11 +4245,6 @@ node-releases@^2.0.19:
   resolved "https://registry.npmjs.org/node-releases/-/node-releases-2.0.19.tgz"
   integrity sha512-xxOWJsBKtzAq7DY0J+DTzuz58K8e7sJbdgwkbMWQe8UYB6ekmsQ45q0M/tJDsGaZmbC+l7n57UV8Hl5tHxO9uw==
 
-normalize-wheel@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/normalize-wheel/-/normalize-wheel-1.0.1.tgz#aec886affdb045070d856447df62ecf86146ec45"
-  integrity sha512-1OnlAPZ3zgrk8B91HyRj+eVv+kS5u+Z0SCsak6Xil/kmgEia50ga7zfkumayonZrImffAxPU/5WcyGhzetHNPA==
-
 object-assign@^4.1.1:
   version "4.1.1"
   resolved "https://registry.npmjs.org/object-assign/-/object-assign-4.1.1.tgz"
@@ -4575,14 +4570,6 @@ react-dropzone@14.2.10:
     attr-accept "^2.2.2"
     file-selector "^0.6.0"
     prop-types "^15.8.1"
-
-react-easy-crop@^5.5.7:
-  version "5.5.7"
-  resolved "https://registry.yarnpkg.com/react-easy-crop/-/react-easy-crop-5.5.7.tgz#220518895ef1ed28bd889cbdfbd5baed0f0009bb"
-  integrity sha512-kYo4NtMeXFQB7h1U+h5yhUkE46WQbQdq7if54uDlbMdZHdRgNehfvaFrXnFw5NR1PNoUOJIfTwLnWmEx/MaZnA==
-  dependencies:
-    normalize-wheel "^1.0.1"
-    tslib "^2.0.1"
 
 react-fast-compare@^2.0.1:
   version "2.0.4"
