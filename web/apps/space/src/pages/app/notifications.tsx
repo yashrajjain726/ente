@@ -7,6 +7,7 @@ import {
     deleteCurrentMessage,
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
+    loadCurrentSpaceFriends,
     markCurrentNotificationsRead,
     replyToCurrentMessage,
     sendCurrentMessage,
@@ -19,7 +20,8 @@ import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { profile, profileLoadStatus } = useSpaceAppState();
+    const { friends, profile, profileLoadStatus, setFriends } =
+        useSpaceAppState();
     const [conversations, setConversations] = React.useState<
         SpaceMessageConversation[]
     >([]);
@@ -30,6 +32,23 @@ const Page: React.FC = () => {
     const [selectedFriend, setSelectedFriend] = React.useState<
         SpaceMessageConversation["friend"] | undefined
     >();
+    const selectedFriendSpaceId = selectedFriend?.spaceId ?? selectedFriend?.id;
+    const selectedFriendSpaceSlug = selectedFriend?.spaceSlug;
+    const selectedFriendUsername = selectedFriend?.username;
+    const isSelectedFriendCurrent = Boolean(
+        selectedFriendSpaceId &&
+            friends.some((friend) => {
+                const friendSpaceId = friend.spaceId ?? friend.id;
+                return (
+                    friendSpaceId == selectedFriendSpaceId ||
+                    (selectedFriendSpaceSlug &&
+                        friend.spaceSlug == selectedFriendSpaceSlug) ||
+                    friend.username == selectedFriendUsername
+                );
+            }),
+    );
+    const isThreadReadOnly =
+        Boolean(selectedFriend) && !isSelectedFriendCurrent;
 
     const refreshConversations = React.useCallback(() => {
         setIsConversationsLoading(true);
@@ -45,6 +64,8 @@ const Page: React.FC = () => {
 
     const openConversation = React.useCallback(
         (conversation: SpaceMessageConversation) => {
+            setIsThreadLoading(true);
+            setMessages([]);
             setSelectedFriend(conversation.friend);
             const friendSpaceId =
                 conversation.friend.spaceId ?? conversation.friend.id;
@@ -67,6 +88,12 @@ const Page: React.FC = () => {
         [],
     );
 
+    const closeConversation = React.useCallback(() => {
+        setSelectedFriend(undefined);
+        setIsThreadLoading(false);
+        setMessages([]);
+    }, []);
+
     React.useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
             void router.replace(spaceRoutes.onboarding);
@@ -79,8 +106,19 @@ const Page: React.FC = () => {
     }, [profile, refreshConversations]);
 
     React.useEffect(() => {
+        if (!profile?.spaceId) return;
+
+        void loadCurrentSpaceFriends(profile.spaceId)
+            .then(setFriends)
+            .catch((error: unknown) =>
+                console.error("Failed to load space friends", error),
+            );
+    }, [profile?.spaceId, setFriends]);
+
+    React.useEffect(() => {
         if (!selectedFriend) {
             setMessages([]);
+            setIsThreadLoading(false);
             return;
         }
 
@@ -115,9 +153,10 @@ const Page: React.FC = () => {
                 conversations={conversations}
                 isConversationsLoading={isConversationsLoading}
                 isThreadLoading={isThreadLoading}
+                isThreadReadOnly={isThreadReadOnly}
                 messages={messages}
                 onBack={() => void router.push(spaceRoutes.home)}
-                onCloseThread={() => setSelectedFriend(undefined)}
+                onCloseThread={closeConversation}
                 onOpenSelectedFriendProfile={(friend) =>
                     void router.push(
                         spaceRoutes.friend(friend.spaceId ?? friend.id),

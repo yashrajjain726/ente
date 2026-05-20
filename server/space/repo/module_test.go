@@ -323,6 +323,66 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Nil(t, conversations[0].LatestActivity.Post)
 }
 
+func TestSpaceMessageConversationPreviewPrioritizesUnreadIncomingMessage(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+
+	aliceID := insertSpaceUser(t, module, "alice-preview-priority@example.com", "alice-preview-public")
+	bobID := insertSpaceUser(t, module, "bob-preview-priority@example.com", "bob-preview-public")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-preview-priority", "alice-space-key", "alice-profile")
+	require.NoError(t, err)
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-preview-priority", "bob-space-key", "bob-profile")
+	require.NoError(t, err)
+	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
+	setFriendEventCreatedAt(t, module, 100, "friend_add", bobID, aliceID)
+
+	aliceOldMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     aliceID,
+		SenderSpaceID:                aliceSpace.SpaceID,
+		RecipientID:                  bobID,
+		RecipientSpaceID:             bobSpace.SpaceID,
+		MessageCipher:                "alice-old-cipher",
+		SenderEncryptedMessageKey:    "alice-old-sender-key",
+		RecipientEncryptedMessageKey: "alice-old-recipient-key",
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 1000, aliceOldMessage.MessageID)
+	bobNewMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     bobID,
+		SenderSpaceID:                bobSpace.SpaceID,
+		RecipientID:                  aliceID,
+		RecipientSpaceID:             aliceSpace.SpaceID,
+		MessageCipher:                "bob-new-cipher",
+		SenderEncryptedMessageKey:    "bob-new-sender-key",
+		RecipientEncryptedMessageKey: "bob-new-recipient-key",
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 2000, bobNewMessage.MessageID)
+	require.NoError(t, module.Messages.SetLike(ctx, aliceOldMessage.MessageID, bobID, true))
+	setMessageLikeCreatedAt(t, module, 3000, aliceOldMessage.MessageID, bobID)
+
+	conversations, _, err := module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, conversations, 1)
+	require.True(t, conversations[0].Unread)
+	require.Equal(t, "message", conversations[0].LatestActivity.Type)
+	require.Equal(t, bobNewMessage.MessageID, conversations[0].LatestActivity.Message.MessageID)
+	require.Equal(t, int64(3000), conversations[0].SortCreatedAt)
+
+	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, bobSpace.SpaceID)
+	require.NoError(t, err)
+	require.Equal(t, int64(3000), latestActivityAt)
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, bobSpace.SpaceID, latestActivityAt))
+
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, "", 10)
+	require.NoError(t, err)
+	require.False(t, conversations[0].Unread)
+	require.Equal(t, "message_like", conversations[0].LatestActivity.Type)
+	require.Equal(t, aliceOldMessage.MessageID, conversations[0].LatestActivity.Message.MessageID)
+}
+
 func TestSpaceModuleLifecycle(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)

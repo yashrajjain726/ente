@@ -51,6 +51,7 @@ interface MessagesScreenProps {
     conversations: SpaceMessageConversation[];
     isConversationsLoading?: boolean;
     isThreadLoading?: boolean;
+    isThreadReadOnly?: boolean;
     messages: SpaceMessage[];
     onBack?: () => void;
     onCloseThread: () => void;
@@ -802,6 +803,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     conversations,
     isConversationsLoading = false,
     isThreadLoading = false,
+    isThreadReadOnly = false,
     messages,
     onBack,
     onCloseThread,
@@ -826,7 +828,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const composerRef = React.useRef<HTMLTextAreaElement | null>(null);
     const threadScrollRef = React.useRef<HTMLDivElement | null>(null);
     const isThreadOpen = Boolean(selectedFriend);
-    const canSend = messageText.trim().length > 0 && sendPhase == "idle";
+    const canInteract = isThreadOpen && !isThreadReadOnly;
+    const canSend =
+        canInteract && messageText.trim().length > 0 && sendPhase == "idle";
     const selectedName = selectedFriend
         ? selectedFriend.fullName.trim() || selectedFriend.username
         : "";
@@ -842,7 +846,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
 
     const sendMessage = () => {
         const text = messageText.trim();
-        if (!selectedFriend || !canSend) return;
+        if (!selectedFriend || !canInteract || !canSend) return;
         const spaceId = selectedFriend.spaceId ?? selectedFriend.id;
         setSendPhase("sending");
         const sendPromise = replyingTo
@@ -876,6 +880,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         const targetMessage = messageContextMenu?.message;
         if (!targetMessage) return;
         closeMessageActions();
+        if (isThreadReadOnly && action != "copy") return;
 
         switch (action) {
             case "copy":
@@ -923,6 +928,13 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         setMessageContextMenu(null);
         setMessageText("");
     }, [selectedFriend]);
+
+    React.useEffect(() => {
+        if (!isThreadReadOnly) return;
+        setReplyingTo(null);
+        setSendPhase("idle");
+        setMessageText("");
+    }, [isThreadReadOnly]);
 
     React.useLayoutEffect(() => {
         if (!selectedFriend || isThreadLoading) return;
@@ -1016,11 +1028,15 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                 component="button"
                                 type="button"
                                 aria-label={
-                                    selectedName
-                                        ? `Open ${selectedName}'s profile`
-                                        : "Open friend profile"
+                                    !canInteract
+                                        ? selectedName || "Conversation"
+                                        : selectedName
+                                          ? `Open ${selectedName}'s profile`
+                                          : "Open friend profile"
                                 }
+                                disabled={!canInteract}
                                 onClick={() =>
+                                    canInteract &&
                                     onOpenSelectedFriendProfile(selectedFriend)
                                 }
                                 sx={{
@@ -1028,7 +1044,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     bgcolor: "transparent",
                                     border: 0,
                                     color: "inherit",
-                                    cursor: "pointer",
+                                    cursor: canInteract ? "pointer" : "default",
                                     display: "block",
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
@@ -1082,9 +1098,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                             ref={threadScrollRef}
                             sx={{
                                 boxSizing: "border-box",
-                                height: replyingTo
-                                    ? "calc(100svh - 56px - 142px - env(safe-area-inset-bottom))"
-                                    : "calc(100svh - 56px - 72px - env(safe-area-inset-bottom))",
+                                height: isThreadReadOnly
+                                    ? "calc(100svh - 56px)"
+                                    : replyingTo
+                                      ? "calc(100svh - 56px - 142px - env(safe-area-inset-bottom))"
+                                      : "calc(100svh - 56px - 72px - env(safe-area-inset-bottom))",
                                 overflowY: "auto",
                                 px: "14px",
                                 py: "12px",
@@ -1207,62 +1225,74 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                 list: { sx: { p: 0 } },
                             }}
                         >
-                            <MenuItem
-                                disableRipple
-                                onClick={() => handleMessageAction("like")}
-                                sx={{
-                                    borderRadius: "12px",
-                                    color: threadText,
-                                    gap: "8px",
-                                    minHeight: 38,
-                                    px: "8px",
-                                    py: "7px",
-                                    "&:hover": {
-                                        bgcolor: "rgba(255, 255, 255, 0.1)",
-                                    },
-                                }}
-                            >
-                                <HeartIcon small />
-                                <Box
-                                    sx={{
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 13,
-                                        fontWeight: 650,
-                                        lineHeight: "18px",
-                                    }}
-                                >
-                                    {isContextMessageLiked ? "Unlike" : "Like"}
-                                </Box>
-                            </MenuItem>
-                            <MenuItem
-                                disableRipple
-                                onClick={() => handleMessageAction("reply")}
-                                sx={{
-                                    borderRadius: "12px",
-                                    color: threadText,
-                                    gap: "8px",
-                                    minHeight: 38,
-                                    px: "8px",
-                                    py: "7px",
-                                    "&:hover": {
-                                        bgcolor: "rgba(255, 255, 255, 0.1)",
-                                    },
-                                }}
-                            >
-                                <ReplyIcon />
-                                <Box
-                                    sx={{
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 13,
-                                        fontWeight: 650,
-                                        lineHeight: "18px",
-                                    }}
-                                >
-                                    Reply
-                                </Box>
-                            </MenuItem>
+                            {!isThreadReadOnly && (
+                                <>
+                                    <MenuItem
+                                        disableRipple
+                                        onClick={() =>
+                                            handleMessageAction("like")
+                                        }
+                                        sx={{
+                                            borderRadius: "12px",
+                                            color: threadText,
+                                            gap: "8px",
+                                            minHeight: 38,
+                                            px: "8px",
+                                            py: "7px",
+                                            "&:hover": {
+                                                bgcolor:
+                                                    "rgba(255, 255, 255, 0.1)",
+                                            },
+                                        }}
+                                    >
+                                        <HeartIcon small />
+                                        <Box
+                                            sx={{
+                                                fontFamily:
+                                                    '"Inter Variable", Inter, sans-serif',
+                                                fontSize: 13,
+                                                fontWeight: 650,
+                                                lineHeight: "18px",
+                                            }}
+                                        >
+                                            {isContextMessageLiked
+                                                ? "Unlike"
+                                                : "Like"}
+                                        </Box>
+                                    </MenuItem>
+                                    <MenuItem
+                                        disableRipple
+                                        onClick={() =>
+                                            handleMessageAction("reply")
+                                        }
+                                        sx={{
+                                            borderRadius: "12px",
+                                            color: threadText,
+                                            gap: "8px",
+                                            minHeight: 38,
+                                            px: "8px",
+                                            py: "7px",
+                                            "&:hover": {
+                                                bgcolor:
+                                                    "rgba(255, 255, 255, 0.1)",
+                                            },
+                                        }}
+                                    >
+                                        <ReplyIcon />
+                                        <Box
+                                            sx={{
+                                                fontFamily:
+                                                    '"Inter Variable", Inter, sans-serif',
+                                                fontSize: 13,
+                                                fontWeight: 650,
+                                                lineHeight: "18px",
+                                            }}
+                                        >
+                                            Reply
+                                        </Box>
+                                    </MenuItem>
+                                </>
+                            )}
                             <MenuItem
                                 disableRipple
                                 onClick={() => handleMessageAction("copy")}
@@ -1291,7 +1321,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     Copy
                                 </Box>
                             </MenuItem>
-                            {messageContextMenu?.message &&
+                            {!isThreadReadOnly &&
+                                messageContextMenu?.message &&
                                 isCurrentProfileMessage(
                                     messageContextMenu.message,
                                     profile,
@@ -1329,279 +1360,287 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     </MenuItem>
                                 )}
                         </Menu>
-                        <Box
-                            sx={{
-                                bgcolor: threadBackground,
-                                bottom: 0,
-                                boxSizing: "border-box",
-                                display: "grid",
-                                gap: "8px",
-                                left: 0,
-                                maxWidth: { sm: 390 },
-                                mx: { sm: "auto" },
-                                p: "10px 14px calc(10px + env(safe-area-inset-bottom))",
-                                position: "fixed",
-                                right: 0,
-                                width: "100%",
-                            }}
-                        >
-                            {replyingTo && (
+                        {!isThreadReadOnly && (
+                            <Box
+                                sx={{
+                                    bgcolor: threadBackground,
+                                    bottom: 0,
+                                    boxSizing: "border-box",
+                                    display: "grid",
+                                    gap: "8px",
+                                    left: 0,
+                                    maxWidth: { sm: 390 },
+                                    mx: { sm: "auto" },
+                                    p: "10px 14px calc(10px + env(safe-area-inset-bottom))",
+                                    position: "fixed",
+                                    right: 0,
+                                    width: "100%",
+                                }}
+                            >
+                                {replyingTo && (
+                                    <Box
+                                        sx={{
+                                            bgcolor: "#262626",
+                                            borderLeft: "3px solid #8C8C8C",
+                                            borderRadius: "12px",
+                                            boxSizing: "border-box",
+                                            display: "grid",
+                                            gap: "8px",
+                                            gridTemplateColumns:
+                                                "minmax(0, 1fr) 24px",
+                                            p: "9px 8px 9px 12px",
+                                            width: "100%",
+                                        }}
+                                    >
+                                        <Box sx={{ minWidth: 0 }}>
+                                            <Box
+                                                sx={{
+                                                    color: threadTimestamp,
+                                                    fontFamily:
+                                                        '"Inter Variable", Inter, sans-serif',
+                                                    fontSize: 12,
+                                                    fontWeight: 650,
+                                                    lineHeight: "16px",
+                                                }}
+                                            >
+                                                Replying to{" "}
+                                                {isCurrentProfileMessage(
+                                                    replyingTo,
+                                                    profile,
+                                                )
+                                                    ? "yourself"
+                                                    : firstNameFrom(
+                                                          replyingTo.sender.fullName.trim() ||
+                                                              replyingTo.sender
+                                                                  .username,
+                                                      )}
+                                            </Box>
+                                            <Box
+                                                sx={{
+                                                    color: threadText,
+                                                    fontFamily:
+                                                        '"Inter Variable", Inter, sans-serif',
+                                                    fontSize: 13,
+                                                    fontWeight: 600,
+                                                    lineHeight: "18px",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap",
+                                                }}
+                                            >
+                                                {truncateMessageText(
+                                                    replyingTo.text,
+                                                )}
+                                            </Box>
+                                        </Box>
+                                        <Box
+                                            component="button"
+                                            type="button"
+                                            aria-label="Cancel reply"
+                                            onClick={() => {
+                                                setReplyingTo(null);
+                                                composerRef.current?.focus();
+                                            }}
+                                            sx={{
+                                                alignItems: "center",
+                                                bgcolor: "transparent",
+                                                border: 0,
+                                                borderRadius: "50%",
+                                                color: "#D8D8D8",
+                                                cursor: "pointer",
+                                                display: "flex",
+                                                height: 24,
+                                                justifyContent: "center",
+                                                p: 0,
+                                                width: 24,
+                                                "&:focus-visible": {
+                                                    outline: `2px solid ${green}`,
+                                                    outlineOffset: 2,
+                                                },
+                                                "&:hover": {
+                                                    color: threadText,
+                                                },
+                                            }}
+                                        >
+                                            <HugeiconsIcon
+                                                icon={Cancel01Icon}
+                                                size={16}
+                                                strokeWidth={1.8}
+                                            />
+                                        </Box>
+                                    </Box>
+                                )}
                                 <Box
                                     sx={{
-                                        bgcolor: "#262626",
-                                        borderLeft: "3px solid #8C8C8C",
-                                        borderRadius: "12px",
-                                        boxSizing: "border-box",
-                                        display: "grid",
+                                        alignItems: "flex-end",
+                                        display: "flex",
                                         gap: "8px",
-                                        gridTemplateColumns:
-                                            "minmax(0, 1fr) 24px",
-                                        p: "9px 8px 9px 12px",
                                         width: "100%",
                                     }}
                                 >
-                                    <Box sx={{ minWidth: 0 }}>
-                                        <Box
-                                            sx={{
-                                                color: threadTimestamp,
-                                                fontFamily:
-                                                    '"Inter Variable", Inter, sans-serif',
-                                                fontSize: 12,
-                                                fontWeight: 650,
-                                                lineHeight: "16px",
-                                            }}
-                                        >
-                                            Replying to{" "}
-                                            {isCurrentProfileMessage(
-                                                replyingTo,
-                                                profile,
-                                            )
-                                                ? "yourself"
-                                                : firstNameFrom(
-                                                      replyingTo.sender.fullName.trim() ||
-                                                          replyingTo.sender
-                                                              .username,
-                                                  )}
-                                        </Box>
-                                        <Box
-                                            sx={{
-                                                color: threadText,
-                                                fontFamily:
-                                                    '"Inter Variable", Inter, sans-serif',
-                                                fontSize: 13,
-                                                fontWeight: 600,
-                                                lineHeight: "18px",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                                whiteSpace: "nowrap",
-                                            }}
-                                        >
-                                            {truncateMessageText(
-                                                replyingTo.text,
-                                            )}
-                                        </Box>
-                                    </Box>
+                                    <Box
+                                        ref={composerRef}
+                                        component="textarea"
+                                        aria-label={`Message ${selectedName}`}
+                                        onChange={(event) => {
+                                            const nextText =
+                                                clampSpaceMessageText(
+                                                    event.target.value,
+                                                );
+                                            event.currentTarget.value =
+                                                nextText;
+                                            setMessageText(nextText);
+                                            resizeComposer(event.currentTarget);
+                                        }}
+                                        onKeyDown={handleComposerKeyDown}
+                                        placeholder="Message"
+                                        rows={1}
+                                        value={messageText}
+                                        sx={{
+                                            bgcolor: threadSurface,
+                                            border: 0,
+                                            borderRadius: "24px",
+                                            boxSizing: "border-box",
+                                            color: threadText,
+                                            flex: "1 1 auto",
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 14,
+                                            fontWeight: 600,
+                                            lineHeight: "20px",
+                                            maxHeight: composerMaxHeight,
+                                            minHeight: composerHeight,
+                                            minWidth: 0,
+                                            outline: 0,
+                                            overflow: "hidden",
+                                            pb: `${composerPadding}px`,
+                                            pl: `${composerPaddingLeft}px`,
+                                            pr: `${composerPadding}px`,
+                                            pt: `${composerPadding}px`,
+                                            resize: "none",
+                                            "&::placeholder": {
+                                                color: threadMuted,
+                                            },
+                                            "&:focus": {
+                                                bgcolor: threadSurfaceHover,
+                                            },
+                                        }}
+                                    />
                                     <Box
                                         component="button"
                                         type="button"
-                                        aria-label="Cancel reply"
-                                        onClick={() => {
-                                            setReplyingTo(null);
-                                            composerRef.current?.focus();
-                                        }}
+                                        aria-label={
+                                            sendPhase == "sending"
+                                                ? "Sending"
+                                                : sendPhase == "done"
+                                                  ? "Sent"
+                                                  : "Send message"
+                                        }
+                                        disabled={!canSend}
+                                        onClick={sendMessage}
                                         sx={{
                                             alignItems: "center",
-                                            bgcolor: "transparent",
+                                            bgcolor: isSendStatus
+                                                ? threadSurfaceHover
+                                                : canSend
+                                                  ? "#FFFFFF"
+                                                  : threadSurfaceHover,
                                             border: 0,
                                             borderRadius: "50%",
-                                            color: "#D8D8D8",
-                                            cursor: "pointer",
+                                            color:
+                                                sendPhase == "sending"
+                                                    ? "#D8D8D8"
+                                                    : sendPhase == "done"
+                                                      ? green
+                                                      : canSend
+                                                        ? "#3A3A3A"
+                                                        : "#D8D8D8",
+                                            cursor: canSend
+                                                ? "pointer"
+                                                : "default",
                                             display: "flex",
-                                            height: 24,
+                                            flexShrink: 0,
+                                            height: composerHeight,
                                             justifyContent: "center",
+                                            opacity:
+                                                sendPhase == "sending"
+                                                    ? 0.72
+                                                    : isSendButtonActive
+                                                      ? 1
+                                                      : 0.42,
                                             p: 0,
-                                            width: 24,
+                                            transition:
+                                                "background-color 180ms ease, color 180ms ease, opacity 180ms ease, transform 120ms ease",
+                                            width: composerHeight,
+                                            "&:active": {
+                                                transform: canSend
+                                                    ? "scale(0.96)"
+                                                    : "none",
+                                            },
                                             "&:focus-visible": {
                                                 outline: `2px solid ${green}`,
                                                 outlineOffset: 2,
                                             },
-                                            "&:hover": { color: threadText },
+                                            "&:hover": {
+                                                bgcolor: isSendStatus
+                                                    ? threadSurfaceHover
+                                                    : canSend
+                                                      ? "#F2F2F2"
+                                                      : "rgba(255, 255, 255, 0.14)",
+                                            },
                                         }}
                                     >
-                                        <HugeiconsIcon
-                                            icon={Cancel01Icon}
-                                            size={16}
-                                            strokeWidth={1.8}
-                                        />
+                                        {sendPhase == "sending" ? (
+                                            <Box
+                                                component="span"
+                                                sx={{
+                                                    animation: `${sendSpin} 1s linear infinite`,
+                                                    display: "flex",
+                                                    transform: "none",
+                                                }}
+                                            >
+                                                <HugeiconsIcon
+                                                    icon={Loading03Icon}
+                                                    size={22}
+                                                    strokeWidth={1.8}
+                                                />
+                                            </Box>
+                                        ) : sendPhase == "done" ? (
+                                            <Box
+                                                component="span"
+                                                sx={{
+                                                    display: "flex",
+                                                    transform:
+                                                        "translate(-1px, 1px)",
+                                                }}
+                                            >
+                                                <HugeiconsIcon
+                                                    icon={Tick02Icon}
+                                                    primaryColor={green}
+                                                    size={22}
+                                                    strokeWidth={1.8}
+                                                />
+                                            </Box>
+                                        ) : (
+                                            <Box
+                                                component="span"
+                                                sx={{
+                                                    display: "flex",
+                                                    transform:
+                                                        "translate(-1px, 1px)",
+                                                }}
+                                            >
+                                                <HugeiconsIcon
+                                                    icon={Navigation03Icon}
+                                                    size={24}
+                                                    strokeWidth={1.8}
+                                                />
+                                            </Box>
+                                        )}
                                     </Box>
                                 </Box>
-                            )}
-                            <Box
-                                sx={{
-                                    alignItems: "flex-end",
-                                    display: "flex",
-                                    gap: "8px",
-                                    width: "100%",
-                                }}
-                            >
-                                <Box
-                                    ref={composerRef}
-                                    component="textarea"
-                                    aria-label={`Message ${selectedName}`}
-                                    onChange={(event) => {
-                                        const nextText = clampSpaceMessageText(
-                                            event.target.value,
-                                        );
-                                        event.currentTarget.value = nextText;
-                                        setMessageText(nextText);
-                                        resizeComposer(event.currentTarget);
-                                    }}
-                                    onKeyDown={handleComposerKeyDown}
-                                    placeholder="Message"
-                                    rows={1}
-                                    value={messageText}
-                                    sx={{
-                                        bgcolor: threadSurface,
-                                        border: 0,
-                                        borderRadius: "24px",
-                                        boxSizing: "border-box",
-                                        color: threadText,
-                                        flex: "1 1 auto",
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 14,
-                                        fontWeight: 600,
-                                        lineHeight: "20px",
-                                        maxHeight: composerMaxHeight,
-                                        minHeight: composerHeight,
-                                        minWidth: 0,
-                                        outline: 0,
-                                        overflow: "hidden",
-                                        pb: `${composerPadding}px`,
-                                        pl: `${composerPaddingLeft}px`,
-                                        pr: `${composerPadding}px`,
-                                        pt: `${composerPadding}px`,
-                                        resize: "none",
-                                        "&::placeholder": {
-                                            color: threadMuted,
-                                        },
-                                        "&:focus": {
-                                            bgcolor: threadSurfaceHover,
-                                        },
-                                    }}
-                                />
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    aria-label={
-                                        sendPhase == "sending"
-                                            ? "Sending"
-                                            : sendPhase == "done"
-                                              ? "Sent"
-                                              : "Send message"
-                                    }
-                                    disabled={!canSend}
-                                    onClick={sendMessage}
-                                    sx={{
-                                        alignItems: "center",
-                                        bgcolor: isSendStatus
-                                            ? threadSurfaceHover
-                                            : canSend
-                                              ? "#FFFFFF"
-                                              : threadSurfaceHover,
-                                        border: 0,
-                                        borderRadius: "50%",
-                                        color:
-                                            sendPhase == "sending"
-                                                ? "#D8D8D8"
-                                                : sendPhase == "done"
-                                                  ? green
-                                                  : canSend
-                                                    ? "#3A3A3A"
-                                                    : "#D8D8D8",
-                                        cursor: canSend ? "pointer" : "default",
-                                        display: "flex",
-                                        flexShrink: 0,
-                                        height: composerHeight,
-                                        justifyContent: "center",
-                                        opacity:
-                                            sendPhase == "sending"
-                                                ? 0.72
-                                                : isSendButtonActive
-                                                  ? 1
-                                                  : 0.42,
-                                        p: 0,
-                                        transition:
-                                            "background-color 180ms ease, color 180ms ease, opacity 180ms ease, transform 120ms ease",
-                                        width: composerHeight,
-                                        "&:active": {
-                                            transform: canSend
-                                                ? "scale(0.96)"
-                                                : "none",
-                                        },
-                                        "&:focus-visible": {
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                        "&:hover": {
-                                            bgcolor: isSendStatus
-                                                ? threadSurfaceHover
-                                                : canSend
-                                                  ? "#F2F2F2"
-                                                  : "rgba(255, 255, 255, 0.14)",
-                                        },
-                                    }}
-                                >
-                                    {sendPhase == "sending" ? (
-                                        <Box
-                                            component="span"
-                                            sx={{
-                                                animation: `${sendSpin} 1s linear infinite`,
-                                                display: "flex",
-                                                transform: "none",
-                                            }}
-                                        >
-                                            <HugeiconsIcon
-                                                icon={Loading03Icon}
-                                                size={22}
-                                                strokeWidth={1.8}
-                                            />
-                                        </Box>
-                                    ) : sendPhase == "done" ? (
-                                        <Box
-                                            component="span"
-                                            sx={{
-                                                display: "flex",
-                                                transform:
-                                                    "translate(-1px, 1px)",
-                                            }}
-                                        >
-                                            <HugeiconsIcon
-                                                icon={Tick02Icon}
-                                                primaryColor={green}
-                                                size={22}
-                                                strokeWidth={1.8}
-                                            />
-                                        </Box>
-                                    ) : (
-                                        <Box
-                                            component="span"
-                                            sx={{
-                                                display: "flex",
-                                                transform:
-                                                    "translate(-1px, 1px)",
-                                            }}
-                                        >
-                                            <HugeiconsIcon
-                                                icon={Navigation03Icon}
-                                                size={24}
-                                                strokeWidth={1.8}
-                                            />
-                                        </Box>
-                                    )}
-                                </Box>
                             </Box>
-                        </Box>
+                        )}
                     </>
                 ) : (
                     <>

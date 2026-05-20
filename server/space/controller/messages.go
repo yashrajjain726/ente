@@ -208,6 +208,12 @@ func (c *MessagesController) Delete(ctx *gin.Context, messageID string) error {
 	if message.SenderID != userID {
 		return ente.ErrPermissionDenied
 	}
+	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx.Request.Context(), userID, message.RecipientSpaceID); err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return ente.ErrPermissionDenied
+		}
+		return err
+	}
 	if message.IsDeleted {
 		return nil
 	}

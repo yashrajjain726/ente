@@ -293,30 +293,69 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			WHERE fe.target_id = $1
 			  AND fe.actor_id <> $1
 		),
-		candidates AS (
-			SELECT * FROM message_candidates
-			UNION ALL
-			SELECT * FROM post_candidates
-			UNION ALL
-			SELECT * FROM friend_candidates
-		),
-		ranked AS (
+			candidates AS (
+				SELECT * FROM message_candidates
+				UNION ALL
+				SELECT * FROM post_candidates
+				UNION ALL
+				SELECT * FROM friend_candidates
+			),
+			latest_activities AS (
+				SELECT DISTINCT ON (friend_space_id)
+					friend_space_id,
+					activity_created_at AS sort_created_at,
+					activity_id AS sort_id
+				FROM candidates
+				ORDER BY friend_space_id, activity_created_at DESC, activity_id DESC
+			),
+			latest_messages AS (
+				SELECT DISTINCT ON (friend_space_id)
+					friend_space_id,
+					activity_created_at AS latest_message_created_at,
+					activity_id AS latest_message_id
+				FROM message_candidates
+				WHERE activity_type = 'message'
+				ORDER BY friend_space_id, activity_created_at DESC, activity_id DESC
+			),
+			candidates_with_read_state AS (
+				SELECT
+					c.*,
+					COALESCE(nrm.read_at, 0) AS read_at,
+					la.sort_created_at,
+					la.sort_id,
+					(
+						c.activity_type = 'message'
+						AND c.unread_created_at IS NOT NULL
+						AND c.unread_created_at > COALESCE(nrm.read_at, 0)
+						AND c.activity_created_at = lm.latest_message_created_at
+						AND c.activity_id = lm.latest_message_id
+					) AS preview_priority
+				FROM candidates c
+				JOIN latest_activities la ON la.friend_space_id = c.friend_space_id
+				LEFT JOIN latest_messages lm ON lm.friend_space_id = c.friend_space_id
+				LEFT JOIN space_notification_read_markers nrm
+				  ON nrm.user_id = $1
+				 AND nrm.friend_space_id = c.friend_space_id
+			),
+			ranked AS (
+				SELECT
+					c.*,
+					ROW_NUMBER() OVER (
+						PARTITION BY c.friend_space_id
+						ORDER BY c.preview_priority DESC, c.activity_created_at DESC, c.activity_id DESC
+					) AS rn
+				FROM candidates_with_read_state c
+			)
 			SELECT
-				c.*,
-				ROW_NUMBER() OVER (
-					PARTITION BY c.friend_space_id
-					ORDER BY c.activity_created_at DESC, c.activity_id DESC
-				) AS rn
-			FROM candidates c
-		)
-		SELECT
-				c.activity_type,
-				c.activity_id,
-				c.activity_created_at,
-				(c.unread_created_at IS NOT NULL AND c.unread_created_at > COALESCE(nrm.read_at, 0)) AS unread,
-			friend_space.owner_id,
-			friend_space.space_id,
-			friend_space.space_slug,
+					c.activity_type,
+					c.activity_id,
+					c.activity_created_at,
+					(c.unread_created_at IS NOT NULL AND c.unread_created_at > c.read_at) AS unread,
+					c.sort_created_at,
+					c.sort_id,
+				friend_space.owner_id,
+				friend_space.space_id,
+				friend_space.space_slug,
 			friend_ka.public_key,
 			friend_space.current_version,
 			friend_space.encrypted_profile,
@@ -378,13 +417,10 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			asset.blur_hash_cipher AS post_object_blur_hash_cipher,
 			asset.width AS post_object_width,
 			asset.height AS post_object_height,
-			asset.media_type AS post_object_media_type
-			FROM ranked c
-			LEFT JOIN space_notification_read_markers nrm
-			  ON nrm.user_id = $1
-			 AND nrm.friend_space_id = c.friend_space_id
-			JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
-		JOIN key_attributes friend_ka ON friend_ka.user_id = friend_space.owner_id
+				asset.media_type AS post_object_media_type
+				FROM ranked c
+				JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
+			JOIN key_attributes friend_ka ON friend_ka.user_id = friend_space.owner_id
 		LEFT JOIN space_messages m ON m.message_id = c.message_id
 		LEFT JOIN spaces sender_space ON sender_space.space_id = m.sender_space_id
 		LEFT JOIN key_attributes sender_ka ON sender_ka.user_id = sender_space.owner_id
@@ -399,10 +435,10 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			ORDER BY position ASC, asset_id ASC
 			LIMIT 1
 		) asset ON TRUE
-			WHERE c.rn = 1
-			  AND ($2::bigint IS NULL OR (c.activity_created_at, c.activity_id) < ($2::bigint, $3::text))
-			ORDER BY c.activity_created_at DESC, c.activity_id DESC
-			LIMIT $4
+				WHERE c.rn = 1
+				  AND ($2::bigint IS NULL OR (c.sort_created_at, c.sort_id) < ($2::bigint, $3::text))
+				ORDER BY c.sort_created_at DESC, c.sort_id DESC
+				LIMIT $4
 		`, viewerID, cursorCreatedAt, cursorID, limit+1)
 	if err != nil {
 		return nil, "", stacktrace.Propagate(err, "")
@@ -655,6 +691,8 @@ func scanMessageConversationRecord(scanner interface{ Scan(dest ...any) error })
 		&rec.LatestActivity.ID,
 		&rec.LatestActivity.CreatedAt,
 		&rec.Unread,
+		&rec.SortCreatedAt,
+		&rec.SortID,
 	}
 	dest = append(dest, spaceActorScanDest(&rec.Friend)...)
 	dest = append(dest,
@@ -721,5 +759,8 @@ func formatMessageCursor(message SpaceMessageRecord) string {
 }
 
 func formatMessageConversationCursor(conversation SpaceMessageConversationRecord) string {
+	if conversation.SortCreatedAt > 0 && strings.TrimSpace(conversation.SortID) != "" {
+		return strconv.FormatInt(conversation.SortCreatedAt, 10) + ":" + conversation.SortID
+	}
 	return strconv.FormatInt(conversation.LatestActivity.CreatedAt, 10) + ":" + conversation.LatestActivity.ID
 }

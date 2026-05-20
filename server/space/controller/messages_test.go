@@ -73,6 +73,7 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	bobID, bobSpace := createMessageControllerUserAndSpace(t, repos, "bob-message-actions", "bob-actions-public")
 	require.NoError(t, repos.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	message := createRepoMessage(t, repos, bobID, bobSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
+	messageToDelete := createRepoMessage(t, repos, bobID, bobSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
 
 	liked, err := controller.ToggleLike(newSpaceControllerContext(aliceID), message.MessageID, models.LikeMessageRequest{Like: true})
 	require.NoError(t, err)
@@ -82,6 +83,11 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	require.Equal(t, int64(1), viewed.Likes)
 	require.True(t, viewed.ViewerLiked)
 
+	require.NoError(t, controller.Delete(newSpaceControllerContext(bobID), messageToDelete.MessageID))
+	_, err = controller.ToggleLike(newSpaceControllerContext(aliceID), messageToDelete.MessageID, models.LikeMessageRequest{Like: true})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cannot like a deleted message")
+
 	require.NoError(t, repos.Friends.DeleteFriendship(ctx, aliceID, bobSpace.SpaceID))
 	_, err = controller.ToggleLike(newSpaceControllerContext(aliceID), message.MessageID, models.LikeMessageRequest{Like: false})
 	require.True(t, errors.Is(err, ente.ErrPermissionDenied))
@@ -90,10 +96,8 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	require.Len(t, thread, 1)
 
 	require.Error(t, controller.Delete(newSpaceControllerContext(aliceID), message.MessageID))
-	require.NoError(t, controller.Delete(newSpaceControllerContext(bobID), message.MessageID))
-	_, err = controller.ToggleLike(newSpaceControllerContext(aliceID), message.MessageID, models.LikeMessageRequest{Like: true})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "cannot like a deleted message")
+	err = controller.Delete(newSpaceControllerContext(bobID), message.MessageID)
+	require.True(t, errors.Is(err, ente.ErrPermissionDenied))
 }
 
 func TestValidateCreateMessageRequestLimits(t *testing.T) {

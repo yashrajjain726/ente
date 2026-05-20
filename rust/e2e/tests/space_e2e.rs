@@ -461,6 +461,10 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite() {
             .await,
         403,
     );
+    space::assert_http_status(
+        owner_ctx.delete_message(&direct_message.message_id).await,
+        403,
+    );
 
     space::assert_http_status(
         friend_ctx
