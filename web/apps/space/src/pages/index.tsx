@@ -26,6 +26,7 @@ import {
     spaceInviteFromLocation,
     type PendingSpaceInvite,
 } from "services/spaceInvite";
+import { savedSpaceUnlockEmail } from "services/spaceSession";
 import {
     useSpaceAppState,
     type OnboardingEntrySource,
@@ -102,6 +103,9 @@ const Page: React.FC = () => {
     const [publicProfile, setPublicProfile] = useState<SetupProfile | null>(
         null,
     );
+    const [unlockCheckStatus, setUnlockCheckStatus] = useState<
+        "idle" | "checking" | "done"
+    >("idle");
     const [publicFriendsCount, setPublicFriendsCount] = useState(0);
     const [publicPosts, setPublicPosts] = useState<SpacePost[]>([]);
     const [publicError, setPublicError] = useState<string>();
@@ -161,8 +165,43 @@ const Page: React.FC = () => {
         }
     }, [profile, profileLoadStatus, routeMode.kind, router]);
 
+    useEffect(() => {
+        if (
+            routeMode.kind != "app" ||
+            profileLoadStatus != "ready" ||
+            profile
+        ) {
+            setUnlockCheckStatus("idle");
+            return undefined;
+        }
+
+        let cancelled = false;
+        setUnlockCheckStatus("checking");
+        void savedSpaceUnlockEmail()
+            .then((email) => {
+                if (cancelled) return;
+                if (email) {
+                    void router.replace(spaceRoutes.unlock);
+                } else {
+                    setUnlockCheckStatus("done");
+                }
+            })
+            .catch((error: unknown) => {
+                console.error("Failed to detect Space unlock state", error);
+                if (!cancelled) setUnlockCheckStatus("done");
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [profile, profileLoadStatus, routeMode.kind, router]);
+
+    const shouldCheckUnlock =
+        routeMode.kind == "app" && profileLoadStatus == "ready" && !profile;
+
     if (
         routeMode.kind == "checking" ||
+        (shouldCheckUnlock && unlockCheckStatus != "done") ||
         (routeMode.kind == "app" &&
             (profileLoadStatus == "loading" || Boolean(profile)))
     ) {

@@ -20,6 +20,7 @@ export const spaceRoutes = {
         from == "login" ? "/setup-profile?from=login" : "/setup-profile",
     signup: "/signup",
     twoFactorVerify: "/two-factor/verify",
+    unlock: "/unlock",
     verify: "/verify",
     verifyLogin: "/verify?flow=login",
 } as const;

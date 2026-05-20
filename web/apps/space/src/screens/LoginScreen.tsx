@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 export const loginBackground = "#FAFAFA";
 
@@ -16,15 +16,24 @@ export interface SpaceLoginCredentials {
 
 interface LoginScreenProps {
     errorMessage?: string;
+    focusPassword?: boolean;
+    initialEmail?: string;
     isSubmitting?: boolean;
-    onBack: () => void;
+    onBack?: () => void;
+    onChangeEmail?: () => void;
     onContinue?: (credentials: SpaceLoginCredentials) => Promise<void> | void;
+    readOnlyEmail?: boolean;
+    showBack?: boolean;
+    title?: string;
 }
 
 interface TextInputProps {
+    autoFocus?: boolean;
+    inputRef?: React.Ref<HTMLInputElement>;
     label: string;
     onChange?: (value: string) => void;
     placeholder?: string;
+    readOnly?: boolean;
     required?: boolean;
     type?: "email" | "password" | "text";
     value?: string;
@@ -75,9 +84,12 @@ const EyeIcon: React.FC = () => (
 );
 
 const TextInput: React.FC<TextInputProps> = ({
+    autoFocus,
+    inputRef,
     label,
     onChange,
     placeholder,
+    readOnly = false,
     required,
     type = "text",
     value,
@@ -106,7 +118,7 @@ const TextInput: React.FC<TextInputProps> = ({
             <Box
                 sx={{
                     alignItems: "center",
-                    bgcolor: "white",
+                    bgcolor: readOnly ? "#F5F5F5" : "white",
                     borderRadius: "16px",
                     display: "flex",
                     height: 52,
@@ -120,14 +132,18 @@ const TextInput: React.FC<TextInputProps> = ({
             >
                 <Box
                     component="input"
+                    ref={inputRef}
+                    autoFocus={autoFocus}
                     onChange={(event) => onChange?.(event.target.value)}
                     placeholder={placeholder}
+                    readOnly={readOnly}
                     type={isPassword && showPassword ? "text" : type}
                     value={value}
                     sx={{
                         bgcolor: "transparent",
                         border: 0,
                         color: textBase,
+                        cursor: readOnly ? "default" : undefined,
                         flex: 1,
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 14,
@@ -175,14 +191,84 @@ const TextInput: React.FC<TextInputProps> = ({
     );
 };
 
+const FooterLinkButton: React.FC<{
+    children: React.ReactNode;
+    disabled?: boolean;
+    onClick?: () => void;
+}> = ({ children, disabled = false, onClick }) => (
+    <Box
+        component="button"
+        type="button"
+        disabled={disabled}
+        onClick={onClick}
+        sx={{
+            alignItems: "center",
+            bgcolor: "transparent",
+            border: 0,
+            color: "#666",
+            cursor: disabled ? "default" : "pointer",
+            display: "flex",
+            fontFamily: '"Inter Variable", Inter, sans-serif',
+            fontSize: 14,
+            fontWeight: 500,
+            justifyContent: "center",
+            lineHeight: "20px",
+            minWidth: 0,
+            opacity: 0.8,
+            p: 0,
+            textAlign: "center",
+            textDecoration: "underline",
+            textDecorationSkipInk: "none",
+            textUnderlineOffset: "2px",
+            textUnderlinePosition: "from-font",
+            width: "100%",
+            "&:focus-visible": {
+                borderRadius: "4px",
+                outline: `2px solid ${green}`,
+                outlineOffset: 4,
+            },
+        }}
+    >
+        {children}
+    </Box>
+);
+
 export const LoginScreen: React.FC<LoginScreenProps> = ({
     errorMessage,
+    focusPassword = false,
+    initialEmail,
     isSubmitting = false,
     onBack,
+    onChangeEmail,
     onContinue,
+    readOnlyEmail = false,
+    showBack = true,
+    title = "Login to Ente",
 }) => {
-    const [email, setEmail] = useState("");
+    const [email, setEmail] = useState(initialEmail ?? "");
     const [password, setPassword] = useState("");
+    const passwordInputRef = useRef<HTMLInputElement | null>(null);
+    const appliedInitialEmailRef = useRef<string | undefined>(initialEmail);
+
+    useEffect(() => {
+        if (!initialEmail || appliedInitialEmailRef.current == initialEmail) {
+            return;
+        }
+
+        setEmail((currentEmail) =>
+            currentEmail && !readOnlyEmail ? currentEmail : initialEmail,
+        );
+        appliedInitialEmailRef.current = initialEmail;
+    }, [initialEmail, readOnlyEmail]);
+
+    useEffect(() => {
+        if (!focusPassword) return undefined;
+
+        const animationFrame = window.requestAnimationFrame(() =>
+            passwordInputRef.current?.focus(),
+        );
+        return () => window.cancelAnimationFrame(animationFrame);
+    }, [focusPassword, initialEmail]);
 
     const canContinue =
         !isSubmitting && email.trim().length > 0 && password.length > 0;
@@ -232,31 +318,35 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                         width: "100%",
                     }}
                 >
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label="Back"
-                        onClick={onBack}
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: "transparent",
-                            border: 0,
-                            color: textBase,
-                            cursor: "pointer",
-                            display: "flex",
-                            height: 42,
-                            justifyContent: "flex-start",
-                            p: 0,
-                            width: 42,
-                            "&:focus-visible": {
-                                borderRadius: "50%",
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                        }}
-                    >
-                        <BackIcon />
-                    </Box>
+                    {showBack && onBack ? (
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label="Back"
+                            onClick={onBack}
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "transparent",
+                                border: 0,
+                                color: textBase,
+                                cursor: "pointer",
+                                display: "flex",
+                                height: 42,
+                                justifyContent: "flex-start",
+                                p: 0,
+                                width: 42,
+                                "&:focus-visible": {
+                                    borderRadius: "50%",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
+                            <BackIcon />
+                        </Box>
+                    ) : (
+                        <Box />
+                    )}
                     <Box
                         component="h1"
                         sx={{
@@ -270,7 +360,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                             whiteSpace: "nowrap",
                         }}
                     >
-                        Login to Ente
+                        {title}
                     </Box>
                     <Box />
                 </Box>
@@ -290,17 +380,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 >
                     <TextInput
                         label="Email"
-                        onChange={setEmail}
+                        onChange={readOnlyEmail ? undefined : setEmail}
                         placeholder="Enter your email"
+                        readOnly={readOnlyEmail}
                         required
                         type="email"
                         value={email}
                     />
                     <TextInput
                         label="Password"
+                        inputRef={passwordInputRef}
                         onChange={setPassword}
                         placeholder="Enter your password"
                         required
+                        autoFocus={focusPassword}
                         type="password"
                         value={password}
                     />
@@ -371,6 +464,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     >
                         {isSubmitting ? "Signing in..." : "Continue"}
                     </Box>
+                    {readOnlyEmail && onChangeEmail && (
+                        <FooterLinkButton
+                            disabled={isSubmitting}
+                            onClick={onChangeEmail}
+                        >
+                            Change email
+                        </FooterLinkButton>
+                    )}
                 </Box>
             </Box>
         </Box>

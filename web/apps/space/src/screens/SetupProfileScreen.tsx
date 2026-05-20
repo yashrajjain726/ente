@@ -265,30 +265,19 @@ const AvatarCropPageButton: React.FC<{
     children: React.ReactNode;
     disabled?: boolean;
     onClick?: () => void;
-    variant: "primary" | "secondary";
-}> = ({ children, disabled = false, onClick, variant }) => (
+}> = ({ children, disabled = false, onClick }) => (
     <Box
-        className={variant == "primary" && !disabled ? "green-bg" : undefined}
+        className={!disabled ? "green-bg" : undefined}
         component="button"
         type="button"
         disabled={disabled}
         onClick={onClick}
         sx={{
             alignItems: "center",
-            bgcolor:
-                variant == "primary"
-                    ? disabled
-                        ? "#F5F5F5"
-                        : green
-                    : "transparent",
-            border: variant == "primary" ? 0 : "1px solid #E6E6E6",
+            bgcolor: disabled ? "#F5F5F5" : green,
+            border: 0,
             borderRadius: "20px",
-            color:
-                variant == "primary"
-                    ? disabled
-                        ? textLight
-                        : "white"
-                    : textBase,
+            color: disabled ? textLight : "white",
             cursor: disabled ? "default" : "pointer",
             display: "flex",
             flex: "0 0 auto",
@@ -305,10 +294,50 @@ const AvatarCropPageButton: React.FC<{
                 outline: `2px solid ${green}`,
                 outlineOffset: 3,
             },
-            "&:hover":
-                !disabled && variant == "primary"
-                    ? { bgcolor: "#07AE22" }
-                    : undefined,
+            "&:hover": !disabled ? { bgcolor: "#07AE22" } : undefined,
+        }}
+    >
+        {children}
+    </Box>
+);
+
+const AvatarCropPageLinkButton: React.FC<{
+    children: React.ReactNode;
+    disabled?: boolean;
+    onClick?: () => void;
+}> = ({ children, disabled = false, onClick }) => (
+    <Box
+        component="button"
+        type="button"
+        disabled={disabled}
+        onClick={onClick}
+        sx={{
+            alignItems: "center",
+            bgcolor: "transparent",
+            border: 0,
+            color: "#666",
+            cursor: disabled ? "default" : "pointer",
+            display: "flex",
+            fontFamily: '"Inter Variable", Inter, sans-serif',
+            fontSize: 14,
+            fontWeight: 500,
+            justifyContent: "center",
+            lineHeight: "20px",
+            minWidth: 0,
+            opacity: 0.8,
+            p: 0,
+            textAlign: "center",
+            textDecoration: "underline",
+            textDecorationSkipInk: "none",
+            textUnderlineOffset: "2px",
+            textUnderlinePosition: "from-font",
+            width: "fit-content",
+            alignSelf: "center",
+            "&:focus-visible": {
+                borderRadius: "4px",
+                outline: `2px solid ${green}`,
+                outlineOffset: 4,
+            },
         }}
     >
         {children}
@@ -506,26 +535,24 @@ const AvatarCropPage: React.FC<AvatarCropPageProps> = ({
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
-                    gap: "10px",
+                    gap: "16px",
                     gridRow: 5,
                     pt: 3,
                     width: "100%",
                 }}
             >
                 <AvatarCropPageButton
-                    disabled={isSaving}
-                    variant="secondary"
-                    onClick={onChooseAnother}
-                >
-                    Choose another
-                </AvatarCropPageButton>
-                <AvatarCropPageButton
                     disabled={isSaving || isDoneDisabled}
-                    variant="primary"
                     onClick={onDone}
                 >
                     {isSaving ? "Saving..." : "Done"}
                 </AvatarCropPageButton>
+                <AvatarCropPageLinkButton
+                    disabled={isSaving}
+                    onClick={onChooseAnother}
+                >
+                    Change picture
+                </AvatarCropPageLinkButton>
             </Box>
         </Box>
     </Box>
