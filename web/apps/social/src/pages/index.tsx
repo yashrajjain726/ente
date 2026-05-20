@@ -5,7 +5,6 @@ import { useRouter } from "next/router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
     OnboardingScreen,
-    addFriendOnboardingDescription,
     addFriendOnboardingTitle,
     onboardingGreen,
 } from "screens/OnboardingScreen";
@@ -232,11 +231,6 @@ const Page: React.FC = () => {
         <>
             <SocialPageMeta themeColor={onboardingGreen} />
             <OnboardingScreen
-                description={
-                    isAddFriendLinkOnboarding
-                        ? addFriendOnboardingDescription
-                        : undefined
-                }
                 onCreateAccount={() => void router.push(socialRoutes.signup)}
                 onLogin={() => void router.push(socialRoutes.login)}
                 title={

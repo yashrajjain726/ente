@@ -3,12 +3,10 @@ import { EnteLogo } from "ente-base/components/EnteLogo";
 import React from "react";
 
 export const onboardingGreen = "#08C225";
-export const onboardingTitle = "Share your life";
+export const onboardingTitle = "Share life’s moments";
 export const onboardingDescription =
-    "A truly private, beautiful way to share your life with friends and family";
-export const addFriendOnboardingTitle = "Follow their life";
-export const addFriendOnboardingDescription =
-    "A truly private, beautiful way to see everyday moments from your friends and family";
+    "A private, end-to-end encrypted space for sharing life’s moments with friends and family";
+export const addFriendOnboardingTitle = "Follow their moments";
 
 const softGreen = "#E7F6E9";
 const copyGreen = "#AAFFB8";
@@ -97,9 +95,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                 overflow: "hidden",
                 px: 3,
                 width: "100%",
-                "@media (min-width: 600px)": {
-                    maxWidth: 390,
-                },
+                "@media (min-width: 600px)": { maxWidth: 390 },
             }}
         >
             <Box
