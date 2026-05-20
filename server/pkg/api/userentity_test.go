@@ -81,12 +81,12 @@ func TestEnsureUserEntityKeyReturnsExistingKeyForConflict(t *testing.T) {
 	})
 
 	firstBody := map[string]any{
-		"type":         "wall",
+		"type":         "space",
 		"encryptedKey": "encrypted-key",
 		"header":       "header",
 	}
 	secondBody := map[string]any{
-		"type":         "wall",
+		"type":         "space",
 		"encryptedKey": "different-encrypted-key",
 		"header":       "different-header",
 	}

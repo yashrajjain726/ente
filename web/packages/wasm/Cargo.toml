@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 [dependencies]
 ente-contacts = { path = "../../../rust/contacts" }
 ente-core = { path = "../../../rust/core", features = ["srp"] }
-ente-wall = { path = "../../../rust/wall" }
+ente-space = { path = "../../../rust/space" }
 md-5 = "0.10"
 js-sys = "0.3"
 serde = { version = "1", features = ["derive"] }

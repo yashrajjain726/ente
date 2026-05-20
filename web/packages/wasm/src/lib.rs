@@ -4,5 +4,5 @@ mod auth;
 mod contacts;
 mod crypto;
 mod http;
+mod space;
 mod urls;
-mod wall;

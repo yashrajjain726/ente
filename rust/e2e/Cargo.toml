@@ -9,7 +9,7 @@ ente-rs = { path = "../cli" }
 ente-accounts = { path = "../accounts" }
 ente-contacts = { path = "../contacts" }
 ente-core = { path = "../core", features = ["srp"] }
-ente-wall = { path = "../wall" }
+ente-space = { path = "../space" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls-native-roots"] }
 zeroize = { version = "1.8", features = ["derive"] }

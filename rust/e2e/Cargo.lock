@@ -680,7 +680,7 @@ dependencies = [
  "ente-contacts",
  "ente-core",
  "ente-rs",
- "ente-wall",
+ "ente-space",
  "hmac",
  "reqwest",
  "serde",
@@ -719,7 +719,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ente-wall"
+name = "ente-space"
 version = "0.0.1"
 dependencies = [
  "base64",

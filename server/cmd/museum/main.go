@@ -72,9 +72,9 @@ import (
 	"github.com/ente-io/museum/pkg/utils/config"
 	"github.com/ente-io/museum/pkg/utils/s3config"
 	timeUtil "github.com/ente-io/museum/pkg/utils/time"
-	wallapi "github.com/ente-io/museum/wall/api"
-	wallcontroller "github.com/ente-io/museum/wall/controller"
-	wallrepo "github.com/ente-io/museum/wall/repo"
+	spaceapi "github.com/ente-io/museum/space/api"
+	spacecontroller "github.com/ente-io/museum/space/controller"
+	spacerepo "github.com/ente-io/museum/space/repo"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/requestid"
 	"github.com/gin-contrib/timeout"
@@ -113,7 +113,7 @@ func main() {
 	viper.SetDefault("apps.accounts", "https://accounts.ente.io")
 	viper.SetDefault("apps.cast", "https://cast.ente.io")
 	viper.SetDefault("apps.family", "https://family.ente.io")
-	viper.SetDefault("apps.social", "https://ente.gg")
+	viper.SetDefault("apps.space", "https://ente.space")
 
 	setupLogger(environment)
 	log.Infof("Booting up %s server with commit #%s", environment, os.Getenv("GIT_COMMIT"))
@@ -940,9 +940,9 @@ func main() {
 
 	userEntityController := &userEntityCtrl.Controller{Repo: userEntityRepo}
 	userEntityHandler := &api.UserEntityHandler{Controller: userEntityController}
-	wallRepos := wallrepo.NewModule(db, s3Config)
-	wallModule := wallcontroller.NewModule(wallRepos, userAuthRepo, &wallcontroller.WallEmailNotifier{UserRepo: userRepo})
-	wallHandlers := wallapi.NewHandlers(wallModule)
+	spaceRepos := spacerepo.NewModule(db, s3Config)
+	spaceModule := spacecontroller.NewModule(spaceRepos, userAuthRepo, &spacecontroller.SpaceEmailNotifier{UserRepo: userRepo})
+	spaceHandlers := spaceapi.NewHandlers(spaceModule)
 
 	privateAPI.POST("/user-entity/key", userEntityHandler.CreateKey)
 	privateAPI.POST("/user-entity/key/ensure", userEntityHandler.EnsureKey)
@@ -951,7 +951,7 @@ func main() {
 	privateAPI.PUT("/user-entity/entity", userEntityHandler.UpdateEntity)
 	privateAPI.DELETE("/user-entity/entity", userEntityHandler.DeleteEntity)
 	privateAPI.GET("/user-entity/entity/diff", userEntityHandler.GetDiff)
-	wallapi.Register(privateAPI, publicAPI, wallHandlers)
+	spaceapi.Register(privateAPI, publicAPI, spaceHandlers)
 
 	contactController := contactCtrl.New(contactRepository, objectCleanupController, s3Config)
 	contactHandler := &api.ContactHandler{Controller: contactController}
@@ -1019,7 +1019,7 @@ func main() {
 	adminAPI.POST("/discount/add-coupons", discountCouponHandler.AddCoupons)
 
 	setKnownAPIs(server.Routes())
-	setupAndStartBackgroundJobs(objectCleanupController, replicationController3, fileDataCtrl, contactController, wallModule)
+	setupAndStartBackgroundJobs(objectCleanupController, replicationController3, fileDataCtrl, contactController, spaceModule)
 	setupAndStartCrons(
 		userAuthRepo, collectionLinkRepo, fileLinkRepo, pasteRepo, twoFactorRepo, passkeysRepo, fileController, taskLockingRepo, emailNotificationCtrl,
 		trashController, pushController, objectController, dataCleanupController, storageBonusCtrl, emergencyCtrl,
@@ -1141,7 +1141,7 @@ func setupAndStartBackgroundJobs(
 	replicationController3 *controller.ReplicationController3,
 	fileDataCtrl *filedata.Controller,
 	contactController *contactCtrl.Controller,
-	wallModule *wallcontroller.Module,
+	spaceModule *spacecontroller.Module,
 ) {
 	isReplicationEnabled := viper.GetBool("replication.enabled")
 	if isReplicationEnabled {
@@ -1165,7 +1165,7 @@ func setupAndStartBackgroundJobs(
 	contactController.StartDataDeletion()
 	objectCleanupController.StartRemovingUnreportedObjects()
 	objectCleanupController.StartClearingOrphanObjects()
-	wallModule.Cleanup.StartRemovingUnreportedObjects()
+	spaceModule.Cleanup.StartRemovingUnreportedObjects()
 }
 
 func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRepo *public.CollectionLinkRepo,
