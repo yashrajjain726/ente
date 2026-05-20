@@ -332,23 +332,32 @@ const AvatarCropPage: React.FC<AvatarCropPageProps> = ({
     <Box
         component="main"
         sx={{
+            "--avatar-crop-size":
+                "min(calc(100vw - 48px), calc(100dvh - 294px), 342px)",
             bgcolor: setupProfileBackground,
             color: textBase,
             display: "grid",
-            minHeight: "100svh",
+            height: "100dvh",
+            inset: 0,
             overflow: "hidden",
             placeItems: { xs: "stretch", sm: "start center" },
+            position: "fixed",
+            width: "100%",
         }}
     >
         <Box
             sx={{
                 bgcolor: setupProfileBackground,
                 boxSizing: "border-box",
-                display: "flex",
-                flexDirection: "column",
-                minHeight: "100svh",
+                display: "grid",
+                gridTemplateRows: "42px auto auto minmax(0, 1fr) auto",
+                height: "100%",
+                minHeight: 0,
                 mx: "auto",
-                pb: "172px",
+                overflowX: "hidden",
+                overflowY: "hidden",
+                pb: "calc(24px + env(safe-area-inset-bottom))",
+                pt: "32px",
                 px: 3,
                 width: "100%",
                 "@media (min-width: 600px)": { maxWidth: 390 },
@@ -360,7 +369,6 @@ const AvatarCropPage: React.FC<AvatarCropPageProps> = ({
                     display: "grid",
                     gridTemplateColumns: "42px 1fr 42px",
                     height: 42,
-                    mt: "32px",
                     width: "100%",
                 }}
             >
@@ -410,14 +418,15 @@ const AvatarCropPage: React.FC<AvatarCropPageProps> = ({
 
             <Box
                 sx={{
+                    alignSelf: "center",
                     bgcolor: "#111",
                     borderRadius: "8px",
-                    height: "auto",
+                    height: "var(--avatar-crop-size)",
                     aspectRatio: "1 / 1",
-                    mt: "32px",
+                    mt: { xs: "24px", sm: "32px" },
                     overflow: "hidden",
                     position: "relative",
-                    width: "100%",
+                    width: "var(--avatar-crop-size)",
                 }}
             >
                 <Cropper
@@ -465,7 +474,13 @@ const AvatarCropPage: React.FC<AvatarCropPageProps> = ({
                     onChange={(event) =>
                         onZoomChange(Number(event.target.value))
                     }
-                    sx={{ accentColor: green, display: "block", width: "100%" }}
+                    sx={{
+                        accentColor: green,
+                        display: "block",
+                        m: 0,
+                        maxWidth: "100%",
+                        width: "100%",
+                    }}
                 />
             </Box>
             {errorMessage && (
@@ -488,16 +503,12 @@ const AvatarCropPage: React.FC<AvatarCropPageProps> = ({
             <Box
                 sx={{
                     bgcolor: setupProfileBackground,
-                    bottom: 0,
                     boxSizing: "border-box",
                     display: "flex",
                     flexDirection: "column",
                     gap: "10px",
-                    left: "50%",
-                    maxWidth: 390,
-                    p: 3,
-                    position: "fixed",
-                    transform: "translateX(-50%)",
+                    gridRow: 5,
+                    pt: 3,
                     width: "100%",
                 }}
             >
