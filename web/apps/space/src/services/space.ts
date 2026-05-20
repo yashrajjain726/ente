@@ -769,9 +769,6 @@ export const loadCurrentSpaceFriends = async (spaceId: string) => {
         }
         throw error;
     } finally {
-        if (spaceFriendsCache.get(spaceId) == promise) {
-            spaceFriendsCache.delete(spaceId);
-        }
         releaseCurrentSpaceContext(ctx);
     }
 };
