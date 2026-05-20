@@ -11,7 +11,11 @@ import {
 import {
     decryptBox,
     deriveKey,
+    encryptBox,
+    fromB64,
     fromB64URLSafeNoPadding,
+    generateKey,
+    toB64,
 } from "ente-accounts-rs/services/crypto";
 import {
     checkPasskeyVerificationStatus,
@@ -25,7 +29,6 @@ import {
 } from "ente-accounts-rs/services/session-storage";
 import {
     getSRPAttributes,
-    type SRPAttributes,
     srpVerificationUnauthorizedErrorMessage,
     verifySRP,
 } from "ente-accounts-rs/services/srp";
@@ -47,6 +50,12 @@ export interface SocialLoginInput {
     password: string;
 }
 
+interface LoginKDFAttributes {
+    kekSalt: string;
+    memLimit: number;
+    opsLimit: number;
+}
+
 export type SocialLoginResult =
     | { status: "complete"; email: string }
     | { status: "email-otp"; email: string }
@@ -66,12 +75,76 @@ export type SocialLoginPasskeyStatusResult =
 export const socialLoginPasskeySessionExpiredErrorMessage =
     passkeySessionExpiredErrorMessage;
 
+const pendingSocialLoginCredentialsKey = "socialPendingLoginCredentials";
+
 const cleanedEmail = (email: string) => email.trim();
 
 const deriveLoginKEK = (
     password: string,
-    { kekSalt, memLimit, opsLimit }: SRPAttributes,
+    { kekSalt, memLimit, opsLimit }: LoginKDFAttributes,
 ) => deriveKey(password, kekSalt, opsLimit, memLimit);
+
+const isSocialLoginInput = (value: unknown): value is SocialLoginInput => {
+    if (!value || typeof value != "object") return false;
+    const candidate = value as Record<string, unknown>;
+    return (
+        typeof candidate.email == "string" &&
+        typeof candidate.password == "string"
+    );
+};
+
+const encodeCredentials = (credentials: SocialLoginInput) =>
+    toB64(new TextEncoder().encode(JSON.stringify(credentials)));
+
+const decodeCredentials = async (encodedCredentials: string) => {
+    const parsed: unknown = JSON.parse(
+        new TextDecoder().decode(await fromB64(encodedCredentials)),
+    );
+    return isSocialLoginInput(parsed) ? parsed : undefined;
+};
+
+export const savePendingSocialLoginCredentials = async (
+    credentials: SocialLoginInput,
+) => {
+    const key = await generateKey();
+    const box = await encryptBox(await encodeCredentials(credentials), key);
+    sessionStorage.setItem(
+        pendingSocialLoginCredentialsKey,
+        JSON.stringify({ key, ...box }),
+    );
+};
+
+export const savedPendingSocialLoginCredentials = async () => {
+    const saved = sessionStorage.getItem(pendingSocialLoginCredentialsKey);
+    if (!saved) return undefined;
+
+    try {
+        const parsed: unknown = JSON.parse(saved);
+        if (!parsed || typeof parsed != "object") return undefined;
+        const {
+            encryptedData,
+            key,
+            nonce,
+        } = parsed as Record<string, unknown>;
+        if (
+            typeof encryptedData != "string" ||
+            typeof key != "string" ||
+            typeof nonce != "string"
+        ) {
+            return undefined;
+        }
+
+        return await decodeCredentials(
+            await decryptBox({ encryptedData, nonce }, key),
+        );
+    } catch {
+        return undefined;
+    }
+};
+
+export const clearPendingSocialLoginCredentials = () => {
+    sessionStorage.removeItem(pendingSocialLoginCredentialsKey);
+};
 
 const socialPasskeyVerificationRedirectURL = (
     accountsURL: string,
@@ -91,17 +164,32 @@ export const beginSocialLogin = async ({
     password,
 }: SocialLoginInput): Promise<SocialLoginResult> => {
     const emailForLogin = cleanedEmail(email);
+    clearPendingSocialLoginCredentials();
     const srpAttributes = await getSRPAttributes(emailForLogin);
-    if (!srpAttributes) throw new Error("No account found for this email.");
+
+    if (!srpAttributes) {
+        await sendOTT(emailForLogin, "login");
+        replaceSavedLocalUser({ email: emailForLogin });
+        await savePendingSocialLoginCredentials({
+            email: emailForLogin,
+            password,
+        });
+        return { status: "email-otp", email: emailForLogin };
+    }
 
     replaceSavedLocalUser({ email: emailForLogin });
     saveSRPAttributes(srpAttributes);
 
     if (srpAttributes.isEmailMFAEnabled) {
         await sendOTT(emailForLogin, "login");
+        await savePendingSocialLoginCredentials({
+            email: emailForLogin,
+            password,
+        });
         return { status: "email-otp", email: emailForLogin };
     }
 
+    clearPendingSocialLoginCredentials();
     const kek = await deriveLoginKEK(password, srpAttributes);
 
     let verification;
@@ -133,15 +221,20 @@ export const completeSocialLoginEmailVerification = async ({
     const emailForLogin = cleanedEmail(email);
     const srpAttributes =
         savedSRPAttributes() ?? (await getSRPAttributes(emailForLogin));
-    if (!srpAttributes) throw new Error("No account found for this email.");
-
-    saveSRPAttributes(srpAttributes);
-    const kek = await deriveLoginKEK(password, srpAttributes);
     const verification = await verifyEmail(emailForLogin, code, undefined);
 
+    if (!srpAttributes) {
+        return finishSocialLoginVerification({
+            email: emailForLogin,
+            password,
+            verification,
+        });
+    }
+
+    saveSRPAttributes(srpAttributes);
     return finishSocialLoginVerification({
         email: emailForLogin,
-        kek,
+        kek: await deriveLoginKEK(password, srpAttributes),
         password,
         verification,
     });
@@ -152,7 +245,7 @@ export const resendSocialLoginCode = (email: string) =>
 
 interface FinishSocialLoginVerificationInput {
     email: string;
-    kek: string;
+    kek?: string;
     password?: string;
     verification: EmailOrSRPVerificationResponse;
 }
@@ -180,7 +273,7 @@ const finishSocialLoginVerification = async ({
         if (!accountsUrl) {
             throw new Error("Passkey verification URL is missing.");
         }
-        await stashKeyEncryptionKeyInSessionStore(kek);
+        if (kek) await stashKeyEncryptionKeyInSessionStore(kek);
         updateSavedLocalUser({
             passkeySessionID,
             twoFactorSessionID: secondFactorSessionID,
@@ -200,7 +293,7 @@ const finishSocialLoginVerification = async ({
     }
 
     if (secondFactorSessionID) {
-        await stashKeyEncryptionKeyInSessionStore(kek);
+        if (kek) await stashKeyEncryptionKeyInSessionStore(kek);
         updateSavedLocalUser({
             passkeySessionID: undefined,
             twoFactorSessionID: secondFactorSessionID,
@@ -223,7 +316,19 @@ const finishSocialLoginVerification = async ({
         throw new Error("This account has not finished setup.");
     }
 
-    await saveCompletedSocialLogin({ keyAttributes, kek, password });
+    const loginKEK =
+        kek ??
+        (password ? await deriveLoginKEK(password, keyAttributes) : undefined);
+    if (!loginKEK) {
+        throw new Error("Login session expired. Please sign in again.");
+    }
+
+    await saveCompletedSocialLogin({
+        keyAttributes,
+        kek: loginKEK,
+        password,
+    });
+    clearPendingSocialLoginCredentials();
 
     return { status: "complete", email };
 };
@@ -282,7 +387,15 @@ const finishSocialLoginAuthorization = async ({
     id,
     keyAttributes,
 }: TwoFactorAuthorizationResponse): Promise<SocialLoginResult> => {
-    const kek = await unstashKeyEncryptionKeyFromSession();
+    const [stashedKEK, pendingCredentials] = await Promise.all([
+        unstashKeyEncryptionKeyFromSession(),
+        savedPendingSocialLoginCredentials(),
+    ]);
+    const kek =
+        stashedKEK ??
+        (pendingCredentials
+            ? await deriveLoginKEK(pendingCredentials.password, keyAttributes)
+            : undefined);
     if (!kek) throw new Error("Login session expired. Please sign in again.");
 
     updateSavedLocalUser({
@@ -293,7 +406,12 @@ const finishSocialLoginAuthorization = async ({
         twoFactorSessionID: undefined,
         passkeySessionID: undefined,
     });
-    await saveCompletedSocialLogin({ keyAttributes, kek });
+    await saveCompletedSocialLogin({
+        keyAttributes,
+        kek,
+        password: pendingCredentials?.password,
+    });
+    clearPendingSocialLoginCredentials();
 
     return { status: "complete", email: savedPartialLocalUser()?.email ?? "" };
 };

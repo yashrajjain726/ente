@@ -10,6 +10,8 @@ import {
 import {
     completeSocialLoginEmailVerification,
     resendSocialLoginCode,
+    savedPendingSocialLoginCredentials,
+    type SocialLoginInput,
     type SocialLoginResult,
 } from "services/socialLogin";
 import { savePendingSocialPasskeyVerification } from "services/socialPasskeyVerification";
@@ -45,40 +47,65 @@ const Page: React.FC = () => {
     const [verificationError, setVerificationError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isResending, setIsResending] = useState(false);
+    const [loginCredentials, setLoginCredentials] = useState<
+        SocialLoginInput | null
+    >(null);
     const verifyFlow = verifyFlowFromQuery(router.query.flow);
     const isLoginVerification = router.isReady && verifyFlow == "login";
-    const email = isLoginVerification
-        ? pendingLoginCredentials?.email
-        : signupEmail;
+    const email = isLoginVerification ? loginCredentials?.email : signupEmail;
 
     useEffect(() => {
-        if (!router.isReady) return;
+        if (!router.isReady) return undefined;
 
         if (isLoginVerification) {
-            if (!pendingLoginCredentials)
-                void router.replace(socialRoutes.login);
-        } else if (!signupEmail) {
+            if (pendingLoginCredentials) {
+                setLoginCredentials(pendingLoginCredentials);
+                return undefined;
+            }
+
+            let cancelled = false;
+            void savedPendingSocialLoginCredentials().then((credentials) => {
+                if (cancelled) return;
+                if (!credentials) {
+                    void router.replace(socialRoutes.login);
+                    return;
+                }
+                setLoginCredentials(credentials);
+                setPendingLoginCredentials(credentials);
+            });
+
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        if (!signupEmail) {
             void router.replace(socialRoutes.signup);
         }
+        return undefined;
     }, [
         isLoginVerification,
         pendingLoginCredentials,
         router,
         router.isReady,
+        setPendingLoginCredentials,
         signupEmail,
     ]);
 
     const handleLoginResult = (result: SocialLoginResult) => {
         switch (result.status) {
             case "complete":
+                setLoginCredentials(null);
                 setPendingLoginCredentials(null);
                 void router.push(socialRoutes.setupProfile("login"));
                 break;
             case "totp":
+                setLoginCredentials(null);
                 setPendingLoginCredentials(null);
                 void router.push(socialRoutes.twoFactorVerify);
                 break;
             case "passkey":
+                setLoginCredentials(null);
                 setPendingLoginCredentials(null);
                 setPendingPasskeyVerification({
                     hasTwoFactorFallback: result.hasTwoFactorFallback,
@@ -117,7 +144,7 @@ const Page: React.FC = () => {
     };
 
     const verifyLoginEmail = async (code: string) => {
-        if (!pendingLoginCredentials) {
+        if (!loginCredentials) {
             void router.replace(socialRoutes.login);
             return;
         }
@@ -125,7 +152,7 @@ const Page: React.FC = () => {
         try {
             handleLoginResult(
                 await completeSocialLoginEmailVerification({
-                    ...pendingLoginCredentials,
+                    ...loginCredentials,
                     code,
                 }),
             );
