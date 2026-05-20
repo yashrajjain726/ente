@@ -403,7 +403,9 @@ const QuotePreview: React.FC<{ isOwn: boolean; message: SpaceMessage }> = ({
                     alignItems: "center",
                     display: "grid",
                     gap: "10px",
-                    gridTemplateColumns: "minmax(0, 1fr) 44px",
+                    gridTemplateColumns: isUnavailable
+                        ? "minmax(0, 1fr)"
+                        : "minmax(0, 1fr) 44px",
                     minWidth: 0,
                     width: "100%",
                 }}
@@ -435,21 +437,10 @@ const QuotePreview: React.FC<{ isOwn: boolean; message: SpaceMessage }> = ({
                             whiteSpace: "nowrap",
                         }}
                     >
-                        {isUnavailable
-                            ? "Deleted post"
-                            : quote.caption || "Photo"}
+                        {isUnavailable ? "Deleted" : quote.caption || "Photo"}
                     </Box>
                 </Box>
-                {isUnavailable ? (
-                    <Box
-                        sx={{
-                            bgcolor: "rgba(255, 255, 255, 0.08)",
-                            borderRadius: "6px",
-                            height: 44,
-                            width: 44,
-                        }}
-                    />
-                ) : (
+                {!isUnavailable && (
                     <Box
                         component="img"
                         alt=""
