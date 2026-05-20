@@ -22,6 +22,7 @@ import { createLocalPostPhoto } from "utils/localPostPhoto";
 import { firstNameFrom, initialsFor } from "utils/socialDisplay";
 import {
     prepareSocialPostImage,
+    socialPostImageErrorMessage,
     socialPostImageInputAccept,
     type PreparedSocialPostImage,
 } from "utils/socialPostImage";
@@ -33,6 +34,7 @@ const paleGreen = "#E7F6E9";
 const textBase = "#000";
 const textStrong = "#303030";
 const textSoft = "#777777";
+const warning = "#F63A3A";
 const coverForeground = "#FFFFFF";
 const profileHeaderHeight = 56;
 const profileAvatarTopOffset = 54;
@@ -176,6 +178,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const [isProfileLinkCopied, setIsProfileLinkCopied] = useState(false);
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
+    const [postPhotoError, setPostPhotoError] = useState<string>();
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
         () => new Set(),
     );
@@ -279,6 +282,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             photo: localPost.photo,
             postActionMode: "draft-post",
         });
+        setPostPhotoError(undefined);
     };
 
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
@@ -288,9 +292,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         event.target.value = "";
         if (!file) return;
 
-        void prepareSelectedPostPhoto(file).catch((error: unknown) =>
-            console.error("Failed to prepare post photo", error),
-        );
+        setPostPhotoError(undefined);
+        void prepareSelectedPostPhoto(file).catch((error: unknown) => {
+            console.error("Failed to prepare post photo", error);
+            setPostPhotoError(socialPostImageErrorMessage(error));
+        });
     };
 
     const copyProfileURL = async () => {
@@ -923,6 +929,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 <Box component="span">friends</Box>
                             </Box>
                         </Box>
+                        {postPhotoError && (
+                            <Box
+                                role="alert"
+                                sx={{
+                                    color: warning,
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    lineHeight: "18px",
+                                    mt: "10px",
+                                    px: 1,
+                                    textAlign: "center",
+                                }}
+                            >
+                                {postPhotoError}
+                            </Box>
+                        )}
                     </Box>
                 </Box>
                 <Box

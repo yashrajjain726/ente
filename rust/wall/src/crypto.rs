@@ -5,6 +5,8 @@ use crate::error::{Result, WallError};
 use crate::transport::EntityKeyPayload;
 
 pub const SECRETBOX_NONCE_BYTES: usize = secretbox::NONCE_BYTES;
+pub const SECRETBOX_MAC_BYTES: usize = secretbox::MAC_BYTES;
+pub const PACKED_SECRETBOX_OVERHEAD_BYTES: usize = 2 + SECRETBOX_NONCE_BYTES + SECRETBOX_MAC_BYTES;
 const WALL_LINK_ACCESS_KEY_LEN: usize = 12;
 const WALL_LINK_ACCESS_KEY_ALPHABET: &[u8] =
     b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";

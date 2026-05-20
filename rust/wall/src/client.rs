@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
 use crate::crypto::{
-    decode_b64, decrypt_entity_key, decrypt_secretbox_packed, derive_wall_link_access_key,
-    derive_wall_link_auth_key, derive_wall_link_wrap_key, encode_b64, encrypt_asset_payload,
-    encrypt_entity_key, encrypt_secretbox_packed, generate_key, pack_payload, unpack_payload,
-    wall_link_access_key_material,
+    PACKED_SECRETBOX_OVERHEAD_BYTES, decode_b64, decrypt_entity_key, decrypt_secretbox_packed,
+    derive_wall_link_access_key, derive_wall_link_auth_key, derive_wall_link_wrap_key, encode_b64,
+    encrypt_asset_payload, encrypt_entity_key, encrypt_secretbox_packed, generate_key,
+    pack_payload, unpack_payload, wall_link_access_key_material,
 };
 use crate::error::{Result, WallError};
 use crate::models::{
@@ -33,6 +33,12 @@ const ROOT_WALL_KEY_TYPE: &str = "wall";
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
 const MESSAGE_KIND_REGULAR: &str = "regular";
 const MESSAGE_KIND_POST_REPLY: &str = "post_reply";
+pub const MAX_WALL_POST_UPLOAD_BYTES: usize = 10 * 1024 * 1024;
+pub const MAX_WALL_AVATAR_UPLOAD_BYTES: usize = 2 * 1024 * 1024;
+pub const MAX_WALL_POST_PLAINTEXT_BYTES: usize =
+    MAX_WALL_POST_UPLOAD_BYTES - PACKED_SECRETBOX_OVERHEAD_BYTES;
+pub const MAX_WALL_AVATAR_PLAINTEXT_BYTES: usize =
+    MAX_WALL_AVATAR_UPLOAD_BYTES - PACKED_SECRETBOX_OVERHEAD_BYTES;
 
 #[derive(Debug, Clone)]
 struct ResolvedWallAccess {
@@ -421,6 +427,7 @@ impl AccountWallCtx {
     }
 
     pub async fn presign_post_upload(&self, size: usize) -> Result<PresignUploadResponse> {
+        ensure_wall_upload_size("post", size, MAX_WALL_POST_UPLOAD_BYTES)?;
         let request = PresignUploadRequest {
             size: size as i64,
             purpose: None,
@@ -437,6 +444,7 @@ impl AccountWallCtx {
         wall_id: &str,
         size: usize,
     ) -> Result<PresignUploadResponse> {
+        ensure_wall_upload_size("avatar", size, MAX_WALL_AVATAR_UPLOAD_BYTES)?;
         let request = PresignUploadRequest {
             size: size as i64,
             purpose: Some(UPLOAD_PURPOSE_AVATAR.to_owned()),
@@ -1213,6 +1221,15 @@ impl AccountWallCtx {
     }
 }
 
+fn ensure_wall_upload_size(purpose: &str, encrypted_size: usize, max_bytes: usize) -> Result<()> {
+    if encrypted_size == 0 || encrypted_size > max_bytes {
+        return Err(WallError::InvalidInput(format!(
+            "{purpose} upload size must be between 1 and {max_bytes} bytes"
+        )));
+    }
+    Ok(())
+}
+
 fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
     PostResponse {
         post_id: item.post_id,
@@ -1976,6 +1993,34 @@ mod tests {
         assert_eq!(payload.media_type.as_deref(), Some("image/jpeg"));
         presign.assert_async().await;
         upload.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn presign_uploads_reject_oversized_wall_assets() {
+        let server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+
+        let post_error = ctx
+            .presign_post_upload(MAX_WALL_POST_UPLOAD_BYTES + 1)
+            .await
+            .expect_err("oversized post upload should fail before presign");
+        assert!(post_error.to_string().contains("post upload size"));
+        assert!(
+            post_error
+                .to_string()
+                .contains(&MAX_WALL_POST_UPLOAD_BYTES.to_string())
+        );
+
+        let avatar_error = ctx
+            .presign_avatar_upload("wall_owner_main", MAX_WALL_AVATAR_UPLOAD_BYTES + 1)
+            .await
+            .expect_err("oversized avatar upload should fail before presign");
+        assert!(avatar_error.to_string().contains("avatar upload size"));
+        assert!(
+            avatar_error
+                .to_string()
+                .contains(&MAX_WALL_AVATAR_UPLOAD_BYTES.to_string())
+        );
     }
 
     #[tokio::test]

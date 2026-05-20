@@ -28,6 +28,7 @@ import {
 } from "utils/socialDisplay";
 import {
     prepareSocialPostImage,
+    socialPostImageErrorMessage,
     socialPostImageInputAccept,
     type PreparedSocialPostImage,
 } from "utils/socialPostImage";
@@ -39,6 +40,7 @@ const paleGreen = "#E7F6E9";
 const feedCardBackground = "#F5F5F5";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
+const warning = "#F63A3A";
 const feedAvatarSize = 26;
 const headerActionSize = 32;
 const headerActionGap = 8;
@@ -646,6 +648,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
+    const [postPhotoError, setPostPhotoError] = useState<string>();
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
@@ -715,6 +718,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             photo: localPost.photo,
             postActionMode: "draft-post",
         });
+        setPostPhotoError(undefined);
     };
 
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
@@ -724,9 +728,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         event.target.value = "";
         if (!file) return;
 
-        void prepareSelectedPostPhoto(file).catch((error: unknown) =>
-            console.error("Failed to prepare post photo", error),
-        );
+        setPostPhotoError(undefined);
+        void prepareSelectedPostPhoto(file).catch((error: unknown) => {
+            console.error("Failed to prepare post photo", error);
+            setPostPhotoError(socialPostImageErrorMessage(error));
+        });
     };
 
     React.useEffect(
@@ -977,6 +983,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         </Box>
                     </Box>
                 </Box>
+                {postPhotoError && (
+                    <Box
+                        role="alert"
+                        sx={{
+                            color: warning,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            lineHeight: "18px",
+                            mt: "-8px",
+                            px: 2,
+                            pb: "12px",
+                            textAlign: "center",
+                        }}
+                    >
+                        {postPhotoError}
+                    </Box>
+                )}
                 <Box
                     sx={{
                         boxSizing: "border-box",

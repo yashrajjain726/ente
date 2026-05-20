@@ -4,6 +4,7 @@ import Cropper, { type Area, type Point } from "react-easy-crop";
 import {
     prepareSocialAvatarImageFromCrop,
     socialAvatarCropImageForFile,
+    socialAvatarImageErrorMessage,
     socialAvatarImageInputAccept,
 } from "utils/socialPostImage";
 
@@ -15,8 +16,6 @@ const textLight = "#969696";
 const warning = "#F63A3A";
 const paleGreen = "#E7F6E9";
 const setupProfileFormID = "social-setup-profile-form";
-const maxAvatarBytes = 10 * 1024 * 1024;
-const maxAvatarSizeMessage = "Choose an image under 10 MB.";
 
 export interface SetupProfile {
     avatarUrl: string | null;
@@ -58,6 +57,7 @@ interface TextInputProps {
 
 interface AvatarCropDialogProps {
     crop: Point;
+    errorMessage?: string;
     imageURL: string;
     isDoneDisabled?: boolean;
     isSaving?: boolean;
@@ -316,6 +316,7 @@ const AvatarCropDialogButton: React.FC<{
 
 const AvatarCropDialog: React.FC<AvatarCropDialogProps> = ({
     crop,
+    errorMessage,
     imageURL,
     isDoneDisabled = false,
     isSaving = false,
@@ -428,6 +429,22 @@ const AvatarCropDialog: React.FC<AvatarCropDialogProps> = ({
                     sx={{ accentColor: green, display: "block", width: "100%" }}
                 />
             </Box>
+            {errorMessage && (
+                <Box
+                    role="alert"
+                    sx={{
+                        color: warning,
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        lineHeight: "18px",
+                        mt: 2,
+                        textAlign: "center",
+                    }}
+                >
+                    {errorMessage}
+                </Box>
+            )}
 
             <Box sx={{ display: "flex", gap: "10px", mt: 3, width: "100%" }}>
                 <AvatarCropDialogButton
@@ -541,7 +558,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
         } catch (error) {
             if (avatarSelectionIDRef.current != selectionID) return;
             console.error("Failed to prepare social avatar", error);
-            setAvatarError("Choose a JPEG, PNG, WebP, HEIC, or HEIF image.");
+            setAvatarError(socialAvatarImageErrorMessage(error));
         } finally {
             if (avatarSelectionIDRef.current == selectionID) {
                 setIsPreparingAvatar(false);
@@ -573,11 +590,6 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                 avatarCropImage.url,
                 avatarCropPixels,
             );
-            if (avatar.file.size > maxAvatarBytes) {
-                setAvatarError(maxAvatarSizeMessage);
-                setIsApplyingAvatarCrop(false);
-                return;
-            }
 
             if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current);
             const nextUrl = URL.createObjectURL(avatar.file);
@@ -588,7 +600,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
             clearAvatarCropImage();
         } catch (error) {
             console.error("Failed to crop social avatar", error);
-            setAvatarError("Couldn't crop this image. Choose another one.");
+            setAvatarError(socialAvatarImageErrorMessage(error));
             setIsApplyingAvatarCrop(false);
         }
     };
@@ -861,6 +873,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                 {avatarCropImage && (
                     <AvatarCropDialog
                         crop={avatarCrop}
+                        errorMessage={avatarError}
                         imageURL={avatarCropImage.url}
                         isDoneDisabled={!avatarCropPixels}
                         isSaving={isApplyingAvatarCrop}

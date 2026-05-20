@@ -31,6 +31,16 @@ const socialAvatarImageMaxEdge = 512;
 const socialPostImageMaxLongEdge = 2560;
 const socialPostImageWebPQuality = 0.85;
 const socialPostImageMimeType = "image/webp";
+const wallAssetEncryptionOverheadBytes = 42;
+const socialAvatarUploadMaxBytes = 2 * 1024 * 1024;
+const socialPostUploadMaxBytes = 10 * 1024 * 1024;
+
+export const maxSocialAvatarImageBytes =
+    socialAvatarUploadMaxBytes - wallAssetEncryptionOverheadBytes;
+export const maxSocialPostImageBytes =
+    socialPostUploadMaxBytes - wallAssetEncryptionOverheadBytes;
+export const socialAvatarImageMaxSizeMessage = "Choose an image under 2 MiB.";
+export const socialPostImageMaxSizeMessage = "Choose an image under 10 MiB.";
 
 export const prepareSocialPostImage = async (
     file: File,
@@ -39,6 +49,11 @@ export const prepareSocialPostImage = async (
     const { blob, height, width } = await webPBlobFromImage(
         renderableBlob,
         postCanvasPlan,
+    );
+    assertSocialImageSize(
+        blob,
+        maxSocialPostImageBytes,
+        socialPostImageMaxSizeMessage,
     );
 
     return {
@@ -58,6 +73,11 @@ export const prepareSocialAvatarImage = async (
     const { blob, height, width } = await webPBlobFromImage(
         renderableBlob,
         avatarCanvasPlan,
+    );
+    assertSocialImageSize(
+        blob,
+        maxSocialAvatarImageBytes,
+        socialAvatarImageMaxSizeMessage,
     );
 
     return {
@@ -95,6 +115,11 @@ export const prepareSocialAvatarImageFromCrop = async (
         (width, height) => avatarCanvasPlanForCrop(width, height, cropArea),
         false,
     );
+    assertSocialImageSize(
+        blob,
+        maxSocialAvatarImageBytes,
+        socialAvatarImageMaxSizeMessage,
+    );
 
     return {
         file: new File([blob], webPFileName(file.name), {
@@ -106,6 +131,16 @@ export const prepareSocialAvatarImageFromCrop = async (
     };
 };
 
+export const socialPostImageErrorMessage = (error: unknown) =>
+    error instanceof SocialImageSizeError
+        ? error.message
+        : "Choose a JPEG, PNG, WebP, HEIC, or HEIF image.";
+
+export const socialAvatarImageErrorMessage = (error: unknown) =>
+    error instanceof SocialImageSizeError
+        ? error.message
+        : "Choose a JPEG, PNG, WebP, HEIC, or HEIF image.";
+
 const renderableBlobForSocialImage = async (file: File): Promise<Blob> => {
     const extension = lowercaseExtension(file.name);
     const mediaType = file.type.toLowerCase();
@@ -115,6 +150,21 @@ const renderableBlobForSocialImage = async (file: File): Promise<Blob> => {
         mediaType == "image/heif";
 
     return isHEIC ? await heicToJPEG(file) : file;
+};
+
+class SocialImageSizeError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "SocialImageSizeError";
+    }
+}
+
+const assertSocialImageSize = (
+    blob: Blob,
+    maxBytes: number,
+    message: string,
+) => {
+    if (blob.size > maxBytes) throw new SocialImageSizeError(message);
 };
 
 interface CanvasPlan {

@@ -4,7 +4,10 @@ pub mod error;
 pub mod models;
 pub mod transport;
 
-pub use client::{AccountWallCtx, WallLinkCtx};
+pub use client::{
+    AccountWallCtx, MAX_WALL_AVATAR_PLAINTEXT_BYTES, MAX_WALL_AVATAR_UPLOAD_BYTES,
+    MAX_WALL_POST_PLAINTEXT_BYTES, MAX_WALL_POST_UPLOAD_BYTES, WallLinkCtx,
+};
 pub use error::{Result, WallError};
 pub use models::{
     AuthKeyAttributes, CreatedWall, CreatedWallLink, DecryptedFriendShare, DecryptedMessage,

@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	maxUploadBytes         int64 = 20 * 1024 * 1024
+	maxPostUploadBytes     int64 = 10 * 1024 * 1024
+	maxAvatarUploadBytes   int64 = 2 * 1024 * 1024
 	uploadURLExpiry              = 15 * time.Minute
 	uploadTempObjectExpiry       = 2 * uploadURLExpiry
 	uploadPurposePost            = wallrepo.TempObjectPurposePost
@@ -38,12 +39,16 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	if err != nil {
 		return nil, err
 	}
-	if req.Size <= 0 || req.Size > maxUploadBytes {
-		return nil, ente.NewBadRequestWithMessage(fmt.Sprintf("size must be between 1 and %d bytes", maxUploadBytes))
-	}
 	purpose := uploadPurposePost
 	if req.Purpose != nil && strings.TrimSpace(*req.Purpose) != "" {
 		purpose = strings.TrimSpace(*req.Purpose)
+	}
+	maxUploadBytes, err := maxUploadBytesForPurpose(purpose)
+	if err != nil {
+		return nil, err
+	}
+	if req.Size <= 0 || req.Size > maxUploadBytes {
+		return nil, ente.NewBadRequestWithMessage(fmt.Sprintf("size must be between 1 and %d bytes", maxUploadBytes))
 	}
 	var wallID sql.NullString
 	switch purpose {
@@ -100,6 +105,17 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 		ObjectKey: objectKey,
 		ExpiresIn: int(uploadURLExpiry.Seconds()),
 	}, nil
+}
+
+func maxUploadBytesForPurpose(purpose string) (int64, error) {
+	switch purpose {
+	case uploadPurposePost:
+		return maxPostUploadBytes, nil
+	case uploadPurposeAvatar:
+		return maxAvatarUploadBytes, nil
+	default:
+		return 0, ente.NewBadRequestWithMessage("invalid upload purpose")
+	}
 }
 
 func verifyStagedUpload(ctx *gin.Context, assetsRepo *wallrepo.AssetsRepository, ownerID int64, objectKey, purpose string, wallID *string) (*wallrepo.WallTempObjectRecord, error) {
