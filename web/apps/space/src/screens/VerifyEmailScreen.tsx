@@ -437,6 +437,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                                         lineHeight: "20px",
                                         p: 0,
                                         textDecoration: "underline",
+                                        textUnderlineOffset: "2px",
                                     }}
                                 >
                                     Change email
@@ -458,6 +459,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                                             lineHeight: "20px",
                                             p: 0,
                                             textDecoration: "underline",
+                                            textUnderlineOffset: "2px",
                                         }}
                                     >
                                         Resend code

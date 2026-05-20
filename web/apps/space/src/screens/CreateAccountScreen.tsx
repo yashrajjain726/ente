@@ -1,5 +1,9 @@
 import { Box } from "@mui/material";
-import React, { useState } from "react";
+import {
+    estimatePasswordStrength,
+    type PasswordStrength,
+} from "ente-accounts-rs/utils/password";
+import React, { useId, useMemo, useState } from "react";
 
 export const createAccountBackground = "#FAFAFA";
 
@@ -7,7 +11,14 @@ const green = "#08C225";
 const textBase = "#000";
 const textLight = "#969696";
 const warning = "#F63A3A";
+const caution = "#B65F00";
 const createAccountFormID = "space-create-account-form";
+
+const passwordStrengthLabels: Record<PasswordStrength, string> = {
+    weak: "Weak",
+    moderate: "Moderate",
+    strong: "Strong",
+};
 
 export interface CreateAccountInput {
     email: string;
@@ -23,7 +34,9 @@ interface CreateAccountScreenProps {
 }
 
 interface TextInputProps {
+    autoComplete?: string;
     label: string;
+    labelAccessory?: React.ReactNode;
     onChange?: (value: string) => void;
     placeholder?: string;
     required?: boolean;
@@ -80,7 +93,7 @@ const CheckIcon: React.FC = () => (
         component="svg"
         viewBox="0 0 16 16"
         aria-hidden
-        sx={{ display: "block", height: 12, width: 12 }}
+        sx={{ display: "block", height: 14, width: 14 }}
     >
         <path
             d="M3.25 8.25L6.25 11.25L12.75 4.75"
@@ -93,14 +106,88 @@ const CheckIcon: React.FC = () => (
     </Box>
 );
 
+const XIcon: React.FC = () => (
+    <Box
+        component="svg"
+        viewBox="0 0 16 16"
+        aria-hidden
+        sx={{ display: "block", height: 14, width: 14 }}
+    >
+        <path
+            d="M4.25 4.25L11.75 11.75M11.75 4.25L4.25 11.75"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+        />
+    </Box>
+);
+
+const AlertIcon: React.FC = () => (
+    <Box
+        component="svg"
+        viewBox="0 0 16 16"
+        aria-hidden
+        sx={{ display: "block", height: 14, width: 14 }}
+    >
+        <path
+            d="M8 2.75L14 13.25H2L8 2.75Z"
+            fill="none"
+            stroke="currentColor"
+            strokeLinejoin="round"
+            strokeWidth="1.6"
+        />
+        <path
+            d="M8 6.25V9M8 11.25H8.01"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth="1.8"
+        />
+    </Box>
+);
+
+const StatusLabel: React.FC<{
+    icon: React.ReactNode;
+    label: string;
+    tone: "critical" | "success" | "warning";
+}> = ({ icon, label, tone }) => {
+    const color =
+        tone == "critical" ? warning : tone == "warning" ? caution : green;
+
+    return (
+        <Box
+            aria-live="polite"
+            sx={{
+                alignItems: "center",
+                color,
+                display: "flex",
+                flexShrink: 0,
+                fontFamily: '"Inter Variable", Inter, sans-serif',
+                fontSize: 12,
+                fontWeight: 600,
+                gap: "4px",
+                lineHeight: "16px",
+            }}
+        >
+            {icon}
+            <Box component="span">{label}</Box>
+        </Box>
+    );
+};
+
 const TextInput: React.FC<TextInputProps> = ({
+    autoComplete,
     label,
+    labelAccessory,
     onChange,
     placeholder,
     required,
     type = "text",
     value,
 }) => {
+    const inputID = useId();
     const [showPassword, setShowPassword] = useState(false);
     const isPassword = type == "password";
 
@@ -108,19 +195,25 @@ const TextInput: React.FC<TextInputProps> = ({
         <Box sx={{ width: "100%" }}>
             <Box
                 component="label"
+                htmlFor={inputID}
                 sx={{
+                    alignItems: "center",
                     color: textBase,
                     display: "flex",
                     fontFamily: '"Inter Variable", Inter, sans-serif',
                     fontSize: 14,
                     fontWeight: 500,
                     gap: "2px",
+                    justifyContent: "space-between",
                     lineHeight: "20px",
                     mb: "9px",
                 }}
             >
-                {label}
-                {required && <Box sx={{ color: warning }}>*</Box>}
+                <Box sx={{ display: "flex", gap: "2px", minWidth: 0 }}>
+                    <Box component="span">{label}</Box>
+                    {required && <Box sx={{ color: warning }}>*</Box>}
+                </Box>
+                {labelAccessory}
             </Box>
             <Box
                 sx={{
@@ -139,8 +232,11 @@ const TextInput: React.FC<TextInputProps> = ({
             >
                 <Box
                     component="input"
+                    autoComplete={autoComplete}
+                    id={inputID}
                     onChange={(event) => onChange?.(event.target.value)}
                     placeholder={placeholder}
+                    required={required}
                     type={isPassword && showPassword ? "text" : type}
                     value={value}
                     sx={{
@@ -205,11 +301,33 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
     const [confirmPassword, setConfirmPassword] = useState("");
     const [referralSource, setReferralSource] = useState("");
     const [acceptedTerms, setAcceptedTerms] = useState(false);
+    const passwordStrength = useMemo(
+        () => estimatePasswordStrength(password),
+        [password],
+    );
+    const hasWeakPassword = password.length > 0 && passwordStrength == "weak";
+    const passwordHelperTone =
+        passwordStrength == "weak"
+            ? "critical"
+            : passwordStrength == "moderate"
+              ? "warning"
+              : "success";
+    const passwordStrengthIcon =
+        passwordStrength == "weak" ? (
+            <XIcon />
+        ) : passwordStrength == "moderate" ? (
+            <AlertIcon />
+        ) : (
+            <CheckIcon />
+        );
+    const isConfirmPasswordFilled = confirmPassword.length > 0;
+    const doPasswordsMatch = password == confirmPassword;
 
     const canCreateAccount =
         !isSubmitting &&
         email.trim().length > 0 &&
         password.length > 0 &&
+        !hasWeakPassword &&
         confirmPassword.length > 0 &&
         password == confirmPassword &&
         acceptedTerms;
@@ -307,7 +425,6 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                 <Box
                     component="form"
                     id={createAccountFormID}
-                    noValidate
                     onSubmit={handleSubmit}
                     sx={{
                         display: "flex",
@@ -318,6 +435,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                     }}
                 >
                     <TextInput
+                        autoComplete="username"
                         label="Email"
                         onChange={setEmail}
                         placeholder="Enter your email"
@@ -326,6 +444,18 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                         value={email}
                     />
                     <TextInput
+                        autoComplete="new-password"
+                        labelAccessory={
+                            password ? (
+                                <StatusLabel
+                                    icon={passwordStrengthIcon}
+                                    label={
+                                        passwordStrengthLabels[passwordStrength]
+                                    }
+                                    tone={passwordHelperTone}
+                                />
+                            ) : undefined
+                        }
                         label="Password"
                         onChange={setPassword}
                         placeholder="Enter your password"
@@ -334,7 +464,29 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                         value={password}
                     />
                     <TextInput
+                        autoComplete="new-password"
                         label="Confirm Password"
+                        labelAccessory={
+                            isConfirmPasswordFilled ? (
+                                <StatusLabel
+                                    icon={
+                                        doPasswordsMatch ? (
+                                            <CheckIcon />
+                                        ) : (
+                                            <XIcon />
+                                        )
+                                    }
+                                    label={
+                                        doPasswordsMatch ? "Match" : "No match"
+                                    }
+                                    tone={
+                                        doPasswordsMatch
+                                            ? "success"
+                                            : "critical"
+                                    }
+                                />
+                            ) : undefined
+                        }
                         onChange={setConfirmPassword}
                         placeholder="Re-enter your password"
                         required
