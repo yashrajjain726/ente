@@ -95,9 +95,15 @@ func TestEnsureUserEntityKeyReturnsExistingKeyForConflict(t *testing.T) {
 	if first.Code != http.StatusOK {
 		t.Fatalf("unexpected status code on first ensure: got %d want %d; body=%s", first.Code, http.StatusOK, first.Body.String())
 	}
+	if first.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("missing no-store cache header on first ensure: %q", first.Header().Get("Cache-Control"))
+	}
 	second := performEnsureUserEntityKeyRequest(t, handler, userID, secondBody)
 	if second.Code != http.StatusOK {
 		t.Fatalf("unexpected status code on duplicate ensure: got %d want %d; body=%s", second.Code, http.StatusOK, second.Body.String())
+	}
+	if second.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("missing no-store cache header on duplicate ensure: %q", second.Header().Get("Cache-Control"))
 	}
 	var response map[string]any
 	if err := json.Unmarshal(second.Body.Bytes(), &response); err != nil {

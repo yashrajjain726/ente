@@ -39,10 +39,12 @@ func TestSpaceSlugAvailabilityRouteReturnsOK(t *testing.T) {
 	existing := httptest.NewRecorder()
 	router.ServeHTTP(existing, httptest.NewRequest(http.MethodGet, "/space/public/slug-availability/alice", nil))
 	require.Equal(t, http.StatusOK, existing.Code)
+	require.Equal(t, "no-store", existing.Header().Get("Cache-Control"))
 	require.JSONEq(t, `{"available": false}`, existing.Body.String())
 
 	free := httptest.NewRecorder()
 	router.ServeHTTP(free, httptest.NewRequest(http.MethodGet, "/space/public/slug-availability/new-person", nil))
 	require.Equal(t, http.StatusOK, free.Code)
+	require.Equal(t, "no-store", free.Header().Get("Cache-Control"))
 	require.JSONEq(t, `{"available": true}`, free.Body.String())
 }

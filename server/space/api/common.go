@@ -8,7 +8,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func setNoStore(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+}
+
 func respondJSON(c *gin.Context, payload any, err error) {
+	setNoStore(c)
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return
@@ -21,6 +26,7 @@ func respondJSON(c *gin.Context, payload any, err error) {
 }
 
 func respondStatus(c *gin.Context, err error) {
+	setNoStore(c)
 	if err != nil {
 		handler.Error(c, stacktrace.Propagate(err, ""))
 		return

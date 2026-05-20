@@ -38,6 +38,7 @@ func (h *UserEntityHandler) CreateKey(c *gin.Context) {
 }
 
 func (h *UserEntityHandler) EnsureKey(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	var request model.EntityKeyRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		handler.Error(c,

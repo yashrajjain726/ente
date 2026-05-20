@@ -244,21 +244,17 @@ const profileFromDecryptedSpaceProfile = (
 };
 
 export const loadExistingSpaceProfile = async () => {
-    const ctx = await openCurrentSpaceContext();
-    if (!ctx) return null;
+    if (!(await currentSpaceContextConfig())) return null;
 
-    try {
-        const spaces = (await ctx.list_owned_spaces()) as OwnedSpace[];
-        const space = defaultOwnedSpace(spaces);
-        if (!space) return null;
+    const ctx = await ensureCurrentSpaceContext();
+    const spaces = (await ctx.list_owned_spaces()) as OwnedSpace[];
+    const space = defaultOwnedSpace(spaces);
+    if (!space) return null;
 
-        const spaceProfile = (await ctx.get_space_profile(
-            space.spaceId,
-        )) as DecryptedSpaceProfile;
-        return profileFromDecryptedSpaceProfile(spaceProfile);
-    } finally {
-        ctx.free();
-    }
+    const spaceProfile = (await ctx.get_space_profile(
+        space.spaceId,
+    )) as DecryptedSpaceProfile;
+    return profileFromDecryptedSpaceProfile(spaceProfile);
 };
 
 export const loadExistingSpaceAvatar = async (

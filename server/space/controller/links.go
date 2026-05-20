@@ -41,15 +41,7 @@ func (c *LinksController) Get(ctx *gin.Context, spaceID string) (*models.SpaceLi
 			Active:     false,
 		}, nil
 	}
-	return &models.SpaceLinkStatusResponse{
-		SpaceID:            link.SpaceID,
-		SpaceSlug:          link.SpaceSlug,
-		KeyVersion:         link.KeyVersion,
-		Active:             link.Active,
-		EncryptedAccessKey: link.EncryptedAccessKey,
-		CreatedAt:          formatMicros(link.CreatedAt),
-		UpdatedAt:          formatMicros(link.UpdatedAt),
-	}, nil
+	return linkStatusResponse(link), nil
 }
 
 func (c *LinksController) Create(ctx *gin.Context, req models.SpaceLinkCreateRequest) (*models.SpaceLinkStatusResponse, error) {
@@ -91,13 +83,24 @@ func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreate
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
 		}
 		if errors.Is(err, repo.ErrActiveLinkAlreadyExists) {
-			return nil, ente.NewBadRequestWithMessage("active space link already exists; rotate it instead")
+			if rotate {
+				return nil, ente.NewBadRequestWithMessage("active space link already exists; rotate it instead")
+			}
+			existing, getErr := c.LinksRepo.GetLink(ctx.Request.Context(), space.SpaceID)
+			if getErr != nil {
+				return nil, getErr
+			}
+			return linkStatusResponse(existing), nil
 		}
 		if errors.Is(err, repo.ErrLinkAuthKeyReused) {
 			return nil, ente.NewBadRequestWithMessage("space link secret has already been used")
 		}
 		return nil, err
 	}
+	return linkStatusResponse(link), nil
+}
+
+func linkStatusResponse(link *repo.SpaceLinkRecord) *models.SpaceLinkStatusResponse {
 	return &models.SpaceLinkStatusResponse{
 		SpaceID:            link.SpaceID,
 		SpaceSlug:          link.SpaceSlug,
@@ -106,7 +109,7 @@ func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreate
 		EncryptedAccessKey: link.EncryptedAccessKey,
 		CreatedAt:          formatMicros(link.CreatedAt),
 		UpdatedAt:          formatMicros(link.UpdatedAt),
-	}, nil
+	}
 }
 
 func (c *LinksController) Delete(ctx *gin.Context, spaceID string) error {

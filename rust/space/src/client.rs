@@ -195,10 +195,16 @@ impl AccountSpaceCtx {
     }
 
     pub async fn list_owned_spaces(&self) -> Result<Vec<SpaceKeyResponse>> {
-        self.client
+        if let Some(value) = cache_lock(&self.owned_spaces_cache, "owned spaces")?.clone() {
+            return Ok(value);
+        }
+        let spaces: Vec<SpaceKeyResponse> = self
+            .client
             .get_json("/space", &[])
             .await
-            .map_err(Into::into)
+            .map_err(SpaceError::from)?;
+        *cache_lock(&self.owned_spaces_cache, "owned spaces")? = Some(spaces.clone());
+        Ok(spaces)
     }
 
     pub async fn list_friend_shares(&self) -> Result<Vec<FriendShareResponse>> {
@@ -282,7 +288,13 @@ impl AccountSpaceCtx {
             .client
             .post_json::<SpaceKeyResponse, _>("/space", &request)
             .await?;
-        self.clear_owned_space_cache()?;
+        self.cache_created_owned_space(SpaceKeyResponse {
+            space_id: response.space_id.clone(),
+            space_slug: response.space_slug.clone(),
+            encrypted_space_key: encrypted_space_key.clone(),
+            encrypted_profile: encrypted_profile.clone(),
+            key_version: response.key_version,
+        })?;
         Ok(CreatedSpace {
             space_id: response.space_id,
             space_slug: response.space_slug,
@@ -1219,10 +1231,6 @@ impl AccountSpaceCtx {
             .ok_or_else(|| {
                 SpaceError::InvalidInput(format!("space {space_id} is not owned by the account"))
             })?;
-        let status = self.get_space_link_status(space_id).await?;
-        if status.active {
-            return self.created_space_link_from_status(&access.root_space_key, status);
-        }
         let access_key = generate_space_link_access_key()?;
         self.write_space_link(space_id, access, access_key, "/space/links")
             .await
@@ -1264,13 +1272,7 @@ impl AccountSpaceCtx {
             )?),
         };
         let status: SpaceLinkStatusResponse = self.client.post_json(path, &request).await?;
-        Ok(CreatedSpaceLink {
-            access_key,
-            space_username: status.space_slug.clone(),
-            space_id: space_id.to_owned(),
-            space_slug: status.space_slug,
-            key_version: status.key_version,
-        })
+        self.created_space_link_from_status(&access.root_space_key, status)
     }
 
     fn created_space_link_from_status(
@@ -1410,6 +1412,15 @@ impl AccountSpaceCtx {
 
     fn clear_owned_space_cache(&self) -> Result<()> {
         *cache_lock(&self.owned_spaces_cache, "owned spaces")? = None;
+        Ok(())
+    }
+
+    fn cache_created_owned_space(&self, created: SpaceKeyResponse) -> Result<()> {
+        let mut cache = cache_lock(&self.owned_spaces_cache, "owned spaces")?;
+        if let Some(spaces) = cache.as_mut() {
+            spaces.retain(|space| space.space_id != created.space_id);
+            spaces.push(created);
+        }
         Ok(())
     }
 
@@ -2520,6 +2531,114 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn create_space_updates_loaded_owned_space_cache() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let space_key = generate_key();
+        let root_space_key = generate_key();
+        let list_spaces = server
+            .mock("GET", "/space")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body("[]")
+            .expect(1)
+            .create_async()
+            .await;
+        let ensure_root = server
+            .mock("POST", "/user-entity/key/ensure")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(root_entity_response(&ctx.master_key, &root_space_key))
+            .create_async()
+            .await;
+        let create_space = server
+            .mock("POST", "/space")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(
+                json!({
+                    "spaceId": "space_owner_main",
+                    "spaceSlug": "owner-main",
+                    "encryptedSpaceKey": "",
+                    "encryptedProfile": "",
+                    "keyVersion": 1
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let update_profile = server
+            .mock("POST", "/space/profile")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+                Matcher::Regex("\"encryptedProfile\":\"[^\"]+\"".into()),
+            ]))
+            .with_status(200)
+            .with_body(json!({ "status": "ok" }).to_string())
+            .create_async()
+            .await;
+
+        let spaces = ctx
+            .list_owned_spaces()
+            .await
+            .expect("space list should load");
+        assert!(spaces.is_empty());
+
+        let created = ctx
+            .create_space_with_key("owner-main", &space_key, b"profile-json")
+            .await
+            .expect("space should be created");
+        ctx.update_space_profile(&created.space_id, b"profile-json-2", None, false)
+            .await
+            .expect("created space should be available from cache");
+
+        list_spaces.assert_async().await;
+        ensure_root.assert_async().await;
+        create_space.assert_async().await;
+        update_profile.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn list_owned_spaces_reuses_loaded_cache() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let root_space_key = generate_key();
+        let space_key = generate_key();
+        let list_spaces = server
+            .mock("GET", "/space")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(owned_space_response(
+                &root_space_key,
+                &space_key,
+                "space_owner_main",
+                "owner-main",
+                3,
+            ))
+            .expect(1)
+            .create_async()
+            .await;
+
+        let first = ctx
+            .list_owned_spaces()
+            .await
+            .expect("space list should load");
+        let second = ctx
+            .list_owned_spaces()
+            .await
+            .expect("space list should reuse cache");
+
+        assert_eq!(first.len(), 1);
+        assert_eq!(second.len(), 1);
+        assert_eq!(second[0].space_id, first[0].space_id);
+        assert_eq!(second[0].space_slug, first[0].space_slug);
+        assert_eq!(second[0].encrypted_space_key, first[0].encrypted_space_key);
+        assert_eq!(second[0].key_version, first[0].key_version);
+        list_spaces.assert_async().await;
+    }
+
+    #[tokio::test]
     async fn create_post_includes_space_key_version() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
@@ -3363,6 +3482,16 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
         let space_key = generate_key();
+        let created_access_key = "AbC123xYz789";
+        let encrypted_created_access_key = encode_b64(
+            &encrypt_secretbox_packed(&root_space_key, created_access_key.as_bytes())
+                .expect("encrypted created access key"),
+        );
+        let rotated_access_key = "ZyX987cBa321";
+        let encrypted_rotated_access_key = encode_b64(
+            &encrypt_secretbox_packed(&root_space_key, rotated_access_key.as_bytes())
+                .expect("encrypted rotated access key"),
+        );
 
         let entity = server
             .mock("GET", "/user-entity/key")
@@ -3406,7 +3535,7 @@ mod tests {
                 })
                 .to_string(),
             )
-            .expect(2)
+            .expect(1)
             .create_async()
             .await;
         let create = server
@@ -3426,7 +3555,7 @@ mod tests {
                     "spaceSlug": "owner-main",
                     "keyVersion": 3,
                     "active": true,
-                    "encryptedAccessKey": "owner-link-secret",
+                    "encryptedAccessKey": encrypted_created_access_key,
                     "createdAt": "2026-04-16T00:00:00Z",
                     "updatedAt": "2026-04-16T00:00:00Z"
                 })
@@ -3451,7 +3580,7 @@ mod tests {
                     "spaceSlug": "owner-main",
                     "keyVersion": 3,
                     "active": true,
-                    "encryptedAccessKey": "rotated-owner-link-secret",
+                    "encryptedAccessKey": encrypted_rotated_access_key,
                     "createdAt": "2026-04-16T00:00:00Z",
                     "updatedAt": "2026-04-16T00:01:00Z"
                 })
@@ -3485,17 +3614,11 @@ mod tests {
         assert!(!status_response.active);
         assert_eq!(created.space_id, "space_owner_main");
         assert_eq!(created.space_username, "owner-main");
-        assert_eq!(created.access_key.len(), 12);
-        assert!(
-            created
-                .access_key
-                .bytes()
-                .all(|value| value.is_ascii_alphanumeric())
-        );
+        assert_eq!(created.access_key, created_access_key);
         assert_eq!(created.key_version, 3);
         assert_eq!(rotated.space_id, "space_owner_main");
         assert_eq!(rotated.space_username, "owner-main");
-        assert_eq!(rotated.access_key.len(), 12);
+        assert_eq!(rotated.access_key, rotated_access_key);
         assert_ne!(rotated.access_key, created.access_key);
         status.assert_async().await;
         entity.assert_async().await;
@@ -3506,7 +3629,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn create_space_link_reuses_active_encrypted_access_key() {
+    async fn create_space_link_reuses_encrypted_access_key_returned_by_post() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
@@ -3541,9 +3664,16 @@ mod tests {
             ))
             .create_async()
             .await;
-        let status = server
-            .mock("GET", "/space/links/space_owner_main")
+        let create = server
+            .mock("POST", "/space/links")
             .match_header("x-auth-token", "token")
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+                Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"keyVersion\":3".into()),
+                Matcher::Regex("\"encryptedSpaceKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"encryptedAccessKey\":\"[^\"]+\"".into()),
+            ]))
             .with_status(200)
             .with_body(
                 json!({
@@ -3563,7 +3693,7 @@ mod tests {
         let created = ctx
             .create_space_link("space_owner_main")
             .await
-            .expect("active link should be reusable");
+            .expect("returned link should be reusable");
 
         assert_eq!(created.access_key, access_key);
         assert_eq!(created.space_id, "space_owner_main");
@@ -3571,7 +3701,7 @@ mod tests {
         assert_eq!(created.key_version, 3);
         entity.assert_async().await;
         spaces.assert_async().await;
-        status.assert_async().await;
+        create.assert_async().await;
     }
 
     #[tokio::test]
