@@ -9,6 +9,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem, Tooltip } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
+import type { FriendProfile } from "data/friends";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -49,7 +50,9 @@ const sendSpin = keyframes`
 
 interface MessagesScreenProps {
     conversations: SpaceMessageConversation[];
+    friends: FriendProfile[];
     isConversationsLoading?: boolean;
+    isFriendsLoaded?: boolean;
     isThreadLoading?: boolean;
     isThreadReadOnly?: boolean;
     messages: SpaceMessage[];
@@ -195,13 +198,41 @@ const messageLikeTooltipLabel = (
     return likerNames.filter(Boolean).join(" and ") || "Liked";
 };
 
+const isCurrentFriend = (
+    conversationFriend: SpaceMessageConversation["friend"],
+    friends: FriendProfile[],
+) => {
+    const conversationSpaceId =
+        conversationFriend.spaceId ?? conversationFriend.id;
+    const conversationSpaceSlug = conversationFriend.spaceSlug;
+    const conversationUsername = conversationFriend.username;
+    return friends.some((friend) => {
+        const friendSpaceId = friend.spaceId ?? friend.id;
+        return (
+            friendSpaceId == conversationSpaceId ||
+            (conversationSpaceSlug &&
+                friend.spaceSlug == conversationSpaceSlug) ||
+            friend.username == conversationUsername
+        );
+    });
+};
+
 const conversationPreview = (
     conversation: SpaceMessageConversation,
     profile: SetupProfile,
+    currentlyFriends?: boolean,
 ) => {
     const activity = conversation.latestActivity;
-    if (activity.type == "friend_add") return "Added you as a friend";
-    if (activity.type == "friend_remove") return "Removed you as a friend";
+    if (activity.type == "friend_add") {
+        return currentlyFriends === false
+            ? "No longer friends"
+            : "Added you as a friend";
+    }
+    if (activity.type == "friend_remove") {
+        return currentlyFriends === true
+            ? "Friends again"
+            : "Removed you as a friend";
+    }
     if (activity.type == "post_like") return "Liked your post";
     if (activity.type == "post_reply") {
         return "Replied";
@@ -245,8 +276,9 @@ const quotedConversationActivityPreview = (
 
 const ConversationPreviewLine: React.FC<{
     conversation: SpaceMessageConversation;
+    currentlyFriends?: boolean;
     profile: SetupProfile;
-}> = ({ conversation, profile }) => {
+}> = ({ conversation, currentlyFriends, profile }) => {
     const activity = conversation.latestActivity;
     const quotedPreview = quotedConversationActivityPreview(activity);
     const previewLineSx = {
@@ -264,7 +296,7 @@ const ConversationPreviewLine: React.FC<{
     if (!quotedPreview) {
         return (
             <Box sx={previewLineSx}>
-                {conversationPreview(conversation, profile)}
+                {conversationPreview(conversation, profile, currentlyFriends)}
             </Box>
         );
     }
@@ -801,7 +833,9 @@ const MessageBubble: React.FC<{
 
 export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     conversations,
+    friends,
     isConversationsLoading = false,
+    isFriendsLoaded = false,
     isThreadLoading = false,
     isThreadReadOnly = false,
     messages,
@@ -1702,6 +1736,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     const name =
                                         conversation.friend.fullName.trim() ||
                                         conversation.friend.username;
+                                    const currentlyFriends = isCurrentFriend(
+                                        conversation.friend,
+                                        friends,
+                                    );
                                     const timestampLabel = formatTimeAgo(
                                         microsForTimestamp(
                                             conversation.latestActivity
@@ -1841,6 +1879,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                     <ConversationPreviewLine
                                                         conversation={
                                                             conversation
+                                                        }
+                                                        currentlyFriends={
+                                                            isFriendsLoaded
+                                                                ? currentlyFriends
+                                                                : undefined
                                                         }
                                                         profile={profile}
                                                     />

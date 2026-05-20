@@ -27,6 +27,7 @@ const Page: React.FC = () => {
     >([]);
     const [isConversationsLoading, setIsConversationsLoading] =
         React.useState(true);
+    const [isFriendsLoaded, setIsFriendsLoaded] = React.useState(false);
     const [isThreadLoading, setIsThreadLoading] = React.useState(false);
     const [messages, setMessages] = React.useState<SpaceMessage[]>([]);
     const [selectedFriend, setSelectedFriend] = React.useState<
@@ -108,8 +109,12 @@ const Page: React.FC = () => {
     React.useEffect(() => {
         if (!profile?.spaceId) return;
 
+        setIsFriendsLoaded(false);
         void loadCurrentSpaceFriends(profile.spaceId)
-            .then(setFriends)
+            .then((nextFriends) => {
+                setFriends(nextFriends);
+                setIsFriendsLoaded(true);
+            })
             .catch((error: unknown) =>
                 console.error("Failed to load space friends", error),
             );
@@ -151,7 +156,9 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={messagesBackground} />
             <MessagesScreen
                 conversations={conversations}
+                friends={friends}
                 isConversationsLoading={isConversationsLoading}
+                isFriendsLoaded={isFriendsLoaded}
                 isThreadLoading={isThreadLoading}
                 isThreadReadOnly={isThreadReadOnly}
                 messages={messages}
