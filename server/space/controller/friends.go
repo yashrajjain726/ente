@@ -55,6 +55,9 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 		strings.TrimSpace(req.RequesterEncryptedSpaceKey),
 		req.RequesterKeyVersion,
 	); err != nil {
+		if errors.Is(stacktrace.RootCause(err), repo.ErrSelfFriendship) {
+			return nil, ente.NewBadRequestWithMessage("cannot join your own space link")
+		}
 		if errors.Is(stacktrace.RootCause(err), repo.ErrAlreadyFriends) {
 			return &models.FriendStatusResponse{Status: "friend"}, nil
 		}

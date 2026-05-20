@@ -386,7 +386,7 @@ func (r *PostsRepository) UpdateCaption(ctx context.Context, postID, ownerID int
 	if captionCipher != nil {
 		caption = *captionCipher
 	}
-	res, err := r.DB.ExecContext(ctx, `UPDATE space_posts SET caption_cipher = $1 WHERE post_id = $2 AND owner_id = $3`, caption, postID, ownerID)
+	res, err := r.DB.ExecContext(ctx, `UPDATE space_posts SET caption_cipher = $1 WHERE post_id = $2 AND owner_id = $3 AND is_deleted = FALSE`, caption, postID, ownerID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}

@@ -9,7 +9,10 @@ import (
 	"github.com/lib/pq"
 )
 
-var ErrAlreadyFriends = errors.New("space users are already friends")
+var (
+	ErrAlreadyFriends = errors.New("space users are already friends")
+	ErrSelfFriendship = errors.New("space users cannot friend themselves")
+)
 
 func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, requesterSpaceID string, targetSpaceID string, targetEncryptedSpaceKey string, targetKeyVersion int, requesterEncryptedSpaceKey string, requesterKeyVersion int) error {
 	tx, err := r.DB.BeginTx(ctx, nil)
@@ -43,7 +46,7 @@ func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, re
 		return stacktrace.Propagate(err, "")
 	}
 	if targetOwnerID == requesterID {
-		return ErrAlreadyFriends
+		return ErrSelfFriendship
 	}
 	if targetCurrentVersion != targetKeyVersion {
 		return sql.ErrNoRows

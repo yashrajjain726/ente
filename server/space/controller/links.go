@@ -12,6 +12,7 @@ import (
 	timeutil "github.com/ente-io/museum/pkg/utils/time"
 	"github.com/ente-io/museum/space/models"
 	"github.com/ente-io/museum/space/repo"
+	"github.com/ente-io/stacktrace"
 	"github.com/gin-gonic/gin"
 )
 
@@ -34,6 +35,9 @@ func (c *LinksController) Get(ctx *gin.Context, spaceID string) (*models.SpaceLi
 	}
 	link, err := c.LinksRepo.GetLink(ctx.Request.Context(), space.SpaceID)
 	if err != nil {
+		if !errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, err
+		}
 		return &models.SpaceLinkStatusResponse{
 			SpaceID:    space.SpaceID,
 			SpaceSlug:  space.SpaceSlug,

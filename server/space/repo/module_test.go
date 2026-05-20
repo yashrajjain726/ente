@@ -549,6 +549,9 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	_, err = module.Posts.GetPost(ctx, postID, bobID)
 	require.Error(t, err)
 
+	err = module.Posts.UpdateCaption(ctx, postID, aliceID, ptr("edited-caption"))
+	require.ErrorIs(t, err, sql.ErrNoRows)
+
 	ok, err = module.Assets.AssetBelongsToSpace(ctx, aliceSpace.SpaceID, "space/alice/post1/full")
 	require.NoError(t, err)
 	require.False(t, ok)
@@ -589,6 +592,29 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.Equal(t, aliceSpace.SpaceID, lookup.SpaceID)
 
 	_ = bobSpace
+}
+
+func TestPostAssetPositionUniqueTreatsMissingVariantAsDefault(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+
+	aliceID := insertSpaceUser(t, module, "alice-assets@example.com", "alice-public")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-assets", "alice-space-key", "alice-profile")
+	require.NoError(t, err)
+	postID, err := module.Posts.CreatePost(ctx, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
+	require.NoError(t, err)
+
+	_, err = module.Posts.DB.Exec(`
+		INSERT INTO space_post_assets (post_id, object_key, bucket_id, position)
+		VALUES ($1, $2, $3, $4)
+	`, postID, "space/alice-assets/post/full-1", "b2-eu-cen", 0)
+	require.NoError(t, err)
+	_, err = module.Posts.DB.Exec(`
+		INSERT INTO space_post_assets (post_id, object_key, bucket_id, position)
+		VALUES ($1, $2, $3, $4)
+	`, postID, "space/alice-assets/post/full-2", "b2-eu-cen", 0)
+
+	require.Error(t, err)
 }
 
 func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
@@ -674,6 +700,19 @@ func TestAddFriendCreatesReciprocalSharesAndEvent(t *testing.T) {
 	err = module.Friends.DB.QueryRow(`SELECT COUNT(*) FROM space_friend_events WHERE event_type = 'friend_add' AND actor_id = $1 AND target_id = $2`, bobID, aliceID).Scan(&eventCount)
 	require.NoError(t, err)
 	require.Equal(t, 1, eventCount)
+}
+
+func TestAddFriendRejectsSelfFriendship(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+
+	aliceID := insertSpaceUser(t, module, "alice-self@example.com", "alice-public")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-self", "alice-space-key", "alice-profile")
+	require.NoError(t, err)
+
+	err = module.Friends.AddFriend(ctx, aliceID, aliceSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion)
+
+	require.ErrorIs(t, err, ErrSelfFriendship)
 }
 
 func TestAddFriendIsIdempotentForExistingFriends(t *testing.T) {

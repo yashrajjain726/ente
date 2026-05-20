@@ -5,9 +5,7 @@ type AssetRedirectRequest struct {
 	ObjectKey string `form:"objectKey" binding:"required"`
 }
 
-type ListSpacesRequest struct {
-	OwnerID *int64 `form:"ownerId"`
-}
+type ListSpacesRequest struct{}
 
 type GetSpaceProfileRequest struct {
 	SpaceID string `form:"spaceId" binding:"required"`

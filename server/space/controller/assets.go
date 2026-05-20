@@ -30,7 +30,6 @@ const (
 type AssetsController struct {
 	AssetsRepo *spacerepo.AssetsRepository
 	SpacesRepo *spacerepo.SpacesRepository
-	LinksRepo  *spacerepo.LinksRepository
 	auth       authDeps
 }
 

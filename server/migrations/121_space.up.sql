@@ -103,9 +103,11 @@ CREATE TABLE IF NOT EXISTS space_post_assets (
     height               INTEGER,
     media_type           TEXT,
     created_at           BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    CONSTRAINT uq_space_post_assets_object_key UNIQUE (object_key),
-    CONSTRAINT uq_space_post_assets_position UNIQUE (post_id, position, variant)
+    CONSTRAINT uq_space_post_assets_object_key UNIQUE (object_key)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_space_post_assets_position
+    ON space_post_assets (post_id, position, COALESCE(variant, ''));
 
 CREATE INDEX IF NOT EXISTS idx_space_post_assets_post_position
     ON space_post_assets (post_id, position ASC, asset_id ASC);

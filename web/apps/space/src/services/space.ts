@@ -265,15 +265,13 @@ export interface SpaceUnreadStatus {
 }
 
 const parseSpaceProfilePayload = (profile: string): SpaceProfilePayload => {
-    if (!profile.trim()) return {};
-    try {
-        const parsed: unknown = JSON.parse(profile);
-        return parsed && typeof parsed == "object"
-            ? (parsed as SpaceProfilePayload)
-            : {};
-    } catch {
-        return {};
+    const trimmed = profile.trim();
+    if (!trimmed) return {};
+    const parsed: unknown = JSON.parse(trimmed);
+    if (!parsed || typeof parsed != "object" || Array.isArray(parsed)) {
+        throw new Error("Space profile payload must be a JSON object.");
     }
+    return parsed as SpaceProfilePayload;
 };
 
 const textField = (value: unknown) =>
@@ -281,7 +279,10 @@ const textField = (value: unknown) =>
 
 const timestampMsFromSpaceDate = (value: string) => {
     const parsed = Date.parse(value);
-    return Number.isFinite(parsed) ? parsed : Date.now();
+    if (!Number.isFinite(parsed)) {
+        throw new Error(`Invalid space date: ${value}`);
+    }
+    return parsed;
 };
 
 const blobURLForBytes = (bytes: Uint8Array, mediaType?: string) =>
