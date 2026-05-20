@@ -19,7 +19,7 @@ const Page: React.FC = () => {
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
-            void router.replace(spaceRoutes.setupProfile("verify"));
+            void router.replace(spaceRoutes.setupProfile());
         }
     }, [profile, profileLoadStatus, router]);
 
@@ -56,7 +56,7 @@ const Page: React.FC = () => {
                 isLinkLoading={isLinkLoading}
                 profile={profile}
                 onBack={() =>
-                    void router.push(spaceRoutes.setupProfile("verify"))
+                    void router.push(spaceRoutes.setupProfile())
                 }
                 onDone={() => void router.push(spaceRoutes.home)}
                 onRetry={() => void loadInviteLink()}

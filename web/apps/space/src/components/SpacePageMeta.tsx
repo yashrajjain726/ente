@@ -9,6 +9,7 @@ interface SpacePageMetaProps {
 export const SpacePageMeta: React.FC<SpacePageMetaProps> = ({ themeColor }) => (
     <Head>
         <meta name="theme-color" content={themeColor} />
+        <meta name="robots" content="noindex,nofollow" />
         <meta name="description" content={onboardingDescription} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link

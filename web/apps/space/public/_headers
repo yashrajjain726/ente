@@ -4,6 +4,7 @@
     X-Content-Type-Options: nosniff
     X-Download-Options: noopen
     X-Frame-Options: deny
+    X-Robots-Tag: noindex, nofollow
     X-XSS-Protection: 1; mode=block
     Referrer-Policy: no-referrer
     Reporting-Endpoints: csp-endpoint="https://csp-reporter.ente.io"

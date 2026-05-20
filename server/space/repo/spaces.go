@@ -14,7 +14,7 @@ func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, space
 	if err != nil {
 		return nil, err
 	}
-	spaceID := base.MustNewID("wal")
+	spaceID := base.MustNewID("space")
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")

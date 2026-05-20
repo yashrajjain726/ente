@@ -16,8 +16,8 @@ export const spaceRoutes = {
     passkeysVerify: "/passkeys/verify",
     profile: "/app/profile",
     settings: "/app/settings",
-    setupProfile: (from: SetupProfileSource = "verify") =>
-        `/setup-profile?from=${from}`,
+    setupProfile: (from?: SetupProfileSource) =>
+        from == "login" ? "/setup-profile?from=login" : "/setup-profile",
     signup: "/signup",
     twoFactorVerify: "/two-factor/verify",
     verify: "/verify",
