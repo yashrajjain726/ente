@@ -1344,14 +1344,27 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
     ) -> Result<Option<ResolvedSpaceAccess>> {
+        let had_cached_shares = cache_lock(&self.friend_shares_cache, "friend shares")?.is_some();
         let shares = self.list_decrypted_friend_shares_cached().await?;
-        let Some(share) = shares.into_iter().find(|value| value.space_id == space_id) else {
+        if let Some(share) = shares.into_iter().find(|value| value.space_id == space_id) {
+            return Ok(Some(ResolvedSpaceAccess {
+                space_key: share.space_key,
+                key_version: share.key_version,
+            }));
+        }
+
+        if !had_cached_shares {
             return Ok(None);
-        };
-        Ok(Some(ResolvedSpaceAccess {
-            space_key: share.space_key,
-            key_version: share.key_version,
-        }))
+        }
+
+        let shares = self.refresh_decrypted_friend_shares_cache().await?;
+        Ok(shares
+            .into_iter()
+            .find(|value| value.space_id == space_id)
+            .map(|share| ResolvedSpaceAccess {
+                space_key: share.space_key,
+                key_version: share.key_version,
+            }))
     }
 
     async fn resolve_space_access(&self, space_id: &str) -> Result<Option<ResolvedSpaceAccess>> {
@@ -1400,6 +1413,10 @@ impl AccountSpaceCtx {
         if let Some(value) = cache_lock(&self.friend_shares_cache, "friend shares")?.clone() {
             return Ok(value);
         }
+        self.refresh_decrypted_friend_shares_cache().await
+    }
+
+    async fn refresh_decrypted_friend_shares_cache(&self) -> Result<Vec<DecryptedFriendShare>> {
         let value = self
             .list_friend_shares()
             .await?
@@ -2307,6 +2324,99 @@ mod tests {
         entity.assert_async().await;
         spaces.assert_async().await;
         shares.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn account_space_key_resolution_refreshes_cached_friend_shares_on_miss() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let root_space_key = generate_key();
+        let friend_space_key = generate_key();
+        let encrypted_profile = encode_b64(
+            &encrypt_secretbox_packed(&friend_space_key, b"friend-profile").expect("profile wrap"),
+        );
+        let sealed_share =
+            sealed::seal(&friend_space_key, ctx.public_key()).expect("friend share seal");
+        let encrypted_space_key = encode_b64(&pack_payload(&sealed_share, &[]));
+
+        let entity = server
+            .mock("GET", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "type".into(),
+                ROOT_SPACE_KEY_TYPE.into(),
+            ))
+            .with_status(200)
+            .with_body(root_entity_response(&ctx.master_key, &root_space_key))
+            .expect(1)
+            .create_async()
+            .await;
+        let spaces = server
+            .mock("GET", "/space")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(owned_space_response(
+                &root_space_key,
+                &generate_key(),
+                "space_owner_main",
+                "owner",
+                1,
+            ))
+            .expect(1)
+            .create_async()
+            .await;
+        let empty_shares = server
+            .mock("GET", "/space/friends/shares")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body("[]")
+            .expect(1)
+            .create_async()
+            .await;
+        let actor = SpaceActorResponse {
+            user_id: 7,
+            space_id: "space_friend".to_owned(),
+            space_slug: "friend".to_owned(),
+            key_version: 1,
+            encrypted_profile,
+            ..Default::default()
+        };
+
+        let missing = ctx
+            .decrypt_actor_profile(&actor)
+            .await
+            .expect("missing profile decrypt should not fail");
+
+        assert!(missing.is_none());
+        empty_shares.assert_async().await;
+
+        let refreshed_shares = server
+            .mock("GET", "/space/friends/shares")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "friend": "friend",
+                    "spaceId": "space_friend",
+                    "spaceSlug": "friend",
+                    "encryptedSpaceKey": encrypted_space_key,
+                    "keyVersion": 1
+                }])
+                .to_string(),
+            )
+            .expect(1)
+            .create_async()
+            .await;
+
+        let profile = ctx
+            .decrypt_actor_profile(&actor)
+            .await
+            .expect("refreshed profile decrypt");
+
+        assert_eq!(profile.as_deref(), Some(b"friend-profile".as_slice()));
+        entity.assert_async().await;
+        spaces.assert_async().await;
+        refreshed_shares.assert_async().await;
     }
 
     #[tokio::test]
