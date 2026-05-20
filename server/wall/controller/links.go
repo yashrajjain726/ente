@@ -42,22 +42,31 @@ func (c *LinksController) Get(ctx *gin.Context, wallID string) (*models.WallLink
 		}, nil
 	}
 	return &models.WallLinkStatusResponse{
-		WallID:     link.WallID,
-		WallSlug:   link.WallSlug,
-		KeyVersion: link.KeyVersion,
-		Active:     link.Active,
-		CreatedAt:  formatMicros(link.CreatedAt),
-		UpdatedAt:  formatMicros(link.UpdatedAt),
+		WallID:             link.WallID,
+		WallSlug:           link.WallSlug,
+		KeyVersion:         link.KeyVersion,
+		Active:             link.Active,
+		EncryptedAccessKey: link.EncryptedAccessKey,
+		CreatedAt:          formatMicros(link.CreatedAt),
+		UpdatedAt:          formatMicros(link.UpdatedAt),
 	}, nil
 }
 
 func (c *LinksController) Create(ctx *gin.Context, req models.WallLinkCreateRequest) (*models.WallLinkStatusResponse, error) {
+	return c.writeLink(ctx, req, false)
+}
+
+func (c *LinksController) Rotate(ctx *gin.Context, req models.WallLinkCreateRequest) (*models.WallLinkStatusResponse, error) {
+	return c.writeLink(ctx, req, true)
+}
+
+func (c *LinksController) writeLink(ctx *gin.Context, req models.WallLinkCreateRequest, rotate bool) (*models.WallLinkStatusResponse, error) {
 	userID, err := c.auth.requireUser(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.WallID) == "" || strings.TrimSpace(req.AuthKey) == "" || strings.TrimSpace(req.EncryptedWallKey) == "" || req.KeyVersion <= 0 {
-		return nil, ente.NewBadRequestWithMessage("wallId, authKey, encryptedWallKey and keyVersion are required")
+	if strings.TrimSpace(req.WallID) == "" || strings.TrimSpace(req.AuthKey) == "" || strings.TrimSpace(req.EncryptedWallKey) == "" || strings.TrimSpace(req.EncryptedAccessKey) == "" || req.KeyVersion <= 0 {
+		return nil, ente.NewBadRequestWithMessage("wallId, authKey, encryptedWallKey, encryptedAccessKey and keyVersion are required")
 	}
 	wall, err := c.auth.requireWallOwner(ctx.Request.Context(), userID, req.WallID)
 	if err != nil {
@@ -71,20 +80,32 @@ func (c *LinksController) Create(ctx *gin.Context, req models.WallLinkCreateRequ
 		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current wall version")
 	}
 	sum := sha256.Sum256(authKeyBytes)
-	link, err := c.LinksRepo.UpsertLink(ctx.Request.Context(), wall.WallID, sum[:], req.KeyVersion, req.EncryptedWallKey)
+	var link *repo.WallLinkRecord
+	if rotate {
+		link, err = c.LinksRepo.RotateLink(ctx.Request.Context(), wall.WallID, sum[:], req.KeyVersion, req.EncryptedWallKey, req.EncryptedAccessKey)
+	} else {
+		link, err = c.LinksRepo.UpsertLink(ctx.Request.Context(), wall.WallID, sum[:], req.KeyVersion, req.EncryptedWallKey, req.EncryptedAccessKey)
+	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current wall version")
 		}
+		if errors.Is(err, repo.ErrActiveLinkAlreadyExists) {
+			return nil, ente.NewBadRequestWithMessage("active wall link already exists; rotate it instead")
+		}
+		if errors.Is(err, repo.ErrLinkAuthKeyReused) {
+			return nil, ente.NewBadRequestWithMessage("wall link secret has already been used")
+		}
 		return nil, err
 	}
 	return &models.WallLinkStatusResponse{
-		WallID:     link.WallID,
-		WallSlug:   link.WallSlug,
-		KeyVersion: link.KeyVersion,
-		Active:     link.Active,
-		CreatedAt:  formatMicros(link.CreatedAt),
-		UpdatedAt:  formatMicros(link.UpdatedAt),
+		WallID:             link.WallID,
+		WallSlug:           link.WallSlug,
+		KeyVersion:         link.KeyVersion,
+		Active:             link.Active,
+		EncryptedAccessKey: link.EncryptedAccessKey,
+		CreatedAt:          formatMicros(link.CreatedAt),
+		UpdatedAt:          formatMicros(link.UpdatedAt),
 	}, nil
 }
 

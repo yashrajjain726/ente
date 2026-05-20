@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use crate::crypto::{
     PACKED_SECRETBOX_OVERHEAD_BYTES, decode_b64, decrypt_entity_key, decrypt_secretbox_packed,
-    derive_wall_link_access_key, derive_wall_link_auth_key, derive_wall_link_wrap_key, encode_b64,
-    encrypt_asset_payload, encrypt_entity_key, encrypt_secretbox_packed, generate_key,
+    derive_wall_link_auth_key, derive_wall_link_wrap_key, encode_b64, encrypt_asset_payload,
+    encrypt_entity_key, encrypt_secretbox_packed, generate_key, generate_wall_link_access_key,
     pack_payload, unpack_payload, wall_link_access_key_material,
 };
 use crate::error::{Result, WallError};
@@ -42,6 +42,13 @@ pub const MAX_WALL_AVATAR_PLAINTEXT_BYTES: usize =
 
 #[derive(Debug, Clone)]
 struct ResolvedWallAccess {
+    wall_key: Vec<u8>,
+    key_version: i32,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedOwnedWallAccess {
+    root_wall_key: Vec<u8>,
     wall_key: Vec<u8>,
     key_version: i32,
 }
@@ -1133,12 +1140,39 @@ impl AccountWallCtx {
 
     pub async fn create_wall_link(&self, wall_id: &str) -> Result<CreatedWallLink> {
         let access = self
-            .resolve_owned_wall_access(wall_id)
+            .resolve_owned_wall_access_with_root(wall_id)
             .await?
             .ok_or_else(|| {
                 WallError::InvalidInput(format!("wall {wall_id} is not owned by the account"))
             })?;
-        let access_key = derive_wall_link_access_key(wall_id, &access.wall_key)?;
+        let status = self.get_wall_link_status(wall_id).await?;
+        if status.active {
+            return self.created_wall_link_from_status(&access.root_wall_key, status);
+        }
+        let access_key = generate_wall_link_access_key()?;
+        self.write_wall_link(wall_id, access, access_key, "/wall/links")
+            .await
+    }
+
+    pub async fn rotate_wall_link(&self, wall_id: &str) -> Result<CreatedWallLink> {
+        let access = self
+            .resolve_owned_wall_access_with_root(wall_id)
+            .await?
+            .ok_or_else(|| {
+                WallError::InvalidInput(format!("wall {wall_id} is not owned by the account"))
+            })?;
+        let access_key = generate_wall_link_access_key()?;
+        self.write_wall_link(wall_id, access, access_key, "/wall/links/rotate")
+            .await
+    }
+
+    async fn write_wall_link(
+        &self,
+        wall_id: &str,
+        access: ResolvedOwnedWallAccess,
+        access_key: String,
+        path: &str,
+    ) -> Result<CreatedWallLink> {
         let access_key_material = wall_link_access_key_material(&access_key)?;
         let auth_key = derive_wall_link_auth_key(&access_key_material)?;
         let wrap_key = derive_wall_link_wrap_key(&access_key_material)?;
@@ -1147,12 +1181,41 @@ impl AccountWallCtx {
             auth_key: encode_b64(&auth_key),
             key_version: access.key_version,
             encrypted_wall_key: encode_b64(&encrypt_secretbox_packed(&wrap_key, &access.wall_key)?),
+            encrypted_access_key: encode_b64(&encrypt_secretbox_packed(
+                &access.root_wall_key,
+                access_key.as_bytes(),
+            )?),
         };
-        let status: WallLinkStatusResponse = self.client.post_json("/wall/links", &request).await?;
+        let status: WallLinkStatusResponse = self.client.post_json(path, &request).await?;
         Ok(CreatedWallLink {
             access_key,
             wall_username: status.wall_slug.clone(),
             wall_id: wall_id.to_owned(),
+            wall_slug: status.wall_slug,
+            key_version: status.key_version,
+        })
+    }
+
+    fn created_wall_link_from_status(
+        &self,
+        root_wall_key: &[u8],
+        status: WallLinkStatusResponse,
+    ) -> Result<CreatedWallLink> {
+        if status.encrypted_access_key.trim().is_empty() {
+            return Err(WallError::InvalidInput(
+                "active wall link is missing encrypted access key".into(),
+            ));
+        }
+        let access_key_bytes =
+            decrypt_secretbox_packed(root_wall_key, &decode_b64(&status.encrypted_access_key)?)?;
+        let access_key = String::from_utf8(access_key_bytes).map_err(|err| {
+            WallError::InvalidInput(format!("invalid wall link access key utf8: {err}"))
+        })?;
+        wall_link_access_key_material(&access_key)?;
+        Ok(CreatedWallLink {
+            access_key,
+            wall_username: status.wall_slug.clone(),
+            wall_id: status.wall_id,
             wall_slug: status.wall_slug,
             key_version: status.key_version,
         })
@@ -1165,6 +1228,19 @@ impl AccountWallCtx {
     }
 
     async fn resolve_owned_wall_access(&self, wall_id: &str) -> Result<Option<ResolvedWallAccess>> {
+        Ok(self
+            .resolve_owned_wall_access_with_root(wall_id)
+            .await?
+            .map(|value| ResolvedWallAccess {
+                wall_key: value.wall_key,
+                key_version: value.key_version,
+            }))
+    }
+
+    async fn resolve_owned_wall_access_with_root(
+        &self,
+        wall_id: &str,
+    ) -> Result<Option<ResolvedOwnedWallAccess>> {
         let root_wall_key = match self.get_root_wall_key().await? {
             Some(value) => value,
             None => return Ok(None),
@@ -1175,7 +1251,8 @@ impl AccountWallCtx {
         };
         let packed = decode_b64(&record.encrypted_wall_key)?;
         let wall_key = decrypt_secretbox_packed(&root_wall_key, &packed)?;
-        Ok(Some(ResolvedWallAccess {
+        Ok(Some(ResolvedOwnedWallAccess {
+            root_wall_key,
             wall_key,
             key_version: record.key_version,
         }))
@@ -2936,6 +3013,159 @@ mod tests {
             ))
             .with_status(200)
             .with_body(root_entity_response(&ctx.master_key, &root_wall_key))
+            .expect(2)
+            .create_async()
+            .await;
+        let walls = server
+            .mock("GET", "/wall")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(owned_wall_response(
+                &root_wall_key,
+                &wall_key,
+                "wall_owner_main",
+                "owner-main",
+                3,
+            ))
+            .expect(2)
+            .create_async()
+            .await;
+        let status = server
+            .mock("GET", "/wall/links/wall_owner_main")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(
+                json!({
+                    "wallId": "wall_owner_main",
+                    "wallSlug": "owner-main",
+                    "keyVersion": 3,
+                    "active": false,
+                    "encryptedAccessKey": "",
+                    "createdAt": "2026-04-16T00:00:00Z",
+                    "updatedAt": "2026-04-16T00:00:00Z"
+                })
+                .to_string(),
+            )
+            .expect(2)
+            .create_async()
+            .await;
+        let create = server
+            .mock("POST", "/wall/links")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"wallId\":\"wall_owner_main\"".into()),
+                Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"keyVersion\":3".into()),
+                Matcher::Regex("\"encryptedWallKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"encryptedAccessKey\":\"[^\"]+\"".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "wallId": "wall_owner_main",
+                    "wallSlug": "owner-main",
+                    "keyVersion": 3,
+                    "active": true,
+                    "encryptedAccessKey": "owner-link-secret",
+                    "createdAt": "2026-04-16T00:00:00Z",
+                    "updatedAt": "2026-04-16T00:00:00Z"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let rotate = server
+            .mock("POST", "/wall/links/rotate")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"wallId\":\"wall_owner_main\"".into()),
+                Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"keyVersion\":3".into()),
+                Matcher::Regex("\"encryptedWallKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"encryptedAccessKey\":\"[^\"]+\"".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "wallId": "wall_owner_main",
+                    "wallSlug": "owner-main",
+                    "keyVersion": 3,
+                    "active": true,
+                    "encryptedAccessKey": "rotated-owner-link-secret",
+                    "createdAt": "2026-04-16T00:00:00Z",
+                    "updatedAt": "2026-04-16T00:01:00Z"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let delete = server
+            .mock("DELETE", "/wall/links/wall_owner_main")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .create_async()
+            .await;
+
+        let status_response = ctx
+            .get_wall_link_status("wall_owner_main")
+            .await
+            .expect("link status should load");
+        let created = ctx
+            .create_wall_link("wall_owner_main")
+            .await
+            .expect("link should be created");
+        let rotated = ctx
+            .rotate_wall_link("wall_owner_main")
+            .await
+            .expect("link should be rotated");
+        ctx.delete_wall_link("wall_owner_main")
+            .await
+            .expect("link should be deleted");
+
+        assert!(!status_response.active);
+        assert_eq!(created.wall_id, "wall_owner_main");
+        assert_eq!(created.wall_username, "owner-main");
+        assert_eq!(created.access_key.len(), 12);
+        assert!(
+            created
+                .access_key
+                .bytes()
+                .all(|value| value.is_ascii_alphanumeric())
+        );
+        assert_eq!(created.key_version, 3);
+        assert_eq!(rotated.wall_id, "wall_owner_main");
+        assert_eq!(rotated.wall_username, "owner-main");
+        assert_eq!(rotated.access_key.len(), 12);
+        assert_ne!(rotated.access_key, created.access_key);
+        status.assert_async().await;
+        entity.assert_async().await;
+        walls.assert_async().await;
+        create.assert_async().await;
+        rotate.assert_async().await;
+        delete.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn create_wall_link_reuses_active_encrypted_access_key() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let root_wall_key = generate_key();
+        let wall_key = generate_key();
+        let access_key = "AbC123xYz789";
+        let encrypted_access_key = encode_b64(
+            &encrypt_secretbox_packed(&root_wall_key, access_key.as_bytes())
+                .expect("encrypted access key"),
+        );
+
+        let entity = server
+            .mock("GET", "/user-entity/key")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::UrlEncoded(
+                "type".into(),
+                ROOT_WALL_KEY_TYPE.into(),
+            ))
+            .with_status(200)
+            .with_body(root_entity_response(&ctx.master_key, &root_wall_key))
             .create_async()
             .await;
         let walls = server
@@ -2961,71 +3191,27 @@ mod tests {
                     "wallSlug": "owner-main",
                     "keyVersion": 3,
                     "active": true,
+                    "encryptedAccessKey": encrypted_access_key,
                     "createdAt": "2026-04-16T00:00:00Z",
                     "updatedAt": "2026-04-16T00:00:00Z"
                 })
                 .to_string(),
             )
-            .create_async()
-            .await;
-        let create = server
-            .mock("POST", "/wall/links")
-            .match_header("x-auth-token", "token")
-            .match_body(Matcher::AllOf(vec![
-                Matcher::Regex("\"wallId\":\"wall_owner_main\"".into()),
-                Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
-                Matcher::Regex("\"keyVersion\":3".into()),
-                Matcher::Regex("\"encryptedWallKey\":\"[^\"]+\"".into()),
-            ]))
-            .with_status(200)
-            .with_body(
-                json!({
-                    "wallId": "wall_owner_main",
-                    "wallSlug": "owner-main",
-                    "keyVersion": 3,
-                    "active": true,
-                    "createdAt": "2026-04-16T00:00:00Z",
-                    "updatedAt": "2026-04-16T00:00:00Z"
-                })
-                .to_string(),
-            )
-            .create_async()
-            .await;
-        let delete = server
-            .mock("DELETE", "/wall/links/wall_owner_main")
-            .match_header("x-auth-token", "token")
-            .with_status(200)
             .create_async()
             .await;
 
-        let status_response = ctx
-            .get_wall_link_status("wall_owner_main")
-            .await
-            .expect("link status should load");
         let created = ctx
             .create_wall_link("wall_owner_main")
             .await
-            .expect("link should be created");
-        ctx.delete_wall_link("wall_owner_main")
-            .await
-            .expect("link should be deleted");
+            .expect("active link should be reusable");
 
-        assert!(status_response.active);
+        assert_eq!(created.access_key, access_key);
         assert_eq!(created.wall_id, "wall_owner_main");
         assert_eq!(created.wall_username, "owner-main");
-        assert_eq!(created.access_key.len(), 12);
-        assert!(
-            created
-                .access_key
-                .bytes()
-                .all(|value| value.is_ascii_alphanumeric())
-        );
         assert_eq!(created.key_version, 3);
-        status.assert_async().await;
         entity.assert_async().await;
         walls.assert_async().await;
-        create.assert_async().await;
-        delete.assert_async().await;
+        status.assert_async().await;
     }
 
     #[tokio::test]

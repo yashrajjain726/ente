@@ -75,7 +75,7 @@ func TestResolveViewerAcceptsWallLinkSessionToken(t *testing.T) {
 	wall, err := repos.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
 	require.NoError(t, err)
 	authHash := sha256.Sum256([]byte("link-auth-key"))
-	link, err := repos.Links.UpsertLink(ctx, wall.WallID, authHash[:], wall.CurrentVersion, "encrypted-link-wall-key")
+	link, err := repos.Links.UpsertLink(ctx, wall.WallID, authHash[:], wall.CurrentVersion, "encrypted-link-wall-key", "encrypted-owner-link-secret")
 	require.NoError(t, err)
 	sessionHash := sha256.Sum256([]byte("link-session-token"))
 	require.NoError(t, repos.Links.CreateSession(ctx, sessionHash[:], link.WallID, link.AuthKeyHash, link.KeyVersion, timeutil.MicrosecondsAfterMinutes(5)))

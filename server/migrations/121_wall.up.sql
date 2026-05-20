@@ -267,17 +267,22 @@ CREATE TRIGGER update_wall_messages_updated_at
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
 CREATE TABLE IF NOT EXISTS wall_links (
-    wall_id              TEXT PRIMARY KEY REFERENCES walls (wall_id) ON DELETE CASCADE,
-    auth_key_hash        BYTEA   NOT NULL UNIQUE,
-    key_version          INTEGER NOT NULL,
-    encrypted_wall_key   TEXT    NOT NULL,
-    active               BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at           BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
-    updated_at           BIGINT  NOT NULL DEFAULT now_utc_micro_seconds()
+    wall_id                TEXT   NOT NULL REFERENCES walls (wall_id) ON DELETE CASCADE,
+    auth_key_hash          BYTEA   NOT NULL UNIQUE,
+    key_version            INTEGER NOT NULL,
+    encrypted_wall_key     TEXT    NOT NULL,
+    encrypted_access_key   TEXT    NOT NULL,
+    active                 BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at             BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
+    updated_at             BIGINT  NOT NULL DEFAULT now_utc_micro_seconds()
 );
 
 CREATE INDEX IF NOT EXISTS idx_wall_links_active
     ON wall_links (active, updated_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_wall_links_active_wall
+    ON wall_links (wall_id)
+    WHERE active = TRUE;
 
 CREATE TRIGGER update_wall_links_updated_at
     BEFORE UPDATE ON wall_links

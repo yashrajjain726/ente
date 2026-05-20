@@ -21,6 +21,16 @@ func (h *Handlers) CreateWallLink(c *gin.Context) {
 	respondJSON(c, resp, err)
 }
 
+func (h *Handlers) RotateWallLink(c *gin.Context) {
+	var req models.WallLinkCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondJSON(c, nil, ente.ErrBadRequest)
+		return
+	}
+	resp, err := h.Module.Links.Rotate(c, req)
+	respondJSON(c, resp, err)
+}
+
 func (h *Handlers) DeleteWallLink(c *gin.Context) {
 	respondStatus(c, h.Module.Links.Delete(c, c.Param("wallID")))
 }

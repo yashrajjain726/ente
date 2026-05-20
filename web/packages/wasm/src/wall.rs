@@ -647,6 +647,14 @@ impl WallAccountCtxHandle {
         .map_err(Into::into)
     }
 
+    /// Rotate a shareable wall link to a fresh secret.
+    pub async fn rotate_wall_link(&self, wall_id: String) -> Result<JsValue, WasmWallError> {
+        swb::to_value(&created_link_to_js(
+            self.inner.rotate_wall_link(&wall_id).await?,
+        ))
+        .map_err(Into::into)
+    }
+
     /// Fetch wall link status.
     pub async fn get_wall_link_status(&self, wall_id: String) -> Result<JsValue, WasmWallError> {
         swb::to_value(&self.inner.get_wall_link_status(&wall_id).await?).map_err(Into::into)

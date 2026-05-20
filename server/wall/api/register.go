@@ -33,6 +33,7 @@ func Register(privateAPI, publicAPI gin.IRoutes, handlers *Handlers) {
 	privateAPI.POST("/wall/rotate", handlers.RotateWallKey)
 	privateAPI.GET("/wall/links/:wallID", handlers.GetWallLink)
 	privateAPI.POST("/wall/links", handlers.CreateWallLink)
+	privateAPI.POST("/wall/links/rotate", handlers.RotateWallLink)
 	privateAPI.DELETE("/wall/links/:wallID", handlers.DeleteWallLink)
 
 	publicAPI.GET("/wall/profile", handlers.GetWallProfile)

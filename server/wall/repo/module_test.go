@@ -503,7 +503,7 @@ func TestWallModuleLifecycle(t *testing.T) {
 	require.False(t, referenced)
 	require.NoError(t, tx.Rollback())
 
-	link, err := module.Links.UpsertLink(ctx, aliceWall.WallID, []byte("hash"), rotatedWall.CurrentVersion, "wall-link-key")
+	link, err := module.Links.UpsertLink(ctx, aliceWall.WallID, []byte("hash"), rotatedWall.CurrentVersion, "wall-link-key", "owner-link-secret")
 	require.NoError(t, err)
 	require.Equal(t, "wall-link-key", link.EncryptedWallKey)
 
@@ -514,7 +514,7 @@ func TestWallModuleLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, aliceWall.WallID, session.WallID)
 
-	newLink, err := module.Links.UpsertLink(ctx, aliceWall.WallID, []byte("new-hash"), rotatedWall.CurrentVersion, "new-wall-link-key")
+	newLink, err := module.Links.RotateLink(ctx, aliceWall.WallID, []byte("new-hash"), rotatedWall.CurrentVersion, "new-wall-link-key", "new-owner-link-secret")
 	require.NoError(t, err)
 	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
 	require.Error(t, err)
@@ -814,7 +814,7 @@ func TestRotateKeyRevokesWallLinks(t *testing.T) {
 	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
 	require.NoError(t, err)
 
-	link, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("hash"), wall.CurrentVersion, "wall-link-key")
+	link, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("hash"), wall.CurrentVersion, "wall-link-key", "owner-link-secret")
 	require.NoError(t, err)
 	require.Equal(t, "wall-link-key", link.EncryptedWallKey)
 
@@ -867,19 +867,60 @@ func TestUpsertLinkReusesExistingLinkWithoutRevokingSessions(t *testing.T) {
 	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
 	require.NoError(t, err)
 
-	link, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("same-hash"), wall.CurrentVersion, "wall-link-key")
+	link, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("same-hash"), wall.CurrentVersion, "wall-link-key", "owner-link-secret")
 	require.NoError(t, err)
 	err = module.Links.CreateSession(ctx, []byte("token-hash"), link.WallID, link.AuthKeyHash, link.KeyVersion, timeutil.NMinFromNow(30))
 	require.NoError(t, err)
 
-	reused, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("same-hash"), wall.CurrentVersion, "new-random-envelope")
+	reused, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("same-hash"), wall.CurrentVersion, "new-random-envelope", "new-owner-link-secret")
 	require.NoError(t, err)
 	require.Equal(t, link.AuthKeyHash, reused.AuthKeyHash)
 	require.Equal(t, link.EncryptedWallKey, reused.EncryptedWallKey)
+	require.Equal(t, link.EncryptedAccessKey, reused.EncryptedAccessKey)
 
 	session, err := module.Links.GetSession(ctx, []byte("token-hash"))
 	require.NoError(t, err)
 	require.Equal(t, link.AuthKeyHash, session.AuthKeyHash)
+}
+
+func TestUpsertLinkRejectsDifferentActiveLinkSecret(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+
+	_, err = module.Links.UpsertLink(ctx, wall.WallID, []byte("old-hash"), wall.CurrentVersion, "old-wall-link-key", "old-owner-link-secret")
+	require.NoError(t, err)
+
+	_, err = module.Links.UpsertLink(ctx, wall.WallID, []byte("new-hash"), wall.CurrentVersion, "new-wall-link-key", "new-owner-link-secret")
+	require.ErrorIs(t, err, ErrActiveLinkAlreadyExists)
+}
+
+func TestDeleteLinkTombstonesAuthHash(t *testing.T) {
+	ctx := context.Background()
+	module := newWallTestModule(t)
+
+	aliceID := insertWallUser(t, module, "alice@example.com", "alice-public")
+	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
+	require.NoError(t, err)
+
+	link, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("old-hash"), wall.CurrentVersion, "old-wall-link-key", "old-owner-link-secret")
+	require.NoError(t, err)
+	err = module.Links.CreateSession(ctx, []byte("token-hash"), link.WallID, link.AuthKeyHash, link.KeyVersion, timeutil.NMinFromNow(30))
+	require.NoError(t, err)
+
+	require.NoError(t, module.Links.DeleteLink(ctx, wall.WallID))
+	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
+	require.Error(t, err)
+
+	_, err = module.Links.UpsertLink(ctx, wall.WallID, link.AuthKeyHash, wall.CurrentVersion, "resurrected-wall-link-key", "resurrected-owner-link-secret")
+	require.ErrorIs(t, err, ErrLinkAuthKeyReused)
+
+	freshLink, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("fresh-hash"), wall.CurrentVersion, "fresh-wall-link-key", "fresh-owner-link-secret")
+	require.NoError(t, err)
+	require.Equal(t, "fresh-wall-link-key", freshLink.EncryptedWallKey)
 }
 
 func TestCreateSessionRejectsStaleLinkAuthHash(t *testing.T) {
@@ -890,9 +931,9 @@ func TestCreateSessionRejectsStaleLinkAuthHash(t *testing.T) {
 	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
 	require.NoError(t, err)
 
-	oldLink, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("old-hash"), wall.CurrentVersion, "old-wall-link-key")
+	oldLink, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("old-hash"), wall.CurrentVersion, "old-wall-link-key", "old-owner-link-secret")
 	require.NoError(t, err)
-	newLink, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("new-hash"), wall.CurrentVersion, "new-wall-link-key")
+	newLink, err := module.Links.RotateLink(ctx, wall.WallID, []byte("new-hash"), wall.CurrentVersion, "new-wall-link-key", "new-owner-link-secret")
 	require.NoError(t, err)
 
 	err = module.Links.CreateSession(ctx, []byte("stale-token"), oldLink.WallID, oldLink.AuthKeyHash, oldLink.KeyVersion, timeutil.NMinFromNow(30))
@@ -914,9 +955,9 @@ func TestGetSessionRejectsStaleLinkMetadata(t *testing.T) {
 	wall, err := module.Walls.CreateWall(ctx, aliceID, "alice", "alice-wall-key", "alice-profile")
 	require.NoError(t, err)
 
-	oldLink, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("old-hash"), wall.CurrentVersion, "old-wall-link-key")
+	oldLink, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("old-hash"), wall.CurrentVersion, "old-wall-link-key", "old-owner-link-secret")
 	require.NoError(t, err)
-	_, err = module.Links.UpsertLink(ctx, wall.WallID, []byte("new-hash"), wall.CurrentVersion, "new-wall-link-key")
+	_, err = module.Links.RotateLink(ctx, wall.WallID, []byte("new-hash"), wall.CurrentVersion, "new-wall-link-key", "new-owner-link-secret")
 	require.NoError(t, err)
 
 	_, err = module.Links.DB.Exec(`
@@ -929,7 +970,7 @@ func TestGetSessionRejectsStaleLinkMetadata(t *testing.T) {
 
 	rotatedWall, err := module.Walls.RotateKey(ctx, aliceID, wall.WallID, "alice-wall-key-v2", "wrapped-prev-key", nil)
 	require.NoError(t, err)
-	reusedHashLink, err := module.Links.UpsertLink(ctx, wall.WallID, oldLink.AuthKeyHash, rotatedWall.CurrentVersion, "reused-hash-new-version-key")
+	reusedHashLink, err := module.Links.UpsertLink(ctx, wall.WallID, []byte("fresh-after-wall-rotate"), rotatedWall.CurrentVersion, "fresh-new-version-key", "fresh-owner-link-secret")
 	require.NoError(t, err)
 	_, err = module.Links.DB.Exec(`
 		INSERT INTO wall_link_sessions (token_hash, wall_id, owner_id, auth_key_hash, key_version, expires_at)
@@ -952,7 +993,7 @@ func TestUpsertLinkRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, wall.CurrentVersion+1, rotatedWall.CurrentVersion)
 
-	_, err = module.Links.UpsertLink(ctx, wall.WallID, []byte("stale-hash"), wall.CurrentVersion, "stale-wall-link-key")
+	_, err = module.Links.UpsertLink(ctx, wall.WallID, []byte("stale-hash"), wall.CurrentVersion, "stale-wall-link-key", "stale-owner-link-secret")
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
 	_, err = module.Links.GetLink(ctx, wall.WallID)

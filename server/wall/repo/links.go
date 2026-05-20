@@ -7,9 +7,23 @@ import (
 	"errors"
 
 	"github.com/ente-io/stacktrace"
+	"github.com/lib/pq"
 )
 
-func (r *LinksRepository) UpsertLink(ctx context.Context, wallID string, authKeyHash []byte, keyVersion int, encryptedWallKey string) (*WallLinkRecord, error) {
+var (
+	ErrActiveLinkAlreadyExists = errors.New("active wall link already exists")
+	ErrLinkAuthKeyReused       = errors.New("wall link auth key has already been used")
+)
+
+func (r *LinksRepository) UpsertLink(ctx context.Context, wallID string, authKeyHash []byte, keyVersion int, encryptedWallKey string, encryptedAccessKey string) (*WallLinkRecord, error) {
+	return r.writeLink(ctx, wallID, authKeyHash, keyVersion, encryptedWallKey, encryptedAccessKey, false)
+}
+
+func (r *LinksRepository) RotateLink(ctx context.Context, wallID string, authKeyHash []byte, keyVersion int, encryptedWallKey string, encryptedAccessKey string) (*WallLinkRecord, error) {
+	return r.writeLink(ctx, wallID, authKeyHash, keyVersion, encryptedWallKey, encryptedAccessKey, true)
+}
+
+func (r *LinksRepository) writeLink(ctx context.Context, wallID string, authKeyHash []byte, keyVersion int, encryptedWallKey string, encryptedAccessKey string, rotate bool) (*WallLinkRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -32,52 +46,68 @@ func (r *LinksRepository) UpsertLink(ctx context.Context, wallID string, authKey
 
 	var existingAuthKeyHash []byte
 	var existingKeyVersion int
-	var existingActive bool
 	err = tx.QueryRowContext(ctx, `
-		SELECT auth_key_hash, key_version, active
+		SELECT auth_key_hash, key_version
 		FROM wall_links
-		WHERE wall_id = $1
+		WHERE wall_id = $1 AND active = TRUE
 		FOR UPDATE
-	`, wallID).Scan(&existingAuthKeyHash, &existingKeyVersion, &existingActive)
-	if err == nil && bytes.Equal(existingAuthKeyHash, authKeyHash) && existingKeyVersion == keyVersion && existingActive {
+	`, wallID).Scan(&existingAuthKeyHash, &existingKeyVersion)
+	if err == nil && bytes.Equal(existingAuthKeyHash, authKeyHash) && existingKeyVersion == keyVersion {
+		if rotate {
+			return nil, ErrLinkAuthKeyReused
+		}
 		return scanLinkRecord(tx.QueryRowContext(ctx, `
-			SELECT l.wall_id, $2::text, $3::bigint, $2::text, l.auth_key_hash, l.key_version, l.encrypted_wall_key, l.active, l.created_at, l.updated_at
+			SELECT l.wall_id, $2::text, $3::bigint, $2::text, l.auth_key_hash, l.key_version, l.encrypted_wall_key, l.encrypted_access_key, l.active, l.created_at, l.updated_at
 			FROM wall_links l
-			WHERE l.wall_id = $1
+			WHERE l.wall_id = $1 AND l.active = TRUE
 		`, wallID, wallSlug, ownerID))
 	}
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	if err == nil {
+		if !rotate {
+			return nil, ErrActiveLinkAlreadyExists
+		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM wall_link_sessions WHERE wall_id = $1`, wallID); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
-		link, err := scanLinkRecord(tx.QueryRowContext(ctx, `
+		if _, err := tx.ExecContext(ctx, `
 			UPDATE wall_links
-			SET auth_key_hash = $2,
-			    key_version = $3,
-			    encrypted_wall_key = $4,
-			    active = TRUE
-			WHERE wall_id = $1
-			RETURNING wall_id, $5::text, $6::bigint, $5::text, auth_key_hash, key_version, encrypted_wall_key, active, created_at, updated_at
-		`, wallID, authKeyHash, keyVersion, encryptedWallKey, wallSlug, ownerID))
-		if err != nil {
-			return nil, err
-		}
-		if err := tx.Commit(); err != nil {
+			SET active = FALSE
+			WHERE wall_id = $1 AND active = TRUE
+		`, wallID); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
-		return link, nil
+	}
+
+	var reusedAuthKeyHash []byte
+	err = tx.QueryRowContext(ctx, `
+		SELECT auth_key_hash
+		FROM wall_links
+		WHERE auth_key_hash = $1
+		FOR UPDATE
+	`, authKeyHash).Scan(&reusedAuthKeyHash)
+	if err == nil {
+		return nil, ErrLinkAuthKeyReused
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return nil, stacktrace.Propagate(err, "")
 	}
 
 	link, err := scanLinkRecord(tx.QueryRowContext(ctx, `
-		INSERT INTO wall_links (wall_id, auth_key_hash, key_version, encrypted_wall_key, active)
-		VALUES ($1, $2, $3, $4, TRUE)
-		RETURNING wall_id, $5::text, $6::bigint, $5::text, auth_key_hash, key_version, encrypted_wall_key, active, created_at, updated_at
-	`, wallID, authKeyHash, keyVersion, encryptedWallKey, wallSlug, ownerID))
+		INSERT INTO wall_links (wall_id, auth_key_hash, key_version, encrypted_wall_key, encrypted_access_key, active)
+		VALUES ($1, $2, $3, $4, $5, TRUE)
+		RETURNING wall_id, $6::text, $7::bigint, $6::text, auth_key_hash, key_version, encrypted_wall_key, encrypted_access_key, active, created_at, updated_at
+	`, wallID, authKeyHash, keyVersion, encryptedWallKey, encryptedAccessKey, wallSlug, ownerID))
 	if err != nil {
-		return nil, err
+		if isUniqueViolationFor(err, "uq_wall_links_active_wall") {
+			return nil, ErrActiveLinkAlreadyExists
+		}
+		if isUniqueViolation(err) {
+			return nil, ErrLinkAuthKeyReused
+		}
+		return nil, stacktrace.Propagate(err, "")
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -87,7 +117,7 @@ func (r *LinksRepository) UpsertLink(ctx context.Context, wallID string, authKey
 
 func (r *LinksRepository) GetLink(ctx context.Context, wallID string) (*WallLinkRecord, error) {
 	return scanLinkRecord(r.DB.QueryRowContext(ctx, `
-		SELECT l.wall_id, w.wall_slug, w.owner_id, w.wall_slug, l.auth_key_hash, l.key_version, l.encrypted_wall_key, l.active, l.created_at, l.updated_at
+		SELECT l.wall_id, w.wall_slug, w.owner_id, w.wall_slug, l.auth_key_hash, l.key_version, l.encrypted_wall_key, l.encrypted_access_key, l.active, l.created_at, l.updated_at
 		FROM wall_links l
 		JOIN walls w ON w.wall_id = l.wall_id
 		WHERE l.wall_id = $1 AND l.active = TRUE
@@ -110,7 +140,7 @@ func deleteLinkTx(ctx context.Context, tx *sql.Tx, wallID string) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM wall_link_sessions WHERE wall_id = $1`, wallID); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM wall_links WHERE wall_id = $1`, wallID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE wall_links SET active = FALSE WHERE wall_id = $1 AND active = TRUE`, wallID); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	return nil
@@ -118,7 +148,7 @@ func deleteLinkTx(ctx context.Context, tx *sql.Tx, wallID string) error {
 
 func (r *LinksRepository) GetLinkByAuthHash(ctx context.Context, wallID string, authHash []byte) (*WallLinkRecord, error) {
 	return scanLinkRecord(r.DB.QueryRowContext(ctx, `
-		SELECT l.wall_id, w.wall_slug, w.owner_id, w.wall_slug, l.auth_key_hash, l.key_version, l.encrypted_wall_key, l.active, l.created_at, l.updated_at
+		SELECT l.wall_id, w.wall_slug, w.owner_id, w.wall_slug, l.auth_key_hash, l.key_version, l.encrypted_wall_key, l.encrypted_access_key, l.active, l.created_at, l.updated_at
 		FROM wall_links l
 		JOIN walls w ON w.wall_id = l.wall_id
 		WHERE l.wall_id = $1 AND l.auth_key_hash = $2 AND l.active = TRUE
@@ -167,6 +197,16 @@ func (r *LinksRepository) GetSession(ctx context.Context, tokenHash []byte) (*Wa
 	return &rec, nil
 }
 
+func isUniqueViolation(err error) bool {
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && pqErr.Code == "23505"
+}
+
+func isUniqueViolationFor(err error, constraint string) bool {
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && pqErr.Code == "23505" && pqErr.Constraint == constraint
+}
+
 func (r *LinksRepository) DeleteSession(ctx context.Context, tokenHash []byte) error {
 	_, err := r.DB.ExecContext(ctx, `DELETE FROM wall_link_sessions WHERE token_hash = $1`, tokenHash)
 	return stacktrace.Propagate(err, "")
@@ -174,7 +214,7 @@ func (r *LinksRepository) DeleteSession(ctx context.Context, tokenHash []byte) e
 
 func scanLinkRecord(scanner interface{ Scan(dest ...any) error }) (*WallLinkRecord, error) {
 	var rec WallLinkRecord
-	if err := scanner.Scan(&rec.WallID, &rec.WallSlug, &rec.OwnerID, &rec.OwnerSlug, &rec.AuthKeyHash, &rec.KeyVersion, &rec.EncryptedWallKey, &rec.Active, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
+	if err := scanner.Scan(&rec.WallID, &rec.WallSlug, &rec.OwnerID, &rec.OwnerSlug, &rec.AuthKeyHash, &rec.KeyVersion, &rec.EncryptedWallKey, &rec.EncryptedAccessKey, &rec.Active, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil

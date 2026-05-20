@@ -95,19 +95,21 @@ type WallActorResponse struct {
 }
 
 type WallLinkCreateRequest struct {
-	WallID           string `json:"wallId"`
-	AuthKey          string `json:"authKey"`
-	KeyVersion       int    `json:"keyVersion"`
-	EncryptedWallKey string `json:"encryptedWallKey"`
+	WallID             string `json:"wallId"`
+	AuthKey            string `json:"authKey"`
+	KeyVersion         int    `json:"keyVersion"`
+	EncryptedWallKey   string `json:"encryptedWallKey"`
+	EncryptedAccessKey string `json:"encryptedAccessKey"`
 }
 
 type WallLinkStatusResponse struct {
-	WallID     string `json:"wallId"`
-	WallSlug   string `json:"wallSlug"`
-	KeyVersion int    `json:"keyVersion"`
-	Active     bool   `json:"active"`
-	CreatedAt  string `json:"createdAt"`
-	UpdatedAt  string `json:"updatedAt"`
+	WallID             string `json:"wallId"`
+	WallSlug           string `json:"wallSlug"`
+	KeyVersion         int    `json:"keyVersion"`
+	Active             bool   `json:"active"`
+	EncryptedAccessKey string `json:"encryptedAccessKey"`
+	CreatedAt          string `json:"createdAt"`
+	UpdatedAt          string `json:"updatedAt"`
 }
 
 type WallLinkLoginRequest struct {

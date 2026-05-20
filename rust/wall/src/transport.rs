@@ -481,6 +481,7 @@ pub struct WallLinkStatusResponse {
     pub wall_slug: String,
     pub key_version: i32,
     pub active: bool,
+    pub encrypted_access_key: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -492,6 +493,7 @@ pub struct WallLinkCreateRequest {
     pub auth_key: String,
     pub key_version: i32,
     pub encrypted_wall_key: String,
+    pub encrypted_access_key: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

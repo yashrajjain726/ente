@@ -215,16 +215,17 @@ type WallFriendRecord struct {
 }
 
 type WallLinkRecord struct {
-	WallID           string
-	WallSlug         string
-	OwnerID          int64
-	OwnerSlug        string
-	AuthKeyHash      []byte
-	KeyVersion       int
-	EncryptedWallKey string
-	Active           bool
-	CreatedAt        int64
-	UpdatedAt        int64
+	WallID             string
+	WallSlug           string
+	OwnerID            int64
+	OwnerSlug          string
+	AuthKeyHash        []byte
+	KeyVersion         int
+	EncryptedWallKey   string
+	EncryptedAccessKey string
+	Active             bool
+	CreatedAt          int64
+	UpdatedAt          int64
 }
 
 type WallLinkSessionRecord struct {
