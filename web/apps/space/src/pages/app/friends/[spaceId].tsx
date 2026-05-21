@@ -29,8 +29,14 @@ const friendSpaceIdFromPath = () => {
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { friends, profile, profileLoadStatus, setFriends } =
-        useSpaceAppState();
+    const {
+        friends,
+        profile,
+        profileLoadError,
+        profileLoadStatus,
+        refreshProfile,
+        setFriends,
+    } = useSpaceAppState();
     const friendSpaceId =
         friendSpaceIdFromQuery(router.query.spaceId) || friendSpaceIdFromPath();
     const selectedFriend = friends.find(
@@ -96,11 +102,18 @@ const Page: React.FC = () => {
 
     if (
         !router.isReady ||
-        profileLoadStatus == "loading" ||
+        profileLoadStatus != "ready" ||
         !profile ||
         !selectedFriend
     ) {
-        return <SpaceRouteFallback background={friendsBackground} />;
+        return (
+            <SpaceRouteFallback
+                actionLabel={profileLoadStatus == "error" ? "Retry" : undefined}
+                background={friendsBackground}
+                message={profileLoadError}
+                onAction={() => void refreshProfile()}
+            />
+        );
     }
 
     return (

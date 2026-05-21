@@ -5,7 +5,7 @@ import type { SetupProfile } from "screens/SetupProfileScreen";
 import type { PendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
 
 export type OnboardingEntrySource = "direct" | "add-friend-link";
-export type SpaceProfileLoadStatus = "loading" | "ready";
+export type SpaceProfileLoadStatus = "error" | "loading" | "ready";
 
 export interface SpaceAppState {
     friends: FriendProfile[];
@@ -14,6 +14,7 @@ export interface SpaceAppState {
     pendingLoginCredentials: SpaceLoginCredentials | null;
     pendingPasskeyVerification: PendingSpacePasskeyVerification | null;
     profile: SetupProfile | null;
+    profileLoadError?: string;
     profileLoadStatus: SpaceProfileLoadStatus;
     signupEmail: string;
     refreshProfile: () => Promise<SetupProfile | null>;

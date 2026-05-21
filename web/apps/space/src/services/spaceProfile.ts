@@ -122,12 +122,9 @@ const currentSpaceContextConfig = async () => {
     }
 
     return {
-        cacheKey: [
-            user.id,
-            authToken,
-            baseUrl,
-            keyAttributes.publicKey,
-        ].join(":"),
+        cacheKey: [user.id, authToken, baseUrl, keyAttributes.publicKey].join(
+            ":",
+        ),
         input: {
             authToken,
             baseUrl,
@@ -208,6 +205,7 @@ export const ensureCurrentSpaceContext = async () => {
 };
 
 export const releaseCurrentSpaceContext = (_ctx: SpaceAccountCtxHandle) => {
+    void _ctx;
     // Shared context is freed by clearCurrentSpaceContext on logout/session change.
 };
 

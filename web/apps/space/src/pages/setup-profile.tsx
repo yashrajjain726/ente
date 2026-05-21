@@ -28,6 +28,7 @@ const Page: React.FC = () => {
     const {
         onboardingEntrySource,
         profile,
+        profileLoadError,
         profileLoadStatus,
         refreshProfile,
         setProfile,
@@ -123,8 +124,15 @@ const Page: React.FC = () => {
         };
     }, [draftUsername, profile, profileLoadStatus]);
 
-    if (profileLoadStatus == "loading" || profile) {
-        return <SpaceRouteFallback background={setupProfileBackground} />;
+    if (profileLoadStatus != "ready" || profile) {
+        return (
+            <SpaceRouteFallback
+                actionLabel={profileLoadStatus == "error" ? "Retry" : undefined}
+                background={setupProfileBackground}
+                message={profileLoadError}
+                onAction={() => void refreshProfile()}
+            />
+        );
     }
 
     return (

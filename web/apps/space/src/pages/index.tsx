@@ -96,7 +96,9 @@ const Page: React.FC = () => {
     const {
         onboardingEntrySource,
         profile,
+        profileLoadError,
         profileLoadStatus,
+        refreshProfile,
         setOnboardingEntrySource,
     } = useSpaceAppState();
     const [routeMode, setRouteMode] = useState<RouteMode>({ kind: "checking" });
@@ -198,6 +200,19 @@ const Page: React.FC = () => {
 
     const shouldCheckUnlock =
         routeMode.kind == "app" && profileLoadStatus == "ready" && !profile;
+    const hasProfileLoadError =
+        routeMode.kind == "app" && profileLoadStatus == "error";
+
+    if (hasProfileLoadError) {
+        return (
+            <SpaceRouteFallback
+                actionLabel="Retry"
+                background={profileBackground}
+                message={profileLoadError}
+                onAction={() => void refreshProfile()}
+            />
+        );
+    }
 
     if (
         routeMode.kind == "checking" ||

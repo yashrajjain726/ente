@@ -313,9 +313,7 @@ const cachedBlobURL = (
     spaceMediaURLCache.set(key, promise);
 
     while (spaceMediaURLCache.size > maxSpaceMediaCacheEntries) {
-        const oldest = spaceMediaURLCache.entries().next().value as
-            | [string, Promise<string>]
-            | undefined;
+        const oldest = spaceMediaURLCache.entries().next().value;
         if (!oldest) break;
         spaceMediaURLCache.delete(oldest[0]);
         void oldest[1].then(
@@ -523,7 +521,11 @@ const postFromLinkPost = async (
     if (!object) return null;
 
     const author = actorProfile(post.author);
-    author.avatarUrl = await linkAvatarURL(ctx, post.author.avatar, avatarCache);
+    author.avatarUrl = await linkAvatarURL(
+        ctx,
+        post.author.avatar,
+        avatarCache,
+    );
 
     const imageUrl = blobURLForBytes(
         await ctx.download_post_asset_with_key(

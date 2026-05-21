@@ -9,7 +9,13 @@ import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { profile, profileLoadStatus, resetAfterLogout } = useSpaceAppState();
+    const {
+        profile,
+        profileLoadError,
+        profileLoadStatus,
+        refreshProfile,
+        resetAfterLogout,
+    } = useSpaceAppState();
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -17,8 +23,15 @@ const Page: React.FC = () => {
         }
     }, [profile, profileLoadStatus, router]);
 
-    if (profileLoadStatus == "loading" || !profile) {
-        return <SpaceRouteFallback background={settingsBackground} />;
+    if (profileLoadStatus != "ready" || !profile) {
+        return (
+            <SpaceRouteFallback
+                actionLabel={profileLoadStatus == "error" ? "Retry" : undefined}
+                background={settingsBackground}
+                message={profileLoadError}
+                onAction={() => void refreshProfile()}
+            />
+        );
     }
 
     return (

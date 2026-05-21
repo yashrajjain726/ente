@@ -20,8 +20,14 @@ import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { friends, profile, profileLoadStatus, setFriends } =
-        useSpaceAppState();
+    const {
+        friends,
+        profile,
+        profileLoadError,
+        profileLoadStatus,
+        refreshProfile,
+        setFriends,
+    } = useSpaceAppState();
     const [conversations, setConversations] = React.useState<
         SpaceMessageConversation[]
     >([]);
@@ -34,6 +40,9 @@ const Page: React.FC = () => {
         SpaceMessageConversation["friend"] | undefined
     >();
     const selectedFriendSpaceId = selectedFriend?.spaceId ?? selectedFriend?.id;
+    const selectedFriendSpaceIdRef = React.useRef<string | undefined>(
+        undefined,
+    );
     const selectedFriendSpaceSlug = selectedFriend?.spaceSlug;
     const selectedFriendUsername = selectedFriend?.username;
     const isSelectedFriendCurrent = Boolean(
@@ -70,6 +79,7 @@ const Page: React.FC = () => {
             setSelectedFriend(conversation.friend);
             const friendSpaceId =
                 conversation.friend.spaceId ?? conversation.friend.id;
+            selectedFriendSpaceIdRef.current = friendSpaceId;
             setConversations((currentConversations) =>
                 currentConversations.map((currentConversation) =>
                     (currentConversation.friend.spaceId ??
@@ -91,9 +101,18 @@ const Page: React.FC = () => {
 
     const closeConversation = React.useCallback(() => {
         setSelectedFriend(undefined);
+        selectedFriendSpaceIdRef.current = undefined;
         setIsThreadLoading(false);
         setMessages([]);
     }, []);
+
+    const appendMessageIfThreadIsCurrent = React.useCallback(
+        (spaceId: string, message: SpaceMessage) => {
+            if (selectedFriendSpaceIdRef.current != spaceId) return;
+            setMessages((currentMessages) => [...currentMessages, message]);
+        },
+        [],
+    );
 
     React.useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -122,16 +141,17 @@ const Page: React.FC = () => {
 
     React.useEffect(() => {
         if (!selectedFriend) {
+            selectedFriendSpaceIdRef.current = undefined;
             setMessages([]);
             setIsThreadLoading(false);
             return;
         }
 
         let cancelled = false;
+        const threadSpaceId = selectedFriend.spaceId ?? selectedFriend.id;
+        selectedFriendSpaceIdRef.current = threadSpaceId;
         setIsThreadLoading(true);
-        void loadCurrentMessageThread(
-            selectedFriend.spaceId ?? selectedFriend.id,
-        )
+        void loadCurrentMessageThread(threadSpaceId)
             .then((page) => {
                 if (!cancelled) setMessages(page.items);
             })
@@ -147,8 +167,15 @@ const Page: React.FC = () => {
         };
     }, [selectedFriend]);
 
-    if (profileLoadStatus == "loading" || !profile) {
-        return <SpaceRouteFallback background={messagesBackground} />;
+    if (profileLoadStatus != "ready" || !profile) {
+        return (
+            <SpaceRouteFallback
+                actionLabel={profileLoadStatus == "error" ? "Retry" : undefined}
+                background={messagesBackground}
+                message={profileLoadError}
+                onAction={() => void refreshProfile()}
+            />
+        );
     }
 
     return (
@@ -172,10 +199,7 @@ const Page: React.FC = () => {
                 onOpenThread={openConversation}
                 onSendMessage={async (spaceId, text) => {
                     const message = await sendCurrentMessage(spaceId, text);
-                    setMessages((currentMessages) => [
-                        ...currentMessages,
-                        message,
-                    ]);
+                    appendMessageIfThreadIsCurrent(spaceId, message);
                     refreshConversations();
                 }}
                 onReplyToMessage={async (spaceId, messageId, text) => {
@@ -184,10 +208,7 @@ const Page: React.FC = () => {
                         messageId,
                         text,
                     );
-                    setMessages((currentMessages) => [
-                        ...currentMessages,
-                        message,
-                    ]);
+                    appendMessageIfThreadIsCurrent(spaceId, message);
                     refreshConversations();
                 }}
                 onSetMessageLiked={async (messageId, liked) => {

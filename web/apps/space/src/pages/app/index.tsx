@@ -21,12 +21,16 @@ import { firstNameFrom } from "utils/spaceDisplay";
 import { spacePostToViewerPhoto } from "utils/spacePostDisplay";
 import { spaceRoutes } from "utils/spaceRoutes";
 
-const loadingHomeProfile = { avatarUrl: null, fullName: "", username: "" };
-
 const Page: React.FC = () => {
     const router = useRouter();
-    const { friends, profile, profileLoadStatus, setFriends } =
-        useSpaceAppState();
+    const {
+        friends,
+        profile,
+        profileLoadError,
+        profileLoadStatus,
+        refreshProfile,
+        setFriends,
+    } = useSpaceAppState();
     const [addedFriendToastName, setAddedFriendToastName] = useState<string>();
     const [feedItems, setFeedItems] = useState<SpacePost[]>([]);
     const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
@@ -54,7 +58,7 @@ const Page: React.FC = () => {
     }, [router.isReady]);
 
     useEffect(() => {
-        if (profileLoadStatus == "loading") return;
+        if (profileLoadStatus != "ready") return;
 
         const spaceId = profile?.spaceId;
         if (!spaceId) {
@@ -95,11 +99,16 @@ const Page: React.FC = () => {
         };
     }, [profile?.spaceId, profileLoadStatus, setFriends]);
 
-    if (profileLoadStatus == "ready" && !profile) {
-        return <SpaceRouteFallback background={homeBackground} />;
+    if (profileLoadStatus != "ready" || !profile) {
+        return (
+            <SpaceRouteFallback
+                actionLabel={profileLoadStatus == "error" ? "Retry" : undefined}
+                background={homeBackground}
+                message={profileLoadError}
+                onAction={() => void refreshProfile()}
+            />
+        );
     }
-
-    const screenProfile = profile ?? loadingHomeProfile;
 
     return (
         <>
@@ -110,10 +119,10 @@ const Page: React.FC = () => {
                 addedFriendToastName={addedFriendToastName}
                 hasUnreadNotifications={hasUnreadNotifications}
                 isFeedLoading={isFeedLoading}
-                profile={screenProfile}
+                profile={profile}
                 onAddedFriendToastClose={closeAddedFriendToast}
                 onCreatePost={async (image, caption) => {
-                    if (!profile?.spaceId) throw new Error("Missing space.");
+                    if (!profile.spaceId) throw new Error("Missing space.");
                     const post = await createCurrentPhotoPost({
                         caption,
                         file: image.file,
@@ -135,7 +144,7 @@ const Page: React.FC = () => {
                 onReplyToPost={replyToCurrentPost}
                 onSetPostLiked={setCurrentPostLiked}
                 onShareProfileLink={async () => {
-                    if (!profile?.spaceId) throw new Error("Missing space.");
+                    if (!profile.spaceId) throw new Error("Missing space.");
                     return (await createCurrentProfileLink(profile.spaceId))
                         .url;
                 }}

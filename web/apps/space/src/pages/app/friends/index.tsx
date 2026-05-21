@@ -12,8 +12,14 @@ import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { friends, profile, profileLoadStatus, setFriends } =
-        useSpaceAppState();
+    const {
+        friends,
+        profile,
+        profileLoadError,
+        profileLoadStatus,
+        refreshProfile,
+        setFriends,
+    } = useSpaceAppState();
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -31,8 +37,15 @@ const Page: React.FC = () => {
             );
     }, [profile?.spaceId, setFriends]);
 
-    if (profileLoadStatus == "loading" || !profile) {
-        return <SpaceRouteFallback background={friendsBackground} />;
+    if (profileLoadStatus != "ready" || !profile) {
+        return (
+            <SpaceRouteFallback
+                actionLabel={profileLoadStatus == "error" ? "Retry" : undefined}
+                background={friendsBackground}
+                message={profileLoadError}
+                onAction={() => void refreshProfile()}
+            />
+        );
     }
 
     return (

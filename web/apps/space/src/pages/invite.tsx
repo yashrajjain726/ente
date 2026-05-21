@@ -12,7 +12,8 @@ import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { profile, profileLoadStatus } = useSpaceAppState();
+    const { profile, profileLoadError, profileLoadStatus, refreshProfile } =
+        useSpaceAppState();
     const [profileLink, setProfileLink] = useState<string>();
     const [linkError, setLinkError] = useState<string>();
     const [isLinkLoading, setIsLinkLoading] = useState(false);
@@ -44,8 +45,15 @@ const Page: React.FC = () => {
         if (!profileLink) void loadInviteLink();
     }, [loadInviteLink, profileLink]);
 
-    if (profileLoadStatus == "loading" || !profile) {
-        return <SpaceRouteFallback background={shareProfileLinkBackground} />;
+    if (profileLoadStatus != "ready" || !profile) {
+        return (
+            <SpaceRouteFallback
+                actionLabel={profileLoadStatus == "error" ? "Retry" : undefined}
+                background={shareProfileLinkBackground}
+                message={profileLoadError}
+                onAction={() => void refreshProfile()}
+            />
+        );
     }
 
     return (
@@ -55,9 +63,7 @@ const Page: React.FC = () => {
                 errorMessage={linkError}
                 isLinkLoading={isLinkLoading}
                 profile={profile}
-                onBack={() =>
-                    void router.push(spaceRoutes.setupProfile())
-                }
+                onBack={() => void router.push(spaceRoutes.setupProfile())}
                 onDone={() => void router.push(spaceRoutes.home)}
                 onRetry={() => void loadInviteLink()}
                 profileLink={profileLink}

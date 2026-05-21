@@ -7,11 +7,11 @@ import React, {
 } from "react";
 import type { SpaceLoginCredentials } from "screens/LoginScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import type { PendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
 import {
     clearSpaceFriendsCache,
     clearSpaceMediaURLCache,
 } from "services/space";
+import type { PendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
 import {
     clearCurrentSpaceContext,
     loadExistingSpaceAvatar,
@@ -38,6 +38,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     const [pendingPasskeyVerification, setPendingPasskeyVerification] =
         useState<PendingSpacePasskeyVerification | null>(null);
     const [profile, setProfile] = useState<SetupProfile | null>(null);
+    const [profileLoadError, setProfileLoadError] = useState<string>();
     const [profileLoadStatus, setProfileLoadStatus] =
         useState<SpaceProfileLoadStatus>("loading");
     const [signupEmail, setSignupEmail] = useState("");
@@ -93,27 +94,32 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         [applyProfile],
     );
 
+    const profileErrorMessage = (error: unknown) =>
+        error instanceof Error
+            ? error.message
+            : "Couldn't load your Space profile. Please try again.";
+
     const refreshProfile = useCallback(async () => {
         const generation = ++profileLoadGenerationRef.current;
+        setProfileLoadError(undefined);
         setProfileLoadStatus("loading");
 
         try {
             const nextProfile = await loadExistingSpaceProfile();
             if (profileLoadGenerationRef.current == generation) {
+                setProfileLoadError(undefined);
                 applyProfile(nextProfile);
                 void loadProfileAvatar(nextProfile, generation);
+                setProfileLoadStatus("ready");
             }
             return nextProfile;
         } catch (error) {
             console.error("Failed to load space profile", error);
             if (profileLoadGenerationRef.current == generation) {
-                applyProfile(null);
+                setProfileLoadError(profileErrorMessage(error));
+                setProfileLoadStatus("error");
             }
             return null;
-        } finally {
-            if (profileLoadGenerationRef.current == generation) {
-                setProfileLoadStatus("ready");
-            }
         }
     }, [applyProfile, loadProfileAvatar]);
 
@@ -123,6 +129,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         clearSpaceFriendsCache();
         clearSpaceMediaURLCache();
         applyProfile(null);
+        setProfileLoadError(undefined);
         setProfileLoadStatus("ready");
         setPendingLoginCredentials(null);
         setPendingPasskeyVerification(null);
@@ -142,6 +149,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             pendingLoginCredentials,
             pendingPasskeyVerification,
             profile,
+            profileLoadError,
             profileLoadStatus,
             refreshProfile,
             resetAfterLogout,
@@ -161,6 +169,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             pendingLoginCredentials,
             pendingPasskeyVerification,
             profile,
+            profileLoadError,
             profileLoadStatus,
             refreshProfile,
             resetAfterLogout,

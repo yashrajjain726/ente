@@ -22,8 +22,14 @@ import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { friends, profile, profileLoadStatus, setFriends } =
-        useSpaceAppState();
+    const {
+        friends,
+        profile,
+        profileLoadError,
+        profileLoadStatus,
+        refreshProfile,
+        setFriends,
+    } = useSpaceAppState();
     const [posts, setPosts] = useState<SpacePost[]>([]);
     const [isPostsLoading, setIsPostsLoading] = useState(true);
     const postGroups = useMemo(
@@ -38,7 +44,7 @@ const Page: React.FC = () => {
     }, [profile, profileLoadStatus, router]);
 
     useEffect(() => {
-        if (profileLoadStatus == "loading") return;
+        if (profileLoadStatus != "ready") return;
 
         const spaceId = profile?.spaceId;
         if (!spaceId) {
@@ -69,8 +75,15 @@ const Page: React.FC = () => {
         };
     }, [profile?.spaceId, profileLoadStatus, setFriends]);
 
-    if (profileLoadStatus == "loading" || !profile) {
-        return <SpaceRouteFallback background={profileBackground} />;
+    if (profileLoadStatus != "ready" || !profile) {
+        return (
+            <SpaceRouteFallback
+                actionLabel={profileLoadStatus == "error" ? "Retry" : undefined}
+                background={profileBackground}
+                message={profileLoadError}
+                onAction={() => void refreshProfile()}
+            />
+        );
     }
 
     return (
