@@ -193,6 +193,12 @@ CREATE INDEX IF NOT EXISTS idx_space_friend_events_target_created
 CREATE INDEX IF NOT EXISTS idx_space_friend_events_target_type_created
     ON space_friend_events (target_id, event_type, created_at DESC);
 
+CREATE INDEX IF NOT EXISTS idx_space_friend_events_target_space_created
+    ON space_friend_events (target_space_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_space_friend_events_target_space_type_created
+    ON space_friend_events (target_space_id, event_type, created_at DESC);
+
 CREATE OR REPLACE FUNCTION tg_space_messages_null_cipher_on_delete() RETURNS trigger AS $$
 BEGIN
     IF NEW.is_deleted THEN
@@ -249,6 +255,14 @@ CREATE INDEX IF NOT EXISTS idx_space_messages_sender_updated
 
 CREATE INDEX IF NOT EXISTS idx_space_messages_recipient_updated
     ON space_messages (recipient_id, updated_at DESC, message_id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_space_messages_sender_space_created
+    ON space_messages (sender_space_id, created_at DESC, message_id DESC)
+    WHERE is_deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_space_messages_recipient_space_created
+    ON space_messages (recipient_space_id, created_at DESC, message_id DESC)
+    WHERE is_deleted = FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_space_messages_thread_created
     ON space_messages (thread_key, created_at DESC, message_id DESC);
