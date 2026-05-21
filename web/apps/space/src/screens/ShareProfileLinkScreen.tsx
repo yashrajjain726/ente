@@ -105,11 +105,14 @@ const ActionRow: React.FC<ActionRowProps> = ({
             bgcolor: "white",
             border: 0,
             borderRadius: "16px",
+            boxSizing: "border-box",
             color: textBase,
             cursor: "pointer",
             display: "flex",
             gap: "14px",
             height: 56,
+            maxWidth: "100%",
+            minWidth: 0,
             p: "8px 12px",
             textAlign: "left",
             width: "100%",
@@ -224,7 +227,9 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                     display: "flex",
                     flexDirection: "column",
                     minHeight: "100svh",
+                    minWidth: 0,
                     mx: "auto",
+                    overflowX: "hidden",
                     pb: "120px",
                     px: 3,
                     width: "100%",
@@ -235,8 +240,9 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                     component="header"
                     sx={{
                         display: "grid",
-                        gridTemplateColumns: "42px 1fr 42px",
+                        gridTemplateColumns: "42px minmax(0, 1fr) 42px",
                         height: 42,
+                        minWidth: 0,
                         mt: "32px",
                         width: "100%",
                     }}
@@ -276,6 +282,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             justifySelf: "center",
                             lineHeight: "28px",
                             m: 0,
+                            minWidth: 0,
                             whiteSpace: "nowrap",
                         }}
                     >
@@ -289,6 +296,8 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                         alignItems: "center",
                         display: "flex",
                         flexDirection: "column",
+                        maxWidth: "100%",
+                        minWidth: 0,
                         mt: "32px",
                         width: "100%",
                     }}
@@ -369,11 +378,14 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                         sx={{
                             bgcolor: "white",
                             borderRadius: "16px",
+                            boxSizing: "border-box",
                             color: textLight,
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 13,
                             fontWeight: 500,
                             lineHeight: "18px",
+                            maxWidth: "100%",
+                            minWidth: 0,
                             mt: "20px",
                             overflow: "hidden",
                             px: 2,
@@ -419,7 +431,10 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             fontWeight: 500,
                             lineHeight: "20px",
                             m: 0,
+                            maxWidth: "100%",
+                            minWidth: 0,
                             mt: "12px",
+                            overflowWrap: "break-word",
                             textAlign: "center",
                             width: "100%",
                         }}
@@ -435,6 +450,8 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                         display: "flex",
                         flexDirection: "column",
                         gap: "10px",
+                        maxWidth: "100%",
+                        minWidth: 0,
                         mt: "34px",
                         width: "100%",
                     }}
