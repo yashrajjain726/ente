@@ -200,7 +200,7 @@ func (r *SpacesRepository) UpdateSlug(ctx context.Context, ownerID int64, spaceI
 	`, normalizedSpaceSlug, ownerID, spaceID))
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "duplicate key value") {
-			return nil, stacktrace.Propagate(err, "space slug already exists")
+			return nil, wrapUnique(err, "space slug already exists")
 		}
 		return nil, err
 	}

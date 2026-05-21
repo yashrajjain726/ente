@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -51,22 +50,45 @@ func (c *CleanupController) removeUnreportedObjects(ctx context.Context) int {
 	logger := log.WithField("task", "space-remove-unreported-objects")
 	tx, tempObjects, err := c.AssetsRepo.GetAndLockExpiredTempObjects(ctx, timeutil.Microseconds(), spaceTempObjectCleanupBatchSize)
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			logger.Error(err)
-		}
+		logger.Error(err)
 		return 0
 	}
 
+	var deleteAfterCommit []spacerepo.SpaceTempObjectRecord
 	count := 0
 	for _, tempObject := range tempObjects {
-		if err := c.removeUnreportedObject(ctx, tx, tempObject); err != nil {
-			continue
+		action, err := c.prepareUnreportedObject(ctx, tx, tempObject)
+		if err != nil {
+			_ = tx.Rollback()
+			logger.Error(err)
+			return count
 		}
-		count++
+		switch action {
+		case tempObjectRemoved:
+			count++
+		case tempObjectDeleteAfterCommit:
+			deleteAfterCommit = append(deleteAfterCommit, tempObject)
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		logger.Error(stacktrace.Propagate(err, "failed to commit space temp object cleanup"))
 		return count
+	}
+	for _, tempObject := range deleteAfterCommit {
+		objectLogger := logger.WithFields(log.Fields{
+			"object_key": tempObject.ObjectKey,
+			"bucket_id":  tempObject.BucketID,
+			"purpose":    tempObject.Purpose,
+		})
+		if err := c.deleteObject(tempObject); err != nil {
+			objectLogger.Errorf("Deleting space temp object failed: %v", err)
+			continue
+		}
+		if err := c.AssetsRepo.RemoveTempObject(ctx, tempObject.ObjectKey); err != nil {
+			objectLogger.Errorf("Removing deleted space temp object failed: %v", err)
+			continue
+		}
+		count++
 	}
 	if count > 0 {
 		logger.Infof("Removed %d space temp objects", count)
@@ -74,36 +96,29 @@ func (c *CleanupController) removeUnreportedObjects(ctx context.Context) int {
 	return count
 }
 
-func (c *CleanupController) removeUnreportedObject(ctx context.Context, tx *sql.Tx, tempObject spacerepo.SpaceTempObjectRecord) error {
-	logger := log.WithFields(log.Fields{
-		"task":       "space-remove-unreported-objects",
-		"object_key": tempObject.ObjectKey,
-		"bucket_id":  tempObject.BucketID,
-		"purpose":    tempObject.Purpose,
-	})
+type tempObjectCleanupAction int
 
-	skip := func(err error) error {
-		logger.Errorf("Clearing space temp object failed: %v", err)
-		newExpiry := timeutil.Microseconds() + int64(spaceTempObjectRetryDelay/time.Microsecond)
-		if serr := spacerepo.SetTempObjectExpiryTx(ctx, tx, tempObject.ObjectKey, newExpiry); serr != nil {
-			logger.Errorf("Updating space temp object expiry failed: %v", serr)
-		}
-		return err
-	}
+const (
+	tempObjectRemoved tempObjectCleanupAction = iota + 1
+	tempObjectDeleteAfterCommit
+)
 
+func (c *CleanupController) prepareUnreportedObject(ctx context.Context, tx *sql.Tx, tempObject spacerepo.SpaceTempObjectRecord) (tempObjectCleanupAction, error) {
 	referenced, err := spacerepo.IsObjectReferencedTx(ctx, tx, tempObject.ObjectKey)
 	if err != nil {
-		return skip(stacktrace.Propagate(err, "failed to check space object reference"))
+		return 0, stacktrace.Propagate(err, "failed to check space object reference")
 	}
-	if !referenced {
-		if err := c.deleteObject(tempObject); err != nil {
-			return skip(err)
+	if referenced {
+		if err := spacerepo.RemoveTempObjectTx(ctx, tx, tempObject.ObjectKey); err != nil {
+			return 0, err
 		}
+		return tempObjectRemoved, nil
 	}
-	if err := spacerepo.RemoveTempObjectTx(ctx, tx, tempObject.ObjectKey); err != nil {
-		return skip(err)
+	retryAfter := timeutil.Microseconds() + int64(spaceTempObjectRetryDelay/time.Microsecond)
+	if err := spacerepo.SetTempObjectCleanupAfterTx(ctx, tx, tempObject.ObjectKey, retryAfter); err != nil {
+		return 0, err
 	}
-	return nil
+	return tempObjectDeleteAfterCommit, nil
 }
 
 func (c *CleanupController) deleteObject(tempObject spacerepo.SpaceTempObjectRecord) error {

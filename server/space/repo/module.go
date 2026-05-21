@@ -106,6 +106,7 @@ type SpaceTempObjectRecord struct {
 	BucketID     string
 	ExpectedSize int64
 	ExpiresAt    int64
+	CleanupAfter int64
 	CreatedAt    int64
 }
 

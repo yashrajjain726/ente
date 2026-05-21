@@ -2,7 +2,6 @@ package controller
 
 import (
 	"database/sql"
-	"encoding/base64"
 	"errors"
 	"strconv"
 	"strings"
@@ -297,29 +296,14 @@ func validateCreateMessageRequest(req models.CreateMessageRequest) error {
 		strings.TrimSpace(req.RecipientEncryptedMessageKey) == "" {
 		return ente.NewBadRequestWithMessage("messageCipher and encrypted message keys are required")
 	}
-	if err := validateEncodedSpaceMessageField("messageCipher", req.MessageCipher, maxSpaceMessageCipherEncodedBytes, maxSpaceMessageCipherDecodedBytes); err != nil {
+	if err := validateEncodedSpaceField("messageCipher", req.MessageCipher, maxSpaceMessageCipherEncodedBytes, maxSpaceMessageCipherDecodedBytes); err != nil {
 		return err
 	}
-	if err := validateEncodedSpaceMessageField("senderEncryptedMessageKey", req.SenderEncryptedMessageKey, maxSpaceMessageKeyEncodedBytes, maxSpaceMessageKeyDecodedBytes); err != nil {
+	if err := validateEncodedSpaceField("senderEncryptedMessageKey", req.SenderEncryptedMessageKey, maxSpaceMessageKeyEncodedBytes, maxSpaceMessageKeyDecodedBytes); err != nil {
 		return err
 	}
-	if err := validateEncodedSpaceMessageField("recipientEncryptedMessageKey", req.RecipientEncryptedMessageKey, maxSpaceMessageKeyEncodedBytes, maxSpaceMessageKeyDecodedBytes); err != nil {
+	if err := validateEncodedSpaceField("recipientEncryptedMessageKey", req.RecipientEncryptedMessageKey, maxSpaceMessageKeyEncodedBytes, maxSpaceMessageKeyDecodedBytes); err != nil {
 		return err
-	}
-	return nil
-}
-
-func validateEncodedSpaceMessageField(field string, value string, maxEncodedBytes int, maxDecodedBytes int) error {
-	trimmed := strings.TrimSpace(value)
-	if len(trimmed) > maxEncodedBytes {
-		return ente.NewBadRequestWithMessage(field + " is too large")
-	}
-	decoded, err := base64.StdEncoding.DecodeString(trimmed)
-	if err != nil || len(decoded) == 0 {
-		return ente.NewBadRequestWithMessage(field + " must be valid base64")
-	}
-	if len(decoded) > maxDecodedBytes {
-		return ente.NewBadRequestWithMessage(field + " is too large")
 	}
 	return nil
 }

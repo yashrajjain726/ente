@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"testing"
 
 	timeutil "github.com/ente-io/museum/pkg/utils/time"
@@ -58,9 +59,9 @@ func TestAddFriendRejectsOwnLink(t *testing.T) {
 		TargetSpaceID:              aliceSpace.SpaceID,
 		LinkSessionToken:           "self-link-session-token",
 		RequesterSpaceID:           aliceSpace.SpaceID,
-		TargetEncryptedSpaceKey:    "alice-target-key",
+		TargetEncryptedSpaceKey:    base64.StdEncoding.EncodeToString([]byte("alice-target-key")),
 		TargetKeyVersion:           aliceSpace.CurrentVersion,
-		RequesterEncryptedSpaceKey: "alice-requester-key",
+		RequesterEncryptedSpaceKey: base64.StdEncoding.EncodeToString([]byte("alice-requester-key")),
 		RequesterKeyVersion:        aliceSpace.CurrentVersion,
 	})
 

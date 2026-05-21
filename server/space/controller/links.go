@@ -64,6 +64,15 @@ func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreate
 	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.AuthKey) == "" || strings.TrimSpace(req.EncryptedSpaceKey) == "" || strings.TrimSpace(req.EncryptedAccessKey) == "" || req.KeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("spaceId, authKey, encryptedSpaceKey, encryptedAccessKey and keyVersion are required")
 	}
+	if len(strings.TrimSpace(req.AuthKey)) > maxSpaceEncryptedKeyEncodedBytes {
+		return nil, ente.NewBadRequestWithMessage("authKey is too large")
+	}
+	if err := validateEncodedSpaceField("encryptedSpaceKey", req.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		return nil, err
+	}
+	if err := validateEncodedSpaceField("encryptedAccessKey", req.EncryptedAccessKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		return nil, err
+	}
 	space, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, req.SpaceID)
 	if err != nil {
 		return nil, err
@@ -131,6 +140,9 @@ func (c *LinksController) Delete(ctx *gin.Context, spaceID string) error {
 func (c *LinksController) Login(ctx *gin.Context, req models.SpaceLinkLoginRequest) (*models.SpaceLinkLoginResponse, error) {
 	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.AuthKey) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceId and authKey are required")
+	}
+	if len(strings.TrimSpace(req.AuthKey)) > maxSpaceEncryptedKeyEncodedBytes {
+		return nil, ente.NewBadRequestWithMessage("authKey is too large")
 	}
 	authKeyBytes, err := base64.StdEncoding.DecodeString(req.AuthKey)
 	if err != nil || len(authKeyBytes) != 32 {

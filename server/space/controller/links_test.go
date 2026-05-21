@@ -24,8 +24,8 @@ func TestCreateSpaceLinkReturnsExistingActiveLink(t *testing.T) {
 		SpaceID:            space.SpaceID,
 		AuthKey:            base64.StdEncoding.EncodeToString(authKey),
 		KeyVersion:         space.CurrentVersion,
-		EncryptedSpaceKey:  "new-space-link-key",
-		EncryptedAccessKey: "new-owner-link-secret",
+		EncryptedSpaceKey:  base64.StdEncoding.EncodeToString([]byte("new-space-link-key")),
+		EncryptedAccessKey: base64.StdEncoding.EncodeToString([]byte("new-owner-link-secret")),
 	})
 
 	require.NoError(t, err)

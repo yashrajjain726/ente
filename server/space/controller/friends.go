@@ -32,6 +32,15 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 		req.RequesterKeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("targetSpaceId, linkSessionToken, requesterSpaceId, encrypted space keys and key versions are required")
 	}
+	if len(strings.TrimSpace(req.LinkSessionToken)) > maxSpaceLinkSessionTokenBytes {
+		return nil, ente.NewBadRequestWithMessage("linkSessionToken is too large")
+	}
+	if err := validateEncodedSpaceField("targetEncryptedSpaceKey", req.TargetEncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		return nil, err
+	}
+	if err := validateEncodedSpaceField("requesterEncryptedSpaceKey", req.RequesterEncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		return nil, err
+	}
 	session, err := c.auth.requireLinkSession(ctx.Request.Context(), req.LinkSessionToken)
 	if err != nil {
 		return nil, err
@@ -153,10 +162,16 @@ func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFr
 	if req.KeyVersion <= 0 {
 		return ente.NewBadRequestWithMessage("keyVersion is required")
 	}
+	if len(req.Shares) > maxSpaceFriendSharesPerRefresh {
+		return ente.NewBadRequestWithMessage("too many friend shares")
+	}
 	updates := make([]repo.SpaceShareUpdateRecord, 0, len(req.Shares))
 	for _, share := range req.Shares {
 		if share.FriendID == 0 || strings.TrimSpace(share.FriendSpaceID) == "" || strings.TrimSpace(share.EncryptedSpaceKey) == "" {
 			return ente.NewBadRequestWithMessage("friendId, friendSpaceId and encryptedSpaceKey are required for each share")
+		}
+		if err := validateEncodedSpaceField("encryptedSpaceKey", share.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+			return err
 		}
 		updates = append(updates, repo.SpaceShareUpdateRecord{
 			FriendID:          share.FriendID,

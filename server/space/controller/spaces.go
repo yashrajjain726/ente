@@ -41,6 +41,12 @@ func (c *SpacesController) Create(ctx *gin.Context, req models.CreateSpaceReques
 	if strings.TrimSpace(req.SpaceSlug) == "" || strings.TrimSpace(req.EncryptedSpaceKey) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceSlug and encryptedSpaceKey are required")
 	}
+	if err := validateEncodedSpaceField("encryptedSpaceKey", req.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalEncodedSpaceField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes); err != nil {
+		return nil, err
+	}
 	space, err := c.SpacesRepo.CreateSpace(ctx.Request.Context(), userID, req.SpaceSlug, req.EncryptedSpaceKey, req.EncryptedProfile)
 	if err != nil {
 		return nil, err
@@ -105,6 +111,9 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 	}
 	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.EncryptedProfile) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceId and encryptedProfile are required")
+	}
+	if err := validateEncodedSpaceField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes); err != nil {
+		return nil, err
 	}
 	if req.RemoveAvatar && req.Avatar != nil {
 		return nil, ente.NewBadRequestWithMessage("avatar and removeAvatar cannot both be set")
@@ -200,6 +209,15 @@ func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKey
 	}
 	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.EncryptedSpaceKey) == "" || strings.TrimSpace(req.WrappedPrevKey) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceId, encryptedSpaceKey and wrappedPrevKey are required")
+	}
+	if err := validateEncodedSpaceField("encryptedSpaceKey", req.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		return nil, err
+	}
+	if err := validateEncodedSpaceField("wrappedPrevKey", req.WrappedPrevKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalEncodedSpacePointerField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes); err != nil {
+		return nil, err
 	}
 	space, err := c.SpacesRepo.RotateKey(ctx.Request.Context(), userID, req.SpaceID, req.EncryptedSpaceKey, req.WrappedPrevKey, req.EncryptedProfile)
 	if err != nil {

@@ -125,13 +125,14 @@ CREATE TABLE IF NOT EXISTS space_temp_objects (
     bucket_id       TEXT NOT NULL,
     expected_size   BIGINT NOT NULL,
     expires_at      BIGINT NOT NULL,
+    cleanup_after   BIGINT NOT NULL,
     created_at      BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     CONSTRAINT chk_space_temp_objects_purpose CHECK (purpose IN ('post', 'avatar')),
     CONSTRAINT chk_space_temp_objects_expected_size CHECK (expected_size > 0)
 );
 
 CREATE INDEX IF NOT EXISTS idx_space_temp_objects_expires
-    ON space_temp_objects (expires_at ASC);
+    ON space_temp_objects (cleanup_after ASC);
 
 CREATE INDEX IF NOT EXISTS idx_space_temp_objects_owner_purpose
     ON space_temp_objects (owner_id, purpose, created_at DESC);

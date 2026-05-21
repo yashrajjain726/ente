@@ -33,8 +33,17 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.EncryptedPostKey) == "" || len(req.Objects) == 0 {
 		return nil, ente.NewBadRequestWithMessage("spaceId, encryptedPostKey and objects are required")
 	}
+	if len(req.Objects) > maxSpacePostObjects {
+		return nil, ente.NewBadRequestWithMessage("too many post objects")
+	}
 	if req.KeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("keyVersion is required")
+	}
+	if err := validateEncodedSpaceField("encryptedPostKey", req.EncryptedPostKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalEncodedSpacePointerField("captionCipher", req.CaptionCipher, maxSpaceCaptionCipherEncodedBytes, maxSpaceCaptionCipherDecodedBytes); err != nil {
+		return nil, err
 	}
 	space, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, req.SpaceID)
 	if err != nil {
@@ -44,6 +53,21 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 	for _, object := range req.Objects {
 		if strings.TrimSpace(object.ObjectKey) == "" {
 			return nil, ente.NewBadRequestWithMessage("objectKey is required for each object")
+		}
+		if err := validateSpaceTextFieldBytes("objectKey", object.ObjectKey, maxSpaceObjectKeyBytes); err != nil {
+			return nil, err
+		}
+		if object.Position < 0 || object.Position >= maxSpacePostObjects {
+			return nil, ente.NewBadRequestWithMessage("invalid object position")
+		}
+		if err := validateOptionalEncodedSpaceField("blurHashCipher", object.BlurHashCipher, maxSpaceBlurHashCipherEncodedBytes, maxSpaceBlurHashCipherDecodedBytes); err != nil {
+			return nil, err
+		}
+		if err := validateSpaceTextFieldBytes("variant", object.Variant, maxSpaceVariantBytes); err != nil {
+			return nil, err
+		}
+		if err := validateSpaceTextFieldBytes("mediaType", object.MediaType, maxSpaceMediaTypeBytes); err != nil {
+			return nil, err
 		}
 		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, object.ObjectKey, repo.TempObjectPurposePost, &space.SpaceID)
 		if err != nil {
@@ -211,6 +235,9 @@ func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req mod
 	id, err := strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
 	if err != nil || id <= 0 {
 		return nil, ente.NewBadRequestWithMessage("invalid postID")
+	}
+	if err := validateOptionalEncodedSpacePointerField("captionCipher", req.CaptionCipher, maxSpaceCaptionCipherEncodedBytes, maxSpaceCaptionCipherDecodedBytes); err != nil {
+		return nil, err
 	}
 	if err := c.PostsRepo.UpdateCaption(ctx.Request.Context(), id, userID, req.CaptionCipher); err != nil {
 		return nil, err

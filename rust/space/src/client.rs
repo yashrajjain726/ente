@@ -379,10 +379,13 @@ impl AccountSpaceCtx {
             avatar,
             remove_avatar,
         };
-        self.client
+        let response = self
+            .client
             .post_json("/space/profile", &request)
             .await
-            .map_err(Into::into)
+            .map_err(SpaceError::from)?;
+        self.update_cached_owned_space_profile(space_id, request.encrypted_profile)?;
+        Ok(response)
     }
 
     pub async fn list_space_key_versions(
@@ -1429,6 +1432,20 @@ impl AccountSpaceCtx {
         if let Some(spaces) = cache.as_mut() {
             spaces.retain(|space| space.space_id != created.space_id);
             spaces.push(created);
+        }
+        Ok(())
+    }
+
+    fn update_cached_owned_space_profile(
+        &self,
+        space_id: &str,
+        encrypted_profile: String,
+    ) -> Result<()> {
+        let mut cache = cache_lock(&self.owned_spaces_cache, "owned spaces")?;
+        if let Some(spaces) = cache.as_mut()
+            && let Some(space) = spaces.iter_mut().find(|space| space.space_id == space_id)
+        {
+            space.encrypted_profile = encrypted_profile;
         }
         Ok(())
     }
@@ -2606,6 +2623,16 @@ mod tests {
         ctx.update_space_profile(&created.space_id, b"profile-json-2", None, false)
             .await
             .expect("created space should be available from cache");
+        let cached = ctx
+            .list_owned_spaces()
+            .await
+            .expect("owned space cache should remain usable");
+        let cached_profile = decrypt_secretbox_packed(
+            &space_key,
+            &decode_b64(&cached[0].encrypted_profile).unwrap(),
+        )
+        .expect("cached profile should decrypt");
+        assert_eq!(cached_profile.as_slice(), b"profile-json-2");
 
         list_spaces.assert_async().await;
         ensure_root.assert_async().await;
