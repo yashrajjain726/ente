@@ -15,7 +15,7 @@ export const appHomeRoute: string = {
     photos: "/gallery",
     ensu: "/",
     locker: "/locker",
-    social: "/app",
+    space: "/app",
 }[appName];
 
 let _stashedRedirect: string | undefined;
