@@ -54,6 +54,9 @@ func shouldSkipBodyLog(method string, path string) bool {
 	if method == http.MethodPost && (path == "/paste/create" || path == "/paste/guard" || path == "/paste/consume") {
 		return true
 	}
+	if method == http.MethodPost && (path == "/space/links" || path == "/space/links/rotate" || path == "/space/links/session" || path == "/space/friends/add") {
+		return true
+	}
 	return false
 }
 

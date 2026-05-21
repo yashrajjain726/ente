@@ -11,11 +11,7 @@ import {
 import {
     decryptBox,
     deriveKey,
-    encryptBox,
-    fromB64,
     fromB64URLSafeNoPadding,
-    generateKey,
-    toB64,
 } from "ente-accounts-rs/services/crypto";
 import {
     checkPasskeyVerificationStatus,
@@ -75,7 +71,7 @@ export type SpaceLoginPasskeyStatusResult =
 export const spaceLoginPasskeySessionExpiredErrorMessage =
     passkeySessionExpiredErrorMessage;
 
-const pendingSpaceLoginCredentialsKey = "spacePendingLoginCredentials";
+let pendingSpaceLoginCredentials: SpaceLoginInput | undefined;
 
 const cleanedEmail = (email: string) => email.trim();
 
@@ -84,62 +80,24 @@ const deriveLoginKEK = (
     { kekSalt, memLimit, opsLimit }: LoginKDFAttributes,
 ) => deriveKey(password, kekSalt, opsLimit, memLimit);
 
-const isSpaceLoginInput = (value: unknown): value is SpaceLoginInput => {
-    if (!value || typeof value != "object") return false;
-    const candidate = value as Record<string, unknown>;
-    return (
-        typeof candidate.email == "string" &&
-        typeof candidate.password == "string"
-    );
-};
-
-const encodeCredentials = (credentials: SpaceLoginInput) =>
-    toB64(new TextEncoder().encode(JSON.stringify(credentials)));
-
-const decodeCredentials = async (encodedCredentials: string) => {
-    const parsed: unknown = JSON.parse(
-        new TextDecoder().decode(await fromB64(encodedCredentials)),
-    );
-    return isSpaceLoginInput(parsed) ? parsed : undefined;
-};
-
-export const savePendingSpaceLoginCredentials = async (
+export const savePendingSpaceLoginCredentials = (
     credentials: SpaceLoginInput,
 ) => {
-    const key = await generateKey();
-    const box = await encryptBox(await encodeCredentials(credentials), key);
-    sessionStorage.setItem(
-        pendingSpaceLoginCredentialsKey,
-        JSON.stringify({ key, ...box }),
+    pendingSpaceLoginCredentials = {
+        email: cleanedEmail(credentials.email),
+        password: credentials.password,
+    };
+};
+
+export const savedPendingSpaceLoginCredentials = () =>
+    Promise.resolve(
+        pendingSpaceLoginCredentials
+            ? { ...pendingSpaceLoginCredentials }
+            : undefined,
     );
-};
-
-export const savedPendingSpaceLoginCredentials = async () => {
-    const saved = sessionStorage.getItem(pendingSpaceLoginCredentialsKey);
-    if (!saved) return undefined;
-
-    try {
-        const parsed: unknown = JSON.parse(saved);
-        if (!parsed || typeof parsed != "object") return undefined;
-        const { encryptedData, key, nonce } = parsed as Record<string, unknown>;
-        if (
-            typeof encryptedData != "string" ||
-            typeof key != "string" ||
-            typeof nonce != "string"
-        ) {
-            return undefined;
-        }
-
-        return await decodeCredentials(
-            await decryptBox({ encryptedData, nonce }, key),
-        );
-    } catch {
-        return undefined;
-    }
-};
 
 export const clearPendingSpaceLoginCredentials = () => {
-    sessionStorage.removeItem(pendingSpaceLoginCredentialsKey);
+    pendingSpaceLoginCredentials = undefined;
 };
 
 const spacePasskeyVerificationRedirectURL = (
@@ -166,10 +124,7 @@ export const beginSpaceLogin = async ({
     if (!srpAttributes) {
         await sendOTT(emailForLogin, "login");
         replaceSavedLocalUser({ email: emailForLogin });
-        await savePendingSpaceLoginCredentials({
-            email: emailForLogin,
-            password,
-        });
+        savePendingSpaceLoginCredentials({ email: emailForLogin, password });
         return { status: "email-otp", email: emailForLogin };
     }
 
@@ -178,10 +133,7 @@ export const beginSpaceLogin = async ({
 
     if (srpAttributes.isEmailMFAEnabled) {
         await sendOTT(emailForLogin, "login");
-        await savePendingSpaceLoginCredentials({
-            email: emailForLogin,
-            password,
-        });
+        savePendingSpaceLoginCredentials({ email: emailForLogin, password });
         return { status: "email-otp", email: emailForLogin };
     }
 
