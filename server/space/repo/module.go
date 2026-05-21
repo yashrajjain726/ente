@@ -207,6 +207,7 @@ type SpaceShareRecord struct {
 
 type SpaceShareUpdateRecord struct {
 	FriendID          int64
+	FriendSpaceID     string
 	EncryptedSpaceKey string
 }
 
@@ -245,6 +246,7 @@ type SpaceLinkSessionRecord struct {
 
 type SpaceReadMarkerRecord struct {
 	UserID            int64
+	ViewerSpaceID     string
 	FeedReadCreatedAt int64
 	FeedReadPostID    int64
 	CreatedAt         int64

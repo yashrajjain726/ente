@@ -226,6 +226,7 @@ type RefreshFriendSharesRequest struct {
 
 type ShareUpdatePayload struct {
 	FriendID          int64  `json:"friendId"`
+	FriendSpaceID     string `json:"friendSpaceId"`
 	EncryptedSpaceKey string `json:"encryptedSpaceKey"`
 }
 

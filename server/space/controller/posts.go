@@ -45,7 +45,7 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 		if strings.TrimSpace(object.ObjectKey) == "" {
 			return nil, ente.NewBadRequestWithMessage("objectKey is required for each object")
 		}
-		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, object.ObjectKey, repo.TempObjectPurposePost, nil)
+		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, object.ObjectKey, repo.TempObjectPurposePost, &space.SpaceID)
 		if err != nil {
 			return nil, err
 		}
@@ -108,10 +108,12 @@ func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*
 		return nil, err
 	}
 	viewerID := int64(0)
+	viewerSpaceID := ""
 	if viewer != nil {
 		viewerID = viewer.UserID
+		viewerSpaceID = viewer.SpaceID
 	}
-	posts, nextCursor, err := c.PostsRepo.ListPostsBySpace(ctx.Request.Context(), space.SpaceID, viewerID, req.Cursor, req.Limit)
+	posts, nextCursor, err := c.PostsRepo.ListPostsBySpace(ctx.Request.Context(), space.SpaceID, viewerID, viewerSpaceID, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -138,11 +140,15 @@ func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest)
 	if err != nil {
 		return nil, err
 	}
-	marker, err := c.ReadMarkersRepo.Get(ctx.Request.Context(), userID)
+	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
 	if err != nil {
 		return nil, err
 	}
-	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx.Request.Context(), userID, req.Cursor, req.Limit, marker.FeedReadCreatedAt, marker.FeedReadPostID)
+	marker, err := c.ReadMarkersRepo.Get(ctx.Request.Context(), userID, viewerSpace.SpaceID)
+	if err != nil {
+		return nil, err
+	}
+	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.Cursor, req.Limit, marker.FeedReadCreatedAt, marker.FeedReadPostID)
 	if err != nil {
 		return nil, err
 	}
@@ -174,10 +180,12 @@ func (c *PostsController) Get(ctx *gin.Context, postID string) (*models.PostResp
 		return nil, err
 	}
 	viewerID := int64(0)
+	viewerSpaceID := ""
 	if viewer != nil {
 		viewerID = viewer.UserID
+		viewerSpaceID = viewer.SpaceID
 	}
-	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), id, viewerID)
+	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), id, viewerID, viewerSpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +215,11 @@ func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req mod
 	if err := c.PostsRepo.UpdateCaption(ctx.Request.Context(), id, userID, req.CaptionCipher); err != nil {
 		return nil, err
 	}
-	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), id, userID)
+	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), id, userID, viewerSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +239,11 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models
 	if err != nil || id <= 0 {
 		return nil, ente.NewBadRequestWithMessage("invalid postID")
 	}
-	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), id, userID)
+	actorSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), id, userID, actorSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -235,10 +251,10 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models
 	if err != nil {
 		return nil, err
 	}
-	if err := c.auth.canViewSpace(ctx.Request.Context(), &viewerAuth{UserID: userID}, space); err != nil {
+	if err := c.auth.canViewSpace(ctx.Request.Context(), &viewerAuth{UserID: userID, SpaceID: actorSpace.SpaceID}, space); err != nil {
 		return nil, err
 	}
-	if err := c.PostsRepo.SetLike(ctx.Request.Context(), id, userID, req.Like); err != nil {
+	if err := c.PostsRepo.SetLike(ctx.Request.Context(), id, userID, actorSpace.SpaceID, req.Like); err != nil {
 		return nil, err
 	}
 	return &models.LikePostResponse{Liked: req.Like}, nil
@@ -254,10 +270,12 @@ func (c *PostsController) ListLikers(ctx *gin.Context, postID string) (*models.L
 		return nil, err
 	}
 	viewerID := int64(0)
+	viewerSpaceID := ""
 	if viewer != nil {
 		viewerID = viewer.UserID
+		viewerSpaceID = viewer.SpaceID
 	}
-	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), id, viewerID)
+	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), id, viewerID, viewerSpaceID)
 	if err != nil {
 		return nil, err
 	}

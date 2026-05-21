@@ -17,8 +17,9 @@ import (
 )
 
 type viewerAuth struct {
-	UserID int64
-	Link   *spacerepo.SpaceLinkSessionRecord
+	UserID  int64
+	SpaceID string
+	Link    *spacerepo.SpaceLinkSessionRecord
 }
 
 type authDeps struct {
@@ -44,7 +45,16 @@ func (a authDeps) resolveViewer(c *gin.Context) (*viewerAuth, error) {
 	if a.UserAuthRepo != nil {
 		userID, expired, err := a.UserAuthRepo.GetUserIDWithToken(token, auth.GetApp(c))
 		if err == nil && !expired && userID > 0 {
-			return &viewerAuth{UserID: userID}, nil
+			viewer := &viewerAuth{UserID: userID}
+			if a.SpacesRepo != nil {
+				space, err := a.SpacesRepo.GetDefaultSpaceByOwner(c.Request.Context(), userID)
+				if err == nil {
+					viewer.SpaceID = space.SpaceID
+				} else if !errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+					return nil, err
+				}
+			}
+			return viewer, nil
 		}
 		if err != nil && !errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, err
@@ -79,6 +89,17 @@ func (a authDeps) requireSpaceOwner(ctx context.Context, ownerID int64, spaceID 
 	return space, nil
 }
 
+func (a authDeps) requireDefaultSpace(ctx context.Context, ownerID int64) (*spacerepo.SpaceRecord, error) {
+	space, err := a.SpacesRepo.GetDefaultSpaceByOwner(ctx, ownerID)
+	if err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, ente.NewBadRequestWithMessage("space is missing")
+		}
+		return nil, err
+	}
+	return space, nil
+}
+
 func (a authDeps) requireLinkSession(ctx context.Context, token string) (*spacerepo.SpaceLinkSessionRecord, error) {
 	token = strings.TrimSpace(token)
 	if token == "" || a.LinksRepo == nil {
@@ -107,7 +128,10 @@ func (a authDeps) canViewSpace(ctx context.Context, viewer *viewerAuth, space *s
 		if viewer.UserID == space.OwnerID {
 			return nil
 		}
-		_, err := a.FriendsRepo.GetShareForFriendAndSpace(ctx, viewer.UserID, space.SpaceID)
+		if strings.TrimSpace(viewer.SpaceID) == "" {
+			return ente.ErrPermissionDenied
+		}
+		_, err := a.FriendsRepo.GetShareForFriendAndSpace(ctx, viewer.UserID, viewer.SpaceID, space.SpaceID)
 		if err != nil {
 			if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 				return ente.ErrPermissionDenied

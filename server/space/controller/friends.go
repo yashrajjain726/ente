@@ -74,6 +74,10 @@ func (c *FriendsController) Unfriend(ctx *gin.Context, req models.FriendTargetPa
 	if err != nil {
 		return err
 	}
+	actorSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return err
+	}
 	var space *repo.SpaceRecord
 	switch {
 	case req.TargetSpaceID != nil && strings.TrimSpace(*req.TargetSpaceID) != "":
@@ -86,7 +90,7 @@ func (c *FriendsController) Unfriend(ctx *gin.Context, req models.FriendTargetPa
 	if err != nil {
 		return err
 	}
-	return c.FriendsRepo.DeleteFriendship(ctx.Request.Context(), userID, space.SpaceID)
+	return c.FriendsRepo.DeleteFriendship(ctx.Request.Context(), userID, actorSpace.SpaceID, space.SpaceID)
 }
 
 func (c *FriendsController) ListFriends(ctx *gin.Context, req models.ListSpaceFriendsRequest) ([]models.SpaceFriendResponse, error) {
@@ -126,7 +130,11 @@ func (c *FriendsController) Relationship(ctx *gin.Context, req models.FriendRela
 	if err != nil {
 		return nil, err
 	}
-	relationship, err := c.FriendsRepo.GetRelationship(ctx.Request.Context(), userID, targetSpace.OwnerID, targetSpace.SpaceID)
+	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	relationship, err := c.FriendsRepo.GetRelationship(ctx.Request.Context(), userID, viewerSpace.SpaceID, targetSpace.OwnerID, targetSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -147,11 +155,12 @@ func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFr
 	}
 	updates := make([]repo.SpaceShareUpdateRecord, 0, len(req.Shares))
 	for _, share := range req.Shares {
-		if share.FriendID == 0 || strings.TrimSpace(share.EncryptedSpaceKey) == "" {
-			return ente.NewBadRequestWithMessage("friendId and encryptedSpaceKey are required for each share")
+		if share.FriendID == 0 || strings.TrimSpace(share.FriendSpaceID) == "" || strings.TrimSpace(share.EncryptedSpaceKey) == "" {
+			return ente.NewBadRequestWithMessage("friendId, friendSpaceId and encryptedSpaceKey are required for each share")
 		}
 		updates = append(updates, repo.SpaceShareUpdateRecord{
 			FriendID:          share.FriendID,
+			FriendSpaceID:     strings.TrimSpace(share.FriendSpaceID),
 			EncryptedSpaceKey: share.EncryptedSpaceKey,
 		})
 	}

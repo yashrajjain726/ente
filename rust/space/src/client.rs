@@ -472,12 +472,16 @@ impl AccountSpaceCtx {
         })
     }
 
-    pub async fn presign_post_upload(&self, size: usize) -> Result<PresignUploadResponse> {
+    pub async fn presign_post_upload(
+        &self,
+        space_id: &str,
+        size: usize,
+    ) -> Result<PresignUploadResponse> {
         ensure_space_upload_size("post", size, MAX_SPACE_POST_UPLOAD_BYTES)?;
         let request = PresignUploadRequest {
             size: size as i64,
             purpose: None,
-            space_id: None,
+            space_id: Some(space_id.to_owned()),
         };
         self.client
             .post_json("/space/uploads/presign", &request)
@@ -517,12 +521,13 @@ impl AccountSpaceCtx {
 
     pub async fn upload_post_asset(
         &self,
+        space_id: &str,
         post_key: &[u8],
         plaintext: &[u8],
         position: Option<i32>,
     ) -> Result<PostObjectPayload> {
         let encrypted = encrypt_asset_payload(post_key, plaintext)?;
-        let presign = self.presign_post_upload(encrypted.len()).await?;
+        let presign = self.presign_post_upload(space_id, encrypted.len()).await?;
         self.upload_bytes(&presign, &encrypted).await?;
         Ok(PostObjectPayload {
             object_key: presign.object_key,
@@ -538,13 +543,16 @@ impl AccountSpaceCtx {
 
     pub async fn upload_post_photo_asset(
         &self,
+        space_id: &str,
         post_key: &[u8],
         plaintext: &[u8],
         width: Option<i32>,
         height: Option<i32>,
         media_type: Option<String>,
     ) -> Result<PostObjectPayload> {
-        let mut object = self.upload_post_asset(post_key, plaintext, Some(0)).await?;
+        let mut object = self
+            .upload_post_asset(space_id, post_key, plaintext, Some(0))
+            .await?;
         object.width = width.filter(|value| *value > 0);
         object.height = height.filter(|value| *value > 0);
         object.media_type = media_type.filter(|value| !value.trim().is_empty());
@@ -1200,6 +1208,7 @@ impl AccountSpaceCtx {
             let sealed_share = sealed::seal(&access.space_key, &public_key)?;
             updates.push(ShareUpdatePayload {
                 friend_id: friend.friend.user_id,
+                friend_space_id: friend.friend.space_id,
                 encrypted_space_key: encode_b64(&pack_payload(&sealed_share, &[])),
             });
         }
@@ -2317,7 +2326,10 @@ mod tests {
         let presign = server
             .mock("POST", "/space/uploads/presign")
             .match_header("x-auth-token", "token")
-            .match_body(Matcher::Regex("\"size\"".into()))
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"size\"".into()),
+                Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+            ]))
             .with_status(200)
             .with_body(
                 json!({
@@ -2341,7 +2353,7 @@ mod tests {
             .await;
 
         let payload = ctx
-            .upload_post_asset(&generate_key(), b"tiny-image", Some(0))
+            .upload_post_asset("space_owner_main", &generate_key(), b"tiny-image", Some(0))
             .await
             .expect("upload should succeed");
 
@@ -2359,6 +2371,7 @@ mod tests {
         let presign = server
             .mock("POST", "/space/uploads/presign")
             .match_header("x-auth-token", "token")
+            .match_body(Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()))
             .with_status(200)
             .with_body(
                 json!({
@@ -2383,6 +2396,7 @@ mod tests {
 
         let payload = ctx
             .upload_post_photo_asset(
+                "space_owner_main",
                 &generate_key(),
                 b"photo-bytes",
                 Some(4032),
@@ -2407,7 +2421,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
 
         let post_error = ctx
-            .presign_post_upload(MAX_SPACE_POST_UPLOAD_BYTES + 1)
+            .presign_post_upload("space_owner_main", MAX_SPACE_POST_UPLOAD_BYTES + 1)
             .await
             .expect_err("oversized post upload should fail before presign");
         assert!(post_error.to_string().contains("post upload size"));
@@ -3458,6 +3472,7 @@ mod tests {
             .match_header("x-auth-token", "token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"friendId\":7".into()),
+                Matcher::Regex("\"friendSpaceId\":\"space_viewer\"".into()),
                 Matcher::Regex("\"keyVersion\":3".into()),
             ]))
             .with_status(200)

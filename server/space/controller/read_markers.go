@@ -24,15 +24,19 @@ func (c *ReadMarkersController) GetUnreadStatus(ctx *gin.Context) (*models.Space
 	if err != nil {
 		return nil, err
 	}
-	marker, err := c.ReadMarkersRepo.Get(ctx.Request.Context(), userID)
+	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
 	if err != nil {
 		return nil, err
 	}
-	feedUnread, err := c.PostsRepo.HasUnreadFeed(ctx.Request.Context(), userID, marker.FeedReadCreatedAt, marker.FeedReadPostID)
+	marker, err := c.ReadMarkersRepo.Get(ctx.Request.Context(), userID, viewerSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
-	notificationsUnread, err := c.MessagesRepo.HasUnreadNotifications(ctx.Request.Context(), userID)
+	feedUnread, err := c.PostsRepo.HasUnreadFeed(ctx.Request.Context(), userID, viewerSpace.SpaceID, marker.FeedReadCreatedAt, marker.FeedReadPostID)
+	if err != nil {
+		return nil, err
+	}
+	notificationsUnread, err := c.MessagesRepo.HasUnreadNotifications(ctx.Request.Context(), userID, viewerSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -50,14 +54,18 @@ func (c *ReadMarkersController) MarkFeedRead(ctx *gin.Context, req models.MarkFe
 	if req.PostID <= 0 {
 		return nil, ente.NewBadRequestWithMessage("postId is required")
 	}
-	createdAt, postID, err := c.PostsRepo.GetFeedPostMarker(ctx.Request.Context(), userID, req.PostID)
+	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	createdAt, postID, err := c.PostsRepo.GetFeedPostMarker(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.PostID)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.ErrPermissionDenied
 		}
 		return nil, err
 	}
-	if err := c.ReadMarkersRepo.UpsertFeedReadMarker(ctx.Request.Context(), userID, createdAt, postID); err != nil {
+	if err := c.ReadMarkersRepo.UpsertFeedReadMarker(ctx.Request.Context(), userID, viewerSpace.SpaceID, createdAt, postID); err != nil {
 		return nil, err
 	}
 	return c.GetUnreadStatus(ctx)
@@ -71,14 +79,18 @@ func (c *ReadMarkersController) MarkNotificationsRead(ctx *gin.Context, req mode
 	if strings.TrimSpace(req.FriendSpaceID) == "" {
 		return nil, ente.NewBadRequestWithMessage("friendSpaceId is required")
 	}
-	readAt, err := c.MessagesRepo.GetLatestConversationActivityAt(ctx.Request.Context(), userID, req.FriendSpaceID)
+	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	readAt, err := c.MessagesRepo.GetLatestConversationActivityAt(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.FriendSpaceID)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.ErrPermissionDenied
 		}
 		return nil, err
 	}
-	if err := c.ReadMarkersRepo.UpsertNotificationReadMarker(ctx.Request.Context(), userID, req.FriendSpaceID, readAt); err != nil {
+	if err := c.ReadMarkersRepo.UpsertNotificationReadMarker(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.FriendSpaceID, readAt); err != nil {
 		return nil, err
 	}
 	return c.GetUnreadStatus(ctx)

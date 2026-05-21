@@ -56,7 +56,7 @@ func TestMessageReplyValidation(t *testing.T) {
 	require.NotNil(t, reply.ReplyMessageID)
 	require.Equal(t, bobMessage.MessageID, *reply.ReplyMessageID)
 
-	require.NoError(t, repos.Messages.DeleteMessage(ctx, bobMessage.MessageID, bobID))
+	require.NoError(t, repos.Messages.DeleteMessage(ctx, bobMessage.MessageID, bobID, bobSpace.SpaceID))
 	_, err = controller.Create(newSpaceControllerContext(aliceID), bobSpace.SpaceID, models.CreateMessageRequest{
 		MessageCipher:                spaceTestB64("reply-after-delete-cipher"),
 		SenderEncryptedMessageKey:    spaceTestB64("reply-after-delete-sender-key"),
@@ -78,7 +78,7 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	liked, err := controller.ToggleLike(newSpaceControllerContext(aliceID), message.MessageID, models.LikeMessageRequest{Like: true})
 	require.NoError(t, err)
 	require.True(t, liked.Liked)
-	viewed, err := repos.Messages.GetMessage(ctx, message.MessageID, aliceID)
+	viewed, err := repos.Messages.GetMessage(ctx, message.MessageID, aliceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), viewed.Likes)
 	require.True(t, viewed.ViewerLiked)
@@ -88,10 +88,10 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot like a deleted message")
 
-	require.NoError(t, repos.Friends.DeleteFriendship(ctx, aliceID, bobSpace.SpaceID))
+	require.NoError(t, repos.Friends.DeleteFriendship(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID))
 	_, err = controller.ToggleLike(newSpaceControllerContext(aliceID), message.MessageID, models.LikeMessageRequest{Like: false})
 	require.True(t, errors.Is(err, ente.ErrPermissionDenied))
-	thread, _, err := repos.Messages.ListThread(ctx, aliceID, bobSpace.SpaceID, "", 10)
+	thread, _, err := repos.Messages.ListThread(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Len(t, thread, 1)
 

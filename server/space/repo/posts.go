@@ -46,7 +46,7 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID
 		`, postID, obj.ObjectKey, obj.BucketID, obj.Size, obj.Position, obj.Variant, obj.BlurHashCipher, obj.Width, obj.Height, obj.MediaType); err != nil {
 			return 0, stacktrace.Propagate(err, "")
 		}
-		if err := ConsumeTempObjectTx(ctx, tx, ownerID, obj.ObjectKey, TempObjectPurposePost, nil); err != nil {
+		if err := ConsumeTempObjectTx(ctx, tx, ownerID, obj.ObjectKey, TempObjectPurposePost, &spaceID); err != nil {
 			return 0, stacktrace.Propagate(err, "failed to consume staged space post upload")
 		}
 	}
@@ -56,7 +56,7 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID
 	return postID, nil
 }
 
-func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID int64) (*SpacePostRecord, error) {
+func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID int64, viewerSpaceID string) (*SpacePostRecord, error) {
 	return scanPostRecord(r.DB.QueryRowContext(ctx, `
 		SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
 		       w.owner_id, w.space_id, w.space_slug, owner_ka.public_key,
@@ -67,21 +67,21 @@ func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID in
 		       p.encrypted_post_key, p.caption_cipher,
 		       p.key_version, p.created_at,
 		       (SELECT COUNT(*) FROM space_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-		       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $2) AS viewer_liked,
+		       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked,
 		       FALSE AS viewer_unread
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
 			JOIN key_attributes owner_ka ON owner_ka.user_id = w.owner_id
 			WHERE p.post_id = $1 AND p.is_deleted = FALSE
-		`, postID, viewerID))
+		`, postID, viewerSpaceID))
 }
 
-func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, viewerID int64, cursor string, limit int) ([]SpacePostRecord, string, error) {
+func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, viewerID int64, viewerSpaceID string, cursor string, limit int) ([]SpacePostRecord, string, error) {
 	limit = optionalInt(limit, 50)
 	if limit > 100 {
 		limit = 100
 	}
-	args := []any{spaceID, viewerID}
+	args := []any{spaceID, viewerSpaceID}
 	query := `
 			SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
 			       w.owner_id, w.space_id, w.space_slug, owner_ka.public_key,
@@ -92,7 +92,7 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 			       p.encrypted_post_key, p.caption_cipher,
 			       p.key_version, p.created_at,
 			       (SELECT COUNT(*) FROM space_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-			       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $2) AS viewer_liked,
+			       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked,
 			       FALSE AS viewer_unread
 				FROM space_posts p
 				JOIN spaces w ON w.space_id = p.space_id
@@ -128,12 +128,12 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 	return out, nextCursor, nil
 }
 
-func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor string, limit int, readCreatedAt int64, readPostID int64) ([]SpacePostRecord, string, error) {
+func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSpaceID string, cursor string, limit int, readCreatedAt int64, readPostID int64) ([]SpacePostRecord, string, error) {
 	limit = optionalInt(limit, 25)
 	if limit > 100 {
 		limit = 100
 	}
-	args := []any{viewerID, readCreatedAt, readPostID}
+	args := []any{viewerID, viewerSpaceID, readCreatedAt, readPostID}
 	query := `
 			SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
 			       w.owner_id, w.space_id, w.space_slug, owner_ka.public_key,
@@ -144,20 +144,20 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor s
 			       p.encrypted_post_key, p.caption_cipher,
 			       p.key_version, p.created_at,
 			       (SELECT COUNT(*) FROM space_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-			       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.user_id = $1) AS viewer_liked,
-			       ((p.created_at, p.post_id) > ($2::bigint, $3::bigint)) AS viewer_unread
+			       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked,
+			       ((p.created_at, p.post_id) > ($3::bigint, $4::bigint)) AS viewer_unread
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
 			JOIN key_attributes owner_ka ON owner_ka.user_id = w.owner_id
 			WHERE p.is_deleted = FALSE
-			  AND p.owner_id <> $1
+			  AND p.space_id <> $2
 			  AND EXISTS (
 			    SELECT 1 FROM space_friend_shares fs
-			    WHERE fs.friend_id = $1 AND fs.space_id = p.space_id
+			    WHERE fs.friend_id = $1 AND fs.friend_space_id = $2 AND fs.space_id = p.space_id
 			  )`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorPostID)
-		query += ` AND (p.created_at, p.post_id) < ($4, $5)`
+		query += ` AND (p.created_at, p.post_id) < ($5, $6)`
 	}
 	args = append(args, limit+1)
 	query += ` ORDER BY p.created_at DESC, p.post_id DESC LIMIT $` + strconv.Itoa(len(args))
@@ -185,40 +185,40 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, cursor s
 	return out, nextCursor, nil
 }
 
-func (r *PostsRepository) GetFeedPostMarker(ctx context.Context, viewerID, postID int64) (int64, int64, error) {
+func (r *PostsRepository) GetFeedPostMarker(ctx context.Context, viewerID int64, viewerSpaceID string, postID int64) (int64, int64, error) {
 	var createdAt int64
 	if err := r.DB.QueryRowContext(ctx, `
 		SELECT p.created_at
 		FROM space_posts p
-		WHERE p.post_id = $2
+		WHERE p.post_id = $3
 		  AND p.is_deleted = FALSE
-		  AND p.owner_id <> $1
+		  AND p.space_id <> $2
 		  AND EXISTS (
 		    SELECT 1 FROM space_friend_shares fs
-		    WHERE fs.friend_id = $1 AND fs.space_id = p.space_id
+		    WHERE fs.friend_id = $1 AND fs.friend_space_id = $2 AND fs.space_id = p.space_id
 		  )
-	`, viewerID, postID).Scan(&createdAt); err != nil {
+	`, viewerID, viewerSpaceID, postID).Scan(&createdAt); err != nil {
 		return 0, 0, stacktrace.Propagate(err, "")
 	}
 	return createdAt, postID, nil
 }
 
-func (r *PostsRepository) HasUnreadFeed(ctx context.Context, viewerID, readCreatedAt, readPostID int64) (bool, error) {
+func (r *PostsRepository) HasUnreadFeed(ctx context.Context, viewerID int64, viewerSpaceID string, readCreatedAt, readPostID int64) (bool, error) {
 	var exists bool
 	if err := r.DB.QueryRowContext(ctx, `
 		SELECT EXISTS (
 			SELECT 1
 			FROM space_posts p
 			WHERE p.is_deleted = FALSE
-			  AND p.owner_id <> $1
-			  AND (p.created_at, p.post_id) > ($2::bigint, $3::bigint)
+			  AND p.space_id <> $2
+			  AND (p.created_at, p.post_id) > ($3::bigint, $4::bigint)
 			  AND EXISTS (
 			    SELECT 1 FROM space_friend_shares fs
-			    WHERE fs.friend_id = $1 AND fs.space_id = p.space_id
+			    WHERE fs.friend_id = $1 AND fs.friend_space_id = $2 AND fs.space_id = p.space_id
 			  )
 			LIMIT 1
 		)
-	`, viewerID, readCreatedAt, readPostID).Scan(&exists); err != nil {
+	`, viewerID, viewerSpaceID, readCreatedAt, readPostID).Scan(&exists); err != nil {
 		return false, stacktrace.Propagate(err, "")
 	}
 	return exists, nil
@@ -323,12 +323,12 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 	return keys, nil
 }
 
-func (r *PostsRepository) SetLike(ctx context.Context, postID, userID int64, like bool) error {
+func (r *PostsRepository) SetLike(ctx context.Context, postID, userID int64, actorSpaceID string, like bool) error {
 	if like {
-		_, err := r.DB.ExecContext(ctx, `INSERT INTO space_post_likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, postID, userID)
+		_, err := r.DB.ExecContext(ctx, `INSERT INTO space_post_likes (post_id, user_id, actor_space_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, postID, userID, actorSpaceID)
 		return stacktrace.Propagate(err, "")
 	}
-	_, err := r.DB.ExecContext(ctx, `DELETE FROM space_post_likes WHERE post_id = $1 AND user_id = $2`, postID, userID)
+	_, err := r.DB.ExecContext(ctx, `DELETE FROM space_post_likes WHERE post_id = $1 AND actor_space_id = $2`, postID, actorSpaceID)
 	return stacktrace.Propagate(err, "")
 }
 
@@ -346,15 +346,15 @@ func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, curs
 		       (SELECT COUNT(*) FROM space_posts lp WHERE lp.space_id = liker_space.space_id AND lp.is_deleted = FALSE) AS liker_posts,
 		       pl.created_at
 		FROM space_post_likes pl
-		JOIN spaces liker_space ON liker_space.owner_id = pl.user_id
+		JOIN spaces liker_space ON liker_space.space_id = pl.actor_space_id
 		JOIN key_attributes liker_ka ON liker_ka.user_id = pl.user_id
 		WHERE pl.post_id = $1`
-	if cursorCreatedAt, cursorUserID, ok := parsePostLikerCursor(cursor); ok {
-		args = append(args, cursorCreatedAt, cursorUserID)
-		query += ` AND (pl.created_at, pl.user_id) < ($2, $3)`
+	if cursorCreatedAt, cursorActorSpaceID, ok := parsePostLikerCursor(cursor); ok {
+		args = append(args, cursorCreatedAt, cursorActorSpaceID)
+		query += ` AND (pl.created_at, pl.actor_space_id) < ($2, $3)`
 	}
 	args = append(args, limit+1)
-	query += ` ORDER BY pl.created_at DESC, pl.user_id DESC LIMIT $` + strconv.Itoa(len(args))
+	query += ` ORDER BY pl.created_at DESC, pl.actor_space_id DESC LIMIT $` + strconv.Itoa(len(args))
 	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, "", stacktrace.Propagate(err, "")
@@ -431,24 +431,24 @@ func formatPostCursor(post SpacePostRecord) string {
 	return strconv.FormatInt(post.CreatedAt, 10) + ":" + strconv.FormatInt(post.PostID, 10)
 }
 
-func parsePostLikerCursor(cursor string) (int64, int64, bool) {
-	createdAtText, userIDText, ok := strings.Cut(strings.TrimSpace(cursor), ":")
+func parsePostLikerCursor(cursor string) (int64, string, bool) {
+	createdAtText, actorSpaceID, ok := strings.Cut(strings.TrimSpace(cursor), ":")
 	if !ok {
-		return 0, 0, false
+		return 0, "", false
 	}
 	createdAt, err := strconv.ParseInt(createdAtText, 10, 64)
 	if err != nil || createdAt <= 0 {
-		return 0, 0, false
+		return 0, "", false
 	}
-	userID, err := strconv.ParseInt(userIDText, 10, 64)
-	if err != nil || userID <= 0 {
-		return 0, 0, false
+	actorSpaceID = strings.TrimSpace(actorSpaceID)
+	if actorSpaceID == "" {
+		return 0, "", false
 	}
-	return createdAt, userID, true
+	return createdAt, actorSpaceID, true
 }
 
 func formatPostLikerCursor(liker SpacePostLikerRecord) string {
-	return strconv.FormatInt(liker.CreatedAt, 10) + ":" + strconv.FormatInt(liker.Actor.UserID, 10)
+	return strconv.FormatInt(liker.CreatedAt, 10) + ":" + liker.Actor.SpaceID
 }
 
 func inClause(format string, ids []int64, offset int) (string, []any) {

@@ -99,7 +99,12 @@ async fn space_bootstrap_posts_friend_share_and_link_suite() {
 
     let post_key = owner_ctx.generate_post_key();
     let object = owner_ctx
-        .upload_post_asset(&post_key, b"space e2e encrypted post asset", Some(0))
+        .upload_post_asset(
+            &owner_space.space_id,
+            &post_key,
+            b"space e2e encrypted post asset",
+            Some(0),
+        )
         .await
         .expect("post asset upload should succeed");
     let (post_id, _post_key) = owner_ctx
@@ -301,7 +306,12 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite() {
 
     let post_key = owner_ctx.generate_post_key();
     let object = owner_ctx
-        .upload_post_asset(&post_key, b"unfriend revocation post asset", Some(0))
+        .upload_post_asset(
+            &owner_space.space_id,
+            &post_key,
+            b"unfriend revocation post asset",
+            Some(0),
+        )
         .await
         .expect("post asset upload should succeed");
     let (post_id, _post_key) = owner_ctx
@@ -533,7 +543,12 @@ async fn space_rotation_history_refresh_and_link_suite() {
 
     let post_key_v1 = owner_ctx.generate_post_key();
     let object_v1 = owner_ctx
-        .upload_post_asset(&post_key_v1, b"rotation post asset v1", Some(0))
+        .upload_post_asset(
+            &owner_space.space_id,
+            &post_key_v1,
+            b"rotation post asset v1",
+            Some(0),
+        )
         .await
         .expect("v1 post asset upload should succeed");
     let (post_id_v1, _post_key_v1) = owner_ctx
@@ -592,7 +607,12 @@ async fn space_rotation_history_refresh_and_link_suite() {
 
     let post_key_v2 = owner_ctx.generate_post_key();
     let object_v2 = owner_ctx
-        .upload_post_asset(&post_key_v2, b"rotation post asset v2", Some(0))
+        .upload_post_asset(
+            &owner_space.space_id,
+            &post_key_v2,
+            b"rotation post asset v2",
+            Some(0),
+        )
         .await
         .expect("v2 post asset upload should succeed");
     let (post_id_v2, _post_key_v2) = owner_ctx

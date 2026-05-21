@@ -52,6 +52,14 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	var spaceID sql.NullString
 	switch purpose {
 	case uploadPurposePost:
+		if req.SpaceID == nil || strings.TrimSpace(*req.SpaceID) == "" {
+			return nil, ente.NewBadRequestWithMessage("spaceId is required for post uploads")
+		}
+		spaceID.String = strings.TrimSpace(*req.SpaceID)
+		spaceID.Valid = true
+		if _, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, spaceID.String); err != nil {
+			return nil, err
+		}
 	case uploadPurposeAvatar:
 		if req.SpaceID == nil || strings.TrimSpace(*req.SpaceID) == "" {
 			return nil, ente.NewBadRequestWithMessage("spaceId is required for avatar uploads")
@@ -69,9 +77,9 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	bucket := c.AssetsRepo.S3Config.GetBucket(bucketID)
 	s3Client := c.AssetsRepo.S3Config.GetS3Client(bucketID)
 
-	keyPrefix := fmt.Sprintf("space/%d/posts", userID)
+	keyPrefix := fmt.Sprintf("space/%s/posts", spaceID.String)
 	if purpose == uploadPurposeAvatar {
-		keyPrefix = fmt.Sprintf("space/%d/avatar", userID)
+		keyPrefix = fmt.Sprintf("space/%s/avatar", spaceID.String)
 	}
 	objectKey := fmt.Sprintf("%s/%s", keyPrefix, base.MustNewID("wo"))
 	input := &s3.PutObjectInput{

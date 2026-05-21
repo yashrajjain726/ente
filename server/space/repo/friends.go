@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/ente-io/stacktrace"
 	"github.com/lib/pq"
@@ -60,30 +61,32 @@ func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, re
 			JOIN space_friend_shares requester_share
 			  ON requester_share.space_id = $1
 			 AND requester_share.friend_id = $2
+			 AND requester_share.friend_space_id = $3
 			WHERE target_share.space_id = $3
 			  AND target_share.friend_id = $4
+			  AND target_share.friend_space_id = $1
 		)
 	`, requesterSpaceID, targetOwnerID, targetSpaceID, requesterID).Scan(&alreadyFriends); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO space_friend_shares (space_id, friend_id, encrypted_space_key, key_version)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (space_id, friend_id) DO UPDATE
+		INSERT INTO space_friend_shares (space_id, friend_id, friend_space_id, encrypted_space_key, key_version)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (space_id, friend_space_id) DO UPDATE
 		SET encrypted_space_key = EXCLUDED.encrypted_space_key,
 		    key_version = EXCLUDED.key_version
-	`, targetSpaceID, requesterID, targetEncryptedSpaceKey, targetKeyVersion); err != nil {
+	`, targetSpaceID, requesterID, requesterSpaceID, targetEncryptedSpaceKey, targetKeyVersion); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO space_friend_shares (space_id, friend_id, encrypted_space_key, key_version)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (space_id, friend_id) DO UPDATE
+		INSERT INTO space_friend_shares (space_id, friend_id, friend_space_id, encrypted_space_key, key_version)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (space_id, friend_space_id) DO UPDATE
 		SET encrypted_space_key = EXCLUDED.encrypted_space_key,
 		    key_version = EXCLUDED.key_version
-	`, requesterSpaceID, targetOwnerID, requesterEncryptedSpaceKey, requesterKeyVersion); err != nil {
+	`, requesterSpaceID, targetOwnerID, targetSpaceID, requesterEncryptedSpaceKey, requesterKeyVersion); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 
@@ -99,20 +102,20 @@ func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, re
 	return stacktrace.Propagate(tx.Commit(), "")
 }
 
-func (r *FriendsRepository) UpsertShare(ctx context.Context, spaceID string, friendID int64, encryptedSpaceKey string, keyVersion int) error {
+func (r *FriendsRepository) UpsertShare(ctx context.Context, spaceID string, friendID int64, friendSpaceID string, encryptedSpaceKey string, keyVersion int) error {
 	_, err := r.DB.ExecContext(ctx, `
-		INSERT INTO space_friend_shares (space_id, friend_id, encrypted_space_key, key_version)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (space_id, friend_id) DO UPDATE
+		INSERT INTO space_friend_shares (space_id, friend_id, friend_space_id, encrypted_space_key, key_version)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (space_id, friend_space_id) DO UPDATE
 		SET encrypted_space_key = EXCLUDED.encrypted_space_key,
 		    key_version = EXCLUDED.key_version
-	`, spaceID, friendID, encryptedSpaceKey, keyVersion)
+	`, spaceID, friendID, friendSpaceID, encryptedSpaceKey, keyVersion)
 	return stacktrace.Propagate(err, "")
 }
 
-func (r *FriendsRepository) UpdateShare(ctx context.Context, spaceID string, friendID int64, encryptedSpaceKey string, keyVersion int) error {
+func (r *FriendsRepository) UpdateShare(ctx context.Context, spaceID string, friendID int64, friendSpaceID string, encryptedSpaceKey string, keyVersion int) error {
 	return r.UpdateShares(ctx, spaceID, []SpaceShareUpdateRecord{
-		{FriendID: friendID, EncryptedSpaceKey: encryptedSpaceKey},
+		{FriendID: friendID, FriendSpaceID: friendSpaceID, EncryptedSpaceKey: encryptedSpaceKey},
 	}, keyVersion)
 }
 
@@ -140,12 +143,16 @@ func (r *FriendsRepository) UpdateShares(ctx context.Context, spaceID string, sh
 	}
 
 	for _, share := range shares {
+		friendSpaceID := strings.TrimSpace(share.FriendSpaceID)
+		if friendSpaceID == "" {
+			return sql.ErrNoRows
+		}
 		res, err := tx.ExecContext(ctx, `
 			UPDATE space_friend_shares
 			SET encrypted_space_key = $3,
 			    key_version = $4
-			WHERE space_id = $1 AND friend_id = $2
-		`, spaceID, share.FriendID, share.EncryptedSpaceKey, keyVersion)
+			WHERE space_id = $1 AND friend_space_id = $2 AND friend_id = $5
+		`, spaceID, friendSpaceID, share.EncryptedSpaceKey, keyVersion, share.FriendID)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -160,7 +167,7 @@ func (r *FriendsRepository) UpdateShares(ctx context.Context, spaceID string, sh
 	return stacktrace.Propagate(tx.Commit(), "")
 }
 
-func (r *FriendsRepository) DeleteFriendship(ctx context.Context, userID int64, targetSpaceID string) error {
+func (r *FriendsRepository) DeleteFriendship(ctx context.Context, userID int64, actorSpaceID string, targetSpaceID string) error {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
@@ -168,19 +175,12 @@ func (r *FriendsRepository) DeleteFriendship(ctx context.Context, userID int64, 
 	defer tx.Rollback()
 
 	var targetOwnerID int64
-	var actorSpaceID string
 	if err := tx.QueryRowContext(ctx, `
-		SELECT target_space.owner_id, actor_space.space_id
+		SELECT target_space.owner_id
 		FROM spaces target_space
-		JOIN LATERAL (
-			SELECT space_id
-			FROM spaces
-			WHERE owner_id = $2
-			ORDER BY created_at ASC
-			LIMIT 1
-		) actor_space ON TRUE
+		JOIN spaces actor_space ON actor_space.space_id = $2 AND actor_space.owner_id = $3
 		WHERE target_space.space_id = $1
-	`, targetSpaceID, userID).Scan(&targetOwnerID, &actorSpaceID); err != nil {
+	`, targetSpaceID, actorSpaceID, userID).Scan(&targetOwnerID); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	if targetOwnerID == userID {
@@ -189,12 +189,9 @@ func (r *FriendsRepository) DeleteFriendship(ctx context.Context, userID int64, 
 
 	res, err := tx.ExecContext(ctx, `
 		DELETE FROM space_friend_shares
-		WHERE (space_id = $1 AND friend_id = $2)
-		   OR (
-		       friend_id = $3
-		       AND space_id IN (SELECT space_id FROM spaces WHERE owner_id = $2)
-		   )
-	`, targetSpaceID, userID, targetOwnerID)
+		WHERE (space_id = $1 AND friend_space_id = $2 AND friend_id = $3)
+		   OR (space_id = $2 AND friend_space_id = $1 AND friend_id = $4)
+	`, targetSpaceID, actorSpaceID, userID, targetOwnerID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -214,19 +211,19 @@ func (r *FriendsRepository) DeleteFriendship(ctx context.Context, userID int64, 
 	return stacktrace.Propagate(tx.Commit(), "")
 }
 
-func (r *FriendsRepository) DeleteShareBySpaceAndFriend(ctx context.Context, spaceID string, friendID int64) error {
-	_, err := r.DB.ExecContext(ctx, `DELETE FROM space_friend_shares WHERE space_id = $1 AND friend_id = $2`, spaceID, friendID)
+func (r *FriendsRepository) DeleteShareBySpaceAndFriend(ctx context.Context, spaceID string, friendID int64, friendSpaceID string) error {
+	_, err := r.DB.ExecContext(ctx, `DELETE FROM space_friend_shares WHERE space_id = $1 AND friend_id = $2 AND friend_space_id = $3`, spaceID, friendID, friendSpaceID)
 	return stacktrace.Propagate(err, "")
 }
 
-func (r *FriendsRepository) GetShareForFriendAndSpace(ctx context.Context, friendID int64, spaceID string) (*SpaceShareRecord, error) {
+func (r *FriendsRepository) GetShareForFriendAndSpace(ctx context.Context, friendID int64, friendSpaceID string, spaceID string) (*SpaceShareRecord, error) {
 	return scanShareRecord(r.DB.QueryRowContext(ctx, `
 		SELECT s.space_id, s.friend_id, w.owner_id, w.space_slug, s.encrypted_space_key, s.key_version, s.created_at, ka.public_key
 		FROM space_friend_shares s
 		JOIN spaces w ON w.space_id = s.space_id
 		JOIN key_attributes ka ON ka.user_id = w.owner_id
-		WHERE s.friend_id = $1 AND s.space_id = $2
-	`, friendID, spaceID))
+		WHERE s.friend_id = $1 AND s.friend_space_id = $2 AND s.space_id = $3
+	`, friendID, friendSpaceID, spaceID))
 }
 
 func (r *FriendsRepository) ListSharesForFriend(ctx context.Context, friendID int64) ([]SpaceShareRecord, error) {
@@ -269,7 +266,7 @@ func (r *FriendsRepository) ListFriendsForSpace(ctx context.Context, spaceID str
 		       s.key_version,
 		       s.created_at
 		FROM space_friend_shares s
-		JOIN spaces friend_space ON friend_space.owner_id = s.friend_id
+		JOIN spaces friend_space ON friend_space.space_id = s.friend_space_id
 		JOIN key_attributes friend_ka ON friend_ka.user_id = s.friend_id
 		WHERE s.space_id = $1
 		ORDER BY lower(friend_space.space_slug) ASC
@@ -303,9 +300,9 @@ func (r *FriendsRepository) CountFriendsForSpace(ctx context.Context, spaceID st
 	return count, nil
 }
 
-func (r *FriendsRepository) ListAccessibleSpaceIDs(ctx context.Context, viewerID int64, spaceIDs []string) (map[string]bool, error) {
+func (r *FriendsRepository) ListAccessibleSpaceIDs(ctx context.Context, viewerID int64, viewerSpaceID string, spaceIDs []string) (map[string]bool, error) {
 	out := make(map[string]bool, len(spaceIDs))
-	if viewerID <= 0 || len(spaceIDs) == 0 {
+	if viewerID <= 0 || strings.TrimSpace(viewerSpaceID) == "" || len(spaceIDs) == 0 {
 		return out, nil
 	}
 	rows, err := r.DB.QueryContext(ctx, `
@@ -315,8 +312,8 @@ func (r *FriendsRepository) ListAccessibleSpaceIDs(ctx context.Context, viewerID
 		UNION
 		SELECT space_id
 		FROM space_friend_shares
-		WHERE friend_id = $1 AND space_id = ANY($2)
-	`, viewerID, pq.Array(spaceIDs))
+		WHERE friend_id = $1 AND friend_space_id = $3 AND space_id = ANY($2)
+	`, viewerID, pq.Array(spaceIDs), viewerSpaceID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
@@ -331,12 +328,12 @@ func (r *FriendsRepository) ListAccessibleSpaceIDs(ctx context.Context, viewerID
 	return out, stacktrace.Propagate(rows.Err(), "")
 }
 
-func (r *FriendsRepository) GetRelationship(ctx context.Context, viewerID, targetOwnerID int64, targetSpaceID string) (string, error) {
+func (r *FriendsRepository) GetRelationship(ctx context.Context, viewerID int64, viewerSpaceID string, targetOwnerID int64, targetSpaceID string) (string, error) {
 	if viewerID == targetOwnerID {
 		return "self", nil
 	}
 	var count int64
-	if err := r.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM space_friend_shares WHERE friend_id = $1 AND space_id = $2`, viewerID, targetSpaceID).Scan(&count); err != nil {
+	if err := r.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM space_friend_shares WHERE friend_id = $1 AND friend_space_id = $2 AND space_id = $3`, viewerID, viewerSpaceID, targetSpaceID).Scan(&count); err != nil {
 		return "", stacktrace.Propagate(err, "")
 	}
 	if count > 0 {

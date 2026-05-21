@@ -82,7 +82,11 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 	if err != nil || id <= 0 {
 		return nil, ente.NewBadRequestWithMessage("invalid postID")
 	}
-	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), id, userID)
+	senderSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	post, err := c.PostsRepo.GetPost(ctx.Request.Context(), id, userID, senderSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +94,7 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 	if err != nil {
 		return nil, err
 	}
-	if err := c.auth.canViewSpace(ctx.Request.Context(), &viewerAuth{UserID: userID}, space); err != nil {
+	if err := c.auth.canViewSpace(ctx.Request.Context(), &viewerAuth{UserID: userID, SpaceID: senderSpace.SpaceID}, space); err != nil {
 		return nil, err
 	}
 	if space.OwnerID == userID {
@@ -123,7 +127,11 @@ func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesReque
 	if err != nil {
 		return nil, err
 	}
-	conversations, nextCursor, err := c.MessagesRepo.ListConversations(ctx.Request.Context(), userID, req.Cursor, req.Limit)
+	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	conversations, nextCursor, err := c.MessagesRepo.ListConversations(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +157,11 @@ func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, 
 	if _, err := c.SpacesRepo.GetSpaceByID(ctx.Request.Context(), strings.TrimSpace(targetSpaceID)); err != nil {
 		return nil, err
 	}
-	messages, nextCursor, err := c.MessagesRepo.ListThread(ctx.Request.Context(), userID, strings.TrimSpace(targetSpaceID), req.Cursor, req.Limit)
+	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	messages, nextCursor, err := c.MessagesRepo.ListThread(ctx.Request.Context(), userID, viewerSpace.SpaceID, strings.TrimSpace(targetSpaceID), req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +181,11 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 	if messageID == "" {
 		return nil, ente.NewBadRequestWithMessage("messageId is required")
 	}
-	message, err := c.MessagesRepo.GetMessage(ctx.Request.Context(), messageID, userID)
+	actorSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	message, err := c.MessagesRepo.GetMessage(ctx.Request.Context(), messageID, userID, actorSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -177,16 +193,16 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 		return nil, ente.NewBadRequestWithMessage("cannot like a deleted message")
 	}
 	otherSpaceID := message.SenderSpaceID
-	if message.SenderID == userID {
+	if message.SenderSpaceID == actorSpace.SpaceID {
 		otherSpaceID = message.RecipientSpaceID
 	}
-	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx.Request.Context(), userID, otherSpaceID); err != nil {
+	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx.Request.Context(), userID, actorSpace.SpaceID, otherSpaceID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.ErrPermissionDenied
 		}
 		return nil, err
 	}
-	if err := c.MessagesRepo.SetLike(ctx.Request.Context(), messageID, userID, req.Like); err != nil {
+	if err := c.MessagesRepo.SetLike(ctx.Request.Context(), messageID, userID, actorSpace.SpaceID, req.Like); err != nil {
 		return nil, err
 	}
 	return &models.LikeMessageResponse{Liked: req.Like}, nil
@@ -201,14 +217,18 @@ func (c *MessagesController) Delete(ctx *gin.Context, messageID string) error {
 	if messageID == "" {
 		return ente.NewBadRequestWithMessage("messageId is required")
 	}
-	message, err := c.MessagesRepo.GetMessage(ctx.Request.Context(), messageID, userID)
+	senderSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
 	if err != nil {
 		return err
 	}
-	if message.SenderID != userID {
+	message, err := c.MessagesRepo.GetMessage(ctx.Request.Context(), messageID, userID, senderSpace.SpaceID)
+	if err != nil {
+		return err
+	}
+	if message.SenderID != userID || message.SenderSpaceID != senderSpace.SpaceID {
 		return ente.ErrPermissionDenied
 	}
-	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx.Request.Context(), userID, message.RecipientSpaceID); err != nil {
+	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx.Request.Context(), userID, senderSpace.SpaceID, message.RecipientSpaceID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return ente.ErrPermissionDenied
 		}
@@ -217,7 +237,7 @@ func (c *MessagesController) Delete(ctx *gin.Context, messageID string) error {
 	if message.IsDeleted {
 		return nil
 	}
-	return c.MessagesRepo.DeleteMessage(ctx.Request.Context(), messageID, userID)
+	return c.MessagesRepo.DeleteMessage(ctx.Request.Context(), messageID, userID, senderSpace.SpaceID)
 }
 
 func (c *MessagesController) requireFriendMessageTarget(ctx *gin.Context, userID int64, targetSpaceID string) (*repo.SpaceRecord, *repo.SpaceRecord, error) {
@@ -239,7 +259,7 @@ func (c *MessagesController) requireFriendMessageTarget(ctx *gin.Context, userID
 	if recipientSpace.OwnerID == userID {
 		return nil, nil, ente.NewBadRequestWithMessage("cannot message your own space")
 	}
-	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx.Request.Context(), userID, recipientSpace.SpaceID); err != nil {
+	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx.Request.Context(), userID, senderSpace.SpaceID, recipientSpace.SpaceID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, nil, ente.ErrPermissionDenied
 		}
@@ -253,7 +273,7 @@ func (c *MessagesController) validateReplyMessage(ctx *gin.Context, userID int64
 	if replyMessageID == "" {
 		return sql.NullString{}, nil
 	}
-	parent, err := c.MessagesRepo.GetMessage(ctx.Request.Context(), replyMessageID, userID)
+	parent, err := c.MessagesRepo.GetMessage(ctx.Request.Context(), replyMessageID, userID, senderSpaceID)
 	if err != nil {
 		return sql.NullString{}, err
 	}

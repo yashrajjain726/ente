@@ -792,7 +792,7 @@ impl SpaceAccountCtxHandle {
         let post_key = self.inner.generate_post_key();
         let object = self
             .inner
-            .upload_post_photo_asset(&post_key, &photo_bytes, width, height, media_type)
+            .upload_post_photo_asset(&space_id, &post_key, &photo_bytes, width, height, media_type)
             .await?;
         let (post_id, _) = self
             .inner

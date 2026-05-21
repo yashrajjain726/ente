@@ -85,14 +85,14 @@ func actorVisibility(ctx context.Context, auth authDeps, viewer *viewerAuth, act
 		visible[viewer.Link.SpaceID] = true
 		return visible, nil
 	}
-	if viewer.UserID <= 0 || auth.FriendsRepo == nil {
+	if viewer.UserID <= 0 || viewer.SpaceID == "" || auth.FriendsRepo == nil {
 		return visible, nil
 	}
 	spaceIDs := make([]string, 0, len(spaceIDSet))
 	for spaceID := range spaceIDSet {
 		spaceIDs = append(spaceIDs, spaceID)
 	}
-	return auth.FriendsRepo.ListAccessibleSpaceIDs(ctx, viewer.UserID, spaceIDs)
+	return auth.FriendsRepo.ListAccessibleSpaceIDs(ctx, viewer.UserID, viewer.SpaceID, spaceIDs)
 }
 
 func visibleActor(visible map[string]bool, actor spacerepo.SpaceActorRecord) bool {

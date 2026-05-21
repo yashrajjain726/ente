@@ -438,6 +438,7 @@ pub struct SpaceFriendResponse {
 #[serde(rename_all = "camelCase")]
 pub struct ShareUpdatePayload {
     pub friend_id: i64,
+    pub friend_space_id: String,
     pub encrypted_space_key: String,
 }
 
