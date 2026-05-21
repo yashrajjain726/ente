@@ -2,6 +2,9 @@
     "name": "space",
     "version": "0.0.0",
     "private": true,
+    "scripts": {
+        "build:post": "rm -f out/404.html"
+    },
     "dependencies": {
         "@hugeicons/core-free-icons": "^1.1.0",
         "@hugeicons/react": "^1.1.4",

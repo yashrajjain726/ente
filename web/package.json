@@ -20,7 +20,7 @@
         "build:payments": "yarn workspace payments build",
         "build:photos": "yarn build:wasm && yarn workspace photos next build",
         "build:share": "yarn build:wasm && yarn workspace share next build && yarn workspace share build:post",
-        "build:space": "yarn build:wasm && yarn workspace space next build",
+        "build:space": "yarn build:wasm && yarn workspace space next build && yarn workspace space build:post",
         "build:twoof3": "yarn workspace twoof3 next build",
         "build:wasm": "yarn workspace ente-wasm build --no-pack",
         "dev": "yarn dev:photos",
