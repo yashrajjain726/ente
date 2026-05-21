@@ -94,6 +94,7 @@ class _HomePageState extends State<HomePage> {
   List<String> tags = [];
   List<Code> _filteredCodes = [];
   StreamSubscription<CodesUpdatedEvent>? _streamSubscription;
+  StreamSubscription<String>? _deepLinkSubscription;
   StreamSubscription<TriggerLogoutEvent>? _triggerLogoutEvent;
   StreamSubscription<IconsChangedEvent>? _iconsChangedEvent;
   StreamSubscription<MultiSelectActionRequestedEvent>?
@@ -475,6 +476,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _onSharePressed(Code code) async {
+    if (!code.type.canShareCodes) {
+      return;
+    }
     bool isAuthSuccessful = await LocalAuthenticationService.instance
         .requestLocalAuthentication(context, context.l10n.authenticateGeneric);
     await PlatformUtil.refocusWindows();
@@ -565,16 +569,18 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(width: 10),
-            _buildActionButton(
-              context.l10n.share,
-              () => _onSharePressed(code),
-              iconWidget: HugeIcon(
-                icon: HugeIcons.strokeRoundedNavigation03,
-                size: 21,
-                color: getEnteColorScheme(context).textBase,
+            if (code.type.canShareCodes) ...[
+              _buildActionButton(
+                context.l10n.share,
+                () => _onSharePressed(code),
+                iconWidget: HugeIcon(
+                  icon: HugeIcons.strokeRoundedNavigation03,
+                  size: 21,
+                  color: getEnteColorScheme(context).textBase,
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
+              const SizedBox(width: 10),
+            ],
             _buildActionButton(
               context.l10n.qrCode,
               () => _onShowQrPressed(code),
@@ -1232,6 +1238,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _streamSubscription?.cancel();
+    _deepLinkSubscription?.cancel();
     _triggerLogoutEvent?.cancel();
     _iconsChangedEvent?.cancel();
     _multiSelectActionSubscription?.cancel();
@@ -1906,29 +1913,26 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  late final AppLinks _appLinks = AppLinks();
+
   Future<bool> _initDeepLinks() async {
     // Platform messages may fail, so we use a try/catch PlatformException.
-    final appLinks = AppLinks();
+    bool hadInitialLink = false;
     try {
-      String? initialLink;
-      initialLink = await appLinks.getInitialLinkString();
-      // Parse the link and warn the user, if it is not correct,
-      // but keep in mind it could be `null`.
+      final initialLink = await _appLinks.getInitialLinkString();
       if (initialLink != null) {
         _handleDeeplink(context, initialLink);
-        return true;
+        hadInitialLink = true;
       } else {
         _logger.info("No initial link received.");
       }
     } on PlatformException {
-      // Handle exception by warning the user their action did not succeed
-      // return?
       _logger.severe("PlatformException thrown while getting initial link");
     }
 
-    // Attach a listener to the stream
+    // Always attach a listener for future deep links
     if (!kIsWeb && !Platform.isLinux) {
-      appLinks.stringLinkStream.listen(
+      _deepLinkSubscription = _appLinks.stringLinkStream.listen(
         (link) {
           _handleDeeplink(context, link);
         },
@@ -1937,7 +1941,7 @@ class _HomePageState extends State<HomePage> {
         },
       );
     }
-    return false;
+    return hadInitialLink;
   }
 
   int lastScanTime = DateTime.now().millisecondsSinceEpoch - 1000;
@@ -1949,12 +1953,26 @@ class _HomePageState extends State<HomePage> {
     if (!(isAccountConfigured || isOfflineModeEnabled) || link == null) {
       return;
     }
-    if (DateTime.now().millisecondsSinceEpoch - lastScanTime < 1000) {
-      _logger.info("Ignoring potential event for same deeplink");
-      return;
-    }
-    lastScanTime = DateTime.now().millisecondsSinceEpoch;
-    if (mounted && link.toLowerCase().startsWith("otpauth://")) {
+    final lowerLink = link.toLowerCase();
+    if (mounted && lowerLink.startsWith("enteauth://search")) {
+      try {
+        final uri = Uri.parse(link);
+        final searchQuery = uri.queryParameters['query'];
+        if (searchQuery != null && searchQuery.isNotEmpty) {
+          _showSearchBox = true;
+          _textController.text = searchQuery;
+          _searchText = searchQuery;
+          _applyFilteringAndRefresh();
+        }
+      } catch (e) {
+        _logger.warning("Malformed enteauth deep link: $link", e);
+      }
+    } else if (mounted && lowerLink.startsWith("otpauth://")) {
+      if (DateTime.now().millisecondsSinceEpoch - lastScanTime < 1000) {
+        _logger.info("Ignoring potential event for same deeplink");
+        return;
+      }
+      lastScanTime = DateTime.now().millisecondsSinceEpoch;
       try {
         final newCode = Code.fromOTPAuthUrl(link);
         getNextTotp(newCode);
@@ -2052,11 +2070,13 @@ class _HomePageState extends State<HomePage> {
       );
 
       if (singleCode != null) {
-        addButton(
-          context.l10n.share,
-          Icons.adaptive.share_outlined,
-          () => _onSharePressed(singleCode),
-        );
+        if (singleCode.type.canShareCodes) {
+          addButton(
+            context.l10n.share,
+            Icons.adaptive.share_outlined,
+            () => _onSharePressed(singleCode),
+          );
+        }
         addButton(
           context.l10n.qr,
           Icons.qr_code_2_outlined,

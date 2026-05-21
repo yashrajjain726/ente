@@ -201,6 +201,10 @@ export const sidebar = [
                                 link: "/photos/features/search-and-discovery/face-recognition",
                             },
                             {
+                                text: "Memory Lane",
+                                link: "/photos/features/search-and-discovery/memory-lane",
+                            },
+                            {
                                 text: "Map and location",
                                 link: "/photos/features/search-and-discovery/map-and-location",
                             },
@@ -214,6 +218,10 @@ export const sidebar = [
                         text: "Utilities",
                         collapsed: true,
                         items: [
+                            {
+                                text: "Android gallery integration",
+                                link: "/photos/features/utilities/android-gallery",
+                            },
                             {
                                 text: "Cast",
                                 link: "/photos/features/utilities/cast/",
@@ -229,6 +237,10 @@ export const sidebar = [
                             {
                                 text: "Detect Text (OCR)",
                                 link: "/photos/features/utilities/detect-text",
+                            },
+                            {
+                                text: "QR codes in photos",
+                                link: "/photos/features/utilities/qr-codes-in-photos",
                             },
                             {
                                 text: "Home Widgets",
@@ -321,6 +333,10 @@ export const sidebar = [
             { text: "Introduction", link: "/auth/" },
             { text: "Features", link: "/auth/features/" },
             {
+                text: "Offline mode",
+                link: "/auth/features/offline-mode",
+            },
+            {
                 text: "FAQ",
                 collapsed: true,
                 items: [
@@ -346,8 +362,16 @@ export const sidebar = [
                         link: "/auth/migration/authy/",
                     },
                     {
+                        text: "From Microsoft Authenticator",
+                        link: "/auth/migration/microsoft-authenticator/",
+                    },
+                    {
                         text: "From Steam",
                         link: "/auth/migration/steam/",
+                    },
+                    {
+                        text: "From Others",
+                        link: "/auth/migration/import",
                     },
                     {
                         text: "Export",
@@ -483,6 +507,10 @@ export const sidebar = [
                             {
                                 text: "Overview",
                                 link: "/locker/features/legacy/",
+                            },
+                            {
+                                text: "Legacy Kits",
+                                link: "/locker/features/legacy/legacy-kits",
                             },
                         ],
                     },

@@ -28,7 +28,7 @@ const _internalUserRoute =
 const _localModelMirrorRelativeDir = ".cache/local_model_mirror";
 
 const _parityReportDataKey = "ml_parity_results_json";
-const _modelBaseUrl = "https://models.ente.io/";
+const _modelBaseUrl = "https://models.ente.com/";
 const _modelFiles = <String>[
   "yolov5s_face_640_640_dynamic.onnx",
   "mobilefacenet_opset15.onnx",
@@ -285,16 +285,16 @@ Future<void> _ensureModelNetworkContext() async {
     return;
   }
 
-  await Configuration.instance.init();
   final prefs = await SharedPreferences.getInstance();
   final packageInfo = await PackageInfo.fromPlatform();
-  await NetworkClient.instance.init(packageInfo);
+  await NetworkClient.instance.init(packageInfo, prefs);
   ServiceLocator.instance.init(
     prefs,
     NetworkClient.instance.enteDio,
     NetworkClient.instance.getDio(),
     packageInfo,
   );
+  await Configuration.instance.init();
   _modelNetworkContextInitialized = true;
 }
 

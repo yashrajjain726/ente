@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use ente_accounts::KeyAttributes as ApiKeyAttributes;
 use ente_contacts::{
     client::{ContactsCtx, OpenContactsCtxInput},

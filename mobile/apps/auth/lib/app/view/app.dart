@@ -28,7 +28,12 @@ import 'package:window_manager/window_manager.dart';
 
 class App extends StatefulWidget {
   final Locale? locale;
-  const App({super.key, this.locale = const Locale("en")});
+  final AdaptiveThemeMode savedThemeMode;
+  const App({
+    super.key,
+    this.locale = const Locale("en"),
+    this.savedThemeMode = AdaptiveThemeMode.system,
+  });
 
   static void setLocale(BuildContext context, Locale newLocale) {
     _AppState state = context.findAncestorStateOfType<_AppState>()!;
@@ -124,31 +129,33 @@ class _AppState extends State<App>
       return AdaptiveTheme(
         light: lightThemeData,
         dark: darkThemeData,
-        initial: AdaptiveThemeMode.system,
-        builder: (lightTheme, dartTheme) => MaterialApp(
-          title: "ente",
-          themeMode: ThemeMode.system,
-          theme: lightTheme,
-          darkTheme: dartTheme,
-          debugShowCheckedModeBanner: false,
-          locale: locale,
-          supportedLocales: appSupportedLocales,
-          localeListResolutionCallback: localResolutionCallBack,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            StringsLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-          ],
-          routes: _getRoutes,
-          builder: _materialAppBuilder,
+        initial: widget.savedThemeMode,
+        builder: (lightTheme, darkTheme) => Builder(
+          builder: (context) => MaterialApp(
+            title: "ente",
+            themeMode: _themeMode(AdaptiveTheme.of(context).mode),
+            theme: lightTheme,
+            darkTheme: darkTheme,
+            debugShowCheckedModeBanner: false,
+            locale: locale,
+            supportedLocales: appSupportedLocales,
+            localeListResolutionCallback: localResolutionCallBack,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              StringsLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
+            routes: _getRoutes,
+            builder: _materialAppBuilder,
+          ),
         ),
       );
     } else {
       return MaterialApp(
         title: "ente",
-        themeMode: ThemeMode.system,
+        themeMode: _themeMode(widget.savedThemeMode),
         theme: lightThemeData,
         darkTheme: darkThemeData,
         debugShowCheckedModeBanner: false,
@@ -168,6 +175,12 @@ class _AppState extends State<App>
     }
   }
 
+  ThemeMode _themeMode(AdaptiveThemeMode mode) {
+    if (mode.isLight) return ThemeMode.light;
+    if (mode.isDark) return ThemeMode.dark;
+    return ThemeMode.system;
+  }
+
   Map<String, WidgetBuilder> get _getRoutes {
     return {
       "/": (context) => Configuration.instance.hasConfiguredAccount() ||
@@ -180,6 +193,16 @@ class _AppState extends State<App>
   @override
   void onWindowResize() {
     WindowListenerService.instance.onWindowResize().ignore();
+  }
+
+  @override
+  void onWindowMaximize() {
+    WindowListenerService.instance.onWindowMaximize().ignore();
+  }
+
+  @override
+  void onWindowUnmaximize() {
+    WindowListenerService.instance.onWindowUnmaximize().ignore();
   }
 
   @override
@@ -224,13 +247,7 @@ class _AppState extends State<App>
         windowManager.setSkipTaskbar(false);
         break;
       case 'exit_app':
-        if (Platform.isWindows) {
-          final int hProcess = GetCurrentProcess();
-          TerminateProcess(hProcess, 0);
-        } else {
-          windowManager.setPreventClose(false);
-          windowManager.destroy();
-        }
+        _quitApp().ignore();
         break;
     }
   }
@@ -243,13 +260,24 @@ class _AppState extends State<App>
       windowManager.hide();
       windowManager.setSkipTaskbar(true);
     } else {
-      if (Platform.isWindows) {
-        final int hProcess = GetCurrentProcess();
-        TerminateProcess(hProcess, 0);
-      } else {
-        windowManager.setPreventClose(false);
-        windowManager.destroy();
-      }
+      _quitApp().ignore();
+    }
+  }
+
+  Future<void> _quitApp() async {
+    if (Platform.isWindows) {
+      final int hProcess = GetCurrentProcess();
+      TerminateProcess(hProcess, 0);
+      return;
+    }
+
+    await windowManager.setPreventClose(false);
+    await windowManager.destroy();
+
+    // On Linux, closing via window_manager.destroy() can still segfault during
+    // native window teardown. Explicitly exiting here avoids that crash.
+    if (Platform.isLinux) {
+      exit(0);
     }
   }
 

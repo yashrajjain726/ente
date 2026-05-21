@@ -39,12 +39,12 @@ works on Windows, Linux and macOS.
 
 ### Web
 
-You can view your 2FA codes at [auth.ente.io](https://auth.ente.io). For adding
+You can view your 2FA codes at [auth.ente.com](https://auth.ente.com). For adding
 or managing your secrets, please use our mobile or desktop app.
 
 ## 🧑‍💻 Build from source
 
-1. [Install Flutter v3.32.8](https://flutter.dev/docs/get-started/install).
+1. [Install Flutter v3.38.10](https://flutter.dev/docs/get-started/install).
 
 2. Pull in submodules with `git submodule update --init --recursive`
 
@@ -55,6 +55,7 @@ or managing your secrets, please use our mobile or desktop app.
 4. Run the app:
    - Android: `flutter run --flavor independent`
    - iOS: `flutter run`
+   - macOS: `flutter run -d macos`
 
 To build a release APK, [setup your keystore](https://docs.flutter.dev/deployment/android#create-an-upload-keystore) and run `flutter build apk --release --flavor independent`. For iOS, use `flutter build ios`.
 
