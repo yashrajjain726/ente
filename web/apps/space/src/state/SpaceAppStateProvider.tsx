@@ -97,7 +97,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     const profileErrorMessage = (error: unknown) =>
         error instanceof Error
             ? error.message
-            : "Couldn't load your Space profile. Please try again.";
+            : "Couldn't load your Space profile. Please try again or contact support.";
 
     const refreshProfile = useCallback(async () => {
         const generation = ++profileLoadGenerationRef.current;

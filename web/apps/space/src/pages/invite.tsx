@@ -12,8 +12,7 @@ import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { profile, profileLoadError, profileLoadStatus, refreshProfile } =
-        useSpaceAppState();
+    const { profile, profileLoadError, profileLoadStatus } = useSpaceAppState();
     const [profileLink, setProfileLink] = useState<string>();
     const [linkError, setLinkError] = useState<string>();
     const [isLinkLoading, setIsLinkLoading] = useState(false);
@@ -48,10 +47,8 @@ const Page: React.FC = () => {
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
-                actionLabel={profileLoadStatus == "error" ? "Retry" : undefined}
                 background={shareProfileLinkBackground}
                 message={profileLoadError}
-                onAction={() => void refreshProfile()}
             />
         );
     }

@@ -28,7 +28,6 @@ const Page: React.FC = () => {
         profile,
         profileLoadError,
         profileLoadStatus,
-        refreshProfile,
         setFriends,
     } = useSpaceAppState();
     const [addedFriendToastName, setAddedFriendToastName] = useState<string>();
@@ -102,10 +101,8 @@ const Page: React.FC = () => {
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
-                actionLabel={profileLoadStatus == "error" ? "Retry" : undefined}
                 background={homeBackground}
                 message={profileLoadError}
-                onAction={() => void refreshProfile()}
             />
         );
     }

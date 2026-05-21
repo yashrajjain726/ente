@@ -98,7 +98,6 @@ const Page: React.FC = () => {
         profile,
         profileLoadError,
         profileLoadStatus,
-        refreshProfile,
         setOnboardingEntrySource,
     } = useSpaceAppState();
     const [routeMode, setRouteMode] = useState<RouteMode>({ kind: "checking" });
@@ -206,10 +205,8 @@ const Page: React.FC = () => {
     if (hasProfileLoadError) {
         return (
             <SpaceRouteFallback
-                actionLabel="Retry"
                 background={profileBackground}
                 message={profileLoadError}
-                onAction={() => void refreshProfile()}
             />
         );
     }

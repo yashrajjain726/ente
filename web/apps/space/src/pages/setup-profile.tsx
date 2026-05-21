@@ -127,10 +127,8 @@ const Page: React.FC = () => {
     if (profileLoadStatus != "ready" || profile) {
         return (
             <SpaceRouteFallback
-                actionLabel={profileLoadStatus == "error" ? "Retry" : undefined}
                 background={setupProfileBackground}
                 message={profileLoadError}
-                onAction={() => void refreshProfile()}
             />
         );
     }
