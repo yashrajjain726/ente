@@ -1176,7 +1176,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             m: 0,
                                         }}
                                     >
-                                        No messages yet
+                                        Say hello!
                                     </Box>
                                 </Box>
                             ) : (
