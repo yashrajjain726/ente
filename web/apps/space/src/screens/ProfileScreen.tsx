@@ -2,11 +2,9 @@ import {
     AddSquareIcon,
     ArrowLeft02Icon,
     Menu01Icon,
-    MoreHorizontalIcon,
-    Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Menu, MenuItem } from "@mui/material";
+import { Box } from "@mui/material";
 import { SpaceActionFeedbackIcon } from "components/SpaceActionFeedback";
 import {
     SpaceFileViewer,
@@ -18,7 +16,7 @@ import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import { LinkIcon, ShareIcon } from "screens/ShareProfileLinkScreen";
+import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import { createLocalPostPhoto } from "utils/localPostPhoto";
 import { firstNameFrom, initialsFor } from "utils/spaceDisplay";
 import {
@@ -176,9 +174,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     postGroups = [],
     profile,
 }) => {
-    const [profileActionsAnchor, setProfileActionsAnchor] =
-        useState<HTMLElement | null>(null);
-    const [isProfileLinkCopied, setIsProfileLinkCopied] = useState(false);
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
     const [postPhotoError, setPostPhotoError] = useState<string>();
@@ -190,9 +185,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         useState<Record<string, ProfilePhotoDimensions>>({});
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
-    const profileLinkCopiedTimerRef = React.useRef<number | undefined>(
-        undefined,
-    );
     const isPublicProfile = headerVariant == "public";
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
@@ -210,7 +202,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         (count, group) => count + group.items.length,
         0,
     );
-    const isProfileActionsOpen = Boolean(profileActionsAnchor);
     const canOpenFriends =
         isOwnerProfile && friendsCount > 0 && Boolean(onOpenFriends);
     const hasProfilePosts = postsSharedCount > 0;
@@ -220,21 +211,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           ? "hidden"
           : "like-only";
 
-    const clearProfileLinkCopiedTimer = () => {
-        if (profileLinkCopiedTimerRef.current == undefined) return;
-        window.clearTimeout(profileLinkCopiedTimerRef.current);
-        profileLinkCopiedTimerRef.current = undefined;
-    };
-    const openProfileActions = (anchor: HTMLElement) => {
-        clearProfileLinkCopiedTimer();
-        setIsProfileLinkCopied(false);
-        setProfileActionsAnchor(anchor);
-    };
-    const closeProfileActions = ({ resetCopied = true } = {}) => {
-        clearProfileLinkCopiedTimer();
-        if (resetCopied) setIsProfileLinkCopied(false);
-        setProfileActionsAnchor(null);
-    };
     const revokeLocalPostObjectUrl = React.useCallback((objectUrl?: string) => {
         if (!objectUrl || !localPostObjectUrlsRef.current.has(objectUrl))
             return;
@@ -312,21 +288,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             });
     };
 
-    const copyProfileURL = async () => {
-        clearProfileLinkCopiedTimer();
-        if (!onShareProfileLink) {
-            closeProfileActions();
-            return;
-        }
-        await navigator.clipboard.writeText(await onShareProfileLink());
-        setIsProfileLinkCopied(true);
-        profileLinkCopiedTimerRef.current = window.setTimeout(() => {
-            closeProfileActions({ resetCopied: false });
-        }, 1200);
-    };
-
     const shareProfile = async () => {
-        closeProfileActions();
         if (!onShareProfileLink) return;
         const profileLink = await onShareProfileLink();
 
@@ -358,7 +320,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
     React.useEffect(
         () => () => {
-            clearProfileLinkCopiedTimer();
             localPostObjectUrlsRef.current.forEach((objectUrl) =>
                 URL.revokeObjectURL(objectUrl),
             );
@@ -693,29 +654,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             {isOwnerProfile && (
                                 <Box
                                     component="button"
-                                    id="profile-actions-button"
                                     type="button"
-                                    aria-label="Profile actions"
-                                    aria-controls={
-                                        isProfileActionsOpen
-                                            ? "profile-actions-menu"
-                                            : undefined
-                                    }
-                                    aria-expanded={
-                                        isProfileActionsOpen
-                                            ? "true"
-                                            : undefined
-                                    }
-                                    aria-haspopup="menu"
-                                    onClick={(event) =>
-                                        openProfileActions(event.currentTarget)
-                                    }
+                                    aria-label="Share profile"
+                                    onClick={() => void shareProfile()}
                                     sx={{
                                         alignItems: "center",
                                         bgcolor: "transparent",
                                         border: 0,
                                         color: textStrong,
-                                        cursor: "pointer",
+                                        cursor: onShareProfileLink
+                                            ? "pointer"
+                                            : "default",
                                         display: "flex",
                                         gridColumn: 3,
                                         height: 24,
@@ -731,157 +680,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         },
                                     }}
                                 >
-                                    <HugeiconsIcon
-                                        icon={MoreHorizontalIcon}
-                                        size={20}
-                                        strokeWidth={2}
-                                    />
+                                    <ShareIcon />
                                 </Box>
                             )}
                         </Box>
-                        {isOwnerProfile && (
-                            <Menu
-                                id="profile-actions-menu"
-                                anchorEl={profileActionsAnchor}
-                                open={isProfileActionsOpen}
-                                onClose={() => closeProfileActions()}
-                                anchorOrigin={{
-                                    horizontal: "center",
-                                    vertical: "bottom",
-                                }}
-                                transformOrigin={{
-                                    horizontal: "center",
-                                    vertical: "top",
-                                }}
-                                slotProps={{
-                                    paper: {
-                                        sx: {
-                                            borderRadius: "16px",
-                                            boxShadow:
-                                                "0 14px 40px rgba(0, 0, 0, 0.16)",
-                                            mt: "6px",
-                                            minWidth: 0,
-                                            p: "4px",
-                                            width: "max-content",
-                                        },
-                                    },
-                                    list: {
-                                        "aria-labelledby":
-                                            "profile-actions-button",
-                                        sx: { p: 0 },
-                                    },
-                                }}
-                            >
-                                <MenuItem
-                                    disableRipple
-                                    onClick={() => void copyProfileURL()}
-                                    sx={{
-                                        borderRadius: "10px",
-                                        gap: "8px",
-                                        minHeight: 38,
-                                        px: "8px",
-                                        py: "7px",
-                                        whiteSpace: "nowrap",
-                                        "&.Mui-focusVisible": {
-                                            bgcolor: "rgba(0, 0, 0, 0.025)",
-                                        },
-                                        "&.Mui-selected": {
-                                            bgcolor: "rgba(0, 0, 0, 0.025)",
-                                        },
-                                        "&.Mui-selected:hover": {
-                                            bgcolor: "rgba(0, 0, 0, 0.025)",
-                                        },
-                                        "&:active": {
-                                            bgcolor: "rgba(0, 0, 0, 0.025)",
-                                        },
-                                        "&:hover": {
-                                            bgcolor: "rgba(0, 0, 0, 0.025)",
-                                        },
-                                    }}
-                                >
-                                    <Box
-                                        sx={{
-                                            alignItems: "center",
-                                            color: isProfileLinkCopied
-                                                ? green
-                                                : textBase,
-                                            display: "flex",
-                                            flexShrink: 0,
-                                        }}
-                                    >
-                                        {isProfileLinkCopied ? (
-                                            <HugeiconsIcon
-                                                icon={Tick02Icon}
-                                                size={20}
-                                                strokeWidth={2}
-                                            />
-                                        ) : (
-                                            <LinkIcon />
-                                        )}
-                                    </Box>
-                                    <Box
-                                        sx={{
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 13,
-                                            fontWeight: 600,
-                                            lineHeight: "18px",
-                                        }}
-                                    >
-                                        Copy profile URL
-                                    </Box>
-                                </MenuItem>
-                                <MenuItem
-                                    disableRipple
-                                    onClick={() => void shareProfile()}
-                                    sx={{
-                                        borderRadius: "10px",
-                                        gap: "8px",
-                                        minHeight: 38,
-                                        px: "8px",
-                                        py: "7px",
-                                        whiteSpace: "nowrap",
-                                        "&.Mui-focusVisible": {
-                                            bgcolor: "rgba(0, 0, 0, 0.025)",
-                                        },
-                                        "&.Mui-selected": {
-                                            bgcolor: "rgba(0, 0, 0, 0.025)",
-                                        },
-                                        "&.Mui-selected:hover": {
-                                            bgcolor: "rgba(0, 0, 0, 0.025)",
-                                        },
-                                        "&:active": {
-                                            bgcolor: "rgba(0, 0, 0, 0.025)",
-                                        },
-                                        "&:hover": {
-                                            bgcolor: "rgba(0, 0, 0, 0.025)",
-                                        },
-                                    }}
-                                >
-                                    <Box
-                                        sx={{
-                                            alignItems: "center",
-                                            color: textBase,
-                                            display: "flex",
-                                            flexShrink: 0,
-                                        }}
-                                    >
-                                        <ShareIcon />
-                                    </Box>
-                                    <Box
-                                        sx={{
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 13,
-                                            fontWeight: 600,
-                                            lineHeight: "18px",
-                                        }}
-                                    >
-                                        Share profile
-                                    </Box>
-                                </MenuItem>
-                            </Menu>
-                        )}
                         <Box
                             sx={{
                                 color: textSoft,
