@@ -36,6 +36,7 @@ const ROOT_SPACE_KEY_TYPE: &str = "space";
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
 const MESSAGE_KIND_REGULAR: &str = "regular";
 const MESSAGE_KIND_POST_REPLY: &str = "post_reply";
+const ONLY_PHOTOS_UPLOAD_MESSAGE: &str = "only photos can be uploaded";
 pub const MAX_SPACE_POST_UPLOAD_BYTES: usize = 10 * 1024 * 1024;
 pub const MAX_SPACE_AVATAR_UPLOAD_BYTES: usize = 2 * 1024 * 1024;
 pub const MAX_SPACE_POST_PLAINTEXT_BYTES: usize =
@@ -555,12 +556,15 @@ impl AccountSpaceCtx {
         height: Option<i32>,
         media_type: Option<String>,
     ) -> Result<PostObjectPayload> {
+        let inferred_media_type = ensure_supported_photo_bytes(plaintext)?;
+        let media_type = ensure_supported_photo_media_type(media_type.as_deref())?
+            .unwrap_or_else(|| inferred_media_type.to_owned());
         let mut object = self
             .upload_post_asset(space_id, post_key, plaintext, Some(0))
             .await?;
         object.width = width.filter(|value| *value > 0);
         object.height = height.filter(|value| *value > 0);
-        object.media_type = media_type.filter(|value| !value.trim().is_empty());
+        object.media_type = Some(media_type);
         Ok(object)
     }
 
@@ -570,6 +574,7 @@ impl AccountSpaceCtx {
         space_key: &[u8],
         plaintext: &[u8],
     ) -> Result<ProfileAvatarPayload> {
+        ensure_supported_photo_bytes(plaintext)?;
         let encrypted = encrypt_asset_payload(space_key, plaintext)?;
         let presign = self
             .presign_avatar_upload(space_id, encrypted.len())
@@ -630,6 +635,7 @@ impl AccountSpaceCtx {
         caption_plaintext: Option<&[u8]>,
         post_key: Option<&[u8]>,
     ) -> Result<(i64, Vec<u8>)> {
+        ensure_post_objects_are_photos(objects)?;
         let access = self
             .resolve_owned_space_access(space_id)
             .await?
@@ -1467,6 +1473,75 @@ fn ensure_space_upload_size(purpose: &str, encrypted_size: usize, max_bytes: usi
     Ok(())
 }
 
+fn ensure_supported_photo_media_type(media_type: Option<&str>) -> Result<Option<String>> {
+    let Some(media_type) = media_type.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    let normalized = media_type.to_ascii_lowercase();
+    if matches!(
+        normalized.as_str(),
+        "image/jpeg" | "image/jpg" | "image/png" | "image/webp" | "image/heic" | "image/heif"
+    ) {
+        return Ok(Some(if normalized == "image/jpg" {
+            "image/jpeg".to_owned()
+        } else {
+            normalized
+        }));
+    }
+
+    Err(SpaceError::InvalidInput(ONLY_PHOTOS_UPLOAD_MESSAGE.into()))
+}
+
+fn ensure_post_objects_are_photos(objects: &[PostObjectPayload]) -> Result<()> {
+    for object in objects {
+        if ensure_supported_photo_media_type(object.media_type.as_deref())?.is_none() {
+            return Err(SpaceError::InvalidInput(ONLY_PHOTOS_UPLOAD_MESSAGE.into()));
+        }
+    }
+    Ok(())
+}
+
+fn ensure_supported_photo_bytes(bytes: &[u8]) -> Result<&'static str> {
+    if let Some(media_type) = supported_photo_media_type_for_bytes(bytes) {
+        return Ok(media_type);
+    }
+
+    Err(SpaceError::InvalidInput(ONLY_PHOTOS_UPLOAD_MESSAGE.into()))
+}
+
+fn supported_photo_media_type_for_bytes(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        return Some("image/jpeg");
+    }
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return Some("image/png");
+    }
+    if bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP" {
+        return Some("image/webp");
+    }
+    if is_supported_heif_bytes(bytes) {
+        return Some("image/heic");
+    }
+    None
+}
+
+fn is_supported_heif_bytes(bytes: &[u8]) -> bool {
+    if bytes.len() < 12 || &bytes[4..8] != b"ftyp" {
+        return false;
+    }
+    let brand = &bytes[8..12];
+    brand == b"heic"
+        || brand == b"heix"
+        || brand == b"hevc"
+        || brand == b"hevx"
+        || brand == b"heim"
+        || brand == b"heis"
+        || brand == b"hevm"
+        || brand == b"hevs"
+        || brand == b"mif1"
+        || brand == b"msf1"
+}
+
 fn validate_message_payload(payload: &MessagePayload, plaintext_len: usize) -> Result<()> {
     if payload.text.chars().count() > MAX_SPACE_MESSAGE_TEXT_CHARS {
         return Err(SpaceError::InvalidInput(format!(
@@ -1879,6 +1954,9 @@ mod tests {
     use ente_core::crypto::{keys, sealed};
     use mockito::{Matcher, Server};
     use serde_json::json;
+
+    const TEST_WEBP_BYTES: &[u8] = b"RIFF0000WEBP";
+    const TEST_MP4_BYTES: &[u8] = b"\0\0\0\x18ftypmp42";
 
     fn test_account_ctx(base_url: &str) -> AccountSpaceCtx {
         let (public_key, private_key) = keys::generate_keypair().expect("valid keypair");
@@ -2417,10 +2495,10 @@ mod tests {
             .upload_post_photo_asset(
                 "space_owner_main",
                 &generate_key(),
-                b"photo-bytes",
+                TEST_WEBP_BYTES,
                 Some(4032),
                 Some(3024),
-                Some("image/jpeg".to_owned()),
+                Some("image/webp".to_owned()),
             )
             .await
             .expect("photo upload should succeed");
@@ -2429,9 +2507,49 @@ mod tests {
         assert_eq!(payload.position, Some(0));
         assert_eq!(payload.width, Some(4032));
         assert_eq!(payload.height, Some(3024));
-        assert_eq!(payload.media_type.as_deref(), Some("image/jpeg"));
+        assert_eq!(payload.media_type.as_deref(), Some("image/webp"));
         presign.assert_async().await;
         upload.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn upload_post_photo_asset_rejects_video_media_type() {
+        let server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+
+        let err = ctx
+            .upload_post_photo_asset(
+                "space_owner_main",
+                &generate_key(),
+                TEST_WEBP_BYTES,
+                Some(4032),
+                Some(3024),
+                Some("video/mp4".to_owned()),
+            )
+            .await
+            .expect_err("video media type should fail before upload");
+
+        assert!(err.to_string().contains(ONLY_PHOTOS_UPLOAD_MESSAGE));
+    }
+
+    #[tokio::test]
+    async fn upload_post_photo_asset_rejects_video_bytes() {
+        let server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+
+        let err = ctx
+            .upload_post_photo_asset(
+                "space_owner_main",
+                &generate_key(),
+                TEST_MP4_BYTES,
+                Some(1920),
+                Some(1080),
+                Some("image/webp".to_owned()),
+            )
+            .await
+            .expect_err("video bytes should fail before upload");
+
+        assert!(err.to_string().contains(ONLY_PHOTOS_UPLOAD_MESSAGE));
     }
 
     #[tokio::test]
@@ -2497,7 +2615,7 @@ mod tests {
             .await;
 
         let payload = ctx
-            .upload_avatar("space_owner_main", &generate_key(), b"avatar-bytes")
+            .upload_avatar("space_owner_main", &generate_key(), TEST_WEBP_BYTES)
             .await
             .expect("avatar upload should succeed");
 
@@ -2505,6 +2623,19 @@ mod tests {
         assert!(payload.size.unwrap_or_default() > 0);
         presign.assert_async().await;
         upload.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn upload_avatar_rejects_video_bytes() {
+        let server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+
+        let err = ctx
+            .upload_avatar("space_owner_main", &generate_key(), TEST_MP4_BYTES)
+            .await
+            .expect_err("video avatar bytes should fail before upload");
+
+        assert!(err.to_string().contains(ONLY_PHOTOS_UPLOAD_MESSAGE));
     }
 
     #[tokio::test]
@@ -2732,6 +2863,32 @@ mod tests {
         entity.assert_async().await;
         spaces.assert_async().await;
         create.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn create_post_rejects_video_object_media_type() {
+        let server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let err = ctx
+            .create_post(
+                "space_owner_main",
+                &[PostObjectPayload {
+                    object_key: "object-1".to_owned(),
+                    size: None,
+                    position: Some(0),
+                    blur_hash_cipher: None,
+                    variant: None,
+                    width: Some(1920),
+                    height: Some(1080),
+                    media_type: Some("video/mp4".to_owned()),
+                }],
+                None,
+                None,
+            )
+            .await
+            .expect_err("video post object should fail before network");
+
+        assert!(err.to_string().contains(ONLY_PHOTOS_UPLOAD_MESSAGE));
     }
 
     #[tokio::test]

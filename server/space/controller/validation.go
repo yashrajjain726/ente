@@ -63,3 +63,18 @@ func validateSpaceTextFieldBytes(field string, value string, maxBytes int) error
 	}
 	return nil
 }
+
+func normalizedSpacePhotoMediaType(value string) (string, error) {
+	if err := validateSpaceTextFieldBytes("mediaType", value, maxSpaceMediaTypeBytes); err != nil {
+		return "", err
+	}
+	mediaType := strings.ToLower(strings.TrimSpace(value))
+	switch mediaType {
+	case "image/jpeg", "image/jpg":
+		return "image/jpeg", nil
+	case "image/png", "image/webp", "image/heic", "image/heif":
+		return mediaType, nil
+	default:
+		return "", ente.NewBadRequestWithMessage("only photos can be uploaded")
+	}
+}

@@ -66,7 +66,8 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 		if err := validateSpaceTextFieldBytes("variant", object.Variant, maxSpaceVariantBytes); err != nil {
 			return nil, err
 		}
-		if err := validateSpaceTextFieldBytes("mediaType", object.MediaType, maxSpaceMediaTypeBytes); err != nil {
+		mediaType, err := normalizedSpacePhotoMediaType(object.MediaType)
+		if err != nil {
 			return nil, err
 		}
 		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, object.ObjectKey, repo.TempObjectPurposePost, &space.SpaceID)
@@ -82,7 +83,7 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 			BlurHashCipher: sql.NullString{String: object.BlurHashCipher, Valid: strings.TrimSpace(object.BlurHashCipher) != ""},
 			Width:          sql.NullInt64{Int64: int64(object.Width), Valid: object.Width > 0},
 			Height:         sql.NullInt64{Int64: int64(object.Height), Valid: object.Height > 0},
-			MediaType:      sql.NullString{String: object.MediaType, Valid: strings.TrimSpace(object.MediaType) != ""},
+			MediaType:      sql.NullString{String: mediaType, Valid: true},
 		})
 	}
 	postID, err := c.PostsRepo.CreatePost(ctx.Request.Context(), userID, space.SpaceID, req.EncryptedPostKey, req.CaptionCipher, req.KeyVersion, assets)

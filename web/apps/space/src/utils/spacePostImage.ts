@@ -43,6 +43,23 @@ export const spaceAvatarImageMaxSizeMessage =
     "This photo is too large. Try a smaller one.";
 export const spacePostImageMaxSizeMessage =
     "This photo is too large. Try a smaller one.";
+const unsupportedSpaceImageMessage = "Only photos can be uploaded.";
+const supportedSpaceImageMimeTypes = new Set([
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+]);
+const supportedSpaceImageExtensions = new Set([
+    "jpg",
+    "jpeg",
+    "png",
+    "webp",
+    "heic",
+    "heif",
+]);
 
 export const prepareSpacePostImage = async (
     file: File,
@@ -134,16 +151,18 @@ export const prepareSpaceAvatarImageFromCrop = async (
 };
 
 export const spacePostImageErrorMessage = (error: unknown) =>
-    error instanceof SpaceImageSizeError
+    error instanceof SpaceImageSizeError || error instanceof SpaceImageTypeError
         ? error.message
         : "Choose a JPEG, PNG, WebP, HEIC, or HEIF image.";
 
 export const spaceAvatarImageErrorMessage = (error: unknown) =>
-    error instanceof SpaceImageSizeError
+    error instanceof SpaceImageSizeError || error instanceof SpaceImageTypeError
         ? error.message
         : "Choose a JPEG, PNG, WebP, HEIC, or HEIF image.";
 
 const renderableBlobForSpaceImage = async (file: File): Promise<Blob> => {
+    assertSupportedSpaceImageFile(file);
+
     const extension = lowercaseExtension(file.name);
     const mediaType = file.type.toLowerCase();
     const isHEIC =
@@ -160,6 +179,28 @@ class SpaceImageSizeError extends Error {
         this.name = "SpaceImageSizeError";
     }
 }
+
+class SpaceImageTypeError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "SpaceImageTypeError";
+    }
+}
+
+const assertSupportedSpaceImageFile = (file: File) => {
+    const extension = lowercaseExtension(file.name);
+    const mediaType = file.type.trim().toLowerCase();
+    if (supportedSpaceImageMimeTypes.has(mediaType)) return;
+    if (
+        (mediaType == "" || mediaType == "application/octet-stream") &&
+        extension != undefined &&
+        supportedSpaceImageExtensions.has(extension)
+    ) {
+        return;
+    }
+
+    throw new SpaceImageTypeError(unsupportedSpaceImageMessage);
+};
 
 const assertSpaceImageSize = (
     blob: Blob,
