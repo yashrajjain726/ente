@@ -7,6 +7,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
+import { SpaceActionFeedbackIcon } from "components/SpaceActionFeedback";
 import {
     SpaceFileViewer,
     type SpaceLiker,
@@ -446,7 +447,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         gridTemplateColumns: isOwnPost
                             ? "minmax(0, 1fr)"
                             : "minmax(0, 1fr) auto",
-                        minHeight: isOwnPost ? undefined : feedLikeActionSize,
+                        minHeight: feedLikeActionSize,
                         mt: "8px",
                         pl: "4px",
                         pr: 0,
@@ -675,6 +676,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
     const [postPhotoError, setPostPhotoError] = useState<string>();
+    const [isPostPhotoPreparing, setIsPostPhotoPreparing] = useState(false);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
@@ -695,7 +697,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         URL.revokeObjectURL(objectUrl);
         localPostObjectUrlsRef.current.delete(objectUrl);
     }, []);
-    const openPostPhotoPicker = () => postInputRef.current?.click();
+    const openPostPhotoPicker = () => {
+        if (isPostPhotoPreparing) return;
+
+        postInputRef.current?.click();
+    };
     const openFeedPhoto = (
         photo: SpaceViewerPhoto,
         initialScreen: SpaceViewerInitialScreen = "photo",
@@ -758,11 +764,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         event.target.value = "";
         if (!file) return;
 
+        setIsPostPhotoPreparing(true);
         setPostPhotoError(undefined);
-        void prepareSelectedPostPhoto(file).catch((error: unknown) => {
-            console.error("Failed to prepare post photo", error);
-            setPostPhotoError(spacePostImageErrorMessage(error));
-        });
+        void prepareSelectedPostPhoto(file)
+            .catch((error: unknown) => {
+                console.error("Failed to prepare post photo", error);
+                setPostPhotoError(spacePostImageErrorMessage(error));
+            })
+            .finally(() => {
+                setIsPostPhotoPreparing(false);
+            });
     };
 
     React.useEffect(
@@ -822,7 +833,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <Box
                         component="button"
                         type="button"
-                        aria-label="Post photo"
+                        aria-label={
+                            isPostPhotoPreparing
+                                ? "Preparing photo"
+                                : "Post photo"
+                        }
+                        disabled={isPostPhotoPreparing}
                         onClick={openPostPhotoPicker}
                         sx={{
                             appearance: "none",
@@ -831,7 +847,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             border: 0,
                             boxSizing: "border-box",
                             color: textBase,
-                            cursor: "pointer",
+                            cursor: isPostPhotoPreparing
+                                ? "default"
+                                : "pointer",
                             display: "flex",
                             fontSize: 0,
                             height: headerActionSize,
@@ -850,10 +868,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             },
                         }}
                     >
-                        <HugeiconsIcon
-                            icon={AddSquareIcon}
+                        <SpaceActionFeedbackIcon
+                            phase={isPostPhotoPreparing ? "busy" : null}
                             size={headerAddIconSize}
-                            strokeWidth={1.8}
+                            idleIcon={
+                                <HugeiconsIcon
+                                    icon={AddSquareIcon}
+                                    size={headerAddIconSize}
+                                    strokeWidth={1.8}
+                                />
+                            }
                         />
                     </Box>
                     <Box

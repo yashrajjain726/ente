@@ -7,6 +7,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem } from "@mui/material";
+import { SpaceActionFeedbackIcon } from "components/SpaceActionFeedback";
 import {
     SpaceFileViewer,
     type SpaceLiker,
@@ -181,6 +182,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
     const [postPhotoError, setPostPhotoError] = useState<string>();
+    const [isPostPhotoPreparing, setIsPostPhotoPreparing] = useState(false);
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
         () => new Set(),
     );
@@ -240,7 +242,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         URL.revokeObjectURL(objectUrl);
         localPostObjectUrlsRef.current.delete(objectUrl);
     }, []);
-    const openPostPhotoPicker = () => postInputRef.current?.click();
+    const openPostPhotoPicker = () => {
+        if (isPostPhotoPreparing) return;
+
+        postInputRef.current?.click();
+    };
     const closeSelectedPost = () => {
         const localObjectUrl = selectedPost?.localObjectUrl;
         setSelectedPost(null);
@@ -294,11 +300,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         event.target.value = "";
         if (!file) return;
 
+        setIsPostPhotoPreparing(true);
         setPostPhotoError(undefined);
-        void prepareSelectedPostPhoto(file).catch((error: unknown) => {
-            console.error("Failed to prepare post photo", error);
-            setPostPhotoError(spacePostImageErrorMessage(error));
-        });
+        void prepareSelectedPostPhoto(file)
+            .catch((error: unknown) => {
+                console.error("Failed to prepare post photo", error);
+                setPostPhotoError(spacePostImageErrorMessage(error));
+            })
+            .finally(() => {
+                setIsPostPhotoPreparing(false);
+            });
     };
 
     const copyProfileURL = async () => {
@@ -1208,7 +1219,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         <Box
                                             component="button"
                                             type="button"
-                                            aria-label="Post photo"
+                                            aria-label={
+                                                isPostPhotoPreparing
+                                                    ? "Preparing photo"
+                                                    : "Post photo"
+                                            }
+                                            disabled={isPostPhotoPreparing}
                                             onClick={openPostPhotoPicker}
                                             sx={{
                                                 appearance: "none",
@@ -1217,7 +1233,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                 border: 0,
                                                 boxSizing: "border-box",
                                                 color: textBase,
-                                                cursor: "pointer",
+                                                cursor: isPostPhotoPreparing
+                                                    ? "default"
+                                                    : "pointer",
                                                 display: "flex",
                                                 fontSize: 0,
                                                 height: 32,
@@ -1237,10 +1255,20 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                 },
                                             }}
                                         >
-                                            <HugeiconsIcon
-                                                icon={AddSquareIcon}
+                                            <SpaceActionFeedbackIcon
+                                                phase={
+                                                    isPostPhotoPreparing
+                                                        ? "busy"
+                                                        : null
+                                                }
                                                 size={28}
-                                                strokeWidth={1.8}
+                                                idleIcon={
+                                                    <HugeiconsIcon
+                                                        icon={AddSquareIcon}
+                                                        size={28}
+                                                        strokeWidth={1.8}
+                                                    />
+                                                }
                                             />
                                         </Box>
                                     )}

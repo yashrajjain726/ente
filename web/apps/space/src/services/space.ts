@@ -292,6 +292,18 @@ const maxSpaceMediaCacheEntries = 128;
 const spaceMediaURLCache = new Map<string, Promise<string>>();
 const spaceFriendsCache = new Map<string, Promise<FriendProfile[]>>();
 
+const trimSpaceMediaURLCache = () => {
+    while (spaceMediaURLCache.size > maxSpaceMediaCacheEntries) {
+        const oldest = spaceMediaURLCache.entries().next().value;
+        if (!oldest) break;
+        spaceMediaURLCache.delete(oldest[0]);
+        void oldest[1].then(
+            (url) => URL.revokeObjectURL(url),
+            () => undefined,
+        );
+    }
+};
+
 const cachedBlobURL = (
     key: string,
     load: () => Promise<Uint8Array>,
@@ -311,18 +323,14 @@ const cachedBlobURL = (
             throw error;
         });
     spaceMediaURLCache.set(key, promise);
-
-    while (spaceMediaURLCache.size > maxSpaceMediaCacheEntries) {
-        const oldest = spaceMediaURLCache.entries().next().value;
-        if (!oldest) break;
-        spaceMediaURLCache.delete(oldest[0]);
-        void oldest[1].then(
-            (url) => URL.revokeObjectURL(url),
-            () => undefined,
-        );
-    }
+    trimSpaceMediaURLCache();
 
     return promise;
+};
+
+const rememberCachedBlobURL = (key: string, url: string) => {
+    spaceMediaURLCache.set(key, Promise.resolve(url));
+    trimSpaceMediaURLCache();
 };
 
 export const clearSpaceMediaURLCache = () => {
@@ -421,6 +429,17 @@ const accountPostAssetURL = (
             ),
         object.mediaType,
     );
+
+const cacheAccountPostAssetURL = (
+    post: SpacePostResponse,
+    object: SpacePostObject,
+    blob: Blob,
+) => {
+    const key = ["post", post.spaceId, object.objectKey].join(":");
+    if (spaceMediaURLCache.has(key)) return;
+
+    rememberCachedBlobURL(key, URL.createObjectURL(blob));
+};
 
 const accountPostAssetURLByPostId = (
     ctx: SpaceAccountCtxHandle,
@@ -863,6 +882,8 @@ export const createCurrentPhotoPost = async ({
             normalizedHeight,
             file.type || null,
         )) as SpacePostResponse;
+        const object = firstObject(created);
+        if (object) cacheAccountPostAssetURL(created, object, file);
         return await postFromAccountPost(ctx, created);
     } finally {
         releaseCurrentSpaceContext(ctx);
