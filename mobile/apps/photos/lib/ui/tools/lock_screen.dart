@@ -119,7 +119,7 @@ class _LockScreenState extends State<LockScreen>
                           child: Container(
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: colorTheme.backgroundBase,
+                              color: colorTheme.backgroundColour,
                             ),
                           ),
                         ),
@@ -377,7 +377,7 @@ class _LockScreenState extends State<LockScreen>
       }
     } catch (e, s) {
       _isShowingLockScreen = false;
-      _logger.severe(e, s);
+      _logger.severe("Failed to show lock screen", e, s);
     }
   }
 }

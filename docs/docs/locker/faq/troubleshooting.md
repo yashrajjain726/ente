@@ -49,14 +49,16 @@ items easier to find.
 
 1. **Check credentials**: Verify your email and password are correct
 2. **Check email**: Ensure you're using the email registered with Ente
-3. **Reset password**: Use your recovery key if you forgot your password
+3. **Reset password**: Use your recovery key if you forgot your password, or
+   use Legacy recovery if you set it up earlier
 4. **Check 2FA**: If enabled, enter your 2FA code correctly
 5. **Try another device**: Test if you can log in elsewhere
 
 ### I'm locked out and don't have my recovery key {#locker-locked-out}
 
-Unfortunately, without your recovery key and password, your account cannot be
-recovered. This is an intentional security feature of end-to-end encryption.
+Without your recovery key and password, your account cannot be recovered unless
+you previously set up [Legacy recovery](/locker/features/legacy/). This is an
+intentional security feature of end-to-end encryption.
 
 To prevent this in the future, always save your recovery key in multiple secure
 locations when creating an account.
@@ -121,11 +123,13 @@ Logs help us diagnose issues but contain no personal data.
 
 ### Can I use Locker offline? {#locker-offline}
 
-Locker requires an internet connection to function. You cannot view or create
-items while offline.
+Yes, for items you choose to keep locally on your device.
 
-If you need access to critical information during travel or in areas with poor
-connectivity, consider keeping physical copies of essential documents.
+Locker now supports keeping specific items available offline so you can open
+them without an internet connection after they have been downloaded.
+
+You still need internet access for syncing changes, fetching items that are not
+already stored locally, and creating or refreshing shared links.
 
 ## Related Features
 

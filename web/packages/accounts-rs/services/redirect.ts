@@ -15,6 +15,7 @@ export const appHomeRoute: string = {
     photos: "/gallery",
     ensu: "/",
     locker: "/locker",
+    legacy: "/",
     space: "/app",
 }[appName];
 

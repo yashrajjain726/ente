@@ -28,13 +28,9 @@ class _DebugSettingsPageState extends State<DebugSettingsPage> {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    final pageBackgroundColor =
-        isDarkMode ? const Color(0xFF161616) : const Color(0xFFFAFAFA);
 
     return Scaffold(
-      backgroundColor: pageBackgroundColor,
+      backgroundColor: colorScheme.backgroundColour,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -92,10 +88,13 @@ class _DebugSettingsPageState extends State<DebugSettingsPage> {
                               HugeIcons.strokeRoundedUpload04,
                             ),
                             trailingWidget: ToggleSwitchWidget(
-                              value: () => localSettings.isCFUploadProxyEnabled,
+                              value: () =>
+                                  localSettings.cfUploadProxyEnabled ??
+                                  flagService.cloudflareUploadWorker,
                               onChanged: () async {
                                 final newValue =
-                                    !localSettings.isCFUploadProxyEnabled;
+                                    !(localSettings.cfUploadProxyEnabled ??
+                                        flagService.cloudflareUploadWorker);
                                 await localSettings
                                     .setCFUploadProxyEnabled(newValue);
                                 setState(() {});

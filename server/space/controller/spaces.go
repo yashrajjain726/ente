@@ -2,6 +2,7 @@ package controller
 
 import (
 	"database/sql"
+	"errors"
 	"strings"
 
 	"github.com/ente-io/museum/ente"
@@ -109,8 +110,8 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.EncryptedProfile) == "" {
-		return nil, ente.NewBadRequestWithMessage("spaceId and encryptedProfile are required")
+	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.EncryptedProfile) == "" || req.KeyVersion <= 0 {
+		return nil, ente.NewBadRequestWithMessage("spaceId, keyVersion and encryptedProfile are required")
 	}
 	if err := validateEncodedSpaceField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes); err != nil {
 		return nil, err
@@ -119,8 +120,12 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 		return nil, ente.NewBadRequestWithMessage("avatar and removeAvatar cannot both be set")
 	}
 	spaceID := strings.TrimSpace(req.SpaceID)
-	if _, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, spaceID); err != nil {
+	current, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, spaceID)
+	if err != nil {
 		return nil, err
+	}
+	if req.KeyVersion != current.CurrentVersion {
+		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
 	}
 	avatar := (*struct {
 		ObjectKey string
@@ -142,8 +147,11 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 			Size:      staged.ExpectedSize,
 		}
 	}
-	space, err := c.SpacesRepo.UpdateProfile(ctx.Request.Context(), userID, spaceID, req.EncryptedProfile, avatar, req.RemoveAvatar)
+	space, err := c.SpacesRepo.UpdateProfile(ctx.Request.Context(), userID, spaceID, req.KeyVersion, req.EncryptedProfile, avatar, req.RemoveAvatar)
 	if err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
+		}
 		return nil, err
 	}
 	return &models.UpdateSpaceProfileResponse{
@@ -207,8 +215,8 @@ func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKey
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.EncryptedSpaceKey) == "" || strings.TrimSpace(req.WrappedPrevKey) == "" {
-		return nil, ente.NewBadRequestWithMessage("spaceId, encryptedSpaceKey and wrappedPrevKey are required")
+	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.EncryptedSpaceKey) == "" || strings.TrimSpace(req.WrappedPrevKey) == "" || req.KeyVersion <= 0 {
+		return nil, ente.NewBadRequestWithMessage("spaceId, keyVersion, encryptedSpaceKey and wrappedPrevKey are required")
 	}
 	if err := validateEncodedSpaceField("encryptedSpaceKey", req.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
 		return nil, err
@@ -219,8 +227,18 @@ func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKey
 	if err := validateOptionalEncodedSpacePointerField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes); err != nil {
 		return nil, err
 	}
-	space, err := c.SpacesRepo.RotateKey(ctx.Request.Context(), userID, req.SpaceID, req.EncryptedSpaceKey, req.WrappedPrevKey, req.EncryptedProfile)
+	current, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, req.SpaceID)
 	if err != nil {
+		return nil, err
+	}
+	if req.KeyVersion != current.CurrentVersion {
+		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
+	}
+	space, err := c.SpacesRepo.RotateKey(ctx.Request.Context(), userID, req.SpaceID, req.KeyVersion, req.EncryptedSpaceKey, req.WrappedPrevKey, req.EncryptedProfile)
+	if err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
+		}
 		return nil, err
 	}
 	return toSpaceKeyResponse(space), nil

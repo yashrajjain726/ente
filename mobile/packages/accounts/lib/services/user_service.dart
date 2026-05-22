@@ -46,8 +46,6 @@ import "package:pointycastle/srp/srp6_verifier_generator.dart";
 import 'package:shared_preferences/shared_preferences.dart';
 import "package:uuid/uuid.dart";
 
-const String kAccountsUrl = "https://accounts.ente.io";
-
 class UserService {
   static const keyHasEnabledTwoFactor = "has_enabled_two_factor";
   static const keyUserDetails = "user_details";
@@ -284,23 +282,28 @@ class UserService {
     try {
       final response = await _enteDio.post("/users/logout");
       if (response.statusCode == 200) {
-        await _config.logout();
-        unawaited(
-          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false),
-        );
+        await _logoutLocally(context);
       } else {
         throw Exception("Log out action failed");
       }
     } catch (e) {
-      _logger.severe(e);
-      // check if token is already invalid
-      if (e is DioException && e.response?.statusCode == 401) {
-        await _config.logout();
-        unawaited(
-          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false),
-        );
+      final bool shouldLogoutLocally =
+          (e is DioException && e.response?.statusCode == 401) ||
+              !_config.isEnteProduction();
+
+      if (shouldLogoutLocally) {
+        if (!_config.isEnteProduction()) {
+          _logger.info(
+            "Custom endpoint detected, proceeding with local logout despite server error",
+          );
+        } else {
+          _logger.info("Token already invalid, proceeding with local logout");
+        }
+        await _logoutLocally(context);
         return;
       }
+
+      _logger.severe(e);
       //This future is for waiting for the dialog from which logout() is called
       //to close and only then to show the error dialog.
       Future.delayed(
@@ -308,6 +311,15 @@ class UserService {
         () => showGenericErrorDialog(context: context, error: e),
       );
       rethrow;
+    }
+  }
+
+  Future<void> _logoutLocally(BuildContext context) async {
+    await _config.logout();
+    if (context.mounted) {
+      unawaited(
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false),
+      );
     }
   }
 
@@ -469,14 +481,15 @@ class UserService {
       await dialog.hide();
       if (response.statusCode == 200) {
         Widget page;
-        final String passkeySessionID = response.data["passkeySessionID"];
-        final String accountsUrl = response.data["accountsUrl"] ?? kAccountsUrl;
-        String twoFASessionID = response.data["twoFactorSessionID"];
+        final responseData = response.data;
+        final String passkeySessionID = responseData["passkeySessionID"] ?? "";
+        String twoFASessionID = responseData["twoFactorSessionID"] ?? "";
         if (twoFASessionID.isEmpty &&
-            response.data["twoFactorSessionIDV2"] != null) {
-          twoFASessionID = response.data["twoFactorSessionIDV2"];
+            responseData["twoFactorSessionIDV2"] != null) {
+          twoFASessionID = responseData["twoFactorSessionIDV2"];
         }
         if (passkeySessionID.isNotEmpty) {
+          final accountsUrl = responseData["accountsUrl"] as String;
           page = PasskeyPage(
             _config,
             passkeySessionID,
@@ -798,15 +811,16 @@ class UserService {
     );
     if (response.statusCode == 200) {
       Widget? page;
-      final String passkeySessionID = response.data["passkeySessionID"];
-      final String accountsUrl = response.data["accountsUrl"] ?? kAccountsUrl;
-      String twoFASessionID = response.data["twoFactorSessionID"];
+      final responseData = response.data;
+      final String passkeySessionID = responseData["passkeySessionID"] ?? "";
+      String twoFASessionID = responseData["twoFactorSessionID"] ?? "";
       if (twoFASessionID.isEmpty &&
-          response.data["twoFactorSessionIDV2"] != null) {
-        twoFASessionID = response.data["twoFactorSessionIDV2"];
+          responseData["twoFactorSessionIDV2"] != null) {
+        twoFASessionID = responseData["twoFactorSessionIDV2"];
       }
       _config.setVolatilePassword(userPassword);
       if (passkeySessionID.isNotEmpty) {
+        final accountsUrl = responseData["accountsUrl"] as String;
         page = PasskeyPage(
           _config,
           passkeySessionID,

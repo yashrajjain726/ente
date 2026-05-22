@@ -146,6 +146,14 @@ In addition, we also offer [family plans](/photos/features/account/family-plans)
 
 If you need a custom plan, please contact [support@ente.com](mailto:support@ente.com).
 
+### Does my free plan storage stack on top of a paid plan? {#free-storage-stacking}
+
+No. The free plan's 10 GB is replaced, not added to, when you upgrade. Your paid plan's allowance, plus any bonuses included with that plan, becomes your total.
+
+For example, the Starter plan is 50 GB plus a 10 GB welcome bonus, which gives 60 GB total. The free plan's 10 GB does not stack on top.
+
+Referral storage is separate and adds on top of your plan, up to the [referral cap](#referral-storage-limit).
+
 ## Family Plans
 
 ### Does Ente have Family Plans? {#family-plans-faq}
@@ -255,7 +263,7 @@ Common reasons and solutions:
 **Problem 5: Purchased through App Store**
 
 - Family plans may have limited functionality for App Store purchases
-- Consider managing your subscription through [web.ente.io](https://web.ente.io) instead
+- Consider managing your subscription through [photos.ente.com](https://photos.ente.com) instead
 
 ### How do I add a family member who already has a paid subscription? {#add-family-member-existing-subscriber}
 
@@ -283,6 +291,18 @@ Referral bonus storage is not included when you join a family plan. You will onl
 When you join a family plan, your individual plan (including any referral bonuses) is replaced by the shared family storage. Referral bonus storage does not carry over or get added on top of the family plan.
 
 (Example: If you were on the free 10 GB plan with an additional 10 GB from referrals - 20 GB total - and you join a family plan with 200 GB of storage, you will have access to 200 GB of shared family storage, not 220 GB.)
+
+### Can a family admin reset another family member's account? {#family-admin-reset-account}
+
+Ente accounts are end-to-end encrypted, so another family member or admin cannot reset an account or recover its contents directly.
+
+However, users can set up a trusted Legacy contact for emergency access.
+
+**On mobile:**
+
+Open `Settings > Legacy > Add trusted contact`.
+
+Learn more in the [Legacy contact guide](https://ente.com/help/photos/features/account/legacy/#legacy).
 
 ### Are duplicate photos deduplicated across family members? {#family-plan-deduplication}
 
@@ -315,7 +335,7 @@ If you have a discount code (e.g., from partnerships like Kagi Friends 25% off),
 **Step-by-step process:**
 
 1. **Do NOT purchase through the iOS/Android App Store** - App Stores don't support discount codes
-2. Go to [web.ente.io](https://web.ente.io) on a desktop or laptop computer
+2. Go to [photos.ente.com](https://photos.ente.com) on a desktop or laptop computer
 3. Log in to your Ente account
 4. Open `Settings > Account > Manage subscription`
 5. Click "Buy subscription" or "Change plan"
@@ -330,7 +350,7 @@ If you have a discount code (e.g., from partnerships like Kagi Friends 25% off),
 - Discount codes only work for **NEW paying customers** (first-time purchases)
 - Cannot be applied to existing paid subscriptions
 - Cannot be combined with cryptocurrency payments
-- Must purchase from web.ente.io or desktop app, NOT mobile app stores
+- Must purchase from photos.ente.com or desktop app, NOT mobile app stores
 
 **If you already purchased without applying a code:**
 
@@ -371,6 +391,14 @@ Earned storage will be accessible as long as your subscription is active, provid
 If you refer more paid customers than your current plan allows, the extra storage earned will be reserved. This reserved storage will become usable once you upgrade to a higher storage plan.
 
 For example, if you're on a 100 GB plan (max 100 GB earned storage) but refer 15 friends (150 GB worth), the extra 50 GB will be held in reserve until you upgrade to a plan that allows more referral storage.
+
+### Can referral credit be applied after signup? {#referral-credit-after-signup}
+
+No. Referral credits are only applied when a new account is created using the referral code during signup.
+
+If the person has not signed up yet, share your referral code before they create their account.
+
+Find your referral code in `Settings > Referrals`.
 
 ### What counts as abuse of the referral program? {#referral-abuse}
 
@@ -430,7 +458,7 @@ Yes! We support _annual plans_ with crypto payments and accept the following cry
 
 **Important limitations:**
 
-⚠️ **Discount codes CANNOT be combined with cryptocurrency payments**. If you have a discount code, you must pay via credit card through web.ente.io instead.
+⚠️ **Discount codes CANNOT be combined with cryptocurrency payments**. If you have a discount code, you must pay via credit card through photos.ente.com instead.
 
 ⚠️ **Privacy note**: Ente does not provide anonymity. What we provide is privacy through end-to-end encryption. [Information we collect](https://ente.com/privacy/#3-what-information-do-we-collect) about you might make your identity deducible. We accept crypto to make Ente more accessible, not to provide anonymity.
 

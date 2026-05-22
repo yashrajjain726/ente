@@ -109,7 +109,7 @@ func (r *SpacesRepository) GetOwnerPublicKey(ctx context.Context, ownerID int64)
 	return publicKey, stacktrace.Propagate(err, "")
 }
 
-func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spaceID, encryptedProfile string, avatar *struct {
+func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spaceID string, keyVersion int, encryptedProfile string, avatar *struct {
 	ObjectKey string
 	BucketID  string
 	Size      int64
@@ -128,6 +128,9 @@ func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spa
 	`, ownerID, spaceID))
 	if err != nil {
 		return nil, err
+	}
+	if previous.CurrentVersion != keyVersion {
+		return nil, sql.ErrNoRows
 	}
 	query := `
 		UPDATE spaces
@@ -207,7 +210,7 @@ func (r *SpacesRepository) UpdateSlug(ctx context.Context, ownerID int64, spaceI
 	return rec, nil
 }
 
-func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID, encryptedSpaceKey, wrappedPrevKey string, encryptedProfile *string) (*SpaceRecord, error) {
+func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID string, keyVersion int, encryptedSpaceKey, wrappedPrevKey string, encryptedProfile *string) (*SpaceRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -222,6 +225,9 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID
 	`, ownerID, spaceID))
 	if err != nil {
 		return nil, err
+	}
+	if current.CurrentVersion != keyVersion {
+		return nil, sql.ErrNoRows
 	}
 	newProfile := current.EncryptedProfile
 	if encryptedProfile != nil {

@@ -1,0 +1,37 @@
+name: "Build (Ensu Android)"
+
+on:
+    pull_request:
+        paths:
+            - "mobile/native/android/apps/ensu/**"
+            - "mobile/native/android/packages/rust/**"
+            - "rust/apps/codegen/**"
+            - "rust/crates/core/**"
+            - "rust/crates/ensu/**"
+            - "rust/bindings/uniffi/**"
+            - "rust/.cargo/config.toml"
+            - "rust/Cargo.toml"
+            - "rust/Cargo.lock"
+            - ".github/workflows/ensu-android-build.yml"
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v6
+
+            - run: cargo codegen native
+              working-directory: rust
+
+            - name: Build Ensu
+              working-directory: mobile/native/android/apps/ensu
+              run: ./gradlew :app-ui:assembleDebug

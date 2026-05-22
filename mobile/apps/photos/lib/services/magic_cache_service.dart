@@ -2,9 +2,9 @@ import "dart:async";
 import "dart:convert";
 import "dart:io";
 
-import "package:computer/computer.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/foundation.dart";
+import "package:flutter/services.dart";
 import "package:flutter/widgets.dart";
 import "package:logging/logging.dart";
 import "package:path_provider/path_provider.dart";
@@ -12,6 +12,7 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/file_uploaded_event.dart";
 import "package:photos/events/magic_cache_updated_event.dart";
+import "package:photos/generated/l10n.dart";
 import "package:photos/l10n/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
@@ -22,7 +23,6 @@ import "package:photos/models/search/hierarchical/magic_filter.dart";
 import "package:photos/models/search/search_types.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/machine_learning/semantic_search/semantic_search_service.dart";
-import "package:photos/services/remote_assets_service.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/ui/viewer/search/result/magic_result_screen.dart";
 import "package:photos/utils/cache_util.dart";
@@ -35,11 +35,7 @@ class MagicCache {
   final List<int>? fileLocalIntIDs;
   Map<int, int>? _fileIdToPositionMap;
 
-  MagicCache(
-    this.title,
-    this.fileUploadedIDs, {
-    this.fileLocalIntIDs,
-  });
+  MagicCache(this.title, this.fileUploadedIDs, {this.fileLocalIntIDs});
 
   // Get map of uploadID to index in fileUploadedIDs
   Map<int, int> get fileIdToPositionMap {
@@ -82,37 +78,43 @@ class MagicCache {
 }
 
 String getLocalizedTitle(BuildContext context, String title) {
+  return getLocalizedTitleForL10n(context.l10n, title);
+}
+
+String getLocalizedTitleForL10n(AppLocalizations l10n, String title) {
   switch (title) {
     case 'Identity':
-      return context.l10n.discover_identity;
+      return l10n.discover_identity;
     case 'Screenshots':
-      return context.l10n.discover_screenshots;
+      return l10n.discover_screenshots;
+    case 'QR Codes':
+      return l10n.discover_qr_codes;
     case 'Receipts':
-      return context.l10n.discover_receipts;
+      return l10n.discover_receipts;
     case 'Notes':
-      return context.l10n.discover_notes;
+      return l10n.discover_notes;
     case 'Memes':
-      return context.l10n.discover_memes;
+      return l10n.discover_memes;
     case 'Visiting Cards':
-      return context.l10n.discover_visiting_cards;
+      return l10n.discover_visiting_cards;
     case 'Babies':
-      return context.l10n.discover_babies;
+      return l10n.discover_babies;
     case 'Pets':
-      return context.l10n.discover_pets;
+      return l10n.discover_pets;
     case 'Selfies':
-      return context.l10n.discover_selfies;
+      return l10n.discover_selfies;
     case 'Wallpapers':
-      return context.l10n.discover_wallpapers;
+      return l10n.discover_wallpapers;
     case 'Food':
-      return context.l10n.discover_food;
+      return l10n.discover_food;
     case 'Celebrations':
-      return context.l10n.discover_celebrations;
+      return l10n.discover_celebrations;
     case 'Sunset':
-      return context.l10n.discover_sunset;
+      return l10n.discover_sunset;
     case 'Hills':
-      return context.l10n.discover_hills;
+      return l10n.discover_hills;
     case 'Greenery':
-      return context.l10n.discover_greenery;
+      return l10n.discover_greenery;
     default:
       return title; // If no match, return the original string
   }
@@ -122,7 +124,7 @@ int? _magicFileId(EnteFile file) {
   return file.uploadedFileID ?? file.generatedID;
 }
 
-int _compareOfflineMagicFilesByRelevantPosition(
+int _compareLocalGalleryMagicFilesByRelevantPosition(
   EnteFile a,
   EnteFile b,
   Map<int, int> fileIdToPositionMap,
@@ -138,7 +140,7 @@ int _compareOfflineMagicFilesByRelevantPosition(
   return posA.compareTo(posB);
 }
 
-void sortOfflineMagicFilesByCreationTime(
+void sortLocalGalleryMagicFilesByCreationTime(
   List<EnteFile> files,
   Map<int, int> fileIdToPositionMap,
   Map<String, int> localIdToIntId,
@@ -148,7 +150,7 @@ void sortOfflineMagicFilesByCreationTime(
     if (timeCompare != 0) {
       return timeCompare;
     }
-    return _compareOfflineMagicFilesByRelevantPosition(
+    return _compareLocalGalleryMagicFilesByRelevantPosition(
       a,
       b,
       fileIdToPositionMap,
@@ -226,7 +228,7 @@ GenericSearchResult? toGenericSearchResult(
 
 class MagicCacheService {
   static const _lastMagicCacheUpdateTime = "last_magic_cache_update_time";
-  static const _kMagicPromptsDataUrl = "https://discover.ente.io/v2.json";
+  static const _kPromptsAssetPath = "assets/discover.json";
 
   /// Delay is for cache update to be done not during app init, during which a
   /// lot of other things are happening.
@@ -250,7 +252,7 @@ class MagicCacheService {
     });
   }
 
-  String get _lastMagicCacheUpdateKey => isOfflineMode
+  String get _lastMagicCacheUpdateKey => isLocalGalleryMode
       ? "${_lastMagicCacheUpdateTime}_offline"
       : _lastMagicCacheUpdateTime;
 
@@ -279,11 +281,7 @@ class MagicCacheService {
     if (!enableDiscover) {
       return;
     }
-    final updatedJSONFile = await RemoteAssetsService.instance
-        .getAssetIfUpdated(_kMagicPromptsDataUrl);
-    if (updatedJSONFile != null) {
-      queueUpdate("Prompts data updated");
-    } else if (lastMagicCacheUpdateTime <
+    if (lastMagicCacheUpdateTime <
         DateTime.now()
             .subtract(const Duration(hours: 12))
             .millisecondsSinceEpoch) {
@@ -292,7 +290,7 @@ class MagicCacheService {
   }
 
   Future<String> _getCachePath() async {
-    final suffix = isOfflineMode ? "_offline" : "";
+    final suffix = isLocalGalleryMode ? "_offline" : "";
     return (await getApplicationSupportDirectory()).path +
         "/cache/magic_cache$suffix";
   }
@@ -317,8 +315,9 @@ class MagicCacheService {
       w?.start();
       final magicPromptsData = await getPrompts();
       w?.log("loadedPrompts");
-      final List<MagicCache> magicCaches =
-          await _nonEmptyMagicResults(magicPromptsData);
+      final List<MagicCache> magicCaches = await _nonEmptyMagicResults(
+        magicPromptsData,
+      );
       w?.log("resultComputed");
       _magicCacheFuture = Future.value(magicCaches);
       await writeToJsonFile<List<MagicCache>>(
@@ -344,7 +343,7 @@ class MagicCacheService {
       return;
     }
     try {
-      final prompts = await _readPromptFromDiskOrNetwork();
+      final prompts = await _readPromptsFromAssets();
       final magicCaches = await _readResultFromDisk();
       _promptFuture = Future.value(prompts);
       _magicCacheFuture = Future.value(magicCaches);
@@ -358,7 +357,7 @@ class MagicCacheService {
     if (_promptFuture != null) {
       return _promptFuture!;
     }
-    _promptFuture = _readPromptFromDiskOrNetwork();
+    _promptFuture = _readPromptsFromAssets();
     return _promptFuture!;
   }
 
@@ -370,15 +369,13 @@ class MagicCacheService {
     return _magicCacheFuture!;
   }
 
-  Future<List<Prompt>> _readPromptFromDiskOrNetwork() async {
-    final String path =
-        await RemoteAssetsService.instance.getAssetPath(_kMagicPromptsDataUrl);
-    return Computer.shared().compute(
-      _loadMagicPrompts,
-      param: <String, dynamic>{
-        "path": path,
-      },
-    );
+  Future<List<Prompt>> _readPromptsFromAssets() async {
+    final String contents = await rootBundle.loadString(_kPromptsAssetPath);
+    final Map<String, dynamic> promptsJson = jsonDecode(contents);
+    final List<dynamic> promptData = promptsJson['prompts'];
+    return promptData
+        .map<Prompt>((jsonItem) => Prompt.fromJson(jsonItem))
+        .toList();
   }
 
   Future<List<MagicCache>> _readResultFromDisk() async {
@@ -420,7 +417,7 @@ class MagicCacheService {
       final List<EnteFile> files =
           await SearchService.instance.getAllFilesForSearch();
 
-      if (!isOfflineMode) {
+      if (!isLocalGalleryMode) {
         final Map<String, List<EnteFile>> magicIdToFiles = {};
         final Map<String, Map<int, int>> promptFileOrder = {};
         for (final cache in magicCaches) {
@@ -463,8 +460,9 @@ class MagicCacheService {
           }
         }
         if (localIntIds.isNotEmpty) {
-          final localIdMap =
-              await OfflineFilesDB.instance.getLocalIdsForIntIds(localIntIds);
+          final localIdMap = await OfflineFilesDB.instance.getLocalIdsForIntIds(
+            localIntIds,
+          );
           final localIdToIntId = <String, int>{};
           for (final entry in localIdMap.entries) {
             localIdToIntId[entry.value] = entry.key;
@@ -500,7 +498,7 @@ class MagicCacheService {
               }
             }
             if (p.recentFirst && filesForPrompt.length > 1) {
-              sortOfflineMagicFilesByCreationTime(
+              sortLocalGalleryMagicFilesByCreationTime(
                 filesForPrompt,
                 fileIdToPosMap,
                 localIdToIntId,
@@ -527,19 +525,6 @@ class MagicCacheService {
     }
   }
 
-  static Future<List<Prompt>> _loadMagicPrompts(
-    Map<String, dynamic> args,
-  ) async {
-    final String path = args["path"] as String;
-    final File file = File(path);
-    final String contents = await file.readAsString();
-    final Map<String, dynamic> promptsJson = jsonDecode(contents);
-    final List<dynamic> promptData = promptsJson['prompts'];
-    return promptData
-        .map<Prompt>((jsonItem) => Prompt.fromJson(jsonItem))
-        .toList();
-  }
-
   ///Returns non-empty magic results from magicPromptsData
   ///Length is number of prompts, can be less if there are not enough non-empty
   ///results
@@ -561,8 +546,8 @@ class MagicCacheService {
         results.add(
           MagicCache(
             prompt.title,
-            isOfflineMode ? const <int>[] : matchedIds,
-            fileLocalIntIDs: isOfflineMode ? matchedIds : null,
+            isLocalGalleryMode ? const <int>[] : matchedIds,
+            fileLocalIntIDs: isLocalGalleryMode ? matchedIds : null,
           ),
         );
       }

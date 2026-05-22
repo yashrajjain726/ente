@@ -328,6 +328,7 @@ pub struct ProfileAvatarResponse {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSpaceProfileRequest {
     pub space_id: String,
+    pub key_version: i32,
     pub encrypted_profile: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub avatar: Option<ProfileAvatarPayload>,
@@ -364,6 +365,7 @@ pub struct SpaceProfileResponse {
 pub struct RotateSpaceKeyRequest {
     pub space_id: String,
     pub encrypted_space_key: String,
+    pub key_version: i32,
     pub wrapped_prev_key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encrypted_profile: Option<String>,

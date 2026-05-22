@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/ente-io/museum/ente"
@@ -14,7 +15,7 @@ func TestGetProfileReturnsHistoricalVersion(t *testing.T) {
 	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-profile-v1")
 	require.NoError(t, err)
 	profileV2 := "alice-profile-v2"
-	rotated, err := repos.Spaces.RotateKey(ctx, aliceID, space.SpaceID, "alice-space-key-v2", "wrapped-prev-key", &profileV2)
+	rotated, err := repos.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", &profileV2)
 	require.NoError(t, err)
 	require.Equal(t, 2, rotated.CurrentVersion)
 	require.NoError(t, userAuthRepo.AddToken(aliceID, ente.Photos, "alice-token", "127.0.0.1", "space-test"))
@@ -76,6 +77,51 @@ func TestGetProfileRejectsInvalidVersion(t *testing.T) {
 
 	require.Nil(t, resp)
 	require.Error(t, err)
+}
+
+func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
+	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
+	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
+	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-profile-v1")
+	require.NoError(t, err)
+	ginCtx := newPublicSpaceContext()
+	ginCtx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(aliceID, 10))
+	profileV2 := "alice-profile-v2"
+
+	resp, err := module.Spaces.RotateKey(ginCtx, models.RotateSpaceKeyRequest{
+		SpaceID:           space.SpaceID,
+		KeyVersion:        space.CurrentVersion + 1,
+		EncryptedSpaceKey: "alice-space-key-v2",
+		WrappedPrevKey:    "wrapped-prev-key",
+		EncryptedProfile:  &profileV2,
+	})
+
+	require.Nil(t, resp)
+	var apiErr *ente.ApiError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, ente.BadRequest, apiErr.Code)
+	require.Equal(t, "keyVersion does not match current space version", apiErr.Message)
+}
+
+func TestUpdateProfileRejectsStaleKeyVersion(t *testing.T) {
+	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
+	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
+	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-profile-v1")
+	require.NoError(t, err)
+	ginCtx := newPublicSpaceContext()
+	ginCtx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(aliceID, 10))
+
+	resp, err := module.Spaces.UpdateProfile(ginCtx, models.UpdateSpaceProfileRequest{
+		SpaceID:          space.SpaceID,
+		KeyVersion:       space.CurrentVersion + 1,
+		EncryptedProfile: "alice-profile-v2",
+	})
+
+	require.Nil(t, resp)
+	var apiErr *ente.ApiError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, ente.BadRequest, apiErr.Code)
+	require.Equal(t, "keyVersion does not match current space version", apiErr.Message)
 }
 
 func TestSlugAvailabilityReturnsFalseForExistingAndReservedSlugs(t *testing.T) {

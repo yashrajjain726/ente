@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
-import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/core/network/network.dart";
 import "package:photos/events/app_mode_changed_event.dart";
@@ -33,8 +32,9 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
+    final endpoint = endpointConfig.endpoint;
     _logger.info(
-      "Current endpoint is: ${Configuration.instance.getHttpEndpoint()}",
+      "Current endpoint is: $endpoint",
     );
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -65,7 +65,7 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
               const SizedBox(height: 20),
               TextInputWidgetV2(
                 label: AppLocalizations.of(context).serverEndpoint,
-                hintText: Configuration.instance.getHttpEndpoint(),
+                hintText: endpoint,
                 textEditingController: _urlController,
                 autoCorrect: false,
                 autoFocus: true,
@@ -79,7 +79,9 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                   final url = _urlController.text.trim();
                   _logger.info("Entered endpoint: $url");
                   final modeToggleMessage =
-                      await _maybeToggleOfflineModeOption(url);
+                      await _maybeToggleLocalGalleryModeOption(
+                    url,
+                  );
                   if (modeToggleMessage != null) {
                     Bus.instance.fire(AppModeChangedEvent());
                     showToast(context, modeToggleMessage);
@@ -90,7 +92,7 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                     final uri = Uri.parse(url);
                     if ((uri.scheme == "http" || uri.scheme == "https")) {
                       await _ping(url);
-                      await Configuration.instance.setHttpEndpoint(url);
+                      await endpointConfig.setEndpoint(url);
                       showToast(
                         context,
                         AppLocalizations.of(context).endpointUpdatedMessage,
@@ -122,8 +124,9 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
 
   Future<void> _ping(String endpoint) async {
     try {
-      final response =
-          await NetworkClient.instance.getDio().get('$endpoint/ping');
+      final response = await NetworkClient.instance.getDio().get(
+            '$endpoint/ping',
+          );
       if (response.data['message'] != 'pong') {
         throw Exception('Invalid response');
       }
@@ -132,14 +135,14 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
     }
   }
 
-  Future<String?> _maybeToggleOfflineModeOption(String input) async {
+  Future<String?> _maybeToggleLocalGalleryModeOption(String input) async {
     switch (input) {
       case "offline":
-        await localSettings.setShowOfflineModeOption(true);
-        return "Offline mode option enabled";
+        await localSettings.setShowLocalGalleryModeOption(true);
+        return "Local gallery mode option enabled";
       case "online":
-        await localSettings.setShowOfflineModeOption(false);
-        return "Offline mode option disabled";
+        await localSettings.setShowLocalGalleryModeOption(false);
+        return "Local gallery mode option disabled";
       default:
         return null;
     }

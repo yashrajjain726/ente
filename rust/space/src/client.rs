@@ -372,6 +372,7 @@ impl AccountSpaceCtx {
             })?;
         let request = UpdateSpaceProfileRequest {
             space_id: space_id.to_owned(),
+            key_version: space_key.key_version,
             encrypted_profile: encode_b64(&encrypt_secretbox_packed(
                 &space_key.space_key,
                 profile,
@@ -447,6 +448,7 @@ impl AccountSpaceCtx {
         let root_space_key = self.get_or_create_root_space_key().await?;
         let request = RotateSpaceKeyRequest {
             space_id: space_id.to_owned(),
+            key_version: current.key_version,
             encrypted_space_key: encode_b64(&encrypt_secretbox_packed(
                 &root_space_key,
                 &next_space_key,
@@ -2767,6 +2769,7 @@ mod tests {
             .match_header("x-auth-token", "token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+                Matcher::Regex("\"keyVersion\":3".into()),
                 Matcher::Regex("\"encryptedProfile\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"avatar\"".into()),
                 Matcher::Regex("\"objectKey\":\"avatar-object\"".into()),

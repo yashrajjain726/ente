@@ -158,6 +158,7 @@ type FriendRelationshipResponse struct {
 
 type UpdateSpaceProfileRequest struct {
 	SpaceID          string                `json:"spaceId"`
+	KeyVersion       int                   `json:"keyVersion"`
 	EncryptedProfile string                `json:"encryptedProfile"`
 	Avatar           *ProfileAvatarPayload `json:"avatar,omitempty"`
 	RemoveAvatar     bool                  `json:"removeAvatar,omitempty"`
@@ -201,6 +202,7 @@ type SpaceSlugAvailabilityResponse struct {
 
 type RotateSpaceKeyRequest struct {
 	SpaceID           string  `json:"spaceId"`
+	KeyVersion        int     `json:"keyVersion"`
 	EncryptedSpaceKey string  `json:"encryptedSpaceKey"`
 	WrappedPrevKey    string  `json:"wrappedPrevKey"`
 	EncryptedProfile  *string `json:"encryptedProfile,omitempty"`

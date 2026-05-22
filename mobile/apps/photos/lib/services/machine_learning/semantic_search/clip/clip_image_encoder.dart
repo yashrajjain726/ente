@@ -8,12 +8,20 @@ import "package:photos/services/machine_learning/ml_model.dart";
 import "package:photos/utils/image_ml_util.dart";
 import "package:photos/utils/ml_util.dart";
 
+/// MobileCLIP S2 image encoder used for semantic search image embeddings.
+///
+/// Model size: ~143.1 MB.
 class ClipImageEncoder extends MlModel {
   static const kRemoteBucketModelPath = "mobileclip_s2_image.onnx";
+  static const kModelSha256 =
+      "ef54ec66c687603eb4dd303e20d9b67e81069d3133b1c69a70028c76718b7752";
   static const _modelName = "ClipImageEncoder";
 
   @override
   String get modelRemotePath => kModelBucketEndpoint + kRemoteBucketModelPath;
+
+  @override
+  String get modelSha256 => kModelSha256;
 
   @override
   Logger get logger => _logger;
