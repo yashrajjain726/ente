@@ -25,7 +25,6 @@ const Page: React.FC = () => {
         profileLoadError,
         profileLoadStatus,
         setFriends,
-        setPendingProfileAvatarFile,
     } = useSpaceAppState();
     const [posts, setPosts] = useState<SpacePost[]>([]);
     const [isPostsLoading, setIsPostsLoading] = useState(true);
@@ -103,10 +102,6 @@ const Page: React.FC = () => {
                     setPosts((currentPosts) => [post, ...currentPosts]);
                 }}
                 onDraftPostPublished={() => void router.push(spaceRoutes.home)}
-                onEditProfilePhoto={(file) => {
-                    setPendingProfileAvatarFile(file);
-                    void router.push(spaceRoutes.editProfilePhoto);
-                }}
                 onDeletePost={async (postId) => {
                     await deleteCurrentPost(postId);
                     setPosts((currentPosts) =>
@@ -117,6 +112,12 @@ const Page: React.FC = () => {
                     void router.push(spaceRoutes.friend(friendID))
                 }
                 onOpenFriends={() => void router.push(spaceRoutes.friends)}
+                onOpenProfileCover={() =>
+                    void router.push(spaceRoutes.profileCover)
+                }
+                onOpenProfilePhoto={() =>
+                    void router.push(spaceRoutes.profilePhoto)
+                }
                 onOpenSettings={() => void router.push(spaceRoutes.settings)}
                 onLoadPostLikers={loadCurrentPostLikers}
                 onSetPostLiked={setCurrentPostLiked}

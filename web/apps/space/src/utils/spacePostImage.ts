@@ -9,6 +9,7 @@ export interface PreparedSpaceImage {
 }
 
 export type PreparedSpaceAvatarImage = PreparedSpaceImage;
+export type PreparedSpaceCoverImage = PreparedSpaceImage;
 export type PreparedSpacePostImage = PreparedSpaceImage;
 
 export interface SpaceAvatarCropImage {
@@ -24,23 +25,30 @@ export interface SpaceImageCropArea {
 
 export const spaceAvatarImageInputAccept =
     "image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif";
+export const spaceCoverImageInputAccept = spaceAvatarImageInputAccept;
 export const spacePostImageInputAccept =
     "image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif";
 
+export const spaceProfileCoverAspectRatio = 39 / 17;
 const spaceAvatarImageMaxEdge = 512;
+const spaceCoverImageMaxWidth = 1170;
 const spacePostImageMaxLongEdge = 2560;
 const spacePostImageWebPQuality = 0.85;
 const spacePostImageMimeType = "image/webp";
 const spaceAssetEncryptionOverheadBytes = 42;
 const spaceAvatarUploadMaxBytes = 2 * 1024 * 1024;
+const spaceCoverUploadMaxBytes = 2 * 1024 * 1024;
 const spacePostUploadMaxBytes = 10 * 1024 * 1024;
 
 export const maxSpaceAvatarImageBytes =
     spaceAvatarUploadMaxBytes - spaceAssetEncryptionOverheadBytes;
+export const maxSpaceCoverImageBytes =
+    spaceCoverUploadMaxBytes - spaceAssetEncryptionOverheadBytes;
 export const maxSpacePostImageBytes =
     spacePostUploadMaxBytes - spaceAssetEncryptionOverheadBytes;
 export const spaceAvatarImageMaxSizeMessage =
     "This photo is too large. Try a smaller one.";
+export const spaceCoverImageMaxSizeMessage = spaceAvatarImageMaxSizeMessage;
 export const spacePostImageMaxSizeMessage =
     "This photo is too large. Try a smaller one.";
 const unsupportedSpaceImageMessage = "Only photos can be uploaded.";
@@ -124,6 +132,8 @@ export const spaceAvatarCropImageForFile = async (
     }
 };
 
+export const spaceCoverCropImageForFile = spaceAvatarCropImageForFile;
+
 export const prepareSpaceAvatarImageFromCrop = async (
     file: File,
     imageURL: string,
@@ -150,6 +160,32 @@ export const prepareSpaceAvatarImageFromCrop = async (
     };
 };
 
+export const prepareSpaceCoverImageFromCrop = async (
+    file: File,
+    imageURL: string,
+    cropArea: SpaceImageCropArea,
+): Promise<PreparedSpaceCoverImage> => {
+    const { blob, height, width } = await webPBlobFromImage(
+        imageURL,
+        (width, height) => coverCanvasPlanForCrop(width, height, cropArea),
+        false,
+    );
+    assertSpaceImageSize(
+        blob,
+        maxSpaceCoverImageBytes,
+        spaceCoverImageMaxSizeMessage,
+    );
+
+    return {
+        file: new File([blob], webPFileName(file.name), {
+            lastModified: file.lastModified || Date.now(),
+            type: spacePostImageMimeType,
+        }),
+        height,
+        width,
+    };
+};
+
 export const spacePostImageErrorMessage = (error: unknown) =>
     error instanceof SpaceImageSizeError || error instanceof SpaceImageTypeError
         ? error.message
@@ -159,6 +195,8 @@ export const spaceAvatarImageErrorMessage = (error: unknown) =>
     error instanceof SpaceImageSizeError || error instanceof SpaceImageTypeError
         ? error.message
         : "Choose a JPEG, PNG, WebP, HEIC, or HEIF image.";
+
+export const spaceCoverImageErrorMessage = spaceAvatarImageErrorMessage;
 
 const renderableBlobForSpaceImage = async (file: File): Promise<Blob> => {
     assertSupportedSpaceImageFile(file);
@@ -345,6 +383,39 @@ const avatarCanvasPlanForCrop = (
         sourceX: clampNumber(cropArea.x, 0, Math.max(0, width - sourceEdge)),
         sourceY: clampNumber(cropArea.y, 0, Math.max(0, height - sourceEdge)),
         width: outputEdge,
+    };
+};
+
+const coverCanvasPlanForCrop = (
+    width: number,
+    height: number,
+    cropArea: SpaceImageCropArea,
+): CanvasPlan => {
+    if (width <= 0 || height <= 0) {
+        return {
+            height: 0,
+            sourceHeight: 0,
+            sourceWidth: 0,
+            sourceX: 0,
+            sourceY: 0,
+            width: 0,
+        };
+    }
+
+    const sourceWidth = Math.min(Math.max(1, cropArea.width), width);
+    const sourceHeight = Math.min(Math.max(1, cropArea.height), height);
+    const dimensions = scaledDimensions(
+        sourceWidth,
+        sourceHeight,
+        spaceCoverImageMaxWidth,
+    );
+
+    return {
+        ...dimensions,
+        sourceHeight,
+        sourceWidth,
+        sourceX: clampNumber(cropArea.x, 0, Math.max(0, width - sourceWidth)),
+        sourceY: clampNumber(cropArea.y, 0, Math.max(0, height - sourceHeight)),
     };
 };
 

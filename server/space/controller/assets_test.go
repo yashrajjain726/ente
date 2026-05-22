@@ -34,6 +34,20 @@ func TestPresignUploadRejectsOversizedAvatar(t *testing.T) {
 	require.Contains(t, err.Error(), strconv.FormatInt(maxAvatarUploadBytes, 10))
 }
 
+func TestPresignUploadRejectsOversizedCover(t *testing.T) {
+	controller := &AssetsController{}
+	ctx := newSpaceControllerContext(1)
+	purpose := uploadPurposeCover
+
+	_, err := controller.PresignUpload(ctx, models.PresignUploadRequest{
+		Size:    maxCoverUploadBytes + 1,
+		Purpose: &purpose,
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), strconv.FormatInt(maxCoverUploadBytes, 10))
+}
+
 func TestMaxUploadBytesForPurpose(t *testing.T) {
 	postLimit, err := maxUploadBytesForPurpose(uploadPurposePost)
 	require.NoError(t, err)
@@ -42,4 +56,8 @@ func TestMaxUploadBytesForPurpose(t *testing.T) {
 	avatarLimit, err := maxUploadBytesForPurpose(uploadPurposeAvatar)
 	require.NoError(t, err)
 	require.Equal(t, maxAvatarUploadBytes, avatarLimit)
+
+	coverLimit, err := maxUploadBytesForPurpose(uploadPurposeCover)
+	require.NoError(t, err)
+	require.Equal(t, maxCoverUploadBytes, coverLimit)
 }

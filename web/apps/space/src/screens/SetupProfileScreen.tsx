@@ -23,6 +23,9 @@ export interface SetupProfile {
     avatarUrl: string | null;
     avatarObjectKey?: string;
     avatarUpdatedAt?: string;
+    coverUrl?: string | null;
+    coverObjectKey?: string;
+    coverUpdatedAt?: string;
     fullName: string;
     username: string;
     spaceId?: string;
@@ -31,6 +34,7 @@ export interface SetupProfile {
 
 export interface SetupProfileInput extends SetupProfile {
     avatarFile?: File | null;
+    coverFile?: File | null;
 }
 
 interface AvatarCropImage {

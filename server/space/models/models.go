@@ -80,6 +80,9 @@ type ProfileAvatarResponse struct {
 	UpdatedAt string `json:"updatedAt,omitempty"`
 }
 
+type ProfileCoverPayload = ProfileAvatarPayload
+type ProfileCoverResponse = ProfileAvatarResponse
+
 type SpaceActorResponse struct {
 	UserID           int64                  `json:"userId,omitempty"`
 	SpaceID          string                 `json:"spaceId,omitempty"`
@@ -161,12 +164,15 @@ type UpdateSpaceProfileRequest struct {
 	KeyVersion       int                   `json:"keyVersion"`
 	EncryptedProfile string                `json:"encryptedProfile"`
 	Avatar           *ProfileAvatarPayload `json:"avatar,omitempty"`
+	Cover            *ProfileCoverPayload  `json:"cover,omitempty"`
 	RemoveAvatar     bool                  `json:"removeAvatar,omitempty"`
+	RemoveCover      bool                  `json:"removeCover,omitempty"`
 }
 
 type UpdateSpaceProfileResponse struct {
 	Status string                 `json:"status"`
 	Avatar *ProfileAvatarResponse `json:"avatar,omitempty"`
+	Cover  *ProfileCoverResponse  `json:"cover,omitempty"`
 }
 
 type CreateSpaceRequest struct {
@@ -182,6 +188,7 @@ type SpaceProfileResponse struct {
 	EncryptedProfile string                 `json:"encryptedProfile,omitempty"`
 	UpdatedAt        string                 `json:"updatedAt,omitempty"`
 	Avatar           *ProfileAvatarResponse `json:"avatar,omitempty"`
+	Cover            *ProfileCoverResponse  `json:"cover,omitempty"`
 	Friends          int64                  `json:"friends"`
 }
 

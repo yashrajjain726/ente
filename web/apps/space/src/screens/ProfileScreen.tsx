@@ -6,7 +6,6 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpaceActionFeedbackIcon } from "components/SpaceActionFeedback";
-import { SpaceAvatarEditButton } from "components/SpaceAvatarEditButton";
 import {
     SpaceFileViewer,
     type SpaceLiker,
@@ -22,7 +21,6 @@ import { createLocalPostPhoto } from "utils/localPostPhoto";
 import { firstNameFrom, initialsFor } from "utils/spaceDisplay";
 import {
     prepareSpacePostImage,
-    spaceAvatarImageInputAccept,
     spacePostImageErrorMessage,
     spacePostImageInputAccept,
     type PreparedSpacePostImage,
@@ -149,10 +147,11 @@ interface ProfileScreenProps {
     ) => Promise<void>;
     onDeletePost?: (postId: number) => Promise<void> | void;
     onDraftPostPublished?: () => void;
-    onEditProfilePhoto?: (file: File) => void;
     onLoadPostLikers?: (postId: number) => Promise<SpaceLiker[]>;
     onOpenFriend?: (friendID: string) => void;
     onOpenFriends?: () => void;
+    onOpenProfileCover?: () => void;
+    onOpenProfilePhoto?: () => void;
     onOpenSettings?: () => void;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onShareProfileLink?: () => Promise<string>;
@@ -169,10 +168,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onCreatePost,
     onDeletePost,
     onDraftPostPublished,
-    onEditProfilePhoto,
     onLoadPostLikers,
     onOpenFriend,
     onOpenFriends,
+    onOpenProfileCover,
+    onOpenProfilePhoto,
     onOpenSettings,
     onSetPostLiked,
     onShareProfileLink,
@@ -188,7 +188,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     );
     const [loadedPhotoDimensionsByURL, setLoadedPhotoDimensionsByURL] =
         useState<Record<string, ProfilePhotoDimensions>>({});
-    const avatarInputRef = React.useRef<HTMLInputElement | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const isPublicProfile = headerVariant == "public";
@@ -210,6 +209,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     );
     const canOpenFriends =
         isOwnerProfile && friendsCount > 0 && Boolean(onOpenFriends);
+    const canOpenProfileCover = isOwnerProfile && Boolean(onOpenProfileCover);
+    const canOpenProfilePhoto = isOwnerProfile && Boolean(onOpenProfilePhoto);
     const hasProfilePosts = postsSharedCount > 0;
     const selectedPostActionMode: SpaceViewerPostActionMode = isPublicProfile
         ? "hidden"
@@ -224,14 +225,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         URL.revokeObjectURL(objectUrl);
         localPostObjectUrlsRef.current.delete(objectUrl);
     }, []);
-    const openAvatarPhotoPicker = () => avatarInputRef.current?.click();
-    const handleAvatarPhotoSelect: React.ChangeEventHandler<
-        HTMLInputElement
-    > = (event) => {
-        const file = event.target.files?.[0];
-        event.target.value = "";
-        if (file) onEditProfilePhoto?.(file);
-    };
     const openPostPhotoPicker = () => {
         if (isPostPhotoPreparing) return;
 
@@ -378,16 +371,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         sx={{ display: "none" }}
                     />
                 )}
-                {isOwnerProfile && onEditProfilePhoto && (
-                    <Box
-                        ref={avatarInputRef}
-                        component="input"
-                        type="file"
-                        accept={spaceAvatarImageInputAccept}
-                        onChange={handleAvatarPhotoSelect}
-                        sx={{ display: "none" }}
-                    />
-                )}
                 <Box
                     className={isFriendProfile ? "green-bg" : undefined}
                     sx={{
@@ -396,6 +379,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             : profileCoverBackground,
                         height: profileCoverHeight,
                         insetInline: 0,
+                        overflow: "hidden",
                         position: "absolute",
                         top: 0,
                         width: "100%",
@@ -405,7 +389,46 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             borderBottomRightRadius: photoMasonryRadius,
                         },
                     }}
-                />
+                >
+                    {profile.coverUrl && (
+                        <Box
+                            component="img"
+                            alt=""
+                            src={profile.coverUrl}
+                            sx={{
+                                display: "block",
+                                height: "100%",
+                                objectFit: "cover",
+                                objectPosition: "center",
+                                width: "100%",
+                            }}
+                        />
+                    )}
+                </Box>
+                {canOpenProfileCover && (
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label="Open cover image"
+                        onClick={onOpenProfileCover}
+                        sx={{
+                            bgcolor: "transparent",
+                            border: 0,
+                            cursor: "pointer",
+                            height: profileCoverHeight,
+                            insetInline: 0,
+                            p: 0,
+                            position: "absolute",
+                            top: 0,
+                            width: "100%",
+                            zIndex: 2,
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: -4,
+                            },
+                        }}
+                    />
+                )}
                 <Box
                     component="header"
                     sx={{
@@ -420,7 +443,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         px: 2,
                         py: 0,
                         width: "100%",
-                        zIndex: 1,
+                        zIndex: 3,
                     }}
                 >
                     {isPublicProfile ? (
@@ -587,13 +610,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         pt: `${profileAvatarTopOffset}px`,
                         textAlign: "center",
                         width: "100%",
-                        zIndex: 1,
                     }}
                 >
                     <Box
-                        sx={{ position: "relative", width: profileAvatarSize }}
+                        sx={{
+                            position: "relative",
+                            width: profileAvatarSize,
+                            zIndex: 3,
+                        }}
                     >
                         <Box
+                            component={canOpenProfilePhoto ? "button" : "div"}
+                            type={canOpenProfilePhoto ? "button" : undefined}
+                            aria-label={
+                                canOpenProfilePhoto
+                                    ? "Open profile picture"
+                                    : undefined
+                            }
+                            onClick={onOpenProfilePhoto}
                             sx={{
                                 alignItems: "center",
                                 aspectRatio: "1 / 1",
@@ -604,10 +638,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 borderRadius: "50%",
                                 boxSizing: "border-box",
                                 color: green,
+                                cursor: canOpenProfilePhoto
+                                    ? "pointer"
+                                    : "default",
                                 display: "flex",
                                 justifyContent: "center",
                                 overflow: "hidden",
+                                p: 0,
                                 width: "100%",
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 3,
+                                },
                             }}
                         >
                             {profile.avatarUrl ? (
@@ -638,12 +680,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 </Box>
                             )}
                         </Box>
-                        {isOwnerProfile && onEditProfilePhoto && (
-                            <SpaceAvatarEditButton
-                                ariaLabel="Edit profile photo"
-                                onClick={openAvatarPhotoPicker}
-                            />
-                        )}
                     </Box>
                     <Box
                         sx={{

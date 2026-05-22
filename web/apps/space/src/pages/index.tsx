@@ -137,6 +137,9 @@ const Page: React.FC = () => {
                 if (cancelled) return;
                 setPublicProfile({
                     avatarUrl: nextProfile.avatarUrl ?? null,
+                    coverUrl: nextProfile.coverUrl ?? null,
+                    coverObjectKey: nextProfile.coverObjectKey,
+                    coverUpdatedAt: nextProfile.coverUpdatedAt,
                     fullName: nextProfile.fullName,
                     username: nextProfile.username,
                     spaceId: nextProfile.spaceId,

@@ -11,6 +11,7 @@ import (
 const (
 	TempObjectPurposePost   = "post"
 	TempObjectPurposeAvatar = "avatar"
+	TempObjectPurposeCover  = "cover"
 )
 
 func (r *AssetsRepository) AddTempObject(ctx context.Context, rec SpaceTempObjectRecord) error {
@@ -134,6 +135,7 @@ func IsObjectReferencedTx(ctx context.Context, tx *sql.Tx, objectKey string) (bo
 	err := tx.QueryRowContext(ctx, `
 		SELECT (
 			EXISTS (SELECT 1 FROM spaces WHERE avatar_object_key = $1) OR
+			EXISTS (SELECT 1 FROM spaces WHERE cover_object_key = $1) OR
 			EXISTS (
 				SELECT 1
 				FROM space_post_assets a

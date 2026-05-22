@@ -14,6 +14,7 @@ export interface SpaceAppState {
     pendingLoginCredentials: SpaceLoginCredentials | null;
     pendingPasskeyVerification: PendingSpacePasskeyVerification | null;
     pendingProfileAvatarFile: File | null;
+    pendingProfileCoverFile: File | null;
     profile: SetupProfile | null;
     profileLoadError?: string;
     profileLoadStatus: SpaceProfileLoadStatus;
@@ -32,6 +33,9 @@ export interface SpaceAppState {
         React.SetStateAction<PendingSpacePasskeyVerification | null>
     >;
     setPendingProfileAvatarFile: React.Dispatch<
+        React.SetStateAction<File | null>
+    >;
+    setPendingProfileCoverFile: React.Dispatch<
         React.SetStateAction<File | null>
     >;
     setProfile: (profile: SetupProfile | null) => void;

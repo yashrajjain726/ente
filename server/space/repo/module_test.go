@@ -411,15 +411,11 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 		ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
 	})
 	require.NoError(t, err)
-	updatedSpace, err := module.Spaces.UpdateProfile(ctx, aliceID, aliceSpace.SpaceID, aliceSpace.CurrentVersion, "alice-profile-v2", &struct {
-		ObjectKey string
-		BucketID  string
-		Size      int64
-	}{
+	updatedSpace, err := module.Spaces.UpdateProfile(ctx, aliceID, aliceSpace.SpaceID, aliceSpace.CurrentVersion, "alice-profile-v2", &ProfileAssetUpdate{
 		ObjectKey: "space/alice/avatar.jpg",
 		BucketID:  "b2-eu-cen",
 		Size:      111,
-	}, false)
+	}, nil, false, false)
 	require.NoError(t, err)
 	require.Equal(t, "alice-profile-v2", updatedSpace.EncryptedProfile)
 	require.Equal(t, "space/alice/avatar.jpg", updatedSpace.AvatarObjectKey.String)
@@ -650,28 +646,67 @@ func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
 		require.NoError(t, module.Assets.AddTempObject(ctx, rec))
 	}
 
-	oldAvatar := &struct {
-		ObjectKey string
-		BucketID  string
-		Size      int64
-	}{ObjectKey: "space/alice/avatar-old", BucketID: "b2-eu-cen", Size: 111}
-	_, err = module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-old-avatar", oldAvatar, false)
+	oldAvatar := &ProfileAssetUpdate{ObjectKey: "space/alice/avatar-old", BucketID: "b2-eu-cen", Size: 111}
+	_, err = module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-old-avatar", oldAvatar, nil, false, false)
 	require.NoError(t, err)
 
-	newAvatar := &struct {
-		ObjectKey string
-		BucketID  string
-		Size      int64
-	}{ObjectKey: "space/alice/avatar-new", BucketID: "b2-us-west", Size: 222}
-	updated, err := module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-new-avatar", newAvatar, false)
+	newAvatar := &ProfileAssetUpdate{ObjectKey: "space/alice/avatar-new", BucketID: "b2-us-west", Size: 222}
+	updated, err := module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-new-avatar", newAvatar, nil, false, false)
 	require.NoError(t, err)
 	require.Equal(t, "space/alice/avatar-new", updated.AvatarObjectKey.String)
 	requireQueuedTempObject(t, module, "space/alice/avatar-old", TempObjectPurposeAvatar, "b2-eu-cen")
 
-	updated, err = module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-no-avatar", nil, true)
+	updated, err = module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-no-avatar", nil, nil, true, false)
 	require.NoError(t, err)
 	require.False(t, updated.AvatarObjectKey.Valid)
 	requireQueuedTempObject(t, module, "space/alice/avatar-new", TempObjectPurposeAvatar, "b2-us-west")
+}
+
+func TestUpdateProfileQueuesOldCoverForCleanup(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+
+	aliceID := insertSpaceUser(t, module, "alice-cover@example.com", "alice-public")
+	space, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-cover", "alice-space-key", "alice-profile")
+	require.NoError(t, err)
+
+	for _, rec := range []SpaceTempObjectRecord{
+		{
+			ObjectKey:    "space/alice-cover/cover-old",
+			OwnerID:      aliceID,
+			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
+			Purpose:      TempObjectPurposeCover,
+			BucketID:     "b2-eu-cen",
+			ExpectedSize: 333,
+			ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
+		},
+		{
+			ObjectKey:    "space/alice-cover/cover-new",
+			OwnerID:      aliceID,
+			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
+			Purpose:      TempObjectPurposeCover,
+			BucketID:     "b2-us-west",
+			ExpectedSize: 444,
+			ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
+		},
+	} {
+		require.NoError(t, module.Assets.AddTempObject(ctx, rec))
+	}
+
+	oldCover := &ProfileAssetUpdate{ObjectKey: "space/alice-cover/cover-old", BucketID: "b2-eu-cen", Size: 333}
+	_, err = module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-old-cover", nil, oldCover, false, false)
+	require.NoError(t, err)
+
+	newCover := &ProfileAssetUpdate{ObjectKey: "space/alice-cover/cover-new", BucketID: "b2-us-west", Size: 444}
+	updated, err := module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-new-cover", nil, newCover, false, false)
+	require.NoError(t, err)
+	require.Equal(t, "space/alice-cover/cover-new", updated.CoverObjectKey.String)
+	requireQueuedTempObject(t, module, "space/alice-cover/cover-old", TempObjectPurposeCover, "b2-eu-cen")
+
+	updated, err = module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-no-cover", nil, nil, false, true)
+	require.NoError(t, err)
+	require.False(t, updated.CoverObjectKey.Valid)
+	requireQueuedTempObject(t, module, "space/alice-cover/cover-new", TempObjectPurposeCover, "b2-us-west")
 }
 
 func TestAddFriendCreatesReciprocalSharesAndEvent(t *testing.T) {
@@ -873,7 +908,7 @@ func TestUpdateProfileRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, rotated.CurrentVersion)
 
-	_, err = module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "stale-profile", nil, false)
+	_, err = module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "stale-profile", nil, nil, false, false)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
 	current, err := module.Spaces.GetSpaceByID(ctx, space.SpaceID)

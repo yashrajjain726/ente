@@ -23,6 +23,8 @@ interface SpaceAvatar {
     updatedAt?: string;
 }
 
+type SpaceCover = SpaceAvatar;
+
 interface OwnedSpace {
     spaceId: string;
     spaceSlug: string;
@@ -43,11 +45,13 @@ interface DecryptedSpaceProfile {
     spaceSlug: string;
     profile: string;
     avatar?: SpaceAvatar;
+    cover?: SpaceCover;
     updatedAt?: string;
 }
 
 interface UpdateSpaceProfileResponse {
     avatar?: SpaceAvatar;
+    cover?: SpaceCover;
 }
 
 interface SpaceProfilePayload {
@@ -219,6 +223,16 @@ const avatarURLForRemoteAvatar = async (
     return URL.createObjectURL(new Blob([bytes]));
 };
 
+const coverURLForRemoteCover = async (
+    ctx: SpaceAccountCtxHandle,
+    spaceId: string,
+    cover: SpaceCover | undefined,
+) => {
+    if (!cover?.objectKey) return null;
+    const bytes = await ctx.download_space_cover(spaceId, cover.objectKey);
+    return URL.createObjectURL(new Blob([bytes]));
+};
+
 const profileFromDecryptedSpaceProfile = (
     spaceProfile: DecryptedSpaceProfile,
 ): SetupProfile => {
@@ -232,6 +246,9 @@ const profileFromDecryptedSpaceProfile = (
         avatarObjectKey: spaceProfile.avatar?.objectKey,
         avatarUpdatedAt: spaceProfile.avatar?.updatedAt,
         avatarUrl: null,
+        coverObjectKey: spaceProfile.cover?.objectKey,
+        coverUpdatedAt: spaceProfile.cover?.updatedAt,
+        coverUrl: null,
         fullName,
         username: spaceProfile.spaceSlug,
         spaceId: spaceProfile.spaceId,
@@ -265,6 +282,24 @@ export const loadExistingSpaceAvatar = async (
     try {
         return await avatarURLForRemoteAvatar(ctx, spaceId, {
             objectKey: avatarObjectKey,
+        });
+    } finally {
+        ctx.free();
+    }
+};
+
+export const loadExistingSpaceCover = async (
+    spaceId: string | undefined,
+    coverObjectKey: string | undefined,
+) => {
+    if (!spaceId || !coverObjectKey) return null;
+
+    const ctx = await openCurrentSpaceContext();
+    if (!ctx) return null;
+
+    try {
+        return await coverURLForRemoteCover(ctx, spaceId, {
+            objectKey: coverObjectKey,
         });
     } finally {
         ctx.free();
@@ -329,7 +364,8 @@ export const saveSpaceProfile = async (
             spaceSlug = created.spaceSlug;
         }
 
-        let avatarUrl: string | null = null;
+        let avatarUrl = profile.avatarUrl ?? null;
+        let coverUrl = profile.coverUrl ?? null;
         if (profile.avatarFile) {
             const avatarBytes = new Uint8Array(
                 await profile.avatarFile.arrayBuffer(),
@@ -340,12 +376,21 @@ export const saveSpaceProfile = async (
                 avatarBytes,
             )) as UpdateSpaceProfileResponse;
             avatarUrl = URL.createObjectURL(profile.avatarFile);
+        } else if (profile.coverFile) {
+            const coverBytes = new Uint8Array(
+                await profile.coverFile.arrayBuffer(),
+            );
+            updateResponse = (await ctx.update_space_profile_with_cover(
+                spaceId,
+                profilePayload,
+                coverBytes,
+            )) as UpdateSpaceProfileResponse;
+            coverUrl = URL.createObjectURL(profile.coverFile);
         } else if (existingSpace) {
             updateResponse = (await ctx.update_space_profile(
                 spaceId,
                 profilePayload,
             )) as UpdateSpaceProfileResponse;
-            avatarUrl = profile.avatarUrl;
         }
 
         return {
@@ -354,6 +399,11 @@ export const saveSpaceProfile = async (
             avatarUpdatedAt:
                 updateResponse?.avatar?.updatedAt ?? profile.avatarUpdatedAt,
             avatarUrl,
+            coverObjectKey:
+                updateResponse?.cover?.objectKey ?? profile.coverObjectKey,
+            coverUpdatedAt:
+                updateResponse?.cover?.updatedAt ?? profile.coverUpdatedAt,
+            coverUrl,
             fullName: profile.fullName.trim(),
             username: spaceSlug,
             spaceId,

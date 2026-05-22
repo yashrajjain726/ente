@@ -10,8 +10,10 @@ const textLight = "#969696";
 const warning = "#F63A3A";
 
 interface SpaceAvatarCropPageProps {
+    aspect?: number;
     background: string;
     crop: Point;
+    cropShape?: "rect" | "round";
     errorMessage?: string;
     headerVariant?: "app" | "setup";
     imageURL: string;
@@ -144,8 +146,11 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
     onZoomChange,
     title = "Edit profile picture",
     zoom,
+    aspect = 1,
+    cropShape = "round",
 }) => {
     const isAppHeader = headerVariant == "app";
+    const isSquareCrop = aspect == 1;
 
     return (
         <Box
@@ -154,6 +159,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                 "--avatar-crop-size": isAppHeader
                     ? "min(calc(100vw - 48px), calc(100dvh - 308px), 342px)"
                     : "min(calc(100vw - 48px), calc(100dvh - 294px), 342px)",
+                "--profile-crop-width": "min(calc(100vw - 48px), 342px)",
                 bgcolor: background,
                 color: textBase,
                 display: "grid",
@@ -286,20 +292,24 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                     sx={{
                         alignSelf: "center",
                         bgcolor: "#111",
-                        borderRadius: "8px",
-                        height: "var(--avatar-crop-size)",
-                        aspectRatio: "1 / 1",
+                        borderRadius: isSquareCrop ? "50%" : "8px",
+                        height: isSquareCrop
+                            ? "var(--avatar-crop-size)"
+                            : undefined,
+                        aspectRatio: `${aspect} / 1`,
                         justifySelf: "center",
                         mt: { xs: "24px", sm: "32px" },
                         overflow: "hidden",
                         position: "relative",
-                        width: "var(--avatar-crop-size)",
+                        width: isSquareCrop
+                            ? "var(--avatar-crop-size)"
+                            : "var(--profile-crop-width)",
                     }}
                 >
                     <Cropper
-                        aspect={1}
+                        aspect={aspect}
                         crop={crop}
-                        cropShape="round"
+                        cropShape={cropShape}
                         disableAutomaticStylesInjection
                         image={imageURL}
                         maxZoom={3}
@@ -323,7 +333,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                 >
                     <Box
                         component="label"
-                        htmlFor="space-avatar-zoom"
+                        htmlFor="space-profile-image-zoom"
                         sx={{
                             border: 0,
                             clip: "rect(0 0 0 0)",
@@ -339,7 +349,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                     </Box>
                     <Box
                         component="input"
-                        id="space-avatar-zoom"
+                        id="space-profile-image-zoom"
                         type="range"
                         min={1}
                         max={3}

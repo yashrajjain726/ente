@@ -29,6 +29,20 @@ func toAvatarResponse(space *spacerepo.SpaceRecord) *models.ProfileAvatarRespons
 	return resp
 }
 
+func toCoverResponse(space *spacerepo.SpaceRecord) *models.ProfileCoverResponse {
+	if !space.CoverObjectKey.Valid {
+		return nil
+	}
+	resp := &models.ProfileCoverResponse{
+		ObjectKey: space.CoverObjectKey.String,
+		UpdatedAt: formatMicros(space.UpdatedAt),
+	}
+	if space.CoverSize.Valid {
+		resp.Size = space.CoverSize.Int64
+	}
+	return resp
+}
+
 func toActorAvatarResponse(actor spacerepo.SpaceActorRecord) *models.ProfileAvatarResponse {
 	if !actor.AvatarObjectKey.Valid {
 		return nil

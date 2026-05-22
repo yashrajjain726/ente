@@ -20,10 +20,12 @@ import (
 const (
 	maxPostUploadBytes     int64 = 10 * 1024 * 1024
 	maxAvatarUploadBytes   int64 = 2 * 1024 * 1024
+	maxCoverUploadBytes    int64 = 2 * 1024 * 1024
 	uploadURLExpiry              = 15 * time.Minute
 	uploadTempObjectExpiry       = 2 * uploadURLExpiry
 	uploadPurposePost            = spacerepo.TempObjectPurposePost
 	uploadPurposeAvatar          = spacerepo.TempObjectPurposeAvatar
+	uploadPurposeCover           = spacerepo.TempObjectPurposeCover
 	uploadContentType            = "application/octet-stream"
 )
 
@@ -60,9 +62,9 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 		if _, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, spaceID.String); err != nil {
 			return nil, err
 		}
-	case uploadPurposeAvatar:
+	case uploadPurposeAvatar, uploadPurposeCover:
 		if req.SpaceID == nil || strings.TrimSpace(*req.SpaceID) == "" {
-			return nil, ente.NewBadRequestWithMessage("spaceId is required for avatar uploads")
+			return nil, ente.NewBadRequestWithMessage("spaceId is required for profile image uploads")
 		}
 		spaceID.String = strings.TrimSpace(*req.SpaceID)
 		spaceID.Valid = true
@@ -80,6 +82,9 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	keyPrefix := fmt.Sprintf("space/%s/posts", spaceID.String)
 	if purpose == uploadPurposeAvatar {
 		keyPrefix = fmt.Sprintf("space/%s/avatar", spaceID.String)
+	}
+	if purpose == uploadPurposeCover {
+		keyPrefix = fmt.Sprintf("space/%s/cover", spaceID.String)
 	}
 	objectKey := fmt.Sprintf("%s/%s", keyPrefix, base.MustNewID("wo"))
 	input := &s3.PutObjectInput{
@@ -120,6 +125,8 @@ func maxUploadBytesForPurpose(purpose string) (int64, error) {
 		return maxPostUploadBytes, nil
 	case uploadPurposeAvatar:
 		return maxAvatarUploadBytes, nil
+	case uploadPurposeCover:
+		return maxCoverUploadBytes, nil
 	default:
 		return 0, ente.NewBadRequestWithMessage("invalid upload purpose")
 	}

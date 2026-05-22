@@ -17,6 +17,8 @@ interface SpaceAvatar {
     updatedAt?: string;
 }
 
+type SpaceCover = SpaceAvatar;
+
 interface SpaceProfilePayload {
     displayName?: unknown;
     fullName?: unknown;
@@ -25,6 +27,7 @@ interface SpaceProfilePayload {
 
 interface SpaceProfileResponse {
     avatar?: SpaceAvatar;
+    cover?: SpaceCover;
     friends?: number;
     profile: string;
     updatedAt?: string;
@@ -380,6 +383,9 @@ const profileFromSpaceProfile = (
 
     return {
         avatarUrl: null,
+        coverObjectKey: spaceProfile.cover?.objectKey,
+        coverUpdatedAt: spaceProfile.cover?.updatedAt,
+        coverUrl: null,
         friendsCount: spaceProfile.friends ?? 0,
         fullName,
         id: spaceProfile.spaceId || spaceProfile.spaceSlug,
@@ -387,6 +393,29 @@ const profileFromSpaceProfile = (
         spaceId: spaceProfile.spaceId,
         spaceSlug: spaceProfile.spaceSlug,
     };
+};
+
+const accountCoverURL = async (
+    ctx: SpaceAccountCtxHandle,
+    spaceId: string | undefined,
+    cover: SpaceCover | undefined,
+) => {
+    if (!spaceId || !cover?.objectKey) return null;
+    try {
+        return await cachedBlobURL(
+            [
+                "cover",
+                spaceId,
+                cover.objectKey,
+                cover.updatedAt ?? "",
+                cover.size ?? "",
+            ].join(":"),
+            () => ctx.download_space_cover(spaceId, cover.objectKey),
+        );
+    } catch (error) {
+        console.warn("Failed to load space cover", error);
+        return null;
+    }
 };
 
 const accountAvatarURL = async (
@@ -493,6 +522,22 @@ const linkAvatarURL = async (
         .download_space_avatar(avatar.objectKey)
         .then((bytes) => blobURLForBytes(bytes));
     cache?.set(avatar.objectKey, promise);
+    return promise;
+};
+
+const linkCoverURL = async (
+    ctx: SpaceLinkCtxHandle,
+    cover: SpaceCover | undefined,
+    cache?: Map<string, Promise<string | null>>,
+) => {
+    if (!cover?.objectKey) return null;
+    const cached = cache?.get(cover.objectKey);
+    if (cached) return cached;
+
+    const promise = ctx
+        .download_space_cover(cover.objectKey)
+        .then((bytes) => blobURLForBytes(bytes));
+    cache?.set(cover.objectKey, promise);
     return promise;
 };
 
@@ -789,6 +834,27 @@ export const loadCurrentSpaceFriends = async (spaceId: string) => {
             spaceFriendsCache.delete(spaceId);
         }
         throw error;
+    } finally {
+        releaseCurrentSpaceContext(ctx);
+    }
+};
+
+export const loadCurrentSpaceProfile = async (
+    spaceId: string,
+): Promise<FriendProfile> => {
+    const ctx = await ensureCurrentSpaceContext();
+    try {
+        const spaceProfile = (await ctx.get_space_profile(
+            spaceId,
+        )) as SpaceProfileResponse;
+        const profile = profileFromSpaceProfile(spaceProfile);
+        const [avatarUrl, coverUrl] = await Promise.all([
+            accountAvatarURL(ctx, spaceProfile.spaceId, spaceProfile.avatar),
+            accountCoverURL(ctx, spaceProfile.spaceId, spaceProfile.cover),
+        ]);
+        profile.avatarUrl = avatarUrl;
+        profile.coverUrl = coverUrl;
+        return profile;
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
@@ -1094,11 +1160,12 @@ export const loadPublicSpaceInvite = async ({
         const spaceProfile =
             (await ctx.get_space_profile()) as SpaceProfileResponse;
         const profile = profileFromSpaceProfile(spaceProfile);
-        profile.avatarUrl = await linkAvatarURL(
-            ctx,
-            spaceProfile.avatar,
-            avatarCache,
-        );
+        const [avatarUrl, coverUrl] = await Promise.all([
+            linkAvatarURL(ctx, spaceProfile.avatar, avatarCache),
+            linkCoverURL(ctx, spaceProfile.cover, avatarCache),
+        ]);
+        profile.avatarUrl = avatarUrl;
+        profile.coverUrl = coverUrl;
         const posts = await postPageFromLinkPage(
             ctx,
             (await ctx.list_posts(null, 60)) as SpacePostPageResponse,

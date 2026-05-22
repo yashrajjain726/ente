@@ -8,9 +8,14 @@ import type { Area, Point } from "react-easy-crop";
 import { profileBackground } from "screens/ProfileScreen";
 import {
     prepareSpaceAvatarImageFromCrop,
+    prepareSpaceCoverImageFromCrop,
     spaceAvatarCropImageForFile,
     spaceAvatarImageErrorMessage,
     spaceAvatarImageInputAccept,
+    spaceCoverCropImageForFile,
+    spaceCoverImageErrorMessage,
+    spaceCoverImageInputAccept,
+    spaceProfileCoverAspectRatio,
 } from "utils/spacePostImage";
 
 const green = "#08C225";
@@ -26,11 +31,18 @@ interface EditProfilePhotoScreenProps {
     avatarFile: File;
     onBack: () => void;
     onSave: (avatarFile: File) => Promise<void>;
+    variant?: "avatar" | "cover";
+}
+
+interface EditProfileCoverScreenProps {
+    coverFile: File;
+    onBack: () => void;
+    onSave: (coverFile: File) => Promise<void>;
 }
 
 const EditProfilePhotoShell: React.FC<
-    React.PropsWithChildren<{ onBack: () => void }>
-> = ({ children, onBack }) => (
+    React.PropsWithChildren<{ onBack: () => void; title: string }>
+> = ({ children, onBack, title }) => (
     <Box
         component="main"
         sx={{
@@ -107,7 +119,7 @@ const EditProfilePhotoShell: React.FC<
                         m: 0,
                     }}
                 >
-                    Edit profile photo
+                    {title}
                 </Box>
                 <Box />
             </Box>
@@ -120,7 +132,16 @@ export const EditProfilePhotoScreen: React.FC<EditProfilePhotoScreenProps> = ({
     avatarFile,
     onBack,
     onSave,
+    variant = "avatar",
 }) => {
+    const isCover = variant == "cover";
+    const title = isCover ? "Edit cover photo" : "Edit profile photo";
+    const inputAccept = isCover
+        ? spaceCoverImageInputAccept
+        : spaceAvatarImageInputAccept;
+    const imageErrorMessage = isCover
+        ? spaceCoverImageErrorMessage
+        : spaceAvatarImageErrorMessage;
     const [avatarCropImage, setAvatarCropImage] =
         useState<AvatarCropImage | null>(null);
     const [avatarCrop, setAvatarCrop] = useState<Point>({ x: 0, y: 0 });
@@ -152,7 +173,9 @@ export const EditProfilePhotoScreen: React.FC<EditProfilePhotoScreenProps> = ({
             setAvatarCropImage(null);
             setAvatarCropPixels(null);
             try {
-                const cropImage = await spaceAvatarCropImageForFile(file);
+                const cropImage = await (isCover
+                    ? spaceCoverCropImageForFile(file)
+                    : spaceAvatarCropImageForFile(file));
                 if (avatarSelectionIDRef.current != selectionID) {
                     URL.revokeObjectURL(cropImage.url);
                     return;
@@ -166,15 +189,15 @@ export const EditProfilePhotoScreen: React.FC<EditProfilePhotoScreenProps> = ({
                 setAvatarZoom(1);
             } catch (error) {
                 if (avatarSelectionIDRef.current != selectionID) return;
-                console.error("Failed to prepare space avatar", error);
-                setAvatarError(spaceAvatarImageErrorMessage(error));
+                console.error("Failed to prepare space profile image", error);
+                setAvatarError(imageErrorMessage(error));
             } finally {
                 if (avatarSelectionIDRef.current == selectionID) {
                     setIsPreparingAvatar(false);
                 }
             }
         },
-        [],
+        [imageErrorMessage, isCover],
     );
 
     useEffect(() => {
@@ -203,15 +226,21 @@ export const EditProfilePhotoScreen: React.FC<EditProfilePhotoScreenProps> = ({
         setIsApplyingAvatarCrop(true);
         let avatarFile: File;
         try {
-            const avatar = await prepareSpaceAvatarImageFromCrop(
-                avatarCropImage.file,
-                avatarCropImage.url,
-                avatarCropPixels,
-            );
+            const avatar = await (isCover
+                ? prepareSpaceCoverImageFromCrop(
+                      avatarCropImage.file,
+                      avatarCropImage.url,
+                      avatarCropPixels,
+                  )
+                : prepareSpaceAvatarImageFromCrop(
+                      avatarCropImage.file,
+                      avatarCropImage.url,
+                      avatarCropPixels,
+                  ));
             avatarFile = avatar.file;
         } catch (error) {
-            console.error("Failed to crop space avatar", error);
-            setAvatarError(spaceAvatarImageErrorMessage(error));
+            console.error("Failed to crop space profile image", error);
+            setAvatarError(imageErrorMessage(error));
             setIsApplyingAvatarCrop(false);
             return;
         }
@@ -219,7 +248,7 @@ export const EditProfilePhotoScreen: React.FC<EditProfilePhotoScreenProps> = ({
         try {
             await onSave(avatarFile);
         } catch (error) {
-            console.error("Failed to save space avatar", error);
+            console.error("Failed to save space profile image", error);
             setAvatarError(
                 error instanceof Error
                     ? error.message
@@ -233,7 +262,7 @@ export const EditProfilePhotoScreen: React.FC<EditProfilePhotoScreenProps> = ({
         <Box
             component="input"
             ref={fileInputRef}
-            accept={spaceAvatarImageInputAccept}
+            accept={inputAccept}
             onChange={handleAvatarChange}
             type="file"
             sx={{ display: "none" }}
@@ -244,7 +273,7 @@ export const EditProfilePhotoScreen: React.FC<EditProfilePhotoScreenProps> = ({
         return (
             <>
                 {avatarFileInput}
-                <EditProfilePhotoShell onBack={onBack}>
+                <EditProfilePhotoShell onBack={onBack} title={title}>
                     <Box
                         sx={{
                             alignItems: "center",
@@ -257,7 +286,13 @@ export const EditProfilePhotoScreen: React.FC<EditProfilePhotoScreenProps> = ({
                         }}
                     >
                         {isPreparingAvatar ? (
-                            <SpaceLoadingSpinner ariaLabel="Preparing profile photo" />
+                            <SpaceLoadingSpinner
+                                ariaLabel={
+                                    isCover
+                                        ? "Preparing cover photo"
+                                        : "Preparing profile photo"
+                                }
+                            />
                         ) : (
                             <>
                                 {avatarError && (
@@ -337,9 +372,24 @@ export const EditProfilePhotoScreen: React.FC<EditProfilePhotoScreenProps> = ({
                 }
                 onDone={() => void applyAvatarCrop()}
                 onZoomChange={setAvatarZoom}
-                title="Edit profile photo"
+                aspect={isCover ? spaceProfileCoverAspectRatio : 1}
+                cropShape={isCover ? "rect" : "round"}
+                title={title}
                 zoom={avatarZoom}
             />
         </>
     );
 };
+
+export const EditProfileCoverScreen: React.FC<EditProfileCoverScreenProps> = ({
+    coverFile,
+    onBack,
+    onSave,
+}) => (
+    <EditProfilePhotoScreen
+        avatarFile={coverFile}
+        onBack={onBack}
+        onSave={onSave}
+        variant="cover"
+    />
+);

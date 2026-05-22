@@ -324,6 +324,9 @@ pub struct ProfileAvatarResponse {
     pub updated_at: String,
 }
 
+pub type ProfileCoverPayload = ProfileAvatarPayload;
+pub type ProfileCoverResponse = ProfileAvatarResponse;
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSpaceProfileRequest {
@@ -332,8 +335,12 @@ pub struct UpdateSpaceProfileRequest {
     pub encrypted_profile: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub avatar: Option<ProfileAvatarPayload>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cover: Option<ProfileCoverPayload>,
     #[serde(skip_serializing_if = "is_false")]
     pub remove_avatar: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub remove_cover: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -342,6 +349,8 @@ pub struct UpdateSpaceProfileResponse {
     pub status: String,
     #[serde(default)]
     pub avatar: Option<ProfileAvatarResponse>,
+    #[serde(default)]
+    pub cover: Option<ProfileCoverResponse>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -358,6 +367,8 @@ pub struct SpaceProfileResponse {
     pub updated_at: String,
     #[serde(default)]
     pub avatar: Option<ProfileAvatarResponse>,
+    #[serde(default)]
+    pub cover: Option<ProfileCoverResponse>,
 }
 
 #[derive(Debug, Clone, Serialize)]

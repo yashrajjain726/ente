@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS spaces (
     avatar_object_key    TEXT,
     avatar_bucket_id     TEXT,
     avatar_size          BIGINT,
+    cover_object_key     TEXT,
+    cover_bucket_id      TEXT,
+    cover_size           BIGINT,
     created_at           BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     updated_at           BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     CONSTRAINT uq_spaces_owner UNIQUE (owner_id),
@@ -127,7 +130,7 @@ CREATE TABLE IF NOT EXISTS space_temp_objects (
     expires_at      BIGINT NOT NULL,
     cleanup_after   BIGINT NOT NULL,
     created_at      BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    CONSTRAINT chk_space_temp_objects_purpose CHECK (purpose IN ('post', 'avatar')),
+    CONSTRAINT chk_space_temp_objects_purpose CHECK (purpose IN ('post', 'avatar', 'cover')),
     CONSTRAINT chk_space_temp_objects_expected_size CHECK (expected_size > 0)
 );
 

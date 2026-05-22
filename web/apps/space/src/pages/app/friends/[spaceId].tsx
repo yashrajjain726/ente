@@ -8,6 +8,7 @@ import {
     loadCurrentPostLikers,
     loadCurrentSpaceFriends,
     loadCurrentSpacePostsPage,
+    loadCurrentSpaceProfile,
     setCurrentPostLiked,
     type SpacePost,
 } from "services/space";
@@ -43,6 +44,7 @@ const Page: React.FC = () => {
             friend.spaceId == friendSpaceId || friend.id == friendSpaceId,
     );
     const [friendsLoadAttempted, setFriendsLoadAttempted] = useState(false);
+    const [selectedProfile, setSelectedProfile] = useState(selectedFriend);
     const [posts, setPosts] = useState<SpacePost[]>([]);
     const postGroups = useMemo(
         () => profilePostGroupsFromPosts(posts),
@@ -84,12 +86,25 @@ const Page: React.FC = () => {
     useEffect(() => {
         if (!selectedFriend?.spaceId) return;
 
-        void loadCurrentSpacePostsPage(selectedFriend.spaceId)
-            .then((page) => setPosts(page.items))
+        let cancelled = false;
+        setSelectedProfile(selectedFriend);
+        void Promise.all([
+            loadCurrentSpaceProfile(selectedFriend.spaceId),
+            loadCurrentSpacePostsPage(selectedFriend.spaceId),
+        ])
+            .then(([nextProfile, page]) => {
+                if (cancelled) return;
+                setSelectedProfile(nextProfile);
+                setPosts(page.items);
+            })
             .catch((error: unknown) =>
                 console.error("Failed to load friend posts", error),
             );
-    }, [selectedFriend?.spaceId]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedFriend]);
 
     const goBack = () => {
         if (typeof window != "undefined" && window.history.length > 1) {
@@ -117,15 +132,26 @@ const Page: React.FC = () => {
         <>
             <SpacePageMeta themeColor={friendsBackground} />
             <ProfileScreen
-                friendsCount={selectedFriend.friendsCount}
+                friendsCount={
+                    selectedProfile?.friendsCount ?? selectedFriend.friendsCount
+                }
                 headerVariant="friend"
                 postGroups={postGroups}
                 profile={{
-                    avatarUrl: selectedFriend.avatarUrl ?? null,
-                    fullName: selectedFriend.fullName,
-                    username: selectedFriend.username,
-                    spaceId: selectedFriend.spaceId,
-                    spaceSlug: selectedFriend.spaceSlug,
+                    avatarUrl:
+                        selectedProfile?.avatarUrl ??
+                        selectedFriend.avatarUrl ??
+                        null,
+                    coverUrl: selectedProfile?.coverUrl ?? null,
+                    coverObjectKey: selectedProfile?.coverObjectKey,
+                    coverUpdatedAt: selectedProfile?.coverUpdatedAt,
+                    fullName:
+                        selectedProfile?.fullName ?? selectedFriend.fullName,
+                    username:
+                        selectedProfile?.username ?? selectedFriend.username,
+                    spaceId: selectedProfile?.spaceId ?? selectedFriend.spaceId,
+                    spaceSlug:
+                        selectedProfile?.spaceSlug ?? selectedFriend.spaceSlug,
                 }}
                 onBack={goBack}
                 onOpenFriend={(nextFriendID) =>

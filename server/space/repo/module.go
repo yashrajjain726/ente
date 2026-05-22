@@ -55,8 +55,17 @@ type SpaceRecord struct {
 	AvatarObjectKey   sql.NullString
 	AvatarBucketID    sql.NullString
 	AvatarSize        sql.NullInt64
+	CoverObjectKey    sql.NullString
+	CoverBucketID     sql.NullString
+	CoverSize         sql.NullInt64
 	CreatedAt         int64
 	UpdatedAt         int64
+}
+
+type ProfileAssetUpdate struct {
+	ObjectKey string
+	BucketID  string
+	Size      int64
 }
 
 type SpaceVersionRecord struct {

@@ -101,6 +101,7 @@ func (c *SpacesController) GetProfile(ctx *gin.Context, req models.GetSpaceProfi
 		EncryptedProfile: space.EncryptedProfile,
 		UpdatedAt:        formatMicros(space.UpdatedAt),
 		Avatar:           toAvatarResponse(space),
+		Cover:            toCoverResponse(space),
 		Friends:          friendsCount,
 	}, nil
 }
@@ -119,6 +120,9 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 	if req.RemoveAvatar && req.Avatar != nil {
 		return nil, ente.NewBadRequestWithMessage("avatar and removeAvatar cannot both be set")
 	}
+	if req.RemoveCover && req.Cover != nil {
+		return nil, ente.NewBadRequestWithMessage("cover and removeCover cannot both be set")
+	}
 	spaceID := strings.TrimSpace(req.SpaceID)
 	current, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, spaceID)
 	if err != nil {
@@ -127,27 +131,31 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 	if req.KeyVersion != current.CurrentVersion {
 		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
 	}
-	avatar := (*struct {
-		ObjectKey string
-		BucketID  string
-		Size      int64
-	})(nil)
+	var avatar *repo.ProfileAssetUpdate
 	if req.Avatar != nil {
 		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, req.Avatar.ObjectKey, repo.TempObjectPurposeAvatar, &spaceID)
 		if err != nil {
 			return nil, err
 		}
-		avatar = &struct {
-			ObjectKey string
-			BucketID  string
-			Size      int64
-		}{
+		avatar = &repo.ProfileAssetUpdate{
 			ObjectKey: staged.ObjectKey,
 			BucketID:  staged.BucketID,
 			Size:      staged.ExpectedSize,
 		}
 	}
-	space, err := c.SpacesRepo.UpdateProfile(ctx.Request.Context(), userID, spaceID, req.KeyVersion, req.EncryptedProfile, avatar, req.RemoveAvatar)
+	var cover *repo.ProfileAssetUpdate
+	if req.Cover != nil {
+		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, req.Cover.ObjectKey, repo.TempObjectPurposeCover, &spaceID)
+		if err != nil {
+			return nil, err
+		}
+		cover = &repo.ProfileAssetUpdate{
+			ObjectKey: staged.ObjectKey,
+			BucketID:  staged.BucketID,
+			Size:      staged.ExpectedSize,
+		}
+	}
+	space, err := c.SpacesRepo.UpdateProfile(ctx.Request.Context(), userID, spaceID, req.KeyVersion, req.EncryptedProfile, avatar, cover, req.RemoveAvatar, req.RemoveCover)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
@@ -157,6 +165,7 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 	return &models.UpdateSpaceProfileResponse{
 		Status: "updated",
 		Avatar: toAvatarResponse(space),
+		Cover:  toCoverResponse(space),
 	}, nil
 }
 

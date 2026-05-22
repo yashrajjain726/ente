@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::transport::{PostObjectPayload, ProfileAvatarResponse, SpaceActorResponse};
+use crate::transport::{
+    PostObjectPayload, ProfileAvatarResponse, ProfileCoverResponse, SpaceActorResponse,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -71,6 +73,7 @@ pub struct DecryptedSpaceProfile {
     pub friends: i64,
     pub profile: Vec<u8>,
     pub avatar: Option<ProfileAvatarResponse>,
+    pub cover: Option<ProfileCoverResponse>,
     pub updated_at: Option<String>,
 }
 

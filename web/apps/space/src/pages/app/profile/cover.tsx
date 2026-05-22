@@ -13,7 +13,7 @@ const Page: React.FC = () => {
         profile,
         profileLoadError,
         profileLoadStatus,
-        setPendingProfileAvatarFile,
+        setPendingProfileCoverFile,
     } = useSpaceAppState();
 
     useEffect(() => {
@@ -36,11 +36,11 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={profileBackground} />
             <ProfileImageViewerScreen
                 profile={profile}
-                variant="avatar"
+                variant="cover"
                 onBack={() => void router.push(spaceRoutes.profile)}
                 onSelectFile={(file) => {
-                    setPendingProfileAvatarFile(file);
-                    void router.push(spaceRoutes.editProfilePhoto);
+                    setPendingProfileCoverFile(file);
+                    void router.push(spaceRoutes.editProfileCover);
                 }}
             />
         </>

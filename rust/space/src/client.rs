@@ -23,10 +23,10 @@ use crate::transport::{
     ListPostLikersResponse, MarkFeedReadRequest, MarkNotificationsReadRequest,
     MessageConversationPage, MessagePage, MessageResponse, PostObjectPayload, PostPage,
     PostResponse, PresignUploadRequest, PresignUploadResponse, ProfileAvatarPayload,
-    RefreshFriendSharesRequest, RotateSpaceKeyRequest, ShareUpdatePayload, SpaceActorResponse,
-    SpaceFriendResponse, SpaceKeyResponse, SpaceKeyVersionResponse, SpaceLinkCreateRequest,
-    SpaceLinkLoginRequest, SpaceLinkLoginResponse, SpaceLinkStatusResponse, SpaceLookupResponse,
-    SpaceProfileResponse, SpaceUnreadStatusResponse, UpdatePostCaptionRequest,
+    ProfileCoverPayload, RefreshFriendSharesRequest, RotateSpaceKeyRequest, ShareUpdatePayload,
+    SpaceActorResponse, SpaceFriendResponse, SpaceKeyResponse, SpaceKeyVersionResponse,
+    SpaceLinkCreateRequest, SpaceLinkLoginRequest, SpaceLinkLoginResponse, SpaceLinkStatusResponse,
+    SpaceLookupResponse, SpaceProfileResponse, SpaceUnreadStatusResponse, UpdatePostCaptionRequest,
     UpdateSpaceProfileRequest, UpdateSpaceProfileResponse, UpdateSpaceSlugRequest,
 };
 use ente_core::crypto::{sealed, secretbox};
@@ -34,15 +34,19 @@ use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
 
 const ROOT_SPACE_KEY_TYPE: &str = "space";
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
+const UPLOAD_PURPOSE_COVER: &str = "cover";
 const MESSAGE_KIND_REGULAR: &str = "regular";
 const MESSAGE_KIND_POST_REPLY: &str = "post_reply";
 const ONLY_PHOTOS_UPLOAD_MESSAGE: &str = "only photos can be uploaded";
 pub const MAX_SPACE_POST_UPLOAD_BYTES: usize = 10 * 1024 * 1024;
 pub const MAX_SPACE_AVATAR_UPLOAD_BYTES: usize = 2 * 1024 * 1024;
+pub const MAX_SPACE_COVER_UPLOAD_BYTES: usize = 2 * 1024 * 1024;
 pub const MAX_SPACE_POST_PLAINTEXT_BYTES: usize =
     MAX_SPACE_POST_UPLOAD_BYTES - PACKED_SECRETBOX_OVERHEAD_BYTES;
 pub const MAX_SPACE_AVATAR_PLAINTEXT_BYTES: usize =
     MAX_SPACE_AVATAR_UPLOAD_BYTES - PACKED_SECRETBOX_OVERHEAD_BYTES;
+pub const MAX_SPACE_COVER_PLAINTEXT_BYTES: usize =
+    MAX_SPACE_COVER_UPLOAD_BYTES - PACKED_SECRETBOX_OVERHEAD_BYTES;
 pub const MAX_SPACE_MESSAGE_TEXT_CHARS: usize = 1000;
 pub const MAX_SPACE_MESSAGE_TEXT_BYTES: usize = 4 * 1024;
 pub const MAX_SPACE_MESSAGE_CIPHER_DECODED_BYTES: usize = 6 * 1024;
@@ -365,6 +369,19 @@ impl AccountSpaceCtx {
         avatar: Option<ProfileAvatarPayload>,
         remove_avatar: bool,
     ) -> Result<UpdateSpaceProfileResponse> {
+        self.update_space_profile_assets(space_id, profile, avatar, None, remove_avatar, false)
+            .await
+    }
+
+    pub async fn update_space_profile_assets(
+        &self,
+        space_id: &str,
+        profile: &[u8],
+        avatar: Option<ProfileAvatarPayload>,
+        cover: Option<ProfileCoverPayload>,
+        remove_avatar: bool,
+        remove_cover: bool,
+    ) -> Result<UpdateSpaceProfileResponse> {
         let space_key = self
             .resolve_owned_space_access(space_id)
             .await?
@@ -379,7 +396,9 @@ impl AccountSpaceCtx {
                 profile,
             )?),
             avatar,
+            cover,
             remove_avatar,
+            remove_cover,
         };
         let response = self
             .client
@@ -512,6 +531,23 @@ impl AccountSpaceCtx {
             .map_err(Into::into)
     }
 
+    pub async fn presign_cover_upload(
+        &self,
+        space_id: &str,
+        size: usize,
+    ) -> Result<PresignUploadResponse> {
+        ensure_space_upload_size("cover", size, MAX_SPACE_COVER_UPLOAD_BYTES)?;
+        let request = PresignUploadRequest {
+            size: size as i64,
+            purpose: Some(UPLOAD_PURPOSE_COVER.to_owned()),
+            space_id: Some(space_id.to_owned()),
+        };
+        self.client
+            .post_json("/space/uploads/presign", &request)
+            .await
+            .map_err(Into::into)
+    }
+
     pub async fn upload_bytes(&self, presign: &PresignUploadResponse, body: &[u8]) -> Result<()> {
         let headers: Vec<(&str, String)> = presign
             .headers
@@ -574,11 +610,41 @@ impl AccountSpaceCtx {
         space_key: &[u8],
         plaintext: &[u8],
     ) -> Result<ProfileAvatarPayload> {
+        self.upload_profile_asset(space_id, space_key, plaintext, UPLOAD_PURPOSE_AVATAR)
+            .await
+    }
+
+    pub async fn upload_cover(
+        &self,
+        space_id: &str,
+        space_key: &[u8],
+        plaintext: &[u8],
+    ) -> Result<ProfileCoverPayload> {
+        self.upload_profile_asset(space_id, space_key, plaintext, UPLOAD_PURPOSE_COVER)
+            .await
+    }
+
+    async fn upload_profile_asset(
+        &self,
+        space_id: &str,
+        space_key: &[u8],
+        plaintext: &[u8],
+        purpose: &str,
+    ) -> Result<ProfileAvatarPayload> {
         ensure_supported_photo_bytes(plaintext)?;
         let encrypted = encrypt_asset_payload(space_key, plaintext)?;
-        let presign = self
-            .presign_avatar_upload(space_id, encrypted.len())
-            .await?;
+        let presign = match purpose {
+            UPLOAD_PURPOSE_AVATAR => {
+                self.presign_avatar_upload(space_id, encrypted.len())
+                    .await?
+            }
+            UPLOAD_PURPOSE_COVER => self.presign_cover_upload(space_id, encrypted.len()).await?,
+            _ => {
+                return Err(SpaceError::InvalidInput(
+                    "invalid profile asset purpose".into(),
+                ));
+            }
+        };
         self.upload_bytes(&presign, &encrypted).await?;
         Ok(ProfileAvatarPayload {
             object_key: presign.object_key,
@@ -1916,6 +1982,7 @@ fn decrypt_space_profile(
         friends: profile.friends,
         profile: profile_bytes,
         avatar: profile.avatar.clone(),
+        cover: profile.cover.clone(),
         updated_at: if profile.updated_at.is_empty() {
             None
         } else {
@@ -2578,6 +2645,17 @@ mod tests {
                 .to_string()
                 .contains(&MAX_SPACE_AVATAR_UPLOAD_BYTES.to_string())
         );
+
+        let cover_error = ctx
+            .presign_cover_upload("space_owner_main", MAX_SPACE_COVER_UPLOAD_BYTES + 1)
+            .await
+            .expect_err("oversized cover upload should fail before presign");
+        assert!(cover_error.to_string().contains("cover upload size"));
+        assert!(
+            cover_error
+                .to_string()
+                .contains(&MAX_SPACE_COVER_UPLOAD_BYTES.to_string())
+        );
     }
 
     #[tokio::test]
@@ -2636,6 +2714,51 @@ mod tests {
             .expect_err("video avatar bytes should fail before upload");
 
         assert!(err.to_string().contains(ONLY_PHOTOS_UPLOAD_MESSAGE));
+    }
+
+    #[tokio::test]
+    async fn upload_cover_uses_cover_presign_and_object_store() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let presign = server
+            .mock("POST", "/space/uploads/presign")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"purpose\":\"cover\"".into()),
+                Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+                Matcher::Regex("\"size\"".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "url": format!("{}/upload/cover-object", server.url()),
+                    "method": "PUT",
+                    "headers": {
+                        "content-type": "application/octet-stream"
+                    },
+                    "objectKey": "cover-object",
+                    "expiresIn": 300
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let upload = server
+            .mock("PUT", "/upload/cover-object")
+            .match_header("content-type", "application/octet-stream")
+            .with_status(200)
+            .create_async()
+            .await;
+
+        let payload = ctx
+            .upload_cover("space_owner_main", &generate_key(), TEST_WEBP_BYTES)
+            .await
+            .expect("cover upload should succeed");
+
+        assert_eq!(payload.object_key, "cover-object");
+        assert!(payload.size.unwrap_or_default() > 0);
+        presign.assert_async().await;
+        upload.assert_async().await;
     }
 
     #[tokio::test]
@@ -2892,7 +3015,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn update_space_profile_sends_encrypted_profile_and_avatar_payload() {
+    async fn update_space_profile_sends_encrypted_profile_and_profile_assets() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
@@ -2931,6 +3054,9 @@ mod tests {
                 Matcher::Regex("\"avatar\"".into()),
                 Matcher::Regex("\"objectKey\":\"avatar-object\"".into()),
                 Matcher::Regex("\"size\":123".into()),
+                Matcher::Regex("\"cover\"".into()),
+                Matcher::Regex("\"objectKey\":\"cover-object\"".into()),
+                Matcher::Regex("\"size\":456".into()),
             ]))
             .with_status(200)
             .with_body(
@@ -2940,6 +3066,11 @@ mod tests {
                         "objectKey": "avatar-object",
                         "size": 123,
                         "updatedAt": "2026-04-16T00:00:00Z"
+                    },
+                    "cover": {
+                        "objectKey": "cover-object",
+                        "size": 456,
+                        "updatedAt": "2026-04-16T00:00:00Z"
                     }
                 })
                 .to_string(),
@@ -2948,13 +3079,18 @@ mod tests {
             .await;
 
         let response = ctx
-            .update_space_profile(
+            .update_space_profile_assets(
                 "space_owner_main",
                 b"profile-v2",
                 Some(ProfileAvatarPayload {
                     object_key: "avatar-object".to_owned(),
                     size: Some(123),
                 }),
+                Some(ProfileCoverPayload {
+                    object_key: "cover-object".to_owned(),
+                    size: Some(456),
+                }),
+                false,
                 false,
             )
             .await
@@ -2967,6 +3103,13 @@ mod tests {
                 .as_ref()
                 .map(|avatar| avatar.object_key.as_str()),
             Some("avatar-object")
+        );
+        assert_eq!(
+            response
+                .cover
+                .as_ref()
+                .map(|cover| cover.object_key.as_str()),
+            Some("cover-object")
         );
         entity.assert_async().await;
         spaces.assert_async().await;

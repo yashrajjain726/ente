@@ -5,8 +5,8 @@ use ente_space::{
     AccountSpaceCtx, AuthKeyAttributes, CreatedSpace, CreatedSpaceLink, DecryptedMessage,
     DecryptedPost, DecryptedSpaceProfile, MessageConversationActivity, MessageConversationPost,
     MessageResponse, OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostResponse,
-    PrivateKeySource, ProfileAvatarResponse, SpaceActorResponse, SpaceError as CoreSpaceError,
-    SpaceLinkCtx,
+    PrivateKeySource, ProfileAvatarResponse, ProfileCoverResponse, SpaceActorResponse,
+    SpaceError as CoreSpaceError, SpaceLinkCtx,
     crypto::{decode_b64, encode_b64},
 };
 use serde::{Deserialize, Serialize};
@@ -132,6 +132,7 @@ struct SpaceProfileJs {
     friends: i64,
     profile: String,
     avatar: Option<ProfileAvatarResponse>,
+    cover: Option<ProfileCoverResponse>,
     updated_at: Option<String>,
 }
 
@@ -317,6 +318,7 @@ fn profile_to_js(value: DecryptedSpaceProfile) -> Result<SpaceProfileJs, WasmSpa
         friends: value.friends,
         profile: utf8_field(value.profile, "profile")?,
         avatar: value.avatar,
+        cover: value.cover,
         updated_at: value.updated_at,
     })
 }
@@ -632,6 +634,42 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
+    /// Update a space profile and replace its encrypted cover asset.
+    pub async fn update_space_profile_with_cover(
+        &self,
+        space_id: String,
+        profile: String,
+        cover_bytes: Vec<u8>,
+    ) -> Result<JsValue, WasmSpaceError> {
+        let space_key = self
+            .inner
+            .resolve_owned_space_key(&space_id)
+            .await?
+            .ok_or_else(|| {
+                CoreSpaceError::InvalidInput(format!(
+                    "space {space_id} is not owned by the account"
+                ))
+            })?;
+        let cover = self
+            .inner
+            .upload_cover(&space_id, &space_key, &cover_bytes)
+            .await?;
+        swb::to_value(
+            &self
+                .inner
+                .update_space_profile_assets(
+                    &space_id,
+                    profile.as_bytes(),
+                    None,
+                    Some(cover),
+                    false,
+                    false,
+                )
+                .await?,
+        )
+        .map_err(Into::into)
+    }
+
     /// Update a space's slug.
     pub async fn update_space_slug(
         &self,
@@ -853,6 +891,25 @@ impl SpaceAccountCtxHandle {
 
     /// Download and decrypt a space avatar using an owned or friend space key.
     pub async fn download_space_avatar(
+        &self,
+        space_id: String,
+        object_key: String,
+    ) -> Result<Vec<u8>, WasmSpaceError> {
+        let space_key = self
+            .inner
+            .resolve_space_key(&space_id)
+            .await?
+            .ok_or_else(|| {
+                CoreSpaceError::InvalidInput(format!("no space key available for {space_id}"))
+            })?;
+        self.inner
+            .download_decrypted_asset(&space_id, &object_key, &space_key)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Download and decrypt a space cover using an owned or friend space key.
+    pub async fn download_space_cover(
         &self,
         space_id: String,
         object_key: String,
@@ -1122,6 +1179,17 @@ impl SpaceLinkCtxHandle {
 
     /// Download and decrypt the public space avatar.
     pub async fn download_space_avatar(
+        &self,
+        object_key: String,
+    ) -> Result<Vec<u8>, WasmSpaceError> {
+        self.inner
+            .download_decrypted_asset(&object_key, self.inner.space_key())
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Download and decrypt the public space cover.
+    pub async fn download_space_cover(
         &self,
         object_key: String,
     ) -> Result<Vec<u8>, WasmSpaceError> {

@@ -15,6 +15,7 @@ import type { PendingSpacePasskeyVerification } from "services/spacePasskeyVerif
 import {
     clearCurrentSpaceContext,
     loadExistingSpaceAvatar,
+    loadExistingSpaceCover,
     loadExistingSpaceProfile,
 } from "services/spaceProfile";
 import {
@@ -39,12 +40,15 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         useState<PendingSpacePasskeyVerification | null>(null);
     const [pendingProfileAvatarFile, setPendingProfileAvatarFile] =
         useState<File | null>(null);
+    const [pendingProfileCoverFile, setPendingProfileCoverFile] =
+        useState<File | null>(null);
     const [profile, setProfile] = useState<SetupProfile | null>(null);
     const [profileLoadError, setProfileLoadError] = useState<string>();
     const [profileLoadStatus, setProfileLoadStatus] =
         useState<SpaceProfileLoadStatus>("loading");
     const [signupEmail, setSignupEmail] = useState("");
     const avatarURLRef = useRef<string | null>(null);
+    const coverURLRef = useRef<string | null>(null);
     const profileRef = useRef<SetupProfile | null>(null);
     const profileLoadGenerationRef = useRef(0);
 
@@ -55,6 +59,13 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         }
         avatarURLRef.current = nextProfile?.avatarUrl?.startsWith("blob:")
             ? nextProfile.avatarUrl
+            : null;
+        const previousCoverURL = coverURLRef.current;
+        if (previousCoverURL && previousCoverURL != nextProfile?.coverUrl) {
+            URL.revokeObjectURL(previousCoverURL);
+        }
+        coverURLRef.current = nextProfile?.coverUrl?.startsWith("blob:")
+            ? nextProfile.coverUrl
             : null;
         profileRef.current = nextProfile;
         setProfile(nextProfile);
@@ -96,6 +107,42 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         [applyProfile],
     );
 
+    const loadProfileCover = useCallback(
+        async (profileToHydrate: SetupProfile | null, generation: number) => {
+            if (
+                !profileToHydrate?.coverObjectKey ||
+                profileToHydrate.coverUrl
+            ) {
+                return;
+            }
+
+            try {
+                const coverUrl = await loadExistingSpaceCover(
+                    profileToHydrate.spaceId,
+                    profileToHydrate.coverObjectKey,
+                );
+                if (!coverUrl) return;
+
+                const currentProfile = profileRef.current;
+                if (
+                    profileLoadGenerationRef.current != generation ||
+                    !currentProfile ||
+                    currentProfile.spaceId != profileToHydrate.spaceId ||
+                    currentProfile.coverObjectKey !=
+                        profileToHydrate.coverObjectKey
+                ) {
+                    URL.revokeObjectURL(coverUrl);
+                    return;
+                }
+
+                applyProfile({ ...currentProfile, coverUrl });
+            } catch (error) {
+                console.warn("Failed to load space cover", error);
+            }
+        },
+        [applyProfile],
+    );
+
     const profileErrorMessage = (error: unknown) =>
         error instanceof Error
             ? error.message
@@ -112,6 +159,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
                 setProfileLoadError(undefined);
                 applyProfile(nextProfile);
                 void loadProfileAvatar(nextProfile, generation);
+                void loadProfileCover(nextProfile, generation);
                 setProfileLoadStatus("ready");
             }
             return nextProfile;
@@ -123,7 +171,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             }
             return null;
         }
-    }, [applyProfile, loadProfileAvatar]);
+    }, [applyProfile, loadProfileAvatar, loadProfileCover]);
 
     const resetAfterLogout = useCallback(() => {
         profileLoadGenerationRef.current += 1;
@@ -136,6 +184,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         setPendingLoginCredentials(null);
         setPendingPasskeyVerification(null);
         setPendingProfileAvatarFile(null);
+        setPendingProfileCoverFile(null);
         setOnboardingEntrySource("direct");
         setFriends(initialFriends());
     }, [applyProfile]);
@@ -152,6 +201,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             pendingLoginCredentials,
             pendingPasskeyVerification,
             pendingProfileAvatarFile,
+            pendingProfileCoverFile,
             profile,
             profileLoadError,
             profileLoadStatus,
@@ -163,6 +213,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             setPendingLoginCredentials,
             setPendingPasskeyVerification,
             setPendingProfileAvatarFile,
+            setPendingProfileCoverFile,
             setProfile: applyProfile,
             setSignupEmail,
             signupEmail,
@@ -174,6 +225,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             pendingLoginCredentials,
             pendingPasskeyVerification,
             pendingProfileAvatarFile,
+            pendingProfileCoverFile,
             profile,
             profileLoadError,
             profileLoadStatus,
