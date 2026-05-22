@@ -13,6 +13,7 @@ export interface SpaceAppState {
     onboardingEntrySource: OnboardingEntrySource;
     pendingLoginCredentials: SpaceLoginCredentials | null;
     pendingPasskeyVerification: PendingSpacePasskeyVerification | null;
+    pendingProfileAvatarFile: File | null;
     profile: SetupProfile | null;
     profileLoadError?: string;
     profileLoadStatus: SpaceProfileLoadStatus;
@@ -29,6 +30,9 @@ export interface SpaceAppState {
     >;
     setPendingPasskeyVerification: React.Dispatch<
         React.SetStateAction<PendingSpacePasskeyVerification | null>
+    >;
+    setPendingProfileAvatarFile: React.Dispatch<
+        React.SetStateAction<File | null>
     >;
     setProfile: (profile: SetupProfile | null) => void;
     setSignupEmail: React.Dispatch<React.SetStateAction<string>>;

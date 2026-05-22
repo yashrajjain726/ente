@@ -14,6 +14,7 @@ export const spaceRoutes = {
     onboarding: "/",
     passkeysFinish: "/passkeys/finish",
     passkeysVerify: "/passkeys/verify",
+    editProfilePhoto: "/app/profile/photo",
     profile: "/app/profile",
     settings: "/app/settings",
     setupProfile: (from?: SetupProfileSource) =>

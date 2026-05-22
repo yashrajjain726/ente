@@ -25,6 +25,7 @@ const Page: React.FC = () => {
         profileLoadError,
         profileLoadStatus,
         setFriends,
+        setPendingProfileAvatarFile,
     } = useSpaceAppState();
     const [posts, setPosts] = useState<SpacePost[]>([]);
     const [isPostsLoading, setIsPostsLoading] = useState(true);
@@ -102,6 +103,10 @@ const Page: React.FC = () => {
                     setPosts((currentPosts) => [post, ...currentPosts]);
                 }}
                 onDraftPostPublished={() => void router.push(spaceRoutes.home)}
+                onEditProfilePhoto={(file) => {
+                    setPendingProfileAvatarFile(file);
+                    void router.push(spaceRoutes.editProfilePhoto);
+                }}
                 onDeletePost={async (postId) => {
                     await deleteCurrentPost(postId);
                     setPosts((currentPosts) =>

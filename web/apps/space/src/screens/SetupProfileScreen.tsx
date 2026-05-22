@@ -1,6 +1,8 @@
 import { Box } from "@mui/material";
+import { SpaceAvatarCropPage } from "components/SpaceAvatarCropPage";
+import { SpaceAvatarEditButton } from "components/SpaceAvatarEditButton";
 import React, { useEffect, useRef, useState } from "react";
-import Cropper, { type Area, type Point } from "react-easy-crop";
+import type { Area, Point } from "react-easy-crop";
 import {
     prepareSpaceAvatarImageFromCrop,
     spaceAvatarCropImageForFile,
@@ -55,21 +57,6 @@ interface TextInputProps {
     value?: string;
 }
 
-interface AvatarCropPageProps {
-    crop: Point;
-    errorMessage?: string;
-    imageURL: string;
-    isDoneDisabled?: boolean;
-    isSaving?: boolean;
-    onBack: () => void;
-    onChooseAnother: () => void;
-    onCropChange: (crop: Point) => void;
-    onCropComplete: (croppedArea: Area, croppedAreaPixels: Area) => void;
-    onDone: () => void;
-    onZoomChange: (zoom: number) => void;
-    zoom: number;
-}
-
 const BackIcon: React.FC = () => (
     <Box
         component="svg"
@@ -108,24 +95,6 @@ const UploadIcon: React.FC = () => (
             fill="none"
             r="3"
             stroke="currentColor"
-            strokeWidth="1.8"
-        />
-    </Box>
-);
-
-const PencilIcon: React.FC = () => (
-    <Box
-        component="svg"
-        viewBox="0 0 24 24"
-        aria-hidden
-        sx={{ display: "block", height: 14, width: 14 }}
-    >
-        <path
-            d="M14.25 5.25L18.75 9.75M4.75 19.25L8.9 18.45L19.35 8C20.25 7.1 20.25 5.65 19.35 4.75C18.45 3.85 17 3.85 16.1 4.75L5.65 15.2L4.75 19.25Z"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
             strokeWidth="1.8"
         />
     </Box>
@@ -257,303 +226,6 @@ const TextInput: React.FC<TextInputProps> = ({
                 }}
             />
             {endAdornment}
-        </Box>
-    </Box>
-);
-
-const AvatarCropPageButton: React.FC<{
-    children: React.ReactNode;
-    disabled?: boolean;
-    onClick?: () => void;
-}> = ({ children, disabled = false, onClick }) => (
-    <Box
-        className={!disabled ? "green-bg" : undefined}
-        component="button"
-        type="button"
-        disabled={disabled}
-        onClick={onClick}
-        sx={{
-            alignItems: "center",
-            bgcolor: disabled ? "#F5F5F5" : green,
-            border: 0,
-            borderRadius: "20px",
-            color: disabled ? textLight : "white",
-            cursor: disabled ? "default" : "pointer",
-            display: "flex",
-            flex: "0 0 auto",
-            fontFamily: '"Inter Variable", Inter, sans-serif',
-            fontSize: 14,
-            fontWeight: 500,
-            height: 44,
-            justifyContent: "center",
-            lineHeight: "20px",
-            minWidth: 0,
-            px: 2,
-            width: "100%",
-            "&:focus-visible": {
-                outline: `2px solid ${green}`,
-                outlineOffset: 3,
-            },
-            "&:hover": !disabled ? { bgcolor: "#07AE22" } : undefined,
-        }}
-    >
-        {children}
-    </Box>
-);
-
-const AvatarCropPageLinkButton: React.FC<{
-    children: React.ReactNode;
-    disabled?: boolean;
-    onClick?: () => void;
-}> = ({ children, disabled = false, onClick }) => (
-    <Box
-        component="button"
-        type="button"
-        disabled={disabled}
-        onClick={onClick}
-        sx={{
-            alignItems: "center",
-            bgcolor: "transparent",
-            border: 0,
-            color: "#666",
-            cursor: disabled ? "default" : "pointer",
-            display: "flex",
-            fontFamily: '"Inter Variable", Inter, sans-serif',
-            fontSize: 14,
-            fontWeight: 500,
-            justifyContent: "center",
-            lineHeight: "20px",
-            minWidth: 0,
-            opacity: 0.8,
-            p: 0,
-            textAlign: "center",
-            textDecoration: "underline",
-            textDecorationSkipInk: "none",
-            textUnderlineOffset: "2px",
-            textUnderlinePosition: "from-font",
-            width: "fit-content",
-            alignSelf: "center",
-            "&:focus-visible": {
-                borderRadius: "4px",
-                outline: `2px solid ${green}`,
-                outlineOffset: 4,
-            },
-        }}
-    >
-        {children}
-    </Box>
-);
-
-const AvatarCropPage: React.FC<AvatarCropPageProps> = ({
-    crop,
-    errorMessage,
-    imageURL,
-    isDoneDisabled = false,
-    isSaving = false,
-    onBack,
-    onChooseAnother,
-    onCropChange,
-    onCropComplete,
-    onDone,
-    onZoomChange,
-    zoom,
-}) => (
-    <Box
-        component="main"
-        sx={{
-            "--avatar-crop-size":
-                "min(calc(100vw - 48px), calc(100dvh - 294px), 342px)",
-            bgcolor: setupProfileBackground,
-            color: textBase,
-            display: "grid",
-            height: "100dvh",
-            inset: 0,
-            overflow: "hidden",
-            placeItems: { xs: "stretch", sm: "start center" },
-            position: "fixed",
-            width: "100%",
-        }}
-    >
-        <Box
-            sx={{
-                bgcolor: setupProfileBackground,
-                boxSizing: "border-box",
-                display: "grid",
-                gridTemplateRows: "42px auto auto minmax(0, 1fr) auto",
-                height: "100%",
-                minHeight: 0,
-                mx: "auto",
-                overflowX: "hidden",
-                overflowY: "hidden",
-                pb: "calc(24px + env(safe-area-inset-bottom))",
-                pt: "32px",
-                px: 3,
-                width: "100%",
-                "@media (min-width: 600px)": { maxWidth: 390 },
-            }}
-        >
-            <Box
-                component="header"
-                sx={{
-                    display: "grid",
-                    gridTemplateColumns: "42px 1fr 42px",
-                    height: 42,
-                    width: "100%",
-                }}
-            >
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label="Back"
-                    disabled={isSaving}
-                    onClick={onBack}
-                    sx={{
-                        alignItems: "center",
-                        bgcolor: "transparent",
-                        border: 0,
-                        color: textBase,
-                        cursor: isSaving ? "default" : "pointer",
-                        display: "flex",
-                        height: 42,
-                        justifyContent: "flex-start",
-                        p: 0,
-                        width: 42,
-                        "&:focus-visible": {
-                            borderRadius: "50%",
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
-                    }}
-                >
-                    <BackIcon />
-                </Box>
-                <Box
-                    component="h1"
-                    sx={{
-                        alignSelf: "center",
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 20,
-                        fontWeight: 600,
-                        justifySelf: "center",
-                        lineHeight: "28px",
-                        m: 0,
-                        whiteSpace: "nowrap",
-                    }}
-                >
-                    Edit profile picture
-                </Box>
-                <Box />
-            </Box>
-
-            <Box
-                sx={{
-                    alignSelf: "center",
-                    bgcolor: "#111",
-                    borderRadius: "8px",
-                    height: "var(--avatar-crop-size)",
-                    aspectRatio: "1 / 1",
-                    mt: { xs: "24px", sm: "32px" },
-                    overflow: "hidden",
-                    position: "relative",
-                    width: "var(--avatar-crop-size)",
-                }}
-            >
-                <Cropper
-                    aspect={1}
-                    crop={crop}
-                    cropShape="round"
-                    disableAutomaticStylesInjection
-                    image={imageURL}
-                    maxZoom={3}
-                    minZoom={1}
-                    objectFit="cover"
-                    onCropChange={onCropChange}
-                    onCropComplete={onCropComplete}
-                    onZoomChange={onZoomChange}
-                    showGrid={false}
-                    zoom={zoom}
-                />
-            </Box>
-
-            <Box sx={{ mt: "28px", width: "100%" }}>
-                <Box
-                    component="label"
-                    htmlFor="space-avatar-zoom"
-                    sx={{
-                        border: 0,
-                        clip: "rect(0 0 0 0)",
-                        height: 1,
-                        m: -1,
-                        overflow: "hidden",
-                        p: 0,
-                        position: "absolute",
-                        width: 1,
-                    }}
-                >
-                    Zoom
-                </Box>
-                <Box
-                    component="input"
-                    id="space-avatar-zoom"
-                    type="range"
-                    min={1}
-                    max={3}
-                    step={0.01}
-                    value={zoom}
-                    onChange={(event) =>
-                        onZoomChange(Number(event.target.value))
-                    }
-                    sx={{
-                        accentColor: green,
-                        display: "block",
-                        m: 0,
-                        maxWidth: "100%",
-                        width: "100%",
-                    }}
-                />
-            </Box>
-            {errorMessage && (
-                <Box
-                    role="alert"
-                    sx={{
-                        color: warning,
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 13,
-                        fontWeight: 500,
-                        lineHeight: "18px",
-                        mt: 2,
-                        textAlign: "center",
-                    }}
-                >
-                    {errorMessage}
-                </Box>
-            )}
-
-            <Box
-                sx={{
-                    bgcolor: setupProfileBackground,
-                    boxSizing: "border-box",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "16px",
-                    gridRow: 5,
-                    pt: 3,
-                    width: "100%",
-                }}
-            >
-                <AvatarCropPageButton
-                    disabled={isSaving || isDoneDisabled}
-                    onClick={onDone}
-                >
-                    {isSaving ? "Saving..." : "Done"}
-                </AvatarCropPageButton>
-                <AvatarCropPageLinkButton
-                    disabled={isSaving}
-                    onClick={onChooseAnother}
-                >
-                    Change picture
-                </AvatarCropPageLinkButton>
-            </Box>
         </Box>
     </Box>
 );
@@ -724,7 +396,8 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
         return (
             <>
                 {avatarFileInput}
-                <AvatarCropPage
+                <SpaceAvatarCropPage
+                    background={setupProfileBackground}
                     crop={avatarCrop}
                     errorMessage={avatarError}
                     imageURL={avatarCropImage.url}
@@ -903,37 +576,10 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                                 <UploadIcon />
                             )}
                         </Box>
-                        <Box
-                            component="button"
-                            type="button"
-                            aria-label="Edit profile picture"
+                        <SpaceAvatarEditButton
                             disabled={isPreparingAvatar}
                             onClick={() => fileInputRef.current?.click()}
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: "white",
-                                border: 0,
-                                borderRadius: "50%",
-                                bottom: 6,
-                                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
-                                color: textBase,
-                                cursor: isPreparingAvatar
-                                    ? "default"
-                                    : "pointer",
-                                display: "flex",
-                                height: 30,
-                                justifyContent: "center",
-                                position: "absolute",
-                                right: -2,
-                                width: 30,
-                                "&:focus-visible": {
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 3,
-                                },
-                            }}
-                        >
-                            <PencilIcon />
-                        </Box>
+                        />
                     </Box>
 
                     <Box

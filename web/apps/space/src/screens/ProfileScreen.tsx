@@ -6,6 +6,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpaceActionFeedbackIcon } from "components/SpaceActionFeedback";
+import { SpaceAvatarEditButton } from "components/SpaceAvatarEditButton";
 import {
     SpaceFileViewer,
     type SpaceLiker,
@@ -21,6 +22,7 @@ import { createLocalPostPhoto } from "utils/localPostPhoto";
 import { firstNameFrom, initialsFor } from "utils/spaceDisplay";
 import {
     prepareSpacePostImage,
+    spaceAvatarImageInputAccept,
     spacePostImageErrorMessage,
     spacePostImageInputAccept,
     type PreparedSpacePostImage,
@@ -146,6 +148,7 @@ interface ProfileScreenProps {
     ) => Promise<void>;
     onDeletePost?: (postId: number) => Promise<void> | void;
     onDraftPostPublished?: () => void;
+    onEditProfilePhoto?: (file: File) => void;
     onLoadPostLikers?: (postId: number) => Promise<SpaceLiker[]>;
     onOpenFriend?: (friendID: string) => void;
     onOpenFriends?: () => void;
@@ -165,6 +168,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onCreatePost,
     onDeletePost,
     onDraftPostPublished,
+    onEditProfilePhoto,
     onLoadPostLikers,
     onOpenFriend,
     onOpenFriends,
@@ -183,6 +187,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     );
     const [loadedPhotoDimensionsByURL, setLoadedPhotoDimensionsByURL] =
         useState<Record<string, ProfilePhotoDimensions>>({});
+    const avatarInputRef = React.useRef<HTMLInputElement | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const isPublicProfile = headerVariant == "public";
@@ -218,6 +223,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         URL.revokeObjectURL(objectUrl);
         localPostObjectUrlsRef.current.delete(objectUrl);
     }, []);
+    const openAvatarPhotoPicker = () => avatarInputRef.current?.click();
+    const handleAvatarPhotoSelect: React.ChangeEventHandler<
+        HTMLInputElement
+    > = (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (file) onEditProfilePhoto?.(file);
+    };
     const openPostPhotoPicker = () => {
         if (isPostPhotoPreparing) return;
 
@@ -361,6 +374,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         type="file"
                         accept={spacePostImageInputAccept}
                         onChange={handlePostPhotoSelect}
+                        sx={{ display: "none" }}
+                    />
+                )}
+                {isOwnerProfile && onEditProfilePhoto && (
+                    <Box
+                        ref={avatarInputRef}
+                        component="input"
+                        type="file"
+                        accept={spaceAvatarImageInputAccept}
+                        onChange={handleAvatarPhotoSelect}
                         sx={{ display: "none" }}
                     />
                 )}
@@ -564,48 +587,58 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     }}
                 >
                     <Box
-                        sx={{
-                            alignItems: "center",
-                            aspectRatio: "1 / 1",
-                            bgcolor: profile.avatarUrl
-                                ? "transparent"
-                                : paleGreen,
-                            border: "4px solid #FFFFFF",
-                            borderRadius: "50%",
-                            boxSizing: "border-box",
-                            color: green,
-                            display: "flex",
-                            justifyContent: "center",
-                            overflow: "hidden",
-                            width: profileAvatarSize,
-                        }}
+                        sx={{ position: "relative", width: profileAvatarSize }}
                     >
-                        {profile.avatarUrl ? (
-                            <Box
-                                component="img"
-                                alt=""
-                                src={profile.avatarUrl}
-                                sx={{
-                                    display: "block",
-                                    height: "100%",
-                                    objectFit: "cover",
-                                    objectPosition: "center",
-                                    width: "100%",
-                                }}
+                        <Box
+                            sx={{
+                                alignItems: "center",
+                                aspectRatio: "1 / 1",
+                                bgcolor: profile.avatarUrl
+                                    ? "transparent"
+                                    : paleGreen,
+                                border: "4px solid #FFFFFF",
+                                borderRadius: "50%",
+                                boxSizing: "border-box",
+                                color: green,
+                                display: "flex",
+                                justifyContent: "center",
+                                overflow: "hidden",
+                                width: "100%",
+                            }}
+                        >
+                            {profile.avatarUrl ? (
+                                <Box
+                                    component="img"
+                                    alt=""
+                                    src={profile.avatarUrl}
+                                    sx={{
+                                        display: "block",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                        objectPosition: "center",
+                                        width: "100%",
+                                    }}
+                                />
+                            ) : (
+                                <Box
+                                    sx={{
+                                        color: green,
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 38,
+                                        fontWeight: 800,
+                                        lineHeight: 1,
+                                    }}
+                                >
+                                    {initials}
+                                </Box>
+                            )}
+                        </Box>
+                        {isOwnerProfile && onEditProfilePhoto && (
+                            <SpaceAvatarEditButton
+                                ariaLabel="Edit profile photo"
+                                onClick={openAvatarPhotoPicker}
                             />
-                        ) : (
-                            <Box
-                                sx={{
-                                    color: green,
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 38,
-                                    fontWeight: 800,
-                                    lineHeight: 1,
-                                }}
-                            >
-                                {initials}
-                            </Box>
                         )}
                     </Box>
                     <Box
