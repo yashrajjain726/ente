@@ -100,6 +100,7 @@ interface SpaceFileViewerProps {
     initialScreen?: SpaceViewerInitialScreen;
     onClose: () => void;
     onDeletePost?: () => Promise<void> | void;
+    onDraftPostPublished?: () => void;
     onLoadPostLikers?: (postId: number) => Promise<SpaceLiker[]>;
     onOpenFriend?: (friendID: string) => void;
     onOpenProfile?: () => void;
@@ -240,6 +241,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     initialScreen = "photo",
     onClose,
     onDeletePost,
+    onDraftPostPublished,
     onLoadPostLikers,
     onOpenFriend,
     onOpenProfile,
@@ -249,8 +251,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     photo,
     postActionMode = "like-with-count",
 }) => {
-    const [activePostActionMode, setActivePostActionMode] =
-        React.useState(postActionMode);
+    const activePostActionMode = postActionMode;
     const isDraftPost = activePostActionMode == "draft-post";
     const {
         showLikeButton: showPhotoLikeButton,
@@ -580,12 +581,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         if (draftPostActionPhase != "done") return;
 
         const timeoutID = window.setTimeout(() => {
-            setActivePostActionMode("like-with-count");
-            setDraftPostActionPhase(null);
+            onClose();
+            onDraftPostPublished?.();
         }, spaceActionDoneDurationMs);
 
         return () => window.clearTimeout(timeoutID);
-    }, [draftPostActionPhase]);
+    }, [draftPostActionPhase, onClose, onDraftPostPublished]);
 
     React.useEffect(() => {
         if (replyActionPhase != "done") return;

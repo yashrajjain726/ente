@@ -278,6 +278,9 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models
 	if err != nil {
 		return nil, err
 	}
+	if space.OwnerID == userID {
+		return nil, ente.NewBadRequestWithMessage("cannot like your own post")
+	}
 	if err := c.auth.canViewSpace(ctx.Request.Context(), &viewerAuth{UserID: userID, SpaceID: actorSpace.SpaceID}, space); err != nil {
 		return nil, err
 	}

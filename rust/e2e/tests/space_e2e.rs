@@ -124,6 +124,27 @@ async fn space_bootstrap_posts_friend_share_and_link_suite() {
         owner_post.caption_plaintext.as_deref(),
         Some(br#"{"caption":"hello world"}"#.as_slice())
     );
+    let owner_feed = owner_ctx
+        .list_feed(None, Some(10))
+        .await
+        .expect("owner feed should include own post");
+    let owner_feed_post = owner_feed
+        .items
+        .iter()
+        .find(|item| item.post_id == post_id)
+        .expect("own post should be in owner feed");
+    assert_eq!(owner_feed_post.space_id, owner_space.space_id);
+    assert!(!owner_feed_post.viewer_liked);
+    assert!(!owner_feed_post.viewer_unread);
+    let owner_feed_decrypted = owner_ctx
+        .decrypt_feed_item(owner_feed_post)
+        .await
+        .expect("owner should decrypt own feed item");
+    assert_eq!(
+        owner_feed_decrypted.caption_plaintext.as_deref(),
+        Some(br#"{"caption":"hello world"}"#.as_slice())
+    );
+    space::assert_http_status(owner_ctx.like_post(post_id, true).await, 400);
 
     space::assert_http_status(
         friend_ctx

@@ -144,8 +144,9 @@ interface ProfileScreenProps {
     onCreatePost?: (
         image: PreparedSpacePostImage,
         caption: string,
-    ) => Promise<SpaceViewerPhoto>;
+    ) => Promise<void>;
     onDeletePost?: (postId: number) => Promise<void> | void;
+    onDraftPostPublished?: () => void;
     onLoadPostLikers?: (postId: number) => Promise<SpaceLiker[]>;
     onOpenFriend?: (friendID: string) => void;
     onOpenFriends?: () => void;
@@ -164,6 +165,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onBack,
     onCreatePost,
     onDeletePost,
+    onDraftPostPublished,
     onLoadPostLikers,
     onOpenFriend,
     onOpenFriends,
@@ -213,7 +215,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const selectedPostActionMode: SpaceViewerPostActionMode = isPublicProfile
         ? "hidden"
         : isOwnerProfile
-          ? "like-with-count"
+          ? "hidden"
           : "like-only";
 
     const clearProfileLinkCopiedTimer = () => {
@@ -1270,24 +1272,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         onOpenProfile={closeSelectedPost}
                         onPublishDraftPost={
                             selectedPost.draftImage && onCreatePost
-                                ? async (caption) => {
-                                      const localObjectUrl =
-                                          selectedPost.localObjectUrl;
-                                      const post = await onCreatePost(
+                                ? (caption) =>
+                                      onCreatePost(
                                           selectedPost.draftImage!,
                                           caption,
-                                      );
-                                      revokeLocalPostObjectUrl(localObjectUrl);
-                                      setSelectedPost({
-                                          id: String(
-                                              post.postId ?? post.imageUrl,
-                                          ),
-                                          photo: post,
-                                          postActionMode: "like-with-count",
-                                      });
-                                  }
+                                      )
                                 : undefined
                         }
+                        onDraftPostPublished={onDraftPostPublished}
                         onSetPostLiked={onSetPostLiked}
                     />
                 )}

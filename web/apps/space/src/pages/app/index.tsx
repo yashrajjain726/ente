@@ -18,7 +18,6 @@ import {
 import { consumeAcceptedSpaceInviteFriend } from "services/spaceInvite";
 import { useSpaceAppState } from "state/spaceAppState";
 import { firstNameFrom } from "utils/spaceDisplay";
-import { spacePostToViewerPhoto } from "utils/spacePostDisplay";
 import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
@@ -128,7 +127,16 @@ const Page: React.FC = () => {
                         width: image.width,
                     });
                     if (!post) throw new Error("Couldn't create post.");
-                    return spacePostToViewerPhoto(post);
+                    setFeedItems((currentItems) => [
+                        post,
+                        ...currentItems.filter(
+                            (item) => item.postId != post.postId,
+                        ),
+                    ]);
+                    void markCurrentFeedRead(post.postId).catch(
+                        (error: unknown) =>
+                            console.warn("Failed to mark feed read", error),
+                    );
                 }}
                 onOpenFriend={(friendID) =>
                     void router.push(spaceRoutes.friend(friendID))

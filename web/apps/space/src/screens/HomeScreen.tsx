@@ -82,7 +82,7 @@ interface HomeScreenProps {
     onCreatePost?: (
         image: PreparedSpacePostImage,
         caption: string,
-    ) => Promise<SpaceViewerPhoto>;
+    ) => Promise<void>;
     onOpenFriend?: (friendID: string) => void;
     onOpenNotifications?: () => void;
     onOpenProfile?: () => void;
@@ -113,6 +113,7 @@ interface FeedItemProps {
     caption?: string;
     friendID: string;
     imageUrl: string;
+    isOwnPost: boolean;
     likeCount: number;
     name: string;
     onOpenFriend?: (friendID: string) => void;
@@ -121,6 +122,7 @@ interface FeedItemProps {
         initialScreen?: SpaceViewerInitialScreen,
         focusReplyOnOpen?: boolean,
     ) => void;
+    onOpenProfile?: () => void;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     postId: number;
     timestampMs: number;
@@ -149,10 +151,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
     caption,
     friendID,
     imageUrl,
+    isOwnPost,
     likeCount,
     name,
     onOpenFriend,
     onOpenPhoto,
+    onOpenProfile,
     onSetPostLiked,
     postId,
     timestampMs,
@@ -164,7 +168,19 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const firstName = firstNameFrom(name);
     const dateLabel = formatSpaceDate(timestampMs);
     const displayCaption = caption?.trim();
-    const openFriend = () => onOpenFriend?.(friendID);
+    const canOpenAuthor = isOwnPost
+        ? Boolean(onOpenProfile)
+        : Boolean(onOpenFriend);
+    const authorProfileLabel = isOwnPost
+        ? "Open your profile"
+        : `Open ${firstName}'s profile`;
+    const openAuthor = () => {
+        if (isOwnPost) {
+            onOpenProfile?.();
+            return;
+        }
+        onOpenFriend?.(friendID);
+    };
     const [loadedPhotoDimensions, setLoadedPhotoDimensions] =
         useState<FeedPhotoDimensions | null>(null);
     const photoDimensions =
@@ -209,6 +225,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
             focusReplyOnOpen,
         );
     const handleLikeClick = () => {
+        if (isOwnPost) return;
+
         const nextLiked = !isLiked;
         setIsLiked(nextLiked);
         setLocalLikeCount((count) => Math.max(0, count + (nextLiked ? 1 : -1)));
@@ -263,14 +281,14 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 <Box
                     component="button"
                     type="button"
-                    aria-label={`Open ${firstName}'s profile`}
-                    onClick={openFriend}
+                    aria-label={authorProfileLabel}
+                    onClick={openAuthor}
                     sx={{
                         appearance: "none",
                         bgcolor: paleGreen,
                         borderRadius: "50%",
                         border: 0,
-                        cursor: onOpenFriend ? "pointer" : "default",
+                        cursor: canOpenAuthor ? "pointer" : "default",
                         display: "flex",
                         flexShrink: 0,
                         height: feedAvatarSize,
@@ -316,14 +334,14 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 <Box
                     component="button"
                     type="button"
-                    aria-label={`Open ${firstName}'s profile`}
-                    onClick={openFriend}
+                    aria-label={authorProfileLabel}
+                    onClick={openAuthor}
                     sx={{
                         appearance: "none",
                         bgcolor: "transparent",
                         border: 0,
                         color: "inherit",
-                        cursor: onOpenFriend ? "pointer" : "default",
+                        cursor: canOpenAuthor ? "pointer" : "default",
                         display: "block",
                         fontFamily: "inherit",
                         fontSize: "inherit",
@@ -418,114 +436,122 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     />
                 </Box>
             </Box>
-            <Box
-                sx={{
-                    alignItems: "center",
-                    boxSizing: "border-box",
-                    display: "grid",
-                    gap: "8px",
-                    gridTemplateColumns: "minmax(0, 1fr) auto",
-                    minHeight: feedLikeActionSize,
-                    mt: "8px",
-                    pl: "4px",
-                    pr: 0,
-                    width: "100%",
-                }}
-            >
-                <Box
-                    component="p"
-                    title={displayCaption || undefined}
-                    sx={{
-                        color: textBase,
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 13,
-                        fontWeight: 600,
-                        lineHeight: "18px",
-                        m: 0,
-                        minWidth: 0,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                    }}
-                >
-                    {displayCaption || ""}
-                </Box>
+            {(!isOwnPost || displayCaption) && (
                 <Box
                     sx={{
                         alignItems: "center",
-                        display: "flex",
+                        boxSizing: "border-box",
+                        display: "grid",
                         gap: "8px",
-                        justifyContent: "flex-end",
+                        gridTemplateColumns: isOwnPost
+                            ? "minmax(0, 1fr)"
+                            : "minmax(0, 1fr) auto",
+                        minHeight: isOwnPost ? undefined : feedLikeActionSize,
+                        mt: "8px",
+                        pl: "4px",
+                        pr: 0,
+                        width: "100%",
                     }}
                 >
                     <Box
-                        component="button"
-                        type="button"
-                        aria-label={`Reply to ${firstName}'s post`}
-                        onClick={() => openPhoto("photo", true)}
+                        component="p"
+                        title={displayCaption || undefined}
                         sx={{
-                            alignItems: "center",
-                            appearance: "none",
-                            bgcolor: "transparent",
-                            border: 0,
-                            borderRadius: "50%",
                             color: textBase,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            height: feedLikeActionSize,
-                            justifyContent: "center",
-                            p: 0,
-                            flexShrink: 0,
-                            transition:
-                                "color 120ms ease, transform 120ms ease",
-                            width: feedLikeActionSize,
-                            "&:focus-visible": {
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                            "&:hover": { bgcolor: "transparent" },
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            lineHeight: "18px",
+                            m: 0,
+                            minWidth: 0,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
                         }}
                     >
-                        <FeedReplyIcon />
+                        {displayCaption || ""}
                     </Box>
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label={isLiked ? "Unlike post" : "Like post"}
-                        aria-pressed={isLiked}
-                        onClick={handleLikeClick}
-                        sx={{
-                            alignItems: "center",
-                            appearance: "none",
-                            bgcolor: "transparent",
-                            border: 0,
-                            borderRadius: "50%",
-                            color: textBase,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            flexShrink: 0,
-                            height: feedLikeActionSize,
-                            justifyContent: "center",
-                            p: 0,
-                            transition: "color 120ms ease",
-                            width: feedLikeActionSize,
-                            "&:focus-visible": {
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                            "&:hover": { bgcolor: "transparent" },
-                        }}
-                    >
-                        <HugeiconsIcon
-                            fill={isLiked ? green : "none"}
-                            icon={FavouriteIcon}
-                            primaryColor={isLiked ? green : textBase}
-                            size={feedActionIconSize}
-                            strokeWidth={1.8}
-                        />
-                    </Box>
+                    {!isOwnPost && (
+                        <Box
+                            sx={{
+                                alignItems: "center",
+                                display: "flex",
+                                gap: "8px",
+                                justifyContent: "flex-end",
+                            }}
+                        >
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label={`Reply to ${firstName}'s post`}
+                                onClick={() => openPhoto("photo", true)}
+                                sx={{
+                                    alignItems: "center",
+                                    appearance: "none",
+                                    bgcolor: "transparent",
+                                    border: 0,
+                                    borderRadius: "50%",
+                                    color: textBase,
+                                    cursor: "pointer",
+                                    display: "inline-flex",
+                                    height: feedLikeActionSize,
+                                    justifyContent: "center",
+                                    p: 0,
+                                    flexShrink: 0,
+                                    transition:
+                                        "color 120ms ease, transform 120ms ease",
+                                    width: feedLikeActionSize,
+                                    "&:focus-visible": {
+                                        outline: `2px solid ${green}`,
+                                        outlineOffset: 2,
+                                    },
+                                    "&:hover": { bgcolor: "transparent" },
+                                }}
+                            >
+                                <FeedReplyIcon />
+                            </Box>
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label={
+                                    isLiked ? "Unlike post" : "Like post"
+                                }
+                                aria-pressed={isLiked}
+                                onClick={handleLikeClick}
+                                sx={{
+                                    alignItems: "center",
+                                    appearance: "none",
+                                    bgcolor: "transparent",
+                                    border: 0,
+                                    borderRadius: "50%",
+                                    color: textBase,
+                                    cursor: "pointer",
+                                    display: "inline-flex",
+                                    flexShrink: 0,
+                                    height: feedLikeActionSize,
+                                    justifyContent: "center",
+                                    p: 0,
+                                    transition: "color 120ms ease",
+                                    width: feedLikeActionSize,
+                                    "&:focus-visible": {
+                                        outline: `2px solid ${green}`,
+                                        outlineOffset: 2,
+                                    },
+                                    "&:hover": { bgcolor: "transparent" },
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    fill={isLiked ? green : "none"}
+                                    icon={FavouriteIcon}
+                                    primaryColor={isLiked ? green : textBase}
+                                    size={feedActionIconSize}
+                                    strokeWidth={1.8}
+                                />
+                            </Box>
+                        </Box>
+                    )}
                 </Box>
-            </Box>
+            )}
         </Box>
     );
 };
@@ -652,6 +678,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
+    const selectedPhotoIsOwn =
+        Boolean(profile.spaceId) && selectedPhotoFriendID == profile.spaceId;
     const hasFeedItems = feedItems.length > 0;
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
     const emptyFeedMessage =
@@ -673,11 +701,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         initialScreen: SpaceViewerInitialScreen = "photo",
         focusReplyOnOpen = false,
     ) => {
+        const isOwnPost =
+            Boolean(profile.spaceId) && photo.friendID == profile.spaceId;
         setSelectedViewer({
-            focusReplyOnOpen,
+            focusReplyOnOpen: isOwnPost ? false : focusReplyOnOpen,
             initialScreen,
             photo,
-            postActionMode: "like-only",
+            postActionMode: isOwnPost ? "hidden" : "like-only",
         });
     };
     const closeSelectedPhoto = () => {
@@ -1017,7 +1047,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     {hasFeedItems ? (
                         feedItems.map((item) => (
                             <FeedItem
-                                key={`${item.name}-${item.imageUrl}`}
+                                key={item.postId}
                                 aspectRatio={
                                     item.width && item.height
                                         ? item.width / item.height
@@ -1027,10 +1057,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 caption={item.caption}
                                 friendID={item.friendID}
                                 imageUrl={item.imageUrl}
+                                isOwnPost={
+                                    Boolean(profile.spaceId) &&
+                                    item.spaceId == profile.spaceId
+                                }
                                 likeCount={item.likeCount}
                                 name={item.name}
                                 onOpenFriend={onOpenFriend}
                                 onOpenPhoto={openFeedPhoto}
+                                onOpenProfile={onOpenProfile}
                                 onSetPostLiked={onSetPostLiked}
                                 postId={item.postId}
                                 timestampMs={item.timestampMs}
@@ -1144,42 +1179,34 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 : undefined
                         }
                         onOpenProfile={
-                            selectedPhotoFriendID && onOpenFriend
+                            selectedPhotoIsOwn && onOpenProfile
                                 ? () => {
                                       closeSelectedPhoto();
-                                      onOpenFriend(selectedPhotoFriendID);
+                                      onOpenProfile();
                                   }
-                                : undefined
+                                : selectedPhotoFriendID && onOpenFriend
+                                  ? () => {
+                                        closeSelectedPhoto();
+                                        onOpenFriend(selectedPhotoFriendID);
+                                    }
+                                  : undefined
                         }
-                        onLoadPostLikers={onLoadPostLikers}
                         onReplyToPost={
+                            !selectedPhotoIsOwn &&
                             selectedViewer.photo.friendID != profile.spaceId
                                 ? onReplyToPost
                                 : undefined
                         }
                         onPublishDraftPost={
                             selectedViewer.draftImage && onCreatePost
-                                ? async (caption) => {
-                                      const localObjectUrl =
-                                          selectedViewer.localObjectUrl;
-                                      const post = await onCreatePost(
+                                ? (caption) =>
+                                      onCreatePost(
                                           selectedViewer.draftImage!,
                                           caption,
-                                      );
-                                      revokeLocalPostObjectUrl(localObjectUrl);
-                                      setSelectedViewer((currentViewer) =>
-                                          currentViewer
-                                              ? {
-                                                    initialScreen: "photo",
-                                                    photo: post,
-                                                    postActionMode:
-                                                        "like-with-count",
-                                                }
-                                              : currentViewer,
-                                      );
-                                  }
+                                      )
                                 : undefined
                         }
+                        onLoadPostLikers={onLoadPostLikers}
                         onSetPostLiked={onSetPostLiked}
                     />
                 )}

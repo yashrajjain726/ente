@@ -144,16 +144,17 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 			       p.encrypted_post_key, p.caption_cipher,
 			       p.key_version, p.created_at,
 			       (SELECT COUNT(*) FROM space_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-			       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked,
-			       ((p.created_at, p.post_id) > ($3::bigint, $4::bigint)) AS viewer_unread
+			       CASE WHEN p.space_id = $2 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) END AS viewer_liked,
+			       (p.space_id <> $2 AND (p.created_at, p.post_id) > ($3::bigint, $4::bigint)) AS viewer_unread
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
 			JOIN key_attributes owner_ka ON owner_ka.user_id = w.owner_id
 			WHERE p.is_deleted = FALSE
-			  AND p.space_id <> $2
-			  AND EXISTS (
-			    SELECT 1 FROM space_friend_shares fs
-			    WHERE fs.friend_id = $1 AND fs.friend_space_id = $2 AND fs.space_id = p.space_id
+			  AND (
+			    p.space_id = $2 OR EXISTS (
+			      SELECT 1 FROM space_friend_shares fs
+			      WHERE fs.friend_id = $1 AND fs.friend_space_id = $2 AND fs.space_id = p.space_id
+			    )
 			  )`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorPostID)
@@ -192,10 +193,11 @@ func (r *PostsRepository) GetFeedPostMarker(ctx context.Context, viewerID int64,
 		FROM space_posts p
 		WHERE p.post_id = $3
 		  AND p.is_deleted = FALSE
-		  AND p.space_id <> $2
-		  AND EXISTS (
-		    SELECT 1 FROM space_friend_shares fs
-		    WHERE fs.friend_id = $1 AND fs.friend_space_id = $2 AND fs.space_id = p.space_id
+		  AND (
+		    p.space_id = $2 OR EXISTS (
+		      SELECT 1 FROM space_friend_shares fs
+		      WHERE fs.friend_id = $1 AND fs.friend_space_id = $2 AND fs.space_id = p.space_id
+		    )
 		  )
 	`, viewerID, viewerSpaceID, postID).Scan(&createdAt); err != nil {
 		return 0, 0, stacktrace.Propagate(err, "")

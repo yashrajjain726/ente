@@ -1241,6 +1241,15 @@ func TestListFeedCursorUsesCreatedAtSortOrder(t *testing.T) {
 	page, nextCursor, err := module.Posts.ListFeed(ctx, aliceID, aliceSpace.SpaceID, "", 1, 0, 0)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
+	require.Equal(t, ownPost, page[0].PostID)
+	require.Equal(t, aliceSpace.SpaceID, page[0].SpaceID)
+	require.False(t, page[0].ViewerUnread)
+	require.False(t, page[0].ViewerLiked)
+	require.Equal(t, "5000:"+strconv.FormatInt(ownPost, 10), nextCursor)
+
+	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceID, aliceSpace.SpaceID, nextCursor, 1, 0, 0)
+	require.NoError(t, err)
+	require.Len(t, page, 1)
 	require.Equal(t, first, page[0].PostID)
 	require.Equal(t, "3000:"+strconv.FormatInt(first, 10), nextCursor)
 

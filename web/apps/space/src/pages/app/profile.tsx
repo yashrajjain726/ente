@@ -14,10 +14,7 @@ import {
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
-import {
-    profilePostGroupsFromPosts,
-    spacePostToViewerPhoto,
-} from "utils/spacePostDisplay";
+import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
 import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
@@ -103,8 +100,8 @@ const Page: React.FC = () => {
                     });
                     if (!post) throw new Error("Couldn't create post.");
                     setPosts((currentPosts) => [post, ...currentPosts]);
-                    return spacePostToViewerPhoto(post);
                 }}
+                onDraftPostPublished={() => void router.push(spaceRoutes.home)}
                 onDeletePost={async (postId) => {
                     await deleteCurrentPost(postId);
                     setPosts((currentPosts) =>
