@@ -37,6 +37,7 @@ const textStrong = "#303030";
 const textSoft = "#777777";
 const warning = "#F63A3A";
 const coverForeground = "#FFFFFF";
+const profileCoverBackground = "#1F1F1F";
 const profileHeaderHeight = 56;
 const profileAvatarTopOffset = 54;
 const profileAvatarSize = 120;
@@ -388,8 +389,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     />
                 )}
                 <Box
-                    className="green-bg"
+                    className={isFriendProfile ? "green-bg" : undefined}
                     sx={{
+                        bgcolor: isFriendProfile
+                            ? undefined
+                            : profileCoverBackground,
                         height: profileCoverHeight,
                         insetInline: 0,
                         position: "absolute",
