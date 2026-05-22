@@ -31,7 +31,8 @@ const Page: React.FC = () => {
     } = useSpaceAppState();
     const [addedFriendToastName, setAddedFriendToastName] = useState<string>();
     const [feedItems, setFeedItems] = useState<SpacePost[]>([]);
-    const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+    const [hasUnreadNotifications, setHasUnreadNotifications] =
+        useState<boolean>();
     const [isFeedLoading, setIsFeedLoading] = useState(true);
     const closeAddedFriendToast = React.useCallback(
         () => setAddedFriendToastName(undefined),
@@ -66,6 +67,7 @@ const Page: React.FC = () => {
         }
 
         let cancelled = false;
+        setHasUnreadNotifications(undefined);
         setIsFeedLoading(true);
         void Promise.all([
             loadCurrentFeedPage(),

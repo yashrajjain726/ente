@@ -1,8 +1,8 @@
 import {
     AddSquareIcon,
+    Chat01Icon,
     FavouriteIcon,
     MultiplicationSignIcon,
-    Notification01Icon,
     UserCheck01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -660,7 +660,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     addedFriendToastName,
     feedItems,
     friendsCount,
-    hasUnreadNotifications = false,
+    hasUnreadNotifications,
     isFeedLoading = false,
     onAddedFriendToastClose,
     onCreatePost,
@@ -684,6 +684,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         Boolean(profile.spaceId) && selectedPhotoFriendID == profile.spaceId;
     const hasFeedItems = feedItems.length > 0;
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
+    const showUnreadIndicator = hasUnreadNotifications === true;
     const emptyFeedMessage =
         friendsCount == 0
             ? "When you add friends, their posts will appear here."
@@ -910,7 +911,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             component="button"
                             type="button"
                             aria-label={
-                                hasUnreadNotifications
+                                showUnreadIndicator
                                     ? "Open notifications with unread activity"
                                     : "Open notifications"
                             }
@@ -942,22 +943,43 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             }}
                         >
                             <HugeiconsIcon
-                                icon={Notification01Icon}
+                                icon={Chat01Icon}
                                 size={headerIconSize}
                                 strokeWidth={1.8}
                             />
-                            {hasUnreadNotifications && (
+                            {showUnreadIndicator && (
                                 <Box
                                     aria-hidden
                                     sx={{
+                                        "@keyframes spaceUnreadBadgePing": {
+                                            "75%, 100%": {
+                                                opacity: 0,
+                                                transform: "scale(2.5)",
+                                            },
+                                        },
+                                        "@media (prefers-reduced-motion: reduce)":
+                                            { "&::after": { display: "none" } },
                                         bgcolor: green,
                                         border: `2px solid ${homeBackground}`,
                                         borderRadius: "50%",
                                         height: 11,
                                         position: "absolute",
-                                        right: 4,
-                                        top: 6,
+                                        right: 2,
+                                        top: 4,
                                         width: 11,
+                                        zIndex: 0,
+                                        "&::after": {
+                                            animation:
+                                                "spaceUnreadBadgePing 1.25s cubic-bezier(0, 0, 0.2, 1) 4",
+                                            bgcolor: green,
+                                            borderRadius: "50%",
+                                            content: '""',
+                                            inset: 0,
+                                            opacity: 0.75,
+                                            pointerEvents: "none",
+                                            position: "absolute",
+                                            zIndex: -1,
+                                        },
                                     }}
                                 />
                             )}
