@@ -6,7 +6,7 @@ import {
     UserCheck01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box } from "@mui/material";
+import { Box, Skeleton } from "@mui/material";
 import { SpaceActionFeedbackIcon } from "components/SpaceActionFeedback";
 import {
     SpaceFileViewer,
@@ -15,7 +15,6 @@ import {
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
-import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -39,6 +38,7 @@ export const homeBackground = "#FFFFFF";
 const green = "#08C225";
 const paleGreen = "#E7F6E9";
 const feedCardBackground = "#F5F5F5";
+const feedSkeletonColor = "#E2E2E2";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
 const warning = "#F63A3A";
@@ -53,6 +53,15 @@ const feedLikeActionSize = 28;
 const feedActionIconSize = 20;
 const feedReplyIconSize = 17;
 const emptyFeedItemGap = "22px";
+const feedSkeletonAspectRatios = [
+    "3 / 4",
+    "16 / 9",
+    "4 / 5",
+    "16 / 9",
+    "3 / 4",
+    "4 / 5",
+    "16 / 9",
+];
 
 const FeedReplyIcon: React.FC = () => (
     <svg
@@ -131,6 +140,10 @@ interface FeedItemProps {
     viewerUnread: boolean;
 }
 
+interface FeedSkeletonItemProps {
+    aspectRatio: string;
+}
+
 interface AddedFriendToastProps {
     name: string;
     onClose?: () => void;
@@ -145,6 +158,92 @@ const dimensionsFromAspectRatio = (
 
     return { height, width: Math.round(safeAspectRatio * height) };
 };
+
+const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({ aspectRatio }) => (
+    <Box
+        component="article"
+        aria-hidden
+        sx={{
+            bgcolor: feedCardBackground,
+            borderRadius: "16px",
+            boxSizing: "border-box",
+            display: "flex",
+            flexDirection: "column",
+            mx: "16px",
+            p: "12px",
+            width: "calc(100% - 32px)",
+        }}
+    >
+        <Box
+            sx={{
+                alignItems: "center",
+                display: "grid",
+                gap: "8px",
+                gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr) auto`,
+                mb: "10px",
+                minHeight: 32,
+                px: "4px",
+                width: "100%",
+            }}
+        >
+            <Skeleton
+                variant="circular"
+                sx={{
+                    bgcolor: feedSkeletonColor,
+                    height: feedAvatarSize,
+                    width: feedAvatarSize,
+                }}
+            />
+            <Skeleton
+                variant="rectangular"
+                sx={{
+                    bgcolor: feedSkeletonColor,
+                    borderRadius: "999px",
+                    height: 10,
+                    width: 72,
+                }}
+            />
+            <Skeleton
+                variant="rectangular"
+                sx={{
+                    bgcolor: feedSkeletonColor,
+                    borderRadius: "999px",
+                    height: 8,
+                    justifySelf: "end",
+                    width: 42,
+                }}
+            />
+        </Box>
+        <Skeleton
+            variant="rectangular"
+            sx={{
+                aspectRatio,
+                bgcolor: feedSkeletonColor,
+                borderRadius: "12px",
+                display: "block",
+                height: "auto",
+                width: "100%",
+            }}
+        />
+    </Box>
+);
+
+const FeedLoadingSkeletons: React.FC = () => (
+    <Box
+        role="status"
+        aria-label="Loading posts"
+        sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "24px",
+            width: "100%",
+        }}
+    >
+        {feedSkeletonAspectRatios.map((aspectRatio, index) => (
+            <FeedSkeletonItem key={index} aspectRatio={aspectRatio} />
+        ))}
+    </Box>
+);
 
 const FeedItem: React.FC<FeedItemProps> = ({
     aspectRatio,
@@ -684,6 +783,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         Boolean(profile.spaceId) && selectedPhotoFriendID == profile.spaceId;
     const hasFeedItems = feedItems.length > 0;
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
+    const showFeedCards = hasFeedItems || isEmptyFeedLoading;
     const showUnreadIndicator = hasUnreadNotifications === true;
     const emptyFeedMessage =
         friendsCount == 0
@@ -1082,10 +1182,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
-                        gap: hasFeedItems ? "24px" : 0,
-                        justifyContent: hasFeedItems ? "flex-start" : "center",
+                        gap: showFeedCards ? "24px" : 0,
+                        justifyContent: showFeedCards ? "flex-start" : "center",
                         minHeight: "calc(100svh - 64px)",
-                        pb: hasFeedItems ? "16px" : "56px",
+                        pb: showFeedCards ? "16px" : "56px",
                         pt: 0,
                         width: "100%",
                     }}
@@ -1120,16 +1220,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             />
                         ))
                     ) : isEmptyFeedLoading ? (
-                        <Box
-                            sx={{
-                                alignItems: "center",
-                                display: "flex",
-                                justifyContent: "center",
-                                width: "100%",
-                            }}
-                        >
-                            <SpaceLoadingSpinner ariaLabel="Loading posts" />
-                        </Box>
+                        <FeedLoadingSkeletons />
                     ) : (
                         <Box
                             sx={{
