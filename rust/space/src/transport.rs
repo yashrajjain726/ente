@@ -220,6 +220,8 @@ pub struct MessageConversationActivity {
     pub activity_type: String,
     pub created_at: String,
     #[serde(default)]
+    pub outgoing: bool,
+    #[serde(default)]
     pub message: Option<MessageResponse>,
     #[serde(default)]
     pub post: Option<MessageConversationPost>,
@@ -393,7 +395,7 @@ pub struct SpaceKeyVersionResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::AssetDownloadResponse;
+    use super::{AssetDownloadResponse, MessageConversationActivity};
 
     #[test]
     fn asset_download_response_deserializes_camel_case() {
@@ -402,6 +404,15 @@ mod tests {
                 .expect("asset download response should deserialize");
         assert_eq!(response.url, "http://127.0.0.1:3900/example");
         assert_eq!(response.expires_in, 900);
+    }
+
+    #[test]
+    fn message_conversation_activity_deserializes_outgoing() {
+        let activity: MessageConversationActivity = serde_json::from_str(
+            r#"{"id":"friend_event:1","type":"friend_add","createdAt":"2026-05-25T00:00:00Z","outgoing":true}"#,
+        )
+        .expect("activity should deserialize");
+        assert!(activity.outgoing);
     }
 }
 

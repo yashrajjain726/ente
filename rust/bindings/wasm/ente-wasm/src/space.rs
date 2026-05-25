@@ -243,6 +243,7 @@ struct MessageConversationActivityJs {
     #[serde(rename = "type")]
     activity_type: String,
     created_at: String,
+    outgoing: bool,
     message: Option<MessageJs>,
     post: Option<MessageConversationPostJs>,
 }
@@ -482,6 +483,7 @@ async fn message_conversation_activity_to_js(
         id: activity.id,
         activity_type: activity.activity_type,
         created_at: activity.created_at,
+        outgoing: activity.outgoing,
         message,
         post: activity.post.map(message_conversation_post_to_js),
     })

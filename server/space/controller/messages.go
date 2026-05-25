@@ -338,6 +338,7 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 		ID:        activity.ID,
 		Type:      activity.Type,
 		CreatedAt: formatMicros(activity.CreatedAt),
+		Outgoing:  activity.Outgoing,
 	}
 	if activity.Message != nil {
 		resp.Message = toMessageResponse(*activity.Message)

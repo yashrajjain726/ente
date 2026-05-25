@@ -9,7 +9,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem, Tooltip } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
-import type { FriendProfile } from "data/friends";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -50,9 +49,7 @@ const sendSpin = keyframes`
 
 interface MessagesScreenProps {
     conversations: SpaceMessageConversation[];
-    friends: FriendProfile[];
     isConversationsLoading?: boolean;
-    isFriendsLoaded?: boolean;
     isThreadLoading?: boolean;
     isThreadReadOnly?: boolean;
     messages: SpaceMessage[];
@@ -70,6 +67,7 @@ interface MessagesScreenProps {
     ) => Promise<void>;
     onSendMessage: (spaceId: string, text: string) => Promise<void>;
     onSetMessageLiked: (messageId: string, liked: boolean) => Promise<void>;
+    newConversationIds?: string[];
     profile: SetupProfile;
     selectedFriend?: SpaceMessageConversation["friend"];
 }
@@ -198,39 +196,19 @@ const messageLikeTooltipLabel = (
     return likerNames.filter(Boolean).join(" and ") || "Liked";
 };
 
-const isCurrentFriend = (
-    conversationFriend: SpaceMessageConversation["friend"],
-    friends: FriendProfile[],
-) => {
-    const conversationSpaceId =
-        conversationFriend.spaceId ?? conversationFriend.id;
-    const conversationSpaceSlug = conversationFriend.spaceSlug;
-    const conversationUsername = conversationFriend.username;
-    return friends.some((friend) => {
-        const friendSpaceId = friend.spaceId ?? friend.id;
-        return (
-            friendSpaceId == conversationSpaceId ||
-            (conversationSpaceSlug &&
-                friend.spaceSlug == conversationSpaceSlug) ||
-            friend.username == conversationUsername
-        );
-    });
-};
-
 const conversationPreview = (
     conversation: SpaceMessageConversation,
     profile: SetupProfile,
-    currentlyFriends?: boolean,
 ) => {
     const activity = conversation.latestActivity;
     if (activity.type == "friend_add") {
-        return currentlyFriends === false
-            ? "No longer friends"
+        return activity.outgoing
+            ? "You're now friends"
             : "Added you as a friend";
     }
     if (activity.type == "friend_remove") {
-        return currentlyFriends === true
-            ? "Friends again"
+        return activity.outgoing
+            ? "You're no longer friends"
             : "Removed you as a friend";
     }
     if (activity.type == "post_like") return "Liked your post";
@@ -276,16 +254,15 @@ const quotedConversationActivityPreview = (
 
 const ConversationPreviewLine: React.FC<{
     conversation: SpaceMessageConversation;
-    currentlyFriends?: boolean;
     profile: SetupProfile;
-}> = ({ conversation, currentlyFriends, profile }) => {
+}> = ({ conversation, profile }) => {
     const activity = conversation.latestActivity;
     const quotedPreview = quotedConversationActivityPreview(activity);
     const previewLineSx = {
         color: textSecondary,
         fontFamily: '"Inter Variable", Inter, sans-serif',
         fontSize: 13,
-        fontWeight: conversation.unread ? 700 : 500,
+        fontWeight: 500,
         lineHeight: "18px",
         minWidth: 0,
         overflow: "hidden",
@@ -296,7 +273,7 @@ const ConversationPreviewLine: React.FC<{
     if (!quotedPreview) {
         return (
             <Box sx={previewLineSx}>
-                {conversationPreview(conversation, profile, currentlyFriends)}
+                {conversationPreview(conversation, profile)}
             </Box>
         );
     }
@@ -319,6 +296,190 @@ const ConversationPreviewLine: React.FC<{
             </Box>
             <Box component="span" sx={{ flexShrink: 0 }}>
                 {quotedPreview.suffix}
+            </Box>
+        </Box>
+    );
+};
+
+const conversationId = (conversation: SpaceMessageConversation) =>
+    conversation.friend.spaceId ?? conversation.friend.id;
+
+const dayMs = 24 * 60 * 60 * 1000;
+
+const NotificationListItem: React.FC<{
+    conversation: SpaceMessageConversation;
+    onOpenThread: (conversation: SpaceMessageConversation) => void;
+    profile: SetupProfile;
+}> = ({ conversation, onOpenThread, profile }) => {
+    const name =
+        conversation.friend.fullName.trim() || conversation.friend.username;
+    const timestampLabel = formatTimeAgo(
+        microsForTimestamp(conversation.latestActivity.createdAtMs),
+    );
+    const postThumbnailUrl = conversation.latestActivity.post?.imageUrl;
+
+    return (
+        <Box component="li" sx={{ listStyle: "none" }}>
+            <Box
+                component="button"
+                type="button"
+                onClick={() => onOpenThread(conversation)}
+                sx={{
+                    alignItems: "center",
+                    appearance: "none",
+                    bgcolor: "transparent",
+                    border: 0,
+                    borderRadius: "8px",
+                    color: textBase,
+                    cursor: "pointer",
+                    display: "grid",
+                    gap: "10px",
+                    gridTemplateColumns: postThumbnailUrl
+                        ? "44px minmax(0, 1fr) 44px"
+                        : "44px minmax(0, 1fr)",
+                    minHeight: 64,
+                    p: "8px 0",
+                    textAlign: "left",
+                    width: "100%",
+                    "&:focus-visible": {
+                        outline: `2px solid ${green}`,
+                        outlineOffset: 2,
+                    },
+                }}
+            >
+                <Avatar
+                    avatarUrl={conversation.friend.avatarUrl}
+                    name={name}
+                    size={44}
+                />
+                <Box sx={{ minWidth: 0 }}>
+                    <Box
+                        sx={{
+                            alignItems: "center",
+                            display: "flex",
+                            gap: "4px",
+                            minWidth: 0,
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                flex: "0 1 auto",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 700,
+                                lineHeight: "20px",
+                                minWidth: 0,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {firstNameFrom(name)}
+                        </Box>
+                        <Box
+                            aria-hidden
+                            component="span"
+                            sx={{
+                                color: textSecondary,
+                                flexShrink: 0,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                lineHeight: "16px",
+                            }}
+                        >
+                            &middot;
+                        </Box>
+                        <Box
+                            component="time"
+                            dateTime={new Date(
+                                conversation.latestActivity.createdAtMs,
+                            ).toISOString()}
+                            sx={{
+                                color: textSecondary,
+                                flexShrink: 0,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                lineHeight: "16px",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {timestampLabel}
+                        </Box>
+                    </Box>
+                    <ConversationPreviewLine
+                        conversation={conversation}
+                        profile={profile}
+                    />
+                </Box>
+                {postThumbnailUrl && (
+                    <Box
+                        component="img"
+                        alt=""
+                        src={postThumbnailUrl}
+                        sx={{
+                            borderRadius: "6px",
+                            display: "block",
+                            height: 44,
+                            objectFit: "cover",
+                            objectPosition: "center",
+                            width: 44,
+                        }}
+                    />
+                )}
+            </Box>
+        </Box>
+    );
+};
+
+interface NotificationSectionItem {
+    conversations: SpaceMessageConversation[];
+    title: string;
+}
+
+const NotificationSection: React.FC<{
+    conversations: SpaceMessageConversation[];
+    onOpenThread: (conversation: SpaceMessageConversation) => void;
+    profile: SetupProfile;
+    title: string;
+}> = ({ conversations, onOpenThread, profile, title }) => {
+    if (conversations.length == 0) return null;
+
+    return (
+        <Box component="section" sx={{ mb: "10px" }}>
+            <Box
+                component="h2"
+                sx={{
+                    color: textSecondary,
+                    fontFamily: '"Inter Variable", Inter, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    lineHeight: "18px",
+                    m: 0,
+                    pb: "4px",
+                    pt: "12px",
+                }}
+            >
+                {title}
+                {title == "New" && (
+                    <Box component="span" sx={{ color: green, ml: "4px" }}>
+                        ({conversations.length})
+                    </Box>
+                )}
+            </Box>
+            <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+                {conversations.map((conversation) => (
+                    <NotificationListItem
+                        key={conversationId(conversation)}
+                        conversation={conversation}
+                        onOpenThread={onOpenThread}
+                        profile={profile}
+                    />
+                ))}
             </Box>
         </Box>
     );
@@ -833,12 +994,11 @@ const MessageBubble: React.FC<{
 
 export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     conversations,
-    friends,
     isConversationsLoading = false,
-    isFriendsLoaded = false,
     isThreadLoading = false,
     isThreadReadOnly = false,
     messages,
+    newConversationIds = [],
     onBack,
     onCloseThread,
     onDeleteMessage,
@@ -874,6 +1034,57 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         () => new Map(messages.map((message) => [message.id, message])),
         [messages],
     );
+    const groupedConversations = React.useMemo(() => {
+        const newIds = new Set(newConversationIds);
+        const now = Date.now();
+        const today = new Date(now);
+        const startOfTodayMs = new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate(),
+        ).getTime();
+        const startOfYesterdayMs = new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate() - 1,
+        ).getTime();
+        const nextSections: NotificationSectionItem[] = [
+            { title: "New", conversations: [] },
+            { title: "Today", conversations: [] },
+            { title: "Yesterday", conversations: [] },
+            { title: "Last 7 days", conversations: [] },
+            { title: "Last 30 days", conversations: [] },
+            { title: "Older", conversations: [] },
+        ];
+        for (const conversation of conversations) {
+            if (newIds.has(conversationId(conversation))) {
+                nextSections[0]!.conversations.push(conversation);
+                continue;
+            }
+
+            const activityCreatedAtMs = conversation.latestActivity.createdAtMs;
+            if (activityCreatedAtMs >= startOfTodayMs) {
+                nextSections[1]!.conversations.push(conversation);
+                continue;
+            }
+            if (activityCreatedAtMs >= startOfYesterdayMs) {
+                nextSections[2]!.conversations.push(conversation);
+                continue;
+            }
+
+            const ageMs = Math.max(0, now - activityCreatedAtMs);
+            if (ageMs <= 7 * dayMs) {
+                nextSections[3]!.conversations.push(conversation);
+                continue;
+            }
+            if (ageMs <= 30 * dayMs) {
+                nextSections[4]!.conversations.push(conversation);
+                continue;
+            }
+            nextSections[5]!.conversations.push(conversation);
+        }
+        return nextSections;
+    }, [conversations, newConversationIds]);
     const isContextMessageLiked = Boolean(
         messageContextMenu?.message.viewerLiked,
     );
@@ -1723,190 +1934,21 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                             </Box>
                         ) : (
                             <Box
-                                component="ul"
                                 sx={{
                                     boxSizing: "border-box",
-                                    listStyle: "none",
                                     m: 0,
-                                    p: "12px 16px 28px",
+                                    p: "6px 16px 28px",
                                 }}
                             >
-                                {conversations.map((conversation) => {
-                                    const name =
-                                        conversation.friend.fullName.trim() ||
-                                        conversation.friend.username;
-                                    const currentlyFriends = isCurrentFriend(
-                                        conversation.friend,
-                                        friends,
-                                    );
-                                    const timestampLabel = formatTimeAgo(
-                                        microsForTimestamp(
-                                            conversation.latestActivity
-                                                .createdAtMs,
-                                        ),
-                                    );
-                                    const postThumbnailUrl =
-                                        conversation.latestActivity.post
-                                            ?.imageUrl;
-                                    return (
-                                        <Box
-                                            component="li"
-                                            key={conversation.friend.id}
-                                            sx={{ listStyle: "none" }}
-                                        >
-                                            <Box
-                                                component="button"
-                                                type="button"
-                                                onClick={() =>
-                                                    onOpenThread(conversation)
-                                                }
-                                                sx={{
-                                                    alignItems: "center",
-                                                    appearance: "none",
-                                                    bgcolor: "transparent",
-                                                    border: 0,
-                                                    borderRadius: "8px",
-                                                    color: textBase,
-                                                    cursor: "pointer",
-                                                    display: "grid",
-                                                    gap: "10px",
-                                                    gridTemplateColumns:
-                                                        postThumbnailUrl
-                                                            ? "44px minmax(0, 1fr) 44px"
-                                                            : "44px minmax(0, 1fr)",
-                                                    minHeight: 64,
-                                                    p: "8px 0",
-                                                    textAlign: "left",
-                                                    width: "100%",
-                                                    "&:focus-visible": {
-                                                        outline: `2px solid ${green}`,
-                                                        outlineOffset: 2,
-                                                    },
-                                                }}
-                                            >
-                                                <Avatar
-                                                    avatarUrl={
-                                                        conversation.friend
-                                                            .avatarUrl
-                                                    }
-                                                    name={name}
-                                                    size={44}
-                                                />
-                                                <Box sx={{ minWidth: 0 }}>
-                                                    <Box
-                                                        sx={{
-                                                            alignItems:
-                                                                "center",
-                                                            display: "flex",
-                                                            gap: "4px",
-                                                            minWidth: 0,
-                                                        }}
-                                                    >
-                                                        <Box
-                                                            sx={{
-                                                                flex: "0 1 auto",
-                                                                fontFamily:
-                                                                    '"Inter Variable", Inter, sans-serif',
-                                                                fontSize: 14,
-                                                                fontWeight: 700,
-                                                                lineHeight:
-                                                                    "20px",
-                                                                minWidth: 0,
-                                                                overflow:
-                                                                    "hidden",
-                                                                textOverflow:
-                                                                    "ellipsis",
-                                                                whiteSpace:
-                                                                    "nowrap",
-                                                            }}
-                                                        >
-                                                            {firstNameFrom(
-                                                                name,
-                                                            )}
-                                                        </Box>
-                                                        <Box
-                                                            aria-hidden
-                                                            component="span"
-                                                            sx={{
-                                                                color: textSecondary,
-                                                                flexShrink: 0,
-                                                                fontFamily:
-                                                                    '"Inter Variable", Inter, sans-serif',
-                                                                fontSize: 12,
-                                                                fontWeight: 600,
-                                                                lineHeight:
-                                                                    "16px",
-                                                            }}
-                                                        >
-                                                            &middot;
-                                                        </Box>
-                                                        <Box
-                                                            component="time"
-                                                            dateTime={new Date(
-                                                                conversation.latestActivity.createdAtMs,
-                                                            ).toISOString()}
-                                                            sx={{
-                                                                color: textSecondary,
-                                                                flexShrink: 0,
-                                                                fontFamily:
-                                                                    '"Inter Variable", Inter, sans-serif',
-                                                                fontSize: 12,
-                                                                fontWeight: 600,
-                                                                lineHeight:
-                                                                    "16px",
-                                                                whiteSpace:
-                                                                    "nowrap",
-                                                            }}
-                                                        >
-                                                            {timestampLabel}
-                                                        </Box>
-                                                        {conversation.unread && (
-                                                            <Box
-                                                                aria-hidden
-                                                                sx={{
-                                                                    bgcolor:
-                                                                        green,
-                                                                    borderRadius:
-                                                                        "50%",
-                                                                    flexShrink: 0,
-                                                                    height: 8,
-                                                                    width: 8,
-                                                                }}
-                                                            />
-                                                        )}
-                                                    </Box>
-                                                    <ConversationPreviewLine
-                                                        conversation={
-                                                            conversation
-                                                        }
-                                                        currentlyFriends={
-                                                            isFriendsLoaded
-                                                                ? currentlyFriends
-                                                                : undefined
-                                                        }
-                                                        profile={profile}
-                                                    />
-                                                </Box>
-                                                {postThumbnailUrl && (
-                                                    <Box
-                                                        component="img"
-                                                        alt=""
-                                                        src={postThumbnailUrl}
-                                                        sx={{
-                                                            borderRadius: "6px",
-                                                            display: "block",
-                                                            height: 44,
-                                                            objectFit: "cover",
-                                                            objectPosition:
-                                                                "center",
-                                                            width: 44,
-                                                        }}
-                                                    />
-                                                )}
-                                            </Box>
-                                        </Box>
-                                    );
-                                })}
+                                {groupedConversations.map((section) => (
+                                    <NotificationSection
+                                        key={section.title}
+                                        conversations={section.conversations}
+                                        onOpenThread={onOpenThread}
+                                        profile={profile}
+                                        title={section.title}
+                                    />
+                                ))}
                             </Box>
                         )}
                     </>

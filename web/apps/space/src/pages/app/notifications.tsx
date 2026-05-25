@@ -18,6 +18,9 @@ import {
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
 
+const conversationId = (conversation: SpaceMessageConversation) =>
+    conversation.friend.spaceId ?? conversation.friend.id;
+
 const Page: React.FC = () => {
     const router = useRouter();
     const {
@@ -32,9 +35,11 @@ const Page: React.FC = () => {
     >([]);
     const [isConversationsLoading, setIsConversationsLoading] =
         React.useState(true);
-    const [isFriendsLoaded, setIsFriendsLoaded] = React.useState(false);
     const [isThreadLoading, setIsThreadLoading] = React.useState(false);
     const [messages, setMessages] = React.useState<SpaceMessage[]>([]);
+    const [newConversationIds, setNewConversationIds] = React.useState<
+        string[]
+    >([]);
     const [selectedFriend, setSelectedFriend] = React.useState<
         SpaceMessageConversation["friend"] | undefined
     >();
@@ -63,7 +68,25 @@ const Page: React.FC = () => {
         setIsConversationsLoading(true);
         void loadCurrentMessageConversations()
             .then((page) => {
-                setConversations(page.items);
+                const unreadConversationIds = page.items
+                    .filter((conversation) => conversation.unread)
+                    .map(conversationId);
+                setNewConversationIds(unreadConversationIds);
+                setConversations(
+                    page.items.map((conversation) =>
+                        conversation.unread
+                            ? { ...conversation, unread: false }
+                            : conversation,
+                    ),
+                );
+                if (unreadConversationIds.length == 0) return;
+                void Promise.all(
+                    unreadConversationIds.map((friendSpaceId) =>
+                        markCurrentNotificationsRead(friendSpaceId),
+                    ),
+                ).catch((error: unknown) =>
+                    console.warn("Failed to mark notifications read", error),
+                );
             })
             .catch((error: unknown) =>
                 console.error("Failed to load message conversations", error),
@@ -127,11 +150,9 @@ const Page: React.FC = () => {
     React.useEffect(() => {
         if (!profile?.spaceId) return;
 
-        setIsFriendsLoaded(false);
         void loadCurrentSpaceFriends(profile.spaceId)
             .then((nextFriends) => {
                 setFriends(nextFriends);
-                setIsFriendsLoaded(true);
             })
             .catch((error: unknown) =>
                 console.error("Failed to load space friends", error),
@@ -180,12 +201,11 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={messagesBackground} />
             <MessagesScreen
                 conversations={conversations}
-                friends={friends}
                 isConversationsLoading={isConversationsLoading}
-                isFriendsLoaded={isFriendsLoaded}
                 isThreadLoading={isThreadLoading}
                 isThreadReadOnly={isThreadReadOnly}
                 messages={messages}
+                newConversationIds={newConversationIds}
                 onBack={() => void router.push(spaceRoutes.home)}
                 onCloseThread={closeConversation}
                 onOpenSelectedFriendProfile={(friend) =>

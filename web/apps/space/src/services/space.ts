@@ -96,6 +96,7 @@ interface SpaceMessageConversationActivity {
     createdAt: string;
     id: string;
     message?: SpaceMessageResponse;
+    outgoing?: boolean;
     post?: SpaceMessageConversationPostResponse;
     type: SpaceMessageConversationActivityType;
 }
@@ -242,6 +243,7 @@ export interface SpaceMessageActivity {
     createdAtMs: number;
     id: string;
     message?: SpaceMessage;
+    outgoing: boolean;
     post?: SpaceMessageActivityPost;
     type: SpaceMessageActivityType;
 }
@@ -758,6 +760,7 @@ const messageActivityFromSpaceActivity = async (
         createdAtMs: timestampMsFromSpaceDate(activity.createdAt),
         id: activity.id,
         message,
+        outgoing: Boolean(activity.outgoing),
         post,
         type: activity.type,
     };

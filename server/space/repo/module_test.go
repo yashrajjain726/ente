@@ -323,6 +323,67 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Nil(t, conversations[0].LatestActivity.Post)
 }
 
+func TestSpaceFriendEventsCreateConversationForBothSides(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+
+	aliceID := insertSpaceUser(t, module, "alice-friend-events@example.com", "alice-friend-events-public")
+	bobID := insertSpaceUser(t, module, "bob-friend-events@example.com", "bob-friend-events-public")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-friend-events", "alice-space-key", "alice-profile")
+	require.NoError(t, err)
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-friend-events", "bob-space-key", "bob-profile")
+	require.NoError(t, err)
+
+	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
+	setFriendEventCreatedAt(t, module, 1000, "friend_add", bobID, aliceID)
+
+	aliceConversations, _, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, aliceConversations, 1)
+	require.Equal(t, bobSpace.SpaceID, aliceConversations[0].Friend.SpaceID)
+	require.Equal(t, "friend_add", aliceConversations[0].LatestActivity.Type)
+	require.False(t, aliceConversations[0].LatestActivity.Outgoing)
+	require.True(t, aliceConversations[0].Unread)
+
+	bobConversations, _, err := module.Messages.ListConversations(ctx, bobID, bobSpace.SpaceID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, bobConversations, 1)
+	require.Equal(t, aliceSpace.SpaceID, bobConversations[0].Friend.SpaceID)
+	require.Equal(t, "friend_add", bobConversations[0].LatestActivity.Type)
+	require.True(t, bobConversations[0].LatestActivity.Outgoing)
+	require.False(t, bobConversations[0].Unread)
+
+	aliceUnread, err := module.Messages.HasUnreadNotifications(ctx, aliceID, aliceSpace.SpaceID)
+	require.NoError(t, err)
+	require.True(t, aliceUnread)
+	bobUnread, err := module.Messages.HasUnreadNotifications(ctx, bobID, bobSpace.SpaceID)
+	require.NoError(t, err)
+	require.False(t, bobUnread)
+	bobLatestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
+	require.NoError(t, err)
+	require.Equal(t, int64(1000), bobLatestActivityAt)
+
+	require.NoError(t, module.Friends.DeleteFriendship(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID))
+	setFriendEventCreatedAt(t, module, 2000, "friend_remove", bobID, aliceID)
+
+	aliceConversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, aliceConversations, 1)
+	require.Equal(t, "friend_remove", aliceConversations[0].LatestActivity.Type)
+	require.False(t, aliceConversations[0].LatestActivity.Outgoing)
+	require.True(t, aliceConversations[0].Unread)
+
+	bobConversations, _, err = module.Messages.ListConversations(ctx, bobID, bobSpace.SpaceID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, bobConversations, 1)
+	require.Equal(t, "friend_remove", bobConversations[0].LatestActivity.Type)
+	require.True(t, bobConversations[0].LatestActivity.Outgoing)
+	require.False(t, bobConversations[0].Unread)
+	bobLatestActivityAt, err = module.Messages.GetLatestConversationActivityAt(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
+	require.NoError(t, err)
+	require.Equal(t, int64(2000), bobLatestActivityAt)
+}
+
 func TestSpaceMessageConversationPreviewPrioritizesUnreadIncomingMessage(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)

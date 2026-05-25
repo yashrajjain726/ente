@@ -156,6 +156,7 @@ type SpaceMessageConversationActivityRecord struct {
 	ID        string
 	Type      string
 	CreatedAt int64
+	Outgoing  bool
 	Message   *SpaceMessageRecord
 	Post      *SpaceMessageConversationPostRecord
 }

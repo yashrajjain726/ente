@@ -208,7 +208,8 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 					CASE WHEN m.sender_space_id = $2 THEN m.recipient_space_id ELSE m.sender_space_id END AS friend_space_id,
 					m.message_id,
 					NULL::bigint AS post_id,
-					CASE WHEN m.recipient_space_id = $2 THEN m.created_at ELSE NULL::bigint END AS unread_created_at
+					CASE WHEN m.recipient_space_id = $2 THEN m.created_at ELSE NULL::bigint END AS unread_created_at,
+					FALSE AS is_outgoing
 				FROM space_messages m
 				WHERE (m.sender_space_id = $2 OR m.recipient_space_id = $2)
 				  AND (m.sender_id = $1 OR m.recipient_id = $1)
@@ -224,7 +225,8 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				liker_space.space_id AS friend_space_id,
 				m.message_id,
 				NULL::bigint AS post_id,
-				ml.created_at AS unread_created_at
+				ml.created_at AS unread_created_at,
+				FALSE AS is_outgoing
 			FROM space_message_likes ml
 			JOIN space_messages m ON m.message_id = ml.message_id
 			JOIN spaces liker_space ON liker_space.space_id = ml.actor_space_id
@@ -274,7 +276,8 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				COALESCE(l.friend_space_id, r.friend_space_id) AS friend_space_id,
 				r.message_id,
 				COALESCE(l.post_id, r.post_id) AS post_id,
-				GREATEST(COALESCE(l.liked_at, 0), COALESCE(r.replied_at, 0)) AS unread_created_at
+				GREATEST(COALESCE(l.liked_at, 0), COALESCE(r.replied_at, 0)) AS unread_created_at,
+				FALSE AS is_outgoing
 			FROM post_like_events l
 			FULL OUTER JOIN post_reply_events r
 			  ON r.friend_space_id = l.friend_space_id
@@ -288,13 +291,14 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				END AS activity_type,
 				'friend_event:' || fe.event_id::text AS activity_id,
 				fe.created_at AS activity_created_at,
-				fe.actor_space_id AS friend_space_id,
+				CASE WHEN fe.actor_space_id = $2 THEN fe.target_space_id ELSE fe.actor_space_id END AS friend_space_id,
 				NULL::text AS message_id,
 				NULL::bigint AS post_id,
-				fe.created_at AS unread_created_at
+				CASE WHEN fe.target_space_id = $2 THEN fe.created_at ELSE NULL::bigint END AS unread_created_at,
+				fe.actor_space_id = $2 AS is_outgoing
 			FROM space_friend_events fe
-			WHERE fe.target_space_id = $2
-			  AND fe.actor_space_id <> $2
+			WHERE (fe.target_space_id = $2 OR fe.actor_space_id = $2)
+			  AND fe.actor_space_id <> fe.target_space_id
 		),
 			candidates AS (
 				SELECT * FROM message_candidates
@@ -353,6 +357,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 					c.activity_type,
 					c.activity_id,
 					c.activity_created_at,
+					c.is_outgoing,
 					(c.unread_created_at IS NOT NULL AND c.unread_created_at > c.read_at) AS unread,
 					c.sort_created_at,
 					c.sort_id,
@@ -526,10 +531,11 @@ func (r *MessagesRepository) GetLatestConversationActivityAt(ctx context.Context
 			SELECT
 				fe.created_at AS activity_created_at,
 				'friend_event:' || fe.event_id::text AS activity_id,
-				fe.actor_space_id AS friend_space_id
+				CASE WHEN fe.actor_space_id = $1 THEN fe.target_space_id ELSE fe.actor_space_id END AS friend_space_id
 			FROM space_friend_events fe
-			WHERE fe.target_space_id = $1
-			  AND fe.actor_space_id <> $1
+			WHERE (fe.target_space_id = $1 OR fe.actor_space_id = $1)
+			  AND fe.actor_space_id <> fe.target_space_id
+
 		)
 		SELECT c.activity_created_at
 		FROM candidates c
@@ -614,11 +620,12 @@ func (r *MessagesRepository) HasUnreadNotifications(ctx context.Context, viewerI
 			SELECT
 				fe.created_at AS activity_created_at,
 				'friend_event:' || fe.event_id::text AS activity_id,
-				fe.actor_space_id AS friend_space_id,
-				fe.created_at AS unread_created_at
+				CASE WHEN fe.actor_space_id = $1 THEN fe.target_space_id ELSE fe.actor_space_id END AS friend_space_id,
+				CASE WHEN fe.target_space_id = $1 THEN fe.created_at ELSE NULL::bigint END AS unread_created_at
 			FROM space_friend_events fe
-			WHERE fe.target_space_id = $1
-			  AND fe.actor_space_id <> $1
+			WHERE (fe.target_space_id = $1 OR fe.actor_space_id = $1)
+			  AND fe.actor_space_id <> fe.target_space_id
+
 		),
 		candidates AS (
 			SELECT * FROM message_candidates
@@ -693,6 +700,7 @@ func scanMessageConversationRecord(scanner interface{ Scan(dest ...any) error })
 		&rec.LatestActivity.Type,
 		&rec.LatestActivity.ID,
 		&rec.LatestActivity.CreatedAt,
+		&rec.LatestActivity.Outgoing,
 		&rec.Unread,
 		&rec.SortCreatedAt,
 		&rec.SortID,

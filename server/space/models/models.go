@@ -320,6 +320,7 @@ type MessageConversationActivityResponse struct {
 	ID        string                           `json:"id"`
 	Type      string                           `json:"type"`
 	CreatedAt string                           `json:"createdAt"`
+	Outgoing  bool                             `json:"outgoing,omitempty"`
 	Message   *MessageResponse                 `json:"message,omitempty"`
 	Post      *MessageConversationPostResponse `json:"post,omitempty"`
 }
