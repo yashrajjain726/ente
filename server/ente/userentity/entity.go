@@ -22,13 +22,13 @@ const (
 	Memory EntityType = "memory"
 	// Contact is the entity type for the shared contact root key.
 	Contact EntityType = "contact"
-	// Wall is the entity type for the wall root key.
-	Wall EntityType = "wall"
+	// Space is the entity type for the space root key.
+	Space EntityType = "space"
 )
 
 func (et EntityType) IsValid() error {
 	switch et {
-	case Location, Person, CGroup, SmartAlbum, Memory, Contact, Wall:
+	case Location, Person, CGroup, SmartAlbum, Memory, Contact, Space:
 		return nil
 	}
 	return ente.NewBadRequestWithMessage(fmt.Sprintf("Invalid EntityType: %s", et))

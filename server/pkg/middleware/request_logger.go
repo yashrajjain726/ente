@@ -54,6 +54,9 @@ func shouldSkipBodyLog(method string, path string) bool {
 	if method == http.MethodPost && (path == "/paste/create" || path == "/paste/guard" || path == "/paste/consume") {
 		return true
 	}
+	if strings.HasPrefix(path, "/space") && method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions {
+		return true
+	}
 	return false
 }
 

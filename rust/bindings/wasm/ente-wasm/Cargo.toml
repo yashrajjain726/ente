@@ -9,6 +9,7 @@ crate-type = ["cdylib"]
 [dependencies]
 ente-contacts = { path = "../../../crates/contacts" }
 ente-core = { path = "../../../crates/core", features = ["srp"] }
+ente-space = { path = "../../../space" }
 md-5 = "0.11"
 js-sys = "0.3"
 serde = { version = "1", features = ["derive"] }

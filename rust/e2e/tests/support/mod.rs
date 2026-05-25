@@ -4,8 +4,8 @@ pub mod auth;
 pub mod contacts;
 pub mod legacy;
 pub mod legacy_kit;
+pub mod space;
 pub mod suite;
-pub mod wall;
 
 use std::collections::HashSet;
 use uuid::Uuid;

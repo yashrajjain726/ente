@@ -1,0 +1,167 @@
+import { SpacePageMeta } from "components/SpacePageMeta";
+import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import { useRouter } from "next/router";
+import React, { useEffect, useMemo, useState } from "react";
+import { friendsBackground } from "screens/FriendsScreen";
+import { ProfileScreen } from "screens/ProfileScreen";
+import {
+    loadCurrentPostLikers,
+    loadCurrentSpaceFriends,
+    loadCurrentSpacePostsPage,
+    loadCurrentSpaceProfile,
+    setCurrentPostLiked,
+    type SpacePost,
+} from "services/space";
+import { useSpaceAppState } from "state/spaceAppState";
+import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
+import { friendSpaceIdFromQuery, spaceRoutes } from "utils/spaceRoutes";
+
+const friendSpaceIdFromPath = () => {
+    if (typeof window == "undefined") return "";
+    const match = /^\/app\/friends\/([^/?#]+)/.exec(window.location.pathname);
+    if (!match?.[1]) return "";
+
+    try {
+        return decodeURIComponent(match[1]);
+    } catch {
+        return "";
+    }
+};
+
+const Page: React.FC = () => {
+    const router = useRouter();
+    const {
+        friends,
+        profile,
+        profileLoadError,
+        profileLoadStatus,
+        setFriends,
+    } = useSpaceAppState();
+    const friendSpaceId =
+        friendSpaceIdFromQuery(router.query.spaceId) || friendSpaceIdFromPath();
+    const selectedFriend = friends.find(
+        (friend) =>
+            friend.spaceId == friendSpaceId || friend.id == friendSpaceId,
+    );
+    const [friendsLoadAttempted, setFriendsLoadAttempted] = useState(false);
+    const [selectedProfile, setSelectedProfile] = useState(selectedFriend);
+    const [posts, setPosts] = useState<SpacePost[]>([]);
+    const postGroups = useMemo(
+        () => profilePostGroupsFromPosts(posts),
+        [posts],
+    );
+
+    useEffect(() => {
+        if (!router.isReady) return;
+        if (profileLoadStatus == "ready" && !profile) {
+            void router.replace(spaceRoutes.onboarding);
+            return;
+        }
+        if (
+            profileLoadStatus == "ready" &&
+            friendsLoadAttempted &&
+            !selectedFriend
+        ) {
+            void router.replace(spaceRoutes.friends);
+        }
+    }, [
+        friendsLoadAttempted,
+        profile,
+        profileLoadStatus,
+        router,
+        selectedFriend,
+    ]);
+
+    useEffect(() => {
+        if (!profile?.spaceId) return;
+
+        void loadCurrentSpaceFriends(profile.spaceId)
+            .then(setFriends)
+            .catch((error: unknown) =>
+                console.error("Failed to load space friends", error),
+            )
+            .finally(() => setFriendsLoadAttempted(true));
+    }, [profile?.spaceId, setFriends]);
+
+    useEffect(() => {
+        if (!selectedFriend?.spaceId) return;
+
+        let cancelled = false;
+        setSelectedProfile(selectedFriend);
+        void Promise.all([
+            loadCurrentSpaceProfile(selectedFriend.spaceId),
+            loadCurrentSpacePostsPage(selectedFriend.spaceId),
+        ])
+            .then(([nextProfile, page]) => {
+                if (cancelled) return;
+                setSelectedProfile(nextProfile);
+                setPosts(page.items);
+            })
+            .catch((error: unknown) =>
+                console.error("Failed to load friend posts", error),
+            );
+
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedFriend]);
+
+    const goBack = () => {
+        if (typeof window != "undefined" && window.history.length > 1) {
+            router.back();
+            return;
+        }
+        void router.push(spaceRoutes.friends);
+    };
+
+    if (
+        !router.isReady ||
+        profileLoadStatus != "ready" ||
+        !profile ||
+        !selectedFriend
+    ) {
+        return (
+            <SpaceRouteFallback
+                background={friendsBackground}
+                message={profileLoadError}
+            />
+        );
+    }
+
+    return (
+        <>
+            <SpacePageMeta themeColor={friendsBackground} />
+            <ProfileScreen
+                friendsCount={
+                    selectedProfile?.friendsCount ?? selectedFriend.friendsCount
+                }
+                headerVariant="friend"
+                postGroups={postGroups}
+                profile={{
+                    avatarUrl:
+                        selectedProfile?.avatarUrl ??
+                        selectedFriend.avatarUrl ??
+                        null,
+                    coverUrl: selectedProfile?.coverUrl ?? null,
+                    coverObjectKey: selectedProfile?.coverObjectKey,
+                    coverUpdatedAt: selectedProfile?.coverUpdatedAt,
+                    fullName:
+                        selectedProfile?.fullName ?? selectedFriend.fullName,
+                    username:
+                        selectedProfile?.username ?? selectedFriend.username,
+                    spaceId: selectedProfile?.spaceId ?? selectedFriend.spaceId,
+                    spaceSlug:
+                        selectedProfile?.spaceSlug ?? selectedFriend.spaceSlug,
+                }}
+                onBack={goBack}
+                onOpenFriend={(nextFriendID) =>
+                    void router.push(spaceRoutes.friend(nextFriendID))
+                }
+                onLoadPostLikers={loadCurrentPostLikers}
+                onSetPostLiked={setCurrentPostLiked}
+            />
+        </>
+    );
+};
+
+export default Page;

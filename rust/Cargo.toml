@@ -23,5 +23,5 @@ members = [
     "crates/image",
     "crates/photos",
     "e2e",
-    "wall",
+    "space",
 ]
