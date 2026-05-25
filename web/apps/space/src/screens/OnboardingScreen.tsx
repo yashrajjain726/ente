@@ -3,10 +3,10 @@ import { EnteLogo } from "ente-base/components/EnteLogo";
 import React from "react";
 
 export const onboardingGreen = "#08C225";
-export const onboardingTitle = "Share life’s moments";
+export const onboardingTitle = "Share your life";
 export const onboardingDescription =
-    "A private, end-to-end encrypted space for sharing life’s moments with friends and family";
-export const addFriendOnboardingTitle = "Follow their moments";
+    "A private, end-to-end encrypted space for sharing everyday moments with friends and family";
+export const addFriendOnboardingTitle = "Follow their life";
 
 const softGreen = "#E7F6E9";
 const copyGreen = "#AAFFB8";
@@ -157,6 +157,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                         flexShrink: 0,
                         mt: "clamp(28px, 7svh, 60px)",
                         textAlign: "center",
+                        width: "100%",
                         "@media (min-height: 760px)": { mt: "92px" },
                     }}
                 >
@@ -184,7 +185,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                             lineHeight: "20px",
                             m: 0,
                             mt: "12px",
-                            maxWidth: 314,
+                            width: "100%",
                         }}
                     >
                         {description}
