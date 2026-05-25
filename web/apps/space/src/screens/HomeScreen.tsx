@@ -38,7 +38,8 @@ export const homeBackground = "#FFFFFF";
 const green = "#08C225";
 const paleGreen = "#E7F6E9";
 const feedCardBackground = "#F5F5F5";
-const feedSkeletonColor = "#E2E2E2";
+const feedSkeletonCardBackground = "#FCFCFC";
+const feedSkeletonColor = "#F2F2F2";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
 const warning = "#F63A3A";
@@ -164,7 +165,7 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({ aspectRatio }) => (
         component="article"
         aria-hidden
         sx={{
-            bgcolor: feedCardBackground,
+            bgcolor: feedSkeletonCardBackground,
             borderRadius: "16px",
             boxSizing: "border-box",
             display: "flex",
