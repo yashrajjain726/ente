@@ -291,7 +291,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                 <Box
                     sx={{
                         alignSelf: "center",
-                        bgcolor: "#111",
+                        bgcolor: isSquareCrop ? "#111" : "#FFFFFF",
                         borderRadius: isSquareCrop ? "50%" : "8px",
                         height: isSquareCrop
                             ? "var(--avatar-crop-size)"
@@ -304,6 +304,13 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                         width: isSquareCrop
                             ? "var(--avatar-crop-size)"
                             : "var(--profile-crop-width)",
+                        ...(!isSquareCrop && {
+                            "& .reactEasyCrop_CropArea": {
+                                borderColor: "#FFFFFF",
+                                boxShadow: "0 0 0 9999em #FFFFFF",
+                                color: "#FFFFFF",
+                            },
+                        }),
                     }}
                 >
                     <Cropper

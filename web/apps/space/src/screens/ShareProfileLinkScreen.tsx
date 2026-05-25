@@ -50,8 +50,10 @@ const BackIcon: React.FC = () => (
     </Box>
 );
 
-export const ShareIcon: React.FC = () => (
-    <HugeiconsIcon icon={Share08Icon} size={18} strokeWidth={1.8} />
+export const ShareIcon: React.FC<{ strokeWidth?: number }> = ({
+    strokeWidth = 1.8,
+}) => (
+    <HugeiconsIcon icon={Share08Icon} size={18} strokeWidth={strokeWidth} />
 );
 
 export const LinkIcon: React.FC = () => (

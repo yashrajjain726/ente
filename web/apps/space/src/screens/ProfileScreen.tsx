@@ -35,6 +35,10 @@ const textStrong = "#303030";
 const textSoft = "#777777";
 const warning = "#F63A3A";
 const coverForeground = "#FFFFFF";
+const coverForegroundShadow = "0 1px 5px rgba(0, 0, 0, 0.34)";
+const coverForegroundIconShadow =
+    "drop-shadow(0 1px 5px rgba(0, 0, 0, 0.34))";
+const coverButtonShadow = "0 1px 5px rgba(0, 0, 0, 0.12)";
 const profileCoverBackground = "#1F1F1F";
 const profileHeaderHeight = 56;
 const profileAvatarTopOffset = 54;
@@ -467,6 +471,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 },
                                 "& svg": {
                                     display: "block",
+                                    filter: coverForegroundIconShadow,
                                     overflow: "visible",
                                 },
                             }}
@@ -500,6 +505,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 2,
                                 },
+                                "& svg": {
+                                    filter: coverForegroundIconShadow,
+                                },
                             }}
                         >
                             <HugeiconsIcon
@@ -519,6 +527,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 backgroundColor: "#FFFFFF",
                                 border: 0,
                                 borderRadius: "999px",
+                                boxShadow: coverButtonShadow,
                                 color: green,
                                 cursor: onAddFriend ? "pointer" : "default",
                                 display: "inline-flex",
@@ -557,7 +566,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 m: 0,
                                 maxWidth: "100%",
                                 overflow: "hidden",
+                                px: "4px",
                                 textOverflow: "ellipsis",
+                                textShadow: coverForegroundShadow,
                                 whiteSpace: "nowrap",
                             }}
                         >
@@ -585,6 +596,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     borderRadius: "50%",
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 2,
+                                },
+                                "& svg": {
+                                    filter: coverForegroundIconShadow,
                                 },
                             }}
                         >
@@ -753,7 +767,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         },
                                     }}
                                 >
-                                    <ShareIcon />
+                                    <ShareIcon strokeWidth={2.2} />
                                 </Box>
                             )}
                         </Box>
