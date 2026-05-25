@@ -66,6 +66,7 @@ const feedSkeletonAspectRatios = [
     "4 / 5",
     "16 / 9",
 ];
+const minimumFeedPhotoFrameAspectRatio = 3 / 4;
 
 const FeedReplyIcon: React.FC = () => (
     <svg
@@ -163,6 +164,13 @@ const dimensionsFromAspectRatio = (
 
     return { height, width: Math.round(safeAspectRatio * height) };
 };
+
+const feedPhotoFrameDimensionsFor = (
+    dimensions: FeedPhotoDimensions,
+): FeedPhotoDimensions =>
+    dimensions.width / dimensions.height < minimumFeedPhotoFrameAspectRatio
+        ? { height: 4, width: 3 }
+        : dimensions;
 
 const pageScrollY = () =>
     Math.max(
@@ -346,6 +354,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
         useState<FeedPhotoDimensions | null>(null);
     const photoDimensions =
         loadedPhotoDimensions ?? dimensionsFromAspectRatio(aspectRatio);
+    const feedPhotoFrameDimensions =
+        feedPhotoFrameDimensionsFor(photoDimensions);
     const rememberLoadedPhotoDimensions: React.ReactEventHandler<
         HTMLImageElement
     > = ({ currentTarget }) => {
@@ -554,7 +564,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
             </Box>
             <Box
                 sx={{
-                    aspectRatio: `${photoDimensions.width} / ${photoDimensions.height}`,
+                    aspectRatio: `${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`,
                     bgcolor: paleGreen,
                     borderRadius: "12px",
                     overflow: "hidden",
