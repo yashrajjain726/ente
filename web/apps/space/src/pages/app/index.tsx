@@ -32,8 +32,7 @@ const Page: React.FC = () => {
     } = useSpaceAppState();
     const [addedFriendToastName, setAddedFriendToastName] = useState<string>();
     const [feedItems, setFeedItems] = useState<SpacePost[]>([]);
-    const [hasUnreadNotifications, setHasUnreadNotifications] =
-        useState<boolean>();
+    const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isFeedLoading, setIsFeedLoading] = useState(true);
     const closeAddedFriendToast = React.useCallback(
         () => setAddedFriendToastName(undefined),
@@ -62,13 +61,13 @@ const Page: React.FC = () => {
 
         const spaceId = profile?.spaceId;
         if (!spaceId) {
-            setHasUnreadNotifications(false);
+            setHasUnreadMessages(false);
             setIsFeedLoading(false);
             return;
         }
 
         let cancelled = false;
-        setHasUnreadNotifications(undefined);
+        setHasUnreadMessages(undefined);
         setIsFeedLoading(true);
         void Promise.all([
             loadCurrentFeedPage(),
@@ -78,7 +77,7 @@ const Page: React.FC = () => {
             .then(([feed, unreadStatus, nextFriends]) => {
                 if (cancelled) return;
                 setFeedItems(feed.items);
-                setHasUnreadNotifications(unreadStatus.notificationsUnread);
+                setHasUnreadMessages(unreadStatus.messagesUnread);
                 setFriends(nextFriends);
                 const latestFeedPost = feed.items[0];
                 if (latestFeedPost) {
@@ -116,7 +115,7 @@ const Page: React.FC = () => {
                 feedItems={feedItems}
                 friendsCount={friends.length}
                 addedFriendToastName={addedFriendToastName}
-                hasUnreadNotifications={hasUnreadNotifications}
+                hasUnreadMessages={hasUnreadMessages}
                 isFeedLoading={isFeedLoading}
                 profile={profile}
                 onAddedFriendToastClose={closeAddedFriendToast}
@@ -150,9 +149,7 @@ const Page: React.FC = () => {
                 onOpenFriend={(friendID) =>
                     void router.push(spaceRoutes.friend(friendID))
                 }
-                onOpenNotifications={() =>
-                    void router.push(spaceRoutes.notifications)
-                }
+                onOpenMessages={() => void router.push(spaceRoutes.messages)}
                 onOpenProfile={() => void router.push(spaceRoutes.profile)}
                 onLoadPostLikers={loadCurrentPostLikers}
                 onReplyToPost={replyToCurrentPost}

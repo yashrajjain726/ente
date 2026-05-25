@@ -266,6 +266,11 @@ export interface SpaceMessageConversationPage {
 
 export interface SpaceUnreadStatus {
     feedUnread: boolean;
+    messagesUnread: boolean;
+}
+
+interface SpaceUnreadStatusResponse {
+    feedUnread: boolean;
     notificationsUnread: boolean;
 }
 
@@ -890,7 +895,11 @@ export const loadCurrentFeedPage = async (
 export const loadCurrentUnreadStatus = async (): Promise<SpaceUnreadStatus> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
-        return (await ctx.unread_status()) as SpaceUnreadStatus;
+        const status = (await ctx.unread_status()) as SpaceUnreadStatusResponse;
+        return {
+            feedUnread: status.feedUnread,
+            messagesUnread: status.notificationsUnread,
+        };
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
@@ -1127,7 +1136,7 @@ export const loadCurrentMessageThread = async (
     }
 };
 
-export const markCurrentNotificationsRead = async (friendSpaceId: string) => {
+export const markCurrentMessagesRead = async (friendSpaceId: string) => {
     if (!friendSpaceId.trim()) return;
     const ctx = await ensureCurrentSpaceContext();
     try {

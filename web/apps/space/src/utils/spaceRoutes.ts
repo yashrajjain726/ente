@@ -10,7 +10,7 @@ export const spaceRoutes = {
     home: "/app",
     invite: "/invite",
     login: "/login",
-    notifications: "/app/notifications",
+    messages: "/app/messages",
     onboarding: "/",
     passkeysFinish: "/passkeys/finish",
     passkeysVerify: "/passkeys/verify",

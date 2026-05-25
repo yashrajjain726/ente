@@ -309,7 +309,7 @@ const conversationId = (conversation: SpaceMessageConversation) =>
 
 const dayMs = 24 * 60 * 60 * 1000;
 
-const NotificationListItem: React.FC<{
+const ConversationListItem: React.FC<{
     conversation: SpaceMessageConversation;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
     profile: SetupProfile;
@@ -439,12 +439,12 @@ const NotificationListItem: React.FC<{
     );
 };
 
-interface NotificationSectionItem {
+interface ConversationSectionItem {
     conversations: SpaceMessageConversation[];
     title: string;
 }
 
-const NotificationSection: React.FC<{
+const ConversationSection: React.FC<{
     conversations: SpaceMessageConversation[];
     onOpenThread: (conversation: SpaceMessageConversation) => void;
     profile: SetupProfile;
@@ -471,7 +471,7 @@ const NotificationSection: React.FC<{
             </Box>
             <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
                 {conversations.map((conversation) => (
-                    <NotificationListItem
+                    <ConversationListItem
                         key={conversationId(conversation)}
                         conversation={conversation}
                         onOpenThread={onOpenThread}
@@ -1046,7 +1046,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             today.getMonth(),
             today.getDate() - 1,
         ).getTime();
-        const nextSections: NotificationSectionItem[] = [
+        const nextSections: ConversationSectionItem[] = [
             { title: "New", conversations: [] },
             { title: "Today", conversations: [] },
             { title: "Yesterday", conversations: [] },
@@ -1225,9 +1225,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     <Box
                         component="button"
                         type="button"
-                        aria-label={
-                            isThreadOpen ? "Back to notifications" : "Back"
-                        }
+                        aria-label={isThreadOpen ? "Back to messages" : "Back"}
                         onClick={isThreadOpen ? onCloseThread : onBack}
                         sx={{
                             alignItems: "center",
@@ -1329,7 +1327,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                 whiteSpace: "nowrap",
                             }}
                         >
-                            Notifications
+                            Messages
                         </Box>
                     )}
                     <Box aria-hidden />
@@ -1927,7 +1925,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         m: 0,
                                     }}
                                 >
-                                    No notifications yet
+                                    No messages yet
                                 </Box>
                             </Box>
                         ) : (
@@ -1939,7 +1937,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                 }}
                             >
                                 {groupedConversations.map((section) => (
-                                    <NotificationSection
+                                    <ConversationSection
                                         key={section.title}
                                         conversations={section.conversations}
                                         onOpenThread={onOpenThread}

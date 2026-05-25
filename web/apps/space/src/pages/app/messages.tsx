@@ -8,7 +8,7 @@ import {
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
     loadCurrentSpaceFriends,
-    markCurrentNotificationsRead,
+    markCurrentMessagesRead,
     replyToCurrentMessage,
     sendCurrentMessage,
     setCurrentMessageLiked,
@@ -82,10 +82,10 @@ const Page: React.FC = () => {
                 if (unreadConversationIds.length == 0) return;
                 void Promise.all(
                     unreadConversationIds.map((friendSpaceId) =>
-                        markCurrentNotificationsRead(friendSpaceId),
+                        markCurrentMessagesRead(friendSpaceId),
                     ),
                 ).catch((error: unknown) =>
-                    console.warn("Failed to mark notifications read", error),
+                    console.warn("Failed to mark messages read", error),
                 );
             })
             .catch((error: unknown) =>
@@ -110,10 +110,10 @@ const Page: React.FC = () => {
                         : currentConversation,
                 ),
             );
-            void markCurrentNotificationsRead(friendSpaceId).catch(
+            void markCurrentMessagesRead(friendSpaceId).catch(
                 (error: unknown) =>
                     console.warn(
-                        "Failed to mark notification conversation read",
+                        "Failed to mark message conversation read",
                         error,
                     ),
             );
@@ -198,7 +198,10 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta themeColor={messagesBackground} />
+            <SpacePageMeta
+                themeColor={messagesBackground}
+                title="Messages | Ente Space"
+            />
             <MessagesScreen
                 conversations={conversations}
                 isConversationsLoading={isConversationsLoading}

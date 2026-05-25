@@ -90,7 +90,7 @@ interface HomeScreenProps {
     addedFriendToastName?: string;
     feedItems: SpacePost[];
     friendsCount: number;
-    hasUnreadNotifications?: boolean;
+    hasUnreadMessages?: boolean;
     isFeedLoading?: boolean;
     onAddedFriendToastClose?: () => void;
     onCreatePost?: (
@@ -99,7 +99,7 @@ interface HomeScreenProps {
     ) => Promise<void>;
     onDeletePost?: (postId: number) => Promise<void> | void;
     onOpenFriend?: (friendID: string) => void;
-    onOpenNotifications?: () => void;
+    onOpenMessages?: () => void;
     onOpenProfile?: () => void;
     onLoadPostLikers?: (postId: number) => Promise<SpaceLiker[]>;
     onReplyToPost?: (postId: number, text: string) => Promise<void>;
@@ -820,14 +820,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     addedFriendToastName,
     feedItems,
     friendsCount,
-    hasUnreadNotifications,
+    hasUnreadMessages,
     isFeedLoading = false,
     onAddedFriendToastClose,
     onCreatePost,
     onDeletePost,
     onLoadPostLikers,
     onOpenFriend,
-    onOpenNotifications,
+    onOpenMessages,
     onOpenProfile,
     onReplyToPost,
     onSetPostLiked,
@@ -849,7 +849,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const hasFeedItems = feedItems.length > 0;
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
     const showFeedCards = hasFeedItems || isEmptyFeedLoading;
-    const showUnreadIndicator = hasUnreadNotifications === true;
+    const showUnreadIndicator = hasUnreadMessages === true;
     const emptyFeedMessage =
         friendsCount == 0
             ? "When you add friends, their posts will appear here."
@@ -1109,10 +1109,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             type="button"
                             aria-label={
                                 showUnreadIndicator
-                                    ? "Open notifications with unread activity"
-                                    : "Open notifications"
+                                    ? "Open messages with unread activity"
+                                    : "Open messages"
                             }
-                            onClick={onOpenNotifications}
+                            onClick={onOpenMessages}
                             sx={{
                                 appearance: "none",
                                 alignItems: "center",
@@ -1120,9 +1120,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 border: 0,
                                 boxSizing: "border-box",
                                 color: textBase,
-                                cursor: onOpenNotifications
-                                    ? "pointer"
-                                    : "default",
+                                cursor: onOpenMessages ? "pointer" : "default",
                                 display: "flex",
                                 fontSize: 0,
                                 height: headerActionSize,
