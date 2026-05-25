@@ -36,8 +36,7 @@ const textSoft = "#777777";
 const warning = "#F63A3A";
 const coverForeground = "#FFFFFF";
 const coverForegroundShadow = "0 1px 5px rgba(0, 0, 0, 0.34)";
-const coverForegroundIconShadow =
-    "drop-shadow(0 1px 5px rgba(0, 0, 0, 0.34))";
+const coverForegroundIconShadow = "drop-shadow(0 1px 5px rgba(0, 0, 0, 0.34))";
 const coverButtonShadow = "0 1px 5px rgba(0, 0, 0, 0.12)";
 const profileCoverBackground = "#1F1F1F";
 const profileHeaderHeight = 56;
@@ -505,9 +504,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 2,
                                 },
-                                "& svg": {
-                                    filter: coverForegroundIconShadow,
-                                },
+                                "& svg": { filter: coverForegroundIconShadow },
                             }}
                         >
                             <HugeiconsIcon
@@ -597,9 +594,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 2,
                                 },
-                                "& svg": {
-                                    filter: coverForegroundIconShadow,
-                                },
+                                "& svg": { filter: coverForegroundIconShadow },
                             }}
                         >
                             <HugeiconsIcon
@@ -794,7 +789,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             <Box component="span" sx={{ color: textBase }}>
                                 {postsSharedCount}
                             </Box>
-                            <Box component="span">posts</Box>
+                            <Box component="span">
+                                {postsSharedCount == 1 ? "post" : "posts"}
+                            </Box>
                             <Box component="span">·</Box>
                             <Box
                                 component={canOpenFriends ? "button" : "span"}
@@ -828,7 +825,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 <Box component="span" sx={{ color: textBase }}>
                                     {friendsCount}
                                 </Box>
-                                <Box component="span">friends</Box>
+                                <Box component="span">
+                                    {friendsCount == 1 ? "friend" : "friends"}
+                                </Box>
                             </Box>
                         </Box>
                         {postPhotoError && (

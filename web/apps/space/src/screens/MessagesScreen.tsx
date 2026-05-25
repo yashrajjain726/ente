@@ -191,7 +191,10 @@ const messageLikeTooltipLabel = (
         likerNames.push(actorName(otherParticipant));
     }
     if (message.likeCount > likerNames.length) {
-        likerNames.push(`${message.likeCount - likerNames.length} others`);
+        const otherCount = message.likeCount - likerNames.length;
+        likerNames.push(
+            `${otherCount} ${otherCount == 1 ? "other" : "others"}`,
+        );
     }
     return likerNames.filter(Boolean).join(" and ") || "Liked";
 };
