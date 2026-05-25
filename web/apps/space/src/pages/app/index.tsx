@@ -6,6 +6,7 @@ import { HomeScreen, homeBackground } from "screens/HomeScreen";
 import {
     createCurrentPhotoPost,
     createCurrentProfileLink,
+    deleteCurrentPost,
     loadCurrentFeedPage,
     loadCurrentPostLikers,
     loadCurrentSpaceFriends,
@@ -138,6 +139,12 @@ const Page: React.FC = () => {
                     void markCurrentFeedRead(post.postId).catch(
                         (error: unknown) =>
                             console.warn("Failed to mark feed read", error),
+                    );
+                }}
+                onDeletePost={async (postId) => {
+                    await deleteCurrentPost(postId);
+                    setFeedItems((currentItems) =>
+                        currentItems.filter((item) => item.postId != postId),
                     );
                 }}
                 onOpenFriend={(friendID) =>

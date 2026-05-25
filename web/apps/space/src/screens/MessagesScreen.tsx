@@ -468,11 +468,6 @@ const NotificationSection: React.FC<{
                 }}
             >
                 {title}
-                {title == "New" && (
-                    <Box component="span" sx={{ color: green, ml: "4px" }}>
-                        ({conversations.length})
-                    </Box>
-                )}
             </Box>
             <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
                 {conversations.map((conversation) => (

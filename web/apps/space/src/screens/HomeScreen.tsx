@@ -48,7 +48,10 @@ const headerActionSize = 32;
 const headerActionGap = 8;
 const headerAddIconSize = 24;
 const headerAvatarSize = 23;
+const headerHeight = 64;
 const headerIconSize = 23;
+const headerHideStartY = 96;
+const headerScrollDelta = 4;
 const headerSideWidth = headerActionSize * 2 + headerActionGap;
 const feedLikeActionSize = 28;
 const feedActionIconSize = 20;
@@ -94,6 +97,7 @@ interface HomeScreenProps {
         image: PreparedSpacePostImage,
         caption: string,
     ) => Promise<void>;
+    onDeletePost?: (postId: number) => Promise<void> | void;
     onOpenFriend?: (friendID: string) => void;
     onOpenNotifications?: () => void;
     onOpenProfile?: () => void;
@@ -158,6 +162,62 @@ const dimensionsFromAspectRatio = (
     const height = 1000;
 
     return { height, width: Math.round(safeAspectRatio * height) };
+};
+
+const pageScrollY = () =>
+    Math.max(
+        0,
+        window.scrollY ||
+            document.scrollingElement?.scrollTop ||
+            document.documentElement.scrollTop ||
+            document.body.scrollTop ||
+            0,
+    );
+
+const useHideHeaderOnScrollDirection = () => {
+    const [isHidden, setIsHidden] = useState(false);
+    const lastScrollYRef = React.useRef(0);
+    const frameRef = React.useRef<number | null>(null);
+
+    React.useEffect(() => {
+        lastScrollYRef.current = pageScrollY();
+
+        const updateVisibility = () => {
+            frameRef.current = null;
+            const nextScrollY = pageScrollY();
+            const delta = nextScrollY - lastScrollYRef.current;
+            lastScrollYRef.current = nextScrollY;
+
+            if (nextScrollY <= headerHideStartY) {
+                setIsHidden(false);
+                return;
+            }
+
+            if (delta > headerScrollDelta) {
+                setIsHidden(true);
+                return;
+            }
+
+            if (delta < -1) setIsHidden(false);
+        };
+
+        const scheduleUpdate = () => {
+            if (frameRef.current != null) return;
+            frameRef.current = window.requestAnimationFrame(updateVisibility);
+        };
+
+        window.addEventListener("scroll", scheduleUpdate, { passive: true });
+        document.addEventListener("scroll", scheduleUpdate, { passive: true });
+        return () => {
+            window.removeEventListener("scroll", scheduleUpdate);
+            document.removeEventListener("scroll", scheduleUpdate);
+            if (frameRef.current != null) {
+                window.cancelAnimationFrame(frameRef.current);
+            }
+        };
+    }, []);
+
+    return isHidden;
 };
 
 const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({ aspectRatio }) => (
@@ -764,6 +824,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     isFeedLoading = false,
     onAddedFriendToastClose,
     onCreatePost,
+    onDeletePost,
     onLoadPostLikers,
     onOpenFriend,
     onOpenNotifications,
@@ -775,6 +836,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
+    const isHeaderTriggered = useHideHeaderOnScrollDirection();
+    const [isHeaderFocused, setIsHeaderFocused] = useState(false);
+    const isHeaderHidden = isHeaderTriggered && !isHeaderFocused;
     const [postPhotoError, setPostPhotoError] = useState<string>();
     const [isPostPhotoPreparing, setIsPostPhotoPreparing] = useState(false);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -822,6 +886,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         const localObjectUrl = selectedViewer?.localObjectUrl;
         setSelectedViewer(null);
         revokeLocalPostObjectUrl(localObjectUrl);
+    };
+    const deleteSelectedPost = async () => {
+        const postId = selectedViewer?.photo.postId;
+        if (!postId || !onDeletePost) return;
+
+        await onDeletePost(postId);
     };
 
     const shareProfileLink = async () => {
@@ -912,16 +982,42 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             >
                 <Box
                     component="header"
+                    onFocusCapture={() => setIsHeaderFocused(true)}
+                    onBlurCapture={(event) => {
+                        const nextFocus = event.relatedTarget;
+                        if (
+                            nextFocus instanceof Node &&
+                            event.currentTarget.contains(nextFocus)
+                        )
+                            return;
+
+                        setIsHeaderFocused(false);
+                    }}
                     sx={{
                         alignItems: "center",
+                        bgcolor: homeBackground,
+                        boxSizing: "border-box",
                         display: "grid",
                         gap: "12px",
                         gridTemplateColumns: `${headerSideWidth}px minmax(0, 1fr) ${headerSideWidth}px`,
-                        boxSizing: "border-box",
+                        height: headerHeight,
+                        left: "50%",
+                        maxWidth: "100%",
                         pb: 2,
+                        position: "fixed",
                         pt: 1.5,
                         px: 1.25,
+                        top: 0,
+                        transform: isHeaderHidden
+                            ? "translate(-50%, calc(-100% - 4px))"
+                            : "translate(-50%, 0)",
+                        transition: "transform 180ms ease",
                         width: "100%",
+                        zIndex: 4,
+                        "@media (min-width: 600px)": { maxWidth: 390 },
+                        "@media (prefers-reduced-motion: reduce)": {
+                            transition: "none",
+                        },
                     }}
                 >
                     <Box
@@ -1160,6 +1256,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         </Box>
                     </Box>
                 </Box>
+                <Box aria-hidden sx={{ height: headerHeight }} />
                 {postPhotoError && (
                     <Box
                         role="alert"
@@ -1333,6 +1430,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             !selectedPhotoIsOwn &&
                             selectedViewer.photo.friendID != profile.spaceId
                                 ? onReplyToPost
+                                : undefined
+                        }
+                        onDeletePost={
+                            selectedPhotoIsOwn &&
+                            selectedViewer.photo.postId &&
+                            onDeletePost
+                                ? deleteSelectedPost
                                 : undefined
                         }
                         onPublishDraftPost={
