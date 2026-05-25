@@ -29,6 +29,7 @@ type MessagesController struct {
 	SpacesRepo      *repo.SpacesRepository
 	FriendsRepo     *repo.FriendsRepository
 	ReadMarkersRepo *repo.ReadMarkersRepository
+	EmailNotifier   SpaceEmailNotifier
 	auth            authDeps
 }
 
@@ -117,6 +118,9 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 	})
 	if err != nil {
 		return nil, err
+	}
+	if c.EmailNotifier != nil {
+		go c.EmailNotifier.OnSpacePostReplied(senderSpace.SpaceSlug, recipientSpace.OwnerID)
 	}
 	return toMessageResponse(*message), nil
 }

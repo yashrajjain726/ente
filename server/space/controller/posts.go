@@ -21,7 +21,7 @@ type PostsController struct {
 	FriendsRepo     *repo.FriendsRepository
 	AssetsRepo      *repo.AssetsRepository
 	ReadMarkersRepo *repo.ReadMarkersRepository
-	EmailNotifier   SpacePostEmailNotifier
+	EmailNotifier   SpaceEmailNotifier
 	auth            authDeps
 }
 
@@ -285,8 +285,12 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models
 	if err := c.auth.canViewSpace(ctx.Request.Context(), &viewerAuth{UserID: userID, SpaceID: actorSpace.SpaceID}, space); err != nil {
 		return nil, err
 	}
-	if err := c.PostsRepo.SetLike(ctx.Request.Context(), id, userID, actorSpace.SpaceID, req.Like); err != nil {
+	created, err := c.PostsRepo.SetLikeWithCreated(ctx.Request.Context(), id, userID, actorSpace.SpaceID, req.Like)
+	if err != nil {
 		return nil, err
+	}
+	if req.Like && created && c.EmailNotifier != nil {
+		go c.EmailNotifier.OnSpacePostLiked(actorSpace.SpaceSlug, post.OwnerID)
 	}
 	return &models.LikePostResponse{Liked: req.Like}, nil
 }

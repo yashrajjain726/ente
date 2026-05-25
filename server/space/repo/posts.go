@@ -326,12 +326,31 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 }
 
 func (r *PostsRepository) SetLike(ctx context.Context, postID, userID int64, actorSpaceID string, like bool) error {
+	_, err := r.SetLikeWithCreated(ctx, postID, userID, actorSpaceID, like)
+	return err
+}
+
+func (r *PostsRepository) SetLikeWithCreated(ctx context.Context, postID, userID int64, actorSpaceID string, like bool) (bool, error) {
 	if like {
-		_, err := r.DB.ExecContext(ctx, `INSERT INTO space_post_likes (post_id, user_id, actor_space_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, postID, userID, actorSpaceID)
-		return stacktrace.Propagate(err, "")
+		res, err := r.DB.ExecContext(ctx, `INSERT INTO space_post_likes (post_id, user_id, actor_space_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, postID, userID, actorSpaceID)
+		if err != nil {
+			return false, stacktrace.Propagate(err, "")
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return false, stacktrace.Propagate(err, "")
+		}
+		return affected > 0, nil
 	}
-	_, err := r.DB.ExecContext(ctx, `DELETE FROM space_post_likes WHERE post_id = $1 AND actor_space_id = $2`, postID, actorSpaceID)
-	return stacktrace.Propagate(err, "")
+	res, err := r.DB.ExecContext(ctx, `DELETE FROM space_post_likes WHERE post_id = $1 AND actor_space_id = $2`, postID, actorSpaceID)
+	if err != nil {
+		return false, stacktrace.Propagate(err, "")
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, stacktrace.Propagate(err, "")
+	}
+	return affected > 0, nil
 }
 
 func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, cursor string, limit int) ([]SpacePostLikerRecord, string, error) {

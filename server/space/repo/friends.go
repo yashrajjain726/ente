@@ -16,9 +16,14 @@ var (
 )
 
 func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, requesterSpaceID string, targetSpaceID string, targetEncryptedSpaceKey string, targetKeyVersion int, requesterEncryptedSpaceKey string, requesterKeyVersion int) error {
+	_, err := r.AddFriendWithCreated(ctx, requesterID, requesterSpaceID, targetSpaceID, targetEncryptedSpaceKey, targetKeyVersion, requesterEncryptedSpaceKey, requesterKeyVersion)
+	return err
+}
+
+func (r *FriendsRepository) AddFriendWithCreated(ctx context.Context, requesterID int64, requesterSpaceID string, targetSpaceID string, targetEncryptedSpaceKey string, targetKeyVersion int, requesterEncryptedSpaceKey string, requesterKeyVersion int) (bool, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return false, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
 
@@ -30,10 +35,10 @@ func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, re
 		WHERE space_id = $1
 		FOR UPDATE
 	`, requesterSpaceID).Scan(&requesterOwnerID, &requesterCurrentVersion); err != nil {
-		return stacktrace.Propagate(err, "")
+		return false, stacktrace.Propagate(err, "")
 	}
 	if requesterOwnerID != requesterID || requesterCurrentVersion != requesterKeyVersion {
-		return sql.ErrNoRows
+		return false, sql.ErrNoRows
 	}
 
 	var targetOwnerID int64
@@ -44,13 +49,13 @@ func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, re
 		WHERE space_id = $1
 		FOR UPDATE
 	`, targetSpaceID).Scan(&targetOwnerID, &targetCurrentVersion); err != nil {
-		return stacktrace.Propagate(err, "")
+		return false, stacktrace.Propagate(err, "")
 	}
 	if targetOwnerID == requesterID {
-		return ErrSelfFriendship
+		return false, ErrSelfFriendship
 	}
 	if targetCurrentVersion != targetKeyVersion {
-		return sql.ErrNoRows
+		return false, sql.ErrNoRows
 	}
 
 	var alreadyFriends bool
@@ -67,7 +72,7 @@ func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, re
 			  AND target_share.friend_space_id = $1
 		)
 	`, requesterSpaceID, targetOwnerID, targetSpaceID, requesterID).Scan(&alreadyFriends); err != nil {
-		return stacktrace.Propagate(err, "")
+		return false, stacktrace.Propagate(err, "")
 	}
 
 	if _, err := tx.ExecContext(ctx, `
@@ -77,7 +82,7 @@ func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, re
 		SET encrypted_space_key = EXCLUDED.encrypted_space_key,
 		    key_version = EXCLUDED.key_version
 	`, targetSpaceID, requesterID, requesterSpaceID, targetEncryptedSpaceKey, targetKeyVersion); err != nil {
-		return stacktrace.Propagate(err, "")
+		return false, stacktrace.Propagate(err, "")
 	}
 
 	if _, err := tx.ExecContext(ctx, `
@@ -87,7 +92,7 @@ func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, re
 		SET encrypted_space_key = EXCLUDED.encrypted_space_key,
 		    key_version = EXCLUDED.key_version
 	`, requesterSpaceID, targetOwnerID, targetSpaceID, requesterEncryptedSpaceKey, requesterKeyVersion); err != nil {
-		return stacktrace.Propagate(err, "")
+		return false, stacktrace.Propagate(err, "")
 	}
 
 	if !alreadyFriends {
@@ -95,11 +100,14 @@ func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, re
 			INSERT INTO space_friend_events (event_type, actor_id, actor_space_id, target_id, target_space_id)
 			VALUES ('friend_add', $1, $2, $3, $4)
 		`, requesterID, requesterSpaceID, targetOwnerID, targetSpaceID); err != nil {
-			return stacktrace.Propagate(err, "")
+			return false, stacktrace.Propagate(err, "")
 		}
 	}
 
-	return stacktrace.Propagate(tx.Commit(), "")
+	if err := tx.Commit(); err != nil {
+		return false, stacktrace.Propagate(err, "")
+	}
+	return !alreadyFriends, nil
 }
 
 func (r *FriendsRepository) UpsertShare(ctx context.Context, spaceID string, friendID int64, friendSpaceID string, encryptedSpaceKey string, keyVersion int) error {

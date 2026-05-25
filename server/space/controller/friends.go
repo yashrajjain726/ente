@@ -13,9 +13,10 @@ import (
 )
 
 type FriendsController struct {
-	FriendsRepo *repo.FriendsRepository
-	SpacesRepo  *repo.SpacesRepository
-	auth        authDeps
+	FriendsRepo   *repo.FriendsRepository
+	SpacesRepo    *repo.SpacesRepository
+	EmailNotifier SpaceEmailNotifier
+	auth          authDeps
 }
 
 func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (*models.FriendStatusResponse, error) {
@@ -51,10 +52,11 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 	if session.KeyVersion != req.TargetKeyVersion {
 		return nil, ente.NewBadRequestWithMessage("targetKeyVersion does not match link session")
 	}
-	if _, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, strings.TrimSpace(req.RequesterSpaceID)); err != nil {
+	requesterSpace, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, strings.TrimSpace(req.RequesterSpaceID))
+	if err != nil {
 		return nil, err
 	}
-	if err := c.FriendsRepo.AddFriend(
+	created, err := c.FriendsRepo.AddFriendWithCreated(
 		ctx.Request.Context(),
 		userID,
 		strings.TrimSpace(req.RequesterSpaceID),
@@ -63,7 +65,8 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 		req.TargetKeyVersion,
 		strings.TrimSpace(req.RequesterEncryptedSpaceKey),
 		req.RequesterKeyVersion,
-	); err != nil {
+	)
+	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), repo.ErrSelfFriendship) {
 			return nil, ente.NewBadRequestWithMessage("cannot join your own space link")
 		}
@@ -74,6 +77,9 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 			return nil, ente.NewBadRequestWithMessage("space key version is stale")
 		}
 		return nil, err
+	}
+	if created && c.EmailNotifier != nil {
+		go c.EmailNotifier.OnSpaceFriendAdded(requesterSpace.SpaceSlug, session.OwnerID)
 	}
 	return &models.FriendStatusResponse{Status: "friend"}, nil
 }
