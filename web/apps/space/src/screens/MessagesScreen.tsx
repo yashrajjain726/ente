@@ -1437,12 +1437,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                     lineHeight: "16px",
                                                 }}
                                             >
-                                                Replying to{" "}
                                                 {isCurrentProfileMessage(
                                                     replyingTo,
                                                     profile,
                                                 )
-                                                    ? "yourself"
+                                                    ? "You"
                                                     : firstNameFrom(
                                                           replyingTo.sender.fullName.trim() ||
                                                               replyingTo.sender
