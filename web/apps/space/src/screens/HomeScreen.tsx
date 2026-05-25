@@ -646,7 +646,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                     icon={FavouriteIcon}
                                     primaryColor={isLiked ? green : textBase}
                                     size={feedActionIconSize}
-                                    strokeWidth={1.8}
+                                    strokeWidth={2}
                                 />
                             </Box>
                         </Box>
