@@ -15,6 +15,7 @@ import {
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
+import { createLocalFeedPostID } from "utils/localFeedPost";
 import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
 import { prepareSpacePostImageFromEdit } from "utils/spacePostImage";
 import { spaceRoutes } from "utils/spaceRoutes";
@@ -96,7 +97,7 @@ const Page: React.FC = () => {
                     const spaceId = profile.spaceId;
                     if (!spaceId) throw new Error("Missing space.");
 
-                    const localPostId = crypto.randomUUID();
+                    const localPostId = createLocalFeedPostID();
                     const displayName =
                         profile.fullName.trim() || profile.username.trim();
                     setLocalFeedPosts((currentPosts) => [
@@ -115,11 +116,12 @@ const Page: React.FC = () => {
                         ...currentPosts,
                     ]);
                     try {
-                        const preparedImage = await prepareSpacePostImageFromEdit(
-                            image.file,
-                            image.cropArea,
-                            image.rotationDegrees,
-                        );
+                        const preparedImage =
+                            await prepareSpacePostImageFromEdit(
+                                image.file,
+                                image.cropArea,
+                                image.rotationDegrees,
+                            );
                         const post = await createCurrentPhotoPost({
                             caption,
                             file: preparedImage.file,
