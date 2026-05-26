@@ -151,6 +151,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
 }) => {
     const isAppHeader = headerVariant == "app";
     const isSquareCrop = aspect == 1;
+    const isCoverCrop = cropShape == "rect" && !isSquareCrop;
 
     return (
         <Box
@@ -159,7 +160,9 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                 "--avatar-crop-size": isAppHeader
                     ? "min(calc(100vw - 48px), calc(100dvh - 308px), 342px)"
                     : "min(calc(100vw - 48px), calc(100dvh - 294px), 342px)",
-                "--profile-crop-width": "min(calc(100vw - 48px), 342px)",
+                "--profile-crop-width": isCoverCrop
+                    ? "100%"
+                    : "min(calc(100vw - 48px), 342px)",
                 bgcolor: background,
                 color: textBase,
                 display: "grid",
@@ -177,8 +180,8 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                     boxSizing: "border-box",
                     display: "grid",
                     gridTemplateRows: isAppHeader
-                        ? "56px auto auto minmax(0, 1fr) auto"
-                        : "42px auto auto minmax(0, 1fr) auto",
+                        ? "56px minmax(0, 1fr) auto auto"
+                        : "42px minmax(0, 1fr) auto auto",
                     height: "100%",
                     minHeight: 0,
                     mx: "auto",
@@ -292,25 +295,30 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                     sx={{
                         alignSelf: "center",
                         bgcolor: isSquareCrop ? "#111" : "#FFFFFF",
-                        borderRadius: isSquareCrop ? "50%" : "8px",
+                        borderRadius: isSquareCrop
+                            ? "50%"
+                            : isCoverCrop
+                              ? 0
+                              : "8px",
                         height: isSquareCrop
                             ? "var(--avatar-crop-size)"
                             : undefined,
                         aspectRatio: `${aspect} / 1`,
-                        justifySelf: "center",
-                        mt: { xs: "24px", sm: "32px" },
+                        justifySelf: isCoverCrop ? "stretch" : "center",
+                        gridRow: 2,
+                        mt: 0,
                         overflow: "hidden",
                         position: "relative",
                         width: isSquareCrop
                             ? "var(--avatar-crop-size)"
                             : "var(--profile-crop-width)",
-                        ...(!isSquareCrop && {
-                            "& .reactEasyCrop_CropArea": {
-                                borderColor: "#FFFFFF",
-                                boxShadow: "0 0 0 9999em #FFFFFF",
-                                color: "#FFFFFF",
-                            },
-                        }),
+                        "& .reactEasyCrop_CropArea": {
+                            borderColor: "rgba(255, 255, 255, 0.54)",
+                            boxShadow: "none",
+                            color: "transparent",
+                        },
+                        "& .reactEasyCrop_CropAreaGrid::before, & .reactEasyCrop_CropAreaGrid::after":
+                            { borderColor: "rgba(255, 255, 255, 0.42)" },
                     }}
                 >
                     <Cropper
@@ -325,55 +333,11 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                         onCropChange={onCropChange}
                         onCropComplete={onCropComplete}
                         onZoomChange={onZoomChange}
-                        showGrid={false}
+                        showGrid
                         zoom={zoom}
                     />
                 </Box>
 
-                <Box
-                    sx={{
-                        boxSizing: "border-box",
-                        mt: "28px",
-                        px: isAppHeader ? 3 : 0,
-                        width: "100%",
-                    }}
-                >
-                    <Box
-                        component="label"
-                        htmlFor="space-profile-image-zoom"
-                        sx={{
-                            border: 0,
-                            clip: "rect(0 0 0 0)",
-                            height: 1,
-                            m: -1,
-                            overflow: "hidden",
-                            p: 0,
-                            position: "absolute",
-                            width: 1,
-                        }}
-                    >
-                        Zoom
-                    </Box>
-                    <Box
-                        component="input"
-                        id="space-profile-image-zoom"
-                        type="range"
-                        min={1}
-                        max={3}
-                        step={0.01}
-                        value={zoom}
-                        onChange={(event) =>
-                            onZoomChange(Number(event.target.value))
-                        }
-                        sx={{
-                            accentColor: green,
-                            display: "block",
-                            m: 0,
-                            maxWidth: "100%",
-                            width: "100%",
-                        }}
-                    />
-                </Box>
                 {errorMessage && (
                     <Box
                         role="alert"
@@ -382,6 +346,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 13,
                             fontWeight: 500,
+                            gridRow: 3,
                             lineHeight: "18px",
                             mt: 2,
                             px: isAppHeader ? 3 : 0,
@@ -399,7 +364,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                         display: "flex",
                         flexDirection: "column",
                         gap: "16px",
-                        gridRow: 5,
+                        gridRow: 4,
                         pt: 3,
                         px: isAppHeader ? 3 : 0,
                         width: "100%",
