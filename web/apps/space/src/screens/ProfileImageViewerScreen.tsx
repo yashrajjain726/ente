@@ -32,6 +32,7 @@ export const ProfileImageViewerScreen: React.FC<
         ? "Change cover image"
         : "Change profile picture";
     const imageUrl = isCover ? profile.coverUrl : profile.avatarUrl;
+    const shouldUseCoverFallback = isCover && !imageUrl;
 
     const handleFileSelect: React.ChangeEventHandler<HTMLInputElement> = (
         event,
@@ -147,9 +148,14 @@ export const ProfileImageViewerScreen: React.FC<
                 >
                     {isCover ? (
                         <Box
+                            className={
+                                shouldUseCoverFallback ? "green-bg" : undefined
+                            }
                             sx={{
                                 aspectRatio: `${spaceProfileCoverAspectRatio} / 1`,
-                                bgcolor: profileCoverBackground,
+                                bgcolor: imageUrl
+                                    ? profileCoverBackground
+                                    : undefined,
                                 overflow: "hidden",
                                 width: "100%",
                             }}

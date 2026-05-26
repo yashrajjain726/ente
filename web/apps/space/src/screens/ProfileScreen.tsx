@@ -229,6 +229,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const hasProfilePosts = postsSharedCount > 0;
     const isCoverImageLoading = Boolean(coverUrl && loadedCoverUrl != coverUrl);
     const shouldShowCoverSkeleton = isCoverLoading || isCoverImageLoading;
+    const shouldUseCoverFallback = !coverUrl && !shouldShowCoverSkeleton;
     const selectedPostActionMode: SpaceViewerPostActionMode = isPublicProfile
         ? "hidden"
         : isOwnerProfile
@@ -445,11 +446,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     />
                 )}
                 <Box
+                    className={shouldUseCoverFallback ? "green-bg" : undefined}
                     sx={{
-                        bgcolor:
-                            shouldShowCoverSkeleton || !coverUrl
-                                ? profileCoverSkeletonBackground
-                                : profileCoverBackground,
+                        bgcolor: shouldShowCoverSkeleton
+                            ? profileCoverSkeletonBackground
+                            : coverUrl
+                              ? profileCoverBackground
+                              : undefined,
                         height: profileCoverHeight,
                         insetInline: 0,
                         overflow: "hidden",
