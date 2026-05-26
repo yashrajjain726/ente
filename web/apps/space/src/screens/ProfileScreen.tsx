@@ -4,10 +4,11 @@ import {
     Menu01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box } from "@mui/material";
+import { Box, Skeleton } from "@mui/material";
 import {
     SpaceFileViewer,
     type SpaceLiker,
+    type SpaceViewerDraftPostEdit,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
@@ -16,17 +17,13 @@ import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
-import {
-    createLoadedLocalPostPhoto,
-    createLocalPostPhoto,
-} from "utils/localPostPhoto";
-import { firstNameFrom, initialsFor } from "utils/spaceDisplay";
+import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
+import { firstNameFrom } from "utils/spaceDisplay";
 import {
     canPreviewSpaceImageFile,
-    prepareSpacePostImage,
     spacePostImageErrorMessage,
     spacePostImageInputAccept,
-    type PreparedSpacePostImage,
+    spacePostPreviewImageForFile,
 } from "utils/spacePostImage";
 
 export const profileBackground = "#FFFFFF";
@@ -41,6 +38,7 @@ const coverForegroundShadow = "0 1px 5px rgba(0, 0, 0, 0.34)";
 const coverForegroundIconShadow = "drop-shadow(0 1px 5px rgba(0, 0, 0, 0.34))";
 const coverButtonShadow = "0 1px 5px rgba(0, 0, 0, 0.12)";
 const profileCoverBackground = "#1F1F1F";
+const profileCoverSkeletonBackground = "#E6E6E6";
 const profileHeaderHeight = 56;
 const profileAvatarTopOffset = 54;
 const profileAvatarSize = 120;
@@ -78,14 +76,21 @@ export interface ProfilePostGroup {
 }
 
 interface SelectedProfilePost {
-    draftImage?: PreparedSpacePostImage;
+    draftFile?: File;
     draftImageError?: string;
     id: string;
-    isDraftImagePreparing?: boolean;
     isDraftImagePreviewPending?: boolean;
     localObjectUrl?: string;
     photo: SpaceViewerPhoto;
     postActionMode?: SpaceViewerPostActionMode;
+}
+
+interface DraftSpacePostImage {
+    cropArea?: SpaceViewerDraftPostEdit["cropArea"];
+    file: File;
+    height?: number;
+    rotationDegrees?: number;
+    width?: number;
 }
 
 interface PostMasonryTile {
@@ -146,11 +151,12 @@ const preferredPostMasonryRowSize = (remainingTiles: number) => {
 interface ProfileScreenProps {
     friendsCount?: number;
     headerVariant?: "friend" | "owner" | "public";
+    isCoverLoading?: boolean;
     isPostsLoading?: boolean;
     onAddFriend?: () => void;
     onBack?: () => void;
     onCreatePost?: (
-        image: PreparedSpacePostImage,
+        image: DraftSpacePostImage,
         caption: string,
     ) => Promise<void>;
     onDeletePost?: (postId: number) => Promise<void> | void;
@@ -170,6 +176,7 @@ interface ProfileScreenProps {
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     friendsCount = 0,
     headerVariant = "owner",
+    isCoverLoading = false,
     isPostsLoading = false,
     onAddFriend,
     onBack,
@@ -195,6 +202,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     );
     const [loadedPhotoDimensionsByURL, setLoadedPhotoDimensionsByURL] =
         useState<Record<string, ProfilePhotoDimensions>>({});
+    const [loadedCoverUrl, setLoadedCoverUrl] = useState<string | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
@@ -202,9 +210,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
     const displayName = profile.fullName.trim() || profile.username.trim();
+    const coverUrl = profile.coverUrl ?? null;
     const firstName = firstNameFrom(displayName);
-    const initialsSource = displayName || profile.username.trim();
-    const initials = initialsFor(initialsSource);
     const visiblePostGroups = postGroups
         .map((group) => ({
             ...group,
@@ -220,6 +227,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const canOpenProfileCover = isOwnerProfile && Boolean(onOpenProfileCover);
     const canOpenProfilePhoto = isOwnerProfile && Boolean(onOpenProfilePhoto);
     const hasProfilePosts = postsSharedCount > 0;
+    const isCoverImageLoading = Boolean(coverUrl && loadedCoverUrl != coverUrl);
+    const shouldShowCoverSkeleton = isCoverLoading || isCoverImageLoading;
     const selectedPostActionMode: SpaceViewerPostActionMode = isPublicProfile
         ? "hidden"
         : isOwnerProfile
@@ -266,88 +275,82 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
     const prepareSelectedPostPhoto = async (file: File) => {
         const canShowLocalPreview = canPreviewSpaceImageFile(file);
-        const localPost = canShowLocalPreview
-            ? await createLoadedLocalPostPhoto({
-                  avatarUrl: profile.avatarUrl,
-                  file,
-                  name: displayName || "You",
-              })
-            : createLocalPostPhoto({
-                  avatarUrl: profile.avatarUrl,
-                  file,
-                  name: displayName || "You",
-              });
+        if (!canShowLocalPreview) {
+            const timestampMs = Date.now();
+            const draftKey = `pending-preview-${timestampMs}`;
+            activeLocalPostObjectUrlRef.current = draftKey;
+            setSelectedPost({
+                draftFile: file,
+                id: `local-${timestampMs}`,
+                isDraftImagePreviewPending: true,
+                localObjectUrl: draftKey,
+                photo: {
+                    alt: `${displayName || "You"} post`,
+                    avatarUrl: profile.avatarUrl,
+                    imageUrl: "",
+                    name: displayName || "You",
+                    timestampMs,
+                },
+                postActionMode: "draft-post",
+            });
+
+            window.setTimeout(() => {
+                if (activeLocalPostObjectUrlRef.current != draftKey) return;
+
+                void spacePostPreviewImageForFile(file)
+                    .then((preview) => {
+                        if (activeLocalPostObjectUrlRef.current != draftKey) {
+                            URL.revokeObjectURL(preview.url);
+                            return;
+                        }
+
+                        localPostObjectUrlsRef.current.add(preview.url);
+                        activeLocalPostObjectUrlRef.current = preview.url;
+                        setSelectedPost((currentPost) => {
+                            if (currentPost?.localObjectUrl != draftKey)
+                                return currentPost;
+
+                            return {
+                                ...currentPost,
+                                isDraftImagePreviewPending: false,
+                                localObjectUrl: preview.url,
+                                photo: {
+                                    ...currentPost.photo,
+                                    height: preview.height,
+                                    imageUrl: preview.url,
+                                    width: preview.width,
+                                },
+                            };
+                        });
+                    })
+                    .catch((error: unknown) => {
+                        console.error("Failed to prepare post preview", error);
+                        const message = spacePostImageErrorMessage(error);
+                        setSelectedPost((currentPost) => {
+                            if (currentPost?.localObjectUrl != draftKey)
+                                return currentPost;
+
+                            return { ...currentPost, draftImageError: message };
+                        });
+                    });
+            }, 0);
+            return;
+        }
+
+        const localPost = await createLoadedLocalPostPhoto({
+            avatarUrl: profile.avatarUrl,
+            file,
+            name: displayName || "You",
+        });
         localPostObjectUrlsRef.current.add(localPost.objectUrl);
         activeLocalPostObjectUrlRef.current = localPost.objectUrl;
         setSelectedPost({
+            draftFile: file,
             id: `local-${localPost.photo.timestampMs}`,
-            isDraftImagePreparing: true,
-            isDraftImagePreviewPending: !canShowLocalPreview,
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
             postActionMode: "draft-post",
         });
-
-        window.setTimeout(() => {
-            if (activeLocalPostObjectUrlRef.current != localPost.objectUrl)
-                return;
-
-            void prepareSpacePostImage(file)
-                .then((image) => {
-                    if (
-                        activeLocalPostObjectUrlRef.current !=
-                        localPost.objectUrl
-                    )
-                        return;
-
-                    const preparedPost = canShowLocalPreview
-                        ? undefined
-                        : createLocalPostPhoto({
-                              avatarUrl: profile.avatarUrl,
-                              dimensions: image,
-                              file: image.file,
-                              name: displayName || "You",
-                          });
-                    if (preparedPost)
-                        localPostObjectUrlsRef.current.add(
-                            preparedPost.objectUrl,
-                        );
-                    setSelectedPost((currentPost) => {
-                        if (currentPost?.localObjectUrl != localPost.objectUrl)
-                            return currentPost;
-
-                        return {
-                            ...currentPost,
-                            draftImage: image,
-                            draftImageError: undefined,
-                            isDraftImagePreparing: false,
-                            isDraftImagePreviewPending: false,
-                            photo: preparedPost
-                                ? {
-                                      ...currentPost.photo,
-                                      height: image.height,
-                                      imageUrl: preparedPost.objectUrl,
-                                      width: image.width,
-                                  }
-                                : currentPost.photo,
-                        };
-                    });
-                })
-                .catch((error: unknown) => {
-                    console.error("Failed to prepare post photo", error);
-                    const message = spacePostImageErrorMessage(error);
-                    setSelectedPost((currentPost) => {
-                        if (currentPost?.localObjectUrl != localPost.objectUrl)
-                            return currentPost;
-
-                        return {
-                            ...currentPost,
-                            draftImageError: message,
-                            isDraftImagePreparing: false,
-                        };
-                    });
-                });
-        }, 0);
     };
 
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
@@ -442,11 +445,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     />
                 )}
                 <Box
-                    className={isFriendProfile ? "green-bg" : undefined}
                     sx={{
-                        bgcolor: isFriendProfile
-                            ? undefined
-                            : profileCoverBackground,
+                        bgcolor:
+                            shouldShowCoverSkeleton || !coverUrl
+                                ? profileCoverSkeletonBackground
+                                : profileCoverBackground,
                         height: profileCoverHeight,
                         insetInline: 0,
                         overflow: "hidden",
@@ -460,16 +463,34 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         },
                     }}
                 >
-                    {profile.coverUrl && (
+                    {shouldShowCoverSkeleton && (
+                        <Skeleton
+                            variant="rectangular"
+                            sx={{
+                                bgcolor: profileCoverSkeletonBackground,
+                                display: "block",
+                                height: "100%",
+                                transform: "none",
+                                width: "100%",
+                            }}
+                        />
+                    )}
+                    {coverUrl && (
                         <Box
                             component="img"
                             alt=""
-                            src={profile.coverUrl}
+                            src={coverUrl}
+                            onLoad={() => setLoadedCoverUrl(coverUrl)}
                             sx={{
                                 display: "block",
                                 height: "100%",
+                                inset: shouldShowCoverSkeleton ? 0 : undefined,
                                 objectFit: "cover",
                                 objectPosition: "center",
+                                opacity: shouldShowCoverSkeleton ? 0 : 1,
+                                position: shouldShowCoverSkeleton
+                                    ? "absolute"
+                                    : undefined,
                                 width: "100%",
                             }}
                         />
@@ -707,13 +728,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             sx={{
                                 alignItems: "center",
                                 aspectRatio: "1 / 1",
-                                bgcolor: profile.avatarUrl
-                                    ? "transparent"
-                                    : paleGreen,
+                                bgcolor: profileCoverSkeletonBackground,
                                 border: "4px solid #FFFFFF",
                                 borderRadius: "50%",
                                 boxSizing: "border-box",
-                                color: green,
                                 cursor: canOpenProfilePhoto
                                     ? "pointer"
                                     : "default",
@@ -742,18 +760,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     }}
                                 />
                             ) : (
-                                <Box
+                                <Skeleton
+                                    variant="circular"
                                     sx={{
-                                        color: green,
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 38,
-                                        fontWeight: 800,
-                                        lineHeight: 1,
+                                        bgcolor: profileCoverSkeletonBackground,
+                                        height: "100%",
+                                        transform: "none",
+                                        width: "100%",
                                     }}
-                                >
-                                    {initials}
-                                </Box>
+                                />
                             )}
                         </Box>
                     </Box>
@@ -1204,9 +1219,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     <SpaceFileViewer
                         photo={selectedPost.photo}
                         draftPostPreparationError={selectedPost.draftImageError}
-                        isDraftPostPreparing={
-                            selectedPost.isDraftImagePreparing
-                        }
                         isDraftPostPreviewPending={
                             selectedPost.isDraftImagePreviewPending
                         }
@@ -1229,10 +1241,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         }
                         onOpenProfile={closeSelectedPost}
                         onPublishDraftPost={
-                            selectedPost.draftImage && onCreatePost
-                                ? (caption) =>
+                            selectedPost.draftFile && onCreatePost
+                                ? (caption, edit) =>
                                       onCreatePost(
-                                          selectedPost.draftImage!,
+                                          {
+                                              cropArea: edit.cropArea,
+                                              file: selectedPost.draftFile!,
+                                              height: edit.height,
+                                              rotationDegrees:
+                                                  edit.rotationDegrees,
+                                              width: edit.width,
+                                          },
                                           caption,
                                       )
                                 : undefined

@@ -44,6 +44,7 @@ const Page: React.FC = () => {
             friend.spaceId == friendSpaceId || friend.id == friendSpaceId,
     );
     const [friendsLoadAttempted, setFriendsLoadAttempted] = useState(false);
+    const [isProfileLoading, setIsProfileLoading] = useState(false);
     const [selectedProfile, setSelectedProfile] = useState(selectedFriend);
     const [posts, setPosts] = useState<SpacePost[]>([]);
     const postGroups = useMemo(
@@ -84,18 +85,28 @@ const Page: React.FC = () => {
     }, [profile?.spaceId, setFriends]);
 
     useEffect(() => {
-        if (!selectedFriend?.spaceId) return;
+        if (!selectedFriend?.spaceId) {
+            setIsProfileLoading(false);
+            return;
+        }
 
         let cancelled = false;
         setSelectedProfile(selectedFriend);
-        void Promise.all([
-            loadCurrentSpaceProfile(selectedFriend.spaceId),
-            loadCurrentSpacePostsPage(selectedFriend.spaceId),
-        ])
-            .then(([nextProfile, page]) => {
+        setIsProfileLoading(true);
+        void loadCurrentSpaceProfile(selectedFriend.spaceId)
+            .then((nextProfile) => {
                 if (cancelled) return;
                 setSelectedProfile(nextProfile);
-                setPosts(page.items);
+            })
+            .catch((error: unknown) =>
+                console.error("Failed to load friend profile", error),
+            )
+            .finally(() => {
+                if (!cancelled) setIsProfileLoading(false);
+            });
+        void loadCurrentSpacePostsPage(selectedFriend.spaceId)
+            .then((page) => {
+                if (!cancelled) setPosts(page.items);
             })
             .catch((error: unknown) =>
                 console.error("Failed to load friend posts", error),
@@ -136,6 +147,7 @@ const Page: React.FC = () => {
                     selectedProfile?.friendsCount ?? selectedFriend.friendsCount
                 }
                 headerVariant="friend"
+                isCoverLoading={isProfileLoading}
                 postGroups={postGroups}
                 profile={{
                     avatarUrl:

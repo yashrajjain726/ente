@@ -4,7 +4,7 @@ import {
     UserRemove01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Menu, MenuItem } from "@mui/material";
+import { Box, Menu, MenuItem, Skeleton } from "@mui/material";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
     spaceActionDoneDurationMs,
@@ -12,12 +12,11 @@ import {
 } from "components/SpaceActionFeedback";
 import type { FriendProfile } from "data/friends";
 import React, { useState } from "react";
-import { initialsFor } from "utils/spaceDisplay";
 
 export const friendsBackground = "#FFFFFF";
 
 const green = "#08C225";
-const paleGreen = "#E7F6E9";
+const avatarSkeletonBackground = "#E6E6E6";
 const textBase = "#000";
 const textStrong = "#303030";
 const textSoft = "#777777";
@@ -48,7 +47,6 @@ const FriendRow: React.FC<FriendRowProps> = ({
     const actionsMenuID = `friend-actions-menu-${friend.id}`;
     const actionsButtonID = `friend-actions-button-${friend.id}`;
     const displayName = friend.fullName.trim() || friend.username.trim();
-    const initials = initialsFor(displayName || friend.username);
 
     const closeActions = () => setActionsAnchor(null);
 
@@ -100,9 +98,8 @@ const FriendRow: React.FC<FriendRowProps> = ({
                 <Box
                     sx={{
                         alignItems: "center",
-                        bgcolor: friend.avatarUrl ? "transparent" : paleGreen,
+                        bgcolor: avatarSkeletonBackground,
                         borderRadius: "50%",
-                        color: green,
                         display: "flex",
                         flexShrink: 0,
                         height: 48,
@@ -125,17 +122,15 @@ const FriendRow: React.FC<FriendRowProps> = ({
                             }}
                         />
                     ) : (
-                        <Box
+                        <Skeleton
+                            variant="circular"
                             sx={{
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 15,
-                                fontWeight: 800,
-                                lineHeight: 1,
+                                bgcolor: avatarSkeletonBackground,
+                                height: "100%",
+                                transform: "none",
+                                width: "100%",
                             }}
-                        >
-                            {initials}
-                        </Box>
+                        />
                     )}
                 </Box>
                 <Box

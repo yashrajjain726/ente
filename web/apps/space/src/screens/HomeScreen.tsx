@@ -9,6 +9,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import {
     SpaceFileViewer,
+    type SpaceViewerDraftPostEdit,
     type SpaceLiker,
     type SpaceViewerInitialScreen,
     type SpaceViewerPhoto,
@@ -19,21 +20,14 @@ import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type { SpacePost } from "services/space";
-import {
-    createLoadedLocalPostPhoto,
-    createLocalPostPhoto,
-} from "utils/localPostPhoto";
-import {
-    firstNameFrom,
-    formatSpaceDate,
-    initialsFor,
-} from "utils/spaceDisplay";
+import type { LocalSpaceFeedPost } from "state/spaceAppState";
+import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
+import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
 import {
     canPreviewSpaceImageFile,
-    prepareSpacePostImage,
     spacePostImageErrorMessage,
     spacePostImageInputAccept,
-    type PreparedSpacePostImage,
+    spacePostPreviewImageForFile,
 } from "utils/spacePostImage";
 
 export const homeBackground = "#FFFFFF";
@@ -96,9 +90,10 @@ interface HomeScreenProps {
     hasUnreadMessages?: boolean;
     isFeedLoading?: boolean;
     isFeedLoadingMore?: boolean;
+    localFeedPosts?: LocalSpaceFeedPost[];
     onAddedFriendToastClose?: () => void;
     onCreatePost?: (
-        image: PreparedSpacePostImage,
+        image: DraftSpacePostImage,
         caption: string,
     ) => Promise<void>;
     onDeletePost?: (postId: number) => Promise<void> | void;
@@ -119,15 +114,22 @@ interface FeedPhotoDimensions {
 }
 
 interface SelectedHomeViewer {
-    draftImage?: PreparedSpacePostImage;
+    draftFile?: File;
     draftImageError?: string;
     focusReplyOnOpen?: boolean;
     initialScreen: SpaceViewerInitialScreen;
-    isDraftImagePreparing?: boolean;
     isDraftImagePreviewPending?: boolean;
     localObjectUrl?: string;
     photo: SpaceViewerPhoto;
     postActionMode?: SpaceViewerPostActionMode;
+}
+
+interface DraftSpacePostImage {
+    cropArea?: SpaceViewerDraftPostEdit["cropArea"];
+    file: File;
+    height?: number;
+    rotationDegrees?: number;
+    width?: number;
 }
 
 interface FeedItemProps {
@@ -136,6 +138,7 @@ interface FeedItemProps {
     caption?: string;
     friendID: string;
     imageUrl: string;
+    isPhotoPending?: boolean;
     isOwnPost: boolean;
     likeCount: number;
     name: string;
@@ -327,6 +330,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     caption,
     friendID,
     imageUrl,
+    isPhotoPending = false,
     isOwnPost,
     likeCount,
     name,
@@ -383,7 +387,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const openPhoto = (
         initialScreen?: SpaceViewerInitialScreen,
         focusReplyOnOpen = false,
-    ) =>
+    ) => {
+        if (isPhotoPending) return;
+
         onOpenPhoto?.(
             {
                 alt: `${name} post`,
@@ -402,6 +408,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
             initialScreen,
             focusReplyOnOpen,
         );
+    };
     const handleLikeClick = () => {
         if (isOwnPost) return;
 
@@ -463,7 +470,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     onClick={openAuthor}
                     sx={{
                         appearance: "none",
-                        bgcolor: avatarUrl ? "transparent" : paleGreen,
+                        bgcolor: feedSkeletonElementBackground,
                         borderRadius: "50%",
                         border: 0,
                         cursor: canOpenAuthor ? "pointer" : "default",
@@ -495,18 +502,15 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             }}
                         />
                     ) : (
-                        <Box
+                        <Skeleton
+                            variant="circular"
                             sx={{
-                                color: green,
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 9,
-                                fontWeight: 800,
-                                lineHeight: 1,
+                                bgcolor: feedSkeletonElementBackground,
+                                height: "100%",
+                                transform: "none",
+                                width: "100%",
                             }}
-                        >
-                            {initialsFor(name)}
-                        </Box>
+                        />
                     )}
                 </Box>
                 <Box
@@ -579,40 +583,55 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     width: "100%",
                 }}
             >
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label={`Open ${name} photo`}
-                    onClick={() => openPhoto()}
-                    sx={{
-                        appearance: "none",
-                        bgcolor: "transparent",
-                        border: 0,
-                        cursor: onOpenPhoto ? "pointer" : "default",
-                        display: "block",
-                        height: "100%",
-                        p: 0,
-                        width: "100%",
-                        "&:focus-visible": {
-                            outline: `2px solid ${green}`,
-                            outlineOffset: -2,
-                        },
-                    }}
-                >
-                    <Box
-                        component="img"
-                        alt={`${name} post`}
-                        src={imageUrl}
-                        onLoad={rememberLoadedPhotoDimensions}
+                {isPhotoPending ? (
+                    <Skeleton
+                        variant="rectangular"
+                        animation="wave"
+                        aria-label="Posting photo"
                         sx={{
+                            bgcolor: feedSkeletonElementBackground,
                             display: "block",
                             height: "100%",
-                            objectFit: "cover",
-                            objectPosition: "center",
+                            transform: "none",
                             width: "100%",
                         }}
                     />
-                </Box>
+                ) : (
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={`Open ${name} photo`}
+                        onClick={() => openPhoto()}
+                        sx={{
+                            appearance: "none",
+                            bgcolor: "transparent",
+                            border: 0,
+                            cursor: onOpenPhoto ? "pointer" : "default",
+                            display: "block",
+                            height: "100%",
+                            p: 0,
+                            width: "100%",
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: -2,
+                            },
+                        }}
+                    >
+                        <Box
+                            component="img"
+                            alt={`${name} post`}
+                            src={imageUrl}
+                            onLoad={rememberLoadedPhotoDimensions}
+                            sx={{
+                                display: "block",
+                                height: "100%",
+                                objectFit: "cover",
+                                objectPosition: "center",
+                                width: "100%",
+                            }}
+                        />
+                    </Box>
+                )}
             </Box>
             {(!isOwnPost || displayCaption) && (
                 <Box
@@ -841,6 +860,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     hasUnreadMessages,
     isFeedLoading = false,
     isFeedLoadingMore = false,
+    localFeedPosts = [],
     onAddedFriendToastClose,
     onCreatePost,
     onDeletePost,
@@ -866,7 +886,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
     const selectedPhotoIsOwn =
         Boolean(profile.spaceId) && selectedPhotoFriendID == profile.spaceId;
-    const hasFeedItems = feedItems.length > 0;
+    const localReadyPostIds = new Set(
+        localFeedPosts
+            .filter((item) => item.status == "ready")
+            .map((item) => item.post.postId),
+    );
+    const remoteFeedItems = feedItems.filter(
+        (item) => !localReadyPostIds.has(item.postId),
+    );
+    const hasFeedItems =
+        localFeedPosts.length > 0 || remoteFeedItems.length > 0;
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
     const showFeedCards = hasFeedItems || isEmptyFeedLoading;
     const showUnreadIndicator = hasUnreadMessages === true;
@@ -874,8 +903,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         friendsCount == 0
             ? "When you add friends, their posts will appear here."
             : "When your friends share posts, they'll appear here.";
-    const initialsSource = profile.fullName.trim() || profile.username.trim();
-    const initials = initialsFor(initialsSource);
+    const profileDisplayName =
+        profile.fullName.trim() || profile.username.trim();
     const revokeLocalPostObjectUrls = React.useCallback(() => {
         localPostObjectUrlsRef.current.forEach((objectUrl) =>
             URL.revokeObjectURL(objectUrl),
@@ -912,6 +941,55 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         await onDeletePost(postId);
     };
+    const feedItemFor = (item: SpacePost, key: React.Key) => (
+        <FeedItem
+            key={key}
+            aspectRatio={
+                item.width && item.height ? item.width / item.height : 1
+            }
+            avatarUrl={item.avatarUrl ?? ""}
+            caption={item.caption}
+            friendID={item.friendID}
+            imageUrl={item.imageUrl}
+            isOwnPost={
+                Boolean(profile.spaceId) && item.spaceId == profile.spaceId
+            }
+            likeCount={item.likeCount}
+            name={item.name}
+            onOpenFriend={onOpenFriend}
+            onOpenPhoto={openFeedPhoto}
+            onOpenProfile={onOpenProfile}
+            onSetPostLiked={onSetPostLiked}
+            postId={item.postId}
+            timestampMs={item.timestampMs}
+            viewerLiked={item.viewerLiked}
+            viewerUnread={item.viewerUnread}
+        />
+    );
+    const localFeedItemFor = (item: LocalSpaceFeedPost) =>
+        item.status == "ready" ? (
+            feedItemFor(item.post, item.id)
+        ) : (
+            <FeedItem
+                key={item.id}
+                aspectRatio={
+                    item.width && item.height ? item.width / item.height : 1
+                }
+                avatarUrl={item.avatarUrl ?? ""}
+                caption={item.caption}
+                friendID={item.friendID}
+                imageUrl=""
+                isOwnPost
+                isPhotoPending
+                likeCount={0}
+                name={item.name}
+                onOpenProfile={onOpenProfile}
+                postId={0}
+                timestampMs={item.timestampMs}
+                viewerLiked={false}
+                viewerUnread={false}
+            />
+        );
 
     const shareProfileLink = async () => {
         if (!onShareProfileLink) return;
@@ -931,92 +1009,85 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
     const prepareSelectedPostPhoto = async (file: File) => {
         const canShowLocalPreview = canPreviewSpaceImageFile(file);
-        const localPost = canShowLocalPreview
-            ? await createLoadedLocalPostPhoto({
-                  avatarUrl: profile.avatarUrl,
-                  file,
-                  name: initialsSource || "You",
-              })
-            : createLocalPostPhoto({
-                  avatarUrl: profile.avatarUrl,
-                  file,
-                  name: initialsSource || "You",
-              });
+        if (!canShowLocalPreview) {
+            const timestampMs = Date.now();
+            const draftKey = `pending-preview-${timestampMs}`;
+            activeLocalPostObjectUrlRef.current = draftKey;
+            setSelectedViewer({
+                draftFile: file,
+                initialScreen: "photo",
+                isDraftImagePreviewPending: true,
+                localObjectUrl: draftKey,
+                photo: {
+                    alt: `${profileDisplayName || "You"} post`,
+                    avatarUrl: profile.avatarUrl,
+                    imageUrl: "",
+                    name: profileDisplayName || "You",
+                    timestampMs,
+                },
+                postActionMode: "draft-post",
+            });
+
+            window.setTimeout(() => {
+                if (activeLocalPostObjectUrlRef.current != draftKey) return;
+
+                void spacePostPreviewImageForFile(file)
+                    .then((preview) => {
+                        if (activeLocalPostObjectUrlRef.current != draftKey) {
+                            URL.revokeObjectURL(preview.url);
+                            return;
+                        }
+
+                        localPostObjectUrlsRef.current.add(preview.url);
+                        activeLocalPostObjectUrlRef.current = preview.url;
+                        setSelectedViewer((currentViewer) => {
+                            if (currentViewer?.localObjectUrl != draftKey)
+                                return currentViewer;
+
+                            return {
+                                ...currentViewer,
+                                isDraftImagePreviewPending: false,
+                                localObjectUrl: preview.url,
+                                photo: {
+                                    ...currentViewer.photo,
+                                    height: preview.height,
+                                    imageUrl: preview.url,
+                                    width: preview.width,
+                                },
+                            };
+                        });
+                    })
+                    .catch((error: unknown) => {
+                        console.error("Failed to prepare post preview", error);
+                        const message = spacePostImageErrorMessage(error);
+                        setSelectedViewer((currentViewer) => {
+                            if (currentViewer?.localObjectUrl != draftKey)
+                                return currentViewer;
+
+                            return {
+                                ...currentViewer,
+                                draftImageError: message,
+                            };
+                        });
+                    });
+            }, 0);
+            return;
+        }
+
+        const localPost = await createLoadedLocalPostPhoto({
+            avatarUrl: profile.avatarUrl,
+            file,
+            name: profileDisplayName || "You",
+        });
         localPostObjectUrlsRef.current.add(localPost.objectUrl);
         activeLocalPostObjectUrlRef.current = localPost.objectUrl;
         setSelectedViewer({
+            draftFile: file,
             initialScreen: "photo",
-            isDraftImagePreparing: true,
-            isDraftImagePreviewPending: !canShowLocalPreview,
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
             postActionMode: "draft-post",
         });
-
-        window.setTimeout(() => {
-            if (activeLocalPostObjectUrlRef.current != localPost.objectUrl)
-                return;
-
-            void prepareSpacePostImage(file)
-                .then((image) => {
-                    if (
-                        activeLocalPostObjectUrlRef.current !=
-                        localPost.objectUrl
-                    )
-                        return;
-
-                    const preparedPost = canShowLocalPreview
-                        ? undefined
-                        : createLocalPostPhoto({
-                              avatarUrl: profile.avatarUrl,
-                              dimensions: image,
-                              file: image.file,
-                              name: initialsSource || "You",
-                          });
-                    if (preparedPost)
-                        localPostObjectUrlsRef.current.add(
-                            preparedPost.objectUrl,
-                        );
-                    setSelectedViewer((currentViewer) => {
-                        if (
-                            currentViewer?.localObjectUrl != localPost.objectUrl
-                        )
-                            return currentViewer;
-
-                        return {
-                            ...currentViewer,
-                            draftImage: image,
-                            draftImageError: undefined,
-                            isDraftImagePreparing: false,
-                            isDraftImagePreviewPending: false,
-                            photo: preparedPost
-                                ? {
-                                      ...currentViewer.photo,
-                                      height: image.height,
-                                      imageUrl: preparedPost.objectUrl,
-                                      width: image.width,
-                                  }
-                                : currentViewer.photo,
-                        };
-                    });
-                })
-                .catch((error: unknown) => {
-                    console.error("Failed to prepare post photo", error);
-                    const message = spacePostImageErrorMessage(error);
-                    setSelectedViewer((currentViewer) => {
-                        if (
-                            currentViewer?.localObjectUrl != localPost.objectUrl
-                        )
-                            return currentViewer;
-
-                        return {
-                            ...currentViewer,
-                            draftImageError: message,
-                            isDraftImagePreparing: false,
-                        };
-                    });
-                });
-        }, 0);
     };
 
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
@@ -1285,9 +1356,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             <Box
                                 sx={{
                                     alignItems: "center",
-                                    bgcolor: profile.avatarUrl
-                                        ? "transparent"
-                                        : paleGreen,
+                                    bgcolor: feedSkeletonElementBackground,
                                     borderRadius: "50%",
                                     display: "flex",
                                     height: headerAvatarSize,
@@ -1311,18 +1380,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                         }}
                                     />
                                 ) : (
-                                    <Box
+                                    <Skeleton
+                                        variant="circular"
                                         sx={{
-                                            color: green,
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 9,
-                                            fontWeight: 700,
-                                            lineHeight: 1,
+                                            bgcolor:
+                                                feedSkeletonElementBackground,
+                                            height: "100%",
+                                            transform: "none",
+                                            width: "100%",
                                         }}
-                                    >
-                                        {initials}
-                                    </Box>
+                                    />
                                 )}
                             </Box>
                         </Box>
@@ -1344,34 +1411,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 >
                     {hasFeedItems ? (
                         <>
-                            {feedItems.map((item) => (
-                                <FeedItem
-                                    key={item.postId}
-                                    aspectRatio={
-                                        item.width && item.height
-                                            ? item.width / item.height
-                                            : 1
-                                    }
-                                    avatarUrl={item.avatarUrl ?? ""}
-                                    caption={item.caption}
-                                    friendID={item.friendID}
-                                    imageUrl={item.imageUrl}
-                                    isOwnPost={
-                                        Boolean(profile.spaceId) &&
-                                        item.spaceId == profile.spaceId
-                                    }
-                                    likeCount={item.likeCount}
-                                    name={item.name}
-                                    onOpenFriend={onOpenFriend}
-                                    onOpenPhoto={openFeedPhoto}
-                                    onOpenProfile={onOpenProfile}
-                                    onSetPostLiked={onSetPostLiked}
-                                    postId={item.postId}
-                                    timestampMs={item.timestampMs}
-                                    viewerLiked={item.viewerLiked}
-                                    viewerUnread={item.viewerUnread}
-                                />
-                            ))}
+                            {localFeedPosts.map(localFeedItemFor)}
+                            {remoteFeedItems.map((item) =>
+                                feedItemFor(item, item.postId),
+                            )}
                             {hasMoreFeedItems && onLoadMoreFeedItems && (
                                 <Box
                                     component="button"
@@ -1507,9 +1550,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         draftPostPreparationError={
                             selectedViewer.draftImageError
                         }
-                        isDraftPostPreparing={
-                            selectedViewer.isDraftImagePreparing
-                        }
                         isDraftPostPreviewPending={
                             selectedViewer.isDraftImagePreviewPending
                         }
@@ -1552,10 +1592,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 : undefined
                         }
                         onPublishDraftPost={
-                            selectedViewer.draftImage && onCreatePost
-                                ? (caption) =>
+                            selectedViewer.draftFile && onCreatePost
+                                ? (caption, edit) =>
                                       onCreatePost(
-                                          selectedViewer.draftImage!,
+                                          {
+                                              cropArea: edit.cropArea,
+                                              file: selectedViewer.draftFile!,
+                                              height: edit.height,
+                                              rotationDegrees:
+                                                  edit.rotationDegrees,
+                                              width: edit.width,
+                                          },
                                           caption,
                                       )
                                 : undefined

@@ -1,14 +1,16 @@
 import {
     Cancel01Icon,
+    CropIcon,
     Delete02Icon,
     FavouriteIcon,
     Loading03Icon,
     MoreHorizontalIcon,
     Navigation03Icon,
+    Rotate01Icon,
     Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Menu, MenuItem } from "@mui/material";
+import { Box, Menu, MenuItem, Skeleton } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
@@ -18,15 +20,13 @@ import {
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
-import {
-    firstNameFrom,
-    formatSpaceDate,
-    initialsFor,
-} from "utils/spaceDisplay";
+import Cropper, { type Area, type Point } from "react-easy-crop";
+import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
 import { clampSpaceMessageText } from "utils/spaceMessageLimits";
+import type { SpaceImageCropArea } from "utils/spacePostImage";
 
 const green = "#08C225";
-const paleGreen = "#E7F6E9";
+const avatarSkeletonBackground = "#E6E6E6";
 const textBase = "#F4F4F4";
 const textSecondary = "#A6A6A6";
 const textTertiary = "rgba(244, 244, 244, 0.52)";
@@ -39,6 +39,7 @@ const controlIcon = "#D8D8D8";
 const dangerColor = "#F63A3A";
 const viewerHeaderHeight = 56;
 const viewerBottomPadding = 72;
+const draftViewerBottomPadding = 88;
 const captionInputMinHeight = 40;
 const replyInputMinHeight = 48;
 const replyInputPadding = 14;
@@ -76,6 +77,13 @@ export type SpaceViewerPostActionMode =
     | "hidden"
     | "like-only"
     | "like-with-count";
+
+export interface SpaceViewerDraftPostEdit {
+    cropArea?: SpaceImageCropArea;
+    height?: number;
+    rotationDegrees: number;
+    width?: number;
+}
 
 interface SpaceViewerPostActionConfig {
     showLikeButton: boolean;
@@ -118,7 +126,10 @@ interface SpaceFileViewerProps {
     onLoadPostLikers?: (postId: number) => Promise<SpaceLiker[]>;
     onOpenFriend?: (friendID: string) => void;
     onOpenProfile?: () => void;
-    onPublishDraftPost?: (caption: string) => Promise<void>;
+    onPublishDraftPost?: (
+        caption: string,
+        edit: SpaceViewerDraftPostEdit,
+    ) => Promise<void>;
     onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     photo: SpaceViewerPhoto;
@@ -151,6 +162,44 @@ const viewerActionButtonSx = {
     "&:hover": { bgcolor: controlBackgroundHover },
 };
 
+const viewerHeaderButtonSx = {
+    alignItems: "center",
+    bgcolor: controlBackground,
+    border: 0,
+    borderRadius: "50%",
+    color: controlIcon,
+    cursor: "pointer",
+    display: "flex",
+    height: 28,
+    justifyContent: "center",
+    p: 0,
+    width: 28,
+    "&:focus-visible": {
+        outline: `2px solid ${green}`,
+        outlineOffset: 2,
+    },
+    "&:hover": { bgcolor: controlBackgroundHover },
+};
+
+const viewerHeaderIconButtonSx = {
+    alignItems: "center",
+    bgcolor: "transparent",
+    border: 0,
+    color: controlIcon,
+    cursor: "pointer",
+    display: "flex",
+    height: 32,
+    justifyContent: "center",
+    p: 0,
+    width: 32,
+    "&:focus-visible": {
+        borderRadius: "4px",
+        outline: `2px solid ${green}`,
+        outlineOffset: 2,
+    },
+    "&:hover": { color: textBase },
+};
+
 const viewerCountBadgeSx = {
     alignItems: "center",
     bgcolor: "#FFFFFF",
@@ -171,17 +220,15 @@ const viewerCountBadgeSx = {
     width: 24,
 };
 
-const SpaceAvatar: React.FC<{
-    avatarUrl?: string | null;
-    name: string;
-    size: number;
-}> = ({ avatarUrl, name, size }) => (
+const SpaceAvatar: React.FC<{ avatarUrl?: string | null; size: number }> = ({
+    avatarUrl,
+    size,
+}) => (
     <Box
         sx={{
             alignItems: "center",
-            bgcolor: avatarUrl ? "transparent" : paleGreen,
+            bgcolor: avatarSkeletonBackground,
             borderRadius: "50%",
-            color: green,
             display: "flex",
             flexShrink: 0,
             height: size,
@@ -204,16 +251,15 @@ const SpaceAvatar: React.FC<{
                 }}
             />
         ) : (
-            <Box
+            <Skeleton
+                variant="circular"
                 sx={{
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: Math.max(10, Math.round(size * 0.34)),
-                    fontWeight: 800,
-                    lineHeight: 1,
+                    bgcolor: avatarSkeletonBackground,
+                    height: "100%",
+                    transform: "none",
+                    width: "100%",
                 }}
-            >
-                {initialsFor(name)}
-            </Box>
+            />
         )}
     </Box>
 );
@@ -248,6 +294,29 @@ const resizeCaptionInput = (
     input.style.height = `${Math.max(minHeight, nextHeight)}px`;
     input.style.overflowY =
         input.scrollHeight > captionInputMaxHeight ? "auto" : "hidden";
+};
+
+const normalizedRotationDegrees = (rotationDegrees: number) =>
+    ((rotationDegrees % 360) + 360) % 360;
+
+const roundedCropArea = (cropArea: Area): SpaceImageCropArea => ({
+    height: Math.max(1, Math.round(cropArea.height)),
+    width: Math.max(1, Math.round(cropArea.width)),
+    x: Math.max(0, Math.round(cropArea.x)),
+    y: Math.max(0, Math.round(cropArea.y)),
+});
+
+const rotatedDimensions = (
+    width: number | undefined,
+    height: number | undefined,
+    rotationDegrees: number,
+) => {
+    if (!width || !height) return { height, width };
+    if (normalizedRotationDegrees(rotationDegrees) % 180 == 0) {
+        return { height, width };
+    }
+
+    return { height: width, width: height };
 };
 
 export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
@@ -296,11 +365,18 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const [isLoadingLikers, setIsLoadingLikers] = React.useState(false);
     const [draftPostActionPhase, setDraftPostActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
-    const [queuedDraftPostCaption, setQueuedDraftPostCaption] =
-        React.useState<string>();
+    const [queuedDraftPost, setQueuedDraftPost] =
+        React.useState<{
+            caption: string;
+            edit: SpaceViewerDraftPostEdit;
+        }>();
+    const [isDraftCropMode, setIsDraftCropMode] = React.useState(false);
+    const [draftCrop, setDraftCrop] = React.useState<Point>({ x: 0, y: 0 });
+    const [draftCropArea, setDraftCropArea] = React.useState<Area | null>(null);
+    const [draftRotationDegrees, setDraftRotationDegrees] = React.useState(0);
+    const [draftZoom, setDraftZoom] = React.useState(1);
     const displayName = firstNameFrom(photo.name);
     const dateLabel = formatSpaceDate(photo.timestampMs);
-    const initials = initialsFor(photo.name);
     const displayCaption = isDraftPost ? "" : caption.trim();
     const hasDisplayCaption = displayCaption.length > 0;
     const viewerRootRef = React.useRef<HTMLDivElement | null>(null);
@@ -327,15 +403,35 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const isDeleteActionRunning = deleteActionPhase != null;
     const isDraftPostActionRunning = draftPostActionPhase != null;
     const hasDraftPostPreparationError = Boolean(draftPostPreparationError);
+    const canEditDraftPost =
+        isDraftPost &&
+        !isDraftPostActionRunning &&
+        !isDraftPostPreviewPending &&
+        !hasDraftPostPreparationError;
+    const isDraftCropIncomplete = isDraftCropMode && !draftCropArea;
     const canQueueDraftPostPublish =
         isDraftPostPreparing &&
         !isDraftPostPreviewPending &&
-        !hasDraftPostPreparationError;
+        !hasDraftPostPreparationError &&
+        !isDraftCropIncomplete;
     const isDraftPostPublishDisabled =
         isDraftPostActionRunning ||
         isDraftPostPreviewPending ||
         hasDraftPostPreparationError ||
+        isDraftCropIncomplete ||
         (!onPublishDraftPost && !canQueueDraftPostPublish);
+    const normalizedDraftRotationDegrees = normalizedRotationDegrees(
+        draftRotationDegrees,
+    );
+    const draftPhotoDimensions = rotatedDimensions(
+        photo.width,
+        photo.height,
+        normalizedDraftRotationDegrees,
+    );
+    const draftPhotoAspectRatio =
+        draftPhotoDimensions.width && draftPhotoDimensions.height
+            ? draftPhotoDimensions.width / draftPhotoDimensions.height
+            : defaultPhotoWidth / defaultPhotoHeight;
     const isReplyActionRunning = replyActionPhase != null;
     const canReplyToPost = Boolean(
         !isDraftPost && photo.postId && onReplyToPost,
@@ -493,23 +589,80 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         })();
     };
 
+    const draftPostEdit = React.useCallback((): SpaceViewerDraftPostEdit => {
+        const cropArea =
+            isDraftCropMode && draftCropArea
+                ? roundedCropArea(draftCropArea)
+                : undefined;
+        const dimensions = cropArea
+            ? { height: cropArea.height, width: cropArea.width }
+            : rotatedDimensions(
+                  photo.width,
+                  photo.height,
+                  normalizedDraftRotationDegrees,
+              );
+
+        return {
+            cropArea,
+            height: dimensions.height,
+            rotationDegrees: normalizedDraftRotationDegrees,
+            width: dimensions.width,
+        };
+    }, [
+        draftCropArea,
+        isDraftCropMode,
+        normalizedDraftRotationDegrees,
+        photo.height,
+        photo.width,
+    ]);
+
+    const rotateDraftPostPhoto = () => {
+        if (!canEditDraftPost) return;
+
+        setDraftRotationDegrees((currentDegrees) =>
+            normalizedRotationDegrees(currentDegrees + 90),
+        );
+    };
+
+    const toggleDraftPostCrop = () => {
+        if (!canEditDraftPost) return;
+
+        setIsDraftCropMode((currentMode) => {
+            if (currentMode) {
+                setDraftCrop({ x: 0, y: 0 });
+                setDraftCropArea(null);
+                setDraftZoom(1);
+                return false;
+            }
+
+            return true;
+        });
+    };
+
     const publishDraftPostWithCaption = React.useCallback(
-        (captionToPublish: string) => {
+        (captionToPublish: string, editToPublish: SpaceViewerDraftPostEdit) => {
             if (!onPublishDraftPost || isDeleteExit) return;
 
             setDraftPostActionPhase("busy");
-            void (async () => {
-                try {
-                    await onPublishDraftPost(captionToPublish);
-                    setQueuedDraftPostCaption(undefined);
-                    setDraftPostActionPhase("done");
-                } catch (error) {
-                    console.error("Failed to publish space post", error);
-                    setDraftPostActionPhase(null);
-                }
-            })();
+            let publishPromise: Promise<void>;
+            try {
+                publishPromise = Promise.resolve(
+                    onPublishDraftPost(captionToPublish, editToPublish),
+                );
+            } catch (error) {
+                console.error("Failed to publish space post", error);
+                setDraftPostActionPhase(null);
+                return;
+            }
+
+            setQueuedDraftPost(undefined);
+            onClose();
+            onDraftPostPublished?.();
+            void publishPromise.catch((error: unknown) => {
+                console.error("Failed to publish space post", error);
+            });
         },
-        [isDeleteExit, onPublishDraftPost],
+        [isDeleteExit, onClose, onDraftPostPublished, onPublishDraftPost],
     );
 
     const publishDraftPost = () => {
@@ -518,19 +671,21 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             isDraftPostActionRunning ||
             isDraftPostPreviewPending ||
             hasDraftPostPreparationError ||
+            isDraftCropIncomplete ||
             isDeleteExit
         )
             return;
 
+        const edit = draftPostEdit();
         if (!onPublishDraftPost) {
             if (!canQueueDraftPostPublish) return;
 
-            setQueuedDraftPostCaption(caption);
+            setQueuedDraftPost({ caption, edit });
             setDraftPostActionPhase("busy");
             return;
         }
 
-        publishDraftPostWithCaption(caption);
+        publishDraftPostWithCaption(caption, edit);
     };
 
     const sendReply = () => {
@@ -626,33 +781,22 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     }, [deleteActionPhase]);
 
     React.useEffect(() => {
-        if (draftPostActionPhase != "done") return;
-
-        const timeoutID = window.setTimeout(() => {
-            onClose();
-            onDraftPostPublished?.();
-        }, spaceActionDoneDurationMs);
-
-        return () => window.clearTimeout(timeoutID);
-    }, [draftPostActionPhase, onClose, onDraftPostPublished]);
-
-    React.useEffect(() => {
-        if (draftPostPreparationError && queuedDraftPostCaption != undefined) {
-            setQueuedDraftPostCaption(undefined);
+        if (draftPostPreparationError && queuedDraftPost != undefined) {
+            setQueuedDraftPost(undefined);
             setDraftPostActionPhase(null);
         }
-    }, [draftPostPreparationError, queuedDraftPostCaption]);
+    }, [draftPostPreparationError, queuedDraftPost]);
 
     React.useEffect(() => {
-        if (queuedDraftPostCaption == undefined || !onPublishDraftPost) return;
+        if (queuedDraftPost == undefined || !onPublishDraftPost) return;
 
-        const captionToPublish = queuedDraftPostCaption;
-        setQueuedDraftPostCaption(undefined);
-        publishDraftPostWithCaption(captionToPublish);
+        const draftPost = queuedDraftPost;
+        setQueuedDraftPost(undefined);
+        publishDraftPostWithCaption(draftPost.caption, draftPost.edit);
     }, [
         onPublishDraftPost,
         publishDraftPostWithCaption,
-        queuedDraftPostCaption,
+        queuedDraftPost,
     ]);
 
     React.useEffect(() => {
@@ -675,9 +819,15 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         setServerLikeCount(photo.likeCount ?? 0);
         setPhotoLikers([]);
         setScreen(resolvedInitialScreen);
+        setIsDraftCropMode(false);
+        setDraftCrop({ x: 0, y: 0 });
+        setDraftCropArea(null);
+        setDraftRotationDegrees(0);
+        setDraftZoom(1);
     }, [
         photo.caption,
         photo.likeCount,
+        photo.imageUrl,
         photo.postId,
         photo.timestampMs,
         photo.viewerLiked,
@@ -701,7 +851,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     React.useEffect(() => {
         const root = viewerRootRef.current;
         if (!root) return;
-        if (isDraftPostPreviewPending) return;
+        if (isDraftPost || isDraftPostPreviewPending) return;
 
         let disposed = false;
         let closedByReact = false;
@@ -770,6 +920,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         photo.imageUrl,
         photo.name,
         photo.width,
+        isDraftPost,
         isDraftPostPreviewPending,
     ]);
 
@@ -859,12 +1010,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         sx={{
                             appearance: "none",
                             alignItems: "center",
-                            bgcolor: photo.avatarUrl
-                                ? "transparent"
-                                : paleGreen,
+                            bgcolor: avatarSkeletonBackground,
                             border: 0,
                             borderRadius: "50%",
-                            color: green,
                             cursor: onOpenProfile ? "pointer" : "default",
                             display: "flex",
                             flexShrink: 0,
@@ -893,17 +1041,15 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 }}
                             />
                         ) : (
-                            <Box
+                            <Skeleton
+                                variant="circular"
                                 sx={{
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 10,
-                                    fontWeight: 800,
-                                    lineHeight: 1,
+                                    bgcolor: avatarSkeletonBackground,
+                                    height: "100%",
+                                    transform: "none",
+                                    width: "100%",
                                 }}
-                            >
-                                {initials}
-                            </Box>
+                            />
                         )}
                     </Box>
                     <Box
@@ -988,7 +1134,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     sx={{
                         alignItems: "center",
                         display: "flex",
-                        gap: "16px",
+                        gap: "8px",
                         justifySelf: "flex-end",
                     }}
                 >
@@ -1032,29 +1178,65 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             />
                         </Box>
                     )}
+                    {isDraftPost && (
+                        <>
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label={
+                                    isDraftCropMode
+                                        ? "Disable crop"
+                                        : "Crop photo"
+                                }
+                                aria-pressed={isDraftCropMode}
+                                disabled={!canEditDraftPost}
+                                onClick={toggleDraftPostCrop}
+                                sx={{
+                                    ...viewerHeaderIconButtonSx,
+                                    color: isDraftCropMode
+                                        ? textBase
+                                        : controlIcon,
+                                    cursor: canEditDraftPost
+                                        ? "pointer"
+                                        : "default",
+                                    opacity: canEditDraftPost ? 1 : 0.48,
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={CropIcon}
+                                    size={22}
+                                    strokeWidth={1.8}
+                                />
+                            </Box>
+                            <Box
+                                component="button"
+                                type="button"
+                                aria-label="Rotate photo clockwise"
+                                disabled={!canEditDraftPost}
+                                onClick={rotateDraftPostPhoto}
+                                sx={{
+                                    ...viewerHeaderIconButtonSx,
+                                    cursor: canEditDraftPost
+                                        ? "pointer"
+                                        : "default",
+                                    mr: "10px",
+                                    opacity: canEditDraftPost ? 1 : 0.48,
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={Rotate01Icon}
+                                    size={22}
+                                    strokeWidth={1.8}
+                                />
+                            </Box>
+                        </>
+                    )}
                     <Box
                         component="button"
                         type="button"
                         aria-label="Close viewer"
                         onClick={onClose}
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: controlBackground,
-                            border: 0,
-                            borderRadius: "50%",
-                            color: controlIcon,
-                            cursor: "pointer",
-                            display: "flex",
-                            height: 28,
-                            justifyContent: "center",
-                            p: 0,
-                            width: 28,
-                            "&:focus-visible": {
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                            "&:hover": { bgcolor: controlBackgroundHover },
-                        }}
+                        sx={viewerHeaderButtonSx}
                     >
                         <HugeiconsIcon
                             icon={Cancel01Icon}
@@ -1149,36 +1331,89 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     width: "100%",
                 }}
             />
-            {isDraftPostPreviewPending && (
+            {isDraftPost && (
                 <Box
-                    role="status"
-                    aria-label="Preparing photo preview"
                     sx={{
-                        bottom: viewerBottomPadding,
+                        bottom: draftViewerBottomPadding,
                         boxSizing: "border-box",
                         display: "grid",
                         left: 0,
+                        overflow: "hidden",
                         placeItems: "center",
-                        pointerEvents: "none",
                         position: "fixed",
                         right: 0,
                         top: viewerHeaderHeight,
                         zIndex: 0,
                     }}
                 >
-                    <Box
-                        sx={{
-                            animation: `${photoPreviewSkeletonShimmer} 1.4s ease-in-out infinite`,
-                            aspectRatio: "3 / 4",
-                            bgcolor: "#171717",
-                            backgroundImage:
-                                "linear-gradient(90deg, #171717 0%, #242424 42%, #2D2D2D 50%, #242424 58%, #171717 100%)",
-                            backgroundSize: "200% 100%",
-                            boxShadow: "0 16px 42px rgba(0, 0, 0, 0.34)",
-                            overflow: "hidden",
-                            width: "min(100vw, 390px)",
-                        }}
-                    />
+                    {isDraftPostPreviewPending ? (
+                        <Box
+                            role="status"
+                            aria-label="Preparing photo preview"
+                            sx={{
+                                animation: `${photoPreviewSkeletonShimmer} 1.4s ease-in-out infinite`,
+                                aspectRatio: "3 / 4",
+                                bgcolor: "#171717",
+                                backgroundImage:
+                                    "linear-gradient(90deg, #171717 0%, #242424 42%, #2D2D2D 50%, #242424 58%, #171717 100%)",
+                                backgroundSize: "200% 100%",
+                                boxShadow:
+                                    "0 16px 42px rgba(0, 0, 0, 0.34)",
+                                overflow: "hidden",
+                                width: "100vw",
+                            }}
+                        />
+                    ) : isDraftCropMode ? (
+                        <Box
+                            sx={{
+                                height: "100%",
+                                position: "relative",
+                                width: "100%",
+                                "& .reactEasyCrop_CropArea": {
+                                    borderColor: "#FFFFFF",
+                                    color: "rgba(0, 0, 0, 0.5)",
+                                },
+                            }}
+                        >
+                            <Cropper
+                                aspect={draftPhotoAspectRatio}
+                                crop={draftCrop}
+                                disableAutomaticStylesInjection
+                                image={photo.imageUrl}
+                                maxZoom={3}
+                                minZoom={1}
+                                objectFit="contain"
+                                onCropChange={setDraftCrop}
+                                onCropComplete={(_crop, croppedAreaPixels) =>
+                                    setDraftCropArea(croppedAreaPixels)
+                                }
+                                onZoomChange={setDraftZoom}
+                                rotation={normalizedDraftRotationDegrees}
+                                showGrid
+                                zoom={draftZoom}
+                            />
+                        </Box>
+                    ) : (
+                        <Box
+                            component="img"
+                            alt={photo.alt ?? `${photo.name} post`}
+                            src={photo.imageUrl}
+                            sx={{
+                                display: "block",
+                                maxHeight:
+                                    normalizedDraftRotationDegrees % 180 == 0
+                                        ? "100%"
+                                        : "100vw",
+                                maxWidth:
+                                    normalizedDraftRotationDegrees % 180 == 0
+                                        ? "100vw"
+                                        : "100%",
+                                objectFit: "contain",
+                                transform: `rotate(${normalizedDraftRotationDegrees}deg)`,
+                                transformOrigin: "center",
+                            }}
+                        />
+                    )}
                 </Box>
             )}
             <Box
@@ -1304,11 +1539,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             aria-label={
                                 draftPostActionPhase == "busy"
                                     ? "Posting"
-                                    : draftPostActionPhase == "done"
-                                      ? "Posted"
-                                      : draftPostPreparationError
-                                        ? "Photo could not be prepared"
-                                        : "Post photo"
+                                    : draftPostPreparationError
+                                      ? "Photo could not be prepared"
+                                      : "Post photo"
                             }
                             disabled={isDraftPostPublishDisabled}
                             onClick={publishDraftPost}
@@ -1319,10 +1552,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 borderRadius: "24px",
                                 boxSizing: "border-box",
                                 boxShadow: "0 10px 28px rgba(0, 0, 0, 0.28)",
-                                color:
-                                    draftPostActionPhase == "done"
-                                        ? green
-                                        : "#111111",
+                                color: "#111111",
                                 cursor: isDraftPostPublishDisabled
                                     ? "default"
                                     : "pointer",
@@ -1350,28 +1580,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 },
                             }}
                         >
-                            {draftPostActionPhase == "busy" ? (
-                                <Box
-                                    component="span"
-                                    sx={{
-                                        animation: `${postButtonSpin} 2.4s linear infinite`,
-                                        display: "flex",
-                                        lineHeight: 0,
-                                    }}
-                                >
-                                    <HugeiconsIcon
-                                        icon={Loading03Icon}
-                                        size={22}
-                                        strokeWidth={1.8}
-                                    />
-                                </Box>
-                            ) : draftPostActionPhase == "done" ? (
-                                <HugeiconsIcon
-                                    icon={Tick02Icon}
-                                    size={22}
-                                    strokeWidth={1.8}
-                                />
-                            ) : draftPostPreparationError ? (
+                            {draftPostPreparationError ? (
                                 "Error"
                             ) : (
                                 "Post"
@@ -1844,7 +2053,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                             >
                                                 <SpaceAvatar
                                                     avatarUrl={liker.avatarUrl}
-                                                    name={likerName}
                                                     size={36}
                                                 />
                                                 <Box

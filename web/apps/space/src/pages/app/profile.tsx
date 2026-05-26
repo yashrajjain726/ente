@@ -10,11 +10,13 @@ import {
     loadCurrentPostLikers,
     loadCurrentSpaceFriends,
     loadCurrentSpacePostsPage,
+    markCurrentFeedRead,
     setCurrentPostLiked,
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
 import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
+import { prepareSpacePostImageFromEdit } from "utils/spacePostImage";
 import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
@@ -25,6 +27,7 @@ const Page: React.FC = () => {
         profileLoadError,
         profileLoadStatus,
         setFriends,
+        setLocalFeedPosts,
     } = useSpaceAppState();
     const [posts, setPosts] = useState<SpacePost[]>([]);
     const [isPostsLoading, setIsPostsLoading] = useState(true);
@@ -90,20 +93,71 @@ const Page: React.FC = () => {
                 profile={profile}
                 onBack={() => void router.push(spaceRoutes.home)}
                 onCreatePost={async (image, caption) => {
-                    if (!profile.spaceId) throw new Error("Missing space.");
-                    const post = await createCurrentPhotoPost({
-                        caption,
-                        file: image.file,
-                        height: image.height,
-                        spaceId: profile.spaceId,
-                        width: image.width,
-                    });
-                    if (!post) throw new Error("Couldn't create post.");
-                    setPosts((currentPosts) => [post, ...currentPosts]);
+                    const spaceId = profile.spaceId;
+                    if (!spaceId) throw new Error("Missing space.");
+
+                    const localPostId = crypto.randomUUID();
+                    const displayName =
+                        profile.fullName.trim() || profile.username.trim();
+                    setLocalFeedPosts((currentPosts) => [
+                        {
+                            avatarUrl: profile.avatarUrl,
+                            caption: caption.trim() || undefined,
+                            friendID: spaceId,
+                            height: image.height,
+                            id: localPostId,
+                            name: displayName || "You",
+                            spaceId,
+                            status: "pending",
+                            timestampMs: Date.now(),
+                            width: image.width,
+                        },
+                        ...currentPosts,
+                    ]);
+                    try {
+                        const preparedImage = await prepareSpacePostImageFromEdit(
+                            image.file,
+                            image.cropArea,
+                            image.rotationDegrees,
+                        );
+                        const post = await createCurrentPhotoPost({
+                            caption,
+                            file: preparedImage.file,
+                            height: preparedImage.height,
+                            spaceId,
+                            width: preparedImage.width,
+                        });
+                        if (!post) throw new Error("Couldn't create post.");
+                        setLocalFeedPosts((currentPosts) =>
+                            currentPosts.map((item) =>
+                                item.id == localPostId
+                                    ? { id: localPostId, post, status: "ready" }
+                                    : item,
+                            ),
+                        );
+                        void markCurrentFeedRead(post.postId).catch(
+                            (error: unknown) =>
+                                console.warn("Failed to mark feed read", error),
+                        );
+                    } catch (error) {
+                        setLocalFeedPosts((currentPosts) =>
+                            currentPosts.filter(
+                                (item) => item.id != localPostId,
+                            ),
+                        );
+                        throw error;
+                    }
                 }}
                 onDraftPostPublished={() => void router.push(spaceRoutes.home)}
                 onDeletePost={async (postId) => {
                     await deleteCurrentPost(postId);
+                    setLocalFeedPosts((currentPosts) =>
+                        currentPosts.filter(
+                            (item) =>
+                                item.status != "ready" ||
+                                item.post.postId != postId,
+                        ),
+                    );
                     setPosts((currentPosts) =>
                         currentPosts.filter((post) => post.postId != postId),
                     );

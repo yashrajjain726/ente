@@ -6,20 +6,20 @@ import {
     Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Menu, MenuItem, Tooltip } from "@mui/material";
+import { Box, Menu, MenuItem, Skeleton, Tooltip } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import type { SpaceMessage, SpaceMessageConversation } from "services/space";
-import { firstNameFrom, initialsFor } from "utils/spaceDisplay";
+import { firstNameFrom } from "utils/spaceDisplay";
 import { clampSpaceMessageText } from "utils/spaceMessageLimits";
 
 export const messagesBackground = "#FFFFFF";
 
 const green = "#08C225";
-const paleGreen = "#E7F6E9";
+const avatarSkeletonBackground = "#E6E6E6";
 const textBase = "#000000";
 const textSecondary = "#777777";
 const threadBackground = "#202020";
@@ -93,17 +93,15 @@ const copyTextToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
 };
 
-const Avatar: React.FC<{
-    avatarUrl?: string | null;
-    name: string;
-    size: number;
-}> = ({ avatarUrl, name, size }) => (
+const Avatar: React.FC<{ avatarUrl?: string | null; size: number }> = ({
+    avatarUrl,
+    size,
+}) => (
     <Box
         sx={{
             alignItems: "center",
-            bgcolor: avatarUrl ? "transparent" : paleGreen,
+            bgcolor: avatarSkeletonBackground,
             borderRadius: "50%",
-            color: green,
             display: "flex",
             flexShrink: 0,
             height: size,
@@ -126,16 +124,15 @@ const Avatar: React.FC<{
                 }}
             />
         ) : (
-            <Box
+            <Skeleton
+                variant="circular"
                 sx={{
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: Math.max(10, Math.round(size * 0.34)),
-                    fontWeight: 800,
-                    lineHeight: 1,
+                    bgcolor: avatarSkeletonBackground,
+                    height: "100%",
+                    transform: "none",
+                    width: "100%",
                 }}
-            >
-                {initialsFor(name)}
-            </Box>
+            />
         )}
     </Box>
 );
@@ -350,11 +347,7 @@ const ConversationListItem: React.FC<{
                     },
                 }}
             >
-                <Avatar
-                    avatarUrl={conversation.friend.avatarUrl}
-                    name={name}
-                    size={44}
-                />
+                <Avatar avatarUrl={conversation.friend.avatarUrl} size={44} />
                 <Box sx={{ minWidth: 0 }}>
                     <Box
                         sx={{

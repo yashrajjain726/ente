@@ -19,6 +19,7 @@ import {
     loadExistingSpaceProfile,
 } from "services/spaceProfile";
 import {
+    type LocalSpaceFeedPost,
     type OnboardingEntrySource,
     type SpaceAppState,
     SpaceAppStateContext,
@@ -32,6 +33,9 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     const [friends, setFriends] = useState(initialFriends);
     const [isLiveSignupVerification, setIsLiveSignupVerification] =
         useState(false);
+    const [localFeedPosts, setLocalFeedPosts] = useState<LocalSpaceFeedPost[]>(
+        [],
+    );
     const [onboardingEntrySource, setOnboardingEntrySource] =
         useState<OnboardingEntrySource>("direct");
     const [pendingLoginCredentials, setPendingLoginCredentials] =
@@ -186,6 +190,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         setPendingProfileAvatarFile(null);
         setPendingProfileCoverFile(null);
         setOnboardingEntrySource("direct");
+        setLocalFeedPosts([]);
         setFriends(initialFriends());
     }, [applyProfile]);
 
@@ -197,6 +202,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         () => ({
             friends,
             isLiveSignupVerification,
+            localFeedPosts,
             onboardingEntrySource,
             pendingLoginCredentials,
             pendingPasskeyVerification,
@@ -209,6 +215,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             resetAfterLogout,
             setFriends,
             setIsLiveSignupVerification,
+            setLocalFeedPosts,
             setOnboardingEntrySource,
             setPendingLoginCredentials,
             setPendingPasskeyVerification,
@@ -221,6 +228,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         [
             friends,
             isLiveSignupVerification,
+            localFeedPosts,
             onboardingEntrySource,
             pendingLoginCredentials,
             pendingPasskeyVerification,
