@@ -14,11 +14,18 @@ export interface PendingSpaceFeedPost {
     friendID: string;
     height?: number;
     id: string;
+    imageUrl: string;
     name: string;
     spaceId: string;
     status: "pending";
     timestampMs: number;
     width?: number;
+}
+
+export interface PostedSpaceFeedPost {
+    id: string;
+    post: SpacePost;
+    status: "posted";
 }
 
 export interface ReadySpaceFeedPost {
@@ -27,7 +34,10 @@ export interface ReadySpaceFeedPost {
     status: "ready";
 }
 
-export type LocalSpaceFeedPost = PendingSpaceFeedPost | ReadySpaceFeedPost;
+export type LocalSpaceFeedPost =
+    | PendingSpaceFeedPost
+    | PostedSpaceFeedPost
+    | ReadySpaceFeedPost;
 
 export interface SpaceAppState {
     friends: FriendProfile[];

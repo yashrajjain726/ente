@@ -89,6 +89,7 @@ interface DraftSpacePostImage {
     cropArea?: SpaceViewerDraftPostEdit["cropArea"];
     file: File;
     height?: number;
+    previewUrl?: string;
     rotationDegrees?: number;
     width?: number;
 }
@@ -241,6 +242,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             URL.revokeObjectURL(objectUrl),
         );
         localPostObjectUrlsRef.current.clear();
+    }, []);
+    const releaseLocalPostObjectUrl = React.useCallback((objectUrl: string) => {
+        localPostObjectUrlsRef.current.delete(objectUrl);
     }, []);
     const openPostPhotoPicker = () => {
         if (isPostPhotoOpening) return;
@@ -1245,18 +1249,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         onOpenProfile={closeSelectedPost}
                         onPublishDraftPost={
                             selectedPost.draftFile && onCreatePost
-                                ? (caption, edit) =>
-                                      onCreatePost(
+                                ? (caption, edit) => {
+                                      const previewUrl =
+                                          selectedPost.photo.imageUrl;
+                                      const publishPromise = onCreatePost(
                                           {
                                               cropArea: edit.cropArea,
                                               file: selectedPost.draftFile!,
                                               height: edit.height,
+                                              previewUrl,
                                               rotationDegrees:
                                                   edit.rotationDegrees,
                                               width: edit.width,
                                           },
                                           caption,
-                                      )
+                                      );
+                                      releaseLocalPostObjectUrl(previewUrl);
+                                      return publishPromise;
+                                  }
                                 : undefined
                         }
                         onDraftPostPublished={onDraftPostPublished}

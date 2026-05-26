@@ -3,14 +3,15 @@ import {
     Chat01Icon,
     FavouriteIcon,
     MultiplicationSignIcon,
+    Tick02Icon,
     UserCheck01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import {
     SpaceFileViewer,
-    type SpaceViewerDraftPostEdit,
     type SpaceLiker,
+    type SpaceViewerDraftPostEdit,
     type SpaceViewerInitialScreen,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
@@ -128,9 +129,12 @@ interface DraftSpacePostImage {
     cropArea?: SpaceViewerDraftPostEdit["cropArea"];
     file: File;
     height?: number;
+    previewUrl?: string;
     rotationDegrees?: number;
     width?: number;
 }
+
+type FeedTimestampStatus = "posted" | "posting";
 
 interface FeedItemProps {
     aspectRatio: number;
@@ -138,7 +142,6 @@ interface FeedItemProps {
     caption?: string;
     friendID: string;
     imageUrl: string;
-    isPhotoPending?: boolean;
     isOwnPost: boolean;
     likeCount: number;
     name: string;
@@ -151,6 +154,7 @@ interface FeedItemProps {
     onOpenProfile?: () => void;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     postId: number;
+    timestampStatus?: FeedTimestampStatus;
     timestampMs: number;
     viewerLiked: boolean;
     viewerUnread: boolean;
@@ -324,13 +328,31 @@ const FeedLoadingSkeletons: React.FC = () => (
     </Box>
 );
 
+const usePostingDotCount = (isPosting: boolean) => {
+    const [dotCount, setDotCount] = useState(1);
+
+    React.useEffect(() => {
+        if (!isPosting) {
+            setDotCount(1);
+            return;
+        }
+
+        const intervalID = window.setInterval(() => {
+            setDotCount((count) => (count % 3) + 1);
+        }, 500);
+
+        return () => window.clearInterval(intervalID);
+    }, [isPosting]);
+
+    return dotCount;
+};
+
 const FeedItem: React.FC<FeedItemProps> = ({
     aspectRatio,
     avatarUrl,
     caption,
     friendID,
     imageUrl,
-    isPhotoPending = false,
     isOwnPost,
     likeCount,
     name,
@@ -339,6 +361,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     onOpenProfile,
     onSetPostLiked,
     postId,
+    timestampStatus,
     timestampMs,
     viewerLiked,
     viewerUnread,
@@ -347,6 +370,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const [localLikeCount, setLocalLikeCount] = useState(likeCount);
     const firstName = firstNameFrom(name);
     const dateLabel = formatSpaceDate(timestampMs);
+    const postingDotCount = usePostingDotCount(timestampStatus == "posting");
     const displayCaption = caption?.trim();
     const canOpenAuthor = isOwnPost
         ? Boolean(onOpenProfile)
@@ -388,8 +412,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
         initialScreen?: SpaceViewerInitialScreen,
         focusReplyOnOpen = false,
     ) => {
-        if (isPhotoPending) return;
-
         onOpenPhoto?.(
             {
                 alt: `${name} post`,
@@ -546,20 +568,68 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 >
                     {firstName}
                 </Box>
-                <Box
-                    component="time"
-                    dateTime={new Date(timestampMs).toISOString()}
-                    sx={{
-                        color: textSecondary,
-                        fontSize: 12,
-                        fontWeight: 500,
-                        justifySelf: "end",
-                        textAlign: "right",
-                        whiteSpace: "nowrap",
-                    }}
-                >
-                    {dateLabel}
-                </Box>
+                {timestampStatus ? (
+                    <Box
+                        component="span"
+                        aria-label={
+                            timestampStatus == "posting" ? "Posting" : "Posted"
+                        }
+                        sx={{
+                            alignItems: "center",
+                            color:
+                                timestampStatus == "posted"
+                                    ? green
+                                    : textSecondary,
+                            display: "inline-flex",
+                            fontSize: 12,
+                            fontWeight: 500,
+                            justifyContent: "flex-end",
+                            justifySelf: "end",
+                            lineHeight: "16px",
+                            textAlign: "right",
+                            whiteSpace: "nowrap",
+                            width: 68,
+                        }}
+                    >
+                        {timestampStatus == "posted" ? (
+                            <HugeiconsIcon
+                                icon={Tick02Icon}
+                                size={16}
+                                strokeWidth={2.2}
+                            />
+                        ) : (
+                            <>
+                                <Box component="span">Posting</Box>
+                                <Box
+                                    component="span"
+                                    aria-hidden
+                                    sx={{
+                                        display: "inline-block",
+                                        textAlign: "left",
+                                        width: 12,
+                                    }}
+                                >
+                                    {".".repeat(postingDotCount)}
+                                </Box>
+                            </>
+                        )}
+                    </Box>
+                ) : (
+                    <Box
+                        component="time"
+                        dateTime={new Date(timestampMs).toISOString()}
+                        sx={{
+                            color: textSecondary,
+                            fontSize: 12,
+                            fontWeight: 500,
+                            justifySelf: "end",
+                            textAlign: "right",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        {dateLabel}
+                    </Box>
+                )}
                 {viewerUnread && (
                     <Box
                         aria-hidden
@@ -583,55 +653,40 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     width: "100%",
                 }}
             >
-                {isPhotoPending ? (
-                    <Skeleton
-                        variant="rectangular"
-                        animation="wave"
-                        aria-label="Posting photo"
+                <Box
+                    component="button"
+                    type="button"
+                    aria-label={`Open ${name} photo`}
+                    onClick={() => openPhoto()}
+                    sx={{
+                        appearance: "none",
+                        bgcolor: "transparent",
+                        border: 0,
+                        cursor: onOpenPhoto ? "pointer" : "default",
+                        display: "block",
+                        height: "100%",
+                        p: 0,
+                        width: "100%",
+                        "&:focus-visible": {
+                            outline: `2px solid ${green}`,
+                            outlineOffset: -2,
+                        },
+                    }}
+                >
+                    <Box
+                        component="img"
+                        alt={`${name} post`}
+                        src={imageUrl}
+                        onLoad={rememberLoadedPhotoDimensions}
                         sx={{
-                            bgcolor: feedSkeletonElementBackground,
                             display: "block",
                             height: "100%",
-                            transform: "none",
+                            objectFit: "cover",
+                            objectPosition: "center",
                             width: "100%",
                         }}
                     />
-                ) : (
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label={`Open ${name} photo`}
-                        onClick={() => openPhoto()}
-                        sx={{
-                            appearance: "none",
-                            bgcolor: "transparent",
-                            border: 0,
-                            cursor: onOpenPhoto ? "pointer" : "default",
-                            display: "block",
-                            height: "100%",
-                            p: 0,
-                            width: "100%",
-                            "&:focus-visible": {
-                                outline: `2px solid ${green}`,
-                                outlineOffset: -2,
-                            },
-                        }}
-                    >
-                        <Box
-                            component="img"
-                            alt={`${name} post`}
-                            src={imageUrl}
-                            onLoad={rememberLoadedPhotoDimensions}
-                            sx={{
-                                display: "block",
-                                height: "100%",
-                                objectFit: "cover",
-                                objectPosition: "center",
-                                width: "100%",
-                            }}
-                        />
-                    </Box>
-                )}
+                </Box>
             </Box>
             {(!isOwnPost || displayCaption) && (
                 <Box
@@ -886,13 +941,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
     const selectedPhotoIsOwn =
         Boolean(profile.spaceId) && selectedPhotoFriendID == profile.spaceId;
-    const localReadyPostIds = new Set(
+    const localResolvedPostIds = new Set(
         localFeedPosts
-            .filter((item) => item.status == "ready")
+            .filter((item) => item.status != "pending")
             .map((item) => item.post.postId),
     );
     const remoteFeedItems = feedItems.filter(
-        (item) => !localReadyPostIds.has(item.postId),
+        (item) => !localResolvedPostIds.has(item.postId),
     );
     const hasFeedItems =
         localFeedPosts.length > 0 || remoteFeedItems.length > 0;
@@ -910,6 +965,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             URL.revokeObjectURL(objectUrl),
         );
         localPostObjectUrlsRef.current.clear();
+    }, []);
+    const releaseLocalPostObjectUrl = React.useCallback((objectUrl: string) => {
+        localPostObjectUrlsRef.current.delete(objectUrl);
     }, []);
     const openPostPhotoPicker = () => {
         if (isPostPhotoOpening) return;
@@ -941,7 +999,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         await onDeletePost(postId);
     };
-    const feedItemFor = (item: SpacePost, key: React.Key) => (
+    const feedItemFor = (
+        item: SpacePost,
+        key: React.Key,
+        timestampStatus?: FeedTimestampStatus,
+    ) => (
         <FeedItem
             key={key}
             aspectRatio={
@@ -961,14 +1023,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onOpenProfile={onOpenProfile}
             onSetPostLiked={onSetPostLiked}
             postId={item.postId}
+            timestampStatus={timestampStatus}
             timestampMs={item.timestampMs}
             viewerLiked={item.viewerLiked}
             viewerUnread={item.viewerUnread}
         />
     );
     const localFeedItemFor = (item: LocalSpaceFeedPost) =>
-        item.status == "ready" ? (
-            feedItemFor(item.post, item.id)
+        item.status != "pending" ? (
+            feedItemFor(
+                item.post,
+                item.id,
+                item.status == "posted" ? "posted" : undefined,
+            )
         ) : (
             <FeedItem
                 key={item.id}
@@ -978,13 +1045,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 avatarUrl={item.avatarUrl ?? ""}
                 caption={item.caption}
                 friendID={item.friendID}
-                imageUrl=""
+                imageUrl={item.imageUrl}
                 isOwnPost
-                isPhotoPending
                 likeCount={0}
                 name={item.name}
                 onOpenProfile={onOpenProfile}
                 postId={0}
+                timestampStatus="posting"
                 timestampMs={item.timestampMs}
                 viewerLiked={false}
                 viewerUnread={false}
@@ -1593,18 +1660,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         }
                         onPublishDraftPost={
                             selectedViewer.draftFile && onCreatePost
-                                ? (caption, edit) =>
-                                      onCreatePost(
+                                ? (caption, edit) => {
+                                      const previewUrl =
+                                          selectedViewer.photo.imageUrl;
+                                      const publishPromise = onCreatePost(
                                           {
                                               cropArea: edit.cropArea,
                                               file: selectedViewer.draftFile!,
                                               height: edit.height,
+                                              previewUrl,
                                               rotationDegrees:
                                                   edit.rotationDegrees,
                                               width: edit.width,
                                           },
                                           caption,
-                                      )
+                                      );
+                                      releaseLocalPostObjectUrl(previewUrl);
+                                      return publishPromise;
+                                  }
                                 : undefined
                         }
                         onLoadPostLikers={onLoadPostLikers}

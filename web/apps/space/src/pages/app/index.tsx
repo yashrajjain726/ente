@@ -18,7 +18,10 @@ import {
 } from "services/space";
 import { consumeAcceptedSpaceInviteFriend } from "services/spaceInvite";
 import { useSpaceAppState } from "state/spaceAppState";
-import { createLocalFeedPostID } from "utils/localFeedPost";
+import {
+    confirmLocalFeedPost,
+    createLocalFeedPostID,
+} from "utils/localFeedPost";
 import { firstNameFrom } from "utils/spaceDisplay";
 import { prepareSpacePostImageFromEdit } from "utils/spacePostImage";
 import { spaceRoutes } from "utils/spaceRoutes";
@@ -174,6 +177,9 @@ const Page: React.FC = () => {
                             friendID: spaceId,
                             height: image.height,
                             id: localPostId,
+                            imageUrl:
+                                image.previewUrl ||
+                                URL.createObjectURL(image.file),
                             name: displayName || "You",
                             spaceId,
                             status: "pending",
@@ -197,12 +203,10 @@ const Page: React.FC = () => {
                             width: preparedImage.width,
                         });
                         if (!post) throw new Error("Couldn't create post.");
-                        setLocalFeedPosts((currentPosts) =>
-                            currentPosts.map((item) =>
-                                item.id == localPostId
-                                    ? { id: localPostId, post, status: "ready" }
-                                    : item,
-                            ),
+                        confirmLocalFeedPost(
+                            setLocalFeedPosts,
+                            localPostId,
+                            post,
                         );
                         void markCurrentFeedRead(post.postId).catch(
                             (error: unknown) =>
@@ -222,7 +226,7 @@ const Page: React.FC = () => {
                     setLocalFeedPosts((currentPosts) =>
                         currentPosts.filter(
                             (item) =>
-                                item.status != "ready" ||
+                                item.status == "pending" ||
                                 item.post.postId != postId,
                         ),
                     );

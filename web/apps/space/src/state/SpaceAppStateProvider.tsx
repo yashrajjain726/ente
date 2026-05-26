@@ -53,6 +53,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     const [signupEmail, setSignupEmail] = useState("");
     const avatarURLRef = useRef<string | null>(null);
     const coverURLRef = useRef<string | null>(null);
+    const localFeedPostURLRef = useRef<Set<string>>(new Set());
     const profileRef = useRef<SetupProfile | null>(null);
     const profileLoadGenerationRef = useRef(0);
 
@@ -197,6 +198,37 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     useEffect(() => {
         void refreshProfile();
     }, [refreshProfile]);
+
+    useEffect(() => {
+        const nextURLs = new Set(
+            localFeedPosts
+                .filter(
+                    (
+                        post,
+                    ): post is Extract<
+                        LocalSpaceFeedPost,
+                        { status: "pending" }
+                    > => post.status == "pending",
+                )
+                .map((post) => post.imageUrl)
+                .filter((url) => url.startsWith("blob:")),
+        );
+
+        for (const url of localFeedPostURLRef.current) {
+            if (!nextURLs.has(url)) URL.revokeObjectURL(url);
+        }
+        localFeedPostURLRef.current = nextURLs;
+    }, [localFeedPosts]);
+
+    useEffect(
+        () => () => {
+            for (const url of localFeedPostURLRef.current) {
+                URL.revokeObjectURL(url);
+            }
+            localFeedPostURLRef.current.clear();
+        },
+        [],
+    );
 
     const value = useMemo<SpaceAppState>(
         () => ({
