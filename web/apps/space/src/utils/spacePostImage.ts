@@ -93,6 +93,16 @@ export const prepareSpacePostImage = async (
     };
 };
 
+export const canPreviewSpaceImageFile = (file: File) => {
+    try {
+        assertSupportedSpaceImageFile(file);
+    } catch {
+        return false;
+    }
+
+    return !isHEICSpaceImageFile(file);
+};
+
 export const prepareSpaceAvatarImage = async (
     file: File,
 ): Promise<PreparedSpaceAvatarImage> => {
@@ -201,14 +211,17 @@ export const spaceCoverImageErrorMessage = spaceAvatarImageErrorMessage;
 const renderableBlobForSpaceImage = async (file: File): Promise<Blob> => {
     assertSupportedSpaceImageFile(file);
 
+    return isHEICSpaceImageFile(file) ? await heicToJPEG(file) : file;
+};
+
+const isHEICSpaceImageFile = (file: File) => {
     const extension = lowercaseExtension(file.name);
     const mediaType = file.type.toLowerCase();
-    const isHEIC =
+    return (
         (extension != undefined && isHEICExtension(extension)) ||
         mediaType == "image/heic" ||
-        mediaType == "image/heif";
-
-    return isHEIC ? await heicToJPEG(file) : file;
+        mediaType == "image/heif"
+    );
 };
 
 class SpaceImageSizeError extends Error {

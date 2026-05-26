@@ -15,21 +15,20 @@ interface CreateLocalPostPhotoAttributes {
     dimensions?: LocalPostPhotoDimensions;
     file: File;
     name: string;
-    onDimensionsLoaded?: (
-        objectUrl: string,
-        dimensions: LocalPostPhotoDimensions,
-    ) => void;
 }
 
-export const createLocalPostPhoto = ({
+interface LocalPostPhotoAttributes extends CreateLocalPostPhotoAttributes {
+    objectUrl: string;
+}
+
+const localPostPhoto = ({
     avatarUrl,
     dimensions,
-    file,
     name,
-    onDimensionsLoaded,
-}: CreateLocalPostPhotoAttributes): LocalPostPhoto => {
-    const objectUrl = URL.createObjectURL(file);
-    const photo: SpaceViewerPhoto = {
+    objectUrl,
+}: LocalPostPhotoAttributes): LocalPostPhoto => ({
+    objectUrl,
+    photo: {
         alt: `${name} post`,
         avatarUrl,
         height: dimensions?.height,
@@ -37,21 +36,45 @@ export const createLocalPostPhoto = ({
         name,
         timestampMs: Date.now(),
         width: dimensions?.width,
-    };
+    },
+});
 
-    if (dimensions) return { objectUrl, photo };
+export const createLocalPostPhoto = (
+    attributes: CreateLocalPostPhotoAttributes,
+): LocalPostPhoto =>
+    localPostPhoto({
+        ...attributes,
+        objectUrl: URL.createObjectURL(attributes.file),
+    });
 
-    const image = new Image();
-    image.onload = () => {
-        const { naturalHeight, naturalWidth } = image;
-        if (naturalHeight <= 0 || naturalWidth <= 0) return;
-
-        onDimensionsLoaded?.(objectUrl, {
-            height: naturalHeight,
-            width: naturalWidth,
+export const createLoadedLocalPostPhoto = async (
+    attributes: CreateLocalPostPhotoAttributes,
+): Promise<LocalPostPhoto> => {
+    const objectUrl = URL.createObjectURL(attributes.file);
+    try {
+        return localPostPhoto({
+            ...attributes,
+            dimensions: await localImageDimensions(objectUrl),
+            objectUrl,
         });
-    };
-    image.src = objectUrl;
-
-    return { objectUrl, photo };
+    } catch (error) {
+        URL.revokeObjectURL(objectUrl);
+        throw error;
+    }
 };
+
+const localImageDimensions = (objectUrl: string) =>
+    new Promise<LocalPostPhotoDimensions>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => {
+            const { naturalHeight, naturalWidth } = image;
+            if (naturalHeight <= 0 || naturalWidth <= 0) {
+                reject(new Error("Image has no dimensions"));
+                return;
+            }
+
+            resolve({ height: naturalHeight, width: naturalWidth });
+        };
+        image.onerror = () => reject(new Error("Image failed to load"));
+        image.src = objectUrl;
+    });

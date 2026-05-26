@@ -5,7 +5,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
-import { SpaceActionFeedbackIcon } from "components/SpaceActionFeedback";
 import {
     SpaceFileViewer,
     type SpaceLiker,
@@ -17,9 +16,13 @@ import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
-import { createLocalPostPhoto } from "utils/localPostPhoto";
+import {
+    createLoadedLocalPostPhoto,
+    createLocalPostPhoto,
+} from "utils/localPostPhoto";
 import { firstNameFrom, initialsFor } from "utils/spaceDisplay";
 import {
+    canPreviewSpaceImageFile,
     prepareSpacePostImage,
     spacePostImageErrorMessage,
     spacePostImageInputAccept,
@@ -33,7 +36,6 @@ const paleGreen = "#E7F6E9";
 const textBase = "#000";
 const textStrong = "#303030";
 const textSoft = "#777777";
-const warning = "#F63A3A";
 const coverForeground = "#FFFFFF";
 const coverForegroundShadow = "0 1px 5px rgba(0, 0, 0, 0.34)";
 const coverForegroundIconShadow = "drop-shadow(0 1px 5px rgba(0, 0, 0, 0.34))";
@@ -77,7 +79,10 @@ export interface ProfilePostGroup {
 
 interface SelectedProfilePost {
     draftImage?: PreparedSpacePostImage;
+    draftImageError?: string;
     id: string;
+    isDraftImagePreparing?: boolean;
+    isDraftImagePreviewPending?: boolean;
     localObjectUrl?: string;
     photo: SpaceViewerPhoto;
     postActionMode?: SpaceViewerPostActionMode;
@@ -184,8 +189,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
-    const [postPhotoError, setPostPhotoError] = useState<string>();
-    const [isPostPhotoPreparing, setIsPostPhotoPreparing] = useState(false);
+    const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
         () => new Set(),
     );
@@ -193,6 +197,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         useState<Record<string, ProfilePhotoDimensions>>({});
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
+    const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
     const isPublicProfile = headerVariant == "public";
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
@@ -221,22 +226,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           ? "hidden"
           : "like-only";
 
-    const revokeLocalPostObjectUrl = React.useCallback((objectUrl?: string) => {
-        if (!objectUrl || !localPostObjectUrlsRef.current.has(objectUrl))
-            return;
-
-        URL.revokeObjectURL(objectUrl);
-        localPostObjectUrlsRef.current.delete(objectUrl);
+    const revokeLocalPostObjectUrls = React.useCallback(() => {
+        localPostObjectUrlsRef.current.forEach((objectUrl) =>
+            URL.revokeObjectURL(objectUrl),
+        );
+        localPostObjectUrlsRef.current.clear();
     }, []);
     const openPostPhotoPicker = () => {
-        if (isPostPhotoPreparing) return;
+        if (isPostPhotoOpening) return;
 
         postInputRef.current?.click();
     };
     const closeSelectedPost = () => {
-        const localObjectUrl = selectedPost?.localObjectUrl;
+        activeLocalPostObjectUrlRef.current = null;
         setSelectedPost(null);
-        revokeLocalPostObjectUrl(localObjectUrl);
+        revokeLocalPostObjectUrls();
     };
     const rememberLoadedPhotoDimensions = (
         imageUrl: string,
@@ -261,22 +265,89 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     };
 
     const prepareSelectedPostPhoto = async (file: File) => {
-        const image = await prepareSpacePostImage(file);
-        const localPost = createLocalPostPhoto({
-            avatarUrl: profile.avatarUrl,
-            dimensions: image,
-            file: image.file,
-            name: displayName || "You",
-        });
+        const canShowLocalPreview = canPreviewSpaceImageFile(file);
+        const localPost = canShowLocalPreview
+            ? await createLoadedLocalPostPhoto({
+                  avatarUrl: profile.avatarUrl,
+                  file,
+                  name: displayName || "You",
+              })
+            : createLocalPostPhoto({
+                  avatarUrl: profile.avatarUrl,
+                  file,
+                  name: displayName || "You",
+              });
         localPostObjectUrlsRef.current.add(localPost.objectUrl);
+        activeLocalPostObjectUrlRef.current = localPost.objectUrl;
         setSelectedPost({
-            draftImage: image,
             id: `local-${localPost.photo.timestampMs}`,
+            isDraftImagePreparing: true,
+            isDraftImagePreviewPending: !canShowLocalPreview,
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
             postActionMode: "draft-post",
         });
-        setPostPhotoError(undefined);
+
+        window.setTimeout(() => {
+            if (activeLocalPostObjectUrlRef.current != localPost.objectUrl)
+                return;
+
+            void prepareSpacePostImage(file)
+                .then((image) => {
+                    if (
+                        activeLocalPostObjectUrlRef.current !=
+                        localPost.objectUrl
+                    )
+                        return;
+
+                    const preparedPost = canShowLocalPreview
+                        ? undefined
+                        : createLocalPostPhoto({
+                              avatarUrl: profile.avatarUrl,
+                              dimensions: image,
+                              file: image.file,
+                              name: displayName || "You",
+                          });
+                    if (preparedPost)
+                        localPostObjectUrlsRef.current.add(
+                            preparedPost.objectUrl,
+                        );
+                    setSelectedPost((currentPost) => {
+                        if (currentPost?.localObjectUrl != localPost.objectUrl)
+                            return currentPost;
+
+                        return {
+                            ...currentPost,
+                            draftImage: image,
+                            draftImageError: undefined,
+                            isDraftImagePreparing: false,
+                            isDraftImagePreviewPending: false,
+                            photo: preparedPost
+                                ? {
+                                      ...currentPost.photo,
+                                      height: image.height,
+                                      imageUrl: preparedPost.objectUrl,
+                                      width: image.width,
+                                  }
+                                : currentPost.photo,
+                        };
+                    });
+                })
+                .catch((error: unknown) => {
+                    console.error("Failed to prepare post photo", error);
+                    const message = spacePostImageErrorMessage(error);
+                    setSelectedPost((currentPost) => {
+                        if (currentPost?.localObjectUrl != localPost.objectUrl)
+                            return currentPost;
+
+                        return {
+                            ...currentPost,
+                            draftImageError: message,
+                            isDraftImagePreparing: false,
+                        };
+                    });
+                });
+        }, 0);
     };
 
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
@@ -286,15 +357,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         event.target.value = "";
         if (!file) return;
 
-        setIsPostPhotoPreparing(true);
-        setPostPhotoError(undefined);
+        setIsPostPhotoOpening(true);
         void prepareSelectedPostPhoto(file)
             .catch((error: unknown) => {
-                console.error("Failed to prepare post photo", error);
-                setPostPhotoError(spacePostImageErrorMessage(error));
+                console.error("Failed to open post photo draft", error);
             })
             .finally(() => {
-                setIsPostPhotoPreparing(false);
+                setIsPostPhotoOpening(false);
             });
     };
 
@@ -330,12 +399,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
     React.useEffect(
         () => () => {
-            localPostObjectUrlsRef.current.forEach((objectUrl) =>
-                URL.revokeObjectURL(objectUrl),
-            );
-            localPostObjectUrlsRef.current.clear();
+            activeLocalPostObjectUrlRef.current = null;
+            revokeLocalPostObjectUrls();
         },
-        [],
+        [revokeLocalPostObjectUrls],
     );
 
     return (
@@ -830,24 +897,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 </Box>
                             </Box>
                         </Box>
-                        {postPhotoError && (
-                            <Box
-                                role="alert"
-                                sx={{
-                                    color: warning,
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    lineHeight: "18px",
-                                    mt: "10px",
-                                    px: 1,
-                                    textAlign: "center",
-                                }}
-                            >
-                                {postPhotoError}
-                            </Box>
-                        )}
                     </Box>
                 </Box>
                 <Box
@@ -1107,12 +1156,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         <Box
                                             component="button"
                                             type="button"
-                                            aria-label={
-                                                isPostPhotoPreparing
-                                                    ? "Preparing photo"
-                                                    : "Post photo"
-                                            }
-                                            disabled={isPostPhotoPreparing}
+                                            aria-label="Post photo"
+                                            disabled={isPostPhotoOpening}
                                             onClick={openPostPhotoPicker}
                                             sx={{
                                                 appearance: "none",
@@ -1121,7 +1166,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                 border: 0,
                                                 boxSizing: "border-box",
                                                 color: textBase,
-                                                cursor: isPostPhotoPreparing
+                                                cursor: isPostPhotoOpening
                                                     ? "default"
                                                     : "pointer",
                                                 display: "flex",
@@ -1143,20 +1188,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                 },
                                             }}
                                         >
-                                            <SpaceActionFeedbackIcon
-                                                phase={
-                                                    isPostPhotoPreparing
-                                                        ? "busy"
-                                                        : null
-                                                }
+                                            <HugeiconsIcon
+                                                icon={AddSquareIcon}
                                                 size={28}
-                                                idleIcon={
-                                                    <HugeiconsIcon
-                                                        icon={AddSquareIcon}
-                                                        size={28}
-                                                        strokeWidth={1.8}
-                                                    />
-                                                }
+                                                strokeWidth={1.8}
                                             />
                                         </Box>
                                     )}
@@ -1168,6 +1203,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 {selectedPost && (
                     <SpaceFileViewer
                         photo={selectedPost.photo}
+                        draftPostPreparationError={selectedPost.draftImageError}
+                        isDraftPostPreparing={
+                            selectedPost.isDraftImagePreparing
+                        }
+                        isDraftPostPreviewPending={
+                            selectedPost.isDraftImagePreviewPending
+                        }
                         postActionMode={
                             selectedPost.postActionMode ??
                             selectedPostActionMode

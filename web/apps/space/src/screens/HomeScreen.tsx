@@ -7,7 +7,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
-import { SpaceActionFeedbackIcon } from "components/SpaceActionFeedback";
 import {
     SpaceFileViewer,
     type SpaceLiker,
@@ -20,13 +19,17 @@ import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type { SpacePost } from "services/space";
-import { createLocalPostPhoto } from "utils/localPostPhoto";
+import {
+    createLoadedLocalPostPhoto,
+    createLocalPostPhoto,
+} from "utils/localPostPhoto";
 import {
     firstNameFrom,
     formatSpaceDate,
     initialsFor,
 } from "utils/spaceDisplay";
 import {
+    canPreviewSpaceImageFile,
     prepareSpacePostImage,
     spacePostImageErrorMessage,
     spacePostImageInputAccept,
@@ -42,7 +45,6 @@ const feedSkeletonCardBackground = "#FCFCFC";
 const feedSkeletonColor = "#F2F2F2";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
-const warning = "#F63A3A";
 const feedAvatarSize = 26;
 const headerActionSize = 32;
 const headerActionGap = 8;
@@ -116,8 +118,11 @@ interface FeedPhotoDimensions {
 
 interface SelectedHomeViewer {
     draftImage?: PreparedSpacePostImage;
+    draftImageError?: string;
     focusReplyOnOpen?: boolean;
     initialScreen: SpaceViewerInitialScreen;
+    isDraftImagePreparing?: boolean;
+    isDraftImagePreviewPending?: boolean;
     localObjectUrl?: string;
     photo: SpaceViewerPhoto;
     postActionMode?: SpaceViewerPostActionMode;
@@ -846,13 +851,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
+    const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
     const isHeaderTriggered = useHideHeaderOnScrollDirection();
     const [isHeaderFocused, setIsHeaderFocused] = useState(false);
     const isHeaderHidden = isHeaderTriggered && !isHeaderFocused;
-    const [postPhotoError, setPostPhotoError] = useState<string>();
-    const [isPostPhotoPreparing, setIsPostPhotoPreparing] = useState(false);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
+    const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
     const selectedPhotoIsOwn =
         Boolean(profile.spaceId) && selectedPhotoFriendID == profile.spaceId;
@@ -866,15 +871,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             : "When your friends share posts, they'll appear here.";
     const initialsSource = profile.fullName.trim() || profile.username.trim();
     const initials = initialsFor(initialsSource);
-    const revokeLocalPostObjectUrl = React.useCallback((objectUrl?: string) => {
-        if (!objectUrl || !localPostObjectUrlsRef.current.has(objectUrl))
-            return;
-
-        URL.revokeObjectURL(objectUrl);
-        localPostObjectUrlsRef.current.delete(objectUrl);
+    const revokeLocalPostObjectUrls = React.useCallback(() => {
+        localPostObjectUrlsRef.current.forEach((objectUrl) =>
+            URL.revokeObjectURL(objectUrl),
+        );
+        localPostObjectUrlsRef.current.clear();
     }, []);
     const openPostPhotoPicker = () => {
-        if (isPostPhotoPreparing) return;
+        if (isPostPhotoOpening) return;
 
         postInputRef.current?.click();
     };
@@ -893,9 +897,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         });
     };
     const closeSelectedPhoto = () => {
-        const localObjectUrl = selectedViewer?.localObjectUrl;
+        activeLocalPostObjectUrlRef.current = null;
         setSelectedViewer(null);
-        revokeLocalPostObjectUrl(localObjectUrl);
+        revokeLocalPostObjectUrls();
     };
     const deleteSelectedPost = async () => {
         const postId = selectedViewer?.photo.postId;
@@ -921,22 +925,93 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
 
     const prepareSelectedPostPhoto = async (file: File) => {
-        const image = await prepareSpacePostImage(file);
-        const localPost = createLocalPostPhoto({
-            avatarUrl: profile.avatarUrl,
-            dimensions: image,
-            file: image.file,
-            name: initialsSource || "You",
-        });
+        const canShowLocalPreview = canPreviewSpaceImageFile(file);
+        const localPost = canShowLocalPreview
+            ? await createLoadedLocalPostPhoto({
+                  avatarUrl: profile.avatarUrl,
+                  file,
+                  name: initialsSource || "You",
+              })
+            : createLocalPostPhoto({
+                  avatarUrl: profile.avatarUrl,
+                  file,
+                  name: initialsSource || "You",
+              });
         localPostObjectUrlsRef.current.add(localPost.objectUrl);
+        activeLocalPostObjectUrlRef.current = localPost.objectUrl;
         setSelectedViewer({
-            draftImage: image,
             initialScreen: "photo",
+            isDraftImagePreparing: true,
+            isDraftImagePreviewPending: !canShowLocalPreview,
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
             postActionMode: "draft-post",
         });
-        setPostPhotoError(undefined);
+
+        window.setTimeout(() => {
+            if (activeLocalPostObjectUrlRef.current != localPost.objectUrl)
+                return;
+
+            void prepareSpacePostImage(file)
+                .then((image) => {
+                    if (
+                        activeLocalPostObjectUrlRef.current !=
+                        localPost.objectUrl
+                    )
+                        return;
+
+                    const preparedPost = canShowLocalPreview
+                        ? undefined
+                        : createLocalPostPhoto({
+                              avatarUrl: profile.avatarUrl,
+                              dimensions: image,
+                              file: image.file,
+                              name: initialsSource || "You",
+                          });
+                    if (preparedPost)
+                        localPostObjectUrlsRef.current.add(
+                            preparedPost.objectUrl,
+                        );
+                    setSelectedViewer((currentViewer) => {
+                        if (
+                            currentViewer?.localObjectUrl != localPost.objectUrl
+                        )
+                            return currentViewer;
+
+                        return {
+                            ...currentViewer,
+                            draftImage: image,
+                            draftImageError: undefined,
+                            isDraftImagePreparing: false,
+                            isDraftImagePreviewPending: false,
+                            photo: preparedPost
+                                ? {
+                                      ...currentViewer.photo,
+                                      height: image.height,
+                                      imageUrl: preparedPost.objectUrl,
+                                      width: image.width,
+                                  }
+                                : currentViewer.photo,
+                        };
+                    });
+                })
+                .catch((error: unknown) => {
+                    console.error("Failed to prepare post photo", error);
+                    const message = spacePostImageErrorMessage(error);
+                    setSelectedViewer((currentViewer) => {
+                        if (
+                            currentViewer?.localObjectUrl != localPost.objectUrl
+                        )
+                            return currentViewer;
+
+                        return {
+                            ...currentViewer,
+                            draftImageError: message,
+                            isDraftImagePreparing: false,
+                        };
+                    });
+                });
+        }, 0);
     };
 
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
@@ -946,26 +1021,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         event.target.value = "";
         if (!file) return;
 
-        setIsPostPhotoPreparing(true);
-        setPostPhotoError(undefined);
+        setIsPostPhotoOpening(true);
         void prepareSelectedPostPhoto(file)
             .catch((error: unknown) => {
-                console.error("Failed to prepare post photo", error);
-                setPostPhotoError(spacePostImageErrorMessage(error));
+                console.error("Failed to open post photo draft", error);
             })
             .finally(() => {
-                setIsPostPhotoPreparing(false);
+                setIsPostPhotoOpening(false);
             });
     };
 
     React.useEffect(
         () => () => {
-            localPostObjectUrlsRef.current.forEach((objectUrl) =>
-                URL.revokeObjectURL(objectUrl),
-            );
-            localPostObjectUrlsRef.current.clear();
+            activeLocalPostObjectUrlRef.current = null;
+            revokeLocalPostObjectUrls();
         },
-        [],
+        [revokeLocalPostObjectUrls],
     );
 
     return (
@@ -1041,12 +1112,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <Box
                         component="button"
                         type="button"
-                        aria-label={
-                            isPostPhotoPreparing
-                                ? "Preparing photo"
-                                : "Post photo"
-                        }
-                        disabled={isPostPhotoPreparing}
+                        aria-label="Post photo"
+                        disabled={isPostPhotoOpening}
                         onClick={openPostPhotoPicker}
                         sx={{
                             appearance: "none",
@@ -1055,9 +1122,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             border: 0,
                             boxSizing: "border-box",
                             color: textBase,
-                            cursor: isPostPhotoPreparing
-                                ? "default"
-                                : "pointer",
+                            cursor: isPostPhotoOpening ? "default" : "pointer",
                             display: "flex",
                             fontSize: 0,
                             height: headerActionSize,
@@ -1076,16 +1141,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             },
                         }}
                     >
-                        <SpaceActionFeedbackIcon
-                            phase={isPostPhotoPreparing ? "busy" : null}
+                        <HugeiconsIcon
+                            icon={AddSquareIcon}
                             size={headerAddIconSize}
-                            idleIcon={
-                                <HugeiconsIcon
-                                    icon={AddSquareIcon}
-                                    size={headerAddIconSize}
-                                    strokeWidth={1.8}
-                                />
-                            }
+                            strokeWidth={1.8}
                         />
                     </Box>
                     <Box
@@ -1265,24 +1324,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </Box>
                 </Box>
                 <Box aria-hidden sx={{ height: headerHeight }} />
-                {postPhotoError && (
-                    <Box
-                        role="alert"
-                        sx={{
-                            color: warning,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 13,
-                            fontWeight: 600,
-                            lineHeight: "18px",
-                            mt: "-8px",
-                            px: 2,
-                            pb: "12px",
-                            textAlign: "center",
-                        }}
-                    >
-                        {postPhotoError}
-                    </Box>
-                )}
                 <Box
                     sx={{
                         boxSizing: "border-box",
@@ -1409,6 +1450,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         initialScreen={selectedViewer.initialScreen}
                         focusReplyOnOpen={selectedViewer.focusReplyOnOpen}
                         photo={selectedViewer.photo}
+                        draftPostPreparationError={
+                            selectedViewer.draftImageError
+                        }
+                        isDraftPostPreparing={
+                            selectedViewer.isDraftImagePreparing
+                        }
+                        isDraftPostPreviewPending={
+                            selectedViewer.isDraftImagePreviewPending
+                        }
                         postActionMode={
                             selectedViewer.postActionMode ?? "like-with-count"
                         }

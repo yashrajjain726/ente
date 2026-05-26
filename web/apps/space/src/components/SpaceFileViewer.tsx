@@ -32,8 +32,9 @@ const textSecondary = "#A6A6A6";
 const textTertiary = "rgba(244, 244, 244, 0.52)";
 const viewerBackground = "#000000";
 const controlBackground = "rgba(36, 36, 36, 0.72)";
-const controlBackgroundActive = "rgba(58, 58, 58, 0.86)";
 const controlBackgroundHover = "rgba(48, 48, 48, 0.86)";
+const inputBackground = "rgba(58, 58, 58, 0.86)";
+const inputBackgroundActive = "rgba(72, 72, 72, 0.9)";
 const controlIcon = "#D8D8D8";
 const dangerColor = "#F63A3A";
 const viewerHeaderHeight = 56;
@@ -55,6 +56,16 @@ const postButtonSpin = keyframes`
 
     to {
         transform: rotate(360deg);
+    }
+`;
+
+const photoPreviewSkeletonShimmer = keyframes`
+    from {
+        background-position: 100% 0;
+    }
+
+    to {
+        background-position: -100% 0;
     }
 `;
 
@@ -97,7 +108,10 @@ export interface SpaceViewerPhoto {
 }
 
 interface SpaceFileViewerProps {
+    draftPostPreparationError?: string;
     initialScreen?: SpaceViewerInitialScreen;
+    isDraftPostPreparing?: boolean;
+    isDraftPostPreviewPending?: boolean;
     onClose: () => void;
     onDeletePost?: () => Promise<void> | void;
     onDraftPostPublished?: () => void;
@@ -237,8 +251,11 @@ const resizeCaptionInput = (
 };
 
 export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
+    draftPostPreparationError,
     focusReplyOnOpen = false,
     initialScreen = "photo",
+    isDraftPostPreparing = false,
+    isDraftPostPreviewPending = false,
     onClose,
     onDeletePost,
     onDraftPostPublished,
@@ -279,6 +296,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const [isLoadingLikers, setIsLoadingLikers] = React.useState(false);
     const [draftPostActionPhase, setDraftPostActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
+    const [queuedDraftPostCaption, setQueuedDraftPostCaption] =
+        React.useState<string>();
     const displayName = firstNameFrom(photo.name);
     const dateLabel = formatSpaceDate(photo.timestampMs);
     const initials = initialsFor(photo.name);
@@ -307,6 +326,16 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const isActionsOpen = Boolean(actionsAnchor);
     const isDeleteActionRunning = deleteActionPhase != null;
     const isDraftPostActionRunning = draftPostActionPhase != null;
+    const hasDraftPostPreparationError = Boolean(draftPostPreparationError);
+    const canQueueDraftPostPublish =
+        isDraftPostPreparing &&
+        !isDraftPostPreviewPending &&
+        !hasDraftPostPreparationError;
+    const isDraftPostPublishDisabled =
+        isDraftPostActionRunning ||
+        isDraftPostPreviewPending ||
+        hasDraftPostPreparationError ||
+        (!onPublishDraftPost && !canQueueDraftPostPublish);
     const isReplyActionRunning = replyActionPhase != null;
     const canReplyToPost = Boolean(
         !isDraftPost && photo.postId && onReplyToPost,
@@ -464,25 +493,44 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         })();
     };
 
+    const publishDraftPostWithCaption = React.useCallback(
+        (captionToPublish: string) => {
+            if (!onPublishDraftPost || isDeleteExit) return;
+
+            setDraftPostActionPhase("busy");
+            void (async () => {
+                try {
+                    await onPublishDraftPost(captionToPublish);
+                    setQueuedDraftPostCaption(undefined);
+                    setDraftPostActionPhase("done");
+                } catch (error) {
+                    console.error("Failed to publish space post", error);
+                    setDraftPostActionPhase(null);
+                }
+            })();
+        },
+        [isDeleteExit, onPublishDraftPost],
+    );
+
     const publishDraftPost = () => {
         if (
             !isDraftPost ||
             isDraftPostActionRunning ||
-            isDeleteExit ||
-            !onPublishDraftPost
+            isDraftPostPreviewPending ||
+            hasDraftPostPreparationError ||
+            isDeleteExit
         )
             return;
 
-        setDraftPostActionPhase("busy");
-        void (async () => {
-            try {
-                await onPublishDraftPost(caption);
-                setDraftPostActionPhase("done");
-            } catch (error) {
-                console.error("Failed to publish space post", error);
-                setDraftPostActionPhase(null);
-            }
-        })();
+        if (!onPublishDraftPost) {
+            if (!canQueueDraftPostPublish) return;
+
+            setQueuedDraftPostCaption(caption);
+            setDraftPostActionPhase("busy");
+            return;
+        }
+
+        publishDraftPostWithCaption(caption);
     };
 
     const sendReply = () => {
@@ -528,7 +576,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     );
 
     React.useLayoutEffect(() => {
-        resizeCaptionInput(captionInputRef.current);
+        resizeCaptionInput(captionInputRef.current, replyInputMinHeight);
     }, [caption]);
 
     React.useLayoutEffect(() => {
@@ -589,6 +637,25 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     }, [draftPostActionPhase, onClose, onDraftPostPublished]);
 
     React.useEffect(() => {
+        if (draftPostPreparationError && queuedDraftPostCaption != undefined) {
+            setQueuedDraftPostCaption(undefined);
+            setDraftPostActionPhase(null);
+        }
+    }, [draftPostPreparationError, queuedDraftPostCaption]);
+
+    React.useEffect(() => {
+        if (queuedDraftPostCaption == undefined || !onPublishDraftPost) return;
+
+        const captionToPublish = queuedDraftPostCaption;
+        setQueuedDraftPostCaption(undefined);
+        publishDraftPostWithCaption(captionToPublish);
+    }, [
+        onPublishDraftPost,
+        publishDraftPostWithCaption,
+        queuedDraftPostCaption,
+    ]);
+
+    React.useEffect(() => {
         if (replyActionPhase != "done") return;
 
         const timeoutID = window.setTimeout(() => {
@@ -610,9 +677,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         setScreen(resolvedInitialScreen);
     }, [
         photo.caption,
-        photo.imageUrl,
         photo.likeCount,
         photo.postId,
+        photo.timestampMs,
         photo.viewerLiked,
         canReplyToPost,
         focusReplyOnOpen,
@@ -634,6 +701,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     React.useEffect(() => {
         const root = viewerRootRef.current;
         if (!root) return;
+        if (isDraftPostPreviewPending) return;
 
         let disposed = false;
         let closedByReact = false;
@@ -704,6 +772,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         photo.imageUrl,
         photo.name,
         photo.width,
+        isDraftPostPreviewPending,
     ]);
 
     React.useEffect(() => {
@@ -1082,6 +1151,38 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     width: "100%",
                 }}
             />
+            {isDraftPostPreviewPending && (
+                <Box
+                    role="status"
+                    aria-label="Preparing photo preview"
+                    sx={{
+                        bottom: viewerBottomPadding,
+                        boxSizing: "border-box",
+                        display: "grid",
+                        left: 0,
+                        placeItems: "center",
+                        pointerEvents: "none",
+                        position: "fixed",
+                        right: 0,
+                        top: viewerHeaderHeight,
+                        zIndex: 0,
+                    }}
+                >
+                    <Box
+                        sx={{
+                            animation: `${photoPreviewSkeletonShimmer} 1.4s ease-in-out infinite`,
+                            aspectRatio: "3 / 4",
+                            bgcolor: "#171717",
+                            backgroundImage:
+                                "linear-gradient(90deg, #171717 0%, #242424 42%, #2D2D2D 50%, #242424 58%, #171717 100%)",
+                            backgroundSize: "200% 100%",
+                            boxShadow: "0 16px 42px rgba(0, 0, 0, 0.34)",
+                            overflow: "hidden",
+                            width: "min(100vw, 390px)",
+                        }}
+                    />
+                </Box>
+            )}
             <Box
                 aria-hidden
                 data-space-viewer-chrome="true"
@@ -1116,10 +1217,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 <Box
                     data-space-viewer-bottom="true"
                     sx={{
-                        alignItems: "flex-end",
+                        alignItems: "stretch",
                         bottom: "16px",
                         boxSizing: "border-box",
                         display: "flex",
+                        flexDirection: "column",
                         gap: "8px",
                         left: { xs: "16px", sm: 0 },
                         maxWidth: { sm: 390 },
@@ -1130,115 +1232,153 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         zIndex: 2,
                     }}
                 >
+                    {draftPostPreparationError && (
+                        <Box
+                            role="alert"
+                            sx={{
+                                bgcolor: "rgba(246, 58, 58, 0.16)",
+                                borderRadius: "12px",
+                                color: "#FF8A8A",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 13,
+                                fontWeight: 650,
+                                lineHeight: "18px",
+                                px: "12px",
+                                py: "8px",
+                            }}
+                        >
+                            {draftPostPreparationError}
+                        </Box>
+                    )}
                     <Box
-                        ref={captionInputRef}
-                        component="textarea"
-                        aria-label="Add a caption"
-                        disabled={isDraftPostActionRunning}
-                        onChange={(event) => {
-                            setCaption(event.target.value);
-                            resizeCaptionInput(event.currentTarget);
-                        }}
-                        placeholder="Add a caption..."
-                        rows={1}
-                        value={caption}
                         sx={{
-                            bgcolor: controlBackground,
-                            border: 0,
-                            borderRadius: "20px",
-                            boxSizing: "border-box",
-                            color: textBase,
-                            flex: "1 1 auto",
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 500,
-                            lineHeight: "20px",
-                            maxHeight: captionInputMaxHeight,
-                            minHeight: captionInputMinHeight,
-                            minWidth: 0,
-                            outline: 0,
-                            overflow: "hidden",
-                            px: "14px",
-                            py: "10px",
-                            resize: "none",
-                            "&::placeholder": { color: textSecondary },
-                            "&:disabled": { opacity: 0.74 },
-                            "&:focus": { bgcolor: controlBackgroundActive },
-                        }}
-                    />
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label={
-                            draftPostActionPhase == "busy"
-                                ? "Posting"
-                                : draftPostActionPhase == "done"
-                                  ? "Posted"
-                                  : "Post photo"
-                        }
-                        disabled={isDraftPostActionRunning}
-                        onClick={publishDraftPost}
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: "#FFFFFF",
-                            border: 0,
-                            borderRadius: "20px",
-                            boxSizing: "border-box",
-                            boxShadow: "0 10px 28px rgba(0, 0, 0, 0.28)",
-                            color:
-                                draftPostActionPhase == "done"
-                                    ? green
-                                    : "#111111",
-                            cursor: isDraftPostActionRunning
-                                ? "default"
-                                : "pointer",
+                            alignItems: "flex-end",
                             display: "flex",
-                            flexShrink: 0,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 750,
-                            height: 40,
-                            justifyContent: "center",
-                            lineHeight: "20px",
-                            minWidth: 70,
-                            px: "20px",
-                            py: "10px",
-                            "&:disabled": { opacity: 1 },
-                            "&:focus-visible": {
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                            "&:hover": {
-                                bgcolor: isDraftPostActionRunning
-                                    ? "#FFFFFF"
-                                    : "#F0F0F0",
-                            },
+                            gap: "8px",
                         }}
                     >
-                        {draftPostActionPhase == "busy" ? (
-                            <Box
-                                component="span"
-                                sx={{
-                                    animation: `${postButtonSpin} 2.4s linear infinite`,
-                                    display: "flex",
-                                    lineHeight: 0,
-                                }}
-                            >
+                        <Box
+                            ref={captionInputRef}
+                            component="textarea"
+                            aria-label="Add a caption"
+                            disabled={isDraftPostActionRunning}
+                            onChange={(event) => {
+                                setCaption(event.target.value);
+                                resizeCaptionInput(
+                                    event.currentTarget,
+                                    replyInputMinHeight,
+                                );
+                            }}
+                            placeholder="Add a caption..."
+                            rows={1}
+                            value={caption}
+                            sx={{
+                                bgcolor: inputBackground,
+                                border: 0,
+                                borderRadius: "24px",
+                                boxSizing: "border-box",
+                                color: textBase,
+                                flex: "1 1 auto",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 500,
+                                lineHeight: "20px",
+                                maxHeight: captionInputMaxHeight,
+                                minHeight: replyInputMinHeight,
+                                minWidth: 0,
+                                outline: 0,
+                                overflow: "hidden",
+                                pb: `${replyInputPadding}px`,
+                                pl: `${replyInputPaddingLeft}px`,
+                                pr: `${replyInputPadding}px`,
+                                pt: `${replyInputPadding}px`,
+                                resize: "none",
+                                "&::placeholder": { color: textSecondary },
+                                "&:disabled": { opacity: 0.74 },
+                                "&:focus": { bgcolor: inputBackgroundActive },
+                            }}
+                        />
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={
+                                draftPostActionPhase == "busy"
+                                    ? "Posting"
+                                    : draftPostActionPhase == "done"
+                                      ? "Posted"
+                                      : draftPostPreparationError
+                                        ? "Photo could not be prepared"
+                                        : "Post photo"
+                            }
+                            disabled={isDraftPostPublishDisabled}
+                            onClick={publishDraftPost}
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "#FFFFFF",
+                                border: 0,
+                                borderRadius: "24px",
+                                boxSizing: "border-box",
+                                boxShadow: "0 10px 28px rgba(0, 0, 0, 0.28)",
+                                color:
+                                    draftPostActionPhase == "done"
+                                        ? green
+                                        : "#111111",
+                                cursor: isDraftPostPublishDisabled
+                                    ? "default"
+                                    : "pointer",
+                                display: "flex",
+                                flexShrink: 0,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 750,
+                                height: replyInputMinHeight,
+                                justifyContent: "center",
+                                lineHeight: "20px",
+                                minWidth: 70,
+                                px: "20px",
+                                py: "10px",
+                                "&:disabled": { opacity: 1 },
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                                "&:hover": {
+                                    bgcolor: isDraftPostPublishDisabled
+                                        ? "#FFFFFF"
+                                        : "#F0F0F0",
+                                },
+                            }}
+                        >
+                            {draftPostActionPhase == "busy" ? (
+                                <Box
+                                    component="span"
+                                    sx={{
+                                        animation: `${postButtonSpin} 2.4s linear infinite`,
+                                        display: "flex",
+                                        lineHeight: 0,
+                                    }}
+                                >
+                                    <HugeiconsIcon
+                                        icon={Loading03Icon}
+                                        size={22}
+                                        strokeWidth={1.8}
+                                    />
+                                </Box>
+                            ) : draftPostActionPhase == "done" ? (
                                 <HugeiconsIcon
-                                    icon={Loading03Icon}
+                                    icon={Tick02Icon}
                                     size={22}
                                     strokeWidth={1.8}
                                 />
-                            </Box>
-                        ) : draftPostActionPhase == "done" ? (
-                            <HugeiconsIcon
-                                icon={Tick02Icon}
-                                size={22}
-                                strokeWidth={1.8}
-                            />
-                        ) : (
-                            "Post"
-                        )}
+                            ) : draftPostPreparationError ? (
+                                "Error"
+                            ) : (
+                                "Post"
+                            )}
+                        </Box>
                     </Box>
                 </Box>
             ) : null}
@@ -1329,7 +1469,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 rows={1}
                                 value={replyText}
                                 sx={{
-                                    bgcolor: controlBackground,
+                                    bgcolor: inputBackground,
                                     border: 0,
                                     borderRadius: "24px",
                                     boxSizing: "border-box",
@@ -1353,7 +1493,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                     "&::placeholder": { color: textSecondary },
                                     "&:disabled": { opacity: 0.74 },
                                     "&:focus": {
-                                        bgcolor: controlBackgroundActive,
+                                        bgcolor: inputBackgroundActive,
                                     },
                                 }}
                             />
