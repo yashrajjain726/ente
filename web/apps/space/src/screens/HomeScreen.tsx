@@ -41,8 +41,7 @@ export const homeBackground = "#FFFFFF";
 const green = "#08C225";
 const paleGreen = "#E7F6E9";
 const feedCardBackground = "#F5F5F5";
-const feedSkeletonCardBackground = "#FCFCFC";
-const feedSkeletonColor = "#F2F2F2";
+const feedSkeletonElementBackground = "#E6E6E6";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
 const feedAvatarSize = 26;
@@ -241,7 +240,7 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({ aspectRatio }) => (
         component="article"
         aria-hidden
         sx={{
-            bgcolor: feedSkeletonCardBackground,
+            bgcolor: feedCardBackground,
             borderRadius: "16px",
             boxSizing: "border-box",
             display: "flex",
@@ -266,7 +265,7 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({ aspectRatio }) => (
             <Skeleton
                 variant="circular"
                 sx={{
-                    bgcolor: feedSkeletonColor,
+                    bgcolor: feedSkeletonElementBackground,
                     height: feedAvatarSize,
                     width: feedAvatarSize,
                 }}
@@ -274,7 +273,7 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({ aspectRatio }) => (
             <Skeleton
                 variant="rectangular"
                 sx={{
-                    bgcolor: feedSkeletonColor,
+                    bgcolor: feedSkeletonElementBackground,
                     borderRadius: "999px",
                     height: 10,
                     width: 72,
@@ -283,7 +282,7 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({ aspectRatio }) => (
             <Skeleton
                 variant="rectangular"
                 sx={{
-                    bgcolor: feedSkeletonColor,
+                    bgcolor: feedSkeletonElementBackground,
                     borderRadius: "999px",
                     height: 8,
                     justifySelf: "end",
@@ -295,7 +294,7 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({ aspectRatio }) => (
             variant="rectangular"
             sx={{
                 aspectRatio,
-                bgcolor: feedSkeletonColor,
+                bgcolor: feedSkeletonElementBackground,
                 borderRadius: "12px",
                 display: "block",
                 height: "auto",
@@ -464,7 +463,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     onClick={openAuthor}
                     sx={{
                         appearance: "none",
-                        bgcolor: paleGreen,
+                        bgcolor: avatarUrl ? "transparent" : paleGreen,
                         borderRadius: "50%",
                         border: 0,
                         cursor: canOpenAuthor ? "pointer" : "default",
@@ -573,7 +572,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
             <Box
                 sx={{
                     aspectRatio: `${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`,
-                    bgcolor: paleGreen,
+                    bgcolor: "transparent",
                     borderRadius: "12px",
                     overflow: "hidden",
                     position: "relative",
