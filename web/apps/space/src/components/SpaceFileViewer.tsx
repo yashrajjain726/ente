@@ -1,12 +1,10 @@
 import {
     Cancel01Icon,
-    CropIcon,
     Delete02Icon,
     FavouriteIcon,
     Loading03Icon,
     MoreHorizontalIcon,
     Navigation03Icon,
-    Rotate01Icon,
     Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -20,7 +18,6 @@ import {
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
-import Cropper, { type Area, type Point } from "react-easy-crop";
 import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
 import { clampSpaceMessageText } from "utils/spaceMessageLimits";
 import type { SpaceImageCropArea } from "utils/spacePostImage";
@@ -174,30 +171,8 @@ const viewerHeaderButtonSx = {
     justifyContent: "center",
     p: 0,
     width: 28,
-    "&:focus-visible": {
-        outline: `2px solid ${green}`,
-        outlineOffset: 2,
-    },
+    "&:focus-visible": { outline: `2px solid ${green}`, outlineOffset: 2 },
     "&:hover": { bgcolor: controlBackgroundHover },
-};
-
-const viewerHeaderIconButtonSx = {
-    alignItems: "center",
-    bgcolor: "transparent",
-    border: 0,
-    color: controlIcon,
-    cursor: "pointer",
-    display: "flex",
-    height: 32,
-    justifyContent: "center",
-    p: 0,
-    width: 32,
-    "&:focus-visible": {
-        borderRadius: "4px",
-        outline: `2px solid ${green}`,
-        outlineOffset: 2,
-    },
-    "&:hover": { color: textBase },
 };
 
 const viewerCountBadgeSx = {
@@ -296,29 +271,6 @@ const resizeCaptionInput = (
         input.scrollHeight > captionInputMaxHeight ? "auto" : "hidden";
 };
 
-const normalizedRotationDegrees = (rotationDegrees: number) =>
-    ((rotationDegrees % 360) + 360) % 360;
-
-const roundedCropArea = (cropArea: Area): SpaceImageCropArea => ({
-    height: Math.max(1, Math.round(cropArea.height)),
-    width: Math.max(1, Math.round(cropArea.width)),
-    x: Math.max(0, Math.round(cropArea.x)),
-    y: Math.max(0, Math.round(cropArea.y)),
-});
-
-const rotatedDimensions = (
-    width: number | undefined,
-    height: number | undefined,
-    rotationDegrees: number,
-) => {
-    if (!width || !height) return { height, width };
-    if (normalizedRotationDegrees(rotationDegrees) % 180 == 0) {
-        return { height, width };
-    }
-
-    return { height: width, width: height };
-};
-
 export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     draftPostPreparationError,
     focusReplyOnOpen = false,
@@ -365,16 +317,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const [isLoadingLikers, setIsLoadingLikers] = React.useState(false);
     const [draftPostActionPhase, setDraftPostActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
-    const [queuedDraftPost, setQueuedDraftPost] =
-        React.useState<{
-            caption: string;
-            edit: SpaceViewerDraftPostEdit;
-        }>();
-    const [isDraftCropMode, setIsDraftCropMode] = React.useState(false);
-    const [draftCrop, setDraftCrop] = React.useState<Point>({ x: 0, y: 0 });
-    const [draftCropArea, setDraftCropArea] = React.useState<Area | null>(null);
-    const [draftRotationDegrees, setDraftRotationDegrees] = React.useState(0);
-    const [draftZoom, setDraftZoom] = React.useState(1);
+    const [queuedDraftPost, setQueuedDraftPost] = React.useState<{
+        caption: string;
+        edit: SpaceViewerDraftPostEdit;
+    }>();
     const displayName = firstNameFrom(photo.name);
     const dateLabel = formatSpaceDate(photo.timestampMs);
     const displayCaption = isDraftPost ? "" : caption.trim();
@@ -403,35 +349,15 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const isDeleteActionRunning = deleteActionPhase != null;
     const isDraftPostActionRunning = draftPostActionPhase != null;
     const hasDraftPostPreparationError = Boolean(draftPostPreparationError);
-    const canEditDraftPost =
-        isDraftPost &&
-        !isDraftPostActionRunning &&
-        !isDraftPostPreviewPending &&
-        !hasDraftPostPreparationError;
-    const isDraftCropIncomplete = isDraftCropMode && !draftCropArea;
     const canQueueDraftPostPublish =
         isDraftPostPreparing &&
         !isDraftPostPreviewPending &&
-        !hasDraftPostPreparationError &&
-        !isDraftCropIncomplete;
+        !hasDraftPostPreparationError;
     const isDraftPostPublishDisabled =
         isDraftPostActionRunning ||
         isDraftPostPreviewPending ||
         hasDraftPostPreparationError ||
-        isDraftCropIncomplete ||
         (!onPublishDraftPost && !canQueueDraftPostPublish);
-    const normalizedDraftRotationDegrees = normalizedRotationDegrees(
-        draftRotationDegrees,
-    );
-    const draftPhotoDimensions = rotatedDimensions(
-        photo.width,
-        photo.height,
-        normalizedDraftRotationDegrees,
-    );
-    const draftPhotoAspectRatio =
-        draftPhotoDimensions.width && draftPhotoDimensions.height
-            ? draftPhotoDimensions.width / draftPhotoDimensions.height
-            : defaultPhotoWidth / defaultPhotoHeight;
     const isReplyActionRunning = replyActionPhase != null;
     const canReplyToPost = Boolean(
         !isDraftPost && photo.postId && onReplyToPost,
@@ -590,54 +516,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     };
 
     const draftPostEdit = React.useCallback((): SpaceViewerDraftPostEdit => {
-        const cropArea =
-            isDraftCropMode && draftCropArea
-                ? roundedCropArea(draftCropArea)
-                : undefined;
-        const dimensions = cropArea
-            ? { height: cropArea.height, width: cropArea.width }
-            : rotatedDimensions(
-                  photo.width,
-                  photo.height,
-                  normalizedDraftRotationDegrees,
-              );
-
-        return {
-            cropArea,
-            height: dimensions.height,
-            rotationDegrees: normalizedDraftRotationDegrees,
-            width: dimensions.width,
-        };
-    }, [
-        draftCropArea,
-        isDraftCropMode,
-        normalizedDraftRotationDegrees,
-        photo.height,
-        photo.width,
-    ]);
-
-    const rotateDraftPostPhoto = () => {
-        if (!canEditDraftPost) return;
-
-        setDraftRotationDegrees((currentDegrees) =>
-            normalizedRotationDegrees(currentDegrees + 90),
-        );
-    };
-
-    const toggleDraftPostCrop = () => {
-        if (!canEditDraftPost) return;
-
-        setIsDraftCropMode((currentMode) => {
-            if (currentMode) {
-                setDraftCrop({ x: 0, y: 0 });
-                setDraftCropArea(null);
-                setDraftZoom(1);
-                return false;
-            }
-
-            return true;
-        });
-    };
+        return { height: photo.height, rotationDegrees: 0, width: photo.width };
+    }, [photo.height, photo.width]);
 
     const publishDraftPostWithCaption = React.useCallback(
         (captionToPublish: string, editToPublish: SpaceViewerDraftPostEdit) => {
@@ -671,7 +551,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             isDraftPostActionRunning ||
             isDraftPostPreviewPending ||
             hasDraftPostPreparationError ||
-            isDraftCropIncomplete ||
             isDeleteExit
         )
             return;
@@ -793,11 +672,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         const draftPost = queuedDraftPost;
         setQueuedDraftPost(undefined);
         publishDraftPostWithCaption(draftPost.caption, draftPost.edit);
-    }, [
-        onPublishDraftPost,
-        publishDraftPostWithCaption,
-        queuedDraftPost,
-    ]);
+    }, [onPublishDraftPost, publishDraftPostWithCaption, queuedDraftPost]);
 
     React.useEffect(() => {
         if (replyActionPhase != "done") return;
@@ -819,11 +694,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         setServerLikeCount(photo.likeCount ?? 0);
         setPhotoLikers([]);
         setScreen(resolvedInitialScreen);
-        setIsDraftCropMode(false);
-        setDraftCrop({ x: 0, y: 0 });
-        setDraftCropArea(null);
-        setDraftRotationDegrees(0);
-        setDraftZoom(1);
     }, [
         photo.caption,
         photo.likeCount,
@@ -1178,59 +1048,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             />
                         </Box>
                     )}
-                    {isDraftPost && (
-                        <>
-                            <Box
-                                component="button"
-                                type="button"
-                                aria-label={
-                                    isDraftCropMode
-                                        ? "Disable crop"
-                                        : "Crop photo"
-                                }
-                                aria-pressed={isDraftCropMode}
-                                disabled={!canEditDraftPost}
-                                onClick={toggleDraftPostCrop}
-                                sx={{
-                                    ...viewerHeaderIconButtonSx,
-                                    color: isDraftCropMode
-                                        ? textBase
-                                        : controlIcon,
-                                    cursor: canEditDraftPost
-                                        ? "pointer"
-                                        : "default",
-                                    opacity: canEditDraftPost ? 1 : 0.48,
-                                }}
-                            >
-                                <HugeiconsIcon
-                                    icon={CropIcon}
-                                    size={22}
-                                    strokeWidth={1.8}
-                                />
-                            </Box>
-                            <Box
-                                component="button"
-                                type="button"
-                                aria-label="Rotate photo clockwise"
-                                disabled={!canEditDraftPost}
-                                onClick={rotateDraftPostPhoto}
-                                sx={{
-                                    ...viewerHeaderIconButtonSx,
-                                    cursor: canEditDraftPost
-                                        ? "pointer"
-                                        : "default",
-                                    mr: "10px",
-                                    opacity: canEditDraftPost ? 1 : 0.48,
-                                }}
-                            >
-                                <HugeiconsIcon
-                                    icon={Rotate01Icon}
-                                    size={22}
-                                    strokeWidth={1.8}
-                                />
-                            </Box>
-                        </>
-                    )}
                     <Box
                         component="button"
                         type="button"
@@ -1357,42 +1174,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 backgroundImage:
                                     "linear-gradient(90deg, #171717 0%, #242424 42%, #2D2D2D 50%, #242424 58%, #171717 100%)",
                                 backgroundSize: "200% 100%",
-                                boxShadow:
-                                    "0 16px 42px rgba(0, 0, 0, 0.34)",
+                                boxShadow: "0 16px 42px rgba(0, 0, 0, 0.34)",
                                 overflow: "hidden",
                                 width: "100vw",
                             }}
                         />
-                    ) : isDraftCropMode ? (
-                        <Box
-                            sx={{
-                                height: "100%",
-                                position: "relative",
-                                width: "100%",
-                                "& .reactEasyCrop_CropArea": {
-                                    borderColor: "#FFFFFF",
-                                    color: "rgba(0, 0, 0, 0.5)",
-                                },
-                            }}
-                        >
-                            <Cropper
-                                aspect={draftPhotoAspectRatio}
-                                crop={draftCrop}
-                                disableAutomaticStylesInjection
-                                image={photo.imageUrl}
-                                maxZoom={3}
-                                minZoom={1}
-                                objectFit="contain"
-                                onCropChange={setDraftCrop}
-                                onCropComplete={(_crop, croppedAreaPixels) =>
-                                    setDraftCropArea(croppedAreaPixels)
-                                }
-                                onZoomChange={setDraftZoom}
-                                rotation={normalizedDraftRotationDegrees}
-                                showGrid
-                                zoom={draftZoom}
-                            />
-                        </Box>
                     ) : (
                         <Box
                             component="img"
@@ -1400,17 +1186,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             src={photo.imageUrl}
                             sx={{
                                 display: "block",
-                                maxHeight:
-                                    normalizedDraftRotationDegrees % 180 == 0
-                                        ? "100%"
-                                        : "100vw",
-                                maxWidth:
-                                    normalizedDraftRotationDegrees % 180 == 0
-                                        ? "100vw"
-                                        : "100%",
+                                maxHeight: "100%",
+                                maxWidth: "100vw",
                                 objectFit: "contain",
-                                transform: `rotate(${normalizedDraftRotationDegrees}deg)`,
-                                transformOrigin: "center",
                             }}
                         />
                     )}
@@ -1580,11 +1358,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 },
                             }}
                         >
-                            {draftPostPreparationError ? (
-                                "Error"
-                            ) : (
-                                "Post"
-                            )}
+                            {draftPostPreparationError ? "Error" : "Post"}
                         </Box>
                     </Box>
                 </Box>
