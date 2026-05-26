@@ -93,14 +93,17 @@ interface HomeScreenProps {
     addedFriendToastName?: string;
     feedItems: SpacePost[];
     friendsCount: number;
+    hasMoreFeedItems?: boolean;
     hasUnreadMessages?: boolean;
     isFeedLoading?: boolean;
+    isFeedLoadingMore?: boolean;
     onAddedFriendToastClose?: () => void;
     onCreatePost?: (
         image: PreparedSpacePostImage,
         caption: string,
     ) => Promise<void>;
     onDeletePost?: (postId: number) => Promise<void> | void;
+    onLoadMoreFeedItems?: () => Promise<void> | void;
     onOpenFriend?: (friendID: string) => void;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
@@ -835,11 +838,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     addedFriendToastName,
     feedItems,
     friendsCount,
+    hasMoreFeedItems = false,
     hasUnreadMessages,
     isFeedLoading = false,
+    isFeedLoadingMore = false,
     onAddedFriendToastClose,
     onCreatePost,
     onDeletePost,
+    onLoadMoreFeedItems,
     onLoadPostLikers,
     onOpenFriend,
     onOpenMessages,
@@ -1338,34 +1344,83 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     }}
                 >
                     {hasFeedItems ? (
-                        feedItems.map((item) => (
-                            <FeedItem
-                                key={item.postId}
-                                aspectRatio={
-                                    item.width && item.height
-                                        ? item.width / item.height
-                                        : 1
-                                }
-                                avatarUrl={item.avatarUrl ?? ""}
-                                caption={item.caption}
-                                friendID={item.friendID}
-                                imageUrl={item.imageUrl}
-                                isOwnPost={
-                                    Boolean(profile.spaceId) &&
-                                    item.spaceId == profile.spaceId
-                                }
-                                likeCount={item.likeCount}
-                                name={item.name}
-                                onOpenFriend={onOpenFriend}
-                                onOpenPhoto={openFeedPhoto}
-                                onOpenProfile={onOpenProfile}
-                                onSetPostLiked={onSetPostLiked}
-                                postId={item.postId}
-                                timestampMs={item.timestampMs}
-                                viewerLiked={item.viewerLiked}
-                                viewerUnread={item.viewerUnread}
-                            />
-                        ))
+                        <>
+                            {feedItems.map((item) => (
+                                <FeedItem
+                                    key={item.postId}
+                                    aspectRatio={
+                                        item.width && item.height
+                                            ? item.width / item.height
+                                            : 1
+                                    }
+                                    avatarUrl={item.avatarUrl ?? ""}
+                                    caption={item.caption}
+                                    friendID={item.friendID}
+                                    imageUrl={item.imageUrl}
+                                    isOwnPost={
+                                        Boolean(profile.spaceId) &&
+                                        item.spaceId == profile.spaceId
+                                    }
+                                    likeCount={item.likeCount}
+                                    name={item.name}
+                                    onOpenFriend={onOpenFriend}
+                                    onOpenPhoto={openFeedPhoto}
+                                    onOpenProfile={onOpenProfile}
+                                    onSetPostLiked={onSetPostLiked}
+                                    postId={item.postId}
+                                    timestampMs={item.timestampMs}
+                                    viewerLiked={item.viewerLiked}
+                                    viewerUnread={item.viewerUnread}
+                                />
+                            ))}
+                            {hasMoreFeedItems && onLoadMoreFeedItems && (
+                                <Box
+                                    component="button"
+                                    type="button"
+                                    disabled={isFeedLoadingMore}
+                                    onClick={onLoadMoreFeedItems}
+                                    sx={{
+                                        alignItems: "center",
+                                        alignSelf: "center",
+                                        appearance: "none",
+                                        bgcolor: paleGreen,
+                                        border: 0,
+                                        borderRadius: "18px",
+                                        color: green,
+                                        cursor: isFeedLoadingMore
+                                            ? "default"
+                                            : "pointer",
+                                        display: "inline-flex",
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        height: 36,
+                                        justifyContent: "center",
+                                        lineHeight: "18px",
+                                        mb: "24px",
+                                        minWidth: 116,
+                                        mt: "12px",
+                                        opacity: isFeedLoadingMore ? 0.7 : 1,
+                                        px: "18px",
+                                        whiteSpace: "nowrap",
+                                        "&:focus-visible": {
+                                            outline: `2px solid ${green}`,
+                                            outlineOffset: 2,
+                                        },
+                                        "&:hover": {
+                                            bgcolor: isFeedLoadingMore
+                                                ? paleGreen
+                                                : "#DDF1E1",
+                                        },
+                                    }}
+                                >
+                                    {isFeedLoadingMore
+                                        ? "Loading..."
+                                        : "Load more"}
+                                </Box>
+                            )}
+                        </>
                     ) : isEmptyFeedLoading ? (
                         <FeedLoadingSkeletons />
                     ) : (

@@ -11,6 +11,8 @@ import {
 } from "services/spaceProfile";
 import { normalizeSpaceMessageText } from "utils/spaceMessageLimits";
 
+const currentFeedPageSize = 10;
+
 interface SpaceAvatar {
     objectKey: string;
     size?: number;
@@ -885,7 +887,10 @@ export const loadCurrentFeedPage = async (
     try {
         return await postPageFromAccountPage(
             ctx,
-            (await ctx.list_feed(cursor ?? null, 30)) as SpacePostPageResponse,
+            (await ctx.list_feed(
+                cursor ?? null,
+                currentFeedPageSize,
+            )) as SpacePostPageResponse,
         );
     } finally {
         releaseCurrentSpaceContext(ctx);

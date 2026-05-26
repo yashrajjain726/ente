@@ -737,7 +737,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 index: 0,
                 loop: false,
                 mainClass: "pswp-space-viewer",
-                maxZoomLevel: 4,
                 paddingFn: () => ({
                     bottom: viewerBottomPadding,
                     left: 0,
@@ -746,7 +745,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 }),
                 pinchToClose: false,
                 returnFocus: false,
-                secondaryZoomLevel: 2,
                 showHideAnimationType: "none",
                 spacing: 0,
                 tapAction: false,

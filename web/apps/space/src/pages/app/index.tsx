@@ -32,8 +32,10 @@ const Page: React.FC = () => {
     } = useSpaceAppState();
     const [addedFriendToastName, setAddedFriendToastName] = useState<string>();
     const [feedItems, setFeedItems] = useState<SpacePost[]>([]);
+    const [feedNextCursor, setFeedNextCursor] = useState<string>();
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isFeedLoading, setIsFeedLoading] = useState(true);
+    const [isFeedLoadingMore, setIsFeedLoadingMore] = useState(false);
     const closeAddedFriendToast = React.useCallback(
         () => setAddedFriendToastName(undefined),
         [],
@@ -61,14 +63,20 @@ const Page: React.FC = () => {
 
         const spaceId = profile?.spaceId;
         if (!spaceId) {
+            setFeedItems([]);
+            setFeedNextCursor(undefined);
             setHasUnreadMessages(false);
             setIsFeedLoading(false);
+            setIsFeedLoadingMore(false);
             return;
         }
 
         let cancelled = false;
+        setFeedItems([]);
+        setFeedNextCursor(undefined);
         setHasUnreadMessages(undefined);
         setIsFeedLoading(true);
+        setIsFeedLoadingMore(false);
         void Promise.all([
             loadCurrentFeedPage(),
             loadCurrentUnreadStatus(),
@@ -77,6 +85,7 @@ const Page: React.FC = () => {
             .then(([feed, unreadStatus, nextFriends]) => {
                 if (cancelled) return;
                 setFeedItems(feed.items);
+                setFeedNextCursor(feed.nextCursor);
                 setHasUnreadMessages(unreadStatus.messagesUnread);
                 setFriends(nextFriends);
                 const latestFeedPost = feed.items[0];
@@ -99,6 +108,31 @@ const Page: React.FC = () => {
         };
     }, [profile?.spaceId, profileLoadStatus, setFriends]);
 
+    const loadMoreFeedItems = React.useCallback(async () => {
+        if (!feedNextCursor || isFeedLoadingMore) return;
+
+        setIsFeedLoadingMore(true);
+        try {
+            const feed = await loadCurrentFeedPage(feedNextCursor);
+            setFeedItems((currentItems) => {
+                const existingPostIds = new Set(
+                    currentItems.map((item) => item.postId),
+                );
+                return [
+                    ...currentItems,
+                    ...feed.items.filter(
+                        (item) => !existingPostIds.has(item.postId),
+                    ),
+                ];
+            });
+            setFeedNextCursor(feed.nextCursor);
+        } catch (error) {
+            console.error("Failed to load more space feed", error);
+        } finally {
+            setIsFeedLoadingMore(false);
+        }
+    }, [feedNextCursor, isFeedLoadingMore]);
+
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
@@ -116,7 +150,9 @@ const Page: React.FC = () => {
                 friendsCount={friends.length}
                 addedFriendToastName={addedFriendToastName}
                 hasUnreadMessages={hasUnreadMessages}
+                hasMoreFeedItems={Boolean(feedNextCursor)}
                 isFeedLoading={isFeedLoading}
+                isFeedLoadingMore={isFeedLoadingMore}
                 profile={profile}
                 onAddedFriendToastClose={closeAddedFriendToast}
                 onCreatePost={async (image, caption) => {
@@ -149,6 +185,7 @@ const Page: React.FC = () => {
                 onOpenFriend={(friendID) =>
                     void router.push(spaceRoutes.friend(friendID))
                 }
+                onLoadMoreFeedItems={loadMoreFeedItems}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
                 onOpenProfile={() => void router.push(spaceRoutes.profile)}
                 onLoadPostLikers={loadCurrentPostLikers}
