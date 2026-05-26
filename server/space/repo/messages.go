@@ -315,15 +315,6 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				FROM candidates
 				ORDER BY friend_space_id, activity_created_at DESC, activity_id DESC
 			),
-			latest_messages AS (
-				SELECT DISTINCT ON (friend_space_id)
-					friend_space_id,
-					activity_created_at AS latest_message_created_at,
-					activity_id AS latest_message_id
-				FROM message_candidates
-				WHERE activity_type = 'message'
-				ORDER BY friend_space_id, activity_created_at DESC, activity_id DESC
-			),
 			candidates_with_read_state AS (
 				SELECT
 					c.*,
@@ -331,15 +322,11 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 					la.sort_created_at,
 					la.sort_id,
 					(
-						c.activity_type = 'message'
-						AND c.unread_created_at IS NOT NULL
+						c.unread_created_at IS NOT NULL
 						AND c.unread_created_at > COALESCE(nrm.read_at, 0)
-						AND c.activity_created_at = lm.latest_message_created_at
-						AND c.activity_id = lm.latest_message_id
 					) AS preview_priority
 				FROM candidates c
 				JOIN latest_activities la ON la.friend_space_id = c.friend_space_id
-				LEFT JOIN latest_messages lm ON lm.friend_space_id = c.friend_space_id
 				LEFT JOIN space_notification_read_markers nrm
 				  ON nrm.viewer_space_id = $2
 				 AND nrm.friend_space_id = c.friend_space_id
@@ -633,24 +620,14 @@ func (r *MessagesRepository) HasUnreadNotifications(ctx context.Context, viewerI
 			SELECT * FROM post_candidates
 			UNION ALL
 			SELECT * FROM friend_candidates
-		),
-		ranked AS (
-			SELECT
-				c.*,
-				ROW_NUMBER() OVER (
-					PARTITION BY c.friend_space_id
-					ORDER BY c.activity_created_at DESC, c.activity_id DESC
-				) AS rn
-			FROM candidates c
 		)
 		SELECT EXISTS (
 			SELECT 1
-			FROM ranked c
+			FROM candidates c
 			LEFT JOIN space_notification_read_markers nrm
 			  ON nrm.viewer_space_id = $1
 			 AND nrm.friend_space_id = c.friend_space_id
-			WHERE c.rn = 1
-			  AND c.unread_created_at IS NOT NULL
+			WHERE c.unread_created_at IS NOT NULL
 			  AND c.unread_created_at > COALESCE(nrm.read_at, 0)
 			LIMIT 1
 		)

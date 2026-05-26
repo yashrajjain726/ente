@@ -1539,15 +1539,15 @@ func TestSpaceNotificationReadMarkersArePerFriend(t *testing.T) {
 	require.False(t, notificationsUnread)
 }
 
-func TestUnreadNotificationsFollowLatestConversationActivity(t *testing.T) {
+func TestUnreadNotificationsPrioritizeUnreadActivity(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
 
-	aliceID := insertSpaceUser(t, module, "alice-latest-unread@example.com", "alice-latest-unread-public")
-	bobID := insertSpaceUser(t, module, "bob-latest-unread@example.com", "bob-latest-unread-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-latest-unread", "alice-space-key", "alice-profile")
+	aliceID := insertSpaceUser(t, module, "alice-priority-unread@example.com", "alice-priority-unread-public")
+	bobID := insertSpaceUser(t, module, "bob-priority-unread@example.com", "bob-priority-unread-public")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-priority-unread", "alice-space-key", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-latest-unread", "bob-space-key", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-priority-unread", "bob-space-key", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	setFriendEventCreatedAt(t, module, 100, "friend_add", bobID, aliceID)
@@ -1580,11 +1580,54 @@ func TestUnreadNotificationsFollowLatestConversationActivity(t *testing.T) {
 	conversations, _, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Len(t, conversations, 1)
-	require.Equal(t, outgoing.MessageID, conversations[0].LatestActivity.Message.MessageID)
-	require.False(t, conversations[0].Unread)
+	require.Equal(t, incoming.MessageID, conversations[0].LatestActivity.Message.MessageID)
+	require.Equal(t, int64(2000), conversations[0].SortCreatedAt)
+	require.True(t, conversations[0].Unread)
 	notificationsUnread, err := module.Messages.HasUnreadNotifications(ctx, aliceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
+	require.True(t, notificationsUnread)
+
+	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	require.NoError(t, err)
+	require.Equal(t, int64(2000), latestActivityAt)
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
+	require.NoError(t, err)
+	require.Equal(t, outgoing.MessageID, conversations[0].LatestActivity.Message.MessageID)
+	require.False(t, conversations[0].Unread)
+	notificationsUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceID, aliceSpace.SpaceID)
+	require.NoError(t, err)
 	require.False(t, notificationsUnread)
+
+	alicePostID, err := module.Posts.CreatePost(ctx, aliceID, aliceSpace.SpaceID, "alice-post-key", nil, aliceSpace.CurrentVersion, nil)
+	require.NoError(t, err)
+	bobPostID, err := module.Posts.CreatePost(ctx, bobID, bobSpace.SpaceID, "bob-post-key", nil, bobSpace.CurrentVersion, nil)
+	require.NoError(t, err)
+	require.NoError(t, module.Posts.SetLike(ctx, alicePostID, bobID, bobSpace.SpaceID, true))
+	setPostLikeCreatedAt(t, module, 3000, alicePostID, bobSpace.SpaceID)
+	outgoingPostReply, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
+		Kind:                         "post_reply",
+		SenderID:                     aliceID,
+		SenderSpaceID:                aliceSpace.SpaceID,
+		RecipientID:                  bobID,
+		RecipientSpaceID:             bobSpace.SpaceID,
+		MessageCipher:                "outgoing-post-reply-cipher",
+		SenderEncryptedMessageKey:    "outgoing-post-reply-sender-key",
+		RecipientEncryptedMessageKey: "outgoing-post-reply-recipient-key",
+		ReplyPostID:                  sql.NullInt64{Int64: bobPostID, Valid: true},
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 4000, outgoingPostReply.MessageID)
+
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
+	require.NoError(t, err)
+	require.Equal(t, "post_like", conversations[0].LatestActivity.Type)
+	require.Equal(t, alicePostID, conversations[0].LatestActivity.Post.PostID)
+	require.Equal(t, int64(4000), conversations[0].SortCreatedAt)
+	require.True(t, conversations[0].Unread)
+	notificationsUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceID, aliceSpace.SpaceID)
+	require.NoError(t, err)
+	require.True(t, notificationsUnread)
 }
 
 func TestListPostLikersPaginates(t *testing.T) {
