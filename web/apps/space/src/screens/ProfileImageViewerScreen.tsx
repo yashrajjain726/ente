@@ -6,6 +6,7 @@ import type { SetupProfile } from "screens/SetupProfileScreen";
 import {
     spaceAvatarImageInputAccept,
     spaceCoverImageInputAccept,
+    spaceDefaultCoverImagePath,
     spaceProfileCoverAspectRatio,
 } from "utils/spacePostImage";
 
@@ -32,7 +33,13 @@ export const ProfileImageViewerScreen: React.FC<
         ? "Change cover image"
         : "Change profile picture";
     const imageUrl = isCover ? profile.coverUrl : profile.avatarUrl;
-    const shouldUseCoverFallback = isCover && !imageUrl;
+    const isCoverURLPending = isCover && Boolean(profile.coverObjectKey);
+    const displayImageUrl =
+        isCover && !imageUrl
+            ? isCoverURLPending
+                ? undefined
+                : spaceDefaultCoverImagePath
+            : imageUrl;
 
     const handleFileSelect: React.ChangeEventHandler<HTMLInputElement> = (
         event,
@@ -148,28 +155,35 @@ export const ProfileImageViewerScreen: React.FC<
                 >
                     {isCover ? (
                         <Box
-                            className={
-                                shouldUseCoverFallback ? "green-bg" : undefined
-                            }
                             sx={{
                                 aspectRatio: `${spaceProfileCoverAspectRatio} / 1`,
-                                bgcolor: imageUrl
-                                    ? profileCoverBackground
-                                    : undefined,
+                                bgcolor: profileCoverBackground,
                                 overflow: "hidden",
                                 width: "100%",
                             }}
                         >
-                            {imageUrl && (
+                            {displayImageUrl ? (
                                 <Box
                                     component="img"
                                     alt=""
-                                    src={imageUrl}
+                                    src={displayImageUrl}
                                     sx={{
                                         display: "block",
                                         height: "100%",
                                         objectFit: "cover",
                                         objectPosition: "center",
+                                        width: "100%",
+                                    }}
+                                />
+                            ) : (
+                                <Skeleton
+                                    variant="rectangular"
+                                    sx={{
+                                        bgcolor:
+                                            profileAvatarSkeletonBackground,
+                                        display: "block",
+                                        height: "100%",
+                                        transform: "none",
                                         width: "100%",
                                     }}
                                 />
@@ -188,11 +202,11 @@ export const ProfileImageViewerScreen: React.FC<
                                 width: "min(64vw, 240px)",
                             }}
                         >
-                            {imageUrl ? (
+                            {displayImageUrl ? (
                                 <Box
                                     component="img"
                                     alt=""
-                                    src={imageUrl}
+                                    src={displayImageUrl}
                                     sx={{
                                         display: "block",
                                         height: "100%",

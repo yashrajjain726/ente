@@ -35,6 +35,7 @@ export const spaceCoverImageInputAccept = spaceAvatarImageInputAccept;
 export const spacePostImageInputAccept =
     "image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif";
 
+export const spaceDefaultCoverImagePath = "/images/default-cover-image.png";
 export const spaceProfileCoverAspectRatio = 39 / 17;
 const spaceAvatarImageMaxEdge = 512;
 const spaceCoverImageMaxWidth = 1170;

@@ -22,6 +22,7 @@ import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
 import { firstNameFrom } from "utils/spaceDisplay";
 import {
     canPreviewSpaceImageFile,
+    spaceDefaultCoverImagePath,
     spacePostImageErrorMessage,
     spacePostImageInputAccept,
     spacePostPreviewImageForFile,
@@ -34,10 +35,9 @@ const textBase = "#000";
 const textStrong = "#303030";
 const textSoft = "#777777";
 const coverForeground = "#FFFFFF";
-const coverForegroundShadow = "0 1px 5px rgba(0, 0, 0, 0.34)";
-const coverForegroundIconShadow = "drop-shadow(0 1px 5px rgba(0, 0, 0, 0.34))";
-const coverButtonShadow = "0 1px 5px rgba(0, 0, 0, 0.12)";
 const profileCoverBackground = "#1F1F1F";
+const profileCoverTopShadow =
+    "linear-gradient(180deg, rgba(0, 0, 0, 0.26) 0%, rgba(0, 0, 0, 0.18) 36%, rgba(0, 0, 0, 0.08) 72%, rgba(0, 0, 0, 0) 100%)";
 const profileCoverSkeletonBackground = "#E6E6E6";
 const profileHeaderHeight = 56;
 const profileAvatarTopOffset = 54;
@@ -351,6 +351,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const isFriendProfile = headerVariant == "friend";
     const displayName = profile.fullName.trim() || profile.username.trim();
     const coverUrl = profile.coverUrl ?? null;
+    const isCoverURLPending = Boolean(profile.coverObjectKey && !coverUrl);
+    const coverImageUrl = coverUrl
+        ? coverUrl
+        : isCoverURLPending
+          ? undefined
+          : spaceDefaultCoverImagePath;
     const firstName = firstNameFrom(displayName);
     const visiblePostGroups = postGroups
         .map((group) => ({
@@ -372,8 +378,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const canOpenProfilePhoto = isOwnerProfile && Boolean(onOpenProfilePhoto);
     const hasProfilePosts = postsSharedCount > 0;
     const isCoverImageLoading = Boolean(coverUrl && loadedCoverUrl != coverUrl);
-    const shouldShowCoverSkeleton = isCoverLoading || isCoverImageLoading;
-    const shouldUseCoverFallback = !coverUrl && !shouldShowCoverSkeleton;
+    const shouldShowCoverSkeleton =
+        isCoverLoading || isCoverURLPending || isCoverImageLoading;
     const selectedPostActionMode: SpaceViewerPostActionMode = isPublicProfile
         ? "hidden"
         : isOwnerProfile
@@ -763,13 +769,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     />
                 )}
                 <Box
-                    className={shouldUseCoverFallback ? "green-bg" : undefined}
                     sx={{
                         bgcolor: shouldShowCoverSkeleton
                             ? profileCoverSkeletonBackground
-                            : coverUrl
-                              ? profileCoverBackground
-                              : undefined,
+                            : profileCoverBackground,
                         height: profileCoverHeight,
                         insetInline: 0,
                         overflow: "hidden",
@@ -795,12 +798,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             }}
                         />
                     )}
-                    {coverUrl && (
+                    {coverImageUrl && (
                         <Box
                             component="img"
                             alt=""
-                            src={coverUrl}
-                            onLoad={() => setLoadedCoverUrl(coverUrl)}
+                            src={coverImageUrl}
+                            onLoad={() => {
+                                if (coverUrl) setLoadedCoverUrl(coverUrl);
+                            }}
                             sx={{
                                 display: "block",
                                 height: "100%",
@@ -815,6 +820,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             }}
                         />
                     )}
+                    <Box
+                        aria-hidden
+                        sx={{
+                            background: profileCoverTopShadow,
+                            height: profileHeaderHeight + 8,
+                            insetInline: 0,
+                            pointerEvents: "none",
+                            position: "absolute",
+                            top: 0,
+                        }}
+                    />
                 </Box>
                 {canOpenProfileCover && (
                     <Box
@@ -878,7 +894,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 },
                                 "& svg": {
                                     display: "block",
-                                    filter: coverForegroundIconShadow,
                                     overflow: "visible",
                                 },
                             }}
@@ -912,7 +927,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 2,
                                 },
-                                "& svg": { filter: coverForegroundIconShadow },
                             }}
                         >
                             <HugeiconsIcon
@@ -932,7 +946,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 backgroundColor: "#FFFFFF",
                                 border: 0,
                                 borderRadius: "999px",
-                                boxShadow: coverButtonShadow,
                                 color: green,
                                 cursor: onAddFriend ? "pointer" : "default",
                                 display: "inline-flex",
@@ -973,7 +986,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 overflow: "hidden",
                                 px: "4px",
                                 textOverflow: "ellipsis",
-                                textShadow: coverForegroundShadow,
                                 whiteSpace: "nowrap",
                             }}
                         >
@@ -1002,7 +1014,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 2,
                                 },
-                                "& svg": { filter: coverForegroundIconShadow },
                             }}
                         >
                             <HugeiconsIcon
