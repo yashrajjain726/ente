@@ -22,6 +22,10 @@ export interface PendingSpaceFeedPost {
     width?: number;
 }
 
+export type FailedSpaceFeedPost = Omit<PendingSpaceFeedPost, "status"> & {
+    status: "failed";
+};
+
 export interface PostedSpaceFeedPost {
     id: string;
     post: SpacePost;
@@ -35,6 +39,7 @@ export interface ReadySpaceFeedPost {
 }
 
 export type LocalSpaceFeedPost =
+    | FailedSpaceFeedPost
     | PendingSpaceFeedPost
     | PostedSpaceFeedPost
     | ReadySpaceFeedPost;

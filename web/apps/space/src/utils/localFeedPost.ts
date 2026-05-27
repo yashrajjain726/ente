@@ -34,3 +34,18 @@ export const confirmLocalFeedPost = (
         );
     }, postedConfirmationDurationMs);
 };
+
+export const failLocalFeedPost = (
+    setLocalFeedPosts: React.Dispatch<
+        React.SetStateAction<LocalSpaceFeedPost[]>
+    >,
+    localPostId: string,
+) => {
+    setLocalFeedPosts((currentPosts) =>
+        currentPosts.map((item) =>
+            item.id == localPostId && item.status == "pending"
+                ? { ...item, status: "failed" }
+                : item,
+        ),
+    );
+};

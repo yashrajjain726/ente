@@ -94,7 +94,6 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={loginBackground} />
             <LoginScreen
                 errorMessage={unlockError}
-                focusPassword
                 initialEmail={email}
                 isSubmitting={isSubmitting}
                 onChangeEmail={() => {
@@ -118,7 +117,7 @@ const Page: React.FC = () => {
                 }}
                 readOnlyEmail
                 showBack={false}
-                title="Unlock space"
+                title="Unlock Space"
             />
         </>
     );

@@ -207,8 +207,8 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
                         post,
                     ): post is Extract<
                         LocalSpaceFeedPost,
-                        { status: "pending" }
-                    > => post.status == "pending",
+                        { status: "failed" | "pending" }
+                    > => post.status == "pending" || post.status == "failed",
                 )
                 .map((post) => post.imageUrl)
                 .filter((url) => url.startsWith("blob:")),

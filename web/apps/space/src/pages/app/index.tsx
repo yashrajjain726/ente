@@ -21,6 +21,7 @@ import { useSpaceAppState } from "state/spaceAppState";
 import {
     confirmLocalFeedPost,
     createLocalFeedPostID,
+    failLocalFeedPost,
 } from "utils/localFeedPost";
 import { firstNameFrom } from "utils/spaceDisplay";
 import { prepareSpacePostImageFromEdit } from "utils/spacePostImage";
@@ -241,11 +242,7 @@ const Page: React.FC = () => {
                                 console.warn("Failed to mark feed read", error),
                         );
                     } catch (error) {
-                        setLocalFeedPosts((currentPosts) =>
-                            currentPosts.filter(
-                                (item) => item.id != localPostId,
-                            ),
-                        );
+                        failLocalFeedPost(setLocalFeedPosts, localPostId);
                         throw error;
                     }
                 }}
@@ -255,6 +252,7 @@ const Page: React.FC = () => {
                         currentPosts.filter(
                             (item) =>
                                 item.status == "pending" ||
+                                item.status == "failed" ||
                                 item.post.postId != postId,
                         ),
                     );

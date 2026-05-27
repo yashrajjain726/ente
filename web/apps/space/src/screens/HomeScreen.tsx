@@ -39,6 +39,7 @@ const feedCardBackground = "#F5F5F5";
 const feedSkeletonElementBackground = "#E6E6E6";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
+const dangerColor = "#F63A3A";
 const feedAvatarSize = 26;
 const headerActionSize = 32;
 const headerActionGap = 8;
@@ -135,7 +136,7 @@ interface DraftSpacePostImage {
     width?: number;
 }
 
-type FeedTimestampStatus = "posted" | "posting";
+type FeedTimestampStatus = "failed" | "posted" | "posting";
 
 interface FeedItemProps {
     aspectRatio: number;
@@ -584,14 +585,20 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     <Box
                         component="span"
                         aria-label={
-                            timestampStatus == "posting" ? "Posting" : "Posted"
+                            timestampStatus == "posting"
+                                ? "Posting"
+                                : timestampStatus == "failed"
+                                  ? "Failed"
+                                  : "Posted"
                         }
                         sx={{
                             alignItems: "center",
                             color:
                                 timestampStatus == "posted"
                                     ? green
-                                    : textSecondary,
+                                    : timestampStatus == "failed"
+                                      ? dangerColor
+                                      : textSecondary,
                             display: "inline-flex",
                             fontSize: 12,
                             fontWeight: 500,
@@ -609,6 +616,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 size={16}
                                 strokeWidth={2.2}
                             />
+                        ) : timestampStatus == "failed" ? (
+                            <Box component="span">Failed</Box>
                         ) : (
                             <>
                                 <Box component="span">Posting</Box>
@@ -957,7 +966,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         Boolean(profile.spaceId) && selectedPhotoFriendID == profile.spaceId;
     const localResolvedPostIds = new Set(
         localFeedPosts
-            .filter((item) => item.status != "pending")
+            .filter((item) => item.status == "posted" || item.status == "ready")
             .map((item) => item.post.postId),
     );
     const remoteFeedItems = feedItems.filter(
@@ -1046,14 +1055,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             viewerUnread={item.viewerUnread}
         />
     );
-    const localFeedItemFor = (item: LocalSpaceFeedPost) =>
-        item.status != "pending" ? (
-            feedItemFor(
+    const localFeedItemFor = (item: LocalSpaceFeedPost) => {
+        if (item.status == "posted" || item.status == "ready") {
+            return feedItemFor(
                 item.post,
                 item.id,
                 item.status == "posted" ? "posted" : undefined,
-            )
-        ) : (
+            );
+        }
+
+        return (
             <FeedItem
                 key={item.id}
                 aspectRatio={
@@ -1068,12 +1079,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 name={item.name}
                 onOpenProfile={onOpenProfile}
                 postId={0}
-                timestampStatus="posting"
+                timestampStatus={item.status == "failed" ? "failed" : "posting"}
                 timestampMs={item.timestampMs}
                 viewerLiked={false}
                 viewerUnread={false}
             />
         );
+    };
 
     React.useEffect(() => {
         const topLocalFeedPostID = localFeedPosts[0]?.id ?? null;

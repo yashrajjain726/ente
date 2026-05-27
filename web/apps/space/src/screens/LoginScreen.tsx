@@ -1,3 +1,5 @@
+import { LoginSquare01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React, { useEffect, useRef, useState } from "react";
@@ -266,14 +268,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     onContinue,
     readOnlyEmail = false,
     showBack = true,
-    title = "Login to Ente",
+    title = "Login",
 }) => {
     const [email, setEmail] = useState(initialEmail ?? "");
     const [password, setPassword] = useState("");
-    const [visualViewportBottomInset, setVisualViewportBottomInset] =
-        useState(0);
     const passwordInputRef = useRef<HTMLInputElement | null>(null);
     const appliedInitialEmailRef = useRef<string | undefined>(initialEmail);
+    const hasBackButton = showBack && Boolean(onBack);
 
     useEffect(() => {
         if (!initialEmail || appliedInitialEmailRef.current == initialEmail) {
@@ -295,59 +296,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         return () => window.cancelAnimationFrame(animationFrame);
     }, [focusPassword, initialEmail]);
 
-    useEffect(() => {
-        const viewport = window.visualViewport;
-        if (!viewport) return undefined;
-
-        const updateBottomInset = () => {
-            const activeElement = document.activeElement;
-            const isEditingText =
-                activeElement instanceof HTMLInputElement ||
-                activeElement instanceof HTMLTextAreaElement ||
-                (activeElement instanceof HTMLElement &&
-                    activeElement.isContentEditable);
-
-            setVisualViewportBottomInset(
-                isEditingText
-                    ? Math.max(
-                          0,
-                          Math.round(
-                              window.innerHeight -
-                                  viewport.height -
-                                  viewport.offsetTop,
-                          ),
-                      )
-                    : 0,
-            );
-        };
-
-        updateBottomInset();
-        viewport.addEventListener("resize", updateBottomInset);
-        viewport.addEventListener("scroll", updateBottomInset);
-        window.addEventListener("focusin", updateBottomInset);
-        window.addEventListener("focusout", updateBottomInset);
-
-        return () => {
-            viewport.removeEventListener("resize", updateBottomInset);
-            viewport.removeEventListener("scroll", updateBottomInset);
-            window.removeEventListener("focusin", updateBottomInset);
-            window.removeEventListener("focusout", updateBottomInset);
-        };
-    }, []);
-
     const canContinue =
         !isSubmitting && email.trim().length > 0 && password.length > 0;
-    const isContinueButtonActive = canContinue || isSubmitting;
-    const footerPaddingBottom =
-        visualViewportBottomInset > 0
-            ? "24px"
-            : "calc(24px + env(safe-area-inset-bottom))";
+    const isSubmitButtonActive = canContinue || isSubmitting;
 
     const submitLogin = () => {
         if (canContinue) void onContinue?.({ email, password });
     };
 
-    const handleContinuePointerDown: React.PointerEventHandler<
+    const handleSubmitPointerDown: React.PointerEventHandler<
         HTMLButtonElement
     > = (event) => {
         if (event.pointerType != "touch") return;
@@ -392,13 +349,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     component="header"
                     sx={{
                         display: "grid",
-                        gridTemplateColumns: "42px 1fr 42px",
+                        gap: hasBackButton ? 0 : "12px",
+                        gridTemplateColumns: hasBackButton
+                            ? "42px 1fr 42px"
+                            : "1fr 42px",
                         height: 42,
                         mt: "32px",
                         width: "100%",
                     }}
                 >
-                    {showBack && onBack ? (
+                    {hasBackButton && (
                         <Box
                             component="button"
                             type="button"
@@ -424,8 +384,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                         >
                             <BackIcon />
                         </Box>
-                    ) : (
-                        <Box />
                     )}
                     <Box
                         component="h1"
@@ -434,7 +392,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 20,
                             fontWeight: 600,
-                            justifySelf: "center",
+                            justifySelf: hasBackButton ? "center" : "start",
                             lineHeight: "28px",
                             m: 0,
                             whiteSpace: "nowrap",
@@ -442,7 +400,49 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     >
                         {title}
                     </Box>
-                    <Box />
+                    <Box
+                        className={
+                            isSubmitButtonActive ? "green-bg" : undefined
+                        }
+                        component="button"
+                        form={loginFormID}
+                        type="submit"
+                        disabled={!canContinue}
+                        aria-label={isSubmitting ? "Signing in" : title}
+                        aria-busy={isSubmitting ? true : undefined}
+                        onPointerDown={handleSubmitPointerDown}
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: isSubmitButtonActive ? green : "#F5F5F5",
+                            border: 0,
+                            borderRadius: "14px",
+                            color: isSubmitButtonActive ? "white" : textLight,
+                            cursor: canContinue ? "pointer" : "default",
+                            display: "flex",
+                            height: 42,
+                            justifyContent: "center",
+                            p: 0,
+                            width: 42,
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 3,
+                            },
+                            "&:hover": canContinue
+                                ? { bgcolor: "#07AE22" }
+                                : undefined,
+                        }}
+                    >
+                        {isSubmitting ? (
+                            <SpaceButtonSpinner />
+                        ) : (
+                            <HugeiconsIcon
+                                icon={LoginSquare01Icon}
+                                size={20}
+                                strokeWidth={2}
+                                style={{ marginLeft: -4 }}
+                            />
+                        )}
+                    </Box>
                 </Box>
 
                 <Box
@@ -495,69 +495,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     )}
                 </Box>
 
-                <Box
-                    sx={{
-                        bgcolor: loginBackground,
-                        bottom: `${visualViewportBottomInset}px`,
-                        boxSizing: "border-box",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "16px",
-                        mt: "auto",
-                        pb: footerPaddingBottom,
-                        pt: 3,
-                        position: "sticky",
-                        width: "100%",
-                        zIndex: 1,
-                    }}
-                >
+                {readOnlyEmail && onChangeEmail && (
                     <Box
-                        className={
-                            isContinueButtonActive ? "green-bg" : undefined
-                        }
-                        component="button"
-                        form={loginFormID}
-                        type="submit"
-                        disabled={!canContinue}
-                        aria-label={isSubmitting ? "Signing in" : undefined}
-                        aria-busy={isSubmitting ? true : undefined}
-                        onPointerDown={handleContinuePointerDown}
                         sx={{
-                            alignItems: "center",
-                            bgcolor: isContinueButtonActive ? green : "#F5F5F5",
-                            border: 0,
-                            borderRadius: "20px",
-                            color: isContinueButtonActive ? "white" : textLight,
-                            cursor: canContinue ? "pointer" : "default",
-                            display: "flex",
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 500,
-                            height: 48,
-                            justifyContent: "center",
-                            lineHeight: "20px",
-                            p: "14px 24px",
+                            bgcolor: loginBackground,
+                            boxSizing: "border-box",
+                            mt: "auto",
+                            pb: "calc(24px + env(safe-area-inset-bottom))",
+                            pt: 3,
                             width: "100%",
-                            "&:focus-visible": {
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 3,
-                            },
-                            "&:hover": canContinue
-                                ? { bgcolor: "#07AE22" }
-                                : undefined,
                         }}
                     >
-                        {isSubmitting ? <SpaceButtonSpinner /> : "Continue"}
-                    </Box>
-                    {readOnlyEmail && onChangeEmail && (
                         <FooterLinkButton
                             disabled={isSubmitting}
                             onClick={onChangeEmail}
                         >
                             Change email
                         </FooterLinkButton>
-                    )}
-                </Box>
+                    </Box>
+                )}
             </Box>
         </Box>
     );
