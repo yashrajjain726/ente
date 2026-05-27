@@ -7,7 +7,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import {
     SpaceFileViewer,
-    type SpaceLiker,
     type SpaceViewerDraftPostEdit,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
@@ -17,6 +16,7 @@ import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
+import type { SpacePostAsset } from "services/space";
 import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
 import { firstNameFrom } from "utils/spaceDisplay";
 import {
@@ -46,6 +46,7 @@ const profileCoverHeight =
 const photoMasonryGap = "3px";
 const photoMasonryPlaceholderBackground = "#F2F2F2";
 const photoMasonryRadius = "12px";
+const photoMasonryLoadRootMargin = "800px 0px";
 interface ProfilePhotoDimensions {
     height: number;
     width: number;
@@ -60,8 +61,8 @@ export interface ProfilePostItem {
     friendID?: string;
     height?: number;
     id: string;
-    imageUrl: string;
-    likeCount?: number;
+    imageAsset?: SpacePostAsset;
+    imageUrl?: string;
     name?: string;
     postId?: number;
     timestampMs: number;
@@ -107,10 +108,10 @@ interface PostMasonryRow {
 
 const buildPostMasonryRows = (
     items: ProfilePostItem[],
-    loadedDimensionsByURL: Record<string, ProfilePhotoDimensions>,
+    loadedDimensionsByID: Record<string, ProfilePhotoDimensions>,
 ): PostMasonryRow[] => {
     const tiles = items.map((item, index) => {
-        const dimensions = loadedDimensionsByURL[item.imageUrl] ?? {
+        const dimensions = loadedDimensionsByID[item.id] ?? {
             height: item.height ?? 1,
             width: item.width ?? 1,
         };
@@ -148,6 +149,138 @@ const preferredPostMasonryRowSize = (remainingTiles: number) => {
     return remainingTiles % 2 == 0 ? 2 : 3;
 };
 
+const profilePostImageCacheKey = (item: ProfilePostItem) =>
+    [item.id, item.imageAsset?.objectKey ?? item.imageUrl ?? ""].join(":");
+
+interface ProfilePostTileProps {
+    aspectRatio: number;
+    dimensions: ProfilePhotoDimensions;
+    displayName: string;
+    groupLabel: string;
+    imageUrl?: string;
+    index: number;
+    isSingleItemRow: boolean;
+    item: ProfilePostItem;
+    onLoadImage: () => Promise<string | undefined>;
+    onOpen: (imageUrl: string) => void;
+    onRememberDimensions: (itemID: string, image: HTMLImageElement) => void;
+}
+
+const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
+    aspectRatio,
+    dimensions,
+    displayName,
+    groupLabel,
+    imageUrl,
+    index,
+    isSingleItemRow,
+    item,
+    onLoadImage,
+    onOpen,
+    onRememberDimensions,
+}) => {
+    const [shouldLoad, setShouldLoad] = React.useState(Boolean(imageUrl));
+    const tileRef = React.useRef<HTMLButtonElement | null>(null);
+
+    React.useEffect(() => {
+        if (imageUrl) setShouldLoad(true);
+    }, [imageUrl]);
+
+    React.useEffect(() => {
+        if (shouldLoad || imageUrl) return;
+        const element = tileRef.current;
+        if (!element) return;
+        if (
+            typeof window == "undefined" ||
+            !("IntersectionObserver" in window)
+        ) {
+            setShouldLoad(true);
+            return;
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    setShouldLoad(true);
+                    observer.disconnect();
+                }
+            },
+            { rootMargin: photoMasonryLoadRootMargin },
+        );
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [imageUrl, shouldLoad]);
+
+    React.useEffect(() => {
+        if (!shouldLoad || imageUrl) return;
+        void onLoadImage().catch((error: unknown) => {
+            console.warn("Failed to load profile post image", error);
+        });
+    }, [imageUrl, onLoadImage, shouldLoad]);
+
+    return (
+        <Box
+            ref={tileRef}
+            component="button"
+            type="button"
+            aria-label={`Open ${displayName} post ${index + 1}`}
+            disabled={!imageUrl}
+            onClick={() => {
+                if (imageUrl) onOpen(imageUrl);
+            }}
+            sx={{
+                appearance: "none",
+                aspectRatio: isSingleItemRow
+                    ? `${dimensions.width} / ${dimensions.height}`
+                    : undefined,
+                bgcolor: photoMasonryPlaceholderBackground,
+                border: 0,
+                cursor: imageUrl ? "pointer" : "default",
+                display: "block",
+                flex: isSingleItemRow ? "0 0 100%" : `${aspectRatio} 1 0`,
+                height: isSingleItemRow ? "auto" : "100%",
+                minWidth: 0,
+                opacity: 1,
+                overflow: "hidden",
+                p: 0,
+                "&:focus-visible": {
+                    outline: `2px solid ${green}`,
+                    outlineOffset: -2,
+                },
+            }}
+        >
+            {imageUrl ? (
+                <Box
+                    component="img"
+                    alt={`${groupLabel} post ${index + 1}`}
+                    onLoad={(event) =>
+                        onRememberDimensions(item.id, event.currentTarget)
+                    }
+                    src={imageUrl}
+                    sx={{
+                        display: "block",
+                        height: "100%",
+                        objectFit: "cover",
+                        objectPosition: "center",
+                        width: "100%",
+                    }}
+                />
+            ) : (
+                <Skeleton
+                    variant="rectangular"
+                    sx={{
+                        bgcolor: photoMasonryPlaceholderBackground,
+                        display: "block",
+                        height: "100%",
+                        transform: "none",
+                        width: "100%",
+                    }}
+                />
+            )}
+        </Box>
+    );
+};
+
 interface ProfileScreenProps {
     friendsCount?: number;
     headerVariant?: "friend" | "owner" | "public";
@@ -161,12 +294,11 @@ interface ProfileScreenProps {
     ) => Promise<void>;
     onDeletePost?: (postId: number) => Promise<void> | void;
     onDraftPostPublished?: () => void;
-    onLoadPostLikers?: (postId: number) => Promise<SpaceLiker[]>;
-    onOpenFriend?: (friendID: string) => void;
     onOpenFriends?: () => void;
     onOpenProfileCover?: () => void;
     onOpenProfilePhoto?: () => void;
     onOpenSettings?: () => void;
+    onLoadPostImage?: (asset: SpacePostAsset) => Promise<string>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onShareProfileLink?: () => Promise<string>;
     postGroups?: ProfilePostGroup[];
@@ -183,12 +315,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onCreatePost,
     onDeletePost,
     onDraftPostPublished,
-    onLoadPostLikers,
-    onOpenFriend,
     onOpenFriends,
     onOpenProfileCover,
     onOpenProfilePhoto,
     onOpenSettings,
+    onLoadPostImage,
     onSetPostLiked,
     onShareProfileLink,
     postGroups = [],
@@ -200,10 +331,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
         () => new Set(),
     );
-    const [loadedPhotoDimensionsByURL, setLoadedPhotoDimensionsByURL] =
-        useState<Record<string, ProfilePhotoDimensions>>({});
+    const [loadedPhotoDimensionsByID, setLoadedPhotoDimensionsByID] = useState<
+        Record<string, ProfilePhotoDimensions>
+    >({});
+    const [loadedPostImageURLsByKey, setLoadedPostImageURLsByKey] = useState<
+        Record<string, string>
+    >({});
     const [loadedCoverUrl, setLoadedCoverUrl] = useState<string | null>(null);
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
+    const postImageLoadsInFlightRef = React.useRef<
+        Map<string, Promise<string | undefined>>
+    >(new Map());
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
     const isPublicProfile = headerVariant == "public";
@@ -256,14 +394,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         revokeLocalPostObjectUrls();
     };
     const rememberLoadedPhotoDimensions = (
-        imageUrl: string,
+        itemID: string,
         image: HTMLImageElement,
     ) => {
         const { naturalHeight, naturalWidth } = image;
         if (naturalHeight <= 0 || naturalWidth <= 0) return;
 
-        setLoadedPhotoDimensionsByURL((currentDimensions) => {
-            const current = currentDimensions[imageUrl];
+        setLoadedPhotoDimensionsByID((currentDimensions) => {
+            const current = currentDimensions[itemID];
             if (
                 current?.height == naturalHeight &&
                 current.width == naturalWidth
@@ -272,10 +410,51 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
             return {
                 ...currentDimensions,
-                [imageUrl]: { height: naturalHeight, width: naturalWidth },
+                [itemID]: { height: naturalHeight, width: naturalWidth },
             };
         });
     };
+
+    const loadedPostImageURLFor = React.useCallback(
+        (item: ProfilePostItem) =>
+            item.imageUrl ??
+            loadedPostImageURLsByKey[profilePostImageCacheKey(item)],
+        [loadedPostImageURLsByKey],
+    );
+
+    const loadPostImage = React.useCallback(
+        (item: ProfilePostItem) => {
+            const loadedImageUrl = loadedPostImageURLFor(item);
+            if (loadedImageUrl) return Promise.resolve(loadedImageUrl);
+            if (!item.imageAsset || !onLoadPostImage) {
+                return Promise.resolve(undefined);
+            }
+
+            const cacheKey = profilePostImageCacheKey(item);
+            const inFlight = postImageLoadsInFlightRef.current.get(cacheKey);
+            if (inFlight) return inFlight;
+
+            const load = onLoadPostImage(item.imageAsset)
+                .then((imageUrl) => {
+                    setLoadedPostImageURLsByKey((currentURLs) =>
+                        currentURLs[cacheKey] == imageUrl
+                            ? currentURLs
+                            : { ...currentURLs, [cacheKey]: imageUrl },
+                    );
+                    return imageUrl;
+                })
+                .catch((error: unknown) => {
+                    console.warn("Failed to load profile post image", error);
+                    return undefined;
+                })
+                .finally(() => {
+                    postImageLoadsInFlightRef.current.delete(cacheKey);
+                });
+            postImageLoadsInFlightRef.current.set(cacheKey, load);
+            return load;
+        },
+        [loadedPostImageURLFor, onLoadPostImage],
+    );
 
     const prepareSelectedPostPhoto = async (file: File) => {
         const canShowLocalPreview = canPreviewSpaceImageFile(file);
@@ -940,7 +1119,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         visiblePostGroups.map((group) => {
                             const masonryRows = buildPostMasonryRows(
                                 group.items,
-                                loadedPhotoDimensionsByURL,
+                                loadedPhotoDimensionsByID,
                             );
 
                             return (
@@ -1006,15 +1185,43 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                             item,
                                                             index,
                                                         }) => {
+                                                            const imageUrl =
+                                                                loadedPostImageURLFor(
+                                                                    item,
+                                                                );
                                                             return (
-                                                                <Box
-                                                                    component="button"
-                                                                    type="button"
-                                                                    aria-label={`Open ${displayName} post ${
-                                                                        index +
-                                                                        1
-                                                                    }`}
-                                                                    onClick={() =>
+                                                                <ProfilePostTile
+                                                                    key={`${group.label}-${item.id}-${index}`}
+                                                                    aspectRatio={
+                                                                        aspectRatio
+                                                                    }
+                                                                    dimensions={
+                                                                        dimensions
+                                                                    }
+                                                                    displayName={
+                                                                        displayName
+                                                                    }
+                                                                    groupLabel={
+                                                                        group.label
+                                                                    }
+                                                                    imageUrl={
+                                                                        imageUrl
+                                                                    }
+                                                                    index={
+                                                                        index
+                                                                    }
+                                                                    isSingleItemRow={
+                                                                        isSingleItemRow
+                                                                    }
+                                                                    item={item}
+                                                                    onLoadImage={() =>
+                                                                        loadPostImage(
+                                                                            item,
+                                                                        )
+                                                                    }
+                                                                    onOpen={(
+                                                                        openedImageUrl,
+                                                                    ) =>
                                                                         setSelectedPost(
                                                                             {
                                                                                 id: item.id,
@@ -1029,9 +1236,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                                         item.caption,
                                                                                     height: dimensions.height,
                                                                                     imageUrl:
-                                                                                        item.imageUrl,
-                                                                                    likeCount:
-                                                                                        item.likeCount,
+                                                                                        openedImageUrl,
                                                                                     name: displayName,
                                                                                     postId: item.postId,
                                                                                     timestampMs:
@@ -1043,65 +1248,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                             },
                                                                         )
                                                                     }
-                                                                    key={`${group.label}-${item.imageUrl}-${index}`}
-                                                                    sx={{
-                                                                        appearance:
-                                                                            "none",
-                                                                        bgcolor:
-                                                                            photoMasonryPlaceholderBackground,
-                                                                        border: 0,
-                                                                        cursor: "pointer",
-                                                                        display:
-                                                                            "block",
-                                                                        flex: isSingleItemRow
-                                                                            ? "0 0 100%"
-                                                                            : `${aspectRatio} 1 0`,
-                                                                        height: isSingleItemRow
-                                                                            ? "auto"
-                                                                            : "100%",
-                                                                        minWidth: 0,
-                                                                        overflow:
-                                                                            "hidden",
-                                                                        p: 0,
-                                                                        "&:focus-visible":
-                                                                            {
-                                                                                outline: `2px solid ${green}`,
-                                                                                outlineOffset:
-                                                                                    -2,
-                                                                            },
-                                                                    }}
-                                                                >
-                                                                    <Box
-                                                                        component="img"
-                                                                        alt={`${group.label} post ${
-                                                                            index +
-                                                                            1
-                                                                        }`}
-                                                                        onLoad={(
-                                                                            event,
-                                                                        ) =>
-                                                                            rememberLoadedPhotoDimensions(
-                                                                                item.imageUrl,
-                                                                                event.currentTarget,
-                                                                            )
-                                                                        }
-                                                                        src={
-                                                                            item.imageUrl
-                                                                        }
-                                                                        sx={{
-                                                                            display:
-                                                                                "block",
-                                                                            height: isSingleItemRow
-                                                                                ? "auto"
-                                                                                : "100%",
-                                                                            objectFit:
-                                                                                "cover",
-                                                                            objectPosition:
-                                                                                "center",
-                                                                            width: "100%",
-                                                                        }}
-                                                                    />
-                                                                </Box>
+                                                                    onRememberDimensions={
+                                                                        rememberLoadedPhotoDimensions
+                                                                    }
+                                                                />
                                                             );
                                                         },
                                                     )}
@@ -1229,15 +1379,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         onClose={closeSelectedPost}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
-                        }
-                        onLoadPostLikers={onLoadPostLikers}
-                        onOpenFriend={
-                            onOpenFriend
-                                ? (friendID) => {
-                                      closeSelectedPost();
-                                      onOpenFriend(friendID);
-                                  }
-                                : undefined
                         }
                         onOpenProfile={closeSelectedPost}
                         onPublishDraftPost={

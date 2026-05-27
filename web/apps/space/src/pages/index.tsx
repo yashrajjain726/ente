@@ -14,7 +14,8 @@ import type { SetupProfile } from "screens/SetupProfileScreen";
 import {
     joinSpaceInvite,
     loadPublicSpaceInvite,
-    type SpacePost,
+    type SpacePostAssetURLLoader,
+    type SpaceProfilePost,
 } from "services/space";
 import {
     clearPendingSpaceInvite,
@@ -108,7 +109,9 @@ const Page: React.FC = () => {
         "idle" | "checking" | "done"
     >("idle");
     const [publicFriendsCount, setPublicFriendsCount] = useState(0);
-    const [publicPosts, setPublicPosts] = useState<SpacePost[]>([]);
+    const [publicPosts, setPublicPosts] = useState<SpaceProfilePost[]>([]);
+    const [publicPostAssetURLLoader, setPublicPostAssetURLLoader] =
+        useState<SpacePostAssetURLLoader>();
     const [publicError, setPublicError] = useState<string>();
     const publicPostGroups = useMemo(
         () => profilePostGroupsFromPosts(publicPosts),
@@ -131,23 +134,32 @@ const Page: React.FC = () => {
         if (routeMode.kind != "public-profile") return;
 
         let cancelled = false;
+        let closePublicInvite: (() => void) | undefined;
         setPublicError(undefined);
+        setPublicPostAssetURLLoader(undefined);
         void loadPublicSpaceInvite(routeMode)
-            .then(({ posts, profile: nextProfile }) => {
-                if (cancelled) return;
-                setPublicProfile({
-                    avatarUrl: nextProfile.avatarUrl ?? null,
-                    coverUrl: nextProfile.coverUrl ?? null,
-                    coverObjectKey: nextProfile.coverObjectKey,
-                    coverUpdatedAt: nextProfile.coverUpdatedAt,
-                    fullName: nextProfile.fullName,
-                    username: nextProfile.username,
-                    spaceId: nextProfile.spaceId,
-                    spaceSlug: nextProfile.spaceSlug,
-                });
-                setPublicFriendsCount(nextProfile.friendsCount);
-                setPublicPosts(posts);
-            })
+            .then(
+                ({ close, loadPostAssetURL, posts, profile: nextProfile }) => {
+                    if (cancelled) {
+                        close();
+                        return;
+                    }
+                    closePublicInvite = close;
+                    setPublicProfile({
+                        avatarUrl: nextProfile.avatarUrl ?? null,
+                        coverUrl: nextProfile.coverUrl ?? null,
+                        coverObjectKey: nextProfile.coverObjectKey,
+                        coverUpdatedAt: nextProfile.coverUpdatedAt,
+                        fullName: nextProfile.fullName,
+                        username: nextProfile.username,
+                        spaceId: nextProfile.spaceId,
+                        spaceSlug: nextProfile.spaceSlug,
+                    });
+                    setPublicFriendsCount(nextProfile.friendsCount);
+                    setPublicPostAssetURLLoader(() => loadPostAssetURL);
+                    setPublicPosts(posts);
+                },
+            )
             .catch((error: unknown) => {
                 console.error("Failed to load public space invite", error);
                 if (!cancelled)
@@ -156,6 +168,7 @@ const Page: React.FC = () => {
 
         return () => {
             cancelled = true;
+            closePublicInvite?.();
         };
     }, [routeMode]);
 
@@ -242,6 +255,7 @@ const Page: React.FC = () => {
                 <SpacePageMeta themeColor={profileBackground} />
                 <PublicProfileScreen
                     friendsCount={publicFriendsCount}
+                    onLoadPostImage={publicPostAssetURLLoader}
                     postGroups={publicPostGroups}
                     profile={publicProfile}
                     onAddFriend={() => {

@@ -7,12 +7,12 @@ import {
     createCurrentPhotoPost,
     createCurrentProfileLink,
     deleteCurrentPost,
-    loadCurrentPostLikers,
     loadCurrentSpaceFriendsCount,
-    loadCurrentSpacePostsPage,
+    loadCurrentSpacePostAssetURL,
+    loadCurrentSpaceProfilePostsPage,
     markCurrentFeedRead,
     setCurrentPostLiked,
-    type SpacePost,
+    type SpaceProfilePost,
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
 import {
@@ -29,7 +29,7 @@ const Page: React.FC = () => {
     const { profile, profileLoadError, profileLoadStatus, setLocalFeedPosts } =
         useSpaceAppState();
     const [friendsCount, setFriendsCount] = useState(0);
-    const [posts, setPosts] = useState<SpacePost[]>([]);
+    const [posts, setPosts] = useState<SpaceProfilePost[]>([]);
     const [isPostsLoading, setIsPostsLoading] = useState(true);
     const postGroups = useMemo(
         () => profilePostGroupsFromPosts(posts),
@@ -55,7 +55,7 @@ const Page: React.FC = () => {
         let cancelled = false;
         setIsPostsLoading(true);
         void Promise.all([
-            loadCurrentSpacePostsPage(spaceId),
+            loadCurrentSpaceProfilePostsPage(spaceId),
             loadCurrentSpaceFriendsCount(spaceId),
         ])
             .then(([page, nextFriendsCount]) => {
@@ -162,9 +162,6 @@ const Page: React.FC = () => {
                         currentPosts.filter((post) => post.postId != postId),
                     );
                 }}
-                onOpenFriend={(friendID) =>
-                    void router.push(spaceRoutes.friend(friendID))
-                }
                 onOpenFriends={() => void router.push(spaceRoutes.friends)}
                 onOpenProfileCover={() =>
                     void router.push(spaceRoutes.profileCover)
@@ -173,7 +170,7 @@ const Page: React.FC = () => {
                     void router.push(spaceRoutes.profilePhoto)
                 }
                 onOpenSettings={() => void router.push(spaceRoutes.settings)}
-                onLoadPostLikers={loadCurrentPostLikers}
+                onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onSetPostLiked={setCurrentPostLiked}
                 onShareProfileLink={async () => {
                     if (!profile.spaceId) throw new Error("Missing space.");

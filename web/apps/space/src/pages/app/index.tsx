@@ -8,7 +8,6 @@ import {
     createCurrentProfileLink,
     deleteCurrentPost,
     loadCurrentFeedPage,
-    loadCurrentPostLikers,
     loadCurrentSpaceFriends,
     loadCurrentUnreadStatus,
     markCurrentFeedRead,
@@ -266,7 +265,6 @@ const Page: React.FC = () => {
                 onLoadMoreFeedItems={loadMoreFeedItems}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
                 onOpenProfile={() => void router.push(spaceRoutes.profile)}
-                onLoadPostLikers={loadCurrentPostLikers}
                 onReplyToPost={replyToCurrentPost}
                 onSetPostLiked={setCurrentPostLiked}
                 onShareProfileLink={async () => {

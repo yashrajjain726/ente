@@ -10,9 +10,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import {
     SpaceFileViewer,
-    type SpaceLiker,
     type SpaceViewerDraftPostEdit,
-    type SpaceViewerInitialScreen,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
@@ -103,7 +101,6 @@ interface HomeScreenProps {
     onOpenFriend?: (friendID: string) => void;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
-    onLoadPostLikers?: (postId: number) => Promise<SpaceLiker[]>;
     onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onShareProfileLink?: () => Promise<string>;
@@ -120,7 +117,6 @@ interface SelectedHomeViewer {
     draftFile?: File;
     draftImageError?: string;
     focusReplyOnOpen?: boolean;
-    initialScreen: SpaceViewerInitialScreen;
     isDraftImagePreviewPending?: boolean;
     localObjectUrl?: string;
     photo: SpaceViewerPhoto;
@@ -145,14 +141,9 @@ interface FeedItemProps {
     friendID: string;
     imageUrl: string;
     isOwnPost: boolean;
-    likeCount: number;
     name: string;
     onOpenFriend?: (friendID: string) => void;
-    onOpenPhoto?: (
-        photo: SpaceViewerPhoto,
-        initialScreen?: SpaceViewerInitialScreen,
-        focusReplyOnOpen?: boolean,
-    ) => void;
+    onOpenPhoto?: (photo: SpaceViewerPhoto, focusReplyOnOpen?: boolean) => void;
     onOpenProfile?: () => void;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     postId: number;
@@ -367,7 +358,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     friendID,
     imageUrl,
     isOwnPost,
-    likeCount,
     name,
     onOpenFriend,
     onOpenPhoto,
@@ -380,7 +370,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     viewerUnread,
 }) => {
     const [isLiked, setIsLiked] = useState(viewerLiked);
-    const [localLikeCount, setLocalLikeCount] = useState(likeCount);
     const firstName = firstNameFrom(name);
     const dateLabel = formatSpaceDate(timestampMs);
     const postingDotCount = usePostingDotCount(timestampStatus == "posting");
@@ -421,10 +410,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
             return { height: naturalHeight, width: naturalWidth };
         });
     };
-    const openPhoto = (
-        initialScreen?: SpaceViewerInitialScreen,
-        focusReplyOnOpen = false,
-    ) => {
+    const openPhoto = (focusReplyOnOpen = false) => {
         onOpenPhoto?.(
             {
                 alt: `${name} post`,
@@ -433,14 +419,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 friendID,
                 height: photoDimensions.height,
                 imageUrl,
-                likeCount: localLikeCount,
                 name,
                 postId,
                 timestampMs,
                 viewerLiked: isLiked,
                 width: photoDimensions.width,
             },
-            initialScreen,
             focusReplyOnOpen,
         );
     };
@@ -449,23 +433,15 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
         const nextLiked = !isLiked;
         setIsLiked(nextLiked);
-        setLocalLikeCount((count) => Math.max(0, count + (nextLiked ? 1 : -1)));
         void onSetPostLiked?.(postId, nextLiked).catch((error: unknown) => {
             console.error("Failed to update post like", error);
             setIsLiked(!nextLiked);
-            setLocalLikeCount((count) =>
-                Math.max(0, count + (nextLiked ? -1 : 1)),
-            );
         });
     };
 
     React.useEffect(() => {
         setIsLiked(viewerLiked);
     }, [viewerLiked]);
-
-    React.useEffect(() => {
-        setLocalLikeCount(likeCount);
-    }, [likeCount]);
 
     return (
         <Box
@@ -757,7 +733,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 component="button"
                                 type="button"
                                 aria-label={`Reply to ${firstName}'s post`}
-                                onClick={() => openPhoto("photo", true)}
+                                onClick={() => openPhoto(true)}
                                 sx={{
                                     alignItems: "center",
                                     appearance: "none",
@@ -941,7 +917,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onCreatePost,
     onDeletePost,
     onLoadMoreFeedItems,
-    onLoadPostLikers,
     onOpenFriend,
     onOpenMessages,
     onOpenProfile,
@@ -1002,14 +977,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
     const openFeedPhoto = (
         photo: SpaceViewerPhoto,
-        initialScreen: SpaceViewerInitialScreen = "photo",
         focusReplyOnOpen = false,
     ) => {
         const isOwnPost =
             Boolean(profile.spaceId) && photo.friendID == profile.spaceId;
         setSelectedViewer({
             focusReplyOnOpen: isOwnPost ? false : focusReplyOnOpen,
-            initialScreen,
             photo,
             postActionMode: isOwnPost ? "hidden" : "like-only",
         });
@@ -1042,7 +1015,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             isOwnPost={
                 Boolean(profile.spaceId) && item.spaceId == profile.spaceId
             }
-            likeCount={item.likeCount}
             name={item.name}
             onOpenFriend={onOpenFriend}
             onOpenPhoto={openFeedPhoto}
@@ -1075,7 +1047,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 friendID={item.friendID}
                 imageUrl={item.imageUrl}
                 isOwnPost
-                likeCount={0}
                 name={item.name}
                 onOpenProfile={onOpenProfile}
                 postId={0}
@@ -1119,7 +1090,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             activeLocalPostObjectUrlRef.current = draftKey;
             setSelectedViewer({
                 draftFile: file,
-                initialScreen: "photo",
                 isDraftImagePreviewPending: true,
                 localObjectUrl: draftKey,
                 photo: {
@@ -1187,7 +1157,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         activeLocalPostObjectUrlRef.current = localPost.objectUrl;
         setSelectedViewer({
             draftFile: file,
-            initialScreen: "photo",
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
             postActionMode: "draft-post",
@@ -1648,7 +1617,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Box>
                 {selectedViewer && (
                     <SpaceFileViewer
-                        initialScreen={selectedViewer.initialScreen}
                         focusReplyOnOpen={selectedViewer.focusReplyOnOpen}
                         photo={selectedViewer.photo}
                         draftPostPreparationError={
@@ -1657,18 +1625,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         isDraftPostPreviewPending={
                             selectedViewer.isDraftImagePreviewPending
                         }
-                        postActionMode={
-                            selectedViewer.postActionMode ?? "like-with-count"
-                        }
+                        postActionMode={selectedViewer.postActionMode}
                         onClose={closeSelectedPhoto}
-                        onOpenFriend={
-                            onOpenFriend
-                                ? (friendID) => {
-                                      closeSelectedPhoto();
-                                      onOpenFriend(friendID);
-                                  }
-                                : undefined
-                        }
                         onOpenProfile={
                             selectedPhotoIsOwn && onOpenProfile
                                 ? () => {
@@ -1717,7 +1675,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                   }
                                 : undefined
                         }
-                        onLoadPostLikers={onLoadPostLikers}
                         onSetPostLiked={onSetPostLiked}
                     />
                 )}

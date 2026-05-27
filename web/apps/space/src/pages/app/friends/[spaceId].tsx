@@ -5,12 +5,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { friendsBackground } from "screens/FriendsScreen";
 import { ProfileScreen } from "screens/ProfileScreen";
 import {
-    loadCurrentPostLikers,
     loadCurrentSpaceFriends,
-    loadCurrentSpacePostsPage,
+    loadCurrentSpacePostAssetURL,
     loadCurrentSpaceProfile,
+    loadCurrentSpaceProfilePostsPage,
     setCurrentPostLiked,
-    type SpacePost,
+    type SpaceProfilePost,
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
 import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
@@ -46,7 +46,7 @@ const Page: React.FC = () => {
     const [friendsLoadAttempted, setFriendsLoadAttempted] = useState(false);
     const [isProfileLoading, setIsProfileLoading] = useState(false);
     const [selectedProfile, setSelectedProfile] = useState(selectedFriend);
-    const [posts, setPosts] = useState<SpacePost[]>([]);
+    const [posts, setPosts] = useState<SpaceProfilePost[]>([]);
     const postGroups = useMemo(
         () => profilePostGroupsFromPosts(posts),
         [posts],
@@ -104,7 +104,7 @@ const Page: React.FC = () => {
             .finally(() => {
                 if (!cancelled) setIsProfileLoading(false);
             });
-        void loadCurrentSpacePostsPage(selectedFriend.spaceId)
+        void loadCurrentSpaceProfilePostsPage(selectedFriend.spaceId)
             .then((page) => {
                 if (!cancelled) setPosts(page.items);
             })
@@ -166,10 +166,7 @@ const Page: React.FC = () => {
                         selectedProfile?.spaceSlug ?? selectedFriend.spaceSlug,
                 }}
                 onBack={goBack}
-                onOpenFriend={(nextFriendID) =>
-                    void router.push(spaceRoutes.friend(nextFriendID))
-                }
-                onLoadPostLikers={loadCurrentPostLikers}
+                onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onSetPostLiked={setCurrentPostLiked}
             />
         </>

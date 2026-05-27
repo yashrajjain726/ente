@@ -15,7 +15,6 @@ import {
     spaceActionDoneDurationMs,
     type SpaceActionPhase,
 } from "components/SpaceActionFeedback";
-import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
 import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
@@ -44,8 +43,6 @@ const replyInputPaddingLeft = 18;
 const captionInputMaxHeight = 112;
 const defaultPhotoWidth = 900;
 const defaultPhotoHeight = 680;
-const viewerPanelBackground = "#202020";
-const viewerPanelMuted = "rgba(244, 244, 244, 0.54)";
 
 const postButtonSpin = keyframes`
     from {
@@ -67,13 +64,7 @@ const photoPreviewSkeletonShimmer = keyframes`
     }
 `;
 
-export type SpaceViewerInitialScreen = "photo" | "likes";
-
-export type SpaceViewerPostActionMode =
-    | "draft-post"
-    | "hidden"
-    | "like-only"
-    | "like-with-count";
+export type SpaceViewerPostActionMode = "draft-post" | "hidden" | "like-only";
 
 export interface SpaceViewerDraftPostEdit {
     cropArea?: SpaceImageCropArea;
@@ -84,17 +75,15 @@ export interface SpaceViewerDraftPostEdit {
 
 interface SpaceViewerPostActionConfig {
     showLikeButton: boolean;
-    showLikeCount: boolean;
 }
 
 const spaceViewerPostActionConfigs: Record<
     SpaceViewerPostActionMode,
     SpaceViewerPostActionConfig
 > = {
-    "draft-post": { showLikeButton: false, showLikeCount: false },
-    hidden: { showLikeButton: false, showLikeCount: false },
-    "like-only": { showLikeButton: true, showLikeCount: false },
-    "like-with-count": { showLikeButton: true, showLikeCount: true },
+    "draft-post": { showLikeButton: false },
+    hidden: { showLikeButton: false },
+    "like-only": { showLikeButton: true },
 };
 
 export interface SpaceViewerPhoto {
@@ -104,7 +93,6 @@ export interface SpaceViewerPhoto {
     friendID?: string;
     height?: number;
     imageUrl: string;
-    likeCount?: number;
     name: string;
     postId?: number;
     timestampMs: number;
@@ -114,14 +102,11 @@ export interface SpaceViewerPhoto {
 
 interface SpaceFileViewerProps {
     draftPostPreparationError?: string;
-    initialScreen?: SpaceViewerInitialScreen;
     isDraftPostPreparing?: boolean;
     isDraftPostPreviewPending?: boolean;
     onClose: () => void;
     onDeletePost?: () => Promise<void> | void;
     onDraftPostPublished?: () => void;
-    onLoadPostLikers?: (postId: number) => Promise<SpaceLiker[]>;
-    onOpenFriend?: (friendID: string) => void;
     onOpenProfile?: () => void;
     onPublishDraftPost?: (
         caption: string,
@@ -132,13 +117,6 @@ interface SpaceFileViewerProps {
     photo: SpaceViewerPhoto;
     focusReplyOnOpen?: boolean;
     postActionMode?: SpaceViewerPostActionMode;
-}
-
-export interface SpaceLiker {
-    id: string;
-    avatarUrl?: string | null;
-    friendID?: string;
-    name: string;
 }
 
 const viewerActionButtonSx = {
@@ -175,89 +153,6 @@ const viewerHeaderButtonSx = {
     "&:hover": { bgcolor: controlBackgroundHover },
 };
 
-const viewerCountBadgeSx = {
-    alignItems: "center",
-    bgcolor: "#FFFFFF",
-    border: `2px solid ${viewerBackground}`,
-    borderRadius: "50%",
-    boxSizing: "border-box",
-    color: "#111111",
-    display: "inline-flex",
-    fontFamily: '"Inter Variable", Inter, sans-serif',
-    fontSize: 10,
-    fontWeight: 800,
-    height: 24,
-    justifyContent: "center",
-    lineHeight: 1,
-    position: "absolute",
-    right: -8,
-    top: -8,
-    width: 24,
-};
-
-const SpaceAvatar: React.FC<{ avatarUrl?: string | null; size: number }> = ({
-    avatarUrl,
-    size,
-}) => (
-    <Box
-        sx={{
-            alignItems: "center",
-            bgcolor: avatarSkeletonBackground,
-            borderRadius: "50%",
-            display: "flex",
-            flexShrink: 0,
-            height: size,
-            justifyContent: "center",
-            overflow: "hidden",
-            width: size,
-        }}
-    >
-        {avatarUrl ? (
-            <Box
-                component="img"
-                alt=""
-                src={avatarUrl}
-                sx={{
-                    display: "block",
-                    height: "100%",
-                    objectFit: "cover",
-                    objectPosition: "center",
-                    width: "100%",
-                }}
-            />
-        ) : (
-            <Skeleton
-                variant="circular"
-                sx={{
-                    bgcolor: avatarSkeletonBackground,
-                    height: "100%",
-                    transform: "none",
-                    width: "100%",
-                }}
-            />
-        )}
-    </Box>
-);
-
-const HeartFilledIcon: React.FC = () => (
-    <svg
-        width="18"
-        height="16"
-        viewBox="0 0 30 26"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-    >
-        <path
-            d="M12.4926 23.4794C8.64537 20.6025 1.02344 14.0254 1.02344 8.10676C1.02344 4.19475 3.89425 1.02344 7.84162 1.02344C9.88707 1.02344 11.9325 1.70526 14.6598 4.43253C17.3871 1.70526 19.4325 1.02344 21.478 1.02344C25.4253 1.02344 28.2962 4.19475 28.2962 8.10676C28.2962 14.0254 20.6743 20.6025 16.827 23.4794C15.5324 24.4474 13.7872 24.4474 12.4926 23.4794Z"
-            fill="#08C225"
-            stroke="#08C225"
-            strokeWidth="2.04545"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        />
-    </svg>
-);
-
 const resizeCaptionInput = (
     input: HTMLTextAreaElement | null,
     minHeight = captionInputMinHeight,
@@ -274,33 +169,22 @@ const resizeCaptionInput = (
 export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     draftPostPreparationError,
     focusReplyOnOpen = false,
-    initialScreen = "photo",
     isDraftPostPreparing = false,
     isDraftPostPreviewPending = false,
     onClose,
     onDeletePost,
     onDraftPostPublished,
-    onLoadPostLikers,
-    onOpenFriend,
     onOpenProfile,
     onPublishDraftPost,
     onReplyToPost,
     onSetPostLiked,
     photo,
-    postActionMode = "like-with-count",
+    postActionMode = "like-only",
 }) => {
     const activePostActionMode = postActionMode;
     const isDraftPost = activePostActionMode == "draft-post";
-    const {
-        showLikeButton: showPhotoLikeButton,
-        showLikeCount: showPhotoLikeCount,
-    } = spaceViewerPostActionConfigs[activePostActionMode];
-    const canOpenLikes = showPhotoLikeCount;
-    const resolvedInitialScreen: SpaceViewerInitialScreen =
-        initialScreen == "likes" && !canOpenLikes ? "photo" : initialScreen;
-    const [screen, setScreen] = React.useState<SpaceViewerInitialScreen>(
-        resolvedInitialScreen,
-    );
+    const { showLikeButton: showPhotoLikeButton } =
+        spaceViewerPostActionConfigs[activePostActionMode];
     const [isPhotoLiked, setIsPhotoLiked] = React.useState(
         photo.viewerLiked ?? false,
     );
@@ -310,11 +194,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         React.useState(focusReplyOnOpen);
     const [replyActionPhase, setReplyActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
-    const [serverLikeCount, setServerLikeCount] = React.useState(
-        photo.likeCount ?? 0,
-    );
-    const [photoLikers, setPhotoLikers] = React.useState<SpaceLiker[]>([]);
-    const [isLoadingLikers, setIsLoadingLikers] = React.useState(false);
     const [draftPostActionPhase, setDraftPostActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
     const [queuedDraftPost, setQueuedDraftPost] = React.useState<{
@@ -328,15 +207,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const viewerRootRef = React.useRef<HTMLDivElement | null>(null);
     const captionInputRef = React.useRef<HTMLTextAreaElement | null>(null);
     const replyInputRef = React.useRef<HTMLTextAreaElement | null>(null);
-    const likeHoldTimeoutRef = React.useRef<number | null>(null);
-    const likeHoldStartPointRef = React.useRef<{ x: number; y: number } | null>(
-        null,
-    );
-    const ignoreNextLikeClickRef = React.useRef(false);
-    const suppressNextLikeContextMenuRef = React.useRef(false);
-    const suppressLikeContextMenuTimeoutRef = React.useRef<number | null>(null);
-    const likeCount = serverLikeCount;
-    const likeCountLabel = `${likeCount} ${likeCount == 1 ? "like" : "likes"}`;
     const [actionsAnchor, setActionsAnchor] =
         React.useState<HTMLElement | null>(null);
     const [deleteSheetOpen, setDeleteSheetOpen] = React.useState(false);
@@ -371,56 +241,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         replyText.trim().length > 0 &&
         !isReplyActionRunning;
 
-    const clearLikeHoldTimeout = () => {
-        if (likeHoldTimeoutRef.current != null) {
-            window.clearTimeout(likeHoldTimeoutRef.current);
-            likeHoldTimeoutRef.current = null;
-        }
-        likeHoldStartPointRef.current = null;
-    };
-
-    const suppressNativeLikeContextMenu = () => {
-        suppressNextLikeContextMenuRef.current = true;
-        if (suppressLikeContextMenuTimeoutRef.current != null)
-            window.clearTimeout(suppressLikeContextMenuTimeoutRef.current);
-
-        suppressLikeContextMenuTimeoutRef.current = window.setTimeout(() => {
-            suppressNextLikeContextMenuRef.current = false;
-            suppressLikeContextMenuTimeoutRef.current = null;
-        }, 700);
-    };
-
-    const openLikes = () => {
-        if (!canOpenLikes) return;
-
-        clearLikeHoldTimeout();
-        setScreen("likes");
-        if (!photo.postId || !onLoadPostLikers) return;
-
-        setIsLoadingLikers(true);
-        void onLoadPostLikers(photo.postId)
-            .then(setPhotoLikers)
-            .catch((error: unknown) =>
-                console.error("Failed to load post likers", error),
-            )
-            .finally(() => setIsLoadingLikers(false));
-    };
-
-    const closeLikes = React.useCallback(() => {
-        if (likeHoldTimeoutRef.current != null) {
-            window.clearTimeout(likeHoldTimeoutRef.current);
-            likeHoldTimeoutRef.current = null;
-        }
-        likeHoldStartPointRef.current = null;
-        setScreen("photo");
-    }, []);
-
     const handlePhotoLikeClick = () => {
-        if (ignoreNextLikeClickRef.current) {
-            ignoreNextLikeClickRef.current = false;
-            return;
-        }
-
         if (!photo.postId || !onSetPostLiked) {
             setIsPhotoLiked((isLiked) => !isLiked);
             return;
@@ -428,64 +249,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 
         const nextLiked = !isPhotoLiked;
         setIsPhotoLiked(nextLiked);
-        setServerLikeCount((count) =>
-            Math.max(0, count + (nextLiked ? 1 : -1)),
-        );
         void onSetPostLiked(photo.postId, nextLiked).catch((error: unknown) => {
             console.error("Failed to update post like", error);
             setIsPhotoLiked(!nextLiked);
-            setServerLikeCount((count) =>
-                Math.max(0, count + (nextLiked ? -1 : 1)),
-            );
         });
-    };
-
-    const handlePhotoLikeContextMenu = (
-        event: React.MouseEvent<HTMLElement>,
-    ) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (!canOpenLikes) return;
-
-        ignoreNextLikeClickRef.current = false;
-        openLikes();
-    };
-
-    const handleLikeCountClick = (event: React.MouseEvent<HTMLElement>) => {
-        event.preventDefault();
-        event.stopPropagation();
-        openLikes();
-    };
-
-    const startPhotoLikeHold = (event: React.PointerEvent<HTMLElement>) => {
-        if (!canOpenLikes) return;
-        if (event.pointerType == "mouse" && event.button != 0) return;
-
-        clearLikeHoldTimeout();
-        likeHoldStartPointRef.current = { x: event.clientX, y: event.clientY };
-        likeHoldTimeoutRef.current = window.setTimeout(() => {
-            likeHoldTimeoutRef.current = null;
-            likeHoldStartPointRef.current = null;
-            ignoreNextLikeClickRef.current = true;
-            suppressNativeLikeContextMenu();
-            openLikes();
-            window.setTimeout(() => {
-                ignoreNextLikeClickRef.current = false;
-            }, 400);
-        }, 500);
-    };
-
-    const cancelPhotoLikeHoldOnMove = (
-        event: React.PointerEvent<HTMLElement>,
-    ) => {
-        const startPoint = likeHoldStartPointRef.current;
-        if (!startPoint) return;
-
-        const distance = Math.hypot(
-            event.clientX - startPoint.x,
-            event.clientY - startPoint.y,
-        );
-        if (distance > 8) clearLikeHoldTimeout();
     };
 
     const closeActions = () => setActionsAnchor(null);
@@ -595,20 +362,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         event.preventDefault();
     };
 
-    const openFriendProfile = (friendID: string) => {
-        onOpenFriend?.(friendID);
-    };
-
-    React.useEffect(
-        () => () => {
-            if (likeHoldTimeoutRef.current != null)
-                window.clearTimeout(likeHoldTimeoutRef.current);
-            if (suppressLikeContextMenuTimeoutRef.current != null)
-                window.clearTimeout(suppressLikeContextMenuTimeoutRef.current);
-        },
-        [],
-    );
-
     React.useLayoutEffect(() => {
         resizeCaptionInput(captionInputRef.current, replyInputMinHeight);
     }, [caption]);
@@ -623,30 +376,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         setIsReplyFocused(true);
         replyInputRef.current?.focus();
     }, [canReplyToPost, focusReplyOnOpen, photo.postId]);
-
-    React.useEffect(() => {
-        const suppressDelayedContextMenu = (event: MouseEvent) => {
-            if (!suppressNextLikeContextMenuRef.current) return;
-
-            event.preventDefault();
-            event.stopPropagation();
-            suppressNextLikeContextMenuRef.current = false;
-            if (suppressLikeContextMenuTimeoutRef.current != null) {
-                window.clearTimeout(suppressLikeContextMenuTimeoutRef.current);
-                suppressLikeContextMenuTimeoutRef.current = null;
-            }
-        };
-
-        document.addEventListener("contextmenu", suppressDelayedContextMenu, {
-            capture: true,
-        });
-        return () =>
-            document.removeEventListener(
-                "contextmenu",
-                suppressDelayedContextMenu,
-                { capture: true },
-            );
-    }, []);
 
     React.useEffect(() => {
         if (deleteActionPhase != "done") return;
@@ -691,19 +420,14 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         setReplyText("");
         setIsReplyFocused(focusReplyOnOpen && canReplyToPost);
         setReplyActionPhase(null);
-        setServerLikeCount(photo.likeCount ?? 0);
-        setPhotoLikers([]);
-        setScreen(resolvedInitialScreen);
     }, [
         photo.caption,
-        photo.likeCount,
         photo.imageUrl,
         photo.postId,
         photo.timestampMs,
         photo.viewerLiked,
         canReplyToPost,
         focusReplyOnOpen,
-        resolvedInitialScreen,
     ]);
 
     const handleDeleteSheetExited = () => {
@@ -809,17 +533,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             if (deleteSheetOpen) return;
             if (event.key != "Escape") return;
 
-            if (screen == "likes") {
-                closeLikes();
-                return;
-            }
-
             onClose();
         };
 
         window.addEventListener("keydown", closeOnEscape);
         return () => window.removeEventListener("keydown", closeOnEscape);
-    }, [closeLikes, deleteSheetOpen, onClose, screen]);
+    }, [deleteSheetOpen, onClose]);
 
     return (
         <Box
@@ -1509,35 +1228,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                         ? sendReply
                                         : handlePhotoLikeClick
                                 }
-                                onContextMenuCapture={
-                                    isReplyMode
-                                        ? undefined
-                                        : handlePhotoLikeContextMenu
-                                }
-                                onPointerCancel={
-                                    isReplyMode
-                                        ? undefined
-                                        : clearLikeHoldTimeout
-                                }
                                 onPointerDown={
                                     isReplyMode
                                         ? handleReplyActionPointerDown
-                                        : startPhotoLikeHold
-                                }
-                                onPointerLeave={
-                                    isReplyMode
-                                        ? undefined
-                                        : clearLikeHoldTimeout
-                                }
-                                onPointerMove={
-                                    isReplyMode
-                                        ? undefined
-                                        : cancelPhotoLikeHoldOnMove
-                                }
-                                onPointerUp={
-                                    isReplyMode
-                                        ? undefined
-                                        : clearLikeHoldTimeout
+                                        : undefined
                                 }
                                 sx={{
                                     ...viewerActionButtonSx,
@@ -1605,266 +1299,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                     />
                                 )}
                             </Box>
-                            {!isReplyMode && showPhotoLikeCount && (
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    aria-label={`View ${likeCountLabel}`}
-                                    onClick={handleLikeCountClick}
-                                    sx={{
-                                        ...viewerCountBadgeSx,
-                                        cursor: "pointer",
-                                        p: 0,
-                                        "&:focus-visible": {
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                    }}
-                                >
-                                    {likeCount}
-                                </Box>
-                            )}
                         </Box>
-                    </Box>
-                </Box>
-            )}
-            {screen == "likes" && canOpenLikes && (
-                <Box
-                    sx={{
-                        bgcolor: viewerPanelBackground,
-                        boxSizing: "border-box",
-                        color: textBase,
-                        display: "flex",
-                        flexDirection: "column",
-                        inset: 0,
-                        maxWidth: "100vw",
-                        overflow: "hidden",
-                        overflowX: "hidden",
-                        position: "fixed",
-                        width: "100%",
-                        zIndex: 3,
-                    }}
-                >
-                    <Box
-                        component="header"
-                        sx={{
-                            alignItems: "center",
-                            boxSizing: "border-box",
-                            display: "grid",
-                            flexShrink: 0,
-                            gridTemplateColumns: "1fr 40px",
-                            minHeight: 56,
-                            px: "16px",
-                            width: "100%",
-                        }}
-                    >
-                        <Box
-                            component="h1"
-                            sx={{
-                                color: textBase,
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 16,
-                                fontWeight: 750,
-                                lineHeight: "20px",
-                                m: 0,
-                            }}
-                        >
-                            {likeCount} {likeCount == 1 ? "like" : "likes"}
-                        </Box>
-                        <Box
-                            component="button"
-                            type="button"
-                            aria-label="Close likes"
-                            onClick={closeLikes}
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: "transparent",
-                                border: 0,
-                                borderRadius: "50%",
-                                color: controlIcon,
-                                cursor: "pointer",
-                                display: "flex",
-                                height: 28,
-                                justifyContent: "center",
-                                justifySelf: "flex-end",
-                                p: 0,
-                                width: 28,
-                                "&:focus-visible": {
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                                "&:hover": {
-                                    bgcolor: "transparent",
-                                    color: textBase,
-                                },
-                            }}
-                        >
-                            <HugeiconsIcon
-                                icon={Cancel01Icon}
-                                size={18}
-                                strokeWidth={1.8}
-                            />
-                        </Box>
-                    </Box>
-                    <Box
-                        component="ul"
-                        sx={{
-                            boxSizing: "border-box",
-                            flex: "1 1 auto",
-                            listStyle: "none",
-                            m: 0,
-                            maxWidth: "100%",
-                            minHeight: 0,
-                            overflowX: "hidden",
-                            overflowY: "auto",
-                            p: "14px 16px 18px",
-                            position: "relative",
-                            width: "100%",
-                        }}
-                    >
-                        {isLoadingLikers ? (
-                            <Box
-                                sx={{
-                                    alignItems: "center",
-                                    bottom: 0,
-                                    display: "flex",
-                                    justifyContent: "center",
-                                    left: 0,
-                                    position: "fixed",
-                                    right: 0,
-                                    top: 0,
-                                    zIndex: 1,
-                                }}
-                            >
-                                <SpaceLoadingSpinner ariaLabel="Loading likes" />
-                            </Box>
-                        ) : photoLikers.length == 0 ? (
-                            <Box
-                                sx={{
-                                    alignItems: "center",
-                                    color: viewerPanelMuted,
-                                    display: "flex",
-                                    flex: "1 1 auto",
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 14,
-                                    fontWeight: 600,
-                                    justifyContent: "center",
-                                    lineHeight: "20px",
-                                    minHeight: "calc(100svh - 56px - 32px)",
-                                }}
-                            >
-                                No likes yet
-                            </Box>
-                        ) : (
-                            photoLikers.map((liker) => {
-                                const likerName = firstNameFrom(liker.name);
-                                const friendID = liker.friendID;
-                                const canOpenFriend = Boolean(
-                                    friendID && onOpenFriend,
-                                );
-                                const openLikerProfile =
-                                    canOpenFriend && friendID
-                                        ? () => openFriendProfile(friendID)
-                                        : undefined;
-
-                                return (
-                                    <Box
-                                        component="li"
-                                        key={liker.id}
-                                        sx={{ listStyle: "none" }}
-                                    >
-                                        <Box
-                                            sx={{
-                                                alignItems: "center",
-                                                boxSizing: "border-box",
-                                                color: "inherit",
-                                                display: "flex",
-                                                gap: "12px",
-                                                minHeight: 52,
-                                                px: "2px",
-                                                py: "8px",
-                                                textAlign: "left",
-                                                width: "100%",
-                                            }}
-                                        >
-                                            <Box
-                                                component={
-                                                    canOpenFriend
-                                                        ? "button"
-                                                        : "div"
-                                                }
-                                                type={
-                                                    canOpenFriend
-                                                        ? "button"
-                                                        : undefined
-                                                }
-                                                onClick={openLikerProfile}
-                                                sx={{
-                                                    alignItems: "center",
-                                                    appearance: "none",
-                                                    bgcolor: "transparent",
-                                                    border: 0,
-                                                    borderRadius: "12px",
-                                                    color: "inherit",
-                                                    cursor: canOpenFriend
-                                                        ? "pointer"
-                                                        : "default",
-                                                    display: "flex",
-                                                    flex: "0 1 auto",
-                                                    gap: "12px",
-                                                    maxWidth: "100%",
-                                                    minWidth: 0,
-                                                    p: 0,
-                                                    textAlign: "left",
-                                                    width: "fit-content",
-                                                    "&:focus-visible": {
-                                                        outline: `2px solid ${green}`,
-                                                        outlineOffset: 2,
-                                                    },
-                                                }}
-                                            >
-                                                <SpaceAvatar
-                                                    avatarUrl={liker.avatarUrl}
-                                                    size={36}
-                                                />
-                                                <Box
-                                                    sx={{
-                                                        color: textBase,
-                                                        flex: "0 1 auto",
-                                                        fontFamily:
-                                                            '"Inter Variable", Inter, sans-serif',
-                                                        fontSize: 14,
-                                                        fontWeight: 600,
-                                                        lineHeight: "20px",
-                                                        minWidth: 0,
-                                                        overflow: "hidden",
-                                                        textOverflow:
-                                                            "ellipsis",
-                                                        whiteSpace: "nowrap",
-                                                    }}
-                                                >
-                                                    {likerName}
-                                                </Box>
-                                            </Box>
-                                            <Box
-                                                aria-hidden
-                                                sx={{
-                                                    alignItems: "center",
-                                                    display: "flex",
-                                                    flexShrink: 0,
-                                                    justifyContent: "center",
-                                                    ml: "auto",
-                                                }}
-                                            >
-                                                <HeartFilledIcon />
-                                            </Box>
-                                        </Box>
-                                    </Box>
-                                );
-                            })
-                        )}
                     </Box>
                 </Box>
             )}
