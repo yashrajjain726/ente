@@ -43,7 +43,6 @@ const profileAvatarTopOffset = 54;
 const profileAvatarSize = 120;
 const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
-const ownerEmptyStateGap = "18px";
 const photoMasonryGap = "3px";
 const photoMasonryPlaceholderBackground = "#F2F2F2";
 const photoMasonryRadius = "12px";
@@ -1137,84 +1136,78 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 <SpaceLoadingSpinner ariaLabel="Loading posts" />
                             ) : (
                                 <>
-                                    {isOwnerProfile && (
-                                        <Box
-                                            component="img"
-                                            alt=""
-                                            src="/images/ducky-camera.svg"
-                                            sx={{
-                                                display: "block",
-                                                height: "auto",
-                                                mt: ownerEmptyStateGap,
-                                                width: 160,
-                                            }}
-                                        />
-                                    )}
                                     <Box
                                         component="p"
                                         sx={{
                                             color: textSoft,
                                             fontFamily:
                                                 '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 14,
+                                            fontSize: 16,
                                             fontWeight: 500,
-                                            lineHeight: "20px",
+                                            lineHeight: "22px",
                                             m: 0,
-                                            mt: isOwnerProfile
-                                                ? ownerEmptyStateGap
-                                                : 0,
                                             maxWidth: isOwnerProfile
                                                 ? 230
                                                 : 250,
                                         }}
                                     >
                                         {isOwnerProfile
-                                            ? "Your profile is looking empty. Share something with your friends."
+                                            ? "Create your first post"
                                             : isPublicProfile
                                               ? `${firstName} hasn't posted anything yet. Add them as a friend to get their latest posts.`
                                               : `${firstName} hasn't posted anything yet.`}
                                     </Box>
                                     {isOwnerProfile && (
                                         <Box
+                                            className="green-bg"
                                             component="button"
                                             type="button"
-                                            aria-label="Post photo"
                                             disabled={isPostPhotoOpening}
                                             onClick={openPostPhotoPicker}
                                             sx={{
                                                 appearance: "none",
                                                 alignItems: "center",
-                                                bgcolor: "transparent",
+                                                bgcolor: green,
                                                 border: 0,
+                                                borderRadius: "20px",
                                                 boxSizing: "border-box",
-                                                color: textBase,
+                                                color: "#FFFFFF",
                                                 cursor: isPostPhotoOpening
                                                     ? "default"
                                                     : "pointer",
-                                                display: "flex",
-                                                fontSize: 0,
-                                                height: 32,
+                                                display: "inline-flex",
+                                                fontFamily:
+                                                    '"Inter Variable", Inter, sans-serif',
+                                                fontSize: 14,
+                                                fontWeight: 600,
+                                                gap: "8px",
+                                                height: 40,
                                                 justifyContent: "center",
-                                                lineHeight: 0,
-                                                mt: ownerEmptyStateGap,
-                                                p: 0,
+                                                lineHeight: "20px",
+                                                mt: "24px",
+                                                px: "16px",
+                                                py: 0,
                                                 pointerEvents: "auto",
-                                                placeSelf: "center",
-                                                placeItems: "center",
-                                                width: 32,
-                                                "& svg": { display: "block" },
+                                                whiteSpace: "nowrap",
+                                                "& svg": {
+                                                    display: "block",
+                                                    flexShrink: 0,
+                                                },
                                                 "&:focus-visible": {
-                                                    borderRadius: "6px",
                                                     outline: `2px solid ${green}`,
                                                     outlineOffset: 2,
                                                 },
+                                                "&:hover": isPostPhotoOpening
+                                                    ? undefined
+                                                    : { bgcolor: "#07AE22" },
                                             }}
                                         >
                                             <HugeiconsIcon
                                                 icon={AddSquareIcon}
-                                                size={28}
+                                                size={20}
                                                 strokeWidth={1.8}
                                             />
+                                            Create
                                         </Box>
                                     )}
                                 </>
