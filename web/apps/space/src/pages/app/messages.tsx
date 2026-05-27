@@ -69,23 +69,27 @@ const Page: React.FC = () => {
         void loadCurrentMessageConversations()
             .then((page) => {
                 const unreadConversationIds = page.items
-                    .filter((conversation) => conversation.unread)
+                    .filter((conversation) => conversation.notificationUnread)
+                    .map(conversationId);
+                const passiveUnreadConversationIds = page.items
+                    .filter(
+                        (conversation) =>
+                            conversation.notificationUnread &&
+                            !conversation.unread,
+                    )
                     .map(conversationId);
                 setNewConversationIds(unreadConversationIds);
-                setConversations(
-                    page.items.map((conversation) =>
-                        conversation.unread
-                            ? { ...conversation, unread: false }
-                            : conversation,
-                    ),
-                );
-                if (unreadConversationIds.length == 0) return;
+                setConversations(page.items);
+                if (passiveUnreadConversationIds.length == 0) return;
                 void Promise.all(
-                    unreadConversationIds.map((friendSpaceId) =>
+                    passiveUnreadConversationIds.map((friendSpaceId) =>
                         markCurrentMessagesRead(friendSpaceId),
                     ),
                 ).catch((error: unknown) =>
-                    console.warn("Failed to mark messages read", error),
+                    console.warn(
+                        "Failed to mark passive message activity read",
+                        error,
+                    ),
                 );
             })
             .catch((error: unknown) =>
@@ -102,6 +106,9 @@ const Page: React.FC = () => {
             const friendSpaceId =
                 conversation.friend.spaceId ?? conversation.friend.id;
             selectedFriendSpaceIdRef.current = friendSpaceId;
+            setNewConversationIds((currentIds) =>
+                currentIds.filter((id) => id != friendSpaceId),
+            );
             setConversations((currentConversations) =>
                 currentConversations.map((currentConversation) =>
                     (currentConversation.friend.spaceId ??

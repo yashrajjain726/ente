@@ -311,9 +311,10 @@ type MessagePage struct {
 }
 
 type MessageConversationResponse struct {
-	Friend         SpaceActorResponse                  `json:"friend"`
-	LatestActivity MessageConversationActivityResponse `json:"latestActivity"`
-	Unread         bool                                `json:"unread"`
+	Friend             SpaceActorResponse                  `json:"friend"`
+	LatestActivity     MessageConversationActivityResponse `json:"latestActivity"`
+	Unread             bool                                `json:"unread"`
+	NotificationUnread bool                                `json:"notificationUnread"`
 }
 
 type MessageConversationActivityResponse struct {

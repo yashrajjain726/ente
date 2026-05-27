@@ -234,6 +234,7 @@ struct MessageConversationJs {
     friend: ActorJs,
     latest_activity: MessageConversationActivityJs,
     unread: bool,
+    notification_unread: bool,
 }
 
 #[derive(Serialize)]
@@ -1031,6 +1032,7 @@ impl SpaceAccountCtxHandle {
                 )
                 .await?,
                 unread: conversation.unread,
+                notification_unread: conversation.notification_unread,
             });
         }
         swb::to_value(&MessageConversationPageJs {

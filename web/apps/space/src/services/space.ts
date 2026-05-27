@@ -83,7 +83,6 @@ type SpaceMessageConversationActivityType =
     | "message"
     | "message_like"
     | "post_like"
-    | "post_like_and_reply"
     | "post_reply";
 
 interface SpaceMessageConversationPostResponse {
@@ -153,6 +152,7 @@ interface SpaceMessagePageResponse {
 interface SpaceMessageConversationResponse {
     friend: SpaceActor;
     latestActivity: SpaceMessageConversationActivity;
+    notificationUnread?: boolean;
     unread?: boolean;
 }
 
@@ -258,6 +258,7 @@ export interface SpaceMessagePage {
 export interface SpaceMessageConversation {
     friend: FriendProfile;
     latestActivity: SpaceMessageActivity;
+    notificationUnread: boolean;
     unread: boolean;
 }
 
@@ -1107,6 +1108,9 @@ export const loadCurrentMessageConversations =
                         latestActivity: await messageActivityFromSpaceActivity(
                             ctx,
                             conversation.latestActivity,
+                        ),
+                        notificationUnread: Boolean(
+                            conversation.notificationUnread,
                         ),
                         unread: Boolean(conversation.unread),
                     };

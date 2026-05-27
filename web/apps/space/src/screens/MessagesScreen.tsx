@@ -215,9 +215,6 @@ const conversationPreview = (
     if (activity.type == "post_reply") {
         return "Replied";
     }
-    if (activity.type == "post_like_and_reply") {
-        return "Liked and replied";
-    }
     if (activity.type == "message_like") {
         const text = activity.message?.text.trim();
         return text
@@ -246,9 +243,6 @@ const quotedConversationActivityPreview = (
     if (activity.type == "post_reply") {
         return { prefix: 'Replied "', previewText, suffix: '"' };
     }
-    if (activity.type == "post_like_and_reply") {
-        return { prefix: 'Liked and replied "', previewText, suffix: '"' };
-    }
     return undefined;
 };
 
@@ -262,7 +256,7 @@ const ConversationPreviewLine: React.FC<{
         color: textSecondary,
         fontFamily: '"Inter Variable", Inter, sans-serif',
         fontSize: 13,
-        fontWeight: 500,
+        fontWeight: conversation.notificationUnread ? 700 : 500,
         lineHeight: "18px",
         minWidth: 0,
         overflow: "hidden",
@@ -406,6 +400,19 @@ const ConversationListItem: React.FC<{
                         >
                             {timestampLabel}
                         </Box>
+                        {conversation.unread && (
+                            <Box
+                                aria-hidden
+                                sx={{
+                                    bgcolor: green,
+                                    borderRadius: "50%",
+                                    flexShrink: 0,
+                                    height: 8,
+                                    ml: "2px",
+                                    width: 8,
+                                }}
+                            />
+                        )}
                     </Box>
                     <ConversationPreviewLine
                         conversation={conversation}

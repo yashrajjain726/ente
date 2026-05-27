@@ -141,9 +141,10 @@ func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesReque
 	items := make([]models.MessageConversationResponse, 0, len(conversations))
 	for _, conversation := range conversations {
 		items = append(items, models.MessageConversationResponse{
-			Friend:         toActorResponse(conversation.Friend, true),
-			LatestActivity: toMessageConversationActivityResponse(conversation.LatestActivity),
-			Unread:         conversation.Unread,
+			Friend:             toActorResponse(conversation.Friend, true),
+			LatestActivity:     toMessageConversationActivityResponse(conversation.LatestActivity),
+			Unread:             conversation.Unread,
+			NotificationUnread: conversation.NotificationUnread,
 		})
 	}
 	return &models.MessageConversationPage{Items: items, NextCursor: nextCursor}, nil

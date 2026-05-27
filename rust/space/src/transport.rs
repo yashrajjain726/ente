@@ -210,6 +210,8 @@ pub struct MessageConversationResponse {
     pub latest_activity: MessageConversationActivity,
     #[serde(default)]
     pub unread: bool,
+    #[serde(default)]
+    pub notification_unread: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
