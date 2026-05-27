@@ -850,6 +850,18 @@ export const loadCurrentSpaceFriends = async (spaceId: string) => {
     }
 };
 
+export const loadCurrentSpaceFriendsCount = async (spaceId: string) => {
+    const ctx = await ensureCurrentSpaceContext();
+    try {
+        const spaceProfile = (await ctx.get_space_profile(
+            spaceId,
+        )) as SpaceProfileResponse;
+        return spaceProfile.friends ?? 0;
+    } finally {
+        releaseCurrentSpaceContext(ctx);
+    }
+};
+
 export const loadCurrentSpaceProfile = async (
     spaceId: string,
 ): Promise<FriendProfile> => {

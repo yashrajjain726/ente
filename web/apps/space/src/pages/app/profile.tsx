@@ -8,7 +8,7 @@ import {
     createCurrentProfileLink,
     deleteCurrentPost,
     loadCurrentPostLikers,
-    loadCurrentSpaceFriends,
+    loadCurrentSpaceFriendsCount,
     loadCurrentSpacePostsPage,
     markCurrentFeedRead,
     setCurrentPostLiked,
@@ -26,14 +26,9 @@ import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const {
-        friends,
-        profile,
-        profileLoadError,
-        profileLoadStatus,
-        setFriends,
-        setLocalFeedPosts,
-    } = useSpaceAppState();
+    const { profile, profileLoadError, profileLoadStatus, setLocalFeedPosts } =
+        useSpaceAppState();
+    const [friendsCount, setFriendsCount] = useState(0);
     const [posts, setPosts] = useState<SpacePost[]>([]);
     const [isPostsLoading, setIsPostsLoading] = useState(true);
     const postGroups = useMemo(
@@ -52,6 +47,7 @@ const Page: React.FC = () => {
 
         const spaceId = profile?.spaceId;
         if (!spaceId) {
+            setFriendsCount(0);
             setIsPostsLoading(false);
             return;
         }
@@ -60,12 +56,12 @@ const Page: React.FC = () => {
         setIsPostsLoading(true);
         void Promise.all([
             loadCurrentSpacePostsPage(spaceId),
-            loadCurrentSpaceFriends(spaceId),
+            loadCurrentSpaceFriendsCount(spaceId),
         ])
-            .then(([page, nextFriends]) => {
+            .then(([page, nextFriendsCount]) => {
                 if (cancelled) return;
                 setPosts(page.items);
-                setFriends(nextFriends);
+                setFriendsCount(nextFriendsCount);
             })
             .catch((error: unknown) =>
                 console.error("Failed to load space profile", error),
@@ -77,7 +73,7 @@ const Page: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, [profile?.spaceId, profileLoadStatus, setFriends]);
+    }, [profile?.spaceId, profileLoadStatus]);
 
     if (profileLoadStatus != "ready" || !profile) {
         return (
@@ -92,7 +88,7 @@ const Page: React.FC = () => {
         <>
             <SpacePageMeta themeColor={profileBackground} />
             <ProfileScreen
-                friendsCount={friends.length}
+                friendsCount={friendsCount}
                 isPostsLoading={isPostsLoading}
                 postGroups={postGroups}
                 profile={profile}
