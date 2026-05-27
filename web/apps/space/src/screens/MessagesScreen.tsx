@@ -1,13 +1,10 @@
 import {
     ArrowLeft02Icon,
     Cancel01Icon,
-    Loading03Icon,
     Navigation03Icon,
-    Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem, Skeleton, Tooltip } from "@mui/material";
-import { keyframes } from "@mui/material/styles";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
@@ -38,16 +35,6 @@ const composerPadding = 14;
 const composerPaddingLeft = 18;
 const threadBottomThresholdPx = 96;
 const messageGroupTimeThresholdMs = 10 * 60 * 1000;
-
-const sendSpin = keyframes`
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-`;
 
 interface MessagesScreenProps {
     conversations: SpaceMessageConversation[];
@@ -1024,9 +1011,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const [replyingTo, setReplyingTo] = React.useState<SpaceMessage | null>(
         null,
     );
-    const [sendPhase, setSendPhase] = React.useState<
-        "done" | "idle" | "sending"
-    >("idle");
+    const [sendPhase, setSendPhase] = React.useState<"idle" | "sending">(
+        "idle",
+    );
     const composerRef = React.useRef<HTMLTextAreaElement | null>(null);
     const threadScrollRef = React.useRef<HTMLDivElement | null>(null);
     const stickToThreadBottomRef = React.useRef(true);
@@ -1042,8 +1029,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const selectedName = selectedFriend
         ? selectedFriend.fullName.trim() || selectedFriend.username
         : "";
-    const isSendStatus = sendPhase != "idle";
-    const isSendButtonActive = canSend || isSendStatus;
     const showInviteEmptyState =
         friendsCount == 0 && Boolean(onShareProfileLink);
     const messageByID = React.useMemo(
@@ -1119,8 +1104,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             .then(() => {
                 setMessageText("");
                 setReplyingTo(null);
-                setSendPhase("done");
-                window.setTimeout(() => setSendPhase("idle"), 900);
+                setSendPhase("idle");
             })
             .catch((error: unknown) => {
                 smoothNextMessageScrollRef.current = false;
@@ -1191,13 +1175,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 }
                 break;
         }
-    };
-
-    const handleComposerKeyDown = (event: React.KeyboardEvent) => {
-        if (event.key != "Enter" || event.shiftKey) return;
-
-        event.preventDefault();
-        sendMessage();
     };
 
     const scrollThreadToBottom = React.useCallback(
@@ -1953,7 +1930,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             resizeComposer(event.currentTarget);
                                         }}
                                         onFocus={handleComposerFocus}
-                                        onKeyDown={handleComposerKeyDown}
                                         placeholder="Message"
                                         rows={1}
                                         value={messageText}
@@ -1990,32 +1966,19 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     <Box
                                         component="button"
                                         type="button"
-                                        aria-label={
-                                            sendPhase == "sending"
-                                                ? "Sending"
-                                                : sendPhase == "done"
-                                                  ? "Sent"
-                                                  : "Send message"
-                                        }
+                                        aria-label="Send message"
                                         disabled={!canSend}
                                         onClick={sendMessage}
                                         sx={{
                                             alignItems: "center",
-                                            bgcolor: isSendStatus
-                                                ? threadSurfaceHover
-                                                : canSend
-                                                  ? "#FFFFFF"
-                                                  : threadSurfaceHover,
+                                            bgcolor: canSend
+                                                ? "#FFFFFF"
+                                                : threadSurfaceHover,
                                             border: 0,
                                             borderRadius: "50%",
-                                            color:
-                                                sendPhase == "sending"
-                                                    ? "#D8D8D8"
-                                                    : sendPhase == "done"
-                                                      ? green
-                                                      : canSend
-                                                        ? "#3A3A3A"
-                                                        : "#D8D8D8",
+                                            color: canSend
+                                                ? "#3A3A3A"
+                                                : "#D8D8D8",
                                             cursor: canSend
                                                 ? "pointer"
                                                 : "default",
@@ -2023,12 +1986,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             flexShrink: 0,
                                             height: composerHeight,
                                             justifyContent: "center",
-                                            opacity:
-                                                sendPhase == "sending"
-                                                    ? 0.72
-                                                    : isSendButtonActive
-                                                      ? 1
-                                                      : 0.42,
+                                            opacity: canSend ? 1 : 0.42,
                                             p: 0,
                                             transition:
                                                 "background-color 180ms ease, color 180ms ease, opacity 180ms ease, transform 120ms ease",
@@ -2043,61 +2001,26 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 outlineOffset: 2,
                                             },
                                             "&:hover": {
-                                                bgcolor: isSendStatus
-                                                    ? threadSurfaceHover
-                                                    : canSend
-                                                      ? "#F2F2F2"
-                                                      : "rgba(255, 255, 255, 0.14)",
+                                                bgcolor: canSend
+                                                    ? "#F2F2F2"
+                                                    : "rgba(255, 255, 255, 0.14)",
                                             },
                                         }}
                                     >
-                                        {sendPhase == "sending" ? (
-                                            <Box
-                                                component="span"
-                                                sx={{
-                                                    animation: `${sendSpin} 1s linear infinite`,
-                                                    display: "flex",
-                                                    transform: "none",
-                                                }}
-                                            >
-                                                <HugeiconsIcon
-                                                    icon={Loading03Icon}
-                                                    size={22}
-                                                    strokeWidth={1.8}
-                                                />
-                                            </Box>
-                                        ) : sendPhase == "done" ? (
-                                            <Box
-                                                component="span"
-                                                sx={{
-                                                    display: "flex",
-                                                    transform:
-                                                        "translate(-1px, 1px)",
-                                                }}
-                                            >
-                                                <HugeiconsIcon
-                                                    icon={Tick02Icon}
-                                                    primaryColor={green}
-                                                    size={22}
-                                                    strokeWidth={1.8}
-                                                />
-                                            </Box>
-                                        ) : (
-                                            <Box
-                                                component="span"
-                                                sx={{
-                                                    display: "flex",
-                                                    transform:
-                                                        "translate(-1px, 1px)",
-                                                }}
-                                            >
-                                                <HugeiconsIcon
-                                                    icon={Navigation03Icon}
-                                                    size={24}
-                                                    strokeWidth={1.8}
-                                                />
-                                            </Box>
-                                        )}
+                                        <Box
+                                            component="span"
+                                            sx={{
+                                                display: "flex",
+                                                transform:
+                                                    "translate(-1px, 1px)",
+                                            }}
+                                        >
+                                            <HugeiconsIcon
+                                                icon={Navigation03Icon}
+                                                size={24}
+                                                strokeWidth={1.8}
+                                            />
+                                        </Box>
                                     </Box>
                                 </Box>
                             </Box>
