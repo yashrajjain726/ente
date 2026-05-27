@@ -13,6 +13,7 @@ import {
 } from "components/SpaceFileViewer";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { EnteLogo } from "ente-base/components/EnteLogo";
+import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
@@ -82,6 +83,7 @@ interface SelectedProfilePost {
     isDraftImagePreviewPending?: boolean;
     localObjectUrl?: string;
     photo: SpaceViewerPhoto;
+    postIndex?: number;
     postActionMode?: SpaceViewerPostActionMode;
 }
 
@@ -356,6 +358,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             items: group.items.filter((item) => !deletedPostIDs.has(item.id)),
         }))
         .filter((group) => group.items.length > 0);
+    const visiblePostItems = visiblePostGroups.flatMap((group) => group.items);
+    const visiblePostIndexByID = new Map(
+        visiblePostItems.map((item, index) => [item.id, index]),
+    );
     const postsSharedCount = visiblePostGroups.reduce(
         (count, group) => count + group.items.length,
         0,
@@ -393,6 +399,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setSelectedPost(null);
         revokeLocalPostObjectUrls();
     };
+    const { clearBrowserBackState: clearSelectedPostHistory } =
+        useBrowserBackClose({
+            open: Boolean(selectedPost),
+            onClose: closeSelectedPost,
+            stateKey: "space-profile-viewer",
+        });
     const rememberLoadedPhotoDimensions = (
         itemID: string,
         image: HTMLImageElement,
@@ -455,6 +467,129 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         },
         [loadedPostImageURLFor, onLoadPostImage],
     );
+
+    const dimensionsForPost = React.useCallback(
+        (item: ProfilePostItem): ProfilePhotoDimensions =>
+            loadedPhotoDimensionsByID[item.id] ?? {
+                height: item.height ?? 1,
+                width: item.width ?? 1,
+            },
+        [loadedPhotoDimensionsByID],
+    );
+
+    const selectedPostForItem = React.useCallback(
+        (
+            item: ProfilePostItem,
+            postIndex: number,
+            imageUrl: string,
+        ): SelectedProfilePost => {
+            const dimensions = dimensionsForPost(item);
+            return {
+                id: item.id,
+                photo: {
+                    alt: `${displayName} post ${postIndex + 1}`,
+                    avatarUrl: profile.avatarUrl,
+                    caption: item.caption,
+                    height: dimensions.height,
+                    imageUrl,
+                    name: displayName,
+                    postId: item.postId,
+                    timestampMs: item.timestampMs,
+                    viewerLiked: item.viewerLiked,
+                    width: dimensions.width,
+                },
+                postIndex,
+            };
+        },
+        [dimensionsForPost, displayName, profile.avatarUrl],
+    );
+
+    const profileViewerPhotos = React.useMemo(
+        () =>
+            visiblePostItems.map((item, index) => {
+                const dimensions = dimensionsForPost(item);
+                return {
+                    alt: `${displayName} post ${index + 1}`,
+                    avatarUrl: profile.avatarUrl,
+                    caption: item.caption,
+                    height: dimensions.height,
+                    imageUrl:
+                        loadedPostImageURLFor(item) ??
+                        (selectedPost?.id == item.id
+                            ? selectedPost.photo.imageUrl
+                            : ""),
+                    name: displayName,
+                    postId: item.postId,
+                    timestampMs: item.timestampMs,
+                    viewerLiked: item.viewerLiked,
+                    width: dimensions.width,
+                };
+            }),
+        [
+            dimensionsForPost,
+            displayName,
+            loadedPostImageURLFor,
+            profile.avatarUrl,
+            selectedPost?.id,
+            selectedPost?.photo.imageUrl,
+            visiblePostItems,
+        ],
+    );
+
+    const handleSelectedPostIndexChange = React.useCallback(
+        (postIndex: number) => {
+            const item = visiblePostItems[postIndex];
+            if (!item) return;
+
+            const updateSelectedPost = (imageUrl: string) => {
+                setSelectedPost((currentPost) => {
+                    if (currentPost?.postIndex == undefined) {
+                        return currentPost;
+                    }
+                    if (
+                        currentPost.id == item.id &&
+                        currentPost.photo.imageUrl == imageUrl
+                    ) {
+                        return currentPost;
+                    }
+                    return selectedPostForItem(item, postIndex, imageUrl);
+                });
+            };
+
+            const imageUrl = loadedPostImageURLFor(item);
+            if (imageUrl) {
+                updateSelectedPost(imageUrl);
+                return;
+            }
+
+            void loadPostImage(item).then((loadedImageUrl) => {
+                if (loadedImageUrl) updateSelectedPost(loadedImageUrl);
+            });
+        },
+        [
+            loadPostImage,
+            loadedPostImageURLFor,
+            selectedPostForItem,
+            visiblePostItems,
+        ],
+    );
+
+    React.useEffect(() => {
+        const currentPostIndex = selectedPost?.postIndex;
+        if (currentPostIndex == undefined) return;
+
+        for (const offset of [-1, 1]) {
+            const adjacentPost = visiblePostItems[currentPostIndex + offset];
+            if (!adjacentPost || loadedPostImageURLFor(adjacentPost)) continue;
+
+            void loadPostImage(adjacentPost);
+        }
+    }, [
+        loadPostImage,
+        loadedPostImageURLFor,
+        selectedPost?.postIndex,
+        visiblePostItems,
+    ]);
 
     const prepareSelectedPostPhoto = async (file: File) => {
         const canShowLocalPreview = canPreviewSpaceImageFile(file);
@@ -1223,29 +1358,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                         openedImageUrl,
                                                                     ) =>
                                                                         setSelectedPost(
-                                                                            {
-                                                                                id: item.id,
-                                                                                photo: {
-                                                                                    alt: `${displayName} post ${
-                                                                                        index +
-                                                                                        1
-                                                                                    }`,
-                                                                                    avatarUrl:
-                                                                                        profile.avatarUrl,
-                                                                                    caption:
-                                                                                        item.caption,
-                                                                                    height: dimensions.height,
-                                                                                    imageUrl:
-                                                                                        openedImageUrl,
-                                                                                    name: displayName,
-                                                                                    postId: item.postId,
-                                                                                    timestampMs:
-                                                                                        item.timestampMs,
-                                                                                    viewerLiked:
-                                                                                        item.viewerLiked,
-                                                                                    width: dimensions.width,
-                                                                                },
-                                                                            },
+                                                                            selectedPostForItem(
+                                                                                item,
+                                                                                visiblePostIndexByID.get(
+                                                                                    item.id,
+                                                                                ) ??
+                                                                                    index,
+                                                                                openedImageUrl,
+                                                                            ),
                                                                         )
                                                                     }
                                                                     onRememberDimensions={
@@ -1376,6 +1496,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             selectedPost.postActionMode ??
                             selectedPostActionMode
                         }
+                        photos={
+                            selectedPost.postIndex == undefined
+                                ? undefined
+                                : profileViewerPhotos
+                        }
+                        photoIndex={selectedPost.postIndex}
+                        onPhotoIndexChange={
+                            selectedPost.postIndex == undefined
+                                ? undefined
+                                : handleSelectedPostIndexChange
+                        }
                         onClose={closeSelectedPost}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
@@ -1403,7 +1534,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                   }
                                 : undefined
                         }
-                        onDraftPostPublished={onDraftPostPublished}
+                        onDraftPostPublished={
+                            onDraftPostPublished
+                                ? () => {
+                                      void clearSelectedPostHistory(
+                                          "back",
+                                      ).finally(onDraftPostPublished);
+                                  }
+                                : undefined
+                        }
                         onSetPostLiked={onSetPostLiked}
                     />
                 )}

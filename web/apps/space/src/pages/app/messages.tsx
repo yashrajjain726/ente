@@ -1,5 +1,6 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import { useRouter } from "next/router";
 import React from "react";
 import { MessagesScreen, messagesBackground } from "screens/MessagesScreen";
@@ -139,6 +140,11 @@ const Page: React.FC = () => {
         setIsThreadLoading(false);
         setMessages([]);
     }, []);
+    const { clearBrowserBackState: clearThreadHistory } = useBrowserBackClose({
+        open: Boolean(selectedFriend),
+        onClose: closeConversation,
+        stateKey: "space-message-thread",
+    });
 
     const appendMessageIfThreadIsCurrent = React.useCallback(
         (spaceId: string, message: SpaceMessage) => {
@@ -225,9 +231,12 @@ const Page: React.FC = () => {
                 onBack={() => void router.push(spaceRoutes.home)}
                 onCloseThread={closeConversation}
                 onOpenSelectedFriendProfile={(friend) =>
-                    void router.push(
-                        spaceRoutes.friend(friend.spaceId ?? friend.id),
-                    )
+                    void clearThreadHistory("back").finally(() => {
+                        closeConversation();
+                        void router.push(
+                            spaceRoutes.friend(friend.spaceId ?? friend.id),
+                        );
+                    })
                 }
                 onOpenThread={openConversation}
                 onSendMessage={async (spaceId, text) => {

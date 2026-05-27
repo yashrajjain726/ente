@@ -15,6 +15,7 @@ import {
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
 import { EnteLogo } from "ente-base/components/EnteLogo";
+import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
@@ -992,6 +993,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         setSelectedViewer(null);
         revokeLocalPostObjectUrls();
     };
+    const { clearBrowserBackState: clearSelectedPhotoHistory } =
+        useBrowserBackClose({
+            open: Boolean(selectedViewer),
+            onClose: closeSelectedPhoto,
+            stateKey: "space-feed-viewer",
+        });
     const deleteSelectedPost = async () => {
         const postId = selectedViewer?.photo.postId;
         if (!postId || !onDeletePost) return;
@@ -1630,16 +1637,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         onOpenProfile={
                             selectedPhotoIsOwn && onOpenProfile
                                 ? () => {
-                                      closeSelectedPhoto();
-                                      onOpenProfile();
+                                      void clearSelectedPhotoHistory(
+                                          "back",
+                                      ).finally(() => {
+                                          closeSelectedPhoto();
+                                          onOpenProfile();
+                                      });
                                   }
                                 : selectedPhotoFriendID && onOpenFriend
                                   ? () => {
-                                        closeSelectedPhoto();
-                                        onOpenFriend(selectedPhotoFriendID);
+                                        void clearSelectedPhotoHistory(
+                                            "back",
+                                        ).finally(() => {
+                                            closeSelectedPhoto();
+                                            onOpenFriend(selectedPhotoFriendID);
+                                        });
                                     }
                                   : undefined
                         }
+                        onSwipeLeft={closeSelectedPhoto}
                         onReplyToPost={
                             !selectedPhotoIsOwn &&
                             selectedViewer.photo.friendID != profile.spaceId
