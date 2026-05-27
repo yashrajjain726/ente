@@ -36,6 +36,7 @@ const composerHeight = 48;
 const composerMaxHeight = 112;
 const composerPadding = 14;
 const composerPaddingLeft = 18;
+const threadBottomThresholdPx = 96;
 const messageGroupTimeThresholdMs = 10 * 60 * 1000;
 
 const sendSpin = keyframes`
@@ -91,6 +92,10 @@ const resizeComposer = (input: HTMLTextAreaElement | null) => {
     input.style.overflowY =
         input.scrollHeight > composerMaxHeight ? "auto" : "hidden";
 };
+
+const isThreadNearBottom = (scroller: HTMLDivElement) =>
+    scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <=
+    threadBottomThresholdPx;
 
 const copyTextToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
@@ -1024,6 +1029,12 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     >("idle");
     const composerRef = React.useRef<HTMLTextAreaElement | null>(null);
     const threadScrollRef = React.useRef<HTMLDivElement | null>(null);
+    const stickToThreadBottomRef = React.useRef(true);
+    const smoothNextMessageScrollRef = React.useRef(false);
+    const bottomScrollFrameRef = React.useRef<number | undefined>(undefined);
+    const bottomScrollSecondFrameRef = React.useRef<number | undefined>(
+        undefined,
+    );
     const isThreadOpen = Boolean(selectedFriend);
     const canInteract = isThreadOpen && !isThreadReadOnly;
     const canSend =
@@ -1098,6 +1109,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         const text = messageText.trim();
         if (!selectedFriend || !canInteract || !canSend) return;
         const spaceId = selectedFriend.spaceId ?? selectedFriend.id;
+        stickToThreadBottomRef.current = true;
+        smoothNextMessageScrollRef.current = true;
         setSendPhase("sending");
         const sendPromise = replyingTo
             ? onReplyToMessage(spaceId, replyingTo.id, text)
@@ -1110,6 +1123,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 window.setTimeout(() => setSendPhase("idle"), 900);
             })
             .catch((error: unknown) => {
+                smoothNextMessageScrollRef.current = false;
                 console.error("Failed to send message", error);
                 setSendPhase("idle");
             });
@@ -1186,14 +1200,68 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         sendMessage();
     };
 
+    const scrollThreadToBottom = React.useCallback(
+        (behavior: ScrollBehavior = "auto") => {
+            const scroller = threadScrollRef.current;
+            if (!scroller) return;
+
+            if (behavior == "smooth") {
+                scroller.scrollTo({ behavior, top: scroller.scrollHeight });
+                return;
+            }
+
+            scroller.scrollTop = scroller.scrollHeight;
+        },
+        [],
+    );
+
+    const scheduleThreadBottomScroll = React.useCallback(
+        (behavior: ScrollBehavior = "auto") => {
+            if (bottomScrollFrameRef.current != undefined) {
+                window.cancelAnimationFrame(bottomScrollFrameRef.current);
+            }
+            if (bottomScrollSecondFrameRef.current != undefined) {
+                window.cancelAnimationFrame(bottomScrollSecondFrameRef.current);
+            }
+
+            bottomScrollFrameRef.current = window.requestAnimationFrame(() => {
+                bottomScrollFrameRef.current = undefined;
+                bottomScrollSecondFrameRef.current =
+                    window.requestAnimationFrame(() => {
+                        bottomScrollSecondFrameRef.current = undefined;
+                        scrollThreadToBottom(behavior);
+                    });
+            });
+        },
+        [scrollThreadToBottom],
+    );
+
+    const handleThreadScroll = () => {
+        const scroller = threadScrollRef.current;
+        if (!scroller) return;
+        stickToThreadBottomRef.current = isThreadNearBottom(scroller);
+    };
+
+    const handleComposerFocus = () => {
+        const scroller = threadScrollRef.current;
+        if (scroller && !isThreadNearBottom(scroller)) return;
+        stickToThreadBottomRef.current = true;
+        scheduleThreadBottomScroll("smooth");
+    };
+
     React.useLayoutEffect(() => {
         resizeComposer(composerRef.current);
-    }, [messageText, replyingTo]);
+        if (!selectedFriend || !stickToThreadBottomRef.current) return;
+        if (smoothNextMessageScrollRef.current) return;
+        scrollThreadToBottom();
+    }, [messageText, replyingTo, scrollThreadToBottom, selectedFriend]);
 
     React.useEffect(() => {
         setReplyingTo(null);
         setMessageContextMenu(null);
         setMessageText("");
+        stickToThreadBottomRef.current = true;
+        smoothNextMessageScrollRef.current = false;
     }, [selectedFriend]);
 
     React.useEffect(() => {
@@ -1205,12 +1273,130 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
 
     React.useLayoutEffect(() => {
         if (!selectedFriend || isThreadLoading) return;
+        if (!stickToThreadBottomRef.current) return;
+        if (smoothNextMessageScrollRef.current) {
+            smoothNextMessageScrollRef.current = false;
+            scheduleThreadBottomScroll("smooth");
+            return;
+        }
+        scrollThreadToBottom();
+    }, [
+        isThreadLoading,
+        messages.length,
+        scheduleThreadBottomScroll,
+        scrollThreadToBottom,
+        selectedFriend,
+    ]);
 
-        const scroller = threadScrollRef.current;
-        if (!scroller) return;
+    React.useEffect(() => {
+        if (!isThreadOpen) return;
 
-        scroller.scrollTop = scroller.scrollHeight;
-    }, [isThreadLoading, messages.length, selectedFriend]);
+        const html = document.documentElement;
+        const body = document.body;
+        const previous = {
+            bodyBackground: body.style.backgroundColor,
+            bodyHeight: body.style.height,
+            bodyOverscroll: body.style.overscrollBehavior,
+            bodyOverflow: body.style.overflow,
+            htmlBackground: html.style.backgroundColor,
+            htmlHeight: html.style.height,
+            htmlOverscroll: html.style.overscrollBehavior,
+            htmlOverflow: html.style.overflow,
+            viewportTop: html.style.getPropertyValue(
+                "--space-messages-viewport-top",
+            ),
+            viewportHeight: html.style.getPropertyValue(
+                "--space-messages-viewport-height",
+            ),
+        };
+
+        const updateViewportHeight = () => {
+            const viewport = window.visualViewport;
+            const height = viewport?.height ?? window.innerHeight;
+            const top = viewport?.offsetTop ?? 0;
+            html.style.setProperty("--space-messages-viewport-top", `${top}px`);
+            html.style.setProperty(
+                "--space-messages-viewport-height",
+                `${height}px`,
+            );
+
+            if (
+                document.activeElement == composerRef.current &&
+                stickToThreadBottomRef.current
+            ) {
+                scheduleThreadBottomScroll();
+            }
+        };
+
+        updateViewportHeight();
+        window.addEventListener("resize", updateViewportHeight);
+        window.addEventListener("orientationchange", updateViewportHeight);
+        window.visualViewport?.addEventListener("resize", updateViewportHeight);
+        window.visualViewport?.addEventListener("scroll", updateViewportHeight);
+
+        html.style.backgroundColor = threadBackground;
+        html.style.height = "100%";
+        html.style.overflow = "hidden";
+        html.style.overscrollBehavior = "none";
+        body.style.backgroundColor = threadBackground;
+        body.style.height = "100%";
+        body.style.overflow = "hidden";
+        body.style.overscrollBehavior = "none";
+
+        return () => {
+            window.removeEventListener("resize", updateViewportHeight);
+            window.removeEventListener(
+                "orientationchange",
+                updateViewportHeight,
+            );
+            window.visualViewport?.removeEventListener(
+                "resize",
+                updateViewportHeight,
+            );
+            window.visualViewport?.removeEventListener(
+                "scroll",
+                updateViewportHeight,
+            );
+
+            if (previous.viewportHeight) {
+                html.style.setProperty(
+                    "--space-messages-viewport-height",
+                    previous.viewportHeight,
+                );
+            } else {
+                html.style.removeProperty("--space-messages-viewport-height");
+            }
+            if (previous.viewportTop) {
+                html.style.setProperty(
+                    "--space-messages-viewport-top",
+                    previous.viewportTop,
+                );
+            } else {
+                html.style.removeProperty("--space-messages-viewport-top");
+            }
+
+            html.style.backgroundColor = previous.htmlBackground;
+            html.style.height = previous.htmlHeight;
+            html.style.overflow = previous.htmlOverflow;
+            html.style.overscrollBehavior = previous.htmlOverscroll;
+            body.style.backgroundColor = previous.bodyBackground;
+            body.style.height = previous.bodyHeight;
+            body.style.overflow = previous.bodyOverflow;
+            body.style.overscrollBehavior = previous.bodyOverscroll;
+        };
+    }, [isThreadOpen, scheduleThreadBottomScroll]);
+
+    React.useEffect(
+        () => () => {
+            if (bottomScrollFrameRef.current != undefined) {
+                window.cancelAnimationFrame(bottomScrollFrameRef.current);
+            }
+            if (bottomScrollSecondFrameRef.current != undefined) {
+                window.cancelAnimationFrame(bottomScrollSecondFrameRef.current);
+            }
+        },
+        [],
+    );
 
     return (
         <Box
@@ -1219,17 +1405,35 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 bgcolor: isThreadOpen ? threadBackground : messagesBackground,
                 color: isThreadOpen ? threadText : textBase,
                 display: "grid",
-                minHeight: "100svh",
+                height: isThreadOpen
+                    ? "var(--space-messages-viewport-height, 100svh)"
+                    : undefined,
+                left: isThreadOpen ? 0 : undefined,
+                minHeight: isThreadOpen ? 0 : "100svh",
+                overflow: isThreadOpen ? "hidden" : undefined,
                 overflowX: "hidden",
                 placeItems: { xs: "stretch", sm: "start center" },
+                position: isThreadOpen ? "fixed" : undefined,
+                right: isThreadOpen ? 0 : undefined,
+                top: isThreadOpen
+                    ? "var(--space-messages-viewport-top, 0px)"
+                    : undefined,
             }}
         >
             <Box
                 sx={{
                     bgcolor: "inherit",
                     boxSizing: "border-box",
-                    minHeight: "100svh",
+                    display: isThreadOpen ? "grid" : undefined,
+                    gridTemplateRows: isThreadOpen
+                        ? isThreadReadOnly
+                            ? "56px minmax(0, 1fr)"
+                            : "56px minmax(0, 1fr) auto"
+                        : undefined,
+                    height: isThreadOpen ? "100%" : undefined,
+                    minHeight: isThreadOpen ? 0 : "100svh",
                     mx: "auto",
+                    overflow: isThreadOpen ? "hidden" : undefined,
                     position: "relative",
                     width: "100%",
                     "@media (min-width: 600px)": { maxWidth: 390 },
@@ -1361,13 +1565,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     <>
                         <Box
                             ref={threadScrollRef}
+                            onScroll={handleThreadScroll}
                             sx={{
                                 boxSizing: "border-box",
-                                height: isThreadReadOnly
-                                    ? "calc(100svh - 56px)"
-                                    : replyingTo
-                                      ? "calc(100svh - 56px - 142px - env(safe-area-inset-bottom))"
-                                      : "calc(100svh - 56px - 72px - env(safe-area-inset-bottom))",
+                                minHeight: 0,
+                                overscrollBehaviorY: "contain",
                                 overflowY: "auto",
                                 px: "14px",
                                 py: "12px",
@@ -1629,16 +1831,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                             <Box
                                 sx={{
                                     bgcolor: threadBackground,
-                                    bottom: 0,
                                     boxSizing: "border-box",
                                     display: "grid",
                                     gap: "8px",
-                                    left: 0,
-                                    maxWidth: { sm: 390 },
-                                    mx: { sm: "auto" },
                                     p: "10px 14px calc(10px + env(safe-area-inset-bottom))",
-                                    position: "fixed",
-                                    right: 0,
                                     width: "100%",
                                 }}
                             >
@@ -1756,6 +1952,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             setMessageText(nextText);
                                             resizeComposer(event.currentTarget);
                                         }}
+                                        onFocus={handleComposerFocus}
                                         onKeyDown={handleComposerKeyDown}
                                         placeholder="Message"
                                         rows={1}
