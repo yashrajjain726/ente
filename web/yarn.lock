@@ -660,6 +660,11 @@
   resolved "https://registry.npmjs.org/@fontsource/jetbrains-mono/-/jetbrains-mono-5.2.8.tgz"
   integrity sha512-6w8/SG4kqvIMu7xd7wt6x3idn1Qux3p9N62s6G3rfldOUYHpWcc2FKrqf+Vo44jRvqWj2oAtTHrZXEP23oSKwQ==
 
+"@fontsource/nunito@^5.2.7":
+  version "5.2.7"
+  resolved "https://registry.yarnpkg.com/@fontsource/nunito/-/nunito-5.2.7.tgz#158a5726437c3899814830db23ec36896fcc44e4"
+  integrity sha512-pmtBq0H9ex9nk+RtJYEJOD9pag393iHETnl/PVKleF4i06cd0ttngK5ZCTgYb5eOqR3Xdlrjtev8m7bmgYprew==
+
 "@fontsource/source-serif-4@^5.2.7":
   version "5.2.9"
   resolved "https://registry.npmjs.org/@fontsource/source-serif-4/-/source-serif-4-5.2.9.tgz"
