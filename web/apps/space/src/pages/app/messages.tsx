@@ -113,7 +113,11 @@ const Page: React.FC = () => {
                 currentConversations.map((currentConversation) =>
                     (currentConversation.friend.spaceId ??
                         currentConversation.friend.id) == friendSpaceId
-                        ? { ...currentConversation, unread: false }
+                        ? {
+                              ...currentConversation,
+                              notificationUnread: false,
+                              unread: false,
+                          }
                         : currentConversation,
                 ),
             );

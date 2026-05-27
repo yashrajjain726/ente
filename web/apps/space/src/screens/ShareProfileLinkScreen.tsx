@@ -430,9 +430,9 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             width: "100%",
                         }}
                     >
-                        Share your end-to-end encrypted profile link with close
-                        people. Only you and the people you share it with can
-                        view it.
+                        Invite your friends and family to follow your life by
+                        sharing your private profile link. Only you and the
+                        people you share it with can access it.
                     </Box>
                 </Box>
 
