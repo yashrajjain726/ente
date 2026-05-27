@@ -9,10 +9,16 @@ interface SpaceRouteFallbackProps {
 
 interface SpaceLoadingSpinnerProps {
     ariaLabel?: string;
+    color?: string;
+    size?: number;
+    trackColor?: string;
 }
 
 export const SpaceLoadingSpinner: React.FC<SpaceLoadingSpinnerProps> = ({
     ariaLabel = "Loading",
+    color = "#08C225",
+    size = 26,
+    trackColor = "rgba(8, 194, 37, 0.18)",
 }) => (
     <Box
         component="span"
@@ -20,11 +26,11 @@ export const SpaceLoadingSpinner: React.FC<SpaceLoadingSpinnerProps> = ({
         aria-label={ariaLabel}
         sx={{
             animation: "spaceRouteFallbackSpin 800ms linear infinite",
-            border: "2px solid rgba(8, 194, 37, 0.18)",
+            border: `2px solid ${trackColor}`,
             borderRadius: "50%",
-            borderTopColor: "#08C225",
-            height: 26,
-            width: 26,
+            borderTopColor: color,
+            height: size,
+            width: size,
             "@keyframes spaceRouteFallbackSpin": {
                 to: { transform: "rotate(360deg)" },
             },

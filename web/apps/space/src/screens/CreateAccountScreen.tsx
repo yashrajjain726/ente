@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import {
     estimatePasswordStrength,
     type PasswordStrength,
@@ -331,6 +332,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
         confirmPassword.length > 0 &&
         password == confirmPassword &&
         acceptedTerms;
+    const isCreateAccountButtonActive = canCreateAccount || isSubmitting;
 
     const submitCreateAccount = () => {
         if (canCreateAccount) {
@@ -617,17 +619,27 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                     }}
                 >
                     <Box
-                        className={canCreateAccount ? "green-bg" : undefined}
+                        className={
+                            isCreateAccountButtonActive ? "green-bg" : undefined
+                        }
                         component="button"
                         form={createAccountFormID}
                         type="submit"
                         disabled={!canCreateAccount}
+                        aria-label={
+                            isSubmitting ? "Creating account" : undefined
+                        }
+                        aria-busy={isSubmitting ? true : undefined}
                         sx={{
                             alignItems: "center",
-                            bgcolor: canCreateAccount ? green : "#F5F5F5",
+                            bgcolor: isCreateAccountButtonActive
+                                ? green
+                                : "#F5F5F5",
                             border: 0,
                             borderRadius: "20px",
-                            color: canCreateAccount ? "white" : textLight,
+                            color: isCreateAccountButtonActive
+                                ? "white"
+                                : textLight,
                             cursor: canCreateAccount ? "pointer" : "default",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -647,9 +659,11 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                                 : undefined,
                         }}
                     >
-                        {isSubmitting
-                            ? "Creating account..."
-                            : "Create an account"}
+                        {isSubmitting ? (
+                            <SpaceButtonSpinner />
+                        ) : (
+                            "Create an account"
+                        )}
                     </Box>
                 </Box>
             </Box>

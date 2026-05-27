@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React, { useEffect, useRef, useState } from "react";
 
 export const loginBackground = "#FAFAFA";
@@ -95,7 +96,28 @@ const TextInput: React.FC<TextInputProps> = ({
     value,
 }) => {
     const [showPassword, setShowPassword] = useState(false);
+    const internalInputRef = useRef<HTMLInputElement | null>(null);
     const isPassword = type == "password";
+    const setInputRef = (element: HTMLInputElement | null) => {
+        internalInputRef.current = element;
+        if (typeof inputRef == "function") {
+            inputRef(element);
+        } else if (inputRef) {
+            inputRef.current = element;
+        }
+    };
+
+    const togglePasswordVisibility = () => {
+        const inputElement = internalInputRef.current;
+        const shouldRestoreFocus = document.activeElement == inputElement;
+
+        setShowPassword((value) => !value);
+        if (shouldRestoreFocus) {
+            window.requestAnimationFrame(() =>
+                inputElement?.focus({ preventScroll: true }),
+            );
+        }
+    };
 
     return (
         <Box sx={{ width: "100%" }}>
@@ -132,7 +154,7 @@ const TextInput: React.FC<TextInputProps> = ({
             >
                 <Box
                     component="input"
-                    ref={inputRef}
+                    ref={setInputRef}
                     autoFocus={autoFocus}
                     onChange={(event) => onChange?.(event.target.value)}
                     placeholder={placeholder}
@@ -162,7 +184,8 @@ const TextInput: React.FC<TextInputProps> = ({
                         aria-label={
                             showPassword ? "Hide password" : "Show password"
                         }
-                        onClick={() => setShowPassword((value) => !value)}
+                        onClick={togglePasswordVisibility}
+                        onPointerDown={(event) => event.preventDefault()}
                         sx={{
                             alignItems: "center",
                             bgcolor: "transparent",
@@ -247,6 +270,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 }) => {
     const [email, setEmail] = useState(initialEmail ?? "");
     const [password, setPassword] = useState("");
+    const [visualViewportBottomInset, setVisualViewportBottomInset] =
+        useState(0);
     const passwordInputRef = useRef<HTMLInputElement | null>(null);
     const appliedInitialEmailRef = useRef<string | undefined>(initialEmail);
 
@@ -270,11 +295,68 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         return () => window.cancelAnimationFrame(animationFrame);
     }, [focusPassword, initialEmail]);
 
+    useEffect(() => {
+        const viewport = window.visualViewport;
+        if (!viewport) return undefined;
+
+        const updateBottomInset = () => {
+            const activeElement = document.activeElement;
+            const isEditingText =
+                activeElement instanceof HTMLInputElement ||
+                activeElement instanceof HTMLTextAreaElement ||
+                (activeElement instanceof HTMLElement &&
+                    activeElement.isContentEditable);
+
+            setVisualViewportBottomInset(
+                isEditingText
+                    ? Math.max(
+                          0,
+                          Math.round(
+                              window.innerHeight -
+                                  viewport.height -
+                                  viewport.offsetTop,
+                          ),
+                      )
+                    : 0,
+            );
+        };
+
+        updateBottomInset();
+        viewport.addEventListener("resize", updateBottomInset);
+        viewport.addEventListener("scroll", updateBottomInset);
+        window.addEventListener("focusin", updateBottomInset);
+        window.addEventListener("focusout", updateBottomInset);
+
+        return () => {
+            viewport.removeEventListener("resize", updateBottomInset);
+            viewport.removeEventListener("scroll", updateBottomInset);
+            window.removeEventListener("focusin", updateBottomInset);
+            window.removeEventListener("focusout", updateBottomInset);
+        };
+    }, []);
+
     const canContinue =
         !isSubmitting && email.trim().length > 0 && password.length > 0;
+    const isContinueButtonActive = canContinue || isSubmitting;
+    const footerPaddingBottom =
+        visualViewportBottomInset > 0
+            ? "24px"
+            : "calc(24px + env(safe-area-inset-bottom))";
 
     const submitLogin = () => {
         if (canContinue) void onContinue?.({ email, password });
+    };
+
+    const handleContinuePointerDown: React.PointerEventHandler<
+        HTMLButtonElement
+    > = (event) => {
+        if (event.pointerType != "touch") return;
+
+        event.preventDefault();
+        submitLogin();
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
     };
 
     const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
@@ -290,7 +372,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 color: textBase,
                 display: "grid",
                 minHeight: "100svh",
-                overflow: "hidden",
                 placeItems: { xs: "stretch", sm: "start center" },
             }}
         >
@@ -302,7 +383,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     flexDirection: "column",
                     minHeight: "100svh",
                     mx: "auto",
-                    pb: "154px",
                     px: 3,
                     width: "100%",
                     "@media (min-width: 600px)": { maxWidth: 390 },
@@ -418,31 +498,36 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 <Box
                     sx={{
                         bgcolor: loginBackground,
-                        bottom: 0,
+                        bottom: `${visualViewportBottomInset}px`,
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
                         gap: "16px",
-                        left: "50%",
-                        maxWidth: 390,
-                        p: 3,
-                        position: "fixed",
-                        transform: "translateX(-50%)",
+                        mt: "auto",
+                        pb: footerPaddingBottom,
+                        pt: 3,
+                        position: "sticky",
                         width: "100%",
+                        zIndex: 1,
                     }}
                 >
                     <Box
-                        className={canContinue ? "green-bg" : undefined}
+                        className={
+                            isContinueButtonActive ? "green-bg" : undefined
+                        }
                         component="button"
                         form={loginFormID}
                         type="submit"
                         disabled={!canContinue}
+                        aria-label={isSubmitting ? "Signing in" : undefined}
+                        aria-busy={isSubmitting ? true : undefined}
+                        onPointerDown={handleContinuePointerDown}
                         sx={{
                             alignItems: "center",
-                            bgcolor: canContinue ? green : "#F5F5F5",
+                            bgcolor: isContinueButtonActive ? green : "#F5F5F5",
                             border: 0,
                             borderRadius: "20px",
-                            color: canContinue ? "white" : textLight,
+                            color: isContinueButtonActive ? "white" : textLight,
                             cursor: canContinue ? "pointer" : "default",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -462,7 +547,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                                 : undefined,
                         }}
                     >
-                        {isSubmitting ? "Signing in..." : "Continue"}
+                        {isSubmitting ? <SpaceButtonSpinner /> : "Continue"}
                     </Box>
                     {readOnlyEmail && onChangeEmail && (
                         <FooterLinkButton

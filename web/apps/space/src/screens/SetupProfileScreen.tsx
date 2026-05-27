@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { SpaceAvatarCropPage } from "components/SpaceAvatarCropPage";
 import { SpaceAvatarEditButton } from "components/SpaceAvatarEditButton";
+import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React, { useEffect, useRef, useState } from "react";
 import type { Area, Point } from "react-easy-crop";
 import {
@@ -268,6 +269,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
         usernameStatus != "unavailable" &&
         username.trim().length > 0 &&
         fullName.trim().length > 0;
+    const isContinueButtonActive = canContinue || isSubmitting;
 
     useEffect(
         () => () => {
@@ -645,17 +647,21 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                     }}
                 >
                     <Box
-                        className={canContinue ? "green-bg" : undefined}
+                        className={
+                            isContinueButtonActive ? "green-bg" : undefined
+                        }
                         component="button"
                         form={setupProfileFormID}
                         type="submit"
                         disabled={!canContinue}
+                        aria-label={isSubmitting ? "Saving" : undefined}
+                        aria-busy={isSubmitting ? true : undefined}
                         sx={{
                             alignItems: "center",
-                            bgcolor: canContinue ? green : "#F5F5F5",
+                            bgcolor: isContinueButtonActive ? green : "#F5F5F5",
                             border: 0,
                             borderRadius: "20px",
-                            color: canContinue ? "white" : textLight,
+                            color: isContinueButtonActive ? "white" : textLight,
                             cursor: canContinue ? "pointer" : "default",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -675,7 +681,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                                 : undefined,
                         }}
                     >
-                        {isSubmitting ? "Saving..." : ctaLabel}
+                        {isSubmitting ? <SpaceButtonSpinner /> : ctaLabel}
                     </Box>
                 </Box>
             </Box>

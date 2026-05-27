@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React, { useEffect, useRef, useState } from "react";
 
 export const verifyEmailBackground = "#FAFAFA";
@@ -16,6 +17,7 @@ interface VerifyEmailScreenProps {
     email: string;
     errorMessage?: string;
     initialCode?: string;
+    isResending?: boolean;
     isSubmitting?: boolean;
     onBack: () => void;
     onChangeEmail: () => void;
@@ -121,6 +123,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
     email,
     errorMessage,
     initialCode = "",
+    isResending = false,
     isSubmitting = false,
     onBack,
     onChangeEmail,
@@ -143,6 +146,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
     );
     const otpComplete = otp.every((digit) => digit.length == 1);
     const canVerify = otpComplete && !isSubmitting;
+    const isVerifyButtonActive = canVerify || isSubmitting;
 
     const focusInput = (index: number) => {
         inputRefs.current[index]?.focus();
@@ -216,6 +220,8 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
     };
 
     const handleResendCode = () => {
+        if (isResending) return;
+
         setOtp(Array(6).fill(""));
         focusInput(0);
         onResendCode?.();
@@ -446,23 +452,39 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                                     <Box
                                         component="button"
                                         type="button"
+                                        disabled={isResending}
+                                        aria-label={
+                                            isResending
+                                                ? "Resending code"
+                                                : undefined
+                                        }
+                                        aria-busy={
+                                            isResending ? true : undefined
+                                        }
                                         onClick={handleResendCode}
                                         sx={{
                                             bgcolor: "transparent",
                                             border: 0,
                                             color: green,
-                                            cursor: "pointer",
+                                            cursor: isResending
+                                                ? "default"
+                                                : "pointer",
                                             fontFamily:
                                                 '"Inter Variable", Inter, sans-serif',
                                             fontSize: 14,
                                             fontWeight: 500,
                                             lineHeight: "20px",
+                                            minWidth: 84,
                                             p: 0,
                                             textDecoration: "underline",
                                             textUnderlineOffset: "2px",
                                         }}
                                     >
-                                        Resend code
+                                        {isResending ? (
+                                            <SpaceButtonSpinner />
+                                        ) : (
+                                            "Resend code"
+                                        )}
                                     </Box>
                                 )}
                             </Box>
@@ -484,17 +506,21 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                     }}
                 >
                     <Box
-                        className={canVerify ? "green-bg" : undefined}
+                        className={
+                            isVerifyButtonActive ? "green-bg" : undefined
+                        }
                         component="button"
                         form={verifyEmailFormID}
                         type="submit"
                         disabled={!canVerify}
+                        aria-label={isSubmitting ? "Verifying" : undefined}
+                        aria-busy={isSubmitting ? true : undefined}
                         sx={{
                             alignItems: "center",
-                            bgcolor: canVerify ? green : "#F5F5F5",
+                            bgcolor: isVerifyButtonActive ? green : "#F5F5F5",
                             border: 0,
                             borderRadius: "20px",
-                            color: canVerify ? "white" : textLight,
+                            color: isVerifyButtonActive ? "white" : textLight,
                             cursor: canVerify ? "pointer" : "default",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -514,7 +540,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                                 : undefined,
                         }}
                     >
-                        {isSubmitting ? "Verifying..." : "Verify"}
+                        {isSubmitting ? <SpaceButtonSpinner /> : "Verify"}
                     </Box>
                 </Box>
             </Box>

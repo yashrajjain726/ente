@@ -1,6 +1,7 @@
 import { ArrowLeft02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
+import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React from "react";
 import Cropper, { type Area, type Point } from "react-easy-crop";
 
@@ -50,20 +51,23 @@ const SetupBackIcon: React.FC = () => (
 const SpaceAvatarCropPageButton: React.FC<{
     children: React.ReactNode;
     disabled?: boolean;
+    loading?: boolean;
     onClick?: () => void;
-}> = ({ children, disabled = false, onClick }) => (
+}> = ({ children, disabled = false, loading = false, onClick }) => (
     <Box
-        className={!disabled ? "green-bg" : undefined}
+        className={!disabled || loading ? "green-bg" : undefined}
         component="button"
         type="button"
         disabled={disabled}
+        aria-label={loading ? "Saving" : undefined}
+        aria-busy={loading ? true : undefined}
         onClick={onClick}
         sx={{
             alignItems: "center",
-            bgcolor: disabled ? "#F5F5F5" : green,
+            bgcolor: disabled && !loading ? "#F5F5F5" : green,
             border: 0,
             borderRadius: "20px",
-            color: disabled ? textLight : "white",
+            color: disabled && !loading ? textLight : "white",
             cursor: disabled ? "default" : "pointer",
             display: "flex",
             flex: "0 0 auto",
@@ -372,9 +376,10 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                 >
                     <SpaceAvatarCropPageButton
                         disabled={isSaving || isDoneDisabled}
+                        loading={isSaving}
                         onClick={onDone}
                     >
-                        {isSaving ? "Saving..." : "Done"}
+                        {isSaving ? <SpaceButtonSpinner /> : "Done"}
                     </SpaceAvatarCropPageButton>
                     <SpaceAvatarCropPageLinkButton
                         disabled={isSaving}
