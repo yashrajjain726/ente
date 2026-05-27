@@ -196,6 +196,17 @@ const pageScrollY = () =>
             0,
     );
 
+const scrollPageToTop = () => {
+    if (pageScrollY() <= 0) return;
+
+    window.scrollTo({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "auto"
+            : "smooth",
+        top: 0,
+    });
+};
+
 const useHideHeaderOnScrollDirection = () => {
     const [isHidden, setIsHidden] = useState(false);
     const lastScrollYRef = React.useRef(0);
@@ -938,6 +949,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
+    const topLocalFeedPostIDRef = React.useRef(localFeedPosts[0]?.id ?? null);
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
     const selectedPhotoIsOwn =
         Boolean(profile.spaceId) && selectedPhotoFriendID == profile.spaceId;
@@ -1057,6 +1069,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 viewerUnread={false}
             />
         );
+
+    React.useEffect(() => {
+        const topLocalFeedPostID = localFeedPosts[0]?.id ?? null;
+        if (topLocalFeedPostIDRef.current == topLocalFeedPostID) return;
+
+        topLocalFeedPostIDRef.current = topLocalFeedPostID;
+        if (topLocalFeedPostID) scrollPageToTop();
+    }, [localFeedPosts]);
 
     const shareProfileLink = async () => {
         if (!onShareProfileLink) return;
