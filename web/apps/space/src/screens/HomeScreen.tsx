@@ -1377,7 +1377,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                         zIndex: 0,
                                         "&::after": {
                                             animation:
-                                                "spaceUnreadBadgePing 1.25s cubic-bezier(0, 0, 0.2, 1) 4",
+                                                "spaceUnreadBadgePing 1.25s cubic-bezier(0, 0, 0.2, 1) 1",
                                             bgcolor: green,
                                             borderRadius: "50%",
                                             content: '""',
