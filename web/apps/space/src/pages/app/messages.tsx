@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import React from "react";
 import { MessagesScreen, messagesBackground } from "screens/MessagesScreen";
 import {
+    createCurrentProfileLink,
     deleteCurrentMessage,
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
@@ -215,6 +216,7 @@ const Page: React.FC = () => {
             />
             <MessagesScreen
                 conversations={conversations}
+                friendsCount={friends.length}
                 isConversationsLoading={isConversationsLoading}
                 isThreadLoading={isThreadLoading}
                 isThreadReadOnly={isThreadReadOnly}
@@ -259,6 +261,11 @@ const Page: React.FC = () => {
                         ),
                     );
                     refreshConversations();
+                }}
+                onShareProfileLink={async () => {
+                    if (!profile.spaceId) throw new Error("Missing space.");
+                    return (await createCurrentProfileLink(profile.spaceId))
+                        .url;
                 }}
                 onDeleteMessage={async (messageId) => {
                     await deleteCurrentMessage(messageId);

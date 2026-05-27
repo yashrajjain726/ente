@@ -12,6 +12,7 @@ import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type { SpaceMessage, SpaceMessageConversation } from "services/space";
 import { firstNameFrom } from "utils/spaceDisplay";
 import { clampSpaceMessageText } from "utils/spaceMessageLimits";
@@ -49,6 +50,7 @@ const sendSpin = keyframes`
 
 interface MessagesScreenProps {
     conversations: SpaceMessageConversation[];
+    friendsCount?: number;
     isConversationsLoading?: boolean;
     isThreadLoading?: boolean;
     isThreadReadOnly?: boolean;
@@ -67,6 +69,7 @@ interface MessagesScreenProps {
     ) => Promise<void>;
     onSendMessage: (spaceId: string, text: string) => Promise<void>;
     onSetMessageLiked: (messageId: string, liked: boolean) => Promise<void>;
+    onShareProfileLink?: () => Promise<string>;
     newConversationIds?: string[];
     profile: SetupProfile;
     selectedFriend?: SpaceMessageConversation["friend"];
@@ -992,6 +995,7 @@ const MessageBubble: React.FC<{
 
 export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     conversations,
+    friendsCount,
     isConversationsLoading = false,
     isThreadLoading = false,
     isThreadReadOnly = false,
@@ -1005,6 +1009,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     onReplyToMessage,
     onSendMessage,
     onSetMessageLiked,
+    onShareProfileLink,
     profile,
     selectedFriend,
 }) => {
@@ -1028,6 +1033,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         : "";
     const isSendStatus = sendPhase != "idle";
     const isSendButtonActive = canSend || isSendStatus;
+    const showInviteEmptyState =
+        friendsCount == 0 && Boolean(onShareProfileLink);
     const messageByID = React.useMemo(
         () => new Map(messages.map((message) => [message.id, message])),
         [messages],
@@ -1116,6 +1123,23 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     };
 
     const closeMessageActions = () => setMessageContextMenu(null);
+
+    const shareProfileLink = async () => {
+        if (!onShareProfileLink) return;
+        const profileLink = await onShareProfileLink();
+
+        if (typeof navigator.share == "function") {
+            try {
+                await navigator.share({ url: profileLink });
+                return;
+            } catch (error) {
+                if (error instanceof DOMException && error.name == "AbortError")
+                    return;
+            }
+        }
+
+        await copyTextToClipboard(profileLink);
+    };
 
     const handleMessageAction = (
         action: "copy" | "delete" | "like" | "reply",
@@ -1905,6 +1929,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     boxSizing: "border-box",
                                     display: "flex",
                                     flexDirection: "column",
+                                    gap: "22px",
                                     inset: 0,
                                     justifyContent: "center",
                                     pointerEvents: "none",
@@ -1923,10 +1948,48 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         fontWeight: 500,
                                         lineHeight: "20px",
                                         m: 0,
+                                        maxWidth: 260,
                                     }}
                                 >
-                                    No messages yet
+                                    {showInviteEmptyState
+                                        ? "No messages yet. Invite people to start conversations here."
+                                        : "No messages yet."}
                                 </Box>
+                                {showInviteEmptyState && (
+                                    <Box
+                                        component="button"
+                                        type="button"
+                                        onClick={() => void shareProfileLink()}
+                                        sx={{
+                                            alignItems: "center",
+                                            bgcolor: "#F2F2F2",
+                                            border: 0,
+                                            borderRadius: "18px",
+                                            color: textBase,
+                                            cursor: "pointer",
+                                            display: "inline-flex",
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            gap: "6px",
+                                            height: 36,
+                                            justifyContent: "center",
+                                            lineHeight: "18px",
+                                            pointerEvents: "auto",
+                                            px: "14px",
+                                            whiteSpace: "nowrap",
+                                            "&:focus-visible": {
+                                                outline: `2px solid ${green}`,
+                                                outlineOffset: 2,
+                                            },
+                                            "&:hover": { bgcolor: "#E8E8E8" },
+                                        }}
+                                    >
+                                        <ShareIcon />
+                                        Invite people
+                                    </Box>
+                                )}
                             </Box>
                         ) : (
                             <Box

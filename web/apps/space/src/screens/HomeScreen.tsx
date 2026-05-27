@@ -107,6 +107,7 @@ interface HomeScreenProps {
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onShareProfileLink?: () => Promise<string>;
     profile: SetupProfile;
+    showInitialFeedSkeleton?: boolean;
 }
 
 interface FeedPhotoDimensions {
@@ -939,6 +940,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onSetPostLiked,
     onShareProfileLink,
     profile,
+    showInitialFeedSkeleton = false,
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
@@ -964,7 +966,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const hasFeedItems =
         localFeedPosts.length > 0 || remoteFeedItems.length > 0;
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
-    const showFeedCards = hasFeedItems || isEmptyFeedLoading;
+    const shouldShowEmptyFeedSkeleton =
+        isEmptyFeedLoading && showInitialFeedSkeleton;
+    const showFeedCards = hasFeedItems || shouldShowEmptyFeedSkeleton;
     const showUnreadIndicator = hasUnreadMessages === true;
     const emptyFeedMessage =
         friendsCount == 0
@@ -981,6 +985,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const releaseLocalPostObjectUrl = React.useCallback((objectUrl: string) => {
         localPostObjectUrlsRef.current.delete(objectUrl);
     }, []);
+
     const openPostPhotoPicker = () => {
         if (isPostPhotoOpening) return;
 
@@ -1550,9 +1555,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 </Box>
                             )}
                         </>
-                    ) : isEmptyFeedLoading ? (
+                    ) : shouldShowEmptyFeedSkeleton ? (
                         <FeedLoadingSkeletons />
-                    ) : (
+                    ) : isEmptyFeedLoading ? null : (
                         <Box
                             sx={{
                                 alignItems: "center",
@@ -1623,7 +1628,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     }}
                                 >
                                     <ShareIcon />
-                                    Share profile
+                                    Invite friends
                                 </Box>
                             )}
                         </Box>

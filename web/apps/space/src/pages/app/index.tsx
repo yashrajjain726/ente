@@ -26,6 +26,8 @@ import { firstNameFrom } from "utils/spaceDisplay";
 import { prepareSpacePostImageFromEdit } from "utils/spacePostImage";
 import { spaceRoutes } from "utils/spaceRoutes";
 
+const initialFeedSkeletonDelayMs = 350;
+
 const Page: React.FC = () => {
     const router = useRouter();
     const {
@@ -43,6 +45,14 @@ const Page: React.FC = () => {
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isFeedLoading, setIsFeedLoading] = useState(true);
     const [isFeedLoadingMore, setIsFeedLoadingMore] = useState(false);
+    const [showInitialFeedSkeleton, setShowInitialFeedSkeleton] =
+        useState(false);
+    const isInitialFeedLoading =
+        profileLoadStatus == "ready" &&
+        Boolean(profile?.spaceId) &&
+        isFeedLoading &&
+        feedItems.length == 0 &&
+        localFeedPosts.length == 0;
     const closeAddedFriendToast = React.useCallback(
         () => setAddedFriendToastName(undefined),
         [],
@@ -115,6 +125,19 @@ const Page: React.FC = () => {
         };
     }, [profile?.spaceId, profileLoadStatus, setFriends]);
 
+    useEffect(() => {
+        if (!isInitialFeedLoading) {
+            setShowInitialFeedSkeleton(false);
+            return;
+        }
+
+        const timeoutID = window.setTimeout(
+            () => setShowInitialFeedSkeleton(true),
+            initialFeedSkeletonDelayMs,
+        );
+        return () => window.clearTimeout(timeoutID);
+    }, [isInitialFeedLoading]);
+
     const loadMoreFeedItems = React.useCallback(async () => {
         if (!feedNextCursor || isFeedLoadingMore) return;
 
@@ -140,7 +163,11 @@ const Page: React.FC = () => {
         }
     }, [feedNextCursor, isFeedLoadingMore]);
 
-    if (profileLoadStatus != "ready" || !profile) {
+    if (
+        profileLoadStatus != "ready" ||
+        !profile ||
+        (isInitialFeedLoading && !showInitialFeedSkeleton)
+    ) {
         return (
             <SpaceRouteFallback
                 background={homeBackground}
@@ -162,6 +189,7 @@ const Page: React.FC = () => {
                 isFeedLoadingMore={isFeedLoadingMore}
                 localFeedPosts={localFeedPosts}
                 profile={profile}
+                showInitialFeedSkeleton={showInitialFeedSkeleton}
                 onAddedFriendToastClose={closeAddedFriendToast}
                 onCreatePost={async (image, caption) => {
                     const spaceId = profile.spaceId;
