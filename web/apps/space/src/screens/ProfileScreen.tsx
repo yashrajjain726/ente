@@ -29,7 +29,6 @@ import {
 export const profileBackground = "#FFFFFF";
 
 const green = "#08C225";
-const paleGreen = "#E7F6E9";
 const textBase = "#000";
 const textStrong = "#303030";
 const textSoft = "#777777";
@@ -46,6 +45,7 @@ const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
 const ownerEmptyStateGap = "18px";
 const photoMasonryGap = "3px";
+const photoMasonryPlaceholderBackground = "#F2F2F2";
 const photoMasonryRadius = "12px";
 interface ProfilePhotoDimensions {
     height: number;
@@ -1049,7 +1049,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                                                         appearance:
                                                                             "none",
                                                                         bgcolor:
-                                                                            paleGreen,
+                                                                            photoMasonryPlaceholderBackground,
                                                                         border: 0,
                                                                         cursor: "pointer",
                                                                         display:
