@@ -90,6 +90,7 @@ const Page: React.FC = () => {
             <ProfileScreen
                 friendsCount={friendsCount}
                 isPostsLoading={isPostsLoading}
+                isStatsLoading={isPostsLoading}
                 postGroups={postGroups}
                 profile={profile}
                 onBack={() => void router.push(spaceRoutes.home)}

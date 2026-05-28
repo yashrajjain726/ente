@@ -45,12 +45,28 @@ const Page: React.FC = () => {
     );
     const [friendsLoadAttempted, setFriendsLoadAttempted] = useState(false);
     const [isProfileLoading, setIsProfileLoading] = useState(false);
+    const [isPostsLoading, setIsPostsLoading] = useState(false);
+    const [loadedProfileSpaceId, setLoadedProfileSpaceId] = useState<string>();
+    const [loadedPostsSpaceId, setLoadedPostsSpaceId] = useState<string>();
     const [selectedProfile, setSelectedProfile] = useState(selectedFriend);
     const [posts, setPosts] = useState<SpaceProfilePost[]>([]);
     const postGroups = useMemo(
         () => profilePostGroupsFromPosts(posts),
         [posts],
     );
+    const selectedFriendSpaceId = selectedFriend?.spaceId;
+    const showProfileLoading = Boolean(
+        selectedFriendSpaceId &&
+            (isProfileLoading || loadedProfileSpaceId != selectedFriendSpaceId),
+    );
+    const showPostsLoading = Boolean(
+        selectedFriendSpaceId &&
+            (isPostsLoading || loadedPostsSpaceId != selectedFriendSpaceId),
+    );
+    const currentSelectedProfile =
+        selectedProfile?.spaceId == selectedFriendSpaceId
+            ? selectedProfile
+            : undefined;
 
     useEffect(() => {
         if (!router.isReady) return;
@@ -85,15 +101,22 @@ const Page: React.FC = () => {
     }, [profile?.spaceId, setFriends]);
 
     useEffect(() => {
-        if (!selectedFriend?.spaceId) {
+        if (!selectedFriendSpaceId) {
             setIsProfileLoading(false);
+            setIsPostsLoading(false);
+            setLoadedProfileSpaceId(undefined);
+            setLoadedPostsSpaceId(undefined);
+            setSelectedProfile(undefined);
+            setPosts([]);
             return;
         }
 
         let cancelled = false;
-        setSelectedProfile(selectedFriend);
+        setSelectedProfile(undefined);
+        setPosts([]);
         setIsProfileLoading(true);
-        void loadCurrentSpaceProfile(selectedFriend.spaceId)
+        setIsPostsLoading(true);
+        void loadCurrentSpaceProfile(selectedFriendSpaceId)
             .then((nextProfile) => {
                 if (cancelled) return;
                 setSelectedProfile(nextProfile);
@@ -102,20 +125,29 @@ const Page: React.FC = () => {
                 console.error("Failed to load friend profile", error),
             )
             .finally(() => {
-                if (!cancelled) setIsProfileLoading(false);
+                if (!cancelled) {
+                    setLoadedProfileSpaceId(selectedFriendSpaceId);
+                    setIsProfileLoading(false);
+                }
             });
-        void loadCurrentSpaceProfilePostsPage(selectedFriend.spaceId)
+        void loadCurrentSpaceProfilePostsPage(selectedFriendSpaceId)
             .then((page) => {
                 if (!cancelled) setPosts(page.items);
             })
             .catch((error: unknown) =>
                 console.error("Failed to load friend posts", error),
-            );
+            )
+            .finally(() => {
+                if (!cancelled) {
+                    setLoadedPostsSpaceId(selectedFriendSpaceId);
+                    setIsPostsLoading(false);
+                }
+            });
 
         return () => {
             cancelled = true;
         };
-    }, [selectedFriend]);
+    }, [selectedFriendSpaceId]);
 
     const goBack = () => {
         if (typeof window != "undefined" && window.history.length > 1) {
@@ -144,26 +176,34 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={friendsBackground} />
             <ProfileScreen
                 friendsCount={
-                    selectedProfile?.friendsCount ?? selectedFriend.friendsCount
+                    currentSelectedProfile?.friendsCount ??
+                    selectedFriend.friendsCount
                 }
                 headerVariant="friend"
-                isCoverLoading={isProfileLoading}
+                isCoverLoading={showProfileLoading}
+                isPostsLoading={showPostsLoading}
+                isStatsLoading={showProfileLoading || showPostsLoading}
                 postGroups={postGroups}
                 profile={{
                     avatarUrl:
-                        selectedProfile?.avatarUrl ??
+                        currentSelectedProfile?.avatarUrl ??
                         selectedFriend.avatarUrl ??
                         null,
-                    coverUrl: selectedProfile?.coverUrl ?? null,
-                    coverObjectKey: selectedProfile?.coverObjectKey,
-                    coverUpdatedAt: selectedProfile?.coverUpdatedAt,
+                    coverUrl: currentSelectedProfile?.coverUrl ?? null,
+                    coverObjectKey: currentSelectedProfile?.coverObjectKey,
+                    coverUpdatedAt: currentSelectedProfile?.coverUpdatedAt,
                     fullName:
-                        selectedProfile?.fullName ?? selectedFriend.fullName,
+                        currentSelectedProfile?.fullName ??
+                        selectedFriend.fullName,
                     username:
-                        selectedProfile?.username ?? selectedFriend.username,
-                    spaceId: selectedProfile?.spaceId ?? selectedFriend.spaceId,
+                        currentSelectedProfile?.username ??
+                        selectedFriend.username,
+                    spaceId:
+                        currentSelectedProfile?.spaceId ??
+                        selectedFriend.spaceId,
                     spaceSlug:
-                        selectedProfile?.spaceSlug ?? selectedFriend.spaceSlug,
+                        currentSelectedProfile?.spaceSlug ??
+                        selectedFriend.spaceSlug,
                 }}
                 onBack={goBack}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
