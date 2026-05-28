@@ -7,6 +7,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
+import { keyframes } from "@mui/material/styles";
 import {
     SpaceFileViewer,
     type SpaceViewerDraftPostEdit,
@@ -53,6 +54,7 @@ const floatingAddIconSize = 34;
 const feedLikeActionSize = 38;
 const feedActionIconSize = 20;
 const feedReplyIconSize = 17;
+const feedLikePopDurationMs = 520;
 const emptyFeedItemGap = "22px";
 const feedSkeletonAspectRatios = [
     "3 / 4",
@@ -64,6 +66,49 @@ const feedSkeletonAspectRatios = [
     "16 / 9",
 ];
 const minimumFeedPhotoFrameAspectRatio = 3 / 4;
+
+const feedLikeButtonPop = keyframes`
+    0% {
+        transform: scale(1);
+    }
+
+    24% {
+        transform: scale(0.88);
+    }
+
+    55% {
+        transform: scale(1.16);
+    }
+
+    78% {
+        transform: scale(0.97);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+`;
+
+const feedLikeHeartPop = keyframes`
+    0% {
+        opacity: 0.72;
+        transform: scale(0.58) rotate(-10deg);
+    }
+
+    44% {
+        opacity: 1;
+        transform: scale(1.38) rotate(6deg);
+    }
+
+    72% {
+        transform: scale(0.93) rotate(-3deg);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1) rotate(0deg);
+    }
+`;
 
 const FeedReplyIcon: React.FC = () => (
     <svg
@@ -422,6 +467,90 @@ const usePostingDotCount = (isPosting: boolean) => {
     return dotCount;
 };
 
+interface FeedLikeButtonProps {
+    isLiked: boolean;
+    onClick: () => void;
+    popID: number;
+}
+
+const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
+    isLiked,
+    onClick,
+    popID,
+}) => {
+    const isPopping = isLiked && popID > 0;
+
+    return (
+        <Box
+            component="button"
+            type="button"
+            aria-label={isLiked ? "Unlike post" : "Like post"}
+            aria-pressed={isLiked}
+            onClick={onClick}
+            sx={{
+                alignItems: "center",
+                animation: isPopping
+                    ? `${feedLikeButtonPop} ${feedLikePopDurationMs}ms cubic-bezier(0.2, 0.82, 0.22, 1) both`
+                    : undefined,
+                appearance: "none",
+                bgcolor: isLiked ? paleGreen : feedActionBackground,
+                border: 0,
+                borderRadius: "50%",
+                color: isLiked ? green : textBase,
+                cursor: "pointer",
+                display: "inline-flex",
+                flexShrink: 0,
+                height: feedLikeActionSize,
+                justifyContent: "center",
+                mr: "9px",
+                p: 0,
+                position: "relative",
+                transition:
+                    "background-color 160ms ease, color 120ms ease, transform 120ms ease",
+                width: feedLikeActionSize,
+                "&:active": { transform: "scale(0.94)" },
+                "&:focus-visible": {
+                    outline: `2px solid ${green}`,
+                    outlineOffset: 2,
+                },
+                "&:hover": {
+                    bgcolor: isLiked ? "#DFF3E2" : feedActionBackgroundHover,
+                },
+                "@media (prefers-reduced-motion: reduce)": {
+                    animation: "none",
+                    transition: "background-color 120ms ease, color 120ms ease",
+                },
+            }}
+        >
+            <Box
+                key={isPopping ? `heart-${popID}` : "heart"}
+                component="span"
+                sx={{
+                    animation: isPopping
+                        ? `${feedLikeHeartPop} ${feedLikePopDurationMs}ms cubic-bezier(0.2, 0.82, 0.22, 1) both`
+                        : undefined,
+                    display: "flex",
+                    lineHeight: 0,
+                    position: "relative",
+                    transformOrigin: "50% 58%",
+                    zIndex: 1,
+                    "@media (prefers-reduced-motion: reduce)": {
+                        animation: "none",
+                    },
+                }}
+            >
+                <HugeiconsIcon
+                    fill={isLiked ? green : "none"}
+                    icon={FavouriteIcon}
+                    primaryColor={isLiked ? green : textBase}
+                    size={feedActionIconSize}
+                    strokeWidth={2}
+                />
+            </Box>
+        </Box>
+    );
+};
+
 const FeedItem: React.FC<FeedItemProps> = ({
     aspectRatio,
     avatarUrl,
@@ -441,6 +570,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     viewerUnread,
 }) => {
     const [isLiked, setIsLiked] = useState(viewerLiked);
+    const [likePopID, setLikePopID] = useState(0);
     const firstName = firstNameFrom(name);
     const dateLabel = formatSpaceDate(timestampMs);
     const postingDotCount = usePostingDotCount(timestampStatus == "posting");
@@ -505,6 +635,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
         const nextLiked = !isLiked;
         setIsLiked(nextLiked);
+        if (nextLiked) setLikePopID((id) => id + 1);
         void onSetPostLiked?.(postId, nextLiked).catch((error: unknown) => {
             console.error("Failed to update post like", error);
             setIsLiked(!nextLiked);
@@ -514,6 +645,16 @@ const FeedItem: React.FC<FeedItemProps> = ({
     React.useEffect(() => {
         setIsLiked(viewerLiked);
     }, [viewerLiked]);
+
+    React.useEffect(() => {
+        if (likePopID == 0) return;
+
+        const timeoutID = window.setTimeout(
+            () => setLikePopID(0),
+            feedLikePopDurationMs,
+        );
+        return () => window.clearTimeout(timeoutID);
+    }, [likePopID]);
 
     return (
         <Box
@@ -858,47 +999,11 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             >
                                 <FeedReplyIcon />
                             </Box>
-                            <Box
-                                component="button"
-                                type="button"
-                                aria-label={
-                                    isLiked ? "Unlike post" : "Like post"
-                                }
-                                aria-pressed={isLiked}
+                            <FeedLikeButton
+                                isLiked={isLiked}
                                 onClick={handleLikeClick}
-                                sx={{
-                                    alignItems: "center",
-                                    appearance: "none",
-                                    bgcolor: feedActionBackground,
-                                    border: 0,
-                                    borderRadius: "50%",
-                                    color: textBase,
-                                    cursor: "pointer",
-                                    display: "inline-flex",
-                                    flexShrink: 0,
-                                    height: feedLikeActionSize,
-                                    justifyContent: "center",
-                                    mr: "9px",
-                                    p: 0,
-                                    transition: "color 120ms ease",
-                                    width: feedLikeActionSize,
-                                    "&:focus-visible": {
-                                        outline: `2px solid ${green}`,
-                                        outlineOffset: 2,
-                                    },
-                                    "&:hover": {
-                                        bgcolor: feedActionBackgroundHover,
-                                    },
-                                }}
-                            >
-                                <HugeiconsIcon
-                                    fill={isLiked ? green : "none"}
-                                    icon={FavouriteIcon}
-                                    primaryColor={isLiked ? green : textBase}
-                                    size={feedActionIconSize}
-                                    strokeWidth={2}
-                                />
-                            </Box>
+                                popID={likePopID}
+                            />
                         </Box>
                     )}
                 </Box>
