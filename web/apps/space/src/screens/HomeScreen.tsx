@@ -1,9 +1,8 @@
 import {
-    AddSquareIcon,
-    Chat01Icon,
+    Add01Icon,
+    BubbleChatIcon,
     FavouriteIcon,
     MultiplicationSignIcon,
-    Tick02Icon,
     UserCheck01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -30,26 +29,28 @@ import {
     spacePostPreviewImageForFile,
 } from "utils/spacePostImage";
 
-export const homeBackground = "#FFFFFF";
+export const homeBackground = "#F5F5F7";
 
 const green = "#08C225";
 const paleGreen = "#E7F6E9";
-const feedCardBackground = "#F5F5F5";
+const feedCardBackground = "#FFFFFF";
+const feedActionBackground = "#F7F7F7";
+const feedActionBackgroundHover = "#EFEFEF";
 const feedSkeletonElementBackground = "#E6E6E6";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
 const dangerColor = "#F63A3A";
-const feedAvatarSize = 26;
 const headerActionSize = 32;
-const headerActionGap = 8;
-const headerAddIconSize = 24;
-const headerAvatarSize = 23;
+const headerAvatarSize = 27;
+const feedAvatarSize = 38;
 const headerHeight = 64;
-const headerIconSize = 23;
+const headerIconSize = 30;
 const headerHideStartY = 96;
 const headerScrollDelta = 4;
-const headerSideWidth = headerActionSize * 2 + headerActionGap;
-const feedLikeActionSize = 28;
+const headerSideWidth = headerActionSize;
+const floatingAddButtonSize = 64;
+const floatingAddIconSize = 34;
+const feedLikeActionSize = 38;
 const feedActionIconSize = 20;
 const feedReplyIconSize = 17;
 const emptyFeedItemGap = "22px";
@@ -253,66 +254,135 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({ aspectRatio }) => (
         aria-hidden
         sx={{
             bgcolor: feedCardBackground,
-            borderRadius: "16px",
+            borderRadius: "17px",
             boxSizing: "border-box",
             display: "flex",
             flexDirection: "column",
             mx: "16px",
-            p: "12px",
+            p: "5px",
             width: "calc(100% - 32px)",
         }}
     >
         <Box
             sx={{
-                alignItems: "center",
-                display: "grid",
-                gap: "8px",
-                gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr) auto`,
-                mb: "10px",
-                minHeight: 32,
-                px: "4px",
+                aspectRatio,
+                borderRadius: "13px",
+                overflow: "hidden",
+                position: "relative",
                 width: "100%",
             }}
         >
             <Skeleton
-                variant="circular"
-                sx={{
-                    bgcolor: feedSkeletonElementBackground,
-                    height: feedAvatarSize,
-                    width: feedAvatarSize,
-                }}
-            />
-            <Skeleton
                 variant="rectangular"
                 sx={{
+                    aspectRatio,
                     bgcolor: feedSkeletonElementBackground,
-                    borderRadius: "999px",
-                    height: 10,
-                    width: 72,
+                    display: "block",
+                    height: "100%",
+                    transform: "none",
+                    width: "100%",
                 }}
             />
-            <Skeleton
-                variant="rectangular"
+            <Box
                 sx={{
-                    bgcolor: feedSkeletonElementBackground,
-                    borderRadius: "999px",
-                    height: 8,
-                    justifySelf: "end",
-                    width: 42,
+                    alignItems: "center",
+                    display: "grid",
+                    gap: "8px",
+                    gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr)`,
+                    left: 12,
+                    position: "absolute",
+                    right: 12,
+                    top: 12,
                 }}
-            />
+            >
+                <Skeleton
+                    variant="circular"
+                    sx={{
+                        bgcolor: "rgba(255, 255, 255, 0.72)",
+                        height: feedAvatarSize,
+                        transform: "none",
+                        width: feedAvatarSize,
+                    }}
+                />
+                <Box sx={{ minWidth: 0 }}>
+                    <Skeleton
+                        variant="rectangular"
+                        sx={{
+                            bgcolor: "rgba(255, 255, 255, 0.72)",
+                            borderRadius: "999px",
+                            height: 10,
+                            mb: "5px",
+                            transform: "none",
+                            width: 72,
+                        }}
+                    />
+                    <Skeleton
+                        variant="rectangular"
+                        sx={{
+                            bgcolor: "rgba(255, 255, 255, 0.56)",
+                            borderRadius: "999px",
+                            height: 8,
+                            transform: "none",
+                            width: 42,
+                        }}
+                    />
+                </Box>
+            </Box>
         </Box>
-        <Skeleton
-            variant="rectangular"
+        <Box
             sx={{
-                aspectRatio,
-                bgcolor: feedSkeletonElementBackground,
-                borderRadius: "12px",
-                display: "block",
-                height: "auto",
+                alignItems: "center",
+                boxSizing: "border-box",
+                display: "grid",
+                gap: "8px",
+                gridTemplateColumns: "minmax(0, 1fr) auto",
+                minHeight: feedLikeActionSize,
+                mt: "8px",
+                pl: "9px",
+                pr: 0,
                 width: "100%",
             }}
-        />
+        >
+            <Skeleton
+                variant="rectangular"
+                sx={{
+                    bgcolor: feedActionBackground,
+                    borderRadius: "999px",
+                    height: 12,
+                    maxWidth: 176,
+                    transform: "none",
+                    width: "60%",
+                }}
+            />
+            <Box
+                sx={{
+                    alignItems: "center",
+                    display: "flex",
+                    gap: "6px",
+                    justifyContent: "flex-end",
+                }}
+            >
+                <Skeleton
+                    variant="circular"
+                    sx={{
+                        bgcolor: feedActionBackground,
+                        height: feedLikeActionSize,
+                        transform: "none",
+                        width: feedLikeActionSize,
+                    }}
+                />
+                <Skeleton
+                    variant="circular"
+                    sx={{
+                        bgcolor: feedActionBackground,
+                        height: feedLikeActionSize,
+                        mr: "9px",
+                        transform: "none",
+                        width: feedLikeActionSize,
+                    }}
+                />
+            </Box>
+        </Box>
     </Box>
 );
 
@@ -375,6 +445,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const dateLabel = formatSpaceDate(timestampMs);
     const postingDotCount = usePostingDotCount(timestampStatus == "posting");
     const displayCaption = caption?.trim();
+    const showFooter = !isOwnPost || Boolean(displayCaption);
     const canOpenAuthor = isOwnPost
         ? Boolean(onOpenProfile)
         : Boolean(onOpenFriend);
@@ -449,203 +520,23 @@ const FeedItem: React.FC<FeedItemProps> = ({
             component="article"
             sx={{
                 bgcolor: feedCardBackground,
-                borderRadius: "16px",
+                borderRadius: "17px",
                 boxSizing: "border-box",
                 display: "flex",
                 flexDirection: "column",
                 mx: "16px",
-                p: "12px",
+                pl: "5px",
+                pb: isOwnPost ? "5px" : "8px",
+                pr: "5px",
+                pt: "5px",
                 width: "calc(100% - 32px)",
             }}
         >
             <Box
                 sx={{
-                    alignItems: "center",
-                    boxSizing: "border-box",
-                    color: textBase,
-                    display: "grid",
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 14,
-                    gap: "8px",
-                    gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr) auto${viewerUnread ? " 8px" : ""}`,
-                    lineHeight: "20px",
-                    mb: "10px",
-                    minHeight: 32,
-                    px: "4px",
-                    width: "100%",
-                }}
-            >
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label={authorProfileLabel}
-                    onClick={openAuthor}
-                    sx={{
-                        appearance: "none",
-                        bgcolor: feedSkeletonElementBackground,
-                        borderRadius: "50%",
-                        border: 0,
-                        cursor: canOpenAuthor ? "pointer" : "default",
-                        display: "flex",
-                        flexShrink: 0,
-                        height: feedAvatarSize,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        overflow: "hidden",
-                        p: 0,
-                        width: feedAvatarSize,
-                        "&:focus-visible": {
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
-                    }}
-                >
-                    {avatarUrl ? (
-                        <Box
-                            component="img"
-                            alt=""
-                            src={avatarUrl}
-                            sx={{
-                                display: "block",
-                                height: "100%",
-                                objectFit: "cover",
-                                objectPosition: "center",
-                                width: "100%",
-                            }}
-                        />
-                    ) : (
-                        <Skeleton
-                            variant="circular"
-                            sx={{
-                                bgcolor: feedSkeletonElementBackground,
-                                height: "100%",
-                                transform: "none",
-                                width: "100%",
-                            }}
-                        />
-                    )}
-                </Box>
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label={authorProfileLabel}
-                    onClick={openAuthor}
-                    sx={{
-                        appearance: "none",
-                        bgcolor: "transparent",
-                        border: 0,
-                        color: "inherit",
-                        cursor: canOpenAuthor ? "pointer" : "default",
-                        display: "block",
-                        fontFamily: "inherit",
-                        fontSize: "inherit",
-                        fontWeight: 650,
-                        justifySelf: "start",
-                        lineHeight: "inherit",
-                        maxWidth: "100%",
-                        minWidth: 0,
-                        overflow: "hidden",
-                        p: 0,
-                        textAlign: "left",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        "&:focus-visible": {
-                            borderRadius: "4px",
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
-                    }}
-                >
-                    {firstName}
-                </Box>
-                {timestampStatus ? (
-                    <Box
-                        component="span"
-                        aria-label={
-                            timestampStatus == "posting"
-                                ? "Posting"
-                                : timestampStatus == "failed"
-                                  ? "Failed"
-                                  : "Posted"
-                        }
-                        sx={{
-                            alignItems: "center",
-                            color:
-                                timestampStatus == "posted"
-                                    ? green
-                                    : timestampStatus == "failed"
-                                      ? dangerColor
-                                      : textSecondary,
-                            display: "inline-flex",
-                            fontSize: 12,
-                            fontWeight: 500,
-                            justifyContent: "flex-end",
-                            justifySelf: "end",
-                            lineHeight: "16px",
-                            textAlign: "right",
-                            whiteSpace: "nowrap",
-                            width: 68,
-                        }}
-                    >
-                        {timestampStatus == "posted" ? (
-                            <HugeiconsIcon
-                                icon={Tick02Icon}
-                                size={16}
-                                strokeWidth={2.2}
-                            />
-                        ) : timestampStatus == "failed" ? (
-                            <Box component="span">Failed</Box>
-                        ) : (
-                            <>
-                                <Box component="span">Posting</Box>
-                                <Box
-                                    component="span"
-                                    aria-hidden
-                                    sx={{
-                                        display: "inline-block",
-                                        textAlign: "left",
-                                        width: 12,
-                                    }}
-                                >
-                                    {".".repeat(postingDotCount)}
-                                </Box>
-                            </>
-                        )}
-                    </Box>
-                ) : (
-                    <Box
-                        component="time"
-                        dateTime={new Date(timestampMs).toISOString()}
-                        sx={{
-                            color: textSecondary,
-                            fontSize: 12,
-                            fontWeight: 500,
-                            justifySelf: "end",
-                            textAlign: "right",
-                            whiteSpace: "nowrap",
-                        }}
-                    >
-                        {dateLabel}
-                    </Box>
-                )}
-                {viewerUnread && (
-                    <Box
-                        aria-hidden
-                        sx={{
-                            bgcolor: green,
-                            borderRadius: "50%",
-                            height: 8,
-                            justifySelf: "end",
-                            width: 8,
-                        }}
-                    />
-                )}
-            </Box>
-            <Box
-                sx={{
                     aspectRatio: `${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`,
                     bgcolor: "transparent",
-                    borderRadius: "12px",
+                    borderRadius: "13px",
                     overflow: "hidden",
                     position: "relative",
                     width: "100%",
@@ -685,8 +576,213 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         }}
                     />
                 </Box>
+                <Box
+                    aria-hidden
+                    sx={{
+                        background:
+                            "linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.32) 24%, rgba(0, 0, 0, 0.2) 48%, rgba(0, 0, 0, 0.1) 72%, rgba(0, 0, 0, 0) 100%)",
+                        height: 56,
+                        left: 0,
+                        pointerEvents: "none",
+                        position: "absolute",
+                        right: 0,
+                        top: 0,
+                        zIndex: 1,
+                    }}
+                />
+                <Box
+                    sx={{
+                        alignItems: "center",
+                        boxSizing: "border-box",
+                        color: "#FFFFFF",
+                        display: "grid",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        gap: "8px",
+                        gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr)`,
+                        left: 12,
+                        lineHeight: "20px",
+                        minHeight: 32,
+                        position: "absolute",
+                        right: 12,
+                        top: 12,
+                        zIndex: 2,
+                    }}
+                >
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={authorProfileLabel}
+                        onClick={openAuthor}
+                        sx={{
+                            alignItems: "center",
+                            appearance: "none",
+                            bgcolor: feedSkeletonElementBackground,
+                            border: 0,
+                            borderRadius: "50%",
+                            cursor: canOpenAuthor ? "pointer" : "default",
+                            display: "flex",
+                            flexShrink: 0,
+                            height: feedAvatarSize,
+                            justifyContent: "center",
+                            overflow: "visible",
+                            p: 0,
+                            position: "relative",
+                            width: feedAvatarSize,
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                        }}
+                    >
+                        {avatarUrl ? (
+                            <Box
+                                component="img"
+                                alt=""
+                                src={avatarUrl}
+                                sx={{
+                                    borderRadius: "50%",
+                                    display: "block",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    objectPosition: "center",
+                                    width: "100%",
+                                }}
+                            />
+                        ) : (
+                            <Skeleton
+                                variant="circular"
+                                sx={{
+                                    bgcolor: feedSkeletonElementBackground,
+                                    height: "100%",
+                                    transform: "none",
+                                    width: "100%",
+                                }}
+                            />
+                        )}
+                        <Box
+                            aria-hidden
+                            sx={{
+                                border: "1px solid rgba(255, 255, 255, 0.5)",
+                                borderRadius: "50%",
+                                inset: -1,
+                                pointerEvents: "none",
+                                position: "absolute",
+                            }}
+                        />
+                    </Box>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={authorProfileLabel}
+                            onClick={openAuthor}
+                            sx={{
+                                appearance: "none",
+                                bgcolor: "transparent",
+                                border: 0,
+                                color: "inherit",
+                                cursor: canOpenAuthor ? "pointer" : "default",
+                                display: "block",
+                                fontFamily: "inherit",
+                                fontSize: 14,
+                                fontWeight: 650,
+                                lineHeight: "18px",
+                                maxWidth: "100%",
+                                minWidth: 0,
+                                overflow: "hidden",
+                                p: 0,
+                                textAlign: "left",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                "&:focus-visible": {
+                                    borderRadius: "4px",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
+                            {firstName}
+                        </Box>
+                        {timestampStatus ? (
+                            <Box
+                                component="span"
+                                aria-label={
+                                    timestampStatus == "posting"
+                                        ? "Posting"
+                                        : timestampStatus == "failed"
+                                          ? "Failed"
+                                          : "Posted"
+                                }
+                                sx={{
+                                    alignItems: "center",
+                                    color:
+                                        timestampStatus == "posted"
+                                            ? green
+                                            : timestampStatus == "failed"
+                                              ? dangerColor
+                                              : "rgba(255, 255, 255, 0.86)",
+                                    display: "inline-flex",
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    lineHeight: "16px",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                {timestampStatus == "posted" ? (
+                                    <Box component="span">Posted</Box>
+                                ) : timestampStatus == "failed" ? (
+                                    <Box component="span">Failed</Box>
+                                ) : (
+                                    <>
+                                        <Box component="span">Posting</Box>
+                                        <Box
+                                            component="span"
+                                            aria-hidden
+                                            sx={{
+                                                display: "inline-block",
+                                                textAlign: "left",
+                                                width: 12,
+                                            }}
+                                        >
+                                            {".".repeat(postingDotCount)}
+                                        </Box>
+                                    </>
+                                )}
+                            </Box>
+                        ) : (
+                            <Box
+                                component="time"
+                                dateTime={new Date(timestampMs).toISOString()}
+                                sx={{
+                                    color: "rgba(255, 255, 255, 0.86)",
+                                    display: "block",
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    lineHeight: "16px",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                {dateLabel}
+                            </Box>
+                        )}
+                    </Box>
+                    {viewerUnread && (
+                        <Box
+                            aria-hidden
+                            sx={{
+                                bgcolor: green,
+                                borderRadius: "50%",
+                                height: 8,
+                                position: "absolute",
+                                right: 0,
+                                top: 4,
+                                width: 8,
+                            }}
+                        />
+                    )}
+                </Box>
             </Box>
-            {(!isOwnPost || displayCaption) && (
+            {showFooter && (
                 <Box
                     sx={{
                         alignItems: "center",
@@ -698,8 +794,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             : "minmax(0, 1fr) auto",
                         minHeight: feedLikeActionSize,
                         mt: "8px",
-                        pl: "4px",
-                        pr: 0,
+                        pl: "9px",
+                        pr: isOwnPost ? "9px" : 0,
                         width: "100%",
                     }}
                 >
@@ -726,7 +822,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             sx={{
                                 alignItems: "center",
                                 display: "flex",
-                                gap: "8px",
+                                gap: "6px",
                                 justifyContent: "flex-end",
                             }}
                         >
@@ -738,7 +834,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 sx={{
                                     alignItems: "center",
                                     appearance: "none",
-                                    bgcolor: "transparent",
+                                    bgcolor: feedActionBackground,
                                     border: 0,
                                     borderRadius: "50%",
                                     color: textBase,
@@ -755,7 +851,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                         outline: `2px solid ${green}`,
                                         outlineOffset: 2,
                                     },
-                                    "&:hover": { bgcolor: "transparent" },
+                                    "&:hover": {
+                                        bgcolor: feedActionBackgroundHover,
+                                    },
                                 }}
                             >
                                 <FeedReplyIcon />
@@ -771,7 +869,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 sx={{
                                     alignItems: "center",
                                     appearance: "none",
-                                    bgcolor: "transparent",
+                                    bgcolor: feedActionBackground,
                                     border: 0,
                                     borderRadius: "50%",
                                     color: textBase,
@@ -780,6 +878,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                     flexShrink: 0,
                                     height: feedLikeActionSize,
                                     justifyContent: "center",
+                                    mr: "9px",
                                     p: 0,
                                     transition: "color 120ms ease",
                                     width: feedLikeActionSize,
@@ -787,7 +886,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                         outline: `2px solid ${green}`,
                                         outlineOffset: 2,
                                     },
-                                    "&:hover": { bgcolor: "transparent" },
+                                    "&:hover": {
+                                        bgcolor: feedActionBackgroundHover,
+                                    },
                                 }}
                             >
                                 <HugeiconsIcon
@@ -1243,7 +1344,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         pb: 2,
                         position: "fixed",
                         pt: 1.5,
-                        px: 1.25,
+                        px: 1.5,
                         top: 0,
                         transform: isHeaderHidden
                             ? "translate(-50%, calc(-100% - 4px))"
@@ -1268,28 +1369,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <Box
                         component="button"
                         type="button"
-                        aria-label="Post photo"
-                        disabled={isPostPhotoOpening}
-                        onClick={openPostPhotoPicker}
+                        aria-label="Open profile"
+                        onClick={onOpenProfile}
                         sx={{
                             appearance: "none",
                             alignItems: "center",
                             bgcolor: "transparent",
                             border: 0,
+                            borderRadius: "50%",
                             boxSizing: "border-box",
-                            color: textBase,
-                            cursor: isPostPhotoOpening ? "default" : "pointer",
+                            color: green,
+                            cursor: onOpenProfile ? "pointer" : "default",
                             display: "flex",
-                            fontSize: 0,
                             height: headerActionSize,
                             justifyContent: "center",
                             lineHeight: 0,
-                            ml: 0,
-                            opacity: 1,
+                            overflow: "hidden",
                             p: 0,
                             placeSelf: "center start",
                             width: headerActionSize,
-                            "& svg": { display: "block" },
                             "&:focus-visible": {
                                 borderRadius: "50%",
                                 outline: `2px solid ${green}`,
@@ -1297,11 +1395,44 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             },
                         }}
                     >
-                        <HugeiconsIcon
-                            icon={AddSquareIcon}
-                            size={headerAddIconSize}
-                            strokeWidth={1.8}
-                        />
+                        <Box
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: feedSkeletonElementBackground,
+                                borderRadius: "50%",
+                                display: "flex",
+                                height: headerAvatarSize,
+                                justifyContent: "center",
+                                overflow: "hidden",
+                                width: headerAvatarSize,
+                            }}
+                        >
+                            {profile.avatarUrl ? (
+                                <Box
+                                    component="img"
+                                    alt=""
+                                    src={profile.avatarUrl}
+                                    sx={{
+                                        borderRadius: "50%",
+                                        display: "block",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                        objectPosition: "center",
+                                        width: "100%",
+                                    }}
+                                />
+                            ) : (
+                                <Skeleton
+                                    variant="circular"
+                                    sx={{
+                                        bgcolor: feedSkeletonElementBackground,
+                                        height: "100%",
+                                        transform: "none",
+                                        width: "100%",
+                                    }}
+                                />
+                            )}
+                        </Box>
                     </Box>
                     <Box
                         sx={{
@@ -1319,160 +1450,81 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         <EnteLogo height={18} />
                     </Box>
                     <Box
+                        component="button"
+                        type="button"
+                        aria-label={
+                            showUnreadIndicator
+                                ? "Open messages with unread activity"
+                                : "Open messages"
+                        }
+                        onClick={onOpenMessages}
                         sx={{
+                            appearance: "none",
                             alignItems: "center",
+                            bgcolor: "transparent",
+                            border: 0,
+                            boxSizing: "border-box",
+                            color: textBase,
+                            cursor: onOpenMessages ? "pointer" : "default",
                             display: "flex",
-                            gap: `${headerActionGap}px`,
-                            justifyContent: "flex-end",
-                            justifySelf: "flex-end",
-                            minWidth: 0,
-                            width: "100%",
+                            fontSize: 0,
+                            height: headerActionSize,
+                            justifyContent: "center",
+                            justifySelf: "end",
+                            lineHeight: 0,
+                            p: 0,
+                            position: "relative",
+                            width: headerActionSize,
+                            "& svg": { display: "block" },
+                            "&:focus-visible": {
+                                borderRadius: "50%",
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
                         }}
                     >
-                        <Box
-                            component="button"
-                            type="button"
-                            aria-label={
-                                showUnreadIndicator
-                                    ? "Open messages with unread activity"
-                                    : "Open messages"
-                            }
-                            onClick={onOpenMessages}
-                            sx={{
-                                appearance: "none",
-                                alignItems: "center",
-                                bgcolor: "transparent",
-                                border: 0,
-                                boxSizing: "border-box",
-                                color: textBase,
-                                cursor: onOpenMessages ? "pointer" : "default",
-                                display: "flex",
-                                fontSize: 0,
-                                height: headerActionSize,
-                                justifyContent: "center",
-                                lineHeight: 0,
-                                p: 0,
-                                position: "relative",
-                                width: headerActionSize,
-                                "& svg": { display: "block" },
-                                "&:focus-visible": {
-                                    borderRadius: "50%",
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                            }}
-                        >
-                            <HugeiconsIcon
-                                icon={Chat01Icon}
-                                size={headerIconSize}
-                                strokeWidth={1.8}
-                            />
-                            {showUnreadIndicator && (
-                                <Box
-                                    aria-hidden
-                                    sx={{
-                                        "@keyframes spaceUnreadBadgePing": {
-                                            "75%, 100%": {
-                                                opacity: 0,
-                                                transform: "scale(2.5)",
-                                            },
-                                        },
-                                        "@media (prefers-reduced-motion: reduce)":
-                                            { "&::after": { display: "none" } },
-                                        bgcolor: green,
-                                        border: `2px solid ${homeBackground}`,
-                                        borderRadius: "50%",
-                                        height: 11,
-                                        position: "absolute",
-                                        right: 2,
-                                        top: 4,
-                                        width: 11,
-                                        zIndex: 0,
-                                        "&::after": {
-                                            animation:
-                                                "spaceUnreadBadgePing 1.25s cubic-bezier(0, 0, 0.2, 1) 1",
-                                            bgcolor: green,
-                                            borderRadius: "50%",
-                                            content: '""',
-                                            inset: 0,
-                                            opacity: 0.75,
-                                            pointerEvents: "none",
-                                            position: "absolute",
-                                            zIndex: -1,
-                                        },
-                                    }}
-                                />
-                            )}
-                        </Box>
-                        <Box
-                            component="button"
-                            type="button"
-                            aria-label="Open profile"
-                            onClick={onOpenProfile}
-                            sx={{
-                                appearance: "none",
-                                alignItems: "center",
-                                bgcolor: "transparent",
-                                border: 0,
-                                borderRadius: "50%",
-                                boxSizing: "border-box",
-                                color: green,
-                                cursor: onOpenProfile ? "pointer" : "default",
-                                display: "flex",
-                                height: headerActionSize,
-                                justifyContent: "center",
-                                lineHeight: 0,
-                                overflow: "visible",
-                                p: 0,
-                                pr: "2.5px",
-                                width: headerActionSize,
-                                "&:focus-visible": {
-                                    borderRadius: "50%",
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                            }}
-                        >
+                        <HugeiconsIcon
+                            icon={BubbleChatIcon}
+                            size={headerIconSize}
+                            strokeWidth={1.5}
+                        />
+                        {showUnreadIndicator && (
                             <Box
+                                aria-hidden
                                 sx={{
-                                    alignItems: "center",
-                                    bgcolor: feedSkeletonElementBackground,
+                                    "@keyframes spaceUnreadBadgePing": {
+                                        "75%, 100%": {
+                                            opacity: 0,
+                                            transform: "scale(2.5)",
+                                        },
+                                    },
+                                    "@media (prefers-reduced-motion: reduce)": {
+                                        "&::after": { display: "none" },
+                                    },
+                                    bgcolor: dangerColor,
+                                    border: `2px solid ${homeBackground}`,
                                     borderRadius: "50%",
-                                    display: "flex",
-                                    height: headerAvatarSize,
-                                    justifyContent: "center",
-                                    overflow: "hidden",
-                                    width: headerAvatarSize,
+                                    height: 13,
+                                    position: "absolute",
+                                    right: -1,
+                                    top: 1,
+                                    width: 13,
+                                    zIndex: 0,
+                                    "&::after": {
+                                        animation:
+                                            "spaceUnreadBadgePing 1.25s cubic-bezier(0, 0, 0.2, 1) 1",
+                                        bgcolor: dangerColor,
+                                        borderRadius: "50%",
+                                        content: '""',
+                                        inset: 0,
+                                        opacity: 0.75,
+                                        pointerEvents: "none",
+                                        position: "absolute",
+                                        zIndex: -1,
+                                    },
                                 }}
-                            >
-                                {profile.avatarUrl ? (
-                                    <Box
-                                        component="img"
-                                        alt=""
-                                        src={profile.avatarUrl}
-                                        sx={{
-                                            display: "block",
-                                            height: "100%",
-                                            borderRadius: "50%",
-                                            objectFit: "cover",
-                                            objectPosition: "center",
-                                            width: "100%",
-                                        }}
-                                    />
-                                ) : (
-                                    <Skeleton
-                                        variant="circular"
-                                        sx={{
-                                            bgcolor:
-                                                feedSkeletonElementBackground,
-                                            height: "100%",
-                                            transform: "none",
-                                            width: "100%",
-                                        }}
-                                    />
-                                )}
-                            </Box>
-                        </Box>
+                            />
+                        )}
                     </Box>
                 </Box>
                 <Box aria-hidden sx={{ height: headerHeight }} />
@@ -1484,8 +1536,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         gap: showFeedCards ? "24px" : 0,
                         justifyContent: showFeedCards ? "flex-start" : "center",
                         minHeight: "calc(100svh - 64px)",
-                        pb: showFeedCards ? "16px" : "56px",
-                        pt: 0,
+                        pb: showFeedCards ? "72px" : "56px",
+                        pt: showFeedCards ? "4px" : 0,
                         width: "100%",
                     }}
                 >
@@ -1520,7 +1572,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                         height: 36,
                                         justifyContent: "center",
                                         lineHeight: "18px",
-                                        mb: "24px",
+                                        mb: 0,
                                         minWidth: 116,
                                         mt: "12px",
                                         opacity: isFeedLoadingMore ? 0.7 : 1,
@@ -1621,6 +1673,59 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             )}
                         </Box>
                     )}
+                </Box>
+                <Box
+                    component="button"
+                    type="button"
+                    aria-label="Post photo"
+                    disabled={isPostPhotoOpening}
+                    onClick={openPostPhotoPicker}
+                    sx={{
+                        alignItems: "center",
+                        appearance: "none",
+                        bgcolor: green,
+                        border: 0,
+                        borderRadius: "50%",
+                        bottom: "calc(env(safe-area-inset-bottom) + 20px)",
+                        boxShadow: "0 10px 24px rgba(0, 0, 0, 0.22)",
+                        color: "#FFFFFF",
+                        cursor: isPostPhotoOpening ? "default" : "pointer",
+                        display: "flex",
+                        fontSize: 0,
+                        height: floatingAddButtonSize,
+                        justifyContent: "center",
+                        lineHeight: 0,
+                        opacity: isPostPhotoOpening ? 0.72 : 1,
+                        p: 0,
+                        position: "fixed",
+                        right: "max(20px, calc((100vw - 390px) / 2 + 20px))",
+                        transition:
+                            "background-color 120ms ease, box-shadow 120ms ease, transform 120ms ease",
+                        width: floatingAddButtonSize,
+                        zIndex: 5,
+                        "& svg": { display: "block" },
+                        "&:active": {
+                            transform: isPostPhotoOpening
+                                ? "none"
+                                : "translateY(1px)",
+                        },
+                        "&:focus-visible": {
+                            outline: `3px solid ${paleGreen}`,
+                            outlineOffset: 3,
+                        },
+                        "&:hover": {
+                            bgcolor: isPostPhotoOpening ? green : "#07B422",
+                            boxShadow: isPostPhotoOpening
+                                ? "0 10px 24px rgba(0, 0, 0, 0.22)"
+                                : "0 12px 28px rgba(0, 0, 0, 0.26)",
+                        },
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={Add01Icon}
+                        size={floatingAddIconSize}
+                        strokeWidth={2.1}
+                    />
                 </Box>
                 {selectedViewer && (
                     <SpaceFileViewer
