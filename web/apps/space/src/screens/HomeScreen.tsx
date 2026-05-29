@@ -121,6 +121,17 @@ interface FeedPhotoDimensions {
     width: number;
 }
 
+interface LoadedFeedPhotoDimensions extends FeedPhotoDimensions {
+    src: string;
+}
+
+interface DecodedImageState {
+    height?: number;
+    ready: boolean;
+    src?: string | null;
+    width?: number;
+}
+
 interface SelectedHomeViewer {
     draftFile?: File;
     draftImageError?: string;
@@ -186,6 +197,53 @@ const feedPhotoFrameDimensionsFor = (
     dimensions.width / dimensions.height < minimumFeedPhotoFrameAspectRatio
         ? { height: 4, width: 3 }
         : dimensions;
+
+const useDecodedImage = (src?: string | null): DecodedImageState => {
+    const [state, setState] = useState<DecodedImageState>({ ready: !src, src });
+
+    React.useEffect(() => {
+        if (!src) {
+            setState({ ready: true, src });
+            return;
+        }
+
+        let cancelled = false;
+        const image = new Image();
+
+        const finish = () => {
+            if (cancelled) return;
+
+            setState({
+                height: image.naturalHeight || undefined,
+                ready: true,
+                src,
+                width: image.naturalWidth || undefined,
+            });
+        };
+        const decodeLoadedImage = () => {
+            if (typeof image.decode != "function") {
+                finish();
+                return;
+            }
+
+            void image.decode().then(finish, finish);
+        };
+
+        setState({ ready: false, src });
+        image.addEventListener("load", decodeLoadedImage, { once: true });
+        image.addEventListener("error", finish, { once: true });
+        image.src = src;
+        if (image.complete) decodeLoadedImage();
+
+        return () => {
+            cancelled = true;
+            image.removeEventListener("load", decodeLoadedImage);
+            image.removeEventListener("error", finish);
+        };
+    }, [src]);
+
+    return state.src == src ? state : { ready: !src, src };
+};
 
 const pageScrollY = () =>
     Math.max(
@@ -551,11 +609,18 @@ const FeedItem: React.FC<FeedItemProps> = ({
         onOpenFriend?.(friendID);
     };
     const [loadedPhotoDimensions, setLoadedPhotoDimensions] =
-        useState<FeedPhotoDimensions | null>(null);
+        useState<LoadedFeedPhotoDimensions | null>(null);
+    const decodedPhoto = useDecodedImage(imageUrl);
+    const decodedAvatar = useDecodedImage(avatarUrl);
     const photoDimensions =
-        loadedPhotoDimensions ?? dimensionsFromAspectRatio(aspectRatio);
+        loadedPhotoDimensions?.src == imageUrl
+            ? loadedPhotoDimensions
+            : dimensionsFromAspectRatio(aspectRatio);
     const feedPhotoFrameDimensions =
         feedPhotoFrameDimensionsFor(photoDimensions);
+    const isFeedItemReady = decodedPhoto.ready && decodedAvatar.ready;
+    const decodedPhotoHeight = decodedPhoto.height;
+    const decodedPhotoWidth = decodedPhoto.width;
     const rememberLoadedPhotoDimensions: React.ReactEventHandler<
         HTMLImageElement
     > = ({ currentTarget }) => {
@@ -565,12 +630,17 @@ const FeedItem: React.FC<FeedItemProps> = ({
         setLoadedPhotoDimensions((currentDimensions) => {
             if (
                 currentDimensions?.height == naturalHeight &&
+                currentDimensions.src == imageUrl &&
                 currentDimensions.width == naturalWidth
             ) {
                 return currentDimensions;
             }
 
-            return { height: naturalHeight, width: naturalWidth };
+            return {
+                height: naturalHeight,
+                src: imageUrl,
+                width: naturalWidth,
+            };
         });
     };
     const openPhoto = (focusReplyOnOpen = false) => {
@@ -608,6 +678,26 @@ const FeedItem: React.FC<FeedItemProps> = ({
     }, [viewerLiked]);
 
     React.useEffect(() => {
+        if (!decodedPhotoHeight || !decodedPhotoWidth) return;
+
+        setLoadedPhotoDimensions((currentDimensions) => {
+            if (
+                currentDimensions?.height == decodedPhotoHeight &&
+                currentDimensions.src == imageUrl &&
+                currentDimensions.width == decodedPhotoWidth
+            ) {
+                return currentDimensions;
+            }
+
+            return {
+                height: decodedPhotoHeight,
+                src: imageUrl,
+                width: decodedPhotoWidth,
+            };
+        });
+    }, [decodedPhotoHeight, decodedPhotoWidth, imageUrl]);
+
+    React.useEffect(() => {
         if (likePopID == 0) return;
 
         const timeoutID = window.setTimeout(
@@ -616,6 +706,14 @@ const FeedItem: React.FC<FeedItemProps> = ({
         );
         return () => window.clearTimeout(timeoutID);
     }, [likePopID]);
+
+    if (!isFeedItemReady) {
+        return (
+            <FeedSkeletonItem
+                aspectRatio={`${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`}
+            />
+        );
+    }
 
     return (
         <Box
