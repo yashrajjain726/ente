@@ -810,19 +810,17 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 component="span"
                                 aria-label={
                                     timestampStatus == "posting"
-                                        ? "Posting"
+                                        ? "posting"
                                         : timestampStatus == "failed"
                                           ? "Failed"
-                                          : "Posted"
+                                          : "posted"
                                 }
                                 sx={{
                                     alignItems: "center",
                                     color:
-                                        timestampStatus == "posted"
-                                            ? green
-                                            : timestampStatus == "failed"
-                                              ? dangerColor
-                                              : "rgba(255, 255, 255, 0.86)",
+                                        timestampStatus == "failed"
+                                            ? dangerColor
+                                            : "rgba(255, 255, 255, 0.86)",
                                     display: "inline-flex",
                                     fontSize: 12,
                                     fontWeight: 500,
@@ -831,12 +829,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 }}
                             >
                                 {timestampStatus == "posted" ? (
-                                    <Box component="span">Posted</Box>
+                                    <Box component="span">posted</Box>
                                 ) : timestampStatus == "failed" ? (
                                     <Box component="span">Failed</Box>
                                 ) : (
                                     <>
-                                        <Box component="span">Posting</Box>
+                                        <Box component="span">posting</Box>
                                         <Box
                                             component="span"
                                             aria-hidden
