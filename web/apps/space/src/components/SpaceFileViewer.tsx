@@ -15,6 +15,12 @@ import {
     spaceActionDoneDurationMs,
     type SpaceActionPhase,
 } from "components/SpaceActionFeedback";
+import {
+    spacePostLikeButtonPop,
+    spacePostLikeHeartPop,
+    spacePostLikePopDurationMs,
+    spacePostLikePopTiming,
+} from "components/SpacePostLikeAnimation";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
 import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
@@ -264,6 +270,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const [isPhotoLiked, setIsPhotoLiked] = React.useState(
         activePhoto.viewerLiked ?? false,
     );
+    const [photoLikePopID, setPhotoLikePopID] = React.useState(0);
     const [caption, setCaption] = React.useState(activePhoto.caption ?? "");
     const [replyText, setReplyText] = React.useState("");
     const [isReplyFocused, setIsReplyFocused] =
@@ -311,6 +318,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const isReplyMode =
         canReplyToPost &&
         (isReplyFocused || replyText.trim().length > 0 || isReplyActionRunning);
+    const isPhotoLikePopping =
+        !isReplyMode && isPhotoLiked && photoLikePopID > 0;
     const canSendReply =
         canReplyToPost &&
         Boolean(activePhoto.postId) &&
@@ -328,13 +337,15 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         isDraftPostPreviewPending;
 
     const handlePhotoLikeClick = () => {
+        const nextLiked = !isPhotoLiked;
         if (!activePhoto.postId || !onSetPostLiked) {
-            setIsPhotoLiked((isLiked) => !isLiked);
+            setIsPhotoLiked(nextLiked);
+            if (nextLiked) setPhotoLikePopID((id) => id + 1);
             return;
         }
 
-        const nextLiked = !isPhotoLiked;
         setIsPhotoLiked(nextLiked);
+        if (nextLiked) setPhotoLikePopID((id) => id + 1);
         void onSetPostLiked(activePhoto.postId, nextLiked).catch(
             (error: unknown) => {
                 console.error("Failed to update post like", error);
@@ -521,6 +532,20 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         canReplyToPost,
         focusReplyOnOpen,
     ]);
+
+    React.useEffect(() => {
+        setPhotoLikePopID(0);
+    }, [activePhoto.imageUrl, activePhoto.postId]);
+
+    React.useEffect(() => {
+        if (photoLikePopID == 0) return;
+
+        const timeoutID = window.setTimeout(
+            () => setPhotoLikePopID(0),
+            spacePostLikePopDurationMs,
+        );
+        return () => window.clearTimeout(timeoutID);
+    }, [photoLikePopID]);
 
     React.useEffect(() => {
         const pswp = pswpRef.current;
@@ -1273,27 +1298,35 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 14,
                         fontWeight: 650,
-                        bgcolor: "rgba(48, 48, 48, 0.82)",
-                        borderRadius: "10px",
                         left: "50%",
-                        lineHeight: "20px",
+                        lineHeight: "23px",
                         m: 0,
-                        maxWidth: "calc(100vw - 32px)",
+                        maxWidth: "90vw",
                         minWidth: 0,
-                        overflow: "hidden",
-                        px: "8px",
-                        py: "2px",
+                        overflowWrap: "break-word",
                         position: "fixed",
                         textAlign: "center",
-                        textOverflow: "ellipsis",
                         textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
                         top: "85%",
                         transform: "translateX(-50%)",
-                        whiteSpace: "nowrap",
+                        whiteSpace: "pre-wrap",
+                        width: "90vw",
                         zIndex: 2,
                     }}
                 >
-                    {displayCaption}
+                    <Box
+                        component="span"
+                        sx={{
+                            bgcolor: "rgba(48, 48, 48, 0.82)",
+                            borderRadius: "10px",
+                            boxDecorationBreak: "clone",
+                            px: "8px",
+                            py: "2px",
+                            WebkitBoxDecorationBreak: "clone",
+                        }}
+                    >
+                        {displayCaption}
+                    </Box>
                 </Box>
             )}
             {showPhotoLikeButton && (
@@ -1415,6 +1448,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 }
                                 sx={{
                                     ...viewerActionButtonSx,
+                                    animation: isPhotoLikePopping
+                                        ? `${spacePostLikeButtonPop} ${spacePostLikePopDurationMs}ms ${spacePostLikePopTiming} both`
+                                        : undefined,
                                     bgcolor:
                                         isReplyMode && canSendReply
                                             ? "#FFFFFF"
@@ -1431,6 +1467,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                     userSelect: "none",
                                     WebkitTouchCallout: "none",
                                     WebkitUserSelect: "none",
+                                    "@media (prefers-reduced-motion: reduce)": {
+                                        animation: "none",
+                                    },
                                 }}
                             >
                                 {isReplyMode ? (
@@ -1468,15 +1507,34 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                         />
                                     )
                                 ) : (
-                                    <HugeiconsIcon
-                                        fill={isPhotoLiked ? green : "none"}
-                                        icon={FavouriteIcon}
-                                        primaryColor={
-                                            isPhotoLiked ? green : undefined
+                                    <Box
+                                        key={
+                                            isPhotoLikePopping
+                                                ? `heart-${photoLikePopID}`
+                                                : "heart"
                                         }
-                                        size={26}
-                                        strokeWidth={1.8}
-                                    />
+                                        component="span"
+                                        sx={{
+                                            animation: isPhotoLikePopping
+                                                ? `${spacePostLikeHeartPop} ${spacePostLikePopDurationMs}ms ${spacePostLikePopTiming} both`
+                                                : undefined,
+                                            display: "flex",
+                                            lineHeight: 0,
+                                            transformOrigin: "50% 58%",
+                                            "@media (prefers-reduced-motion: reduce)":
+                                                { animation: "none" },
+                                        }}
+                                    >
+                                        <HugeiconsIcon
+                                            fill={isPhotoLiked ? green : "none"}
+                                            icon={FavouriteIcon}
+                                            primaryColor={
+                                                isPhotoLiked ? green : undefined
+                                            }
+                                            size={26}
+                                            strokeWidth={1.8}
+                                        />
+                                    </Box>
                                 )}
                             </Box>
                         </Box>

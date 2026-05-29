@@ -7,13 +7,18 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
-import { keyframes } from "@mui/material/styles";
 import {
     SpaceFileViewer,
     type SpaceViewerDraftPostEdit,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
+import {
+    spacePostLikeButtonPop,
+    spacePostLikeHeartPop,
+    spacePostLikePopDurationMs,
+    spacePostLikePopTiming,
+} from "components/SpacePostLikeAnimation";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
@@ -54,7 +59,6 @@ const floatingAddIconSize = 34;
 const feedLikeActionSize = 38;
 const feedActionIconSize = 20;
 const feedReplyIconSize = 17;
-const feedLikePopDurationMs = 520;
 const emptyFeedItemGap = "22px";
 const feedSkeletonAspectRatios = [
     "3 / 4",
@@ -66,49 +70,6 @@ const feedSkeletonAspectRatios = [
     "16 / 9",
 ];
 const minimumFeedPhotoFrameAspectRatio = 3 / 4;
-
-const feedLikeButtonPop = keyframes`
-    0% {
-        transform: scale(1);
-    }
-
-    24% {
-        transform: scale(0.88);
-    }
-
-    55% {
-        transform: scale(1.16);
-    }
-
-    78% {
-        transform: scale(0.97);
-    }
-
-    100% {
-        transform: scale(1);
-    }
-`;
-
-const feedLikeHeartPop = keyframes`
-    0% {
-        opacity: 0.72;
-        transform: scale(0.58) rotate(-10deg);
-    }
-
-    44% {
-        opacity: 1;
-        transform: scale(1.38) rotate(6deg);
-    }
-
-    72% {
-        transform: scale(0.93) rotate(-3deg);
-    }
-
-    100% {
-        opacity: 1;
-        transform: scale(1) rotate(0deg);
-    }
-`;
 
 const FeedReplyIcon: React.FC = () => (
     <svg
@@ -490,7 +451,7 @@ const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
             sx={{
                 alignItems: "center",
                 animation: isPopping
-                    ? `${feedLikeButtonPop} ${feedLikePopDurationMs}ms cubic-bezier(0.2, 0.82, 0.22, 1) both`
+                    ? `${spacePostLikeButtonPop} ${spacePostLikePopDurationMs}ms ${spacePostLikePopTiming} both`
                     : undefined,
                 appearance: "none",
                 bgcolor: isLiked ? paleGreen : feedActionBackground,
@@ -527,7 +488,7 @@ const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
                 component="span"
                 sx={{
                     animation: isPopping
-                        ? `${feedLikeHeartPop} ${feedLikePopDurationMs}ms cubic-bezier(0.2, 0.82, 0.22, 1) both`
+                        ? `${spacePostLikeHeartPop} ${spacePostLikePopDurationMs}ms ${spacePostLikePopTiming} both`
                         : undefined,
                     display: "flex",
                     lineHeight: 0,
@@ -651,7 +612,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
         const timeoutID = window.setTimeout(
             () => setLikePopID(0),
-            feedLikePopDurationMs,
+            spacePostLikePopDurationMs,
         );
         return () => window.clearTimeout(timeoutID);
     }, [likePopID]);
