@@ -15,7 +15,8 @@ pub use error::{Result, SpaceError};
 pub use models::{
     AuthKeyAttributes, CreatedSpace, CreatedSpaceLink, DecryptedFriendShare, DecryptedMessage,
     DecryptedPost, DecryptedSpaceProfile, FeedItem, FeedPage, HydratedKeys, MessagePayload,
-    MessageQuote, OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PrivateKeySource,
+    MessageQuote, OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostObjectMetadata,
+    PrivateKeySource,
 };
 pub use transport::{
     EntityKeyPayload, FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse,

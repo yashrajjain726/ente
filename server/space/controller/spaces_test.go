@@ -14,8 +14,7 @@ func TestGetProfileReturnsHistoricalVersion(t *testing.T) {
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
 	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-profile-v1")
 	require.NoError(t, err)
-	profileV2 := "alice-profile-v2"
-	rotated, err := repos.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", &profileV2)
+	rotated, err := repos.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
 	require.Equal(t, 2, rotated.CurrentVersion)
 	require.NoError(t, userAuthRepo.AddToken(aliceID, ente.Photos, "alice-token", "127.0.0.1", "space-test"))
@@ -86,14 +85,13 @@ func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 	ginCtx := newPublicSpaceContext()
 	ginCtx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(aliceID, 10))
-	profileV2 := "alice-profile-v2"
 
 	resp, err := module.Spaces.RotateKey(ginCtx, models.RotateSpaceKeyRequest{
 		SpaceID:           space.SpaceID,
 		KeyVersion:        space.CurrentVersion + 1,
-		EncryptedSpaceKey: "alice-space-key-v2",
-		WrappedPrevKey:    "wrapped-prev-key",
-		EncryptedProfile:  &profileV2,
+		EncryptedSpaceKey: "YWxpY2Utc3BhY2Uta2V5LXYy",
+		WrappedPrevKey:    "d3JhcHBlZC1wcmV2LWtleQ==",
+		EncryptedProfile:  "YWxpY2UtcHJvZmlsZS12Mg==",
 	})
 
 	require.Nil(t, resp)

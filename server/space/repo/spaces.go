@@ -239,7 +239,7 @@ func (r *SpacesRepository) UpdateSlug(ctx context.Context, ownerID int64, spaceI
 	return rec, nil
 }
 
-func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID string, keyVersion int, encryptedSpaceKey, wrappedPrevKey string, encryptedProfile *string) (*SpaceRecord, error) {
+func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID string, keyVersion int, encryptedSpaceKey, wrappedPrevKey, encryptedProfile string) (*SpaceRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -258,15 +258,11 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID
 	if current.CurrentVersion != keyVersion {
 		return nil, sql.ErrNoRows
 	}
-	newProfile := current.EncryptedProfile
-	if encryptedProfile != nil {
-		newProfile = *encryptedProfile
-	}
 	newVersion := current.CurrentVersion + 1
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO space_key_versions (space_id, version, encrypted_space_key, encrypted_profile, wrapped_prev_key)
 		VALUES ($1, $2, $3, $4, $5)
-	`, spaceID, newVersion, encryptedSpaceKey, newProfile, strings.TrimSpace(wrappedPrevKey)); err != nil {
+	`, spaceID, newVersion, encryptedSpaceKey, encryptedProfile, strings.TrimSpace(wrappedPrevKey)); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	rec, err := scanSpaceRecord(tx.QueryRowContext(ctx, `
@@ -275,7 +271,7 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID
 		WHERE owner_id = $4 AND space_id = $5
 		RETURNING space_id, owner_id, space_slug, encrypted_space_key, encrypted_profile, current_version,
 		          avatar_object_key, avatar_bucket_id, avatar_size, cover_object_key, cover_bucket_id, cover_size, created_at, updated_at
-	`, encryptedSpaceKey, newProfile, newVersion, ownerID, spaceID))
+	`, encryptedSpaceKey, encryptedProfile, newVersion, ownerID, spaceID))
 	if err != nil {
 		return nil, err
 	}

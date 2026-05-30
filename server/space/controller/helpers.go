@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/ente-io/museum/space/models"
@@ -131,20 +132,8 @@ func toPostObjectPayload(asset spacerepo.SpacePostAssetRecord) models.PostObject
 	if asset.Size.Valid {
 		resp.Size = asset.Size.Int64
 	}
-	if asset.Variant.Valid {
-		resp.Variant = asset.Variant.String
-	}
-	if asset.BlurHashCipher.Valid {
-		resp.BlurHashCipher = asset.BlurHashCipher.String
-	}
-	if asset.Width.Valid {
-		resp.Width = int(asset.Width.Int64)
-	}
-	if asset.Height.Valid {
-		resp.Height = int(asset.Height.Int64)
-	}
-	if asset.MediaType.Valid {
-		resp.MediaType = asset.MediaType.String
+	if strings.TrimSpace(asset.MetadataCipher) != "" {
+		resp.MetadataCipher = asset.MetadataCipher
 	}
 	return resp
 }

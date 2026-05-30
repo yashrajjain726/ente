@@ -208,11 +208,11 @@ type SpaceSlugAvailabilityResponse struct {
 }
 
 type RotateSpaceKeyRequest struct {
-	SpaceID           string  `json:"spaceId"`
-	KeyVersion        int     `json:"keyVersion"`
-	EncryptedSpaceKey string  `json:"encryptedSpaceKey"`
-	WrappedPrevKey    string  `json:"wrappedPrevKey"`
-	EncryptedProfile  *string `json:"encryptedProfile,omitempty"`
+	SpaceID           string `json:"spaceId"`
+	KeyVersion        int    `json:"keyVersion"`
+	EncryptedSpaceKey string `json:"encryptedSpaceKey"`
+	WrappedPrevKey    string `json:"wrappedPrevKey"`
+	EncryptedProfile  string `json:"encryptedProfile"`
 }
 
 type SpaceKeyVersionResponse struct {
@@ -344,11 +344,7 @@ type PostObjectPayload struct {
 	ObjectKey      string `json:"objectKey"`
 	Size           int64  `json:"size,omitempty"`
 	Position       int    `json:"position,omitempty"`
-	Variant        string `json:"variant,omitempty"`
-	BlurHashCipher string `json:"blurHashCipher,omitempty"`
-	Width          int    `json:"width,omitempty"`
-	Height         int    `json:"height,omitempty"`
-	MediaType      string `json:"mediaType,omitempty"`
+	MetadataCipher string `json:"metadataCipher,omitempty"`
 }
 
 type PostResponse struct {

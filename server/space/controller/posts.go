@@ -60,14 +60,7 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 		if object.Position < 0 || object.Position >= maxSpacePostObjects {
 			return nil, ente.NewBadRequestWithMessage("invalid object position")
 		}
-		if err := validateOptionalEncodedSpaceField("blurHashCipher", object.BlurHashCipher, maxSpaceBlurHashCipherEncodedBytes, maxSpaceBlurHashCipherDecodedBytes); err != nil {
-			return nil, err
-		}
-		if err := validateSpaceTextFieldBytes("variant", object.Variant, maxSpaceVariantBytes); err != nil {
-			return nil, err
-		}
-		mediaType, err := normalizedSpacePhotoMediaType(object.MediaType)
-		if err != nil {
+		if err := validateEncodedSpaceField("metadataCipher", object.MetadataCipher, maxSpaceAssetMetadataEncodedBytes, maxSpaceAssetMetadataDecodedBytes); err != nil {
 			return nil, err
 		}
 		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, object.ObjectKey, repo.TempObjectPurposePost, &space.SpaceID)
@@ -79,11 +72,7 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 			BucketID:       staged.BucketID,
 			Size:           sql.NullInt64{Int64: staged.ExpectedSize, Valid: staged.ExpectedSize > 0},
 			Position:       object.Position,
-			Variant:        sql.NullString{String: object.Variant, Valid: strings.TrimSpace(object.Variant) != ""},
-			BlurHashCipher: sql.NullString{String: object.BlurHashCipher, Valid: strings.TrimSpace(object.BlurHashCipher) != ""},
-			Width:          sql.NullInt64{Int64: int64(object.Width), Valid: object.Width > 0},
-			Height:         sql.NullInt64{Int64: int64(object.Height), Valid: object.Height > 0},
-			MediaType:      sql.NullString{String: mediaType, Valid: true},
+			MetadataCipher: strings.TrimSpace(object.MetadataCipher),
 		})
 	}
 	postID, err := c.PostsRepo.CreatePost(ctx.Request.Context(), userID, space.SpaceID, req.EncryptedPostKey, req.CaptionCipher, req.KeyVersion, assets)

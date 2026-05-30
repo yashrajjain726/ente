@@ -41,9 +41,9 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID
 	}
 	for _, obj := range objects {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO space_post_assets (post_id, object_key, bucket_id, size, position, variant, blur_hash_cipher, width, height, media_type)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		`, postID, obj.ObjectKey, obj.BucketID, obj.Size, obj.Position, obj.Variant, obj.BlurHashCipher, obj.Width, obj.Height, obj.MediaType); err != nil {
+			INSERT INTO space_post_assets (post_id, object_key, bucket_id, size, position, metadata_cipher)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`, postID, obj.ObjectKey, obj.BucketID, obj.Size, obj.Position, obj.MetadataCipher); err != nil {
 			return 0, stacktrace.Propagate(err, "")
 		}
 		if err := ConsumeTempObjectTx(ctx, tx, ownerID, obj.ObjectKey, TempObjectPurposePost, &spaceID); err != nil {
@@ -230,7 +230,7 @@ func (r *PostsRepository) ListAssetsByPostIDs(ctx context.Context, postIDs []int
 	if len(postIDs) == 0 {
 		return map[int64][]SpacePostAssetRecord{}, nil
 	}
-	query, args := inClause("SELECT asset_id, post_id, object_key, bucket_id, size, position, variant, blur_hash_cipher, width, height, media_type, created_at FROM space_post_assets WHERE post_id IN (%s) ORDER BY position ASC, asset_id ASC", postIDs, 0)
+	query, args := inClause("SELECT asset_id, post_id, object_key, bucket_id, size, position, metadata_cipher, created_at FROM space_post_assets WHERE post_id IN (%s) ORDER BY position ASC, asset_id ASC", postIDs, 0)
 	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -239,7 +239,7 @@ func (r *PostsRepository) ListAssetsByPostIDs(ctx context.Context, postIDs []int
 	result := make(map[int64][]SpacePostAssetRecord, len(postIDs))
 	for rows.Next() {
 		var rec SpacePostAssetRecord
-		if err := rows.Scan(&rec.AssetID, &rec.PostID, &rec.ObjectKey, &rec.BucketID, &rec.Size, &rec.Position, &rec.Variant, &rec.BlurHashCipher, &rec.Width, &rec.Height, &rec.MediaType, &rec.CreatedAt); err != nil {
+		if err := rows.Scan(&rec.AssetID, &rec.PostID, &rec.ObjectKey, &rec.BucketID, &rec.Size, &rec.Position, &rec.MetadataCipher, &rec.CreatedAt); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		result[rec.PostID] = append(result[rec.PostID], rec)

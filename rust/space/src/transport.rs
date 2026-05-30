@@ -89,15 +89,7 @@ pub struct PostObjectPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub blur_hash_cipher: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub variant: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub width: Option<i32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub height: Option<i32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub media_type: Option<String>,
+    pub metadata_cipher: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -382,8 +374,7 @@ pub struct RotateSpaceKeyRequest {
     pub encrypted_space_key: String,
     pub key_version: i32,
     pub wrapped_prev_key: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub encrypted_profile: Option<String>,
+    pub encrypted_profile: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

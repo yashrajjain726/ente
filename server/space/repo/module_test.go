@@ -235,9 +235,9 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	postID, err := module.Posts.CreatePost(ctx, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
 	_, err = module.Posts.DB.Exec(`
-		INSERT INTO space_post_assets (post_id, object_key, bucket_id, width, height, media_type)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, postID, "activity-post-object", "bucket", 320, 240, "image/jpeg")
+			INSERT INTO space_post_assets (post_id, object_key, bucket_id, metadata_cipher)
+			VALUES ($1, $2, $3, $4)
+		`, postID, "activity-post-object", "bucket", "metadata")
 	require.NoError(t, err)
 	require.NoError(t, module.Posts.SetLike(ctx, postID, bobID, bobSpace.SpaceID, true))
 	setPostLikeCreatedAt(t, module, 4000, postID, bobSpace.SpaceID)
@@ -488,7 +488,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.Equal(t, "space/alice/avatar.jpg", updatedSpace.AvatarObjectKey.String)
 	require.Equal(t, "b2-eu-cen", updatedSpace.AvatarBucketID.String)
 
-	rotatedSpace, err := module.Spaces.RotateKey(ctx, aliceID, aliceSpace.SpaceID, updatedSpace.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", nil)
+	rotatedSpace, err := module.Spaces.RotateKey(ctx, aliceID, aliceSpace.SpaceID, updatedSpace.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v3")
 	require.NoError(t, err)
 	require.Equal(t, 2, rotatedSpace.CurrentVersion)
 
@@ -548,16 +548,14 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 			BucketID:       "b2-eu-cen",
 			Size:           sqlNullInt64(123),
 			Position:       0,
-			Variant:        nullString("full"),
-			BlurHashCipher: sqlNullString(""),
+			MetadataCipher: "full-metadata",
 		},
 		{
 			ObjectKey:      "space/alice/post1/thumb",
 			BucketID:       "b2-eu-cen",
 			Size:           sqlNullInt64(45),
-			Position:       0,
-			Variant:        nullString("thumbnail"),
-			BlurHashCipher: sqlNullString("blurhash"),
+			Position:       1,
+			MetadataCipher: "thumbnail-metadata",
 		},
 	})
 	require.NoError(t, err)
@@ -659,7 +657,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	_ = bobSpace
 }
 
-func TestPostAssetPositionUniqueTreatsMissingVariantAsDefault(t *testing.T) {
+func TestPostAssetPositionIsUnique(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
 
@@ -670,14 +668,14 @@ func TestPostAssetPositionUniqueTreatsMissingVariantAsDefault(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = module.Posts.DB.Exec(`
-		INSERT INTO space_post_assets (post_id, object_key, bucket_id, position)
-		VALUES ($1, $2, $3, $4)
-	`, postID, "space/alice-assets/post/full-1", "b2-eu-cen", 0)
+			INSERT INTO space_post_assets (post_id, object_key, bucket_id, position, metadata_cipher)
+			VALUES ($1, $2, $3, $4, $5)
+		`, postID, "space/alice-assets/post/full-1", "b2-eu-cen", 0, "metadata-1")
 	require.NoError(t, err)
 	_, err = module.Posts.DB.Exec(`
-		INSERT INTO space_post_assets (post_id, object_key, bucket_id, position)
-		VALUES ($1, $2, $3, $4)
-	`, postID, "space/alice-assets/post/full-2", "b2-eu-cen", 0)
+			INSERT INTO space_post_assets (post_id, object_key, bucket_id, position, metadata_cipher)
+			VALUES ($1, $2, $3, $4, $5)
+		`, postID, "space/alice-assets/post/full-2", "b2-eu-cen", 0, "metadata-2")
 
 	require.Error(t, err)
 }
@@ -924,7 +922,7 @@ func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
 	err = module.Friends.UpsertShare(ctx, aliceSpace.SpaceID, bobID, bobSpace.SpaceID, "share-key-v1", aliceSpace.CurrentVersion)
 	require.NoError(t, err)
 
-	rotatedSpace, err := module.Spaces.RotateKey(ctx, aliceID, aliceSpace.SpaceID, aliceSpace.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", nil)
+	rotatedSpace, err := module.Spaces.RotateKey(ctx, aliceID, aliceSpace.SpaceID, aliceSpace.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
 
 	err = module.Friends.UpdateShare(ctx, aliceSpace.SpaceID, bobID, bobSpace.SpaceID, "share-key-v2", rotatedSpace.CurrentVersion)
@@ -950,7 +948,7 @@ func TestCreatePostRejectsStaleKeyVersion(t *testing.T) {
 	aliceID := insertSpaceUser(t, module, "alice@example.com", "alice-public")
 	space, err := module.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key", "alice-profile")
 	require.NoError(t, err)
-	_, err = module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", nil)
+	_, err = module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
 
 	postID, err := module.Posts.CreatePost(ctx, aliceID, space.SpaceID, "post-key-stale", nil, space.CurrentVersion, nil)
@@ -971,7 +969,7 @@ func TestUpdateProfileRejectsStaleKeyVersion(t *testing.T) {
 	space, err := module.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-profile-v1")
 	require.NoError(t, err)
 
-	rotated, err := module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", ptr("alice-profile-v2"))
+	rotated, err := module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
 	require.Equal(t, 2, rotated.CurrentVersion)
 
@@ -992,11 +990,11 @@ func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
 	space, err := module.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-profile-v1")
 	require.NoError(t, err)
 
-	rotated, err := module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-v1", ptr("alice-profile-v2"))
+	rotated, err := module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-v1", "alice-profile-v2")
 	require.NoError(t, err)
 	require.Equal(t, 2, rotated.CurrentVersion)
 
-	_, err = module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v3", "stale-wrapped-v1", ptr("alice-profile-v3"))
+	_, err = module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v3", "stale-wrapped-v1", "alice-profile-v3")
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
 	current, err := module.Spaces.GetSpaceByID(ctx, space.SpaceID)
@@ -1019,7 +1017,7 @@ func TestAddFriendRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob", "bob-space-key", "bob-profile")
 	require.NoError(t, err)
-	_, err = module.Spaces.RotateKey(ctx, aliceID, aliceSpace.SpaceID, aliceSpace.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", nil)
+	_, err = module.Spaces.RotateKey(ctx, aliceID, aliceSpace.SpaceID, aliceSpace.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
 
 	err = module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "stale-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion)
@@ -1043,7 +1041,7 @@ func TestUpdateShareRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 	err = module.Friends.UpsertShare(ctx, aliceSpace.SpaceID, bobID, bobSpace.SpaceID, "share-key-v1", aliceSpace.CurrentVersion)
 	require.NoError(t, err)
-	_, err = module.Spaces.RotateKey(ctx, aliceID, aliceSpace.SpaceID, aliceSpace.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", nil)
+	_, err = module.Spaces.RotateKey(ctx, aliceID, aliceSpace.SpaceID, aliceSpace.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
 
 	err = module.Friends.UpdateShare(ctx, aliceSpace.SpaceID, bobID, bobSpace.SpaceID, "stale-share-key", aliceSpace.CurrentVersion)
@@ -1072,7 +1070,7 @@ func TestRotateKeyRevokesSpaceLinks(t *testing.T) {
 	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
 	require.NoError(t, err)
 
-	rotatedSpace, err := module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", nil)
+	rotatedSpace, err := module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
 	require.Equal(t, 2, rotatedSpace.CurrentVersion)
 
@@ -1093,7 +1091,7 @@ func TestGetVersionReturnsHistoricalProfile(t *testing.T) {
 	aliceID := insertSpaceUser(t, module, "alice@example.com", "alice-public")
 	space, err := module.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-profile-v1")
 	require.NoError(t, err)
-	rotated, err := module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", ptr("alice-profile-v2"))
+	rotated, err := module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
 	require.Equal(t, 2, rotated.CurrentVersion)
 
@@ -1217,7 +1215,7 @@ func TestGetSessionRejectsStaleLinkMetadata(t *testing.T) {
 	_, err = module.Links.GetSession(ctx, []byte("stale-auth-token"))
 	require.Error(t, err)
 
-	rotatedSpace, err := module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", nil)
+	rotatedSpace, err := module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
 	reusedHashLink, err := module.Links.UpsertLink(ctx, space.SpaceID, []byte("fresh-after-space-rotate"), rotatedSpace.CurrentVersion, "fresh-new-version-key", "fresh-owner-link-secret")
 	require.NoError(t, err)
@@ -1238,7 +1236,7 @@ func TestUpsertLinkRejectsStaleKeyVersion(t *testing.T) {
 	space, err := module.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key", "alice-profile")
 	require.NoError(t, err)
 
-	rotatedSpace, err := module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", nil)
+	rotatedSpace, err := module.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
 	require.Equal(t, space.CurrentVersion+1, rotatedSpace.CurrentVersion)
 

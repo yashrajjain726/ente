@@ -105,17 +105,13 @@ CREATE TABLE IF NOT EXISTS space_post_assets (
     bucket_id            TEXT   NOT NULL,
     size                 BIGINT,
     position             INTEGER NOT NULL DEFAULT 0,
-    variant              TEXT,
-    blur_hash_cipher     TEXT,
-    width                INTEGER,
-    height               INTEGER,
-    media_type           TEXT,
+    metadata_cipher      TEXT   NOT NULL,
     created_at           BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     CONSTRAINT uq_space_post_assets_object_key UNIQUE (object_key)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_space_post_assets_position
-    ON space_post_assets (post_id, position, COALESCE(variant, ''));
+    ON space_post_assets (post_id, position);
 
 CREATE INDEX IF NOT EXISTS idx_space_post_assets_post_position
     ON space_post_assets (post_id, position ASC, asset_id ASC);

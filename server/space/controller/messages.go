@@ -363,11 +363,7 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 					ObjectKey:      activity.Post.ObjectKey.String,
 					Size:           activity.Post.ObjectSize,
 					Position:       int(activity.Post.ObjectPosition.Int64),
-					Variant:        activity.Post.ObjectVariant,
-					BlurHashCipher: activity.Post.ObjectBlurHashCipher,
-					Width:          activity.Post.ObjectWidth,
-					Height:         activity.Post.ObjectHeight,
-					MediaType:      activity.Post.ObjectMediaType,
+					MetadataCipher: activity.Post.ObjectMetadataCipher.String,
 				}),
 			}
 		}

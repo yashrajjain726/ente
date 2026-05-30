@@ -2004,7 +2004,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     onClick={shareProfileLink}
                                     sx={{
                                         alignItems: "center",
-                                        bgcolor: "#F2F2F2",
+                                        bgcolor: "#E8E8E8",
                                         border: 0,
                                         borderRadius: "18px",
                                         color: textBase,
@@ -2025,7 +2025,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                             outline: `2px solid ${green}`,
                                             outlineOffset: 2,
                                         },
-                                        "&:hover": { bgcolor: "#E8E8E8" },
+                                        "&:hover": { bgcolor: "#DEDEDE" },
                                     }}
                                 >
                                     <ShareIcon />
@@ -2036,6 +2036,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     )}
                 </Box>
                 <Box
+                    className="green-bg"
                     component="button"
                     type="button"
                     aria-label="Post photo"

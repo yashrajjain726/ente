@@ -99,11 +99,7 @@ type SpacePostAssetRecord struct {
 	BucketID       string
 	Size           sql.NullInt64
 	Position       int
-	Variant        sql.NullString
-	BlurHashCipher sql.NullString
-	Width          sql.NullInt64
-	Height         sql.NullInt64
-	MediaType      sql.NullString
+	MetadataCipher string
 	CreatedAt      int64
 }
 
@@ -171,11 +167,7 @@ type SpaceMessageConversationPostRecord struct {
 	ObjectKey            sql.NullString
 	ObjectSize           sql.NullInt64
 	ObjectPosition       sql.NullInt64
-	ObjectVariant        sql.NullString
-	ObjectBlurHashCipher sql.NullString
-	ObjectWidth          sql.NullInt64
-	ObjectHeight         sql.NullInt64
-	ObjectMediaType      sql.NullString
+	ObjectMetadataCipher sql.NullString
 }
 
 type CreateSpaceMessageRecord struct {

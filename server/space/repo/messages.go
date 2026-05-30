@@ -427,13 +427,9 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			asset.object_key AS post_object_key,
 			asset.size AS post_object_size,
 			asset.position AS post_object_position,
-			asset.variant AS post_object_variant,
-			asset.blur_hash_cipher AS post_object_blur_hash_cipher,
-			asset.width AS post_object_width,
-			asset.height AS post_object_height,
-				asset.media_type AS post_object_media_type
-				FROM ranked c
-				JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
+			asset.metadata_cipher AS post_object_metadata_cipher
+		FROM ranked c
+		JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
 			JOIN key_attributes friend_ka ON friend_ka.user_id = friend_space.owner_id
 		LEFT JOIN space_messages m ON m.message_id = c.message_id
 		LEFT JOIN spaces sender_space ON sender_space.space_id = m.sender_space_id
@@ -443,17 +439,17 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 		LEFT JOIN space_posts p ON p.post_id = c.post_id
 		LEFT JOIN spaces post_space ON post_space.space_id = p.space_id
 		LEFT JOIN LATERAL (
-			SELECT object_key, size, position, variant, blur_hash_cipher, width, height, media_type
+			SELECT object_key, size, position, metadata_cipher
 			FROM space_post_assets
 			WHERE post_id = p.post_id AND p.is_deleted = FALSE
 			ORDER BY position ASC, asset_id ASC
 			LIMIT 1
 		) asset ON TRUE
-				WHERE c.rn = 1
-				  AND ($3::bigint IS NULL OR (c.sort_created_at, c.sort_id) < ($3::bigint, $4::text))
-				ORDER BY c.sort_created_at DESC, c.sort_id DESC
-				LIMIT $5
-		`, viewerID, viewerSpaceID, cursorCreatedAt, cursorID, limit+1)
+		WHERE c.rn = 1
+		  AND ($3::bigint IS NULL OR (c.sort_created_at, c.sort_id) < ($3::bigint, $4::text))
+		ORDER BY c.sort_created_at DESC, c.sort_id DESC
+		LIMIT $5
+			`, viewerID, viewerSpaceID, cursorCreatedAt, cursorID, limit+1)
 	if err != nil {
 		return nil, "", stacktrace.Propagate(err, "")
 	}
@@ -705,11 +701,7 @@ func scanMessageConversationRecord(scanner interface{ Scan(dest ...any) error })
 		&post.ObjectKey,
 		&post.ObjectSize,
 		&post.ObjectPosition,
-		&post.ObjectVariant,
-		&post.ObjectBlurHashCipher,
-		&post.ObjectWidth,
-		&post.ObjectHeight,
-		&post.ObjectMediaType,
+		&post.ObjectMetadataCipher,
 	)
 	if err := scanner.Scan(dest...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
