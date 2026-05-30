@@ -156,6 +156,9 @@ interface SpaceMessageConversationPageResponse {
 }
 
 interface SpacePostBase {
+    avatarObjectKey?: string;
+    avatarSize?: number;
+    avatarUpdatedAt?: string;
     avatarUrl?: string | null;
     caption?: string;
     friendID: string;
@@ -180,7 +183,7 @@ export interface SpacePostAsset {
 
 export interface SpacePost extends SpacePostBase {
     imageAsset?: SpacePostAsset;
-    imageUrl: string;
+    imageUrl?: string;
 }
 
 export interface SpacePostPage {
@@ -201,6 +204,10 @@ export interface SpaceProfilePostPage {
 export type SpacePostAssetURLLoader = (
     asset: SpacePostAsset,
 ) => Promise<string>;
+
+export type SpacePostAvatarURLLoader = (
+    post: SpacePost,
+) => Promise<string | null>;
 
 export interface SpaceLink {
     accessKey: string;
@@ -628,19 +635,27 @@ const firstObject = (post: { objects?: SpacePostObject[] }) =>
 const postFromAccountPost = async (
     ctx: SpaceAccountCtxHandle,
     post: SpacePostResponse,
+    loadMedia = true,
 ): Promise<SpacePost | null> => {
     const object = firstObject(post);
     if (!object) return null;
 
     const author = actorProfile(post.author);
-    author.avatarUrl = await accountAvatarURL(
-        ctx,
-        post.author.spaceId,
-        post.author.avatar,
-    );
+    if (loadMedia) {
+        author.avatarUrl = await accountAvatarURL(
+            ctx,
+            post.author.spaceId,
+            post.author.avatar,
+        );
+    }
 
-    const imageUrl = await accountPostAssetURL(ctx, post, object);
+    const imageUrl = loadMedia
+        ? await accountPostAssetURL(ctx, post, object)
+        : undefined;
     return {
+        avatarObjectKey: author.avatarObjectKey,
+        avatarSize: author.avatarSize,
+        avatarUpdatedAt: author.avatarUpdatedAt,
         avatarUrl: author.avatarUrl,
         caption: post.caption,
         friendID: author.id,
@@ -665,6 +680,9 @@ const profilePostFromPost = (
 
     const author = actorProfile(post.author);
     return {
+        avatarObjectKey: author.avatarObjectKey,
+        avatarSize: author.avatarSize,
+        avatarUpdatedAt: author.avatarUpdatedAt,
         avatarUrl: null,
         caption: post.caption,
         friendID: author.id,
@@ -683,10 +701,13 @@ const profilePostFromPost = (
 const postPageFromAccountPage = async (
     ctx: SpaceAccountCtxHandle,
     page: SpacePostPageResponse,
+    loadMedia = true,
 ): Promise<SpacePostPage> => {
     const items = (
         await Promise.all(
-            (page.items ?? []).map((post) => postFromAccountPost(ctx, post)),
+            (page.items ?? []).map((post) =>
+                postFromAccountPost(ctx, post, loadMedia),
+            ),
         )
     ).filter((post): post is SpacePost => Boolean(post));
     return { items, nextCursor: page.nextCursor || undefined };
@@ -941,6 +962,7 @@ export const loadCurrentFeedPage = async (
                 cursor ?? null,
                 currentFeedPageSize,
             )) as SpacePostPageResponse,
+            false,
         );
     } finally {
         releaseCurrentSpaceContext(ctx);
@@ -1013,6 +1035,23 @@ export const loadCurrentSpacePostAssetURL: SpacePostAssetURLLoader = async (
     const ctx = await ensureCurrentSpaceContext();
     try {
         return await accountPostAssetURLFromAsset(ctx, asset);
+    } finally {
+        releaseCurrentSpaceContext(ctx);
+    }
+};
+
+export const loadCurrentSpacePostAvatarURL: SpacePostAvatarURLLoader = async (
+    post,
+) => {
+    if (!post.spaceId || !post.avatarObjectKey) return null;
+
+    const ctx = await ensureCurrentSpaceContext();
+    try {
+        return await accountAvatarURL(ctx, post.spaceId, {
+            objectKey: post.avatarObjectKey,
+            size: post.avatarSize,
+            updatedAt: post.avatarUpdatedAt,
+        });
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

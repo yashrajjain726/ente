@@ -9,6 +9,8 @@ import {
     deleteCurrentPost,
     loadCurrentFeedPage,
     loadCurrentSpaceFriends,
+    loadCurrentSpacePostAssetURL,
+    loadCurrentSpacePostAvatarURL,
     loadCurrentUnreadStatus,
     markCurrentFeedRead,
     replyToCurrentPost,
@@ -263,6 +265,8 @@ const Page: React.FC = () => {
                     void router.push(spaceRoutes.friend(friendID))
                 }
                 onLoadMoreFeedItems={loadMoreFeedItems}
+                onLoadPostAvatar={loadCurrentSpacePostAvatarURL}
+                onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
                 onOpenProfile={() => void router.push(spaceRoutes.profile)}
                 onReplyToPost={replyToCurrentPost}

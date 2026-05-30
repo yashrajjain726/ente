@@ -24,7 +24,11 @@ import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
-import type { SpacePost } from "services/space";
+import type {
+    SpacePost,
+    SpacePostAssetURLLoader,
+    SpacePostAvatarURLLoader,
+} from "services/space";
 import type { LocalSpaceFeedPost } from "state/spaceAppState";
 import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
 import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
@@ -70,6 +74,7 @@ const feedSkeletonAspectRatios = [
     "16 / 9",
 ];
 const minimumFeedPhotoFrameAspectRatio = 3 / 4;
+const feedMediaLoadRootMargin = "640px 0px";
 
 const FeedReplyIcon: React.FC = () => (
     <svg
@@ -106,6 +111,8 @@ interface HomeScreenProps {
     ) => Promise<void>;
     onDeletePost?: (postId: number) => Promise<void> | void;
     onLoadMoreFeedItems?: () => Promise<void> | void;
+    onLoadPostAvatar?: SpacePostAvatarURLLoader;
+    onLoadPostImage?: SpacePostAssetURLLoader;
     onOpenFriend?: (friendID: string) => void;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
@@ -158,9 +165,11 @@ interface FeedItemProps {
     avatarUrl?: string | null;
     caption?: string;
     friendID: string;
-    imageUrl: string;
+    imageUrl?: string;
     isOwnPost: boolean;
     name: string;
+    onLoadAvatar?: () => Promise<string | null | undefined>;
+    onLoadImage?: () => Promise<string | undefined>;
     onOpenFriend?: (friendID: string) => void;
     onOpenPhoto?: (photo: SpaceViewerPhoto, focusReplyOnOpen?: boolean) => void;
     onOpenProfile?: () => void;
@@ -174,6 +183,7 @@ interface FeedItemProps {
 
 interface FeedSkeletonItemProps {
     aspectRatio: string;
+    rootRef?: React.Ref<HTMLElement>;
 }
 
 interface AddedFriendToastProps {
@@ -197,6 +207,21 @@ const feedPhotoFrameDimensionsFor = (
     dimensions.width / dimensions.height < minimumFeedPhotoFrameAspectRatio
         ? { height: 4, width: 3 }
         : dimensions;
+
+const feedPostImageCacheKey = (item: SpacePost) =>
+    [
+        item.postId,
+        item.imageAsset?.spaceId ?? item.spaceId,
+        item.imageAsset?.objectKey ?? item.imageUrl ?? "",
+    ].join(":");
+
+const feedPostAvatarCacheKey = (item: SpacePost) =>
+    [
+        item.spaceId,
+        item.avatarObjectKey ?? "",
+        item.avatarUpdatedAt ?? "",
+        item.avatarSize ?? "",
+    ].join(":");
 
 const useDecodedImage = (src?: string | null): DecodedImageState => {
     const [state, setState] = useState<DecodedImageState>({ ready: !src, src });
@@ -312,8 +337,12 @@ const useHideHeaderOnScrollDirection = () => {
     return isHidden;
 };
 
-const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({ aspectRatio }) => (
+const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({
+    aspectRatio,
+    rootRef,
+}) => (
     <Box
+        ref={rootRef}
         component="article"
         aria-hidden
         sx={{
@@ -578,6 +607,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     imageUrl,
     isOwnPost,
     name,
+    onLoadAvatar,
+    onLoadImage,
     onOpenFriend,
     onOpenPhoto,
     onOpenProfile,
@@ -590,6 +621,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
 }) => {
     const [isLiked, setIsLiked] = useState(viewerLiked);
     const [likePopID, setLikePopID] = useState(0);
+    const [shouldLoadMedia, setShouldLoadMedia] = useState(
+        Boolean(imageUrl) && avatarUrl !== undefined,
+    );
+    const rootRef = React.useRef<HTMLElement | null>(null);
     const firstName = firstNameFrom(name);
     const dateLabel = formatSpaceDate(timestampMs);
     const postingDotCount = usePostingDotCount(timestampStatus == "posting");
@@ -612,18 +647,21 @@ const FeedItem: React.FC<FeedItemProps> = ({
         useState<LoadedFeedPhotoDimensions | null>(null);
     const decodedPhoto = useDecodedImage(imageUrl);
     const decodedAvatar = useDecodedImage(avatarUrl);
+    const isAvatarReady = avatarUrl !== undefined && decodedAvatar.ready;
     const photoDimensions =
-        loadedPhotoDimensions?.src == imageUrl
+        loadedPhotoDimensions && loadedPhotoDimensions.src == imageUrl
             ? loadedPhotoDimensions
             : dimensionsFromAspectRatio(aspectRatio);
     const feedPhotoFrameDimensions =
         feedPhotoFrameDimensionsFor(photoDimensions);
-    const isFeedItemReady = decodedPhoto.ready && decodedAvatar.ready;
+    const isFeedItemReady =
+        Boolean(imageUrl) && decodedPhoto.ready && isAvatarReady;
     const decodedPhotoHeight = decodedPhoto.height;
     const decodedPhotoWidth = decodedPhoto.width;
     const rememberLoadedPhotoDimensions: React.ReactEventHandler<
         HTMLImageElement
     > = ({ currentTarget }) => {
+        if (!imageUrl) return;
         const { naturalHeight, naturalWidth } = currentTarget;
         if (!naturalHeight || !naturalWidth) return;
 
@@ -644,10 +682,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
         });
     };
     const openPhoto = (focusReplyOnOpen = false) => {
+        if (!imageUrl) return;
+
         onOpenPhoto?.(
             {
                 alt: `${name} post`,
-                avatarUrl,
+                avatarUrl: avatarUrl ?? null,
                 caption,
                 friendID,
                 height: photoDimensions.height,
@@ -678,7 +718,44 @@ const FeedItem: React.FC<FeedItemProps> = ({
     }, [viewerLiked]);
 
     React.useEffect(() => {
+        if (shouldLoadMedia) return;
+        const element = rootRef.current;
+        if (!element) return;
+        if (
+            typeof window == "undefined" ||
+            !("IntersectionObserver" in window)
+        ) {
+            setShouldLoadMedia(true);
+            return;
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    setShouldLoadMedia(true);
+                    observer.disconnect();
+                }
+            },
+            { rootMargin: feedMediaLoadRootMargin },
+        );
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [shouldLoadMedia]);
+
+    React.useEffect(() => {
+        if (!shouldLoadMedia) return;
+
+        if (!imageUrl) {
+            void onLoadImage?.();
+        }
+        if (avatarUrl === undefined) {
+            void onLoadAvatar?.();
+        }
+    }, [avatarUrl, imageUrl, onLoadAvatar, onLoadImage, shouldLoadMedia]);
+
+    React.useEffect(() => {
         if (!decodedPhotoHeight || !decodedPhotoWidth) return;
+        if (!imageUrl) return;
 
         setLoadedPhotoDimensions((currentDimensions) => {
             if (
@@ -711,12 +788,14 @@ const FeedItem: React.FC<FeedItemProps> = ({
         return (
             <FeedSkeletonItem
                 aspectRatio={`${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`}
+                rootRef={rootRef}
             />
         );
     }
 
     return (
         <Box
+            ref={rootRef}
             component="article"
             sx={{
                 bgcolor: feedCardBackground,
@@ -911,10 +990,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 component="span"
                                 aria-label={
                                     timestampStatus == "posting"
-                                        ? "posting"
+                                        ? "Posting"
                                         : timestampStatus == "failed"
                                           ? "Failed"
-                                          : "posted"
+                                          : "Posted"
                                 }
                                 sx={{
                                     alignItems: "center",
@@ -922,20 +1001,22 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                         timestampStatus == "failed"
                                             ? dangerColor
                                             : "rgba(255, 255, 255, 0.86)",
-                                    display: "inline-flex",
+                                    display: "flex",
                                     fontSize: 12,
                                     fontWeight: 500,
+                                    height: 16,
                                     lineHeight: "16px",
+                                    minWidth: "10ch",
                                     whiteSpace: "nowrap",
                                 }}
                             >
                                 {timestampStatus == "posted" ? (
-                                    <Box component="span">posted</Box>
+                                    <Box component="span">Posted</Box>
                                 ) : timestampStatus == "failed" ? (
                                     <Box component="span">Failed</Box>
                                 ) : (
                                     <>
-                                        <Box component="span">posting</Box>
+                                        <Box component="span">Posting</Box>
                                         <Box
                                             component="span"
                                             aria-hidden
@@ -955,10 +1036,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 component="time"
                                 dateTime={new Date(timestampMs).toISOString()}
                                 sx={{
+                                    alignItems: "center",
                                     color: "rgba(255, 255, 255, 0.86)",
-                                    display: "block",
+                                    display: "flex",
                                     fontSize: 12,
                                     fontWeight: 500,
+                                    height: 16,
                                     lineHeight: "16px",
                                     whiteSpace: "nowrap",
                                 }}
@@ -1184,6 +1267,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onCreatePost,
     onDeletePost,
     onLoadMoreFeedItems,
+    onLoadPostAvatar,
+    onLoadPostImage,
     onOpenFriend,
     onOpenMessages,
     onOpenProfile,
@@ -1196,12 +1281,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
+    const [loadedFeedAvatarURLsByKey, setLoadedFeedAvatarURLsByKey] = useState<
+        Record<string, string | null>
+    >({});
+    const [loadedFeedImageURLsByKey, setLoadedFeedImageURLsByKey] = useState<
+        Record<string, string>
+    >({});
     const isHeaderTriggered = useHideHeaderOnScrollDirection();
     const [isHeaderFocused, setIsHeaderFocused] = useState(false);
     const isHeaderHidden = isHeaderTriggered && !isHeaderFocused;
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
+    const feedAvatarLoadsInFlightRef = React.useRef<
+        Map<string, Promise<string | null>>
+    >(new Map());
+    const feedImageLoadsInFlightRef = React.useRef<
+        Map<string, Promise<string | undefined>>
+    >(new Map());
     const topLocalFeedPostIDRef = React.useRef(localFeedPosts[0]?.id ?? null);
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
     const selectedPhotoIsOwn =
@@ -1271,35 +1368,134 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         await onDeletePost(postId);
     };
+    const loadedFeedImageURLFor = React.useCallback(
+        (item: SpacePost) =>
+            item.imageUrl ??
+            loadedFeedImageURLsByKey[feedPostImageCacheKey(item)],
+        [loadedFeedImageURLsByKey],
+    );
+    const loadedFeedAvatarURLFor = React.useCallback(
+        (item: SpacePost) => {
+            if (item.avatarUrl) return item.avatarUrl;
+            if (!item.avatarObjectKey) return null;
+            return loadedFeedAvatarURLsByKey[feedPostAvatarCacheKey(item)];
+        },
+        [loadedFeedAvatarURLsByKey],
+    );
+    const loadFeedPostImage = React.useCallback(
+        (item: SpacePost) => {
+            const loadedImageUrl = loadedFeedImageURLFor(item);
+            if (loadedImageUrl) return Promise.resolve(loadedImageUrl);
+            if (!item.imageAsset || !onLoadPostImage) {
+                return Promise.resolve(undefined);
+            }
+
+            const cacheKey = feedPostImageCacheKey(item);
+            const inFlight = feedImageLoadsInFlightRef.current.get(cacheKey);
+            if (inFlight) return inFlight;
+
+            const load = onLoadPostImage(item.imageAsset)
+                .then((imageUrl) => {
+                    setLoadedFeedImageURLsByKey((currentURLs) =>
+                        currentURLs[cacheKey] == imageUrl
+                            ? currentURLs
+                            : { ...currentURLs, [cacheKey]: imageUrl },
+                    );
+                    return imageUrl;
+                })
+                .catch((error: unknown) => {
+                    console.warn("Failed to load feed post image", error);
+                    return undefined;
+                })
+                .finally(() => {
+                    feedImageLoadsInFlightRef.current.delete(cacheKey);
+                });
+            feedImageLoadsInFlightRef.current.set(cacheKey, load);
+            return load;
+        },
+        [loadedFeedImageURLFor, onLoadPostImage],
+    );
+    const loadFeedPostAvatar = React.useCallback(
+        (item: SpacePost) => {
+            const loadedAvatarUrl = loadedFeedAvatarURLFor(item);
+            if (loadedAvatarUrl !== undefined) {
+                return Promise.resolve(loadedAvatarUrl);
+            }
+            if (!item.avatarObjectKey || !onLoadPostAvatar) {
+                return Promise.resolve(null);
+            }
+
+            const cacheKey = feedPostAvatarCacheKey(item);
+            const inFlight = feedAvatarLoadsInFlightRef.current.get(cacheKey);
+            if (inFlight) return inFlight;
+
+            const load = onLoadPostAvatar(item)
+                .then((avatarUrl) => {
+                    setLoadedFeedAvatarURLsByKey((currentURLs) =>
+                        currentURLs[cacheKey] == avatarUrl
+                            ? currentURLs
+                            : { ...currentURLs, [cacheKey]: avatarUrl },
+                    );
+                    return avatarUrl;
+                })
+                .catch((error: unknown) => {
+                    console.warn("Failed to load feed avatar", error);
+                    setLoadedFeedAvatarURLsByKey((currentURLs) =>
+                        currentURLs[cacheKey] === null
+                            ? currentURLs
+                            : { ...currentURLs, [cacheKey]: null },
+                    );
+                    return null;
+                })
+                .finally(() => {
+                    feedAvatarLoadsInFlightRef.current.delete(cacheKey);
+                });
+            feedAvatarLoadsInFlightRef.current.set(cacheKey, load);
+            return load;
+        },
+        [loadedFeedAvatarURLFor, onLoadPostAvatar],
+    );
     const feedItemFor = (
         item: SpacePost,
         key: React.Key,
         timestampStatus?: FeedTimestampStatus,
-    ) => (
-        <FeedItem
-            key={key}
-            aspectRatio={
-                item.width && item.height ? item.width / item.height : 1
-            }
-            avatarUrl={item.avatarUrl ?? ""}
-            caption={item.caption}
-            friendID={item.friendID}
-            imageUrl={item.imageUrl}
-            isOwnPost={
-                Boolean(profile.spaceId) && item.spaceId == profile.spaceId
-            }
-            name={item.name}
-            onOpenFriend={onOpenFriend}
-            onOpenPhoto={openFeedPhoto}
-            onOpenProfile={onOpenProfile}
-            onSetPostLiked={onSetPostLiked}
-            postId={item.postId}
-            timestampStatus={timestampStatus}
-            timestampMs={item.timestampMs}
-            viewerLiked={item.viewerLiked}
-            viewerUnread={item.viewerUnread}
-        />
-    );
+    ) => {
+        const imageUrl = loadedFeedImageURLFor(item);
+        const avatarUrl = loadedFeedAvatarURLFor(item);
+        return (
+            <FeedItem
+                key={key}
+                aspectRatio={
+                    item.width && item.height ? item.width / item.height : 1
+                }
+                avatarUrl={avatarUrl}
+                caption={item.caption}
+                friendID={item.friendID}
+                imageUrl={imageUrl}
+                isOwnPost={
+                    Boolean(profile.spaceId) && item.spaceId == profile.spaceId
+                }
+                name={item.name}
+                onLoadAvatar={
+                    avatarUrl === undefined
+                        ? () => loadFeedPostAvatar(item)
+                        : undefined
+                }
+                onLoadImage={
+                    imageUrl ? undefined : () => loadFeedPostImage(item)
+                }
+                onOpenFriend={onOpenFriend}
+                onOpenPhoto={openFeedPhoto}
+                onOpenProfile={onOpenProfile}
+                onSetPostLiked={onSetPostLiked}
+                postId={item.postId}
+                timestampStatus={timestampStatus}
+                timestampMs={item.timestampMs}
+                viewerLiked={item.viewerLiked}
+                viewerUnread={item.viewerUnread}
+            />
+        );
+    };
     const localFeedItemFor = (item: LocalSpaceFeedPost) => {
         if (item.status == "posted" || item.status == "ready") {
             return feedItemFor(
@@ -1315,7 +1511,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 aspectRatio={
                     item.width && item.height ? item.width / item.height : 1
                 }
-                avatarUrl={item.avatarUrl ?? ""}
+                avatarUrl={item.avatarUrl ?? null}
                 caption={item.caption}
                 friendID={item.friendID}
                 imageUrl={item.imageUrl}
