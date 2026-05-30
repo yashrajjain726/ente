@@ -1308,7 +1308,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         position: "fixed",
                         textAlign: "center",
                         textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
-                        top: "85%",
+                        bottom: "14%",
                         transform: "translateX(-50%)",
                         whiteSpace: "pre-wrap",
                         width: "90vw",
