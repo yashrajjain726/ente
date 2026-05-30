@@ -399,6 +399,7 @@ interface ProfileScreenProps {
     onOpenProfilePhoto?: () => void;
     onOpenSettings?: () => void;
     onLoadPostImage?: (asset: SpacePostAsset) => Promise<string>;
+    onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onShareProfileLink?: () => Promise<string>;
     postGroups?: ProfilePostGroup[];
@@ -421,6 +422,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onOpenProfilePhoto,
     onOpenSettings,
     onLoadPostImage,
+    onReplyToPost,
     onSetPostLiked,
     onShareProfileLink,
     postGroups = [],
@@ -1632,6 +1634,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             isOwnerProfile ? deleteSelectedPost : undefined
                         }
                         onOpenProfile={closeSelectedPost}
+                        onReplyToPost={
+                            isFriendProfile ? onReplyToPost : undefined
+                        }
                         onPublishDraftPost={
                             selectedPost.draftFile && onCreatePost
                                 ? (caption, edit) => {

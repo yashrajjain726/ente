@@ -9,6 +9,7 @@ import {
     loadCurrentSpacePostAssetURL,
     loadCurrentSpaceProfile,
     loadCurrentSpaceProfilePostsPage,
+    replyToCurrentPost,
     setCurrentPostLiked,
     type SpaceProfilePost,
 } from "services/space";
@@ -207,6 +208,7 @@ const Page: React.FC = () => {
                 }}
                 onBack={goBack}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
+                onReplyToPost={replyToCurrentPost}
                 onSetPostLiked={setCurrentPostLiked}
             />
         </>
