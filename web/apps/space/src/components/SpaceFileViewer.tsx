@@ -1154,7 +1154,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     data-space-viewer-bottom="true"
                     sx={{
                         alignItems: "stretch",
-                        bottom: "16px",
+                        bottom:
+                            "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
@@ -1335,7 +1336,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     data-space-viewer-bottom="true"
                     sx={{
                         alignItems: "stretch",
-                        bottom: "16px",
+                        bottom:
+                            "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
                         display: "flex",
                         flexDirection: "column",
                         gap: 0,

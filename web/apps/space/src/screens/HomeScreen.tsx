@@ -802,6 +802,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         left: 12,
                         lineHeight: "20px",
                         minHeight: 32,
+                        pointerEvents: "none",
                         position: "absolute",
                         right: 12,
                         top: 12,
@@ -826,6 +827,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             justifyContent: "center",
                             overflow: "visible",
                             p: 0,
+                            pointerEvents: "auto",
                             position: "relative",
                             width: feedAvatarSize,
                             "&:focus-visible": {
@@ -891,6 +893,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 minWidth: 0,
                                 overflow: "hidden",
                                 p: 0,
+                                pointerEvents: "auto",
                                 textAlign: "left",
                                 textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",
