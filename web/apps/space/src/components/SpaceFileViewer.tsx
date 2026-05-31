@@ -41,6 +41,7 @@ const controlIcon = "#D8D8D8";
 const dangerColor = "#F63A3A";
 const viewerHeaderHeight = 56;
 const viewerBottomPadding = 72;
+const viewerDesktopMinWidth = 600;
 const draftViewerBottomPadding = 88;
 const captionInputMinHeight = 40;
 const replyInputMinHeight = 48;
@@ -280,6 +281,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         React.useState<SpaceActionPhase | null>(null);
     const [draftPostActionPhase, setDraftPostActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
+    const [isDesktopViewer, setIsDesktopViewer] = React.useState(
+        () =>
+            typeof window != "undefined" &&
+            window.innerWidth >= viewerDesktopMinWidth,
+    );
     const [queuedDraftPost, setQueuedDraftPost] = React.useState<{
         caption: string;
         edit: SpaceViewerDraftPostEdit;
@@ -321,6 +327,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         (isReplyFocused || replyText.trim().length > 0 || isReplyActionRunning);
     const isPhotoLikePopping =
         !isReplyMode && isPhotoLiked && photoLikePopID > 0;
+    const usePhotoSwipeViewer = !isDraftPost || isDesktopViewer;
     const canSendReply =
         canReplyToPost &&
         Boolean(activePhoto.postId) &&
@@ -569,6 +576,18 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     };
 
     React.useEffect(() => {
+        const mediaQuery = window.matchMedia(
+            `(min-width: ${viewerDesktopMinWidth}px)`,
+        );
+        const syncDesktopViewer = () => setIsDesktopViewer(mediaQuery.matches);
+
+        syncDesktopViewer();
+        mediaQuery.addEventListener("change", syncDesktopViewer);
+        return () =>
+            mediaQuery.removeEventListener("change", syncDesktopViewer);
+    }, []);
+
+    React.useEffect(() => {
         if (!isDeleteExit) return;
 
         onClose();
@@ -577,7 +596,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     React.useEffect(() => {
         const root = viewerRootRef.current;
         if (!root) return;
-        if (isDraftPost || isDraftPostPreviewPending) return;
+        if (!usePhotoSwipeViewer || isDraftPostPreviewPending) return;
 
         let disposed = false;
         let closedByReact = false;
@@ -606,10 +625,16 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 loop: false,
                 mainClass: "pswp-space-viewer",
                 paddingFn: () => ({
-                    bottom: viewerBottomPadding,
+                    bottom:
+                        window.innerWidth >= viewerDesktopMinWidth
+                            ? 0
+                            : viewerBottomPadding,
                     left: 0,
                     right: 0,
-                    top: viewerHeaderHeight,
+                    top:
+                        window.innerWidth >= viewerDesktopMinWidth
+                            ? 0
+                            : viewerHeaderHeight,
                 }),
                 pinchToClose: false,
                 returnFocus: false,
@@ -722,7 +747,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             pswpRef.current = undefined;
             pswp?.destroy();
         };
-    }, [isDraftPost, isDraftPostPreviewPending]);
+    }, [isDraftPostPreviewPending, usePhotoSwipeViewer]);
 
     React.useEffect(() => {
         if (typeof document == "undefined") return;
@@ -1073,10 +1098,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     width: "100%",
                 }}
             />
-            {isDraftPost && (
+            {isDraftPost && (!isDesktopViewer || isDraftPostPreviewPending) && (
                 <Box
                     sx={{
-                        bottom: draftViewerBottomPadding,
+                        bottom: { xs: draftViewerBottomPadding, sm: 0 },
                         boxSizing: "border-box",
                         display: "grid",
                         left: 0,
@@ -1084,7 +1109,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         placeItems: "center",
                         position: "fixed",
                         right: 0,
-                        top: viewerHeaderHeight,
+                        top: { xs: viewerHeaderHeight, sm: 0 },
                         zIndex: 0,
                     }}
                 >
@@ -1154,17 +1179,15 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     data-space-viewer-bottom="true"
                     sx={{
                         alignItems: "stretch",
-                        bottom:
-                            "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
+                        bottom: "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
                         gap: "8px",
-                        left: { xs: "16px", sm: 0 },
+                        left: { xs: "16px", sm: "auto" },
                         maxWidth: { sm: 390 },
-                        mx: { sm: "auto" },
                         position: "fixed",
-                        right: { xs: "16px", sm: 0 },
+                        right: "16px",
                         width: { sm: "calc(100% - 32px)" },
                         zIndex: 2,
                     }}
@@ -1336,14 +1359,14 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     data-space-viewer-bottom="true"
                     sx={{
                         alignItems: "stretch",
-                        bottom:
-                            "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
+                        bottom: "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
                         display: "flex",
                         flexDirection: "column",
                         gap: 0,
-                        left: canReplyToPost ? { xs: "16px", sm: 0 } : "auto",
+                        left: canReplyToPost
+                            ? { xs: "16px", sm: "auto" }
+                            : "auto",
                         maxWidth: canReplyToPost ? { sm: 390 } : undefined,
-                        mx: canReplyToPost ? { sm: "auto" } : undefined,
                         position: "fixed",
                         right: "16px",
                         width: canReplyToPost
@@ -1470,6 +1493,13 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                     userSelect: "none",
                                     WebkitTouchCallout: "none",
                                     WebkitUserSelect: "none",
+                                    "&:hover": {
+                                        bgcolor: isReplyMode
+                                            ? canSendReply
+                                                ? "#F0F0F0"
+                                                : controlBackground
+                                            : controlBackgroundHover,
+                                    },
                                     "@media (prefers-reduced-motion: reduce)": {
                                         animation: "none",
                                     },
