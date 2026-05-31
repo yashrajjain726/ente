@@ -1538,9 +1538,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     color: textSoft,
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 16,
+                                    fontSize: 14,
                                     fontWeight: 500,
-                                    lineHeight: "22px",
+                                    lineHeight: "20px",
                                     m: 0,
                                     maxWidth: isOwnerProfile ? 230 : 250,
                                 }}
