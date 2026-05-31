@@ -223,7 +223,10 @@ const feedPostAvatarCacheKey = (item: SpacePost) =>
         item.avatarSize ?? "",
     ].join(":");
 
-const useDecodedImage = (src?: string | null): DecodedImageState => {
+const useDecodedImage = (
+    src?: string | null,
+    keepPreviousUntilReady = false,
+): DecodedImageState => {
     const [state, setState] = useState<DecodedImageState>({ ready: !src, src });
 
     React.useEffect(() => {
@@ -254,7 +257,11 @@ const useDecodedImage = (src?: string | null): DecodedImageState => {
             void image.decode().then(finish, finish);
         };
 
-        setState({ ready: false, src });
+        setState((currentState) =>
+            keepPreviousUntilReady && currentState.ready && currentState.src
+                ? currentState
+                : { ready: false, src },
+        );
         image.addEventListener("load", decodeLoadedImage, { once: true });
         image.addEventListener("error", finish, { once: true });
         image.src = src;
@@ -265,9 +272,11 @@ const useDecodedImage = (src?: string | null): DecodedImageState => {
             image.removeEventListener("load", decodeLoadedImage);
             image.removeEventListener("error", finish);
         };
-    }, [src]);
+    }, [keepPreviousUntilReady, src]);
 
-    return state.src == src ? state : { ready: !src, src };
+    if (state.src == src) return state;
+    if (keepPreviousUntilReady && src && state.ready && state.src) return state;
+    return { ready: !src, src };
 };
 
 const pageScrollY = () =>
@@ -645,30 +654,35 @@ const FeedItem: React.FC<FeedItemProps> = ({
     };
     const [loadedPhotoDimensions, setLoadedPhotoDimensions] =
         useState<LoadedFeedPhotoDimensions | null>(null);
-    const decodedPhoto = useDecodedImage(imageUrl);
-    const decodedAvatar = useDecodedImage(avatarUrl);
+    const decodedPhoto = useDecodedImage(imageUrl, true);
+    const decodedAvatar = useDecodedImage(avatarUrl, true);
+    const displayImageUrl =
+        (decodedPhoto.ready ? decodedPhoto.src : imageUrl) ?? undefined;
+    const displayAvatarUrl =
+        (decodedAvatar.ready ? decodedAvatar.src : avatarUrl) ?? undefined;
     const isAvatarReady = avatarUrl !== undefined && decodedAvatar.ready;
     const photoDimensions =
-        loadedPhotoDimensions && loadedPhotoDimensions.src == imageUrl
+        loadedPhotoDimensions && loadedPhotoDimensions.src == displayImageUrl
             ? loadedPhotoDimensions
             : dimensionsFromAspectRatio(aspectRatio);
     const feedPhotoFrameDimensions =
         feedPhotoFrameDimensionsFor(photoDimensions);
     const isFeedItemReady =
-        Boolean(imageUrl) && decodedPhoto.ready && isAvatarReady;
+        Boolean(displayImageUrl) && decodedPhoto.ready && isAvatarReady;
     const decodedPhotoHeight = decodedPhoto.height;
+    const decodedPhotoSrc = decodedPhoto.src;
     const decodedPhotoWidth = decodedPhoto.width;
     const rememberLoadedPhotoDimensions: React.ReactEventHandler<
         HTMLImageElement
     > = ({ currentTarget }) => {
-        if (!imageUrl) return;
+        if (!displayImageUrl) return;
         const { naturalHeight, naturalWidth } = currentTarget;
         if (!naturalHeight || !naturalWidth) return;
 
         setLoadedPhotoDimensions((currentDimensions) => {
             if (
                 currentDimensions?.height == naturalHeight &&
-                currentDimensions.src == imageUrl &&
+                currentDimensions.src == displayImageUrl &&
                 currentDimensions.width == naturalWidth
             ) {
                 return currentDimensions;
@@ -676,22 +690,22 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
             return {
                 height: naturalHeight,
-                src: imageUrl,
+                src: displayImageUrl,
                 width: naturalWidth,
             };
         });
     };
     const openPhoto = (focusReplyOnOpen = false) => {
-        if (!imageUrl) return;
+        if (!displayImageUrl) return;
 
         onOpenPhoto?.(
             {
                 alt: `${name} post`,
-                avatarUrl: avatarUrl ?? null,
+                avatarUrl: displayAvatarUrl ?? null,
                 caption,
                 friendID,
                 height: photoDimensions.height,
-                imageUrl,
+                imageUrl: displayImageUrl,
                 name,
                 postId,
                 timestampMs,
@@ -755,12 +769,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
     React.useEffect(() => {
         if (!decodedPhotoHeight || !decodedPhotoWidth) return;
-        if (!imageUrl) return;
+        if (!decodedPhotoSrc) return;
 
         setLoadedPhotoDimensions((currentDimensions) => {
             if (
                 currentDimensions?.height == decodedPhotoHeight &&
-                currentDimensions.src == imageUrl &&
+                currentDimensions.src == decodedPhotoSrc &&
                 currentDimensions.width == decodedPhotoWidth
             ) {
                 return currentDimensions;
@@ -768,11 +782,11 @@ const FeedItem: React.FC<FeedItemProps> = ({
 
             return {
                 height: decodedPhotoHeight,
-                src: imageUrl,
+                src: decodedPhotoSrc,
                 width: decodedPhotoWidth,
             };
         });
-    }, [decodedPhotoHeight, decodedPhotoWidth, imageUrl]);
+    }, [decodedPhotoHeight, decodedPhotoSrc, decodedPhotoWidth]);
 
     React.useEffect(() => {
         if (likePopID == 0) return;
@@ -844,7 +858,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     <Box
                         component="img"
                         alt={`${name} post`}
-                        src={imageUrl}
+                        src={displayImageUrl}
                         onLoad={rememberLoadedPhotoDimensions}
                         sx={{
                             display: "block",
@@ -915,11 +929,11 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             },
                         }}
                     >
-                        {avatarUrl ? (
+                        {displayAvatarUrl ? (
                             <Box
                                 component="img"
                                 alt=""
-                                src={avatarUrl}
+                                src={displayAvatarUrl}
                                 sx={{
                                     borderRadius: "50%",
                                     display: "block",
