@@ -144,6 +144,7 @@ func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesReque
 			Friend:             toActorResponse(conversation.Friend, true),
 			LatestActivity:     toMessageConversationActivityResponse(conversation.LatestActivity),
 			Unread:             conversation.Unread,
+			UnreadCount:        conversation.UnreadCount,
 			NotificationUnread: conversation.NotificationUnread,
 		})
 	}

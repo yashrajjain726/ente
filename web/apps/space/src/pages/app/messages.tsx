@@ -119,6 +119,7 @@ const Page: React.FC = () => {
                               ...currentConversation,
                               notificationUnread: false,
                               unread: false,
+                              unreadCount: 0,
                           }
                         : currentConversation,
                 ),

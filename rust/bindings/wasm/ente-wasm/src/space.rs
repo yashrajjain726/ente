@@ -234,6 +234,7 @@ struct MessageConversationJs {
     friend: ActorJs,
     latest_activity: MessageConversationActivityJs,
     unread: bool,
+    unread_count: i64,
     notification_unread: bool,
 }
 
@@ -1087,6 +1088,7 @@ impl SpaceAccountCtxHandle {
                 )
                 .await?,
                 unread: conversation.unread,
+                unread_count: conversation.unread_count,
                 notification_unread: conversation.notification_unread,
             });
         }

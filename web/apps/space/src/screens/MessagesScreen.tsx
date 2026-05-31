@@ -251,7 +251,7 @@ const ConversationPreviewLine: React.FC<{
         color: textSecondary,
         fontFamily: '"Inter Variable", Inter, sans-serif',
         fontSize: 13,
-        fontWeight: conversation.notificationUnread ? 700 : 500,
+        fontWeight: 500,
         lineHeight: "18px",
         minWidth: 0,
         overflow: "hidden",
@@ -293,6 +293,9 @@ const ConversationPreviewLine: React.FC<{
 const conversationId = (conversation: SpaceMessageConversation) =>
     conversation.friend.spaceId ?? conversation.friend.id;
 
+const conversationUnreadLabel = (count: number) =>
+    count > 99 ? "99+" : String(count);
+
 const dayMs = 24 * 60 * 60 * 1000;
 
 const ConversationListItem: React.FC<{
@@ -306,6 +309,7 @@ const ConversationListItem: React.FC<{
         microsForTimestamp(conversation.latestActivity.createdAtMs),
     );
     const postThumbnailUrl = conversation.latestActivity.post?.imageUrl;
+    const unreadCount = conversation.unreadCount;
 
     return (
         <Box component="li" sx={{ listStyle: "none" }}>
@@ -336,7 +340,49 @@ const ConversationListItem: React.FC<{
                     },
                 }}
             >
-                <Avatar avatarUrl={conversation.friend.avatarUrl} size={44} />
+                <Box
+                    sx={{
+                        flexShrink: 0,
+                        height: 44,
+                        position: "relative",
+                        width: 44,
+                    }}
+                >
+                    <Avatar
+                        avatarUrl={conversation.friend.avatarUrl}
+                        size={44}
+                    />
+                    {unreadCount > 0 && (
+                        <Box
+                            aria-label={`${unreadCount} unread message${unreadCount == 1 ? "" : "s"}`}
+                            component="span"
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: dangerColor,
+                                borderRadius: "8px",
+                                boxShadow: `0 0 0 2px ${messagesBackground}`,
+                                color: "#FFFFFF",
+                                display: "inline-flex",
+                                flexShrink: 0,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 10,
+                                fontWeight: 700,
+                                height: 16,
+                                justifyContent: "center",
+                                lineHeight: "16px",
+                                minWidth: 16,
+                                position: "absolute",
+                                px: "4px",
+                                right: -2,
+                                top: -2,
+                                zIndex: 1,
+                            }}
+                        >
+                            {conversationUnreadLabel(unreadCount)}
+                        </Box>
+                    )}
+                </Box>
                 <Box sx={{ minWidth: 0 }}>
                     <Box
                         sx={{
@@ -395,19 +441,6 @@ const ConversationListItem: React.FC<{
                         >
                             {timestampLabel}
                         </Box>
-                        {conversation.unread && (
-                            <Box
-                                aria-hidden
-                                sx={{
-                                    bgcolor: green,
-                                    borderRadius: "50%",
-                                    flexShrink: 0,
-                                    height: 8,
-                                    ml: "2px",
-                                    width: 8,
-                                }}
-                            />
-                        )}
                     </Box>
                     <ConversationPreviewLine
                         conversation={conversation}

@@ -148,6 +148,7 @@ interface SpaceMessageConversationResponse {
     latestActivity: SpaceMessageConversationActivity;
     notificationUnread?: boolean;
     unread?: boolean;
+    unreadCount: number;
 }
 
 interface SpaceMessageConversationPageResponse {
@@ -287,6 +288,7 @@ export interface SpaceMessageConversation {
     latestActivity: SpaceMessageActivity;
     notificationUnread: boolean;
     unread: boolean;
+    unreadCount: number;
 }
 
 export interface SpaceMessageConversationPage {
@@ -1218,6 +1220,7 @@ export const loadCurrentMessageConversations =
                             conversation.notificationUnread,
                         ),
                         unread: Boolean(conversation.unread),
+                        unreadCount: conversation.unreadCount,
                     };
                 }),
             );

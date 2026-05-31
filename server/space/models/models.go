@@ -314,6 +314,7 @@ type MessageConversationResponse struct {
 	Friend             SpaceActorResponse                  `json:"friend"`
 	LatestActivity     MessageConversationActivityResponse `json:"latestActivity"`
 	Unread             bool                                `json:"unread"`
+	UnreadCount        int64                               `json:"unreadCount"`
 	NotificationUnread bool                                `json:"notificationUnread"`
 }
 

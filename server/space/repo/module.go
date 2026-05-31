@@ -144,6 +144,7 @@ type SpaceMessageConversationRecord struct {
 	Friend             SpaceActorRecord
 	LatestActivity     SpaceMessageConversationActivityRecord
 	Unread             bool
+	UnreadCount        int64
 	NotificationUnread bool
 	SortCreatedAt      int64
 	SortID             string

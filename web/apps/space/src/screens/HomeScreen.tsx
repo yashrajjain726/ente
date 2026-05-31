@@ -1174,16 +1174,15 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
         }}
     >
         <Box
-            className="green-bg"
             role="status"
             aria-live="polite"
             sx={{
                 alignItems: "center",
-                bgcolor: green,
+                bgcolor: "#FFFFFF",
                 borderRadius: "18px",
                 boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
                 boxSizing: "border-box",
-                color: "#FFFFFF",
+                color: textBase,
                 display: "flex",
                 fontFamily: '"Inter Variable", Inter, sans-serif',
                 fontSize: 14,
@@ -1228,7 +1227,7 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                     bgcolor: "transparent",
                     border: 0,
                     borderRadius: "50%",
-                    color: "#FFFFFF",
+                    color: textBase,
                     cursor: onClose ? "pointer" : "default",
                     display: "flex",
                     flexShrink: 0,
@@ -1238,10 +1237,10 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                     p: 0,
                     width: 24,
                     "&:focus-visible": {
-                        outline: "2px solid rgba(255 255 255 / 0.9)",
+                        outline: "2px solid rgba(0 0 0 / 0.72)",
                         outlineOffset: 2,
                     },
-                    "&:hover": { bgcolor: "rgba(255, 255, 255, 0.12)" },
+                    "&:hover": { bgcolor: "rgba(0, 0, 0, 0.06)" },
                 }}
             >
                 <HugeiconsIcon

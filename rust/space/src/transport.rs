@@ -203,6 +203,8 @@ pub struct MessageConversationResponse {
     #[serde(default)]
     pub unread: bool,
     #[serde(default)]
+    pub unread_count: i64,
+    #[serde(default)]
     pub notification_unread: bool,
 }
 
