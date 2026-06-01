@@ -23,6 +23,8 @@ import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
 import { prepareSpacePostImageFromEdit } from "utils/spacePostImage";
 import { spaceRoutes } from "utils/spaceRoutes";
 
+const initialPostSkeletonDelayMs = 350;
+
 const Page: React.FC = () => {
     const router = useRouter();
     const { profile, profileLoadError, profileLoadStatus, setLocalFeedPosts } =
@@ -30,10 +32,17 @@ const Page: React.FC = () => {
     const [friendsCount, setFriendsCount] = useState(0);
     const [posts, setPosts] = useState<SpaceProfilePost[]>([]);
     const [isPostsLoading, setIsPostsLoading] = useState(true);
+    const [showInitialPostSkeleton, setShowInitialPostSkeleton] =
+        useState(false);
     const postGroups = useMemo(
         () => profilePostGroupsFromPosts(posts),
         [posts],
     );
+    const isInitialPostsLoading =
+        profileLoadStatus == "ready" &&
+        Boolean(profile?.spaceId) &&
+        isPostsLoading &&
+        posts.length == 0;
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -74,6 +83,19 @@ const Page: React.FC = () => {
         };
     }, [profile?.spaceId, profileLoadStatus]);
 
+    useEffect(() => {
+        if (!isInitialPostsLoading) {
+            setShowInitialPostSkeleton(false);
+            return;
+        }
+
+        const timeoutID = window.setTimeout(
+            () => setShowInitialPostSkeleton(true),
+            initialPostSkeletonDelayMs,
+        );
+        return () => window.clearTimeout(timeoutID);
+    }, [isInitialPostsLoading]);
+
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
@@ -92,6 +114,7 @@ const Page: React.FC = () => {
                 isStatsLoading={isPostsLoading}
                 postGroups={postGroups}
                 profile={profile}
+                showPostLoadingSkeleton={showInitialPostSkeleton}
                 onBack={() => void router.push(spaceRoutes.home)}
                 onCreatePost={async (image, caption) => {
                     const spaceId = profile.spaceId;

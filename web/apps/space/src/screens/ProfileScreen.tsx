@@ -386,6 +386,7 @@ interface ProfileScreenProps {
     isCoverLoading?: boolean;
     isPostsLoading?: boolean;
     isStatsLoading?: boolean;
+    showPostLoadingSkeleton?: boolean;
     onAddFriend?: () => void;
     onBack?: () => void;
     onCreatePost?: (
@@ -427,6 +428,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onShareProfileLink,
     postGroups = [],
     profile,
+    showPostLoadingSkeleton,
 }) => {
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
@@ -478,7 +480,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const canOpenProfileCover = isOwnerProfile && Boolean(onOpenProfileCover);
     const canOpenProfilePhoto = isOwnerProfile && Boolean(onOpenProfilePhoto);
     const hasProfilePosts = postsSharedCount > 0;
-    const shouldShowPostGrid = hasProfilePosts || isPostsLoading;
+    const shouldShowPostLoadingSkeleton =
+        isPostsLoading && (showPostLoadingSkeleton ?? true);
+    const shouldShowPostGrid = hasProfilePosts || shouldShowPostLoadingSkeleton;
     const isCoverImageLoading = Boolean(coverUrl && loadedCoverUrl != coverUrl);
     const shouldShowCoverSkeleton =
         isCoverLoading || isCoverURLPending || isCoverImageLoading;
@@ -1510,9 +1514,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 </Box>
                             );
                         })
-                    ) : isPostsLoading ? (
+                    ) : shouldShowPostLoadingSkeleton ? (
                         <ProfilePostLoadingSkeletons />
-                    ) : (
+                    ) : isPostsLoading ? null : (
                         <Box
                             sx={{
                                 alignItems: "center",
