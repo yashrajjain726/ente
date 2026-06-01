@@ -3,6 +3,7 @@
 use std::error::Error as StdError;
 use std::fmt::Write as _;
 use std::sync::RwLock;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, LOCATION};
@@ -268,14 +269,12 @@ pub struct HttpClient {
     user_agent: Option<String>,
     client_package: Option<String>,
     client_version: Option<String>,
-    timeout: Option<Duration>,
 }
 
 /// Bare HTTP client for presigned object-store transfers.
 #[derive(Clone)]
 pub struct ObjectStoreHttpClient {
     client: reqwest::Client,
-    timeout: Option<Duration>,
 }
 
 impl HttpClient {
@@ -297,15 +296,13 @@ impl HttpClient {
                 None
             }
         });
-        let timeout = config.timeout_secs.map(Duration::from_secs);
-
         #[cfg(not(target_arch = "wasm32"))]
         let mut builder = reqwest::Client::builder();
         #[cfg(target_arch = "wasm32")]
         let builder = reqwest::Client::builder();
         #[cfg(not(target_arch = "wasm32"))]
-        if let Some(timeout) = timeout {
-            builder = builder.timeout(timeout);
+        if let Some(timeout) = config.timeout_secs {
+            builder = builder.timeout(Duration::from_secs(timeout));
         }
 
         let client = builder.build().map_err(Error::from)?;
@@ -314,8 +311,8 @@ impl HttpClient {
         #[cfg(target_arch = "wasm32")]
         let no_redirect_builder = reqwest::Client::builder();
         #[cfg(not(target_arch = "wasm32"))]
-        if let Some(timeout) = timeout {
-            no_redirect_builder = no_redirect_builder.timeout(timeout);
+        if let Some(timeout) = config.timeout_secs {
+            no_redirect_builder = no_redirect_builder.timeout(Duration::from_secs(timeout));
         }
         let no_redirect_client = no_redirect_builder.build().map_err(Error::from)?;
 
@@ -329,7 +326,6 @@ impl HttpClient {
             user_agent: config.user_agent,
             client_package: config.client_package,
             client_version: config.client_version,
-            timeout,
         })
     }
 
@@ -343,7 +339,6 @@ impl HttpClient {
     pub fn object_store(&self) -> ObjectStoreHttpClient {
         ObjectStoreHttpClient {
             client: self.no_redirect_client.clone(),
-            timeout: self.timeout,
         }
     }
 
@@ -561,14 +556,12 @@ impl HttpClient {
         let mut current_url = self.parse_url(url)?;
         for _ in 0..5 {
             let headers = headers_for_url(&current_url)?;
-            let mut request = self
+            let response = self
                 .no_redirect_client
                 .get(current_url.clone())
-                .headers(headers);
-            if let Some(timeout) = self.timeout {
-                request = request.timeout(timeout);
-            }
-            let response = request.send().await?;
+                .headers(headers)
+                .send()
+                .await?;
             if response.status().is_redirection()
                 && let Some(location) = response.headers().get(LOCATION)
             {
@@ -713,7 +706,7 @@ impl HttpClient {
 impl ObjectStoreHttpClient {
     /// Download bytes from a presigned URL without Ente headers.
     pub async fn get_bytes(&self, url: &str) -> Result<Vec<u8>, Error> {
-        get_bytes_with_client(&self.client, url, self.timeout, |_| Ok(HeaderMap::new())).await
+        get_bytes_with_client(&self.client, url, |_| Ok(HeaderMap::new())).await
     }
 
     /// Upload raw bytes to a presigned URL without Ente headers.
@@ -723,14 +716,13 @@ impl ObjectStoreHttpClient {
         body: &[u8],
         headers: &[(&str, String)],
     ) -> Result<(), Error> {
-        put_bytes_with_client(&self.client, url, self.timeout, body, headers).await
+        put_bytes_with_client(&self.client, url, body, headers).await
     }
 }
 
 async fn get_bytes_with_client<F>(
     client: &reqwest::Client,
     url: &str,
-    timeout: Option<Duration>,
     headers_for_url: F,
 ) -> Result<Vec<u8>, Error>
 where
@@ -739,11 +731,11 @@ where
     let mut current_url = parse_url(url)?;
     for _ in 0..5 {
         let headers = headers_for_url(&current_url)?;
-        let mut request = client.get(current_url.clone()).headers(headers);
-        if let Some(timeout) = timeout {
-            request = request.timeout(timeout);
-        }
-        let response = request.send().await?;
+        let response = client
+            .get(current_url.clone())
+            .headers(headers)
+            .send()
+            .await?;
         if response.status().is_redirection()
             && let Some(location) = response.headers().get(LOCATION)
         {
@@ -759,21 +751,18 @@ where
 async fn put_bytes_with_client(
     client: &reqwest::Client,
     url: &str,
-    timeout: Option<Duration>,
     body: &[u8],
     headers: &[(&str, String)],
 ) -> Result<(), Error> {
     let header_map = build_header_map(headers)?;
     let mut current_url = parse_url(url)?;
     for _ in 0..5 {
-        let mut request = client
+        let response = client
             .put(current_url.clone())
             .headers(header_map.clone())
-            .body(body.to_vec());
-        if let Some(timeout) = timeout {
-            request = request.timeout(timeout);
-        }
-        let response = request.send().await?;
+            .body(body.to_vec())
+            .send()
+            .await?;
         if response.status().is_redirection()
             && let Some(location) = response.headers().get(LOCATION)
         {

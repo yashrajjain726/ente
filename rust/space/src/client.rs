@@ -1963,7 +1963,7 @@ fn build_http_client(
         user_agent,
         client_package,
         client_version,
-        timeout_secs: Some(30),
+        ..HttpConfig::default()
     })
     .map_err(Into::into)
 }
