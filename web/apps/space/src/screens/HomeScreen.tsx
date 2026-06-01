@@ -291,14 +291,14 @@ const pageScrollY = () =>
     );
 
 const scrollPageToTop = () => {
-    if (pageScrollY() <= 0) return;
+    const scrollOptions: ScrollToOptions = { behavior: "auto", top: 0 };
+    document.scrollingElement?.scrollTo(scrollOptions);
+    window.scrollTo(scrollOptions);
+};
 
-    window.scrollTo({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-            ? "auto"
-            : "smooth",
-        top: 0,
-    });
+const scheduleScrollPageToTop = () => {
+    const timeoutID = window.setTimeout(scrollPageToTop, 0);
+    return () => window.clearTimeout(timeoutID);
 };
 
 const useHideHeaderOnScrollDirection = () => {
@@ -1295,6 +1295,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const [loadedFeedImageURLsByKey, setLoadedFeedImageURLsByKey] = useState<
         Record<string, string>
     >({});
+    const [feedScrollRequest, setFeedScrollRequest] = useState(0);
     const isHeaderTriggered = useHideHeaderOnScrollDirection();
     const [isHeaderFocused, setIsHeaderFocused] = useState(false);
     const isHeaderHidden = isHeaderTriggered && !isHeaderFocused;
@@ -1307,7 +1308,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const feedImageLoadsInFlightRef = React.useRef<
         Map<string, Promise<string | undefined>>
     >(new Map());
-    const topLocalFeedPostIDRef = React.useRef(localFeedPosts[0]?.id ?? null);
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
     const selectedPhotoIsOwn =
         Boolean(profile.spaceId) && selectedPhotoFriendID == profile.spaceId;
@@ -1534,12 +1534,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
 
     React.useEffect(() => {
-        const topLocalFeedPostID = localFeedPosts[0]?.id ?? null;
-        if (topLocalFeedPostIDRef.current == topLocalFeedPostID) return;
+        if (feedScrollRequest == 0) return;
 
-        topLocalFeedPostIDRef.current = topLocalFeedPostID;
-        if (topLocalFeedPostID) scrollPageToTop();
-    }, [localFeedPosts]);
+        return scheduleScrollPageToTop();
+    }, [feedScrollRequest]);
 
     const shareProfileLink = async () => {
         if (!onShareProfileLink) return;
@@ -2163,6 +2161,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                       return publishPromise;
                                   }
                                 : undefined
+                        }
+                        onDraftPostPublished={() =>
+                            setFeedScrollRequest((request) => request + 1)
                         }
                         onSetPostLiked={onSetPostLiked}
                     />
