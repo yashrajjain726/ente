@@ -8,6 +8,12 @@ import {
     loginBackground,
     type SpaceLoginCredentials,
 } from "screens/LoginScreen";
+import {
+    savePendingSpaceInvite,
+    savePendingSpaceInviteFriend,
+    savedPendingSpaceInvite,
+    savedPendingSpaceInviteFriend,
+} from "services/spaceInvite";
 import { beginSpaceLogin, type SpaceLoginResult } from "services/spaceLogin";
 import { savePendingSpacePasskeyVerification } from "services/spacePasskeyVerification";
 import { savedSpaceUnlockEmail } from "services/spaceSession";
@@ -33,8 +39,15 @@ const Page: React.FC = () => {
             : "Couldn't unlock Space. Please try again.";
 
     const changeEmail = () => {
+        const pendingInvite = savedPendingSpaceInvite();
+        const pendingFriend = savedPendingSpaceInviteFriend();
+
         void accountLogout().then(() => {
             resetAfterLogout();
+            if (pendingInvite) {
+                savePendingSpaceInvite(pendingInvite);
+                if (pendingFriend) savePendingSpaceInviteFriend(pendingFriend);
+            }
             void router.replace(spaceRoutes.onboarding);
         });
     };

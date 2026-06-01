@@ -38,7 +38,7 @@ func (n *SpaceEmailSender) OnSpacePostReplied(actorSlug string, recipientUserID 
 }
 
 func (n *SpaceEmailSender) OnSpaceFriendAdded(actorSlug string, recipientUserID int64) {
-	n.send(actorSlug, "added you as a friend", "friend_added", []int64{recipientUserID})
+	n.send(actorSlug, "is now your friend", "friend_added", []int64{recipientUserID})
 }
 
 func (n *SpaceEmailSender) send(actorSlug, action, event string, recipientUserIDs []int64) {
