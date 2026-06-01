@@ -660,7 +660,7 @@
   resolved "https://registry.npmjs.org/@fontsource/jetbrains-mono/-/jetbrains-mono-5.2.8.tgz"
   integrity sha512-6w8/SG4kqvIMu7xd7wt6x3idn1Qux3p9N62s6G3rfldOUYHpWcc2FKrqf+Vo44jRvqWj2oAtTHrZXEP23oSKwQ==
 
-"@fontsource/nunito@^5.2.7":
+"@fontsource/nunito@5.2.7":
   version "5.2.7"
   resolved "https://registry.yarnpkg.com/@fontsource/nunito/-/nunito-5.2.7.tgz#158a5726437c3899814830db23ec36896fcc44e4"
   integrity sha512-pmtBq0H9ex9nk+RtJYEJOD9pag393iHETnl/PVKleF4i06cd0ttngK5ZCTgYb5eOqR3Xdlrjtev8m7bmgYprew==
@@ -675,12 +675,12 @@
   resolved "https://registry.yarnpkg.com/@fontsource/space-grotesk/-/space-grotesk-5.2.10.tgz#36eef6a105be125d1025c206eb48f1a3d37ad512"
   integrity sha512-XNXEbT74OIITPqw2H6HXwPDp85fy43uxfBwFR5PU+9sLnjuLj12KlhVM9nZVN6q6dlKjkuN8JisW/OBxwxgUew==
 
-"@hugeicons/core-free-icons@^1.0.5", "@hugeicons/core-free-icons@^1.1.0":
+"@hugeicons/core-free-icons@1.2.1", "@hugeicons/core-free-icons@^1.0.5", "@hugeicons/core-free-icons@^1.1.0":
   version "1.2.1"
   resolved "https://registry.npmjs.org/@hugeicons/core-free-icons/-/core-free-icons-1.2.1.tgz"
   integrity sha512-ho0QdGMkgL+kt+QsZocCsKvJou1rfyVQWARrxIhNLi+9tCKayUUtD9jlHgioaRphmskSl84TxrDm9Ae0G4Uu1g==
 
-"@hugeicons/react@^1.0.5", "@hugeicons/react@^1.1.4":
+"@hugeicons/react@1.1.4", "@hugeicons/react@^1.0.5", "@hugeicons/react@^1.1.4":
   version "1.1.4"
   resolved "https://registry.npmjs.org/@hugeicons/react/-/react-1.1.4.tgz"
   integrity sha512-gsc3eZyd2fGqRUThW9+lfjxxsOkz6KNVmRXRgJjP32GL0OnnLJnl3hytKt47CBbiQj2xE2kCw+rnP3UQCThcKw==
@@ -4451,7 +4451,7 @@ pdfjs-dist@^5.4.394:
   optionalDependencies:
     "@napi-rs/canvas" "^0.1.100"
 
-photoswipe@^5.4.4:
+photoswipe@5.4.4, photoswipe@^5.4.4:
   version "5.4.4"
   resolved "https://registry.npmjs.org/photoswipe/-/photoswipe-5.4.4.tgz"
   integrity sha512-WNFHoKrkZNnvFFhbHL93WDkW3ifwVOXSW3w1UuZZelSmgXpIGiZSNlZJq37rR8YejqME2rHs9EhH9ZvlvFH2NA==
@@ -4589,7 +4589,7 @@ react-dropzone@14.2.10:
     file-selector "^0.6.0"
     prop-types "^15.8.1"
 
-react-easy-crop@^5.5.7:
+react-easy-crop@5.5.7:
   version "5.5.7"
   resolved "https://registry.yarnpkg.com/react-easy-crop/-/react-easy-crop-5.5.7.tgz#220518895ef1ed28bd889cbdfbd5baed0f0009bb"
   integrity sha512-kYo4NtMeXFQB7h1U+h5yhUkE46WQbQdq7if54uDlbMdZHdRgNehfvaFrXnFw5NR1PNoUOJIfTwLnWmEx/MaZnA==

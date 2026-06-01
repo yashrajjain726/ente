@@ -6,15 +6,15 @@
         "build:post": "rm -f out/404.html"
     },
     "dependencies": {
-        "@fontsource/nunito": "^5.2.7",
-        "@hugeicons/core-free-icons": "^1.1.0",
-        "@hugeicons/react": "^1.1.4",
+        "@fontsource/nunito": "5.2.7",
+        "@hugeicons/core-free-icons": "1.2.1",
+        "@hugeicons/react": "1.1.4",
         "ente-accounts-rs": "*",
         "ente-base": "*",
         "ente-media": "*",
         "ente-wasm": "*",
-        "photoswipe": "^5.4.4",
-        "react-easy-crop": "^5.5.7"
+        "photoswipe": "5.4.4",
+        "react-easy-crop": "5.5.7"
     },
     "devDependencies": {
         "ente-build-config": "*"
