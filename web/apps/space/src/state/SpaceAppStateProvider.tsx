@@ -50,6 +50,8 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     const [profileLoadError, setProfileLoadError] = useState<string>();
     const [profileLoadStatus, setProfileLoadStatus] =
         useState<SpaceProfileLoadStatus>("loading");
+    const [skipNextHomeFeedSkeleton, setSkipNextHomeFeedSkeleton] =
+        useState(false);
     const [signupEmail, setSignupEmail] = useState("");
     const avatarURLRef = useRef<string | null>(null);
     const coverURLRef = useRef<string | null>(null);
@@ -191,6 +193,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         setPendingProfileAvatarFile(null);
         setPendingProfileCoverFile(null);
         setOnboardingEntrySource("direct");
+        setSkipNextHomeFeedSkeleton(false);
         setLocalFeedPosts([]);
         setFriends(initialFriends());
     }, [applyProfile]);
@@ -243,6 +246,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             profile,
             profileLoadError,
             profileLoadStatus,
+            skipNextHomeFeedSkeleton,
             refreshProfile,
             resetAfterLogout,
             setFriends,
@@ -254,6 +258,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             setPendingProfileAvatarFile,
             setPendingProfileCoverFile,
             setProfile: applyProfile,
+            setSkipNextHomeFeedSkeleton,
             setSignupEmail,
             signupEmail,
         }),
@@ -269,6 +274,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             profile,
             profileLoadError,
             profileLoadStatus,
+            skipNextHomeFeedSkeleton,
             refreshProfile,
             resetAfterLogout,
             signupEmail,

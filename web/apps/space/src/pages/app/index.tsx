@@ -39,6 +39,8 @@ const Page: React.FC = () => {
         profileLoadStatus,
         setFriends,
         setLocalFeedPosts,
+        setSkipNextHomeFeedSkeleton,
+        skipNextHomeFeedSkeleton,
     } = useSpaceAppState();
     const [addedFriendToastName, setAddedFriendToastName] = useState<string>();
     const [feedItems, setFeedItems] = useState<SpacePost[]>([]);
@@ -54,6 +56,10 @@ const Page: React.FC = () => {
         isFeedLoading &&
         feedItems.length == 0 &&
         localFeedPosts.length == 0;
+    const shouldDelayInitialFeedSkeleton =
+        isInitialFeedLoading && !skipNextHomeFeedSkeleton;
+    const isSkippingInitialFeedSkeleton =
+        isInitialFeedLoading && skipNextHomeFeedSkeleton;
     const closeAddedFriendToast = React.useCallback(
         () => setAddedFriendToastName(undefined),
         [],
@@ -86,6 +92,7 @@ const Page: React.FC = () => {
             setHasUnreadMessages(false);
             setIsFeedLoading(false);
             setIsFeedLoadingMore(false);
+            setSkipNextHomeFeedSkeleton(false);
             return;
         }
 
@@ -111,16 +118,24 @@ const Page: React.FC = () => {
                 console.error("Failed to load space home", error),
             )
             .finally(() => {
-                if (!cancelled) setIsFeedLoading(false);
+                if (!cancelled) {
+                    setIsFeedLoading(false);
+                    setSkipNextHomeFeedSkeleton(false);
+                }
             });
 
         return () => {
             cancelled = true;
         };
-    }, [profile?.spaceId, profileLoadStatus, setFriends]);
+    }, [
+        profile?.spaceId,
+        profileLoadStatus,
+        setFriends,
+        setSkipNextHomeFeedSkeleton,
+    ]);
 
     useEffect(() => {
-        if (!isInitialFeedLoading) {
+        if (!shouldDelayInitialFeedSkeleton) {
             setShowInitialFeedSkeleton(false);
             return;
         }
@@ -130,7 +145,7 @@ const Page: React.FC = () => {
             initialFeedSkeletonDelayMs,
         );
         return () => window.clearTimeout(timeoutID);
-    }, [isInitialFeedLoading]);
+    }, [shouldDelayInitialFeedSkeleton]);
 
     const loadMoreFeedItems = React.useCallback(async () => {
         if (!feedNextCursor || isFeedLoadingMore) return;
@@ -174,7 +189,7 @@ const Page: React.FC = () => {
     if (
         profileLoadStatus != "ready" ||
         !profile ||
-        (isInitialFeedLoading && !showInitialFeedSkeleton)
+        (shouldDelayInitialFeedSkeleton && !showInitialFeedSkeleton)
     ) {
         return (
             <SpaceRouteFallback
@@ -193,7 +208,9 @@ const Page: React.FC = () => {
                 addedFriendToastName={addedFriendToastName}
                 hasUnreadMessages={hasUnreadMessages}
                 hasMoreFeedItems={Boolean(feedNextCursor)}
-                isFeedLoading={isFeedLoading}
+                isFeedLoading={
+                    isSkippingInitialFeedSkeleton ? false : isFeedLoading
+                }
                 isFeedLoadingMore={isFeedLoadingMore}
                 localFeedPosts={localFeedPosts}
                 profile={profile}

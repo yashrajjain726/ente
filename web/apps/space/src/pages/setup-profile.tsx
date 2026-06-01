@@ -32,6 +32,7 @@ const Page: React.FC = () => {
         profileLoadStatus,
         refreshProfile,
         setProfile,
+        setSkipNextHomeFeedSkeleton,
     } = useSpaceAppState();
     const backSource = setupProfileSourceFromQuery(router.query.from);
     const isAddFriendLinkOnboarding =
@@ -52,7 +53,7 @@ const Page: React.FC = () => {
 
     const acceptPendingInvite = useCallback(async () => {
         const pendingInvite = savedPendingSpaceInvite();
-        if (!pendingInvite) return;
+        if (!pendingInvite) return false;
 
         const pendingFriend = savedPendingSpaceInviteFriend() ?? {
             fullName: "",
@@ -62,6 +63,7 @@ const Page: React.FC = () => {
         clearPendingSpaceInvite();
         clearPendingSpaceInviteFriend();
         saveAcceptedSpaceInviteFriend(pendingFriend);
+        return true;
     }, []);
 
     useEffect(() => {
@@ -153,8 +155,11 @@ const Page: React.FC = () => {
                     try {
                         const savedProfile =
                             await saveSpaceProfile(nextProfile);
-                        await acceptPendingInvite();
+                        const acceptedInvite = await acceptPendingInvite();
                         setProfile(savedProfile);
+                        if (!acceptedInvite) {
+                            setSkipNextHomeFeedSkeleton(true);
+                        }
                         void router.push(
                             isAddFriendLinkOnboarding
                                 ? spaceRoutes.home
