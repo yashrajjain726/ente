@@ -182,7 +182,9 @@ interface FeedItemProps {
 
 interface FeedSkeletonItemProps {
     aspectRatio: string;
+    pb?: string;
     rootRef?: React.Ref<HTMLElement>;
+    showFooter?: boolean;
 }
 
 interface AddedFriendToastProps {
@@ -347,7 +349,9 @@ const useHideHeaderOnScrollDirection = () => {
 
 const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({
     aspectRatio,
+    pb = "8px",
     rootRef,
+    showFooter = true,
 }) => (
     <Box
         ref={rootRef}
@@ -360,7 +364,10 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({
             display: "flex",
             flexDirection: "column",
             mx: "16px",
-            p: "5px",
+            pb,
+            pl: "5px",
+            pr: "5px",
+            pt: "5px",
             width: "calc(100% - 32px)",
         }}
     >
@@ -430,60 +437,62 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({
                 </Box>
             </Box>
         </Box>
-        <Box
-            sx={{
-                alignItems: "center",
-                boxSizing: "border-box",
-                display: "grid",
-                gap: "8px",
-                gridTemplateColumns: "minmax(0, 1fr) auto",
-                minHeight: feedLikeActionSize,
-                mt: "8px",
-                pl: "9px",
-                pr: 0,
-                width: "100%",
-            }}
-        >
-            <Skeleton
-                variant="rectangular"
-                sx={{
-                    bgcolor: feedActionBackground,
-                    borderRadius: "999px",
-                    height: 12,
-                    maxWidth: 176,
-                    transform: "none",
-                    width: "60%",
-                }}
-            />
+        {showFooter && (
             <Box
                 sx={{
                     alignItems: "center",
-                    display: "flex",
-                    gap: "6px",
-                    justifyContent: "flex-end",
+                    boxSizing: "border-box",
+                    display: "grid",
+                    gap: "8px",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    minHeight: feedLikeActionSize,
+                    mt: "8px",
+                    pl: "9px",
+                    pr: 0,
+                    width: "100%",
                 }}
             >
                 <Skeleton
-                    variant="circular"
+                    variant="rectangular"
                     sx={{
                         bgcolor: feedActionBackground,
-                        height: feedLikeActionSize,
+                        borderRadius: "999px",
+                        height: 12,
+                        maxWidth: 176,
                         transform: "none",
-                        width: feedLikeActionSize,
+                        width: "60%",
                     }}
                 />
-                <Skeleton
-                    variant="circular"
+                <Box
                     sx={{
-                        bgcolor: feedActionBackground,
-                        height: feedLikeActionSize,
-                        mr: "9px",
-                        transform: "none",
-                        width: feedLikeActionSize,
+                        alignItems: "center",
+                        display: "flex",
+                        gap: "6px",
+                        justifyContent: "flex-end",
                     }}
-                />
+                >
+                    <Skeleton
+                        variant="circular"
+                        sx={{
+                            bgcolor: feedActionBackground,
+                            height: feedLikeActionSize,
+                            transform: "none",
+                            width: feedLikeActionSize,
+                        }}
+                    />
+                    <Skeleton
+                        variant="circular"
+                        sx={{
+                            bgcolor: feedActionBackground,
+                            height: feedLikeActionSize,
+                            mr: "9px",
+                            transform: "none",
+                            width: feedLikeActionSize,
+                        }}
+                    />
+                </Box>
             </Box>
-        </Box>
+        )}
     </Box>
 );
 
@@ -800,7 +809,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
         return (
             <FeedSkeletonItem
                 aspectRatio={`${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`}
+                pb={isOwnPost ? "5px" : "8px"}
                 rootRef={rootRef}
+                showFooter={showFooter}
             />
         );
     }
