@@ -6,6 +6,7 @@ on:
         paths:
             - "web/**"
             - "rust/bindings/wasm/ente-wasm/**"
+            - "rust/space/**"
             - "rust/crates/contacts/**"
             - "rust/crates/core/**"
             - "rust/Cargo.lock"
