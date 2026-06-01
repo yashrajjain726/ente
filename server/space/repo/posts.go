@@ -67,8 +67,7 @@ func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID in
 		       p.encrypted_post_key, p.caption_cipher,
 		       p.key_version, p.created_at,
 		       (SELECT COUNT(*) FROM space_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-		       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked,
-		       FALSE AS viewer_unread
+		       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
 			JOIN key_attributes owner_ka ON owner_ka.user_id = w.owner_id
@@ -92,8 +91,7 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 			       p.encrypted_post_key, p.caption_cipher,
 			       p.key_version, p.created_at,
 			       (SELECT COUNT(*) FROM space_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-			       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked,
-			       FALSE AS viewer_unread
+			       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked
 				FROM space_posts p
 				JOIN spaces w ON w.space_id = p.space_id
 				JOIN key_attributes owner_ka ON owner_ka.user_id = w.owner_id
@@ -128,12 +126,12 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 	return out, nextCursor, nil
 }
 
-func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSpaceID string, cursor string, limit int, readCreatedAt int64, readPostID int64) ([]SpacePostRecord, string, error) {
+func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSpaceID string, cursor string, limit int) ([]SpacePostRecord, string, error) {
 	limit = optionalInt(limit, 25)
 	if limit > 100 {
 		limit = 100
 	}
-	args := []any{viewerID, viewerSpaceID, readCreatedAt, readPostID}
+	args := []any{viewerID, viewerSpaceID}
 	query := `
 			SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
 			       w.owner_id, w.space_id, w.space_slug, owner_ka.public_key,
@@ -144,8 +142,7 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 			       p.encrypted_post_key, p.caption_cipher,
 			       p.key_version, p.created_at,
 			       (SELECT COUNT(*) FROM space_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-			       CASE WHEN p.space_id = $2 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) END AS viewer_liked,
-			       (p.space_id <> $2 AND (p.created_at, p.post_id) > ($3::bigint, $4::bigint)) AS viewer_unread
+			       CASE WHEN p.space_id = $2 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) END AS viewer_liked
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
 			JOIN key_attributes owner_ka ON owner_ka.user_id = w.owner_id
@@ -158,7 +155,7 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 			  )`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorPostID)
-		query += ` AND (p.created_at, p.post_id) < ($5, $6)`
+		query += ` AND (p.created_at, p.post_id) < ($3, $4)`
 	}
 	args = append(args, limit+1)
 	query += ` ORDER BY p.created_at DESC, p.post_id DESC LIMIT $` + strconv.Itoa(len(args))
@@ -184,46 +181,6 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 		out = out[:limit]
 	}
 	return out, nextCursor, nil
-}
-
-func (r *PostsRepository) GetFeedPostMarker(ctx context.Context, viewerID int64, viewerSpaceID string, postID int64) (int64, int64, error) {
-	var createdAt int64
-	if err := r.DB.QueryRowContext(ctx, `
-		SELECT p.created_at
-		FROM space_posts p
-		WHERE p.post_id = $3
-		  AND p.is_deleted = FALSE
-		  AND (
-		    p.space_id = $2 OR EXISTS (
-		      SELECT 1 FROM space_friend_shares fs
-		      WHERE fs.friend_id = $1 AND fs.friend_space_id = $2 AND fs.space_id = p.space_id
-		    )
-		  )
-	`, viewerID, viewerSpaceID, postID).Scan(&createdAt); err != nil {
-		return 0, 0, stacktrace.Propagate(err, "")
-	}
-	return createdAt, postID, nil
-}
-
-func (r *PostsRepository) HasUnreadFeed(ctx context.Context, viewerID int64, viewerSpaceID string, readCreatedAt, readPostID int64) (bool, error) {
-	var exists bool
-	if err := r.DB.QueryRowContext(ctx, `
-		SELECT EXISTS (
-			SELECT 1
-			FROM space_posts p
-			WHERE p.is_deleted = FALSE
-			  AND p.space_id <> $2
-			  AND (p.created_at, p.post_id) > ($3::bigint, $4::bigint)
-			  AND EXISTS (
-			    SELECT 1 FROM space_friend_shares fs
-			    WHERE fs.friend_id = $1 AND fs.friend_space_id = $2 AND fs.space_id = p.space_id
-			  )
-			LIMIT 1
-		)
-	`, viewerID, viewerSpaceID, readCreatedAt, readPostID).Scan(&exists); err != nil {
-		return false, stacktrace.Propagate(err, "")
-	}
-	return exists, nil
 }
 
 func (r *PostsRepository) ListAssetsByPostIDs(ctx context.Context, postIDs []int64) (map[int64][]SpacePostAssetRecord, error) {
@@ -425,7 +382,7 @@ func scanPostRecord(scanner interface{ Scan(dest ...any) error }) (*SpacePostRec
 	var rec SpacePostRecord
 	dest := []any{&rec.PostID, &rec.SpaceID, &rec.SpaceSlug, &rec.OwnerID}
 	dest = append(dest, spaceActorScanDest(&rec.Author)...)
-	dest = append(dest, &rec.EncryptedPostKey, &rec.CaptionCipher, &rec.KeyVersion, &rec.CreatedAt, &rec.Likes, &rec.ViewerLiked, &rec.ViewerUnread)
+	dest = append(dest, &rec.EncryptedPostKey, &rec.CaptionCipher, &rec.KeyVersion, &rec.CreatedAt, &rec.Likes, &rec.ViewerLiked)
 	if err := scanner.Scan(dest...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

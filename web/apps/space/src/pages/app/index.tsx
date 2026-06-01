@@ -12,7 +12,6 @@ import {
     loadCurrentSpacePostAssetURL,
     loadCurrentSpacePostAvatarURL,
     loadCurrentUnreadStatus,
-    markCurrentFeedRead,
     replyToCurrentPost,
     setCurrentPostLiked,
     type SpacePost,
@@ -107,13 +106,6 @@ const Page: React.FC = () => {
                 setFeedNextCursor(feed.nextCursor);
                 setHasUnreadMessages(unreadStatus.messagesUnread);
                 setFriends(nextFriends);
-                const latestFeedPost = feed.items[0];
-                if (latestFeedPost) {
-                    void markCurrentFeedRead(latestFeedPost.postId).catch(
-                        (error: unknown) =>
-                            console.warn("Failed to mark feed read", error),
-                    );
-                }
             })
             .catch((error: unknown) =>
                 console.error("Failed to load space home", error),
@@ -251,10 +243,6 @@ const Page: React.FC = () => {
                             setLocalFeedPosts,
                             localPostId,
                             post,
-                        );
-                        void markCurrentFeedRead(post.postId).catch(
-                            (error: unknown) =>
-                                console.warn("Failed to mark feed read", error),
                         );
                     } catch (error) {
                         failLocalFeedPost(setLocalFeedPosts, localPostId);

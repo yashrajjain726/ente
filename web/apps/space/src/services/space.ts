@@ -66,7 +66,6 @@ interface SpacePostResponse {
     objects?: SpacePostObject[];
     postId: number;
     viewerLiked: boolean;
-    viewerUnread?: boolean;
     spaceId: string;
     spaceSlug: string;
 }
@@ -168,7 +167,6 @@ interface SpacePostBase {
     postId: number;
     timestampMs: number;
     viewerLiked: boolean;
-    viewerUnread: boolean;
     spaceId: string;
     width?: number;
 }
@@ -297,12 +295,10 @@ export interface SpaceMessageConversationPage {
 }
 
 export interface SpaceUnreadStatus {
-    feedUnread: boolean;
     messagesUnread: boolean;
 }
 
 interface SpaceUnreadStatusResponse {
-    feedUnread: boolean;
     notificationsUnread: boolean;
 }
 
@@ -668,7 +664,6 @@ const postFromAccountPost = async (
         postId: post.postId,
         timestampMs: timestampMsFromSpaceDate(post.createdAt),
         viewerLiked: post.viewerLiked,
-        viewerUnread: Boolean(post.viewerUnread),
         spaceId: post.spaceId,
         width: object.width,
     };
@@ -694,7 +689,6 @@ const profilePostFromPost = (
         postId: post.postId,
         timestampMs: timestampMsFromSpaceDate(post.createdAt),
         viewerLiked: post.viewerLiked,
-        viewerUnread: Boolean(post.viewerUnread),
         spaceId: post.spaceId,
         width: object.width,
     };
@@ -976,19 +970,8 @@ export const loadCurrentUnreadStatus = async (): Promise<SpaceUnreadStatus> => {
     try {
         const status = (await ctx.unread_status()) as SpaceUnreadStatusResponse;
         return {
-            feedUnread: status.feedUnread,
             messagesUnread: status.notificationsUnread,
         };
-    } finally {
-        releaseCurrentSpaceContext(ctx);
-    }
-};
-
-export const markCurrentFeedRead = async (postId: number) => {
-    if (postId <= 0) return;
-    const ctx = await ensureCurrentSpaceContext();
-    try {
-        await ctx.mark_feed_read(BigInt(postId));
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

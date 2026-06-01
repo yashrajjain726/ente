@@ -139,7 +139,6 @@ async fn space_bootstrap_posts_friend_share_and_link_suite() {
         .expect("own post should be in owner feed");
     assert_eq!(owner_feed_post.space_id, owner_space.space_id);
     assert!(!owner_feed_post.viewer_liked);
-    assert!(!owner_feed_post.viewer_unread);
     let owner_feed_decrypted = owner_ctx
         .decrypt_feed_item(owner_feed_post)
         .await

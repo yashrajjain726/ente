@@ -122,12 +122,6 @@ pub struct LikePostResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MarkFeedReadRequest {
-    pub post_id: i64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct MarkNotificationsReadRequest {
     pub friend_space_id: String,
 }
@@ -135,7 +129,6 @@ pub struct MarkNotificationsReadRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceUnreadStatusResponse {
-    pub feed_unread: bool,
     pub notifications_unread: bool,
 }
 
@@ -270,8 +263,6 @@ pub struct PostResponse {
     pub created_at: String,
     pub likes: i64,
     pub viewer_liked: bool,
-    #[serde(default)]
-    pub viewer_unread: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

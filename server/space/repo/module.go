@@ -89,7 +89,6 @@ type SpacePostRecord struct {
 	CreatedAt        int64
 	Likes            int64
 	ViewerLiked      bool
-	ViewerUnread     bool
 }
 
 type SpacePostAssetRecord struct {
@@ -247,15 +246,6 @@ type SpaceLinkSessionRecord struct {
 	SpaceSlug         string
 	OwnerSlug         string
 	EncryptedSpaceKey string
-}
-
-type SpaceReadMarkerRecord struct {
-	UserID            int64
-	ViewerSpaceID     string
-	FeedReadCreatedAt int64
-	FeedReadPostID    int64
-	CreatedAt         int64
-	UpdatedAt         int64
 }
 
 func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {

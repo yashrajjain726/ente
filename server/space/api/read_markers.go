@@ -11,16 +11,6 @@ func (h *Handlers) GetUnreadStatus(c *gin.Context) {
 	respondJSON(c, resp, err)
 }
 
-func (h *Handlers) MarkFeedRead(c *gin.Context) {
-	var req models.MarkFeedReadRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
-		return
-	}
-	resp, err := h.Module.Read.MarkFeedRead(c, req)
-	respondJSON(c, resp, err)
-}
-
 func (h *Handlers) MarkNotificationsRead(c *gin.Context) {
 	var req models.MarkNotificationsReadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

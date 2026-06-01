@@ -165,7 +165,6 @@ struct PostJs {
     created_at: String,
     likes: i64,
     viewer_liked: bool,
-    viewer_unread: bool,
 }
 
 #[derive(Serialize)]
@@ -428,7 +427,6 @@ async fn account_post_to_js(
         created_at: post.created_at,
         likes: post.likes,
         viewer_liked: post.viewer_liked,
-        viewer_unread: post.viewer_unread,
     })
 }
 
@@ -451,7 +449,6 @@ async fn link_post_to_js(
         created_at: post.created_at,
         likes: post.likes,
         viewer_liked: post.viewer_liked,
-        viewer_unread: post.viewer_unread,
     })
 }
 
@@ -829,7 +826,6 @@ impl SpaceAccountCtxHandle {
                             created_at: item.created_at,
                             likes: item.likes,
                             viewer_liked: item.viewer_liked,
-                            viewer_unread: item.viewer_unread,
                         })
                         .collect(),
                     next_cursor: page.next_cursor,
@@ -840,14 +836,9 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Return whether the current account has unread feed or notification activity.
+    /// Return whether the current account has unread notification activity.
     pub async fn unread_status(&self) -> Result<JsValue, WasmSpaceError> {
         swb::to_value(&self.inner.unread_status().await?).map_err(Into::into)
-    }
-
-    /// Mark feed posts read through the given visible post.
-    pub async fn mark_feed_read(&self, post_id: i64) -> Result<JsValue, WasmSpaceError> {
-        swb::to_value(&self.inner.mark_feed_read(post_id).await?).map_err(Into::into)
     }
 
     /// Mark notification activity for one friend as read.

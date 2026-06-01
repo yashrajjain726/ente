@@ -10,7 +10,6 @@ import {
     loadCurrentSpaceFriendsCount,
     loadCurrentSpacePostAssetURL,
     loadCurrentSpaceProfilePostsPage,
-    markCurrentFeedRead,
     setCurrentPostLiked,
     type SpaceProfilePost,
 } from "services/space";
@@ -138,10 +137,6 @@ const Page: React.FC = () => {
                             setLocalFeedPosts,
                             localPostId,
                             post,
-                        );
-                        void markCurrentFeedRead(post.postId).catch(
-                            (error: unknown) =>
-                                console.warn("Failed to mark feed read", error),
                         );
                     } catch (error) {
                         failLocalFeedPost(setLocalFeedPosts, localPostId);

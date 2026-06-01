@@ -178,7 +178,6 @@ interface FeedItemProps {
     timestampStatus?: FeedTimestampStatus;
     timestampMs: number;
     viewerLiked: boolean;
-    viewerUnread: boolean;
 }
 
 interface FeedSkeletonItemProps {
@@ -626,7 +625,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     timestampStatus,
     timestampMs,
     viewerLiked,
-    viewerUnread,
 }) => {
     const [isLiked, setIsLiked] = useState(viewerLiked);
     const [likePopID, setLikePopID] = useState(0);
@@ -1064,20 +1062,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             </Box>
                         )}
                     </Box>
-                    {viewerUnread && (
-                        <Box
-                            aria-hidden
-                            sx={{
-                                bgcolor: green,
-                                borderRadius: "50%",
-                                height: 8,
-                                position: "absolute",
-                                right: 0,
-                                top: 4,
-                                width: 8,
-                            }}
-                        />
-                    )}
                 </Box>
             </Box>
             {showFooter && (
@@ -1505,7 +1489,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 timestampStatus={timestampStatus}
                 timestampMs={item.timestampMs}
                 viewerLiked={item.viewerLiked}
-                viewerUnread={item.viewerUnread}
             />
         );
     };
@@ -1535,7 +1518,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 timestampStatus={item.status == "failed" ? "failed" : "posting"}
                 timestampMs={item.timestampMs}
                 viewerLiked={false}
-                viewerUnread={false}
             />
         );
     };

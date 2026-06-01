@@ -16,13 +16,12 @@ import (
 )
 
 type PostsController struct {
-	PostsRepo       *repo.PostsRepository
-	SpacesRepo      *repo.SpacesRepository
-	FriendsRepo     *repo.FriendsRepository
-	AssetsRepo      *repo.AssetsRepository
-	ReadMarkersRepo *repo.ReadMarkersRepository
-	EmailNotifier   SpaceEmailNotifier
-	auth            authDeps
+	PostsRepo     *repo.PostsRepository
+	SpacesRepo    *repo.SpacesRepository
+	FriendsRepo   *repo.FriendsRepository
+	AssetsRepo    *repo.AssetsRepository
+	EmailNotifier SpaceEmailNotifier
+	auth          authDeps
 }
 
 func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest) (*models.CreatePostResponse, error) {
@@ -158,11 +157,7 @@ func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest)
 	if err != nil {
 		return nil, err
 	}
-	marker, err := c.ReadMarkersRepo.Get(ctx.Request.Context(), userID, viewerSpace.SpaceID)
-	if err != nil {
-		return nil, err
-	}
-	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.Cursor, req.Limit, marker.FeedReadCreatedAt, marker.FeedReadPostID)
+	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}

@@ -1338,35 +1338,34 @@ func TestListFeedCursorUsesCreatedAtSortOrder(t *testing.T) {
 	setPostCreatedAt(t, module, 2000, second)
 	setPostCreatedAt(t, module, 1000, third)
 
-	page, nextCursor, err := module.Posts.ListFeed(ctx, aliceID, aliceSpace.SpaceID, "", 1, 0, 0)
+	page, nextCursor, err := module.Posts.ListFeed(ctx, aliceID, aliceSpace.SpaceID, "", 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, ownPost, page[0].PostID)
 	require.Equal(t, aliceSpace.SpaceID, page[0].SpaceID)
-	require.False(t, page[0].ViewerUnread)
 	require.False(t, page[0].ViewerLiked)
 	require.Equal(t, "5000:"+strconv.FormatInt(ownPost, 10), nextCursor)
 
-	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceID, aliceSpace.SpaceID, nextCursor, 1, 0, 0)
+	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceID, aliceSpace.SpaceID, nextCursor, 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, first, page[0].PostID)
 	require.Equal(t, "3000:"+strconv.FormatInt(first, 10), nextCursor)
 
-	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceID, aliceSpace.SpaceID, nextCursor, 1, 0, 0)
+	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceID, aliceSpace.SpaceID, nextCursor, 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, second, page[0].PostID)
 	require.Equal(t, "2000:"+strconv.FormatInt(second, 10), nextCursor)
 
-	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceID, aliceSpace.SpaceID, nextCursor, 1, 0, 0)
+	page, nextCursor, err = module.Posts.ListFeed(ctx, aliceID, aliceSpace.SpaceID, nextCursor, 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, third, page[0].PostID)
 	require.Empty(t, nextCursor)
 }
 
-func TestSpaceReadMarkersDriveUnreadState(t *testing.T) {
+func TestSpaceReadMarkersDriveNotificationState(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
 
@@ -1378,29 +1377,6 @@ func TestSpaceReadMarkersDriveUnreadState(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	setFriendEventCreatedAt(t, module, 500, "friend_add", bobID, aliceID)
-
-	postID, err := module.Posts.CreatePost(ctx, bobID, bobSpace.SpaceID, "post-key", nil, bobSpace.CurrentVersion, nil)
-	require.NoError(t, err)
-	setPostCreatedAt(t, module, 1000, postID)
-	feed, _, err := module.Posts.ListFeed(ctx, aliceID, aliceSpace.SpaceID, "", 10, 0, 0)
-	require.NoError(t, err)
-	require.Len(t, feed, 1)
-	require.True(t, feed[0].ViewerUnread)
-	feedUnread, err := module.Posts.HasUnreadFeed(ctx, aliceID, aliceSpace.SpaceID, 0, 0)
-	require.NoError(t, err)
-	require.True(t, feedUnread)
-
-	createdAt, markerPostID, err := module.Posts.GetFeedPostMarker(ctx, aliceID, aliceSpace.SpaceID, postID)
-	require.NoError(t, err)
-	require.NoError(t, module.Read.UpsertFeedReadMarker(ctx, aliceID, aliceSpace.SpaceID, createdAt, markerPostID))
-	marker, err := module.Read.Get(ctx, aliceID, aliceSpace.SpaceID)
-	require.NoError(t, err)
-	feed, _, err = module.Posts.ListFeed(ctx, aliceID, aliceSpace.SpaceID, "", 10, marker.FeedReadCreatedAt, marker.FeedReadPostID)
-	require.NoError(t, err)
-	require.False(t, feed[0].ViewerUnread)
-	feedUnread, err = module.Posts.HasUnreadFeed(ctx, aliceID, aliceSpace.SpaceID, marker.FeedReadCreatedAt, marker.FeedReadPostID)
-	require.NoError(t, err)
-	require.False(t, feedUnread)
 
 	incoming, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",

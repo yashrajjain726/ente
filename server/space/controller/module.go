@@ -30,12 +30,12 @@ func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, em
 	}
 	return &Module{
 		Spaces:   &SpacesController{SpacesRepo: repos.Spaces, AssetsRepo: repos.Assets, auth: authDeps},
-		Posts:    &PostsController{PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, AssetsRepo: repos.Assets, ReadMarkersRepo: repos.Read, EmailNotifier: emailNotifier, auth: authDeps},
+		Posts:    &PostsController{PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, AssetsRepo: repos.Assets, EmailNotifier: emailNotifier, auth: authDeps},
 		Friends:  &FriendsController{FriendsRepo: repos.Friends, SpacesRepo: repos.Spaces, EmailNotifier: emailNotifier, auth: authDeps},
 		Messages: &MessagesController{MessagesRepo: repos.Messages, PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, ReadMarkersRepo: repos.Read, EmailNotifier: emailNotifier, auth: authDeps},
 		Links:    &LinksController{LinksRepo: repos.Links, SpacesRepo: repos.Spaces, auth: authDeps},
 		Assets:   &AssetsController{AssetsRepo: repos.Assets, SpacesRepo: repos.Spaces, auth: authDeps},
-		Read:     &ReadMarkersController{ReadMarkersRepo: repos.Read, PostsRepo: repos.Posts, MessagesRepo: repos.Messages, auth: authDeps},
+		Read:     &ReadMarkersController{ReadMarkersRepo: repos.Read, MessagesRepo: repos.Messages, auth: authDeps},
 		Cleanup:  &CleanupController{AssetsRepo: repos.Assets},
 		UserAuth: userAuthRepo,
 	}

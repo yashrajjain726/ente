@@ -25,23 +25,6 @@ CREATE TRIGGER update_spaces_updated_at
     FOR EACH ROW
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
-CREATE TABLE IF NOT EXISTS space_read_markers (
-    user_id                  BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    viewer_space_id          TEXT   PRIMARY KEY REFERENCES spaces (space_id) ON DELETE CASCADE,
-    feed_read_created_at     BIGINT NOT NULL DEFAULT 0,
-    feed_read_post_id        BIGINT NOT NULL DEFAULT 0,
-    created_at               BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    updated_at               BIGINT NOT NULL DEFAULT now_utc_micro_seconds()
-);
-
-CREATE INDEX IF NOT EXISTS idx_space_read_markers_user
-    ON space_read_markers (user_id);
-
-CREATE TRIGGER update_space_read_markers_updated_at
-    BEFORE UPDATE ON space_read_markers
-    FOR EACH ROW
-EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
-
 CREATE TABLE IF NOT EXISTS space_notification_read_markers (
     user_id        BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     viewer_space_id TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
