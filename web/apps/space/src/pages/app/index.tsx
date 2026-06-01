@@ -165,6 +165,20 @@ const Page: React.FC = () => {
         }
     }, [feedNextCursor, isFeedLoadingMore]);
 
+    const setFeedPostLiked = React.useCallback(
+        async (postId: number, liked: boolean) => {
+            await setCurrentPostLiked(postId, liked);
+            setFeedItems((currentItems) =>
+                currentItems.map((item) =>
+                    item.postId == postId
+                        ? { ...item, viewerLiked: liked }
+                        : item,
+                ),
+            );
+        },
+        [],
+    );
+
     if (
         profileLoadStatus != "ready" ||
         !profile ||
@@ -270,7 +284,7 @@ const Page: React.FC = () => {
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
                 onOpenProfile={() => void router.push(spaceRoutes.profile)}
                 onReplyToPost={replyToCurrentPost}
-                onSetPostLiked={setCurrentPostLiked}
+                onSetPostLiked={setFeedPostLiked}
                 onShareProfileLink={async () => {
                     if (!profile.spaceId) throw new Error("Missing space.");
                     return (await createCurrentProfileLink(profile.spaceId))
