@@ -19,6 +19,7 @@ import {
     loadExistingSpaceProfile,
 } from "services/spaceProfile";
 import {
+    type LocalSpaceFeedPost,
     type OnboardingEntrySource,
     type SpaceAppState,
     SpaceAppStateContext,
@@ -32,6 +33,9 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     const [friends, setFriends] = useState(initialFriends);
     const [isLiveSignupVerification, setIsLiveSignupVerification] =
         useState(false);
+    const [localFeedPosts, setLocalFeedPosts] = useState<LocalSpaceFeedPost[]>(
+        [],
+    );
     const [onboardingEntrySource, setOnboardingEntrySource] =
         useState<OnboardingEntrySource>("direct");
     const [pendingLoginCredentials, setPendingLoginCredentials] =
@@ -49,6 +53,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     const [signupEmail, setSignupEmail] = useState("");
     const avatarURLRef = useRef<string | null>(null);
     const coverURLRef = useRef<string | null>(null);
+    const localFeedPostURLRef = useRef<Set<string>>(new Set());
     const profileRef = useRef<SetupProfile | null>(null);
     const profileLoadGenerationRef = useRef(0);
 
@@ -146,7 +151,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     const profileErrorMessage = (error: unknown) =>
         error instanceof Error
             ? error.message
-            : "Couldn't load your Space profile. Please try again or contact support.";
+            : "Couldn't load this page. Please try again later or contact support.";
 
     const refreshProfile = useCallback(async () => {
         const generation = ++profileLoadGenerationRef.current;
@@ -186,6 +191,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         setPendingProfileAvatarFile(null);
         setPendingProfileCoverFile(null);
         setOnboardingEntrySource("direct");
+        setLocalFeedPosts([]);
         setFriends(initialFriends());
     }, [applyProfile]);
 
@@ -193,10 +199,42 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         void refreshProfile();
     }, [refreshProfile]);
 
+    useEffect(() => {
+        const nextURLs = new Set(
+            localFeedPosts
+                .filter(
+                    (
+                        post,
+                    ): post is Extract<
+                        LocalSpaceFeedPost,
+                        { status: "failed" | "pending" }
+                    > => post.status == "pending" || post.status == "failed",
+                )
+                .map((post) => post.imageUrl)
+                .filter((url) => url.startsWith("blob:")),
+        );
+
+        for (const url of localFeedPostURLRef.current) {
+            if (!nextURLs.has(url)) URL.revokeObjectURL(url);
+        }
+        localFeedPostURLRef.current = nextURLs;
+    }, [localFeedPosts]);
+
+    useEffect(
+        () => () => {
+            for (const url of localFeedPostURLRef.current) {
+                URL.revokeObjectURL(url);
+            }
+            localFeedPostURLRef.current.clear();
+        },
+        [],
+    );
+
     const value = useMemo<SpaceAppState>(
         () => ({
             friends,
             isLiveSignupVerification,
+            localFeedPosts,
             onboardingEntrySource,
             pendingLoginCredentials,
             pendingPasskeyVerification,
@@ -209,6 +247,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             resetAfterLogout,
             setFriends,
             setIsLiveSignupVerification,
+            setLocalFeedPosts,
             setOnboardingEntrySource,
             setPendingLoginCredentials,
             setPendingPasskeyVerification,
@@ -221,6 +260,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
         [
             friends,
             isLiveSignupVerification,
+            localFeedPosts,
             onboardingEntrySource,
             pendingLoginCredentials,
             pendingPasskeyVerification,

@@ -8,45 +8,51 @@ import {
     Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Menu, MenuItem } from "@mui/material";
+import { Box, Menu, MenuItem, Skeleton } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
     spaceActionDoneDurationMs,
     type SpaceActionPhase,
 } from "components/SpaceActionFeedback";
-import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
+import {
+    spacePostLikeButtonPop,
+    spacePostLikeHeartPop,
+    spacePostLikePopDurationMs,
+    spacePostLikePopTiming,
+} from "components/SpacePostLikeAnimation";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
-import {
-    firstNameFrom,
-    formatSpaceDate,
-    initialsFor,
-} from "utils/spaceDisplay";
+import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
 import { clampSpaceMessageText } from "utils/spaceMessageLimits";
+import type { SpaceImageCropArea } from "utils/spacePostImage";
 
 const green = "#08C225";
-const paleGreen = "#E7F6E9";
+const avatarSkeletonBackground = "#E6E6E6";
 const textBase = "#F4F4F4";
 const textSecondary = "#A6A6A6";
 const textTertiary = "rgba(244, 244, 244, 0.52)";
 const viewerBackground = "#000000";
 const controlBackground = "rgba(36, 36, 36, 0.72)";
-const controlBackgroundActive = "rgba(58, 58, 58, 0.86)";
 const controlBackgroundHover = "rgba(48, 48, 48, 0.86)";
+const inputBackground = "rgba(58, 58, 58, 0.86)";
+const inputBackgroundActive = "rgba(72, 72, 72, 0.9)";
 const controlIcon = "#D8D8D8";
 const dangerColor = "#F63A3A";
 const viewerHeaderHeight = 56;
 const viewerBottomPadding = 72;
+const viewerDesktopMinWidth = 600;
+const draftViewerBottomPadding = 88;
 const captionInputMinHeight = 40;
 const replyInputMinHeight = 48;
 const replyInputPadding = 14;
 const replyInputPaddingLeft = 18;
+const replyActionDoneDurationMs = 1000;
 const captionInputMaxHeight = 112;
 const defaultPhotoWidth = 900;
 const defaultPhotoHeight = 680;
-const viewerPanelBackground = "#202020";
-const viewerPanelMuted = "rgba(244, 244, 244, 0.54)";
+const viewerSwipeMinDeltaPx = 72;
+const viewerSwipeAxisRatio = 1.5;
 
 const postButtonSpin = keyframes`
     from {
@@ -58,27 +64,36 @@ const postButtonSpin = keyframes`
     }
 `;
 
-export type SpaceViewerInitialScreen = "photo" | "likes";
+const photoPreviewSkeletonShimmer = keyframes`
+    from {
+        background-position: 100% 0;
+    }
 
-export type SpaceViewerPostActionMode =
-    | "draft-post"
-    | "hidden"
-    | "like-only"
-    | "like-with-count";
+    to {
+        background-position: -100% 0;
+    }
+`;
+
+export type SpaceViewerPostActionMode = "draft-post" | "hidden" | "like-only";
+
+export interface SpaceViewerDraftPostEdit {
+    cropArea?: SpaceImageCropArea;
+    height?: number;
+    rotationDegrees: number;
+    width?: number;
+}
 
 interface SpaceViewerPostActionConfig {
     showLikeButton: boolean;
-    showLikeCount: boolean;
 }
 
 const spaceViewerPostActionConfigs: Record<
     SpaceViewerPostActionMode,
     SpaceViewerPostActionConfig
 > = {
-    "draft-post": { showLikeButton: false, showLikeCount: false },
-    hidden: { showLikeButton: false, showLikeCount: false },
-    "like-only": { showLikeButton: true, showLikeCount: false },
-    "like-with-count": { showLikeButton: true, showLikeCount: true },
+    "draft-post": { showLikeButton: false },
+    hidden: { showLikeButton: false },
+    "like-only": { showLikeButton: true },
 };
 
 export interface SpaceViewerPhoto {
@@ -88,7 +103,6 @@ export interface SpaceViewerPhoto {
     friendID?: string;
     height?: number;
     imageUrl: string;
-    likeCount?: number;
     name: string;
     postId?: number;
     timestampMs: number;
@@ -97,27 +111,70 @@ export interface SpaceViewerPhoto {
 }
 
 interface SpaceFileViewerProps {
-    initialScreen?: SpaceViewerInitialScreen;
+    draftPostPreparationError?: string;
+    isDraftPostPreparing?: boolean;
+    isDraftPostPreviewPending?: boolean;
     onClose: () => void;
     onDeletePost?: () => Promise<void> | void;
     onDraftPostPublished?: () => void;
-    onLoadPostLikers?: (postId: number) => Promise<SpaceLiker[]>;
-    onOpenFriend?: (friendID: string) => void;
     onOpenProfile?: () => void;
-    onPublishDraftPost?: (caption: string) => Promise<void>;
+    onPublishDraftPost?: (
+        caption: string,
+        edit: SpaceViewerDraftPostEdit,
+    ) => Promise<void>;
     onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
+    onSwipeLeft?: () => void;
+    onSwipeRight?: () => void;
+    onPhotoIndexChange?: (index: number) => void;
     photo: SpaceViewerPhoto;
+    photoIndex?: number;
+    photos?: SpaceViewerPhoto[];
     focusReplyOnOpen?: boolean;
     postActionMode?: SpaceViewerPostActionMode;
 }
 
-export interface SpaceLiker {
-    id: string;
-    avatarUrl?: string | null;
-    friendID?: string;
-    name: string;
+interface ViewerSwipeGesture {
+    lastX: number;
+    lastY: number;
+    pointerId?: number;
+    startX: number;
+    startY: number;
 }
+
+const viewerSwipePointFromEvent = (event: Event) => {
+    if (event.type.startsWith("mouse")) return undefined;
+    if (
+        "pointerType" in event &&
+        (event as PointerEvent).pointerType == "mouse"
+    ) {
+        return undefined;
+    }
+    if ("changedTouches" in event) {
+        const touch = (event as TouchEvent).changedTouches[0];
+        if (!touch) return undefined;
+        return { x: touch.pageX, y: touch.pageY };
+    }
+    if ("pageX" in event && "pageY" in event) {
+        return {
+            pointerId:
+                "pointerId" in event
+                    ? (event as PointerEvent).pointerId
+                    : undefined,
+            x: (event as MouseEvent).pageX,
+            y: (event as MouseEvent).pageY,
+        };
+    }
+    return undefined;
+};
+
+const viewerSwipeStartsOnInteractiveTarget = (target: EventTarget | null) =>
+    target instanceof Element &&
+    Boolean(
+        target.closest(
+            "input, textarea, select, button, [data-space-viewer-chrome='true'], [data-space-viewer-bottom='true']",
+        ),
+    );
 
 const viewerActionButtonSx = {
     alignItems: "center",
@@ -137,91 +194,21 @@ const viewerActionButtonSx = {
     "&:hover": { bgcolor: controlBackgroundHover },
 };
 
-const viewerCountBadgeSx = {
+const viewerHeaderButtonSx = {
     alignItems: "center",
-    bgcolor: "#FFFFFF",
-    border: `2px solid ${viewerBackground}`,
+    bgcolor: controlBackground,
+    border: 0,
     borderRadius: "50%",
-    boxSizing: "border-box",
-    color: "#111111",
-    display: "inline-flex",
-    fontFamily: '"Inter Variable", Inter, sans-serif',
-    fontSize: 10,
-    fontWeight: 800,
-    height: 24,
+    color: controlIcon,
+    cursor: "pointer",
+    display: "flex",
+    height: 28,
     justifyContent: "center",
-    lineHeight: 1,
-    position: "absolute",
-    right: -8,
-    top: -8,
-    width: 24,
+    p: 0,
+    width: 28,
+    "&:focus-visible": { outline: `2px solid ${green}`, outlineOffset: 2 },
+    "&:hover": { bgcolor: controlBackgroundHover },
 };
-
-const SpaceAvatar: React.FC<{
-    avatarUrl?: string | null;
-    name: string;
-    size: number;
-}> = ({ avatarUrl, name, size }) => (
-    <Box
-        sx={{
-            alignItems: "center",
-            bgcolor: avatarUrl ? "transparent" : paleGreen,
-            borderRadius: "50%",
-            color: green,
-            display: "flex",
-            flexShrink: 0,
-            height: size,
-            justifyContent: "center",
-            overflow: "hidden",
-            width: size,
-        }}
-    >
-        {avatarUrl ? (
-            <Box
-                component="img"
-                alt=""
-                src={avatarUrl}
-                sx={{
-                    display: "block",
-                    height: "100%",
-                    objectFit: "cover",
-                    objectPosition: "center",
-                    width: "100%",
-                }}
-            />
-        ) : (
-            <Box
-                sx={{
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: Math.max(10, Math.round(size * 0.34)),
-                    fontWeight: 800,
-                    lineHeight: 1,
-                }}
-            >
-                {initialsFor(name)}
-            </Box>
-        )}
-    </Box>
-);
-
-const HeartFilledIcon: React.FC = () => (
-    <svg
-        width="18"
-        height="16"
-        viewBox="0 0 30 26"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-    >
-        <path
-            d="M12.4926 23.4794C8.64537 20.6025 1.02344 14.0254 1.02344 8.10676C1.02344 4.19475 3.89425 1.02344 7.84162 1.02344C9.88707 1.02344 11.9325 1.70526 14.6598 4.43253C17.3871 1.70526 19.4325 1.02344 21.478 1.02344C25.4253 1.02344 28.2962 4.19475 28.2962 8.10676C28.2962 14.0254 20.6743 20.6025 16.827 23.4794C15.5324 24.4474 13.7872 24.4474 12.4926 23.4794Z"
-            fill="#08C225"
-            stroke="#08C225"
-            strokeWidth="2.04545"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        />
-    </svg>
-);
 
 const resizeCaptionInput = (
     input: HTMLTextAreaElement | null,
@@ -237,65 +224,79 @@ const resizeCaptionInput = (
 };
 
 export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
+    draftPostPreparationError,
     focusReplyOnOpen = false,
-    initialScreen = "photo",
+    isDraftPostPreparing = false,
+    isDraftPostPreviewPending = false,
     onClose,
     onDeletePost,
     onDraftPostPublished,
-    onLoadPostLikers,
-    onOpenFriend,
     onOpenProfile,
     onPublishDraftPost,
     onReplyToPost,
     onSetPostLiked,
+    onSwipeLeft,
+    onSwipeRight,
+    onPhotoIndexChange,
     photo,
-    postActionMode = "like-with-count",
+    photoIndex = 0,
+    photos,
+    postActionMode = "like-only",
 }) => {
     const activePostActionMode = postActionMode;
     const isDraftPost = activePostActionMode == "draft-post";
-    const {
-        showLikeButton: showPhotoLikeButton,
-        showLikeCount: showPhotoLikeCount,
-    } = spaceViewerPostActionConfigs[activePostActionMode];
-    const canOpenLikes = showPhotoLikeCount;
-    const resolvedInitialScreen: SpaceViewerInitialScreen =
-        initialScreen == "likes" && !canOpenLikes ? "photo" : initialScreen;
-    const [screen, setScreen] = React.useState<SpaceViewerInitialScreen>(
-        resolvedInitialScreen,
+    const { showLikeButton: showPhotoLikeButton } =
+        spaceViewerPostActionConfigs[activePostActionMode];
+    const viewerPhotos = photos && photos.length > 0 ? photos : [photo];
+    const activePhotoIndex = Math.min(
+        Math.max(photoIndex, 0),
+        viewerPhotos.length - 1,
     );
+    const activePhoto = viewerPhotos[activePhotoIndex] ?? photo;
+    const viewerPhotosRef = React.useRef(viewerPhotos);
+    const onCloseRef = React.useRef(onClose);
+    const onPhotoIndexChangeRef = React.useRef(onPhotoIndexChange);
+    const initialPhotoIndexRef = React.useRef(activePhotoIndex);
+    const fallbackPhotoRef = React.useRef(activePhoto);
+    const pswpRef = React.useRef<PhotoSwipe | undefined>(undefined);
+    viewerPhotosRef.current = viewerPhotos;
+    onCloseRef.current = onClose;
+    onPhotoIndexChangeRef.current = onPhotoIndexChange;
+    fallbackPhotoRef.current = activePhoto;
+    const viewerPhotosContentKey = viewerPhotos
+        .map(
+            (item) =>
+                `${item.imageUrl}:${item.width ?? ""}:${item.height ?? ""}`,
+        )
+        .join("|");
     const [isPhotoLiked, setIsPhotoLiked] = React.useState(
-        photo.viewerLiked ?? false,
+        activePhoto.viewerLiked ?? false,
     );
-    const [caption, setCaption] = React.useState(photo.caption ?? "");
+    const [photoLikePopID, setPhotoLikePopID] = React.useState(0);
+    const [caption, setCaption] = React.useState(activePhoto.caption ?? "");
     const [replyText, setReplyText] = React.useState("");
     const [isReplyFocused, setIsReplyFocused] =
         React.useState(focusReplyOnOpen);
     const [replyActionPhase, setReplyActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
-    const [serverLikeCount, setServerLikeCount] = React.useState(
-        photo.likeCount ?? 0,
-    );
-    const [photoLikers, setPhotoLikers] = React.useState<SpaceLiker[]>([]);
-    const [isLoadingLikers, setIsLoadingLikers] = React.useState(false);
     const [draftPostActionPhase, setDraftPostActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
-    const displayName = firstNameFrom(photo.name);
-    const dateLabel = formatSpaceDate(photo.timestampMs);
-    const initials = initialsFor(photo.name);
+    const [isDesktopViewer, setIsDesktopViewer] = React.useState(
+        () =>
+            typeof window != "undefined" &&
+            window.innerWidth >= viewerDesktopMinWidth,
+    );
+    const [queuedDraftPost, setQueuedDraftPost] = React.useState<{
+        caption: string;
+        edit: SpaceViewerDraftPostEdit;
+    }>();
+    const displayName = firstNameFrom(activePhoto.name);
+    const dateLabel = formatSpaceDate(activePhoto.timestampMs);
     const displayCaption = isDraftPost ? "" : caption.trim();
     const hasDisplayCaption = displayCaption.length > 0;
     const viewerRootRef = React.useRef<HTMLDivElement | null>(null);
     const captionInputRef = React.useRef<HTMLTextAreaElement | null>(null);
     const replyInputRef = React.useRef<HTMLTextAreaElement | null>(null);
-    const likeHoldTimeoutRef = React.useRef<number | null>(null);
-    const likeHoldStartPointRef = React.useRef<{ x: number; y: number } | null>(
-        null,
-    );
-    const ignoreNextLikeClickRef = React.useRef(false);
-    const suppressNextLikeContextMenuRef = React.useRef(false);
-    const suppressLikeContextMenuTimeoutRef = React.useRef<number | null>(null);
-    const likeCount = serverLikeCount;
-    const likeCountLabel = `${likeCount} ${likeCount == 1 ? "like" : "likes"}`;
     const [actionsAnchor, setActionsAnchor] =
         React.useState<HTMLElement | null>(null);
     const [deleteSheetOpen, setDeleteSheetOpen] = React.useState(false);
@@ -307,134 +308,58 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const isActionsOpen = Boolean(actionsAnchor);
     const isDeleteActionRunning = deleteActionPhase != null;
     const isDraftPostActionRunning = draftPostActionPhase != null;
+    const hasDraftPostPreparationError = Boolean(draftPostPreparationError);
+    const canQueueDraftPostPublish =
+        isDraftPostPreparing &&
+        !isDraftPostPreviewPending &&
+        !hasDraftPostPreparationError;
+    const isDraftPostPublishDisabled =
+        isDraftPostActionRunning ||
+        isDraftPostPreviewPending ||
+        hasDraftPostPreparationError ||
+        (!onPublishDraftPost && !canQueueDraftPostPublish);
     const isReplyActionRunning = replyActionPhase != null;
     const canReplyToPost = Boolean(
-        !isDraftPost && photo.postId && onReplyToPost,
+        !isDraftPost && activePhoto.postId && onReplyToPost,
     );
     const isReplyMode =
         canReplyToPost &&
         (isReplyFocused || replyText.trim().length > 0 || isReplyActionRunning);
+    const isPhotoLikePopping =
+        !isReplyMode && isPhotoLiked && photoLikePopID > 0;
+    const usePhotoSwipeViewer = !isDraftPost || isDesktopViewer;
     const canSendReply =
         canReplyToPost &&
-        Boolean(photo.postId) &&
+        Boolean(activePhoto.postId) &&
         replyText.trim().length > 0 &&
         !isReplyActionRunning;
-
-    const clearLikeHoldTimeout = () => {
-        if (likeHoldTimeoutRef.current != null) {
-            window.clearTimeout(likeHoldTimeoutRef.current);
-            likeHoldTimeoutRef.current = null;
-        }
-        likeHoldStartPointRef.current = null;
-    };
-
-    const suppressNativeLikeContextMenu = () => {
-        suppressNextLikeContextMenuRef.current = true;
-        if (suppressLikeContextMenuTimeoutRef.current != null)
-            window.clearTimeout(suppressLikeContextMenuTimeoutRef.current);
-
-        suppressLikeContextMenuTimeoutRef.current = window.setTimeout(() => {
-            suppressNextLikeContextMenuRef.current = false;
-            suppressLikeContextMenuTimeoutRef.current = null;
-        }, 700);
-    };
-
-    const openLikes = () => {
-        if (!canOpenLikes) return;
-
-        clearLikeHoldTimeout();
-        setScreen("likes");
-        if (!photo.postId || !onLoadPostLikers) return;
-
-        setIsLoadingLikers(true);
-        void onLoadPostLikers(photo.postId)
-            .then(setPhotoLikers)
-            .catch((error: unknown) =>
-                console.error("Failed to load post likers", error),
-            )
-            .finally(() => setIsLoadingLikers(false));
-    };
-
-    const closeLikes = React.useCallback(() => {
-        if (likeHoldTimeoutRef.current != null) {
-            window.clearTimeout(likeHoldTimeoutRef.current);
-            likeHoldTimeoutRef.current = null;
-        }
-        likeHoldStartPointRef.current = null;
-        setScreen("photo");
-    }, []);
+    const swipeGestureRef = React.useRef<ViewerSwipeGesture | null>(null);
+    const swipeActionsRef = React.useRef({ onSwipeLeft, onSwipeRight });
+    swipeActionsRef.current = { onSwipeLeft, onSwipeRight };
+    const isSwipeBlockedRef = React.useRef(false);
+    isSwipeBlockedRef.current =
+        isActionsOpen ||
+        deleteSheetOpen ||
+        isDeleteExit ||
+        isDraftPost ||
+        isDraftPostPreviewPending;
 
     const handlePhotoLikeClick = () => {
-        if (ignoreNextLikeClickRef.current) {
-            ignoreNextLikeClickRef.current = false;
-            return;
-        }
-
-        if (!photo.postId || !onSetPostLiked) {
-            setIsPhotoLiked((isLiked) => !isLiked);
-            return;
-        }
-
         const nextLiked = !isPhotoLiked;
+        if (!activePhoto.postId || !onSetPostLiked) {
+            setIsPhotoLiked(nextLiked);
+            if (nextLiked) setPhotoLikePopID((id) => id + 1);
+            return;
+        }
+
         setIsPhotoLiked(nextLiked);
-        setServerLikeCount((count) =>
-            Math.max(0, count + (nextLiked ? 1 : -1)),
+        if (nextLiked) setPhotoLikePopID((id) => id + 1);
+        void onSetPostLiked(activePhoto.postId, nextLiked).catch(
+            (error: unknown) => {
+                console.error("Failed to update post like", error);
+                setIsPhotoLiked(!nextLiked);
+            },
         );
-        void onSetPostLiked(photo.postId, nextLiked).catch((error: unknown) => {
-            console.error("Failed to update post like", error);
-            setIsPhotoLiked(!nextLiked);
-            setServerLikeCount((count) =>
-                Math.max(0, count + (nextLiked ? -1 : 1)),
-            );
-        });
-    };
-
-    const handlePhotoLikeContextMenu = (
-        event: React.MouseEvent<HTMLElement>,
-    ) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (!canOpenLikes) return;
-
-        ignoreNextLikeClickRef.current = false;
-        openLikes();
-    };
-
-    const handleLikeCountClick = (event: React.MouseEvent<HTMLElement>) => {
-        event.preventDefault();
-        event.stopPropagation();
-        openLikes();
-    };
-
-    const startPhotoLikeHold = (event: React.PointerEvent<HTMLElement>) => {
-        if (!canOpenLikes) return;
-        if (event.pointerType == "mouse" && event.button != 0) return;
-
-        clearLikeHoldTimeout();
-        likeHoldStartPointRef.current = { x: event.clientX, y: event.clientY };
-        likeHoldTimeoutRef.current = window.setTimeout(() => {
-            likeHoldTimeoutRef.current = null;
-            likeHoldStartPointRef.current = null;
-            ignoreNextLikeClickRef.current = true;
-            suppressNativeLikeContextMenu();
-            openLikes();
-            window.setTimeout(() => {
-                ignoreNextLikeClickRef.current = false;
-            }, 400);
-        }, 500);
-    };
-
-    const cancelPhotoLikeHoldOnMove = (
-        event: React.PointerEvent<HTMLElement>,
-    ) => {
-        const startPoint = likeHoldStartPointRef.current;
-        if (!startPoint) return;
-
-        const distance = Math.hypot(
-            event.clientX - startPoint.x,
-            event.clientY - startPoint.y,
-        );
-        if (distance > 8) clearLikeHoldTimeout();
     };
 
     const closeActions = () => setActionsAnchor(null);
@@ -464,35 +389,70 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         })();
     };
 
+    const draftPostEdit = React.useCallback((): SpaceViewerDraftPostEdit => {
+        return {
+            height: activePhoto.height,
+            rotationDegrees: 0,
+            width: activePhoto.width,
+        };
+    }, [activePhoto.height, activePhoto.width]);
+
+    const publishDraftPostWithCaption = React.useCallback(
+        (captionToPublish: string, editToPublish: SpaceViewerDraftPostEdit) => {
+            if (!onPublishDraftPost || isDeleteExit) return;
+
+            setDraftPostActionPhase("busy");
+            let publishPromise: Promise<void>;
+            try {
+                publishPromise = Promise.resolve(
+                    onPublishDraftPost(captionToPublish, editToPublish),
+                );
+            } catch (error) {
+                console.error("Failed to publish space post", error);
+                setDraftPostActionPhase(null);
+                return;
+            }
+
+            setQueuedDraftPost(undefined);
+            onClose();
+            onDraftPostPublished?.();
+            void publishPromise.catch((error: unknown) => {
+                console.error("Failed to publish space post", error);
+            });
+        },
+        [isDeleteExit, onClose, onDraftPostPublished, onPublishDraftPost],
+    );
+
     const publishDraftPost = () => {
         if (
             !isDraftPost ||
             isDraftPostActionRunning ||
-            isDeleteExit ||
-            !onPublishDraftPost
+            isDraftPostPreviewPending ||
+            hasDraftPostPreparationError ||
+            isDeleteExit
         )
             return;
 
-        setDraftPostActionPhase("busy");
-        void (async () => {
-            try {
-                await onPublishDraftPost(caption);
-                setDraftPostActionPhase("done");
-            } catch (error) {
-                console.error("Failed to publish space post", error);
-                setDraftPostActionPhase(null);
-            }
-        })();
+        const edit = draftPostEdit();
+        if (!onPublishDraftPost) {
+            if (!canQueueDraftPostPublish) return;
+
+            setQueuedDraftPost({ caption, edit });
+            setDraftPostActionPhase("busy");
+            return;
+        }
+
+        publishDraftPostWithCaption(caption, edit);
     };
 
     const sendReply = () => {
         const text = replyText.trim();
-        if (!canSendReply || !photo.postId || !onReplyToPost) return;
+        if (!canSendReply || !activePhoto.postId || !onReplyToPost) return;
 
         setReplyActionPhase("busy");
         void (async () => {
             try {
-                await onReplyToPost(photo.postId!, text);
+                await onReplyToPost(activePhoto.postId!, text);
                 setReplyText("");
                 setReplyActionPhase("done");
             } catch (error) {
@@ -513,22 +473,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         event.preventDefault();
     };
 
-    const openFriendProfile = (friendID: string) => {
-        onOpenFriend?.(friendID);
-    };
-
-    React.useEffect(
-        () => () => {
-            if (likeHoldTimeoutRef.current != null)
-                window.clearTimeout(likeHoldTimeoutRef.current);
-            if (suppressLikeContextMenuTimeoutRef.current != null)
-                window.clearTimeout(suppressLikeContextMenuTimeoutRef.current);
-        },
-        [],
-    );
-
     React.useLayoutEffect(() => {
-        resizeCaptionInput(captionInputRef.current);
+        resizeCaptionInput(captionInputRef.current, replyInputMinHeight);
     }, [caption]);
 
     React.useLayoutEffect(() => {
@@ -540,31 +486,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 
         setIsReplyFocused(true);
         replyInputRef.current?.focus();
-    }, [canReplyToPost, focusReplyOnOpen, photo.postId]);
-
-    React.useEffect(() => {
-        const suppressDelayedContextMenu = (event: MouseEvent) => {
-            if (!suppressNextLikeContextMenuRef.current) return;
-
-            event.preventDefault();
-            event.stopPropagation();
-            suppressNextLikeContextMenuRef.current = false;
-            if (suppressLikeContextMenuTimeoutRef.current != null) {
-                window.clearTimeout(suppressLikeContextMenuTimeoutRef.current);
-                suppressLikeContextMenuTimeoutRef.current = null;
-            }
-        };
-
-        document.addEventListener("contextmenu", suppressDelayedContextMenu, {
-            capture: true,
-        });
-        return () =>
-            document.removeEventListener(
-                "contextmenu",
-                suppressDelayedContextMenu,
-                { capture: true },
-            );
-    }, []);
+    }, [canReplyToPost, focusReplyOnOpen, activePhoto.postId]);
 
     React.useEffect(() => {
         if (deleteActionPhase != "done") return;
@@ -578,15 +500,19 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     }, [deleteActionPhase]);
 
     React.useEffect(() => {
-        if (draftPostActionPhase != "done") return;
+        if (draftPostPreparationError && queuedDraftPost != undefined) {
+            setQueuedDraftPost(undefined);
+            setDraftPostActionPhase(null);
+        }
+    }, [draftPostPreparationError, queuedDraftPost]);
 
-        const timeoutID = window.setTimeout(() => {
-            onClose();
-            onDraftPostPublished?.();
-        }, spaceActionDoneDurationMs);
+    React.useEffect(() => {
+        if (queuedDraftPost == undefined || !onPublishDraftPost) return;
 
-        return () => window.clearTimeout(timeoutID);
-    }, [draftPostActionPhase, onClose, onDraftPostPublished]);
+        const draftPost = queuedDraftPost;
+        setQueuedDraftPost(undefined);
+        publishDraftPostWithCaption(draftPost.caption, draftPost.edit);
+    }, [onPublishDraftPost, publishDraftPostWithCaption, queuedDraftPost]);
 
     React.useEffect(() => {
         if (replyActionPhase != "done") return;
@@ -594,36 +520,72 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         const timeoutID = window.setTimeout(() => {
             setReplyActionPhase(null);
             setIsReplyFocused(false);
-        }, spaceActionDoneDurationMs);
+        }, replyActionDoneDurationMs);
 
         return () => window.clearTimeout(timeoutID);
     }, [replyActionPhase]);
 
     React.useEffect(() => {
-        setIsPhotoLiked(photo.viewerLiked ?? false);
-        setCaption(photo.caption ?? "");
+        setIsPhotoLiked(activePhoto.viewerLiked ?? false);
+        setCaption(activePhoto.caption ?? "");
         setReplyText("");
         setIsReplyFocused(focusReplyOnOpen && canReplyToPost);
         setReplyActionPhase(null);
-        setServerLikeCount(photo.likeCount ?? 0);
-        setPhotoLikers([]);
-        setScreen(resolvedInitialScreen);
     }, [
-        photo.caption,
-        photo.imageUrl,
-        photo.likeCount,
-        photo.postId,
-        photo.viewerLiked,
+        activePhoto.caption,
+        activePhoto.imageUrl,
+        activePhoto.postId,
+        activePhoto.timestampMs,
+        activePhoto.viewerLiked,
         canReplyToPost,
         focusReplyOnOpen,
-        resolvedInitialScreen,
     ]);
+
+    React.useEffect(() => {
+        setPhotoLikePopID(0);
+    }, [activePhoto.imageUrl, activePhoto.postId]);
+
+    React.useEffect(() => {
+        if (photoLikePopID == 0) return;
+
+        const timeoutID = window.setTimeout(
+            () => setPhotoLikePopID(0),
+            spacePostLikePopDurationMs,
+        );
+        return () => window.clearTimeout(timeoutID);
+    }, [photoLikePopID]);
+
+    React.useEffect(() => {
+        const pswp = pswpRef.current;
+        if (!pswp) return;
+
+        const refreshIndex = (index: number) => {
+            if (index >= 0 && index < viewerPhotosRef.current.length) {
+                pswp.refreshSlideContent(index);
+            }
+        };
+        refreshIndex(pswp.currIndex - 1);
+        refreshIndex(pswp.currIndex);
+        refreshIndex(pswp.currIndex + 1);
+    }, [viewerPhotosContentKey]);
 
     const handleDeleteSheetExited = () => {
         if (!isDeleteExit) return;
 
         setDeleteActionPhase(null);
     };
+
+    React.useEffect(() => {
+        const mediaQuery = window.matchMedia(
+            `(min-width: ${viewerDesktopMinWidth}px)`,
+        );
+        const syncDesktopViewer = () => setIsDesktopViewer(mediaQuery.matches);
+
+        syncDesktopViewer();
+        mediaQuery.addEventListener("change", syncDesktopViewer);
+        return () =>
+            mediaQuery.removeEventListener("change", syncDesktopViewer);
+    }, []);
 
     React.useEffect(() => {
         if (!isDeleteExit) return;
@@ -634,6 +596,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     React.useEffect(() => {
         const root = viewerRootRef.current;
         if (!root) return;
+        if (!usePhotoSwipeViewer || isDraftPostPreviewPending) return;
 
         let disposed = false;
         let closedByReact = false;
@@ -643,7 +606,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             if (disposed || !viewerRootRef.current) return;
 
             pswp = new PhotoSwipeClass({
-                allowPanToNext: false,
+                allowPanToNext: viewerPhotosRef.current.length > 1,
                 appendToEl: viewerRootRef.current,
                 arrowKeys: false,
                 arrowNext: false,
@@ -654,31 +617,27 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 close: false,
                 closeOnVerticalDrag: false,
                 counter: false,
-                dataSource: [
-                    {
-                        alt: photo.alt ?? `${photo.name} post`,
-                        height: photo.height ?? defaultPhotoHeight,
-                        src: photo.imageUrl,
-                        width: photo.width ?? defaultPhotoWidth,
-                    },
-                ],
                 doubleTapAction: "zoom",
                 errorMsg: "Unable to preview this photo",
                 escKey: false,
                 imageClickAction: "zoom",
-                index: 0,
+                index: initialPhotoIndexRef.current,
                 loop: false,
                 mainClass: "pswp-space-viewer",
-                maxZoomLevel: 4,
                 paddingFn: () => ({
-                    bottom: viewerBottomPadding,
+                    bottom:
+                        window.innerWidth >= viewerDesktopMinWidth
+                            ? 0
+                            : viewerBottomPadding,
                     left: 0,
                     right: 0,
-                    top: viewerHeaderHeight,
+                    top:
+                        window.innerWidth >= viewerDesktopMinWidth
+                            ? 0
+                            : viewerHeaderHeight,
                 }),
                 pinchToClose: false,
                 returnFocus: false,
-                secondaryZoomLevel: 2,
                 showHideAnimationType: "none",
                 spacing: 0,
                 tapAction: false,
@@ -686,8 +645,97 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 wheelToZoom: true,
                 zoom: false,
             });
+            pswpRef.current = pswp;
+            pswp.addFilter("numItems", () => viewerPhotosRef.current.length);
+            pswp.addFilter("itemData", (_, index) => {
+                const item =
+                    viewerPhotosRef.current[index] ?? fallbackPhotoRef.current;
+                return {
+                    alt: item.alt ?? `${item.name} post`,
+                    height: item.height ?? defaultPhotoHeight,
+                    src: item.imageUrl,
+                    width: item.width ?? defaultPhotoWidth,
+                };
+            });
             pswp.on("close", () => {
-                if (!closedByReact) onClose();
+                if (!closedByReact) onCloseRef.current();
+            });
+            pswp.on("change", () => {
+                const nextIndex = pswp?.currIndex;
+                if (nextIndex != undefined) {
+                    onPhotoIndexChangeRef.current?.(nextIndex);
+                }
+            });
+            pswp.on("pointerDown", ({ originalEvent }) => {
+                if (isSwipeBlockedRef.current) return;
+                if (
+                    !swipeActionsRef.current.onSwipeLeft &&
+                    !swipeActionsRef.current.onSwipeRight
+                ) {
+                    return;
+                }
+                if (viewerSwipeStartsOnInteractiveTarget(originalEvent.target))
+                    return;
+
+                const point = viewerSwipePointFromEvent(originalEvent);
+                if (!point) return;
+
+                swipeGestureRef.current = {
+                    lastX: point.x,
+                    lastY: point.y,
+                    pointerId: point.pointerId,
+                    startX: point.x,
+                    startY: point.y,
+                };
+            });
+            pswp.on("pointerMove", ({ originalEvent }) => {
+                const gesture = swipeGestureRef.current;
+                if (!gesture) return;
+
+                const point = viewerSwipePointFromEvent(originalEvent);
+                if (!point) return;
+                if (
+                    gesture.pointerId != undefined &&
+                    point.pointerId != undefined &&
+                    gesture.pointerId != point.pointerId
+                ) {
+                    return;
+                }
+
+                gesture.lastX = point.x;
+                gesture.lastY = point.y;
+            });
+            pswp.on("pointerUp", ({ originalEvent }) => {
+                const gesture = swipeGestureRef.current;
+                swipeGestureRef.current = null;
+                if (!gesture || isSwipeBlockedRef.current) return;
+
+                const point = viewerSwipePointFromEvent(originalEvent);
+                if (
+                    point &&
+                    (gesture.pointerId == undefined ||
+                        point.pointerId == undefined ||
+                        gesture.pointerId == point.pointerId)
+                ) {
+                    gesture.lastX = point.x;
+                    gesture.lastY = point.y;
+                }
+
+                const deltaX = gesture.lastX - gesture.startX;
+                const deltaY = gesture.lastY - gesture.startY;
+                if (Math.abs(deltaX) < viewerSwipeMinDeltaPx) return;
+                if (
+                    Math.abs(deltaX) <
+                    Math.abs(deltaY) * viewerSwipeAxisRatio
+                ) {
+                    return;
+                }
+
+                const swipeAction =
+                    deltaX < 0
+                        ? swipeActionsRef.current.onSwipeLeft
+                        : swipeActionsRef.current.onSwipeRight;
+                swipeAction?.();
             });
             pswp.init();
         });
@@ -695,16 +743,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         return () => {
             disposed = true;
             closedByReact = true;
+            swipeGestureRef.current = null;
+            pswpRef.current = undefined;
             pswp?.destroy();
         };
-    }, [
-        onClose,
-        photo.alt,
-        photo.height,
-        photo.imageUrl,
-        photo.name,
-        photo.width,
-    ]);
+    }, [isDraftPostPreviewPending, usePhotoSwipeViewer]);
 
     React.useEffect(() => {
         if (typeof document == "undefined") return;
@@ -721,17 +764,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             if (deleteSheetOpen) return;
             if (event.key != "Escape") return;
 
-            if (screen == "likes") {
-                closeLikes();
-                return;
-            }
-
-            onClose();
+            onCloseRef.current();
         };
 
         window.addEventListener("keydown", closeOnEscape);
         return () => window.removeEventListener("keydown", closeOnEscape);
-    }, [closeLikes, deleteSheetOpen, onClose, screen]);
+    }, [deleteSheetOpen]);
 
     return (
         <Box
@@ -792,12 +830,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         sx={{
                             appearance: "none",
                             alignItems: "center",
-                            bgcolor: photo.avatarUrl
-                                ? "transparent"
-                                : paleGreen,
+                            bgcolor: avatarSkeletonBackground,
                             border: 0,
                             borderRadius: "50%",
-                            color: green,
                             cursor: onOpenProfile ? "pointer" : "default",
                             display: "flex",
                             flexShrink: 0,
@@ -812,11 +847,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             },
                         }}
                     >
-                        {photo.avatarUrl ? (
+                        {activePhoto.avatarUrl ? (
                             <Box
                                 component="img"
                                 alt=""
-                                src={photo.avatarUrl}
+                                src={activePhoto.avatarUrl}
                                 sx={{
                                     display: "block",
                                     height: "100%",
@@ -826,17 +861,15 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 }}
                             />
                         ) : (
-                            <Box
+                            <Skeleton
+                                variant="circular"
                                 sx={{
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 10,
-                                    fontWeight: 800,
-                                    lineHeight: 1,
+                                    bgcolor: avatarSkeletonBackground,
+                                    height: "100%",
+                                    transform: "none",
+                                    width: "100%",
                                 }}
-                            >
-                                {initials}
-                            </Box>
+                            />
                         )}
                     </Box>
                     <Box
@@ -902,7 +935,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 <Box
                                     component="time"
                                     dateTime={new Date(
-                                        photo.timestampMs,
+                                        activePhoto.timestampMs,
                                     ).toISOString()}
                                     sx={{
                                         color: textTertiary,
@@ -921,7 +954,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     sx={{
                         alignItems: "center",
                         display: "flex",
-                        gap: "16px",
+                        gap: "8px",
                         justifySelf: "flex-end",
                     }}
                 >
@@ -970,24 +1003,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         type="button"
                         aria-label="Close viewer"
                         onClick={onClose}
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: controlBackground,
-                            border: 0,
-                            borderRadius: "50%",
-                            color: controlIcon,
-                            cursor: "pointer",
-                            display: "flex",
-                            height: 28,
-                            justifyContent: "center",
-                            p: 0,
-                            width: 28,
-                            "&:focus-visible": {
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                            "&:hover": { bgcolor: controlBackgroundHover },
-                        }}
+                        sx={viewerHeaderButtonSx}
                     >
                         <HugeiconsIcon
                             icon={Cancel01Icon}
@@ -1082,6 +1098,52 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     width: "100%",
                 }}
             />
+            {isDraftPost && (!isDesktopViewer || isDraftPostPreviewPending) && (
+                <Box
+                    sx={{
+                        bottom: { xs: draftViewerBottomPadding, sm: 0 },
+                        boxSizing: "border-box",
+                        display: "grid",
+                        left: 0,
+                        overflow: "hidden",
+                        placeItems: "center",
+                        position: "fixed",
+                        right: 0,
+                        top: { xs: viewerHeaderHeight, sm: 0 },
+                        zIndex: 0,
+                    }}
+                >
+                    {isDraftPostPreviewPending ? (
+                        <Box
+                            role="status"
+                            aria-label="Preparing photo preview"
+                            sx={{
+                                animation: `${photoPreviewSkeletonShimmer} 1.4s ease-in-out infinite`,
+                                aspectRatio: "3 / 4",
+                                bgcolor: "#171717",
+                                backgroundImage:
+                                    "linear-gradient(90deg, #171717 0%, #242424 42%, #2D2D2D 50%, #242424 58%, #171717 100%)",
+                                backgroundSize: "200% 100%",
+                                boxShadow: "0 16px 42px rgba(0, 0, 0, 0.34)",
+                                overflow: "hidden",
+                                width: "100vw",
+                            }}
+                        />
+                    ) : (
+                        <Box
+                            component="img"
+                            alt={activePhoto.alt ?? `${activePhoto.name} post`}
+                            src={activePhoto.imageUrl}
+                            sx={{
+                                display: "block",
+                                maxHeight: "100%",
+                                maxWidth: "100vw",
+                                objectFit: "contain",
+                            }}
+                        />
+                    )}
+                </Box>
+            )}
             <Box
                 aria-hidden
                 data-space-viewer-chrome="true"
@@ -1116,129 +1178,137 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 <Box
                     data-space-viewer-bottom="true"
                     sx={{
-                        alignItems: "flex-end",
-                        bottom: "16px",
+                        alignItems: "stretch",
+                        bottom: "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
                         boxSizing: "border-box",
                         display: "flex",
+                        flexDirection: "column",
                         gap: "8px",
-                        left: { xs: "16px", sm: 0 },
+                        left: { xs: "16px", sm: "auto" },
                         maxWidth: { sm: 390 },
-                        mx: { sm: "auto" },
                         position: "fixed",
-                        right: { xs: "16px", sm: 0 },
+                        right: "16px",
                         width: { sm: "calc(100% - 32px)" },
                         zIndex: 2,
                     }}
                 >
+                    {draftPostPreparationError && (
+                        <Box
+                            role="alert"
+                            sx={{
+                                bgcolor: "rgba(246, 58, 58, 0.16)",
+                                borderRadius: "12px",
+                                color: "#FF8A8A",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 13,
+                                fontWeight: 650,
+                                lineHeight: "18px",
+                                px: "12px",
+                                py: "8px",
+                            }}
+                        >
+                            {draftPostPreparationError}
+                        </Box>
+                    )}
                     <Box
-                        ref={captionInputRef}
-                        component="textarea"
-                        aria-label="Add a caption"
-                        disabled={isDraftPostActionRunning}
-                        onChange={(event) => {
-                            setCaption(event.target.value);
-                            resizeCaptionInput(event.currentTarget);
-                        }}
-                        placeholder="Add a caption..."
-                        rows={1}
-                        value={caption}
                         sx={{
-                            bgcolor: controlBackground,
-                            border: 0,
-                            borderRadius: "20px",
-                            boxSizing: "border-box",
-                            color: textBase,
-                            flex: "1 1 auto",
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 500,
-                            lineHeight: "20px",
-                            maxHeight: captionInputMaxHeight,
-                            minHeight: captionInputMinHeight,
-                            minWidth: 0,
-                            outline: 0,
-                            overflow: "hidden",
-                            px: "14px",
-                            py: "10px",
-                            resize: "none",
-                            "&::placeholder": { color: textSecondary },
-                            "&:disabled": { opacity: 0.74 },
-                            "&:focus": { bgcolor: controlBackgroundActive },
-                        }}
-                    />
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label={
-                            draftPostActionPhase == "busy"
-                                ? "Posting"
-                                : draftPostActionPhase == "done"
-                                  ? "Posted"
-                                  : "Post photo"
-                        }
-                        disabled={isDraftPostActionRunning}
-                        onClick={publishDraftPost}
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: "#FFFFFF",
-                            border: 0,
-                            borderRadius: "20px",
-                            boxSizing: "border-box",
-                            boxShadow: "0 10px 28px rgba(0, 0, 0, 0.28)",
-                            color:
-                                draftPostActionPhase == "done"
-                                    ? green
-                                    : "#111111",
-                            cursor: isDraftPostActionRunning
-                                ? "default"
-                                : "pointer",
+                            alignItems: "flex-end",
                             display: "flex",
-                            flexShrink: 0,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 750,
-                            height: 40,
-                            justifyContent: "center",
-                            lineHeight: "20px",
-                            minWidth: 70,
-                            px: "20px",
-                            py: "10px",
-                            "&:disabled": { opacity: 1 },
-                            "&:focus-visible": {
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                            "&:hover": {
-                                bgcolor: isDraftPostActionRunning
-                                    ? "#FFFFFF"
-                                    : "#F0F0F0",
-                            },
+                            gap: "8px",
                         }}
                     >
-                        {draftPostActionPhase == "busy" ? (
-                            <Box
-                                component="span"
-                                sx={{
-                                    animation: `${postButtonSpin} 2.4s linear infinite`,
-                                    display: "flex",
-                                    lineHeight: 0,
-                                }}
-                            >
-                                <HugeiconsIcon
-                                    icon={Loading03Icon}
-                                    size={22}
-                                    strokeWidth={1.8}
-                                />
-                            </Box>
-                        ) : draftPostActionPhase == "done" ? (
-                            <HugeiconsIcon
-                                icon={Tick02Icon}
-                                size={22}
-                                strokeWidth={1.8}
-                            />
-                        ) : (
-                            "Post"
-                        )}
+                        <Box
+                            ref={captionInputRef}
+                            component="textarea"
+                            aria-label="Add a caption"
+                            disabled={isDraftPostActionRunning}
+                            onChange={(event) => {
+                                setCaption(event.target.value);
+                                resizeCaptionInput(
+                                    event.currentTarget,
+                                    replyInputMinHeight,
+                                );
+                            }}
+                            placeholder="Add a caption..."
+                            rows={1}
+                            value={caption}
+                            sx={{
+                                bgcolor: inputBackground,
+                                border: 0,
+                                borderRadius: "24px",
+                                boxSizing: "border-box",
+                                color: textBase,
+                                flex: "1 1 auto",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 500,
+                                lineHeight: "20px",
+                                maxHeight: captionInputMaxHeight,
+                                minHeight: replyInputMinHeight,
+                                minWidth: 0,
+                                outline: 0,
+                                overflow: "hidden",
+                                pb: `${replyInputPadding}px`,
+                                pl: `${replyInputPaddingLeft}px`,
+                                pr: `${replyInputPadding}px`,
+                                pt: `${replyInputPadding}px`,
+                                resize: "none",
+                                "&::placeholder": { color: textSecondary },
+                                "&:disabled": { opacity: 0.74 },
+                                "&:focus": { bgcolor: inputBackgroundActive },
+                            }}
+                        />
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={
+                                draftPostActionPhase == "busy"
+                                    ? "Posting"
+                                    : draftPostPreparationError
+                                      ? "Photo could not be prepared"
+                                      : "Post photo"
+                            }
+                            disabled={isDraftPostPublishDisabled}
+                            onClick={publishDraftPost}
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "#FFFFFF",
+                                border: 0,
+                                borderRadius: "24px",
+                                boxSizing: "border-box",
+                                boxShadow: "0 10px 28px rgba(0, 0, 0, 0.28)",
+                                color: "#111111",
+                                cursor: isDraftPostPublishDisabled
+                                    ? "default"
+                                    : "pointer",
+                                display: "flex",
+                                flexShrink: 0,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 750,
+                                height: replyInputMinHeight,
+                                justifyContent: "center",
+                                lineHeight: "20px",
+                                minWidth: 70,
+                                px: "20px",
+                                py: "10px",
+                                "&:disabled": { opacity: 1 },
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                                "&:hover": {
+                                    bgcolor: isDraftPostPublishDisabled
+                                        ? "#FFFFFF"
+                                        : "#F0F0F0",
+                                },
+                            }}
+                        >
+                            {draftPostPreparationError ? "Error" : "Post"}
+                        </Box>
                     </Box>
                 </Box>
             ) : null}
@@ -1253,27 +1323,35 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 14,
                         fontWeight: 650,
-                        bgcolor: "rgba(48, 48, 48, 0.82)",
-                        borderRadius: "10px",
                         left: "50%",
-                        lineHeight: "20px",
+                        lineHeight: "23px",
                         m: 0,
-                        maxWidth: "calc(100vw - 32px)",
+                        maxWidth: "90vw",
                         minWidth: 0,
-                        overflow: "hidden",
-                        px: "8px",
-                        py: "2px",
+                        overflowWrap: "break-word",
                         position: "fixed",
                         textAlign: "center",
-                        textOverflow: "ellipsis",
                         textShadow: "0 1px 10px rgba(0, 0, 0, 0.74)",
-                        top: "85%",
+                        bottom: "14%",
                         transform: "translateX(-50%)",
-                        whiteSpace: "nowrap",
+                        whiteSpace: "pre-wrap",
+                        width: "90vw",
                         zIndex: 2,
                     }}
                 >
-                    {displayCaption}
+                    <Box
+                        component="span"
+                        sx={{
+                            bgcolor: "rgba(48, 48, 48, 0.82)",
+                            borderRadius: "10px",
+                            boxDecorationBreak: "clone",
+                            px: "8px",
+                            py: "2px",
+                            WebkitBoxDecorationBreak: "clone",
+                        }}
+                    >
+                        {displayCaption}
+                    </Box>
                 </Box>
             )}
             {showPhotoLikeButton && (
@@ -1281,13 +1359,14 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     data-space-viewer-bottom="true"
                     sx={{
                         alignItems: "stretch",
-                        bottom: "16px",
+                        bottom: "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
                         display: "flex",
                         flexDirection: "column",
                         gap: 0,
-                        left: canReplyToPost ? { xs: "16px", sm: 0 } : "auto",
+                        left: canReplyToPost
+                            ? { xs: "16px", sm: "auto" }
+                            : "auto",
                         maxWidth: canReplyToPost ? { sm: 390 } : undefined,
-                        mx: canReplyToPost ? { sm: "auto" } : undefined,
                         position: "fixed",
                         right: "16px",
                         width: canReplyToPost
@@ -1325,11 +1404,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 }}
                                 onFocus={() => setIsReplyFocused(true)}
                                 onKeyDown={handleReplyKeyDown}
-                                placeholder="Reply"
+                                placeholder={`Reply to ${displayName}...`}
                                 rows={1}
                                 value={replyText}
                                 sx={{
-                                    bgcolor: controlBackground,
+                                    bgcolor: inputBackground,
                                     border: 0,
                                     borderRadius: "24px",
                                     boxSizing: "border-box",
@@ -1353,7 +1432,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                     "&::placeholder": { color: textSecondary },
                                     "&:disabled": { opacity: 0.74 },
                                     "&:focus": {
-                                        bgcolor: controlBackgroundActive,
+                                        bgcolor: inputBackgroundActive,
                                     },
                                 }}
                             />
@@ -1388,38 +1467,16 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                         ? sendReply
                                         : handlePhotoLikeClick
                                 }
-                                onContextMenuCapture={
-                                    isReplyMode
-                                        ? undefined
-                                        : handlePhotoLikeContextMenu
-                                }
-                                onPointerCancel={
-                                    isReplyMode
-                                        ? undefined
-                                        : clearLikeHoldTimeout
-                                }
                                 onPointerDown={
                                     isReplyMode
                                         ? handleReplyActionPointerDown
-                                        : startPhotoLikeHold
-                                }
-                                onPointerLeave={
-                                    isReplyMode
-                                        ? undefined
-                                        : clearLikeHoldTimeout
-                                }
-                                onPointerMove={
-                                    isReplyMode
-                                        ? undefined
-                                        : cancelPhotoLikeHoldOnMove
-                                }
-                                onPointerUp={
-                                    isReplyMode
-                                        ? undefined
-                                        : clearLikeHoldTimeout
+                                        : undefined
                                 }
                                 sx={{
                                     ...viewerActionButtonSx,
+                                    animation: isPhotoLikePopping
+                                        ? `${spacePostLikeButtonPop} ${spacePostLikePopDurationMs}ms ${spacePostLikePopTiming} both`
+                                        : undefined,
                                     bgcolor:
                                         isReplyMode && canSendReply
                                             ? "#FFFFFF"
@@ -1436,6 +1493,16 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                     userSelect: "none",
                                     WebkitTouchCallout: "none",
                                     WebkitUserSelect: "none",
+                                    "&:hover": {
+                                        bgcolor: isReplyMode
+                                            ? canSendReply
+                                                ? "#F0F0F0"
+                                                : controlBackground
+                                            : controlBackgroundHover,
+                                    },
+                                    "@media (prefers-reduced-motion: reduce)": {
+                                        animation: "none",
+                                    },
                                 }}
                             >
                                 {isReplyMode ? (
@@ -1473,278 +1540,37 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                         />
                                     )
                                 ) : (
-                                    <HugeiconsIcon
-                                        fill={isPhotoLiked ? green : "none"}
-                                        icon={FavouriteIcon}
-                                        primaryColor={
-                                            isPhotoLiked ? green : undefined
+                                    <Box
+                                        key={
+                                            isPhotoLikePopping
+                                                ? `heart-${photoLikePopID}`
+                                                : "heart"
                                         }
-                                        size={26}
-                                        strokeWidth={1.8}
-                                    />
+                                        component="span"
+                                        sx={{
+                                            animation: isPhotoLikePopping
+                                                ? `${spacePostLikeHeartPop} ${spacePostLikePopDurationMs}ms ${spacePostLikePopTiming} both`
+                                                : undefined,
+                                            display: "flex",
+                                            lineHeight: 0,
+                                            transformOrigin: "50% 58%",
+                                            "@media (prefers-reduced-motion: reduce)":
+                                                { animation: "none" },
+                                        }}
+                                    >
+                                        <HugeiconsIcon
+                                            fill={isPhotoLiked ? green : "none"}
+                                            icon={FavouriteIcon}
+                                            primaryColor={
+                                                isPhotoLiked ? green : undefined
+                                            }
+                                            size={26}
+                                            strokeWidth={1.8}
+                                        />
+                                    </Box>
                                 )}
                             </Box>
-                            {!isReplyMode && showPhotoLikeCount && (
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    aria-label={`View ${likeCountLabel}`}
-                                    onClick={handleLikeCountClick}
-                                    sx={{
-                                        ...viewerCountBadgeSx,
-                                        cursor: "pointer",
-                                        p: 0,
-                                        "&:focus-visible": {
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                    }}
-                                >
-                                    {likeCount}
-                                </Box>
-                            )}
                         </Box>
-                    </Box>
-                </Box>
-            )}
-            {screen == "likes" && canOpenLikes && (
-                <Box
-                    sx={{
-                        bgcolor: viewerPanelBackground,
-                        boxSizing: "border-box",
-                        color: textBase,
-                        display: "flex",
-                        flexDirection: "column",
-                        inset: 0,
-                        maxWidth: "100vw",
-                        overflow: "hidden",
-                        overflowX: "hidden",
-                        position: "fixed",
-                        width: "100%",
-                        zIndex: 3,
-                    }}
-                >
-                    <Box
-                        component="header"
-                        sx={{
-                            alignItems: "center",
-                            boxSizing: "border-box",
-                            display: "grid",
-                            flexShrink: 0,
-                            gridTemplateColumns: "1fr 40px",
-                            minHeight: 56,
-                            px: "16px",
-                            width: "100%",
-                        }}
-                    >
-                        <Box
-                            component="h1"
-                            sx={{
-                                color: textBase,
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 16,
-                                fontWeight: 750,
-                                lineHeight: "20px",
-                                m: 0,
-                            }}
-                        >
-                            {likeCount} {likeCount == 1 ? "like" : "likes"}
-                        </Box>
-                        <Box
-                            component="button"
-                            type="button"
-                            aria-label="Close likes"
-                            onClick={closeLikes}
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: "transparent",
-                                border: 0,
-                                borderRadius: "50%",
-                                color: controlIcon,
-                                cursor: "pointer",
-                                display: "flex",
-                                height: 28,
-                                justifyContent: "center",
-                                justifySelf: "flex-end",
-                                p: 0,
-                                width: 28,
-                                "&:focus-visible": {
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                                "&:hover": {
-                                    bgcolor: "transparent",
-                                    color: textBase,
-                                },
-                            }}
-                        >
-                            <HugeiconsIcon
-                                icon={Cancel01Icon}
-                                size={18}
-                                strokeWidth={1.8}
-                            />
-                        </Box>
-                    </Box>
-                    <Box
-                        component="ul"
-                        sx={{
-                            boxSizing: "border-box",
-                            flex: "1 1 auto",
-                            listStyle: "none",
-                            m: 0,
-                            maxWidth: "100%",
-                            minHeight: 0,
-                            overflowX: "hidden",
-                            overflowY: "auto",
-                            p: "14px 16px 18px",
-                            position: "relative",
-                            width: "100%",
-                        }}
-                    >
-                        {isLoadingLikers ? (
-                            <Box
-                                sx={{
-                                    alignItems: "center",
-                                    bottom: 0,
-                                    display: "flex",
-                                    justifyContent: "center",
-                                    left: 0,
-                                    position: "fixed",
-                                    right: 0,
-                                    top: 0,
-                                    zIndex: 1,
-                                }}
-                            >
-                                <SpaceLoadingSpinner ariaLabel="Loading likes" />
-                            </Box>
-                        ) : photoLikers.length == 0 ? (
-                            <Box
-                                sx={{
-                                    alignItems: "center",
-                                    color: viewerPanelMuted,
-                                    display: "flex",
-                                    flex: "1 1 auto",
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 14,
-                                    fontWeight: 600,
-                                    justifyContent: "center",
-                                    lineHeight: "20px",
-                                    minHeight: "calc(100svh - 56px - 32px)",
-                                }}
-                            >
-                                No likes yet
-                            </Box>
-                        ) : (
-                            photoLikers.map((liker) => {
-                                const likerName = firstNameFrom(liker.name);
-                                const friendID = liker.friendID;
-                                const canOpenFriend = Boolean(
-                                    friendID && onOpenFriend,
-                                );
-                                const openLikerProfile =
-                                    canOpenFriend && friendID
-                                        ? () => openFriendProfile(friendID)
-                                        : undefined;
-
-                                return (
-                                    <Box
-                                        component="li"
-                                        key={liker.id}
-                                        sx={{ listStyle: "none" }}
-                                    >
-                                        <Box
-                                            sx={{
-                                                alignItems: "center",
-                                                boxSizing: "border-box",
-                                                color: "inherit",
-                                                display: "flex",
-                                                gap: "12px",
-                                                minHeight: 52,
-                                                px: "2px",
-                                                py: "8px",
-                                                textAlign: "left",
-                                                width: "100%",
-                                            }}
-                                        >
-                                            <Box
-                                                component={
-                                                    canOpenFriend
-                                                        ? "button"
-                                                        : "div"
-                                                }
-                                                type={
-                                                    canOpenFriend
-                                                        ? "button"
-                                                        : undefined
-                                                }
-                                                onClick={openLikerProfile}
-                                                sx={{
-                                                    alignItems: "center",
-                                                    appearance: "none",
-                                                    bgcolor: "transparent",
-                                                    border: 0,
-                                                    borderRadius: "12px",
-                                                    color: "inherit",
-                                                    cursor: canOpenFriend
-                                                        ? "pointer"
-                                                        : "default",
-                                                    display: "flex",
-                                                    flex: "0 1 auto",
-                                                    gap: "12px",
-                                                    maxWidth: "100%",
-                                                    minWidth: 0,
-                                                    p: 0,
-                                                    textAlign: "left",
-                                                    width: "fit-content",
-                                                    "&:focus-visible": {
-                                                        outline: `2px solid ${green}`,
-                                                        outlineOffset: 2,
-                                                    },
-                                                }}
-                                            >
-                                                <SpaceAvatar
-                                                    avatarUrl={liker.avatarUrl}
-                                                    name={likerName}
-                                                    size={36}
-                                                />
-                                                <Box
-                                                    sx={{
-                                                        color: textBase,
-                                                        flex: "0 1 auto",
-                                                        fontFamily:
-                                                            '"Inter Variable", Inter, sans-serif',
-                                                        fontSize: 14,
-                                                        fontWeight: 600,
-                                                        lineHeight: "20px",
-                                                        minWidth: 0,
-                                                        overflow: "hidden",
-                                                        textOverflow:
-                                                            "ellipsis",
-                                                        whiteSpace: "nowrap",
-                                                    }}
-                                                >
-                                                    {likerName}
-                                                </Box>
-                                            </Box>
-                                            <Box
-                                                aria-hidden
-                                                sx={{
-                                                    alignItems: "center",
-                                                    display: "flex",
-                                                    flexShrink: 0,
-                                                    justifyContent: "center",
-                                                    ml: "auto",
-                                                }}
-                                            >
-                                                <HeartFilledIcon />
-                                            </Box>
-                                        </Box>
-                                    </Box>
-                                );
-                            })
-                        )}
                     </Box>
                 </Box>
             )}

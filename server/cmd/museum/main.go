@@ -975,7 +975,7 @@ func main() {
 	userEntityController := &userEntityCtrl.Controller{Repo: userEntityRepo}
 	userEntityHandler := &api.UserEntityHandler{Controller: userEntityController}
 	spaceRepos := spacerepo.NewModule(db, s3Config)
-	spaceModule := spacecontroller.NewModule(spaceRepos, userAuthRepo, &spacecontroller.SpaceEmailNotifier{UserRepo: userRepo})
+	spaceModule := spacecontroller.NewModule(spaceRepos, userAuthRepo, &spacecontroller.SpaceEmailSender{UserRepo: userRepo})
 	spaceHandlers := spaceapi.NewHandlers(spaceModule)
 
 	privateAPI.POST("/user-entity/key", userEntityHandler.CreateKey)

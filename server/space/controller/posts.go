@@ -16,13 +16,12 @@ import (
 )
 
 type PostsController struct {
-	PostsRepo       *repo.PostsRepository
-	SpacesRepo      *repo.SpacesRepository
-	FriendsRepo     *repo.FriendsRepository
-	AssetsRepo      *repo.AssetsRepository
-	ReadMarkersRepo *repo.ReadMarkersRepository
-	EmailNotifier   SpacePostEmailNotifier
-	auth            authDeps
+	PostsRepo     *repo.PostsRepository
+	SpacesRepo    *repo.SpacesRepository
+	FriendsRepo   *repo.FriendsRepository
+	AssetsRepo    *repo.AssetsRepository
+	EmailNotifier SpaceEmailNotifier
+	auth          authDeps
 }
 
 func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest) (*models.CreatePostResponse, error) {
@@ -60,14 +59,7 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 		if object.Position < 0 || object.Position >= maxSpacePostObjects {
 			return nil, ente.NewBadRequestWithMessage("invalid object position")
 		}
-		if err := validateOptionalEncodedSpaceField("blurHashCipher", object.BlurHashCipher, maxSpaceBlurHashCipherEncodedBytes, maxSpaceBlurHashCipherDecodedBytes); err != nil {
-			return nil, err
-		}
-		if err := validateSpaceTextFieldBytes("variant", object.Variant, maxSpaceVariantBytes); err != nil {
-			return nil, err
-		}
-		mediaType, err := normalizedSpacePhotoMediaType(object.MediaType)
-		if err != nil {
+		if err := validateEncodedSpaceField("metadataCipher", object.MetadataCipher, maxSpaceAssetMetadataEncodedBytes, maxSpaceAssetMetadataDecodedBytes); err != nil {
 			return nil, err
 		}
 		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, object.ObjectKey, repo.TempObjectPurposePost, &space.SpaceID)
@@ -79,11 +71,7 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 			BucketID:       staged.BucketID,
 			Size:           sql.NullInt64{Int64: staged.ExpectedSize, Valid: staged.ExpectedSize > 0},
 			Position:       object.Position,
-			Variant:        sql.NullString{String: object.Variant, Valid: strings.TrimSpace(object.Variant) != ""},
-			BlurHashCipher: sql.NullString{String: object.BlurHashCipher, Valid: strings.TrimSpace(object.BlurHashCipher) != ""},
-			Width:          sql.NullInt64{Int64: int64(object.Width), Valid: object.Width > 0},
-			Height:         sql.NullInt64{Int64: int64(object.Height), Valid: object.Height > 0},
-			MediaType:      sql.NullString{String: mediaType, Valid: true},
+			MetadataCipher: strings.TrimSpace(object.MetadataCipher),
 		})
 	}
 	postID, err := c.PostsRepo.CreatePost(ctx.Request.Context(), userID, space.SpaceID, req.EncryptedPostKey, req.CaptionCipher, req.KeyVersion, assets)
@@ -169,11 +157,7 @@ func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest)
 	if err != nil {
 		return nil, err
 	}
-	marker, err := c.ReadMarkersRepo.Get(ctx.Request.Context(), userID, viewerSpace.SpaceID)
-	if err != nil {
-		return nil, err
-	}
-	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.Cursor, req.Limit, marker.FeedReadCreatedAt, marker.FeedReadPostID)
+	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -285,8 +269,12 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models
 	if err := c.auth.canViewSpace(ctx.Request.Context(), &viewerAuth{UserID: userID, SpaceID: actorSpace.SpaceID}, space); err != nil {
 		return nil, err
 	}
-	if err := c.PostsRepo.SetLike(ctx.Request.Context(), id, userID, actorSpace.SpaceID, req.Like); err != nil {
+	created, err := c.PostsRepo.SetLikeWithCreated(ctx.Request.Context(), id, userID, actorSpace.SpaceID, req.Like)
+	if err != nil {
 		return nil, err
+	}
+	if req.Like && created && c.EmailNotifier != nil {
+		go c.EmailNotifier.OnSpacePostLiked(actorSpace.SpaceSlug, post.OwnerID)
 	}
 	return &models.LikePostResponse{Liked: req.Like}, nil
 }

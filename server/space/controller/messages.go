@@ -29,6 +29,7 @@ type MessagesController struct {
 	SpacesRepo      *repo.SpacesRepository
 	FriendsRepo     *repo.FriendsRepository
 	ReadMarkersRepo *repo.ReadMarkersRepository
+	EmailNotifier   SpaceEmailNotifier
 	auth            authDeps
 }
 
@@ -118,6 +119,9 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 	if err != nil {
 		return nil, err
 	}
+	if c.EmailNotifier != nil {
+		go c.EmailNotifier.OnSpacePostReplied(senderSpace.SpaceSlug, recipientSpace.OwnerID)
+	}
 	return toMessageResponse(*message), nil
 }
 
@@ -137,9 +141,11 @@ func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesReque
 	items := make([]models.MessageConversationResponse, 0, len(conversations))
 	for _, conversation := range conversations {
 		items = append(items, models.MessageConversationResponse{
-			Friend:         toActorResponse(conversation.Friend, true),
-			LatestActivity: toMessageConversationActivityResponse(conversation.LatestActivity),
-			Unread:         conversation.Unread,
+			Friend:             toActorResponse(conversation.Friend, true),
+			LatestActivity:     toMessageConversationActivityResponse(conversation.LatestActivity),
+			Unread:             conversation.Unread,
+			UnreadCount:        conversation.UnreadCount,
+			NotificationUnread: conversation.NotificationUnread,
 		})
 	}
 	return &models.MessageConversationPage{Items: items, NextCursor: nextCursor}, nil
@@ -338,6 +344,7 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 		ID:        activity.ID,
 		Type:      activity.Type,
 		CreatedAt: formatMicros(activity.CreatedAt),
+		Outgoing:  activity.Outgoing,
 	}
 	if activity.Message != nil {
 		resp.Message = toMessageResponse(*activity.Message)
@@ -357,11 +364,7 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 					ObjectKey:      activity.Post.ObjectKey.String,
 					Size:           activity.Post.ObjectSize,
 					Position:       int(activity.Post.ObjectPosition.Int64),
-					Variant:        activity.Post.ObjectVariant,
-					BlurHashCipher: activity.Post.ObjectBlurHashCipher,
-					Width:          activity.Post.ObjectWidth,
-					Height:         activity.Post.ObjectHeight,
-					MediaType:      activity.Post.ObjectMediaType,
+					MetadataCipher: activity.Post.ObjectMetadataCipher.String,
 				}),
 			}
 		}

@@ -38,8 +38,11 @@ import {
     verifyTwoFactor,
 } from "ente-accounts-rs/services/user";
 import { clientPackageName } from "ente-base/app";
+import { HTTPError } from "ente-base/http";
+import log from "ente-base/log";
 import { saveAuthToken } from "ente-base/token";
 import { nullToUndefined } from "ente-utils/transform";
+import { z } from "zod";
 
 export interface SpaceLoginInput {
     email: string;
@@ -113,6 +116,32 @@ const spacePasskeyVerificationRedirectURL = (
     return `${accountsURL}/passkeys/verify?${params.toString()}`;
 };
 
+const sendSpaceLoginOTT = async (email: string) => {
+    try {
+        await sendOTT(email, "login");
+    } catch (error) {
+        if (error instanceof HTTPError && error.res.status == 404) {
+            let errorCode: string | undefined;
+            try {
+                errorCode = z
+                    .object({ code: z.string() })
+                    .parse(await error.res.json()).code;
+            } catch (parseErr) {
+                log.warn("Ignoring error when parsing error payload", parseErr);
+            }
+            if (errorCode == "USER_NOT_REGISTERED") {
+                throw new Error("Email not registered");
+            }
+            if (errorCode == "USER_SIGNUP_INCOMPLETE") {
+                throw new Error(
+                    "Account setup incomplete. Create account to finish setup.",
+                );
+            }
+        }
+        throw error;
+    }
+};
+
 export const beginSpaceLogin = async ({
     email,
     password,
@@ -122,7 +151,7 @@ export const beginSpaceLogin = async ({
     const srpAttributes = await getSRPAttributes(emailForLogin);
 
     if (!srpAttributes) {
-        await sendOTT(emailForLogin, "login");
+        await sendSpaceLoginOTT(emailForLogin);
         replaceSavedLocalUser({ email: emailForLogin });
         savePendingSpaceLoginCredentials({ email: emailForLogin, password });
         return { status: "email-otp", email: emailForLogin };
@@ -132,7 +161,7 @@ export const beginSpaceLogin = async ({
     saveSRPAttributes(srpAttributes);
 
     if (srpAttributes.isEmailMFAEnabled) {
-        await sendOTT(emailForLogin, "login");
+        await sendSpaceLoginOTT(emailForLogin);
         savePendingSpaceLoginCredentials({ email: emailForLogin, password });
         return { status: "email-otp", email: emailForLogin };
     }
@@ -189,7 +218,7 @@ export const completeSpaceLoginEmailVerification = async ({
 };
 
 export const resendSpaceLoginCode = (email: string) =>
-    sendOTT(email.trim(), "login");
+    sendSpaceLoginOTT(email.trim());
 
 interface FinishSpaceLoginVerificationInput {
     email: string;

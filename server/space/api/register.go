@@ -10,7 +10,6 @@ func Register(privateAPI, publicAPI gin.IRoutes, handlers *Handlers) {
 	privateAPI.PATCH("/space/:spaceID/slug", handlers.UpdateSpaceSlug)
 	privateAPI.POST("/space/uploads/presign", handlers.PresignUpload)
 	privateAPI.GET("/space/unread", handlers.GetUnreadStatus)
-	privateAPI.POST("/space/feed/read", handlers.MarkFeedRead)
 	privateAPI.POST("/space/posts", handlers.CreatePost)
 	privateAPI.GET("/space/feed", handlers.ListFeed)
 	privateAPI.POST("/space/posts/:postID/caption", handlers.UpdatePostCaption)

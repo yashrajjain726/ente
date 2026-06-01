@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import {
+    loadCurrentFriendAvatarURL,
     loadCurrentSpaceFriends,
     removeCurrentSpaceFriend,
 } from "services/space";
@@ -50,6 +51,7 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={friendsBackground} />
             <FriendsScreen
                 friends={friends}
+                onLoadFriendAvatar={loadCurrentFriendAvatarURL}
                 onBack={() => void router.push(spaceRoutes.profile)}
                 onOpenFriend={(friendID) =>
                     void router.push(spaceRoutes.friend(friendID))

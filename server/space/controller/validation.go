@@ -14,13 +14,11 @@ const (
 	maxSpaceEncryptedKeyDecodedBytes     = 3 * 1024
 	maxSpaceCaptionCipherEncodedBytes    = 16 * 1024
 	maxSpaceCaptionCipherDecodedBytes    = 12 * 1024
-	maxSpaceBlurHashCipherEncodedBytes   = 1024
-	maxSpaceBlurHashCipherDecodedBytes   = 768
+	maxSpaceAssetMetadataEncodedBytes    = 8 * 1024
+	maxSpaceAssetMetadataDecodedBytes    = 6 * 1024
 	maxSpacePostObjects                  = 10
 	maxSpaceFriendSharesPerRefresh       = 500
 	maxSpaceObjectKeyBytes               = 512
-	maxSpaceVariantBytes                 = 64
-	maxSpaceMediaTypeBytes               = 128
 	maxSpaceLinkSessionTokenBytes        = 256
 )
 
@@ -62,19 +60,4 @@ func validateSpaceTextFieldBytes(field string, value string, maxBytes int) error
 		return ente.NewBadRequestWithMessage(field + " is too large")
 	}
 	return nil
-}
-
-func normalizedSpacePhotoMediaType(value string) (string, error) {
-	if err := validateSpaceTextFieldBytes("mediaType", value, maxSpaceMediaTypeBytes); err != nil {
-		return "", err
-	}
-	mediaType := strings.ToLower(strings.TrimSpace(value))
-	switch mediaType {
-	case "image/jpeg", "image/jpg":
-		return "image/jpeg", nil
-	case "image/png", "image/webp", "image/heic", "image/heif":
-		return mediaType, nil
-	default:
-		return "", ente.NewBadRequestWithMessage("only photos can be uploaded")
-	}
 }

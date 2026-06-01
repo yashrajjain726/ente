@@ -1,56 +1,66 @@
 import {
-    AddSquareIcon,
-    Chat01Icon,
+    Add01Icon,
+    BubbleChatIcon,
     FavouriteIcon,
     MultiplicationSignIcon,
     UserCheck01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
-import { SpaceActionFeedbackIcon } from "components/SpaceActionFeedback";
 import {
     SpaceFileViewer,
-    type SpaceLiker,
-    type SpaceViewerInitialScreen,
+    type SpaceViewerDraftPostEdit,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
+import {
+    spacePostLikeButtonPop,
+    spacePostLikeHeartPop,
+    spacePostLikePopDurationMs,
+    spacePostLikePopTiming,
+} from "components/SpacePostLikeAnimation";
 import { EnteLogo } from "ente-base/components/EnteLogo";
+import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
-import type { SpacePost } from "services/space";
-import { createLocalPostPhoto } from "utils/localPostPhoto";
+import type {
+    SpacePost,
+    SpacePostAssetURLLoader,
+    SpacePostAvatarURLLoader,
+} from "services/space";
+import type { LocalSpaceFeedPost } from "state/spaceAppState";
+import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
+import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
 import {
-    firstNameFrom,
-    formatSpaceDate,
-    initialsFor,
-} from "utils/spaceDisplay";
-import {
-    prepareSpacePostImage,
+    canPreviewSpaceImageFile,
     spacePostImageErrorMessage,
     spacePostImageInputAccept,
-    type PreparedSpacePostImage,
+    spacePostPreviewImageForFile,
 } from "utils/spacePostImage";
 
-export const homeBackground = "#FFFFFF";
+export const homeBackground = "#F5F5F7";
 
 const green = "#08C225";
 const paleGreen = "#E7F6E9";
-const feedCardBackground = "#F5F5F5";
-const feedSkeletonCardBackground = "#FCFCFC";
-const feedSkeletonColor = "#F2F2F2";
+const feedCardBackground = "#FFFFFF";
+const feedActionBackground = "#F7F7F7";
+const feedActionBackgroundHover = "#EFEFEF";
+const feedSkeletonElementBackground = "#E6E6E6";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
-const warning = "#F63A3A";
-const feedAvatarSize = 26;
+const dangerColor = "#F63A3A";
 const headerActionSize = 32;
-const headerActionGap = 8;
-const headerAddIconSize = 24;
-const headerAvatarSize = 23;
-const headerIconSize = 23;
-const headerSideWidth = headerActionSize * 2 + headerActionGap;
-const feedLikeActionSize = 28;
+const headerAvatarSize = 27;
+const feedAvatarSize = 38;
+const headerHeight = 64;
+const headerIconSize = 30;
+const headerHideStartY = 96;
+const headerScrollDelta = 4;
+const headerSideWidth = headerActionSize;
+const floatingAddButtonSize = 64;
+const floatingAddIconSize = 34;
+const feedLikeActionSize = 38;
 const feedActionIconSize = 20;
 const feedReplyIconSize = 17;
 const emptyFeedItemGap = "22px";
@@ -63,6 +73,8 @@ const feedSkeletonAspectRatios = [
     "4 / 5",
     "16 / 9",
 ];
+const minimumFeedPhotoFrameAspectRatio = 3 / 4;
+const feedMediaLoadRootMargin = "640px 0px";
 
 const FeedReplyIcon: React.FC = () => (
     <svg
@@ -87,21 +99,28 @@ interface HomeScreenProps {
     addedFriendToastName?: string;
     feedItems: SpacePost[];
     friendsCount: number;
-    hasUnreadNotifications?: boolean;
+    hasMoreFeedItems?: boolean;
+    hasUnreadMessages?: boolean;
     isFeedLoading?: boolean;
+    isFeedLoadingMore?: boolean;
+    localFeedPosts?: LocalSpaceFeedPost[];
     onAddedFriendToastClose?: () => void;
     onCreatePost?: (
-        image: PreparedSpacePostImage,
+        image: DraftSpacePostImage,
         caption: string,
     ) => Promise<void>;
+    onDeletePost?: (postId: number) => Promise<void> | void;
+    onLoadMoreFeedItems?: () => Promise<void> | void;
+    onLoadPostAvatar?: SpacePostAvatarURLLoader;
+    onLoadPostImage?: SpacePostAssetURLLoader;
     onOpenFriend?: (friendID: string) => void;
-    onOpenNotifications?: () => void;
+    onOpenMessages?: () => void;
     onOpenProfile?: () => void;
-    onLoadPostLikers?: (postId: number) => Promise<SpaceLiker[]>;
     onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onShareProfileLink?: () => Promise<string>;
     profile: SetupProfile;
+    showInitialFeedSkeleton?: boolean;
 }
 
 interface FeedPhotoDimensions {
@@ -109,40 +128,63 @@ interface FeedPhotoDimensions {
     width: number;
 }
 
+interface LoadedFeedPhotoDimensions extends FeedPhotoDimensions {
+    src: string;
+}
+
+interface DecodedImageState {
+    height?: number;
+    ready: boolean;
+    src?: string | null;
+    width?: number;
+}
+
 interface SelectedHomeViewer {
-    draftImage?: PreparedSpacePostImage;
+    draftFile?: File;
+    draftImageError?: string;
     focusReplyOnOpen?: boolean;
-    initialScreen: SpaceViewerInitialScreen;
+    isDraftImagePreviewPending?: boolean;
     localObjectUrl?: string;
     photo: SpaceViewerPhoto;
     postActionMode?: SpaceViewerPostActionMode;
 }
+
+interface DraftSpacePostImage {
+    cropArea?: SpaceViewerDraftPostEdit["cropArea"];
+    file: File;
+    height?: number;
+    previewUrl?: string;
+    rotationDegrees?: number;
+    width?: number;
+}
+
+type FeedTimestampStatus = "failed" | "posted" | "posting";
 
 interface FeedItemProps {
     aspectRatio: number;
     avatarUrl?: string | null;
     caption?: string;
     friendID: string;
-    imageUrl: string;
+    imageUrl?: string;
     isOwnPost: boolean;
-    likeCount: number;
     name: string;
+    onLoadAvatar?: () => Promise<string | null | undefined>;
+    onLoadImage?: () => Promise<string | undefined>;
     onOpenFriend?: (friendID: string) => void;
-    onOpenPhoto?: (
-        photo: SpaceViewerPhoto,
-        initialScreen?: SpaceViewerInitialScreen,
-        focusReplyOnOpen?: boolean,
-    ) => void;
+    onOpenPhoto?: (photo: SpaceViewerPhoto, focusReplyOnOpen?: boolean) => void;
     onOpenProfile?: () => void;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     postId: number;
+    timestampStatus?: FeedTimestampStatus;
     timestampMs: number;
     viewerLiked: boolean;
-    viewerUnread: boolean;
 }
 
 interface FeedSkeletonItemProps {
     aspectRatio: string;
+    pb?: string;
+    rootRef?: React.Ref<HTMLElement>;
+    showFooter?: boolean;
 }
 
 interface AddedFriendToastProps {
@@ -160,72 +202,297 @@ const dimensionsFromAspectRatio = (
     return { height, width: Math.round(safeAspectRatio * height) };
 };
 
-const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({ aspectRatio }) => (
+const feedPhotoFrameDimensionsFor = (
+    dimensions: FeedPhotoDimensions,
+): FeedPhotoDimensions =>
+    dimensions.width / dimensions.height < minimumFeedPhotoFrameAspectRatio
+        ? { height: 4, width: 3 }
+        : dimensions;
+
+const feedPostImageCacheKey = (item: SpacePost) =>
+    [
+        item.postId,
+        item.imageAsset?.spaceId ?? item.spaceId,
+        item.imageAsset?.objectKey ?? item.imageUrl ?? "",
+    ].join(":");
+
+const feedPostAvatarCacheKey = (item: SpacePost) =>
+    [
+        item.spaceId,
+        item.avatarObjectKey ?? "",
+        item.avatarUpdatedAt ?? "",
+        item.avatarSize ?? "",
+    ].join(":");
+
+const useDecodedImage = (
+    src?: string | null,
+    keepPreviousUntilReady = false,
+): DecodedImageState => {
+    const [state, setState] = useState<DecodedImageState>({ ready: !src, src });
+
+    React.useEffect(() => {
+        if (!src) {
+            setState({ ready: true, src });
+            return;
+        }
+
+        let cancelled = false;
+        const image = new Image();
+
+        const finish = () => {
+            if (cancelled) return;
+
+            setState({
+                height: image.naturalHeight || undefined,
+                ready: true,
+                src,
+                width: image.naturalWidth || undefined,
+            });
+        };
+        const decodeLoadedImage = () => {
+            if (typeof image.decode != "function") {
+                finish();
+                return;
+            }
+
+            void image.decode().then(finish, finish);
+        };
+
+        setState((currentState) =>
+            keepPreviousUntilReady && currentState.ready && currentState.src
+                ? currentState
+                : { ready: false, src },
+        );
+        image.addEventListener("load", decodeLoadedImage, { once: true });
+        image.addEventListener("error", finish, { once: true });
+        image.src = src;
+        if (image.complete) decodeLoadedImage();
+
+        return () => {
+            cancelled = true;
+            image.removeEventListener("load", decodeLoadedImage);
+            image.removeEventListener("error", finish);
+        };
+    }, [keepPreviousUntilReady, src]);
+
+    if (state.src == src) return state;
+    if (keepPreviousUntilReady && src && state.ready && state.src) return state;
+    return { ready: !src, src };
+};
+
+const pageScrollY = () =>
+    Math.max(
+        0,
+        window.scrollY ||
+            document.scrollingElement?.scrollTop ||
+            document.documentElement.scrollTop ||
+            document.body.scrollTop ||
+            0,
+    );
+
+const scrollPageToTop = () => {
+    const scrollOptions: ScrollToOptions = { behavior: "auto", top: 0 };
+    document.scrollingElement?.scrollTo(scrollOptions);
+    window.scrollTo(scrollOptions);
+};
+
+const scheduleScrollPageToTop = () => {
+    const timeoutID = window.setTimeout(scrollPageToTop, 0);
+    return () => window.clearTimeout(timeoutID);
+};
+
+const useHideHeaderOnScrollDirection = () => {
+    const [isHidden, setIsHidden] = useState(false);
+    const lastScrollYRef = React.useRef(0);
+    const frameRef = React.useRef<number | null>(null);
+
+    React.useEffect(() => {
+        lastScrollYRef.current = pageScrollY();
+
+        const updateVisibility = () => {
+            frameRef.current = null;
+            const nextScrollY = pageScrollY();
+            const delta = nextScrollY - lastScrollYRef.current;
+            lastScrollYRef.current = nextScrollY;
+
+            if (nextScrollY <= headerHideStartY) {
+                setIsHidden(false);
+                return;
+            }
+
+            if (delta > headerScrollDelta) {
+                setIsHidden(true);
+                return;
+            }
+
+            if (delta < -1) setIsHidden(false);
+        };
+
+        const scheduleUpdate = () => {
+            if (frameRef.current != null) return;
+            frameRef.current = window.requestAnimationFrame(updateVisibility);
+        };
+
+        window.addEventListener("scroll", scheduleUpdate, { passive: true });
+        document.addEventListener("scroll", scheduleUpdate, { passive: true });
+        return () => {
+            window.removeEventListener("scroll", scheduleUpdate);
+            document.removeEventListener("scroll", scheduleUpdate);
+            if (frameRef.current != null) {
+                window.cancelAnimationFrame(frameRef.current);
+            }
+        };
+    }, []);
+
+    return isHidden;
+};
+
+const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({
+    aspectRatio,
+    pb = "8px",
+    rootRef,
+    showFooter = true,
+}) => (
     <Box
+        ref={rootRef}
         component="article"
         aria-hidden
         sx={{
-            bgcolor: feedSkeletonCardBackground,
-            borderRadius: "16px",
+            bgcolor: feedCardBackground,
+            borderRadius: "17px",
             boxSizing: "border-box",
             display: "flex",
             flexDirection: "column",
             mx: "16px",
-            p: "12px",
+            pb,
+            pl: "5px",
+            pr: "5px",
+            pt: "5px",
             width: "calc(100% - 32px)",
         }}
     >
         <Box
             sx={{
-                alignItems: "center",
-                display: "grid",
-                gap: "8px",
-                gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr) auto`,
-                mb: "10px",
-                minHeight: 32,
-                px: "4px",
+                aspectRatio,
+                borderRadius: "13px",
+                overflow: "hidden",
+                position: "relative",
                 width: "100%",
             }}
         >
             <Skeleton
-                variant="circular"
-                sx={{
-                    bgcolor: feedSkeletonColor,
-                    height: feedAvatarSize,
-                    width: feedAvatarSize,
-                }}
-            />
-            <Skeleton
                 variant="rectangular"
                 sx={{
-                    bgcolor: feedSkeletonColor,
-                    borderRadius: "999px",
-                    height: 10,
-                    width: 72,
+                    aspectRatio,
+                    bgcolor: feedSkeletonElementBackground,
+                    display: "block",
+                    height: "100%",
+                    transform: "none",
+                    width: "100%",
                 }}
             />
-            <Skeleton
-                variant="rectangular"
+            <Box
                 sx={{
-                    bgcolor: feedSkeletonColor,
-                    borderRadius: "999px",
-                    height: 8,
-                    justifySelf: "end",
-                    width: 42,
+                    alignItems: "center",
+                    display: "grid",
+                    gap: "8px",
+                    gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr)`,
+                    left: 12,
+                    position: "absolute",
+                    right: 12,
+                    top: 12,
                 }}
-            />
+            >
+                <Skeleton
+                    variant="circular"
+                    sx={{
+                        bgcolor: "rgba(255, 255, 255, 0.72)",
+                        height: feedAvatarSize,
+                        transform: "none",
+                        width: feedAvatarSize,
+                    }}
+                />
+                <Box sx={{ minWidth: 0 }}>
+                    <Skeleton
+                        variant="rectangular"
+                        sx={{
+                            bgcolor: "rgba(255, 255, 255, 0.72)",
+                            borderRadius: "999px",
+                            height: 10,
+                            mb: "5px",
+                            transform: "none",
+                            width: 72,
+                        }}
+                    />
+                    <Skeleton
+                        variant="rectangular"
+                        sx={{
+                            bgcolor: "rgba(255, 255, 255, 0.56)",
+                            borderRadius: "999px",
+                            height: 8,
+                            transform: "none",
+                            width: 42,
+                        }}
+                    />
+                </Box>
+            </Box>
         </Box>
-        <Skeleton
-            variant="rectangular"
-            sx={{
-                aspectRatio,
-                bgcolor: feedSkeletonColor,
-                borderRadius: "12px",
-                display: "block",
-                height: "auto",
-                width: "100%",
-            }}
-        />
+        {showFooter && (
+            <Box
+                sx={{
+                    alignItems: "center",
+                    boxSizing: "border-box",
+                    display: "grid",
+                    gap: "8px",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    minHeight: feedLikeActionSize,
+                    mt: "8px",
+                    pl: "9px",
+                    pr: 0,
+                    width: "100%",
+                }}
+            >
+                <Skeleton
+                    variant="rectangular"
+                    sx={{
+                        bgcolor: feedActionBackground,
+                        borderRadius: "999px",
+                        height: 12,
+                        maxWidth: 176,
+                        transform: "none",
+                        width: "60%",
+                    }}
+                />
+                <Box
+                    sx={{
+                        alignItems: "center",
+                        display: "flex",
+                        gap: "6px",
+                        justifyContent: "flex-end",
+                    }}
+                >
+                    <Skeleton
+                        variant="circular"
+                        sx={{
+                            bgcolor: feedActionBackground,
+                            height: feedLikeActionSize,
+                            transform: "none",
+                            width: feedLikeActionSize,
+                        }}
+                    />
+                    <Skeleton
+                        variant="circular"
+                        sx={{
+                            bgcolor: feedActionBackground,
+                            height: feedLikeActionSize,
+                            mr: "9px",
+                            transform: "none",
+                            width: feedLikeActionSize,
+                        }}
+                    />
+                </Box>
+            </Box>
+        )}
     </Box>
 );
 
@@ -246,6 +513,109 @@ const FeedLoadingSkeletons: React.FC = () => (
     </Box>
 );
 
+const usePostingDotCount = (isPosting: boolean) => {
+    const [dotCount, setDotCount] = useState(1);
+
+    React.useEffect(() => {
+        if (!isPosting) {
+            setDotCount(1);
+            return;
+        }
+
+        const intervalID = window.setInterval(() => {
+            setDotCount((count) => (count % 3) + 1);
+        }, 500);
+
+        return () => window.clearInterval(intervalID);
+    }, [isPosting]);
+
+    return dotCount;
+};
+
+interface FeedLikeButtonProps {
+    isLiked: boolean;
+    onClick: () => void;
+    popID: number;
+}
+
+const FeedLikeButton: React.FC<FeedLikeButtonProps> = ({
+    isLiked,
+    onClick,
+    popID,
+}) => {
+    const isPopping = isLiked && popID > 0;
+
+    return (
+        <Box
+            component="button"
+            type="button"
+            aria-label={isLiked ? "Unlike post" : "Like post"}
+            aria-pressed={isLiked}
+            onClick={onClick}
+            sx={{
+                alignItems: "center",
+                animation: isPopping
+                    ? `${spacePostLikeButtonPop} ${spacePostLikePopDurationMs}ms ${spacePostLikePopTiming} both`
+                    : undefined,
+                appearance: "none",
+                bgcolor: isLiked ? paleGreen : feedActionBackground,
+                border: 0,
+                borderRadius: "50%",
+                color: isLiked ? green : textBase,
+                cursor: "pointer",
+                display: "inline-flex",
+                flexShrink: 0,
+                height: feedLikeActionSize,
+                justifyContent: "center",
+                mr: "9px",
+                p: 0,
+                position: "relative",
+                transition:
+                    "background-color 160ms ease, color 120ms ease, transform 120ms ease",
+                width: feedLikeActionSize,
+                "&:active": { transform: "scale(0.94)" },
+                "&:focus-visible": {
+                    outline: `2px solid ${green}`,
+                    outlineOffset: 2,
+                },
+                "&:hover": {
+                    bgcolor: isLiked ? "#DFF3E2" : feedActionBackgroundHover,
+                },
+                "@media (prefers-reduced-motion: reduce)": {
+                    animation: "none",
+                    transition: "background-color 120ms ease, color 120ms ease",
+                },
+            }}
+        >
+            <Box
+                key={isPopping ? `heart-${popID}` : "heart"}
+                component="span"
+                sx={{
+                    animation: isPopping
+                        ? `${spacePostLikeHeartPop} ${spacePostLikePopDurationMs}ms ${spacePostLikePopTiming} both`
+                        : undefined,
+                    display: "flex",
+                    lineHeight: 0,
+                    position: "relative",
+                    transformOrigin: "50% 58%",
+                    zIndex: 1,
+                    "@media (prefers-reduced-motion: reduce)": {
+                        animation: "none",
+                    },
+                }}
+            >
+                <HugeiconsIcon
+                    fill={isLiked ? green : "none"}
+                    icon={FavouriteIcon}
+                    primaryColor={isLiked ? green : textBase}
+                    size={feedActionIconSize}
+                    strokeWidth={2}
+                />
+            </Box>
+        </Box>
+    );
+};
+
 const FeedItem: React.FC<FeedItemProps> = ({
     aspectRatio,
     avatarUrl,
@@ -253,22 +623,29 @@ const FeedItem: React.FC<FeedItemProps> = ({
     friendID,
     imageUrl,
     isOwnPost,
-    likeCount,
     name,
+    onLoadAvatar,
+    onLoadImage,
     onOpenFriend,
     onOpenPhoto,
     onOpenProfile,
     onSetPostLiked,
     postId,
+    timestampStatus,
     timestampMs,
     viewerLiked,
-    viewerUnread,
 }) => {
     const [isLiked, setIsLiked] = useState(viewerLiked);
-    const [localLikeCount, setLocalLikeCount] = useState(likeCount);
+    const [likePopID, setLikePopID] = useState(0);
+    const [shouldLoadMedia, setShouldLoadMedia] = useState(
+        Boolean(imageUrl) && avatarUrl !== undefined,
+    );
+    const rootRef = React.useRef<HTMLElement | null>(null);
     const firstName = firstNameFrom(name);
     const dateLabel = formatSpaceDate(timestampMs);
+    const postingDotCount = usePostingDotCount(timestampStatus == "posting");
     const displayCaption = caption?.trim();
+    const showFooter = !isOwnPost || Boolean(displayCaption);
     const canOpenAuthor = isOwnPost
         ? Boolean(onOpenProfile)
         : Boolean(onOpenFriend);
@@ -283,60 +660,77 @@ const FeedItem: React.FC<FeedItemProps> = ({
         onOpenFriend?.(friendID);
     };
     const [loadedPhotoDimensions, setLoadedPhotoDimensions] =
-        useState<FeedPhotoDimensions | null>(null);
+        useState<LoadedFeedPhotoDimensions | null>(null);
+    const decodedPhoto = useDecodedImage(imageUrl, true);
+    const decodedAvatar = useDecodedImage(avatarUrl, true);
+    const displayImageUrl =
+        (decodedPhoto.ready ? decodedPhoto.src : imageUrl) ?? undefined;
+    const displayAvatarUrl =
+        (decodedAvatar.ready ? decodedAvatar.src : avatarUrl) ?? undefined;
+    const isAvatarReady = avatarUrl !== undefined && decodedAvatar.ready;
     const photoDimensions =
-        loadedPhotoDimensions ?? dimensionsFromAspectRatio(aspectRatio);
+        loadedPhotoDimensions && loadedPhotoDimensions.src == displayImageUrl
+            ? loadedPhotoDimensions
+            : dimensionsFromAspectRatio(aspectRatio);
+    const feedPhotoFrameDimensions =
+        feedPhotoFrameDimensionsFor(photoDimensions);
+    const isFeedItemReady =
+        Boolean(displayImageUrl) && decodedPhoto.ready && isAvatarReady;
+    const decodedPhotoHeight = decodedPhoto.height;
+    const decodedPhotoSrc = decodedPhoto.src;
+    const decodedPhotoWidth = decodedPhoto.width;
     const rememberLoadedPhotoDimensions: React.ReactEventHandler<
         HTMLImageElement
     > = ({ currentTarget }) => {
+        if (!displayImageUrl) return;
         const { naturalHeight, naturalWidth } = currentTarget;
         if (!naturalHeight || !naturalWidth) return;
 
         setLoadedPhotoDimensions((currentDimensions) => {
             if (
                 currentDimensions?.height == naturalHeight &&
+                currentDimensions.src == displayImageUrl &&
                 currentDimensions.width == naturalWidth
             ) {
                 return currentDimensions;
             }
 
-            return { height: naturalHeight, width: naturalWidth };
+            return {
+                height: naturalHeight,
+                src: displayImageUrl,
+                width: naturalWidth,
+            };
         });
     };
-    const openPhoto = (
-        initialScreen?: SpaceViewerInitialScreen,
-        focusReplyOnOpen = false,
-    ) =>
+    const openPhoto = (focusReplyOnOpen = false) => {
+        if (!displayImageUrl) return;
+
         onOpenPhoto?.(
             {
                 alt: `${name} post`,
-                avatarUrl,
+                avatarUrl: displayAvatarUrl ?? null,
                 caption,
                 friendID,
                 height: photoDimensions.height,
-                imageUrl,
-                likeCount: localLikeCount,
+                imageUrl: displayImageUrl,
                 name,
                 postId,
                 timestampMs,
                 viewerLiked: isLiked,
                 width: photoDimensions.width,
             },
-            initialScreen,
             focusReplyOnOpen,
         );
+    };
     const handleLikeClick = () => {
         if (isOwnPost) return;
 
         const nextLiked = !isLiked;
         setIsLiked(nextLiked);
-        setLocalLikeCount((count) => Math.max(0, count + (nextLiked ? 1 : -1)));
+        if (nextLiked) setLikePopID((id) => id + 1);
         void onSetPostLiked?.(postId, nextLiked).catch((error: unknown) => {
             console.error("Failed to update post like", error);
             setIsLiked(!nextLiked);
-            setLocalLikeCount((count) =>
-                Math.max(0, count + (nextLiked ? -1 : 1)),
-            );
         });
     };
 
@@ -345,158 +739,106 @@ const FeedItem: React.FC<FeedItemProps> = ({
     }, [viewerLiked]);
 
     React.useEffect(() => {
-        setLocalLikeCount(likeCount);
-    }, [likeCount]);
+        if (shouldLoadMedia) return;
+        const element = rootRef.current;
+        if (!element) return;
+        if (
+            typeof window == "undefined" ||
+            !("IntersectionObserver" in window)
+        ) {
+            setShouldLoadMedia(true);
+            return;
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    setShouldLoadMedia(true);
+                    observer.disconnect();
+                }
+            },
+            { rootMargin: feedMediaLoadRootMargin },
+        );
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [shouldLoadMedia]);
+
+    React.useEffect(() => {
+        if (!shouldLoadMedia) return;
+
+        if (!imageUrl) {
+            void onLoadImage?.();
+        }
+        if (avatarUrl === undefined) {
+            void onLoadAvatar?.();
+        }
+    }, [avatarUrl, imageUrl, onLoadAvatar, onLoadImage, shouldLoadMedia]);
+
+    React.useEffect(() => {
+        if (!decodedPhotoHeight || !decodedPhotoWidth) return;
+        if (!decodedPhotoSrc) return;
+
+        setLoadedPhotoDimensions((currentDimensions) => {
+            if (
+                currentDimensions?.height == decodedPhotoHeight &&
+                currentDimensions.src == decodedPhotoSrc &&
+                currentDimensions.width == decodedPhotoWidth
+            ) {
+                return currentDimensions;
+            }
+
+            return {
+                height: decodedPhotoHeight,
+                src: decodedPhotoSrc,
+                width: decodedPhotoWidth,
+            };
+        });
+    }, [decodedPhotoHeight, decodedPhotoSrc, decodedPhotoWidth]);
+
+    React.useEffect(() => {
+        if (likePopID == 0) return;
+
+        const timeoutID = window.setTimeout(
+            () => setLikePopID(0),
+            spacePostLikePopDurationMs,
+        );
+        return () => window.clearTimeout(timeoutID);
+    }, [likePopID]);
+
+    if (!isFeedItemReady) {
+        return (
+            <FeedSkeletonItem
+                aspectRatio={`${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`}
+                pb={isOwnPost ? "5px" : "8px"}
+                rootRef={rootRef}
+                showFooter={showFooter}
+            />
+        );
+    }
 
     return (
         <Box
+            ref={rootRef}
             component="article"
             sx={{
                 bgcolor: feedCardBackground,
-                borderRadius: "16px",
+                borderRadius: "17px",
                 boxSizing: "border-box",
                 display: "flex",
                 flexDirection: "column",
                 mx: "16px",
-                p: "12px",
+                pl: "5px",
+                pb: isOwnPost ? "5px" : "8px",
+                pr: "5px",
+                pt: "5px",
                 width: "calc(100% - 32px)",
             }}
         >
             <Box
                 sx={{
-                    alignItems: "center",
-                    boxSizing: "border-box",
-                    color: textBase,
-                    display: "grid",
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 14,
-                    gap: "8px",
-                    gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr) auto${viewerUnread ? " 8px" : ""}`,
-                    lineHeight: "20px",
-                    mb: "10px",
-                    minHeight: 32,
-                    px: "4px",
-                    width: "100%",
-                }}
-            >
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label={authorProfileLabel}
-                    onClick={openAuthor}
-                    sx={{
-                        appearance: "none",
-                        bgcolor: paleGreen,
-                        borderRadius: "50%",
-                        border: 0,
-                        cursor: canOpenAuthor ? "pointer" : "default",
-                        display: "flex",
-                        flexShrink: 0,
-                        height: feedAvatarSize,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        overflow: "hidden",
-                        p: 0,
-                        width: feedAvatarSize,
-                        "&:focus-visible": {
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
-                    }}
-                >
-                    {avatarUrl ? (
-                        <Box
-                            component="img"
-                            alt=""
-                            src={avatarUrl}
-                            sx={{
-                                display: "block",
-                                height: "100%",
-                                objectFit: "cover",
-                                objectPosition: "center",
-                                width: "100%",
-                            }}
-                        />
-                    ) : (
-                        <Box
-                            sx={{
-                                color: green,
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 9,
-                                fontWeight: 800,
-                                lineHeight: 1,
-                            }}
-                        >
-                            {initialsFor(name)}
-                        </Box>
-                    )}
-                </Box>
-                <Box
-                    component="button"
-                    type="button"
-                    aria-label={authorProfileLabel}
-                    onClick={openAuthor}
-                    sx={{
-                        appearance: "none",
-                        bgcolor: "transparent",
-                        border: 0,
-                        color: "inherit",
-                        cursor: canOpenAuthor ? "pointer" : "default",
-                        display: "block",
-                        fontFamily: "inherit",
-                        fontSize: "inherit",
-                        fontWeight: 650,
-                        justifySelf: "start",
-                        lineHeight: "inherit",
-                        maxWidth: "100%",
-                        minWidth: 0,
-                        overflow: "hidden",
-                        p: 0,
-                        textAlign: "left",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        "&:focus-visible": {
-                            borderRadius: "4px",
-                            outline: `2px solid ${green}`,
-                            outlineOffset: 2,
-                        },
-                    }}
-                >
-                    {firstName}
-                </Box>
-                <Box
-                    component="time"
-                    dateTime={new Date(timestampMs).toISOString()}
-                    sx={{
-                        color: textSecondary,
-                        fontSize: 12,
-                        fontWeight: 500,
-                        justifySelf: "end",
-                        textAlign: "right",
-                        whiteSpace: "nowrap",
-                    }}
-                >
-                    {dateLabel}
-                </Box>
-                {viewerUnread && (
-                    <Box
-                        aria-hidden
-                        sx={{
-                            bgcolor: green,
-                            borderRadius: "50%",
-                            height: 8,
-                            justifySelf: "end",
-                            width: 8,
-                        }}
-                    />
-                )}
-            </Box>
-            <Box
-                sx={{
-                    aspectRatio: `${photoDimensions.width} / ${photoDimensions.height}`,
-                    bgcolor: paleGreen,
-                    borderRadius: "12px",
+                    aspectRatio: `${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`,
+                    bgcolor: "transparent",
+                    borderRadius: "13px",
                     overflow: "hidden",
                     position: "relative",
                     width: "100%",
@@ -525,7 +867,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     <Box
                         component="img"
                         alt={`${name} post`}
-                        src={imageUrl}
+                        src={displayImageUrl}
                         onLoad={rememberLoadedPhotoDimensions}
                         sx={{
                             display: "block",
@@ -536,8 +878,204 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         }}
                     />
                 </Box>
+                <Box
+                    aria-hidden
+                    sx={{
+                        background:
+                            "linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.32) 24%, rgba(0, 0, 0, 0.2) 48%, rgba(0, 0, 0, 0.1) 72%, rgba(0, 0, 0, 0) 100%)",
+                        height: 56,
+                        left: 0,
+                        pointerEvents: "none",
+                        position: "absolute",
+                        right: 0,
+                        top: 0,
+                        zIndex: 1,
+                    }}
+                />
+                <Box
+                    sx={{
+                        alignItems: "center",
+                        boxSizing: "border-box",
+                        color: "#FFFFFF",
+                        display: "grid",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        gap: "8px",
+                        gridTemplateColumns: `${feedAvatarSize}px minmax(0, 1fr)`,
+                        left: 12,
+                        lineHeight: "20px",
+                        minHeight: 32,
+                        pointerEvents: "none",
+                        position: "absolute",
+                        right: 12,
+                        top: 12,
+                        zIndex: 2,
+                    }}
+                >
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={authorProfileLabel}
+                        onClick={openAuthor}
+                        sx={{
+                            alignItems: "center",
+                            appearance: "none",
+                            bgcolor: feedSkeletonElementBackground,
+                            border: 0,
+                            borderRadius: "50%",
+                            cursor: canOpenAuthor ? "pointer" : "default",
+                            display: "flex",
+                            flexShrink: 0,
+                            height: feedAvatarSize,
+                            justifyContent: "center",
+                            overflow: "visible",
+                            p: 0,
+                            pointerEvents: "auto",
+                            position: "relative",
+                            width: feedAvatarSize,
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                        }}
+                    >
+                        {displayAvatarUrl ? (
+                            <Box
+                                component="img"
+                                alt=""
+                                src={displayAvatarUrl}
+                                sx={{
+                                    borderRadius: "50%",
+                                    display: "block",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    objectPosition: "center",
+                                    width: "100%",
+                                }}
+                            />
+                        ) : (
+                            <Skeleton
+                                variant="circular"
+                                sx={{
+                                    bgcolor: feedSkeletonElementBackground,
+                                    height: "100%",
+                                    transform: "none",
+                                    width: "100%",
+                                }}
+                            />
+                        )}
+                        <Box
+                            aria-hidden
+                            sx={{
+                                border: "1px solid rgba(255, 255, 255, 0.5)",
+                                borderRadius: "50%",
+                                inset: -1,
+                                pointerEvents: "none",
+                                position: "absolute",
+                            }}
+                        />
+                    </Box>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={authorProfileLabel}
+                            onClick={openAuthor}
+                            sx={{
+                                appearance: "none",
+                                bgcolor: "transparent",
+                                border: 0,
+                                color: "inherit",
+                                cursor: canOpenAuthor ? "pointer" : "default",
+                                display: "block",
+                                fontFamily: "inherit",
+                                fontSize: 14,
+                                fontWeight: 650,
+                                lineHeight: "18px",
+                                maxWidth: "100%",
+                                minWidth: 0,
+                                overflow: "hidden",
+                                p: 0,
+                                pointerEvents: "auto",
+                                textAlign: "left",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                "&:focus-visible": {
+                                    borderRadius: "4px",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
+                            {firstName}
+                        </Box>
+                        {timestampStatus ? (
+                            <Box
+                                component="span"
+                                aria-label={
+                                    timestampStatus == "posting"
+                                        ? "Posting"
+                                        : timestampStatus == "failed"
+                                          ? "Failed"
+                                          : "Posted"
+                                }
+                                sx={{
+                                    alignItems: "center",
+                                    color:
+                                        timestampStatus == "failed"
+                                            ? dangerColor
+                                            : "rgba(255, 255, 255, 0.86)",
+                                    display: "flex",
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    height: 16,
+                                    lineHeight: "16px",
+                                    minWidth: "10ch",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                {timestampStatus == "posted" ? (
+                                    <Box component="span">Posted</Box>
+                                ) : timestampStatus == "failed" ? (
+                                    <Box component="span">Failed</Box>
+                                ) : (
+                                    <>
+                                        <Box component="span">Posting</Box>
+                                        <Box
+                                            component="span"
+                                            aria-hidden
+                                            sx={{
+                                                display: "inline-block",
+                                                textAlign: "left",
+                                                width: 12,
+                                            }}
+                                        >
+                                            {".".repeat(postingDotCount)}
+                                        </Box>
+                                    </>
+                                )}
+                            </Box>
+                        ) : (
+                            <Box
+                                component="time"
+                                dateTime={new Date(timestampMs).toISOString()}
+                                sx={{
+                                    alignItems: "center",
+                                    color: "rgba(255, 255, 255, 0.86)",
+                                    display: "flex",
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    height: 16,
+                                    lineHeight: "16px",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                {dateLabel}
+                            </Box>
+                        )}
+                    </Box>
+                </Box>
             </Box>
-            {(!isOwnPost || displayCaption) && (
+            {showFooter && (
                 <Box
                     sx={{
                         alignItems: "center",
@@ -549,8 +1087,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             : "minmax(0, 1fr) auto",
                         minHeight: feedLikeActionSize,
                         mt: "8px",
-                        pl: "4px",
-                        pr: 0,
+                        pl: "9px",
+                        pr: isOwnPost ? "9px" : 0,
                         width: "100%",
                     }}
                 >
@@ -577,7 +1115,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             sx={{
                                 alignItems: "center",
                                 display: "flex",
-                                gap: "8px",
+                                gap: "6px",
                                 justifyContent: "flex-end",
                             }}
                         >
@@ -585,11 +1123,11 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                 component="button"
                                 type="button"
                                 aria-label={`Reply to ${firstName}'s post`}
-                                onClick={() => openPhoto("photo", true)}
+                                onClick={() => openPhoto(true)}
                                 sx={{
                                     alignItems: "center",
                                     appearance: "none",
-                                    bgcolor: "transparent",
+                                    bgcolor: feedActionBackground,
                                     border: 0,
                                     borderRadius: "50%",
                                     color: textBase,
@@ -606,49 +1144,18 @@ const FeedItem: React.FC<FeedItemProps> = ({
                                         outline: `2px solid ${green}`,
                                         outlineOffset: 2,
                                     },
-                                    "&:hover": { bgcolor: "transparent" },
+                                    "&:hover": {
+                                        bgcolor: feedActionBackgroundHover,
+                                    },
                                 }}
                             >
                                 <FeedReplyIcon />
                             </Box>
-                            <Box
-                                component="button"
-                                type="button"
-                                aria-label={
-                                    isLiked ? "Unlike post" : "Like post"
-                                }
-                                aria-pressed={isLiked}
+                            <FeedLikeButton
+                                isLiked={isLiked}
                                 onClick={handleLikeClick}
-                                sx={{
-                                    alignItems: "center",
-                                    appearance: "none",
-                                    bgcolor: "transparent",
-                                    border: 0,
-                                    borderRadius: "50%",
-                                    color: textBase,
-                                    cursor: "pointer",
-                                    display: "inline-flex",
-                                    flexShrink: 0,
-                                    height: feedLikeActionSize,
-                                    justifyContent: "center",
-                                    p: 0,
-                                    transition: "color 120ms ease",
-                                    width: feedLikeActionSize,
-                                    "&:focus-visible": {
-                                        outline: `2px solid ${green}`,
-                                        outlineOffset: 2,
-                                    },
-                                    "&:hover": { bgcolor: "transparent" },
-                                }}
-                            >
-                                <HugeiconsIcon
-                                    fill={isLiked ? green : "none"}
-                                    icon={FavouriteIcon}
-                                    primaryColor={isLiked ? green : textBase}
-                                    size={feedActionIconSize}
-                                    strokeWidth={2}
-                                />
-                            </Box>
+                                popID={likePopID}
+                            />
                         </Box>
                     )}
                 </Box>
@@ -676,16 +1183,15 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
         }}
     >
         <Box
-            className="green-bg"
             role="status"
             aria-live="polite"
             sx={{
                 alignItems: "center",
-                bgcolor: green,
+                bgcolor: "#FFFFFF",
                 borderRadius: "18px",
                 boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
                 boxSizing: "border-box",
-                color: "#FFFFFF",
+                color: textBase,
                 display: "flex",
                 fontFamily: '"Inter Variable", Inter, sans-serif',
                 fontSize: 14,
@@ -730,7 +1236,7 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                     bgcolor: "transparent",
                     border: 0,
                     borderRadius: "50%",
-                    color: "#FFFFFF",
+                    color: textBase,
                     cursor: onClose ? "pointer" : "default",
                     display: "flex",
                     flexShrink: 0,
@@ -740,10 +1246,10 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                     p: 0,
                     width: 24,
                     "&:focus-visible": {
-                        outline: "2px solid rgba(255 255 255 / 0.9)",
+                        outline: "2px solid rgba(0 0 0 / 0.72)",
                         outlineOffset: 2,
                     },
-                    "&:hover": { bgcolor: "rgba(255, 255, 255, 0.12)" },
+                    "&:hover": { bgcolor: "rgba(0, 0, 0, 0.06)" },
                 }}
             >
                 <HugeiconsIcon
@@ -760,69 +1266,278 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     addedFriendToastName,
     feedItems,
     friendsCount,
-    hasUnreadNotifications,
+    hasMoreFeedItems = false,
+    hasUnreadMessages,
     isFeedLoading = false,
+    isFeedLoadingMore = false,
+    localFeedPosts = [],
     onAddedFriendToastClose,
     onCreatePost,
-    onLoadPostLikers,
+    onDeletePost,
+    onLoadMoreFeedItems,
+    onLoadPostAvatar,
+    onLoadPostImage,
     onOpenFriend,
-    onOpenNotifications,
+    onOpenMessages,
     onOpenProfile,
     onReplyToPost,
     onSetPostLiked,
     onShareProfileLink,
     profile,
+    showInitialFeedSkeleton = false,
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
-    const [postPhotoError, setPostPhotoError] = useState<string>();
-    const [isPostPhotoPreparing, setIsPostPhotoPreparing] = useState(false);
+    const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
+    const [loadedFeedAvatarURLsByKey, setLoadedFeedAvatarURLsByKey] = useState<
+        Record<string, string | null>
+    >({});
+    const [loadedFeedImageURLsByKey, setLoadedFeedImageURLsByKey] = useState<
+        Record<string, string>
+    >({});
+    const [feedScrollRequest, setFeedScrollRequest] = useState(0);
+    const isHeaderTriggered = useHideHeaderOnScrollDirection();
+    const [isHeaderFocused, setIsHeaderFocused] = useState(false);
+    const isHeaderHidden = isHeaderTriggered && !isHeaderFocused;
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
+    const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
+    const feedAvatarLoadsInFlightRef = React.useRef<
+        Map<string, Promise<string | null>>
+    >(new Map());
+    const feedImageLoadsInFlightRef = React.useRef<
+        Map<string, Promise<string | undefined>>
+    >(new Map());
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
     const selectedPhotoIsOwn =
         Boolean(profile.spaceId) && selectedPhotoFriendID == profile.spaceId;
-    const hasFeedItems = feedItems.length > 0;
+    const localResolvedPostIds = new Set(
+        localFeedPosts
+            .filter((item) => item.status == "posted" || item.status == "ready")
+            .map((item) => item.post.postId),
+    );
+    const remoteFeedItems = feedItems.filter(
+        (item) => !localResolvedPostIds.has(item.postId),
+    );
+    const hasFeedItems =
+        localFeedPosts.length > 0 || remoteFeedItems.length > 0;
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
-    const showFeedCards = hasFeedItems || isEmptyFeedLoading;
-    const showUnreadIndicator = hasUnreadNotifications === true;
+    const shouldShowEmptyFeedSkeleton =
+        isEmptyFeedLoading && showInitialFeedSkeleton;
+    const showFeedCards = hasFeedItems || shouldShowEmptyFeedSkeleton;
+    const showUnreadIndicator = hasUnreadMessages === true;
     const emptyFeedMessage =
         friendsCount == 0
             ? "When you add friends, their posts will appear here."
             : "When your friends share posts, they'll appear here.";
-    const initialsSource = profile.fullName.trim() || profile.username.trim();
-    const initials = initialsFor(initialsSource);
-    const revokeLocalPostObjectUrl = React.useCallback((objectUrl?: string) => {
-        if (!objectUrl || !localPostObjectUrlsRef.current.has(objectUrl))
-            return;
-
-        URL.revokeObjectURL(objectUrl);
+    const profileDisplayName =
+        profile.fullName.trim() || profile.username.trim();
+    const revokeLocalPostObjectUrls = React.useCallback(() => {
+        localPostObjectUrlsRef.current.forEach((objectUrl) =>
+            URL.revokeObjectURL(objectUrl),
+        );
+        localPostObjectUrlsRef.current.clear();
+    }, []);
+    const releaseLocalPostObjectUrl = React.useCallback((objectUrl: string) => {
         localPostObjectUrlsRef.current.delete(objectUrl);
     }, []);
+
     const openPostPhotoPicker = () => {
-        if (isPostPhotoPreparing) return;
+        if (isPostPhotoOpening) return;
 
         postInputRef.current?.click();
     };
     const openFeedPhoto = (
         photo: SpaceViewerPhoto,
-        initialScreen: SpaceViewerInitialScreen = "photo",
         focusReplyOnOpen = false,
     ) => {
         const isOwnPost =
             Boolean(profile.spaceId) && photo.friendID == profile.spaceId;
         setSelectedViewer({
             focusReplyOnOpen: isOwnPost ? false : focusReplyOnOpen,
-            initialScreen,
             photo,
             postActionMode: isOwnPost ? "hidden" : "like-only",
         });
     };
     const closeSelectedPhoto = () => {
-        const localObjectUrl = selectedViewer?.localObjectUrl;
+        activeLocalPostObjectUrlRef.current = null;
         setSelectedViewer(null);
-        revokeLocalPostObjectUrl(localObjectUrl);
+        revokeLocalPostObjectUrls();
     };
+    const { clearBrowserBackState: clearSelectedPhotoHistory } =
+        useBrowserBackClose({
+            open: Boolean(selectedViewer),
+            onClose: closeSelectedPhoto,
+            stateKey: "space-feed-viewer",
+        });
+    const deleteSelectedPost = async () => {
+        const postId = selectedViewer?.photo.postId;
+        if (!postId || !onDeletePost) return;
+
+        await onDeletePost(postId);
+    };
+    const loadedFeedImageURLFor = React.useCallback(
+        (item: SpacePost) =>
+            item.imageUrl ??
+            loadedFeedImageURLsByKey[feedPostImageCacheKey(item)],
+        [loadedFeedImageURLsByKey],
+    );
+    const loadedFeedAvatarURLFor = React.useCallback(
+        (item: SpacePost) => {
+            if (item.avatarUrl) return item.avatarUrl;
+            if (!item.avatarObjectKey) return null;
+            return loadedFeedAvatarURLsByKey[feedPostAvatarCacheKey(item)];
+        },
+        [loadedFeedAvatarURLsByKey],
+    );
+    const loadFeedPostImage = React.useCallback(
+        (item: SpacePost) => {
+            const loadedImageUrl = loadedFeedImageURLFor(item);
+            if (loadedImageUrl) return Promise.resolve(loadedImageUrl);
+            if (!item.imageAsset || !onLoadPostImage) {
+                return Promise.resolve(undefined);
+            }
+
+            const cacheKey = feedPostImageCacheKey(item);
+            const inFlight = feedImageLoadsInFlightRef.current.get(cacheKey);
+            if (inFlight) return inFlight;
+
+            const load = onLoadPostImage(item.imageAsset)
+                .then((imageUrl) => {
+                    setLoadedFeedImageURLsByKey((currentURLs) =>
+                        currentURLs[cacheKey] == imageUrl
+                            ? currentURLs
+                            : { ...currentURLs, [cacheKey]: imageUrl },
+                    );
+                    return imageUrl;
+                })
+                .catch((error: unknown) => {
+                    console.warn("Failed to load feed post image", error);
+                    return undefined;
+                })
+                .finally(() => {
+                    feedImageLoadsInFlightRef.current.delete(cacheKey);
+                });
+            feedImageLoadsInFlightRef.current.set(cacheKey, load);
+            return load;
+        },
+        [loadedFeedImageURLFor, onLoadPostImage],
+    );
+    const loadFeedPostAvatar = React.useCallback(
+        (item: SpacePost) => {
+            const loadedAvatarUrl = loadedFeedAvatarURLFor(item);
+            if (loadedAvatarUrl !== undefined) {
+                return Promise.resolve(loadedAvatarUrl);
+            }
+            if (!item.avatarObjectKey || !onLoadPostAvatar) {
+                return Promise.resolve(null);
+            }
+
+            const cacheKey = feedPostAvatarCacheKey(item);
+            const inFlight = feedAvatarLoadsInFlightRef.current.get(cacheKey);
+            if (inFlight) return inFlight;
+
+            const load = onLoadPostAvatar(item)
+                .then((avatarUrl) => {
+                    setLoadedFeedAvatarURLsByKey((currentURLs) =>
+                        currentURLs[cacheKey] == avatarUrl
+                            ? currentURLs
+                            : { ...currentURLs, [cacheKey]: avatarUrl },
+                    );
+                    return avatarUrl;
+                })
+                .catch((error: unknown) => {
+                    console.warn("Failed to load feed avatar", error);
+                    setLoadedFeedAvatarURLsByKey((currentURLs) =>
+                        currentURLs[cacheKey] === null
+                            ? currentURLs
+                            : { ...currentURLs, [cacheKey]: null },
+                    );
+                    return null;
+                })
+                .finally(() => {
+                    feedAvatarLoadsInFlightRef.current.delete(cacheKey);
+                });
+            feedAvatarLoadsInFlightRef.current.set(cacheKey, load);
+            return load;
+        },
+        [loadedFeedAvatarURLFor, onLoadPostAvatar],
+    );
+    const feedItemFor = (
+        item: SpacePost,
+        key: React.Key,
+        timestampStatus?: FeedTimestampStatus,
+    ) => {
+        const imageUrl = loadedFeedImageURLFor(item);
+        const avatarUrl = loadedFeedAvatarURLFor(item);
+        return (
+            <FeedItem
+                key={key}
+                aspectRatio={
+                    item.width && item.height ? item.width / item.height : 1
+                }
+                avatarUrl={avatarUrl}
+                caption={item.caption}
+                friendID={item.friendID}
+                imageUrl={imageUrl}
+                isOwnPost={
+                    Boolean(profile.spaceId) && item.spaceId == profile.spaceId
+                }
+                name={item.name}
+                onLoadAvatar={
+                    avatarUrl === undefined
+                        ? () => loadFeedPostAvatar(item)
+                        : undefined
+                }
+                onLoadImage={
+                    imageUrl ? undefined : () => loadFeedPostImage(item)
+                }
+                onOpenFriend={onOpenFriend}
+                onOpenPhoto={openFeedPhoto}
+                onOpenProfile={onOpenProfile}
+                onSetPostLiked={onSetPostLiked}
+                postId={item.postId}
+                timestampStatus={timestampStatus}
+                timestampMs={item.timestampMs}
+                viewerLiked={item.viewerLiked}
+            />
+        );
+    };
+    const localFeedItemFor = (item: LocalSpaceFeedPost) => {
+        if (item.status == "posted" || item.status == "ready") {
+            return feedItemFor(
+                item.post,
+                item.id,
+                item.status == "posted" ? "posted" : undefined,
+            );
+        }
+
+        return (
+            <FeedItem
+                key={item.id}
+                aspectRatio={
+                    item.width && item.height ? item.width / item.height : 1
+                }
+                avatarUrl={item.avatarUrl ?? null}
+                caption={item.caption}
+                friendID={item.friendID}
+                imageUrl={item.imageUrl}
+                isOwnPost
+                name={item.name}
+                onOpenProfile={onOpenProfile}
+                postId={0}
+                timestampStatus={item.status == "failed" ? "failed" : "posting"}
+                timestampMs={item.timestampMs}
+                viewerLiked={false}
+            />
+        );
+    };
+
+    React.useEffect(() => {
+        if (feedScrollRequest == 0) return;
+
+        return scheduleScrollPageToTop();
+    }, [feedScrollRequest]);
 
     const shareProfileLink = async () => {
         if (!onShareProfileLink) return;
@@ -841,22 +1556,84 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
 
     const prepareSelectedPostPhoto = async (file: File) => {
-        const image = await prepareSpacePostImage(file);
-        const localPost = createLocalPostPhoto({
+        const canShowLocalPreview = canPreviewSpaceImageFile(file);
+        if (!canShowLocalPreview) {
+            const timestampMs = Date.now();
+            const draftKey = `pending-preview-${timestampMs}`;
+            activeLocalPostObjectUrlRef.current = draftKey;
+            setSelectedViewer({
+                draftFile: file,
+                isDraftImagePreviewPending: true,
+                localObjectUrl: draftKey,
+                photo: {
+                    alt: `${profileDisplayName || "You"} post`,
+                    avatarUrl: profile.avatarUrl,
+                    imageUrl: "",
+                    name: profileDisplayName || "You",
+                    timestampMs,
+                },
+                postActionMode: "draft-post",
+            });
+
+            window.setTimeout(() => {
+                if (activeLocalPostObjectUrlRef.current != draftKey) return;
+
+                void spacePostPreviewImageForFile(file)
+                    .then((preview) => {
+                        if (activeLocalPostObjectUrlRef.current != draftKey) {
+                            URL.revokeObjectURL(preview.url);
+                            return;
+                        }
+
+                        localPostObjectUrlsRef.current.add(preview.url);
+                        activeLocalPostObjectUrlRef.current = preview.url;
+                        setSelectedViewer((currentViewer) => {
+                            if (currentViewer?.localObjectUrl != draftKey)
+                                return currentViewer;
+
+                            return {
+                                ...currentViewer,
+                                isDraftImagePreviewPending: false,
+                                localObjectUrl: preview.url,
+                                photo: {
+                                    ...currentViewer.photo,
+                                    height: preview.height,
+                                    imageUrl: preview.url,
+                                    width: preview.width,
+                                },
+                            };
+                        });
+                    })
+                    .catch((error: unknown) => {
+                        console.error("Failed to prepare post preview", error);
+                        const message = spacePostImageErrorMessage(error);
+                        setSelectedViewer((currentViewer) => {
+                            if (currentViewer?.localObjectUrl != draftKey)
+                                return currentViewer;
+
+                            return {
+                                ...currentViewer,
+                                draftImageError: message,
+                            };
+                        });
+                    });
+            }, 0);
+            return;
+        }
+
+        const localPost = await createLoadedLocalPostPhoto({
             avatarUrl: profile.avatarUrl,
-            dimensions: image,
-            file: image.file,
-            name: initialsSource || "You",
+            file,
+            name: profileDisplayName || "You",
         });
         localPostObjectUrlsRef.current.add(localPost.objectUrl);
+        activeLocalPostObjectUrlRef.current = localPost.objectUrl;
         setSelectedViewer({
-            draftImage: image,
-            initialScreen: "photo",
+            draftFile: file,
             localObjectUrl: localPost.objectUrl,
             photo: localPost.photo,
             postActionMode: "draft-post",
         });
-        setPostPhotoError(undefined);
     };
 
     const handlePostPhotoSelect: React.ChangeEventHandler<HTMLInputElement> = (
@@ -866,26 +1643,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         event.target.value = "";
         if (!file) return;
 
-        setIsPostPhotoPreparing(true);
-        setPostPhotoError(undefined);
+        setIsPostPhotoOpening(true);
         void prepareSelectedPostPhoto(file)
             .catch((error: unknown) => {
-                console.error("Failed to prepare post photo", error);
-                setPostPhotoError(spacePostImageErrorMessage(error));
+                console.error("Failed to open post photo draft", error);
             })
             .finally(() => {
-                setIsPostPhotoPreparing(false);
+                setIsPostPhotoOpening(false);
             });
     };
 
     React.useEffect(
         () => () => {
-            localPostObjectUrlsRef.current.forEach((objectUrl) =>
-                URL.revokeObjectURL(objectUrl),
-            );
-            localPostObjectUrlsRef.current.clear();
+            activeLocalPostObjectUrlRef.current = null;
+            revokeLocalPostObjectUrls();
         },
-        [],
+        [revokeLocalPostObjectUrls],
     );
 
     return (
@@ -912,16 +1685,42 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             >
                 <Box
                     component="header"
+                    onFocusCapture={() => setIsHeaderFocused(true)}
+                    onBlurCapture={(event) => {
+                        const nextFocus = event.relatedTarget;
+                        if (
+                            nextFocus instanceof Node &&
+                            event.currentTarget.contains(nextFocus)
+                        )
+                            return;
+
+                        setIsHeaderFocused(false);
+                    }}
                     sx={{
                         alignItems: "center",
+                        bgcolor: homeBackground,
+                        boxSizing: "border-box",
                         display: "grid",
                         gap: "12px",
                         gridTemplateColumns: `${headerSideWidth}px minmax(0, 1fr) ${headerSideWidth}px`,
-                        boxSizing: "border-box",
+                        height: headerHeight,
+                        left: "50%",
+                        maxWidth: "100%",
                         pb: 2,
+                        position: "fixed",
                         pt: 1.5,
-                        px: 1.25,
+                        px: 1.5,
+                        top: 0,
+                        transform: isHeaderHidden
+                            ? "translate(-50%, calc(-100% - 4px))"
+                            : "translate(-50%, 0)",
+                        transition: "transform 180ms ease",
                         width: "100%",
+                        zIndex: 4,
+                        "@media (min-width: 600px)": { maxWidth: 390 },
+                        "@media (prefers-reduced-motion: reduce)": {
+                            transition: "none",
+                        },
                     }}
                 >
                     <Box
@@ -935,34 +1734,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <Box
                         component="button"
                         type="button"
-                        aria-label={
-                            isPostPhotoPreparing
-                                ? "Preparing photo"
-                                : "Post photo"
-                        }
-                        disabled={isPostPhotoPreparing}
-                        onClick={openPostPhotoPicker}
+                        aria-label="Open profile"
+                        onClick={onOpenProfile}
                         sx={{
                             appearance: "none",
                             alignItems: "center",
                             bgcolor: "transparent",
                             border: 0,
+                            borderRadius: "50%",
                             boxSizing: "border-box",
-                            color: textBase,
-                            cursor: isPostPhotoPreparing
-                                ? "default"
-                                : "pointer",
+                            color: green,
+                            cursor: onOpenProfile ? "pointer" : "default",
                             display: "flex",
-                            fontSize: 0,
                             height: headerActionSize,
                             justifyContent: "center",
                             lineHeight: 0,
-                            ml: 0,
-                            opacity: 1,
+                            overflow: "hidden",
                             p: 0,
                             placeSelf: "center start",
                             width: headerActionSize,
-                            "& svg": { display: "block" },
                             "&:focus-visible": {
                                 borderRadius: "50%",
                                 outline: `2px solid ${green}`,
@@ -970,17 +1760,44 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             },
                         }}
                     >
-                        <SpaceActionFeedbackIcon
-                            phase={isPostPhotoPreparing ? "busy" : null}
-                            size={headerAddIconSize}
-                            idleIcon={
-                                <HugeiconsIcon
-                                    icon={AddSquareIcon}
-                                    size={headerAddIconSize}
-                                    strokeWidth={1.8}
+                        <Box
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: feedSkeletonElementBackground,
+                                borderRadius: "50%",
+                                display: "flex",
+                                height: headerAvatarSize,
+                                justifyContent: "center",
+                                overflow: "hidden",
+                                width: headerAvatarSize,
+                            }}
+                        >
+                            {profile.avatarUrl ? (
+                                <Box
+                                    component="img"
+                                    alt=""
+                                    src={profile.avatarUrl}
+                                    sx={{
+                                        borderRadius: "50%",
+                                        display: "block",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                        objectPosition: "center",
+                                        width: "100%",
+                                    }}
                                 />
-                            }
-                        />
+                            ) : (
+                                <Skeleton
+                                    variant="circular"
+                                    sx={{
+                                        bgcolor: feedSkeletonElementBackground,
+                                        height: "100%",
+                                        transform: "none",
+                                        width: "100%",
+                                    }}
+                                />
+                            )}
+                        </Box>
                     </Box>
                     <Box
                         sx={{
@@ -998,186 +1815,84 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         <EnteLogo height={18} />
                     </Box>
                     <Box
+                        component="button"
+                        type="button"
+                        aria-label={
+                            showUnreadIndicator
+                                ? "Open messages with unread activity"
+                                : "Open messages"
+                        }
+                        onClick={onOpenMessages}
                         sx={{
+                            appearance: "none",
                             alignItems: "center",
+                            bgcolor: "transparent",
+                            border: 0,
+                            boxSizing: "border-box",
+                            color: textBase,
+                            cursor: onOpenMessages ? "pointer" : "default",
                             display: "flex",
-                            gap: `${headerActionGap}px`,
-                            justifyContent: "flex-end",
-                            justifySelf: "flex-end",
-                            minWidth: 0,
-                            width: "100%",
+                            fontSize: 0,
+                            height: headerActionSize,
+                            justifyContent: "center",
+                            justifySelf: "end",
+                            lineHeight: 0,
+                            p: 0,
+                            position: "relative",
+                            width: headerActionSize,
+                            "& svg": { display: "block" },
+                            "&:focus-visible": {
+                                borderRadius: "50%",
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
                         }}
                     >
-                        <Box
-                            component="button"
-                            type="button"
-                            aria-label={
-                                showUnreadIndicator
-                                    ? "Open notifications with unread activity"
-                                    : "Open notifications"
-                            }
-                            onClick={onOpenNotifications}
-                            sx={{
-                                appearance: "none",
-                                alignItems: "center",
-                                bgcolor: "transparent",
-                                border: 0,
-                                boxSizing: "border-box",
-                                color: textBase,
-                                cursor: onOpenNotifications
-                                    ? "pointer"
-                                    : "default",
-                                display: "flex",
-                                fontSize: 0,
-                                height: headerActionSize,
-                                justifyContent: "center",
-                                lineHeight: 0,
-                                p: 0,
-                                position: "relative",
-                                width: headerActionSize,
-                                "& svg": { display: "block" },
-                                "&:focus-visible": {
-                                    borderRadius: "50%",
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                            }}
-                        >
-                            <HugeiconsIcon
-                                icon={Chat01Icon}
-                                size={headerIconSize}
-                                strokeWidth={1.8}
-                            />
-                            {showUnreadIndicator && (
-                                <Box
-                                    aria-hidden
-                                    sx={{
-                                        "@keyframes spaceUnreadBadgePing": {
-                                            "75%, 100%": {
-                                                opacity: 0,
-                                                transform: "scale(2.5)",
-                                            },
-                                        },
-                                        "@media (prefers-reduced-motion: reduce)":
-                                            { "&::after": { display: "none" } },
-                                        bgcolor: green,
-                                        border: `2px solid ${homeBackground}`,
-                                        borderRadius: "50%",
-                                        height: 11,
-                                        position: "absolute",
-                                        right: 2,
-                                        top: 4,
-                                        width: 11,
-                                        zIndex: 0,
-                                        "&::after": {
-                                            animation:
-                                                "spaceUnreadBadgePing 1.25s cubic-bezier(0, 0, 0.2, 1) 4",
-                                            bgcolor: green,
-                                            borderRadius: "50%",
-                                            content: '""',
-                                            inset: 0,
-                                            opacity: 0.75,
-                                            pointerEvents: "none",
-                                            position: "absolute",
-                                            zIndex: -1,
-                                        },
-                                    }}
-                                />
-                            )}
-                        </Box>
-                        <Box
-                            component="button"
-                            type="button"
-                            aria-label="Open profile"
-                            onClick={onOpenProfile}
-                            sx={{
-                                appearance: "none",
-                                alignItems: "center",
-                                bgcolor: "transparent",
-                                border: 0,
-                                borderRadius: "50%",
-                                boxSizing: "border-box",
-                                color: green,
-                                cursor: onOpenProfile ? "pointer" : "default",
-                                display: "flex",
-                                height: headerActionSize,
-                                justifyContent: "center",
-                                lineHeight: 0,
-                                overflow: "visible",
-                                p: 0,
-                                pr: "2.5px",
-                                width: headerActionSize,
-                                "&:focus-visible": {
-                                    borderRadius: "50%",
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                            }}
-                        >
+                        <HugeiconsIcon
+                            icon={BubbleChatIcon}
+                            size={headerIconSize}
+                            strokeWidth={1.5}
+                        />
+                        {showUnreadIndicator && (
                             <Box
+                                aria-hidden
                                 sx={{
-                                    alignItems: "center",
-                                    bgcolor: profile.avatarUrl
-                                        ? "transparent"
-                                        : paleGreen,
+                                    "@keyframes spaceUnreadBadgePing": {
+                                        "75%, 100%": {
+                                            opacity: 0,
+                                            transform: "scale(2.5)",
+                                        },
+                                    },
+                                    "@media (prefers-reduced-motion: reduce)": {
+                                        "&::after": { display: "none" },
+                                    },
+                                    bgcolor: dangerColor,
+                                    border: `2px solid ${homeBackground}`,
                                     borderRadius: "50%",
-                                    display: "flex",
-                                    height: headerAvatarSize,
-                                    justifyContent: "center",
-                                    overflow: "hidden",
-                                    width: headerAvatarSize,
+                                    height: 13,
+                                    position: "absolute",
+                                    right: -1,
+                                    top: 1,
+                                    width: 13,
+                                    zIndex: 0,
+                                    "&::after": {
+                                        animation:
+                                            "spaceUnreadBadgePing 1.25s cubic-bezier(0, 0, 0.2, 1) 1",
+                                        bgcolor: dangerColor,
+                                        borderRadius: "50%",
+                                        content: '""',
+                                        inset: 0,
+                                        opacity: 0.75,
+                                        pointerEvents: "none",
+                                        position: "absolute",
+                                        zIndex: -1,
+                                    },
                                 }}
-                            >
-                                {profile.avatarUrl ? (
-                                    <Box
-                                        component="img"
-                                        alt=""
-                                        src={profile.avatarUrl}
-                                        sx={{
-                                            display: "block",
-                                            height: "100%",
-                                            borderRadius: "50%",
-                                            objectFit: "cover",
-                                            objectPosition: "center",
-                                            width: "100%",
-                                        }}
-                                    />
-                                ) : (
-                                    <Box
-                                        sx={{
-                                            color: green,
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 9,
-                                            fontWeight: 700,
-                                            lineHeight: 1,
-                                        }}
-                                    >
-                                        {initials}
-                                    </Box>
-                                )}
-                            </Box>
-                        </Box>
+                            />
+                        )}
                     </Box>
                 </Box>
-                {postPhotoError && (
-                    <Box
-                        role="alert"
-                        sx={{
-                            color: warning,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 13,
-                            fontWeight: 600,
-                            lineHeight: "18px",
-                            mt: "-8px",
-                            px: 2,
-                            pb: "12px",
-                            textAlign: "center",
-                        }}
-                    >
-                        {postPhotoError}
-                    </Box>
-                )}
+                <Box aria-hidden sx={{ height: headerHeight }} />
                 <Box
                     sx={{
                         boxSizing: "border-box",
@@ -1186,43 +1901,68 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         gap: showFeedCards ? "24px" : 0,
                         justifyContent: showFeedCards ? "flex-start" : "center",
                         minHeight: "calc(100svh - 64px)",
-                        pb: showFeedCards ? "16px" : "56px",
-                        pt: 0,
+                        pb: showFeedCards ? "72px" : "56px",
+                        pt: showFeedCards ? "4px" : 0,
                         width: "100%",
                     }}
                 >
                     {hasFeedItems ? (
-                        feedItems.map((item) => (
-                            <FeedItem
-                                key={item.postId}
-                                aspectRatio={
-                                    item.width && item.height
-                                        ? item.width / item.height
-                                        : 1
-                                }
-                                avatarUrl={item.avatarUrl ?? ""}
-                                caption={item.caption}
-                                friendID={item.friendID}
-                                imageUrl={item.imageUrl}
-                                isOwnPost={
-                                    Boolean(profile.spaceId) &&
-                                    item.spaceId == profile.spaceId
-                                }
-                                likeCount={item.likeCount}
-                                name={item.name}
-                                onOpenFriend={onOpenFriend}
-                                onOpenPhoto={openFeedPhoto}
-                                onOpenProfile={onOpenProfile}
-                                onSetPostLiked={onSetPostLiked}
-                                postId={item.postId}
-                                timestampMs={item.timestampMs}
-                                viewerLiked={item.viewerLiked}
-                                viewerUnread={item.viewerUnread}
-                            />
-                        ))
-                    ) : isEmptyFeedLoading ? (
+                        <>
+                            {localFeedPosts.map(localFeedItemFor)}
+                            {remoteFeedItems.map((item) =>
+                                feedItemFor(item, item.postId),
+                            )}
+                            {hasMoreFeedItems && onLoadMoreFeedItems && (
+                                <Box
+                                    component="button"
+                                    type="button"
+                                    disabled={isFeedLoadingMore}
+                                    onClick={onLoadMoreFeedItems}
+                                    sx={{
+                                        alignItems: "center",
+                                        alignSelf: "center",
+                                        appearance: "none",
+                                        bgcolor: paleGreen,
+                                        border: 0,
+                                        borderRadius: "18px",
+                                        color: green,
+                                        cursor: isFeedLoadingMore
+                                            ? "default"
+                                            : "pointer",
+                                        display: "inline-flex",
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        height: 36,
+                                        justifyContent: "center",
+                                        lineHeight: "18px",
+                                        mb: 0,
+                                        minWidth: 116,
+                                        mt: "12px",
+                                        opacity: isFeedLoadingMore ? 0.7 : 1,
+                                        px: "18px",
+                                        whiteSpace: "nowrap",
+                                        "&:focus-visible": {
+                                            outline: `2px solid ${green}`,
+                                            outlineOffset: 2,
+                                        },
+                                        "&:hover": {
+                                            bgcolor: isFeedLoadingMore
+                                                ? paleGreen
+                                                : "#DDF1E1",
+                                        },
+                                    }}
+                                >
+                                    {isFeedLoadingMore
+                                        ? "Loading..."
+                                        : "Load more"}
+                                </Box>
+                            )}
+                        </>
+                    ) : shouldShowEmptyFeedSkeleton ? (
                         <FeedLoadingSkeletons />
-                    ) : (
+                    ) : isEmptyFeedLoading ? null : (
                         <Box
                             sx={{
                                 alignItems: "center",
@@ -1268,7 +2008,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     onClick={shareProfileLink}
                                     sx={{
                                         alignItems: "center",
-                                        bgcolor: "#F2F2F2",
+                                        bgcolor: "#E8E8E8",
                                         border: 0,
                                         borderRadius: "18px",
                                         color: textBase,
@@ -1289,62 +2029,142 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                             outline: `2px solid ${green}`,
                                             outlineOffset: 2,
                                         },
-                                        "&:hover": { bgcolor: "#E8E8E8" },
+                                        "&:hover": { bgcolor: "#DEDEDE" },
                                     }}
                                 >
                                     <ShareIcon />
-                                    Share profile
+                                    Invite friends
                                 </Box>
                             )}
                         </Box>
                     )}
                 </Box>
+                <Box
+                    className="green-bg"
+                    component="button"
+                    type="button"
+                    aria-label="Post photo"
+                    disabled={isPostPhotoOpening}
+                    onClick={openPostPhotoPicker}
+                    sx={{
+                        alignItems: "center",
+                        appearance: "none",
+                        bgcolor: green,
+                        border: 0,
+                        borderRadius: "50%",
+                        bottom: "calc(env(safe-area-inset-bottom) + 20px)",
+                        boxShadow: "0 10px 24px rgba(0, 0, 0, 0.22)",
+                        color: "#FFFFFF",
+                        cursor: isPostPhotoOpening ? "default" : "pointer",
+                        display: "flex",
+                        fontSize: 0,
+                        height: floatingAddButtonSize,
+                        justifyContent: "center",
+                        lineHeight: 0,
+                        opacity: isPostPhotoOpening ? 0.72 : 1,
+                        p: 0,
+                        position: "fixed",
+                        right: "max(20px, calc((100vw - 390px) / 2 + 20px))",
+                        transition:
+                            "background-color 120ms ease, box-shadow 120ms ease, transform 120ms ease",
+                        width: floatingAddButtonSize,
+                        zIndex: 5,
+                        "& svg": { display: "block" },
+                        "&:active": {
+                            transform: isPostPhotoOpening
+                                ? "none"
+                                : "translateY(1px)",
+                        },
+                        "&:focus-visible": {
+                            outline: `3px solid ${paleGreen}`,
+                            outlineOffset: 3,
+                        },
+                        "&:hover": {
+                            bgcolor: isPostPhotoOpening ? green : "#07B422",
+                            boxShadow: isPostPhotoOpening
+                                ? "0 10px 24px rgba(0, 0, 0, 0.22)"
+                                : "0 12px 28px rgba(0, 0, 0, 0.26)",
+                        },
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={Add01Icon}
+                        size={floatingAddIconSize}
+                        strokeWidth={2.1}
+                    />
+                </Box>
                 {selectedViewer && (
                     <SpaceFileViewer
-                        initialScreen={selectedViewer.initialScreen}
                         focusReplyOnOpen={selectedViewer.focusReplyOnOpen}
                         photo={selectedViewer.photo}
-                        postActionMode={
-                            selectedViewer.postActionMode ?? "like-with-count"
+                        draftPostPreparationError={
+                            selectedViewer.draftImageError
                         }
+                        isDraftPostPreviewPending={
+                            selectedViewer.isDraftImagePreviewPending
+                        }
+                        postActionMode={selectedViewer.postActionMode}
                         onClose={closeSelectedPhoto}
-                        onOpenFriend={
-                            onOpenFriend
-                                ? (friendID) => {
-                                      closeSelectedPhoto();
-                                      onOpenFriend(friendID);
-                                  }
-                                : undefined
-                        }
                         onOpenProfile={
                             selectedPhotoIsOwn && onOpenProfile
                                 ? () => {
-                                      closeSelectedPhoto();
-                                      onOpenProfile();
+                                      void clearSelectedPhotoHistory(
+                                          "back",
+                                      ).finally(() => {
+                                          closeSelectedPhoto();
+                                          onOpenProfile();
+                                      });
                                   }
                                 : selectedPhotoFriendID && onOpenFriend
                                   ? () => {
-                                        closeSelectedPhoto();
-                                        onOpenFriend(selectedPhotoFriendID);
+                                        void clearSelectedPhotoHistory(
+                                            "back",
+                                        ).finally(() => {
+                                            closeSelectedPhoto();
+                                            onOpenFriend(selectedPhotoFriendID);
+                                        });
                                     }
                                   : undefined
                         }
+                        onSwipeLeft={closeSelectedPhoto}
                         onReplyToPost={
                             !selectedPhotoIsOwn &&
                             selectedViewer.photo.friendID != profile.spaceId
                                 ? onReplyToPost
                                 : undefined
                         }
-                        onPublishDraftPost={
-                            selectedViewer.draftImage && onCreatePost
-                                ? (caption) =>
-                                      onCreatePost(
-                                          selectedViewer.draftImage!,
-                                          caption,
-                                      )
+                        onDeletePost={
+                            selectedPhotoIsOwn &&
+                            selectedViewer.photo.postId &&
+                            onDeletePost
+                                ? deleteSelectedPost
                                 : undefined
                         }
-                        onLoadPostLikers={onLoadPostLikers}
+                        onPublishDraftPost={
+                            selectedViewer.draftFile && onCreatePost
+                                ? (caption, edit) => {
+                                      const previewUrl =
+                                          selectedViewer.photo.imageUrl;
+                                      const publishPromise = onCreatePost(
+                                          {
+                                              cropArea: edit.cropArea,
+                                              file: selectedViewer.draftFile!,
+                                              height: edit.height,
+                                              previewUrl,
+                                              rotationDegrees:
+                                                  edit.rotationDegrees,
+                                              width: edit.width,
+                                          },
+                                          caption,
+                                      );
+                                      releaseLocalPostObjectUrl(previewUrl);
+                                      return publishPromise;
+                                  }
+                                : undefined
+                        }
+                        onDraftPostPublished={() =>
+                            setFeedScrollRequest((request) => request + 1)
+                        }
                         onSetPostLiked={onSetPostLiked}
                     />
                 )}

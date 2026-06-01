@@ -16,6 +16,12 @@ export interface SpaceAvatarCropImage {
     url: string;
 }
 
+export interface SpacePostPreviewImage {
+    height: number;
+    url: string;
+    width: number;
+}
+
 export interface SpaceImageCropArea {
     height: number;
     width: number;
@@ -29,6 +35,7 @@ export const spaceCoverImageInputAccept = spaceAvatarImageInputAccept;
 export const spacePostImageInputAccept =
     "image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif";
 
+export const spaceDefaultCoverImagePath = "/images/default-cover-image.png";
 export const spaceProfileCoverAspectRatio = 39 / 17;
 const spaceAvatarImageMaxEdge = 512;
 const spaceCoverImageMaxWidth = 1170;
@@ -91,6 +98,68 @@ export const prepareSpacePostImage = async (
         height,
         width,
     };
+};
+
+export const prepareSpacePostImageFromEdit = async (
+    file: File,
+    cropArea?: SpaceImageCropArea,
+    rotationDegrees = 0,
+): Promise<PreparedSpacePostImage> => {
+    const normalizedRotationDegrees =
+        normalizeSpaceImageRotation(rotationDegrees);
+    if (!cropArea && normalizedRotationDegrees == 0) {
+        return await prepareSpacePostImage(file);
+    }
+
+    const renderableBlob = await renderableBlobForSpaceImage(file);
+    const { blob, height, width } = await webPBlobFromEditedImage(
+        renderableBlob,
+        cropArea,
+        normalizedRotationDegrees,
+    );
+    assertSpaceImageSize(
+        blob,
+        maxSpacePostImageBytes,
+        spacePostImageMaxSizeMessage,
+    );
+
+    return {
+        file: new File([blob], webPFileName(file.name), {
+            lastModified: file.lastModified || Date.now(),
+            type: spacePostImageMimeType,
+        }),
+        height,
+        width,
+    };
+};
+
+export const canPreviewSpaceImageFile = (file: File) => {
+    try {
+        assertSupportedSpaceImageFile(file);
+    } catch {
+        return false;
+    }
+
+    return !isHEICSpaceImageFile(file);
+};
+
+export const spacePostPreviewImageForFile = async (
+    file: File,
+): Promise<SpacePostPreviewImage> => {
+    const renderableBlob = await renderableBlobForSpaceImage(file);
+    const imageURL = URL.createObjectURL(renderableBlob);
+
+    try {
+        const image = await loadImage(imageURL);
+        return {
+            height: image.naturalHeight,
+            url: imageURL,
+            width: image.naturalWidth,
+        };
+    } catch (error) {
+        URL.revokeObjectURL(imageURL);
+        throw error;
+    }
 };
 
 export const prepareSpaceAvatarImage = async (
@@ -201,14 +270,17 @@ export const spaceCoverImageErrorMessage = spaceAvatarImageErrorMessage;
 const renderableBlobForSpaceImage = async (file: File): Promise<Blob> => {
     assertSupportedSpaceImageFile(file);
 
+    return isHEICSpaceImageFile(file) ? await heicToJPEG(file) : file;
+};
+
+const isHEICSpaceImageFile = (file: File) => {
     const extension = lowercaseExtension(file.name);
     const mediaType = file.type.toLowerCase();
-    const isHEIC =
+    return (
         (extension != undefined && isHEICExtension(extension)) ||
         mediaType == "image/heic" ||
-        mediaType == "image/heif";
-
-    return isHEIC ? await heicToJPEG(file) : file;
+        mediaType == "image/heif"
+    );
 };
 
 class SpaceImageSizeError extends Error {
@@ -305,6 +377,70 @@ const webPBlobFromImage = async (
     }
 };
 
+const webPBlobFromEditedImage = async (
+    imageSource: Blob | string,
+    cropArea: SpaceImageCropArea | undefined,
+    rotationDegrees: number,
+): Promise<{ blob: Blob; height: number; width: number }> => {
+    const imageURL =
+        typeof imageSource == "string"
+            ? imageSource
+            : URL.createObjectURL(imageSource);
+    try {
+        const image = await loadImage(imageURL);
+        const sourceWidth = image.naturalWidth || image.width;
+        const sourceHeight = image.naturalHeight || image.height;
+        if (sourceWidth <= 0 || sourceHeight <= 0) {
+            throw new Error("Invalid image dimensions");
+        }
+
+        const rotatedCanvas = rotatedImageCanvas(
+            image,
+            sourceWidth,
+            sourceHeight,
+            rotationDegrees,
+        );
+        const sourceCanvas = cropArea
+            ? croppedImageCanvas(rotatedCanvas, cropArea)
+            : rotatedCanvas;
+        const dimensions = scaledDimensions(
+            sourceCanvas.width,
+            sourceCanvas.height,
+            spacePostImageMaxLongEdge,
+        );
+        if (dimensions.width <= 0 || dimensions.height <= 0) {
+            throw new Error("Invalid image dimensions");
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = dimensions.width;
+        canvas.height = dimensions.height;
+
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Could not create image canvas");
+
+        context.drawImage(
+            sourceCanvas,
+            0,
+            0,
+            sourceCanvas.width,
+            sourceCanvas.height,
+            0,
+            0,
+            dimensions.width,
+            dimensions.height,
+        );
+
+        return {
+            blob: await canvasToBlob(canvas, spacePostImageMimeType),
+            height: dimensions.height,
+            width: dimensions.width,
+        };
+    } finally {
+        if (typeof imageSource != "string") URL.revokeObjectURL(imageURL);
+    }
+};
+
 const loadImage = async (imageURL: string) =>
     await new Promise<HTMLImageElement>((resolve, reject) => {
         const image = new Image();
@@ -313,6 +449,77 @@ const loadImage = async (imageURL: string) =>
         image.onerror = () => reject(new Error("Could not decode image"));
         image.src = imageURL;
     });
+
+const rotatedImageCanvas = (
+    image: HTMLImageElement,
+    width: number,
+    height: number,
+    rotationDegrees: number,
+) => {
+    const rotationRadians = (rotationDegrees * Math.PI) / 180;
+    const rotatedWidth = Math.round(
+        Math.abs(width * Math.cos(rotationRadians)) +
+            Math.abs(height * Math.sin(rotationRadians)),
+    );
+    const rotatedHeight = Math.round(
+        Math.abs(width * Math.sin(rotationRadians)) +
+            Math.abs(height * Math.cos(rotationRadians)),
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = rotatedWidth;
+    canvas.height = rotatedHeight;
+
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not create image canvas");
+
+    context.translate(rotatedWidth / 2, rotatedHeight / 2);
+    context.rotate(rotationRadians);
+    context.drawImage(image, -width / 2, -height / 2, width, height);
+    return canvas;
+};
+
+const croppedImageCanvas = (
+    sourceCanvas: HTMLCanvasElement,
+    cropArea: SpaceImageCropArea,
+) => {
+    const sourceWidth = Math.min(
+        Math.max(1, Math.round(cropArea.width)),
+        sourceCanvas.width,
+    );
+    const sourceHeight = Math.min(
+        Math.max(1, Math.round(cropArea.height)),
+        sourceCanvas.height,
+    );
+    const sourceX = clampNumber(
+        Math.round(cropArea.x),
+        0,
+        Math.max(0, sourceCanvas.width - sourceWidth),
+    );
+    const sourceY = clampNumber(
+        Math.round(cropArea.y),
+        0,
+        Math.max(0, sourceCanvas.height - sourceHeight),
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = sourceWidth;
+    canvas.height = sourceHeight;
+
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not create image canvas");
+
+    context.drawImage(
+        sourceCanvas,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        0,
+        0,
+        sourceWidth,
+        sourceHeight,
+    );
+    return canvas;
+};
 
 const postCanvasPlan = (width: number, height: number): CanvasPlan => {
     const dimensions = scaledDimensions(
@@ -440,6 +647,9 @@ const scaledDimensions = (
 
 const clampNumber = (value: number, min: number, max: number) =>
     Math.min(Math.max(value, min), max);
+
+const normalizeSpaceImageRotation = (rotationDegrees: number) =>
+    ((rotationDegrees % 360) + 360) % 360;
 
 const canvasToBlob = async (
     canvas: HTMLCanvasElement,

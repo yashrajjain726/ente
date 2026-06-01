@@ -1,9 +1,8 @@
 import { Share08Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box } from "@mui/material";
+import { Box, Skeleton } from "@mui/material";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import { initialsFor } from "utils/spaceDisplay";
 
 export const shareProfileLinkBackground = "#FAFAFA";
 
@@ -11,7 +10,7 @@ const green = "#08C225";
 const textBase = "#000";
 const textMuted = "#666";
 const textLight = "#969696";
-const paleGreen = "#E7F6E9";
+const avatarSkeletonBackground = "#E6E6E6";
 const iconFill = "#F0F0F0";
 const actionRowHover = "#F5F5F5";
 
@@ -50,9 +49,9 @@ const BackIcon: React.FC = () => (
     </Box>
 );
 
-export const ShareIcon: React.FC = () => (
-    <HugeiconsIcon icon={Share08Icon} size={18} strokeWidth={1.8} />
-);
+export const ShareIcon: React.FC<{ strokeWidth?: number }> = ({
+    strokeWidth = 1.8,
+}) => <HugeiconsIcon icon={Share08Icon} size={18} strokeWidth={strokeWidth} />;
 
 export const LinkIcon: React.FC = () => (
     <Box
@@ -181,8 +180,6 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
 }) => {
     const [copied, setCopied] = useState(false);
     const displayName = profile.fullName.trim() || profile.username.trim();
-    const initialsSource = displayName || profile.username.trim();
-    const initials = initialsFor(initialsSource);
 
     const copyProfileLink = async () => {
         if (!profileLink) return;
@@ -306,11 +303,8 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                         sx={{
                             alignItems: "center",
                             aspectRatio: "1 / 1",
-                            bgcolor: profile.avatarUrl
-                                ? "transparent"
-                                : paleGreen,
+                            bgcolor: avatarSkeletonBackground,
                             borderRadius: "50%",
-                            color: green,
                             display: "flex",
                             height: 112,
                             justifyContent: "center",
@@ -332,18 +326,15 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                                 }}
                             />
                         ) : (
-                            <Box
+                            <Skeleton
+                                variant="circular"
                                 sx={{
-                                    color: green,
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 32,
-                                    fontWeight: 700,
-                                    lineHeight: 1,
+                                    bgcolor: avatarSkeletonBackground,
+                                    height: "100%",
+                                    transform: "none",
+                                    width: "100%",
                                 }}
-                            >
-                                {initials}
-                            </Box>
+                            />
                         )}
                     </Box>
 
@@ -439,9 +430,9 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             width: "100%",
                         }}
                     >
-                        Share your end-to-end encrypted profile link with close
-                        people. Only you and the people you share it with can
-                        view it.
+                        Invite your friends and family to follow your life by
+                        sharing your private profile link. Only you and the
+                        people you share it with can access it.
                     </Box>
                 </Box>
 

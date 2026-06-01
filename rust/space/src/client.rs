@@ -13,21 +13,21 @@ use crate::error::{Result, SpaceError};
 use crate::models::{
     CreatedSpace, CreatedSpaceLink, DecryptedFriendShare, DecryptedMessage, DecryptedPost,
     DecryptedSpaceProfile, FeedItem, FeedPage, HydratedKeys, MessagePayload, MessageQuote,
-    OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PrivateKeySource,
+    OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostObjectMetadata, PrivateKeySource,
 };
 use crate::transport::{
     AddFriendPayload, AssetDownloadResponse, CreateEntityKeyRequest, CreateMessageRequest,
     CreatePostRequest, CreatePostResponse, CreateSpaceRequest, EntityKeyPayload, EntityKeyResponse,
     FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse, FriendTargetPayload,
     LikeMessageRequest, LikeMessageResponse, LikePostRequest, LikePostResponse,
-    ListPostLikersResponse, MarkFeedReadRequest, MarkNotificationsReadRequest,
-    MessageConversationPage, MessagePage, MessageResponse, PostObjectPayload, PostPage,
-    PostResponse, PresignUploadRequest, PresignUploadResponse, ProfileAvatarPayload,
-    ProfileCoverPayload, RefreshFriendSharesRequest, RotateSpaceKeyRequest, ShareUpdatePayload,
-    SpaceActorResponse, SpaceFriendResponse, SpaceKeyResponse, SpaceKeyVersionResponse,
-    SpaceLinkCreateRequest, SpaceLinkLoginRequest, SpaceLinkLoginResponse, SpaceLinkStatusResponse,
-    SpaceLookupResponse, SpaceProfileResponse, SpaceUnreadStatusResponse, UpdatePostCaptionRequest,
-    UpdateSpaceProfileRequest, UpdateSpaceProfileResponse, UpdateSpaceSlugRequest,
+    ListPostLikersResponse, MarkNotificationsReadRequest, MessageConversationPage, MessagePage,
+    MessageResponse, PostObjectPayload, PostPage, PostResponse, PresignUploadRequest,
+    PresignUploadResponse, ProfileAvatarPayload, ProfileCoverPayload, RefreshFriendSharesRequest,
+    RotateSpaceKeyRequest, ShareUpdatePayload, SpaceActorResponse, SpaceFriendResponse,
+    SpaceKeyResponse, SpaceKeyVersionResponse, SpaceLinkCreateRequest, SpaceLinkLoginRequest,
+    SpaceLinkLoginResponse, SpaceLinkStatusResponse, SpaceLookupResponse, SpaceProfileResponse,
+    SpaceUnreadStatusResponse, UpdatePostCaptionRequest, UpdateSpaceProfileRequest,
+    UpdateSpaceProfileResponse, UpdateSpaceSlugRequest,
 };
 use ente_core::crypto::{sealed, secretbox};
 use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
@@ -477,10 +477,10 @@ impl AccountSpaceCtx {
                 &next_space_key,
                 &current.space_key,
             )?),
-            encrypted_profile: Some(encode_b64(&encrypt_secretbox_packed(
+            encrypted_profile: encode_b64(&encrypt_secretbox_packed(
                 &next_space_key,
                 &next_profile,
-            )?)),
+            )?),
         };
         let response = self
             .client
@@ -493,7 +493,7 @@ impl AccountSpaceCtx {
             key_version: response.key_version,
             space_key: next_space_key,
             encrypted_space_key: request.encrypted_space_key,
-            encrypted_profile: request.encrypted_profile.unwrap_or_default(),
+            encrypted_profile: request.encrypted_profile,
         })
     }
 
@@ -575,11 +575,7 @@ impl AccountSpaceCtx {
             object_key: presign.object_key,
             size: Some(encrypted.len() as i64),
             position,
-            blur_hash_cipher: None,
-            variant: None,
-            width: None,
-            height: None,
-            media_type: None,
+            metadata_cipher: None,
         })
     }
 
@@ -598,9 +594,15 @@ impl AccountSpaceCtx {
         let mut object = self
             .upload_post_asset(space_id, post_key, plaintext, Some(0))
             .await?;
-        object.width = width.filter(|value| *value > 0);
-        object.height = height.filter(|value| *value > 0);
-        object.media_type = Some(media_type);
+        object.metadata_cipher = Some(encrypt_post_object_metadata(
+            post_key,
+            &PostObjectMetadata {
+                width: width.filter(|value| *value > 0),
+                height: height.filter(|value| *value > 0),
+                media_type: Some(media_type),
+                ..Default::default()
+            },
+        )?);
         Ok(object)
     }
 
@@ -701,14 +703,14 @@ impl AccountSpaceCtx {
         caption_plaintext: Option<&[u8]>,
         post_key: Option<&[u8]>,
     ) -> Result<(i64, Vec<u8>)> {
-        ensure_post_objects_are_photos(objects)?;
+        let post_key_bytes = post_key.map_or_else(generate_key, ToOwned::to_owned);
+        ensure_post_objects_are_photos(objects, &post_key_bytes)?;
         let access = self
             .resolve_owned_space_access(space_id)
             .await?
             .ok_or_else(|| {
                 SpaceError::InvalidInput(format!("space {space_id} is not owned by the account"))
             })?;
-        let post_key_bytes = post_key.map_or_else(generate_key, ToOwned::to_owned);
         let caption_cipher = match caption_plaintext {
             Some(value) => Some(encode_b64(&encrypt_secretbox_packed(
                 &post_key_bytes,
@@ -769,16 +771,6 @@ impl AccountSpaceCtx {
     pub async fn unread_status(&self) -> Result<SpaceUnreadStatusResponse> {
         self.client
             .get_json("/space/unread", &[])
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn mark_feed_read(&self, post_id: i64) -> Result<SpaceUnreadStatusResponse> {
-        if post_id <= 0 {
-            return Err(SpaceError::InvalidInput("post id is required".into()));
-        }
-        self.client
-            .post_json("/space/feed/read", &MarkFeedReadRequest { post_id })
             .await
             .map_err(Into::into)
     }
@@ -896,14 +888,17 @@ impl AccountSpaceCtx {
         post_key: &[u8],
         object: &PostObjectPayload,
     ) -> Result<Option<String>> {
-        let Some(cipher) = object.blur_hash_cipher.as_deref() else {
-            return Ok(None);
-        };
-        let packed = decode_b64(cipher)?;
-        let plaintext = decrypt_secretbox_packed(post_key, &packed)?;
-        let blur_hash = String::from_utf8(plaintext)
-            .map_err(|err| SpaceError::InvalidInput(format!("invalid blur hash utf8: {err}")))?;
-        Ok(Some(blur_hash))
+        Ok(self
+            .decrypt_post_object_metadata(post_key, object)?
+            .and_then(|metadata| metadata.blur_hash))
+    }
+
+    pub fn decrypt_post_object_metadata(
+        &self,
+        post_key: &[u8],
+        object: &PostObjectPayload,
+    ) -> Result<Option<PostObjectMetadata>> {
+        decrypt_post_object_metadata(post_key, object)
     }
 
     pub async fn decrypt_post_for_space(
@@ -1101,6 +1096,10 @@ impl AccountSpaceCtx {
         let decrypted = self.decrypt_post_for_space(&post.space_id, &post).await?;
         let caption = optional_utf8(decrypted.caption_plaintext, "caption")?;
         let object = post.objects.first();
+        let object_metadata = object
+            .map(|value| decrypt_post_object_metadata(&decrypted.post_key, value))
+            .transpose()?
+            .flatten();
         let payload = MessagePayload {
             version: 1,
             kind: MESSAGE_KIND_POST_REPLY.to_owned(),
@@ -1112,9 +1111,9 @@ impl AccountSpaceCtx {
                 key_version: Some(post.key_version),
                 caption,
                 object_key: object.map(|value| value.object_key.clone()),
-                width: object.and_then(|value| value.width),
-                height: object.and_then(|value| value.height),
-                media_type: object.and_then(|value| value.media_type.clone()),
+                width: object_metadata.as_ref().and_then(|value| value.width),
+                height: object_metadata.as_ref().and_then(|value| value.height),
+                media_type: object_metadata.and_then(|value| value.media_type),
             }),
         };
         let request = self.message_request_for_payload(&post.author.public_key, &payload, None)?;
@@ -1558,9 +1557,30 @@ fn ensure_supported_photo_media_type(media_type: Option<&str>) -> Result<Option<
     Err(SpaceError::InvalidInput(ONLY_PHOTOS_UPLOAD_MESSAGE.into()))
 }
 
-fn ensure_post_objects_are_photos(objects: &[PostObjectPayload]) -> Result<()> {
+fn encrypt_post_object_metadata(post_key: &[u8], metadata: &PostObjectMetadata) -> Result<String> {
+    let plaintext = serde_json::to_vec(metadata)
+        .map_err(|err| SpaceError::InvalidInput(format!("invalid post object metadata: {err}")))?;
+    Ok(encode_b64(&encrypt_secretbox_packed(post_key, &plaintext)?))
+}
+
+pub fn decrypt_post_object_metadata(
+    post_key: &[u8],
+    object: &PostObjectPayload,
+) -> Result<Option<PostObjectMetadata>> {
+    let Some(cipher) = object.metadata_cipher.as_deref() else {
+        return Ok(None);
+    };
+    let plaintext = decrypt_secretbox_packed(post_key, &decode_b64(cipher)?)?;
+    serde_json::from_slice(&plaintext)
+        .map(Some)
+        .map_err(|err| SpaceError::InvalidInput(format!("invalid post object metadata: {err}")))
+}
+
+fn ensure_post_objects_are_photos(objects: &[PostObjectPayload], post_key: &[u8]) -> Result<()> {
     for object in objects {
-        if ensure_supported_photo_media_type(object.media_type.as_deref())?.is_none() {
+        let metadata = decrypt_post_object_metadata(post_key, object)?
+            .ok_or_else(|| SpaceError::InvalidInput("post object metadata is required".into()))?;
+        if ensure_supported_photo_media_type(metadata.media_type.as_deref())?.is_none() {
             return Err(SpaceError::InvalidInput(ONLY_PHOTOS_UPLOAD_MESSAGE.into()));
         }
     }
@@ -1641,7 +1661,6 @@ fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
         created_at: item.created_at.clone(),
         likes: item.likes,
         viewer_liked: item.viewer_liked,
-        viewer_unread: item.viewer_unread,
     }
 }
 
@@ -1944,7 +1963,7 @@ fn build_http_client(
         user_agent,
         client_package,
         client_version,
-        timeout_secs: Some(30),
+        ..HttpConfig::default()
     })
     .map_err(Into::into)
 }
@@ -2327,7 +2346,6 @@ mod tests {
             created_at: "2026-04-16T00:00:00Z".to_owned(),
             likes: 0,
             viewer_liked: false,
-            viewer_unread: false,
         };
 
         let decrypted = ctx
@@ -2558,10 +2576,11 @@ mod tests {
             .create_async()
             .await;
 
+        let post_key = generate_key();
         let payload = ctx
             .upload_post_photo_asset(
                 "space_owner_main",
-                &generate_key(),
+                &post_key,
                 TEST_WEBP_BYTES,
                 Some(4032),
                 Some(3024),
@@ -2572,9 +2591,13 @@ mod tests {
 
         assert_eq!(payload.object_key, "photo-object");
         assert_eq!(payload.position, Some(0));
-        assert_eq!(payload.width, Some(4032));
-        assert_eq!(payload.height, Some(3024));
-        assert_eq!(payload.media_type.as_deref(), Some("image/webp"));
+        let metadata = ctx
+            .decrypt_post_object_metadata(&post_key, &payload)
+            .expect("metadata should decrypt")
+            .expect("metadata should exist");
+        assert_eq!(metadata.width, Some(4032));
+        assert_eq!(metadata.height, Some(3024));
+        assert_eq!(metadata.media_type.as_deref(), Some("image/webp"));
         presign.assert_async().await;
         upload.assert_async().await;
     }
@@ -2992,6 +3015,17 @@ mod tests {
     async fn create_post_rejects_video_object_media_type() {
         let server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
+        let post_key = generate_key();
+        let metadata_cipher = encrypt_post_object_metadata(
+            &post_key,
+            &PostObjectMetadata {
+                width: Some(1920),
+                height: Some(1080),
+                media_type: Some("video/mp4".to_owned()),
+                ..Default::default()
+            },
+        )
+        .expect("metadata should encrypt");
         let err = ctx
             .create_post(
                 "space_owner_main",
@@ -2999,14 +3033,10 @@ mod tests {
                     object_key: "object-1".to_owned(),
                     size: None,
                     position: Some(0),
-                    blur_hash_cipher: None,
-                    variant: None,
-                    width: Some(1920),
-                    height: Some(1080),
-                    media_type: Some("video/mp4".to_owned()),
+                    metadata_cipher: Some(metadata_cipher),
                 }],
                 None,
-                None,
+                Some(&post_key),
             )
             .await
             .expect_err("video post object should fail before network");
@@ -3370,15 +3400,7 @@ mod tests {
             .mock("GET", "/space/unread")
             .match_header("x-auth-token", "token")
             .with_status(200)
-            .with_body(json!({"feedUnread": true, "notificationsUnread": false}).to_string())
-            .create_async()
-            .await;
-        let feed_read = server
-            .mock("POST", "/space/feed/read")
-            .match_header("x-auth-token", "token")
-            .match_body(Matcher::JsonString(json!({"postId": 42}).to_string()))
-            .with_status(200)
-            .with_body(json!({"feedUnread": false, "notificationsUnread": false}).to_string())
+            .with_body(json!({"notificationsUnread": false}).to_string())
             .create_async()
             .await;
         let notifications_read = server
@@ -3388,7 +3410,7 @@ mod tests {
                 json!({"friendSpaceId": "space_friend"}).to_string(),
             ))
             .with_status(200)
-            .with_body(json!({"feedUnread": false, "notificationsUnread": false}).to_string())
+            .with_body(json!({"notificationsUnread": false}).to_string())
             .create_async()
             .await;
 
@@ -3396,9 +3418,7 @@ mod tests {
             .unread_status()
             .await
             .expect("unread status should load");
-        assert!(unread.feed_unread);
         assert!(!unread.notifications_unread);
-        assert!(!ctx.mark_feed_read(42).await.expect("feed read").feed_unread);
         assert!(
             !ctx.mark_notifications_read("space_friend")
                 .await
@@ -3407,7 +3427,6 @@ mod tests {
         );
 
         status.assert_async().await;
-        feed_read.assert_async().await;
         notifications_read.assert_async().await;
     }
 

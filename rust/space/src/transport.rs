@@ -89,15 +89,7 @@ pub struct PostObjectPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub blur_hash_cipher: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub variant: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub width: Option<i32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub height: Option<i32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub media_type: Option<String>,
+    pub metadata_cipher: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -130,12 +122,6 @@ pub struct LikePostResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MarkFeedReadRequest {
-    pub post_id: i64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct MarkNotificationsReadRequest {
     pub friend_space_id: String,
 }
@@ -143,7 +129,6 @@ pub struct MarkNotificationsReadRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceUnreadStatusResponse {
-    pub feed_unread: bool,
     pub notifications_unread: bool,
 }
 
@@ -210,6 +195,10 @@ pub struct MessageConversationResponse {
     pub latest_activity: MessageConversationActivity,
     #[serde(default)]
     pub unread: bool,
+    #[serde(default)]
+    pub unread_count: i64,
+    #[serde(default)]
+    pub notification_unread: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -219,6 +208,8 @@ pub struct MessageConversationActivity {
     #[serde(rename = "type")]
     pub activity_type: String,
     pub created_at: String,
+    #[serde(default)]
+    pub outgoing: bool,
     #[serde(default)]
     pub message: Option<MessageResponse>,
     #[serde(default)]
@@ -272,8 +263,6 @@ pub struct PostResponse {
     pub created_at: String,
     pub likes: i64,
     pub viewer_liked: bool,
-    #[serde(default)]
-    pub viewer_unread: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -378,8 +367,7 @@ pub struct RotateSpaceKeyRequest {
     pub encrypted_space_key: String,
     pub key_version: i32,
     pub wrapped_prev_key: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub encrypted_profile: Option<String>,
+    pub encrypted_profile: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -393,7 +381,7 @@ pub struct SpaceKeyVersionResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::AssetDownloadResponse;
+    use super::{AssetDownloadResponse, MessageConversationActivity};
 
     #[test]
     fn asset_download_response_deserializes_camel_case() {
@@ -402,6 +390,15 @@ mod tests {
                 .expect("asset download response should deserialize");
         assert_eq!(response.url, "http://127.0.0.1:3900/example");
         assert_eq!(response.expires_in, 900);
+    }
+
+    #[test]
+    fn message_conversation_activity_deserializes_outgoing() {
+        let activity: MessageConversationActivity = serde_json::from_str(
+            r#"{"id":"friend_event:1","type":"friend_add","createdAt":"2026-05-25T00:00:00Z","outgoing":true}"#,
+        )
+        .expect("activity should deserialize");
+        assert!(activity.outgoing);
     }
 }
 

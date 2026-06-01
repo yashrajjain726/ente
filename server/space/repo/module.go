@@ -89,7 +89,6 @@ type SpacePostRecord struct {
 	CreatedAt        int64
 	Likes            int64
 	ViewerLiked      bool
-	ViewerUnread     bool
 }
 
 type SpacePostAssetRecord struct {
@@ -99,11 +98,7 @@ type SpacePostAssetRecord struct {
 	BucketID       string
 	Size           sql.NullInt64
 	Position       int
-	Variant        sql.NullString
-	BlurHashCipher sql.NullString
-	Width          sql.NullInt64
-	Height         sql.NullInt64
-	MediaType      sql.NullString
+	MetadataCipher string
 	CreatedAt      int64
 }
 
@@ -145,17 +140,20 @@ type SpaceMessageRecord struct {
 }
 
 type SpaceMessageConversationRecord struct {
-	Friend         SpaceActorRecord
-	LatestActivity SpaceMessageConversationActivityRecord
-	Unread         bool
-	SortCreatedAt  int64
-	SortID         string
+	Friend             SpaceActorRecord
+	LatestActivity     SpaceMessageConversationActivityRecord
+	Unread             bool
+	UnreadCount        int64
+	NotificationUnread bool
+	SortCreatedAt      int64
+	SortID             string
 }
 
 type SpaceMessageConversationActivityRecord struct {
 	ID        string
 	Type      string
 	CreatedAt int64
+	Outgoing  bool
 	Message   *SpaceMessageRecord
 	Post      *SpaceMessageConversationPostRecord
 }
@@ -169,11 +167,7 @@ type SpaceMessageConversationPostRecord struct {
 	ObjectKey            sql.NullString
 	ObjectSize           sql.NullInt64
 	ObjectPosition       sql.NullInt64
-	ObjectVariant        sql.NullString
-	ObjectBlurHashCipher sql.NullString
-	ObjectWidth          sql.NullInt64
-	ObjectHeight         sql.NullInt64
-	ObjectMediaType      sql.NullString
+	ObjectMetadataCipher sql.NullString
 }
 
 type CreateSpaceMessageRecord struct {
@@ -252,15 +246,6 @@ type SpaceLinkSessionRecord struct {
 	SpaceSlug         string
 	OwnerSlug         string
 	EncryptedSpaceKey string
-}
-
-type SpaceReadMarkerRecord struct {
-	UserID            int64
-	ViewerSpaceID     string
-	FeedReadCreatedAt int64
-	FeedReadPostID    int64
-	CreatedAt         int64
-	UpdatedAt         int64
 }
 
 func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {

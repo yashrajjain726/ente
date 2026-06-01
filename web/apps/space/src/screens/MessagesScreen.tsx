@@ -1,26 +1,23 @@
 import {
     ArrowLeft02Icon,
     Cancel01Icon,
-    Loading03Icon,
     Navigation03Icon,
-    Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Menu, MenuItem, Tooltip } from "@mui/material";
-import { keyframes } from "@mui/material/styles";
+import { Box, Menu, MenuItem, Skeleton, Tooltip } from "@mui/material";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
-import type { FriendProfile } from "data/friends";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type { SpaceMessage, SpaceMessageConversation } from "services/space";
-import { firstNameFrom, initialsFor } from "utils/spaceDisplay";
+import { firstNameFrom } from "utils/spaceDisplay";
 import { clampSpaceMessageText } from "utils/spaceMessageLimits";
 
 export const messagesBackground = "#FFFFFF";
 
 const green = "#08C225";
-const paleGreen = "#E7F6E9";
+const avatarSkeletonBackground = "#E6E6E6";
 const textBase = "#000000";
 const textSecondary = "#777777";
 const threadBackground = "#202020";
@@ -36,23 +33,13 @@ const composerHeight = 48;
 const composerMaxHeight = 112;
 const composerPadding = 14;
 const composerPaddingLeft = 18;
+const threadBottomThresholdPx = 96;
 const messageGroupTimeThresholdMs = 10 * 60 * 1000;
-
-const sendSpin = keyframes`
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-`;
 
 interface MessagesScreenProps {
     conversations: SpaceMessageConversation[];
-    friends: FriendProfile[];
+    friendsCount?: number;
     isConversationsLoading?: boolean;
-    isFriendsLoaded?: boolean;
     isThreadLoading?: boolean;
     isThreadReadOnly?: boolean;
     messages: SpaceMessage[];
@@ -70,6 +57,8 @@ interface MessagesScreenProps {
     ) => Promise<void>;
     onSendMessage: (spaceId: string, text: string) => Promise<void>;
     onSetMessageLiked: (messageId: string, liked: boolean) => Promise<void>;
+    onShareProfileLink?: () => Promise<string>;
+    newConversationIds?: string[];
     profile: SetupProfile;
     selectedFriend?: SpaceMessageConversation["friend"];
 }
@@ -91,21 +80,23 @@ const resizeComposer = (input: HTMLTextAreaElement | null) => {
         input.scrollHeight > composerMaxHeight ? "auto" : "hidden";
 };
 
+const isThreadNearBottom = (scroller: HTMLDivElement) =>
+    scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <=
+    threadBottomThresholdPx;
+
 const copyTextToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
 };
 
-const Avatar: React.FC<{
-    avatarUrl?: string | null;
-    name: string;
-    size: number;
-}> = ({ avatarUrl, name, size }) => (
+const Avatar: React.FC<{ avatarUrl?: string | null; size: number }> = ({
+    avatarUrl,
+    size,
+}) => (
     <Box
         sx={{
             alignItems: "center",
-            bgcolor: avatarUrl ? "transparent" : paleGreen,
+            bgcolor: avatarSkeletonBackground,
             borderRadius: "50%",
-            color: green,
             display: "flex",
             flexShrink: 0,
             height: size,
@@ -128,16 +119,15 @@ const Avatar: React.FC<{
                 }}
             />
         ) : (
-            <Box
+            <Skeleton
+                variant="circular"
                 sx={{
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: Math.max(10, Math.round(size * 0.34)),
-                    fontWeight: 800,
-                    lineHeight: 1,
+                    bgcolor: avatarSkeletonBackground,
+                    height: "100%",
+                    transform: "none",
+                    width: "100%",
                 }}
-            >
-                {initialsFor(name)}
-            </Box>
+            />
         )}
     </Box>
 );
@@ -193,52 +183,32 @@ const messageLikeTooltipLabel = (
         likerNames.push(actorName(otherParticipant));
     }
     if (message.likeCount > likerNames.length) {
-        likerNames.push(`${message.likeCount - likerNames.length} others`);
+        const otherCount = message.likeCount - likerNames.length;
+        likerNames.push(
+            `${otherCount} ${otherCount == 1 ? "other" : "others"}`,
+        );
     }
     return likerNames.filter(Boolean).join(" and ") || "Liked";
-};
-
-const isCurrentFriend = (
-    conversationFriend: SpaceMessageConversation["friend"],
-    friends: FriendProfile[],
-) => {
-    const conversationSpaceId =
-        conversationFriend.spaceId ?? conversationFriend.id;
-    const conversationSpaceSlug = conversationFriend.spaceSlug;
-    const conversationUsername = conversationFriend.username;
-    return friends.some((friend) => {
-        const friendSpaceId = friend.spaceId ?? friend.id;
-        return (
-            friendSpaceId == conversationSpaceId ||
-            (conversationSpaceSlug &&
-                friend.spaceSlug == conversationSpaceSlug) ||
-            friend.username == conversationUsername
-        );
-    });
 };
 
 const conversationPreview = (
     conversation: SpaceMessageConversation,
     profile: SetupProfile,
-    currentlyFriends?: boolean,
 ) => {
     const activity = conversation.latestActivity;
     if (activity.type == "friend_add") {
-        return currentlyFriends === false
-            ? "No longer friends"
+        return activity.outgoing
+            ? "You're now friends"
             : "Added you as a friend";
     }
     if (activity.type == "friend_remove") {
-        return currentlyFriends === true
-            ? "Friends again"
+        return activity.outgoing
+            ? "You're no longer friends"
             : "Removed you as a friend";
     }
     if (activity.type == "post_like") return "Liked your post";
     if (activity.type == "post_reply") {
         return "Replied";
-    }
-    if (activity.type == "post_like_and_reply") {
-        return "Liked and replied";
     }
     if (activity.type == "message_like") {
         const text = activity.message?.text.trim();
@@ -268,24 +238,20 @@ const quotedConversationActivityPreview = (
     if (activity.type == "post_reply") {
         return { prefix: 'Replied "', previewText, suffix: '"' };
     }
-    if (activity.type == "post_like_and_reply") {
-        return { prefix: 'Liked and replied "', previewText, suffix: '"' };
-    }
     return undefined;
 };
 
 const ConversationPreviewLine: React.FC<{
     conversation: SpaceMessageConversation;
-    currentlyFriends?: boolean;
     profile: SetupProfile;
-}> = ({ conversation, currentlyFriends, profile }) => {
+}> = ({ conversation, profile }) => {
     const activity = conversation.latestActivity;
     const quotedPreview = quotedConversationActivityPreview(activity);
     const previewLineSx = {
         color: textSecondary,
         fontFamily: '"Inter Variable", Inter, sans-serif',
         fontSize: 13,
-        fontWeight: conversation.unread ? 700 : 500,
+        fontWeight: 500,
         lineHeight: "18px",
         minWidth: 0,
         overflow: "hidden",
@@ -296,7 +262,7 @@ const ConversationPreviewLine: React.FC<{
     if (!quotedPreview) {
         return (
             <Box sx={previewLineSx}>
-                {conversationPreview(conversation, profile, currentlyFriends)}
+                {conversationPreview(conversation, profile)}
             </Box>
         );
     }
@@ -319,6 +285,227 @@ const ConversationPreviewLine: React.FC<{
             </Box>
             <Box component="span" sx={{ flexShrink: 0 }}>
                 {quotedPreview.suffix}
+            </Box>
+        </Box>
+    );
+};
+
+const conversationId = (conversation: SpaceMessageConversation) =>
+    conversation.friend.spaceId ?? conversation.friend.id;
+
+const conversationUnreadLabel = (count: number) =>
+    count > 99 ? "99+" : String(count);
+
+const dayMs = 24 * 60 * 60 * 1000;
+
+const ConversationListItem: React.FC<{
+    conversation: SpaceMessageConversation;
+    onOpenThread: (conversation: SpaceMessageConversation) => void;
+    profile: SetupProfile;
+}> = ({ conversation, onOpenThread, profile }) => {
+    const name =
+        conversation.friend.fullName.trim() || conversation.friend.username;
+    const timestampLabel = formatTimeAgo(
+        microsForTimestamp(conversation.latestActivity.createdAtMs),
+    );
+    const postThumbnailUrl = conversation.latestActivity.post?.imageUrl;
+    const unreadCount = conversation.unreadCount;
+
+    return (
+        <Box component="li" sx={{ listStyle: "none" }}>
+            <Box
+                component="button"
+                type="button"
+                onClick={() => onOpenThread(conversation)}
+                sx={{
+                    alignItems: "center",
+                    appearance: "none",
+                    bgcolor: "transparent",
+                    border: 0,
+                    borderRadius: "8px",
+                    color: textBase,
+                    cursor: "pointer",
+                    display: "grid",
+                    gap: "10px",
+                    gridTemplateColumns: postThumbnailUrl
+                        ? "44px minmax(0, 1fr) 44px"
+                        : "44px minmax(0, 1fr)",
+                    minHeight: 64,
+                    p: "8px 0",
+                    textAlign: "left",
+                    width: "100%",
+                    "&:focus-visible": {
+                        outline: `2px solid ${green}`,
+                        outlineOffset: 2,
+                    },
+                }}
+            >
+                <Box
+                    sx={{
+                        flexShrink: 0,
+                        height: 44,
+                        position: "relative",
+                        width: 44,
+                    }}
+                >
+                    <Avatar
+                        avatarUrl={conversation.friend.avatarUrl}
+                        size={44}
+                    />
+                    {unreadCount > 0 && (
+                        <Box
+                            aria-label={`${unreadCount} unread message${unreadCount == 1 ? "" : "s"}`}
+                            component="span"
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: dangerColor,
+                                borderRadius: "8px",
+                                boxShadow: `0 0 0 2px ${messagesBackground}`,
+                                color: "#FFFFFF",
+                                display: "inline-flex",
+                                flexShrink: 0,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 10,
+                                fontWeight: 700,
+                                height: 16,
+                                justifyContent: "center",
+                                lineHeight: "16px",
+                                minWidth: 16,
+                                position: "absolute",
+                                px: "4px",
+                                right: -2,
+                                top: -2,
+                                zIndex: 1,
+                            }}
+                        >
+                            {conversationUnreadLabel(unreadCount)}
+                        </Box>
+                    )}
+                </Box>
+                <Box sx={{ minWidth: 0 }}>
+                    <Box
+                        sx={{
+                            alignItems: "center",
+                            display: "flex",
+                            gap: "4px",
+                            minWidth: 0,
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                flex: "0 1 auto",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 700,
+                                lineHeight: "20px",
+                                minWidth: 0,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {firstNameFrom(name)}
+                        </Box>
+                        <Box
+                            aria-hidden
+                            component="span"
+                            sx={{
+                                color: textSecondary,
+                                flexShrink: 0,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                lineHeight: "16px",
+                            }}
+                        >
+                            &middot;
+                        </Box>
+                        <Box
+                            component="time"
+                            dateTime={new Date(
+                                conversation.latestActivity.createdAtMs,
+                            ).toISOString()}
+                            sx={{
+                                color: textSecondary,
+                                flexShrink: 0,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                lineHeight: "16px",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {timestampLabel}
+                        </Box>
+                    </Box>
+                    <ConversationPreviewLine
+                        conversation={conversation}
+                        profile={profile}
+                    />
+                </Box>
+                {postThumbnailUrl && (
+                    <Box
+                        component="img"
+                        alt=""
+                        src={postThumbnailUrl}
+                        sx={{
+                            borderRadius: "6px",
+                            display: "block",
+                            height: 44,
+                            objectFit: "cover",
+                            objectPosition: "center",
+                            width: 44,
+                        }}
+                    />
+                )}
+            </Box>
+        </Box>
+    );
+};
+
+interface ConversationSectionItem {
+    conversations: SpaceMessageConversation[];
+    title: string;
+}
+
+const ConversationSection: React.FC<{
+    conversations: SpaceMessageConversation[];
+    onOpenThread: (conversation: SpaceMessageConversation) => void;
+    profile: SetupProfile;
+    title: string;
+}> = ({ conversations, onOpenThread, profile, title }) => {
+    if (conversations.length == 0) return null;
+
+    return (
+        <Box component="section" sx={{ mb: "10px" }}>
+            <Box
+                component="h2"
+                sx={{
+                    color: textSecondary,
+                    fontFamily: '"Inter Variable", Inter, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    lineHeight: "18px",
+                    m: 0,
+                    pb: "4px",
+                    pt: "12px",
+                }}
+            >
+                {title}
+            </Box>
+            <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+                {conversations.map((conversation) => (
+                    <ConversationListItem
+                        key={conversationId(conversation)}
+                        conversation={conversation}
+                        onOpenThread={onOpenThread}
+                        profile={profile}
+                    />
+                ))}
             </Box>
         </Box>
     );
@@ -833,12 +1020,12 @@ const MessageBubble: React.FC<{
 
 export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     conversations,
-    friends,
+    friendsCount,
     isConversationsLoading = false,
-    isFriendsLoaded = false,
     isThreadLoading = false,
     isThreadReadOnly = false,
     messages,
+    newConversationIds = [],
     onBack,
     onCloseThread,
     onDeleteMessage,
@@ -847,6 +1034,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     onReplyToMessage,
     onSendMessage,
     onSetMessageLiked,
+    onShareProfileLink,
     profile,
     selectedFriend,
 }) => {
@@ -856,11 +1044,17 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const [replyingTo, setReplyingTo] = React.useState<SpaceMessage | null>(
         null,
     );
-    const [sendPhase, setSendPhase] = React.useState<
-        "done" | "idle" | "sending"
-    >("idle");
+    const [sendPhase, setSendPhase] = React.useState<"idle" | "sending">(
+        "idle",
+    );
     const composerRef = React.useRef<HTMLTextAreaElement | null>(null);
     const threadScrollRef = React.useRef<HTMLDivElement | null>(null);
+    const stickToThreadBottomRef = React.useRef(true);
+    const smoothNextMessageScrollRef = React.useRef(false);
+    const bottomScrollFrameRef = React.useRef<number | undefined>(undefined);
+    const bottomScrollSecondFrameRef = React.useRef<number | undefined>(
+        undefined,
+    );
     const isThreadOpen = Boolean(selectedFriend);
     const canInteract = isThreadOpen && !isThreadReadOnly;
     const canSend =
@@ -868,12 +1062,63 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const selectedName = selectedFriend
         ? selectedFriend.fullName.trim() || selectedFriend.username
         : "";
-    const isSendStatus = sendPhase != "idle";
-    const isSendButtonActive = canSend || isSendStatus;
+    const showInviteEmptyState =
+        friendsCount == 0 && Boolean(onShareProfileLink);
     const messageByID = React.useMemo(
         () => new Map(messages.map((message) => [message.id, message])),
         [messages],
     );
+    const groupedConversations = React.useMemo(() => {
+        const newIds = new Set(newConversationIds);
+        const now = Date.now();
+        const today = new Date(now);
+        const startOfTodayMs = new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate(),
+        ).getTime();
+        const startOfYesterdayMs = new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate() - 1,
+        ).getTime();
+        const nextSections: ConversationSectionItem[] = [
+            { title: "New", conversations: [] },
+            { title: "Today", conversations: [] },
+            { title: "Yesterday", conversations: [] },
+            { title: "Last 7 days", conversations: [] },
+            { title: "Last 30 days", conversations: [] },
+            { title: "Older", conversations: [] },
+        ];
+        for (const conversation of conversations) {
+            if (newIds.has(conversationId(conversation))) {
+                nextSections[0]!.conversations.push(conversation);
+                continue;
+            }
+
+            const activityCreatedAtMs = conversation.latestActivity.createdAtMs;
+            if (activityCreatedAtMs >= startOfTodayMs) {
+                nextSections[1]!.conversations.push(conversation);
+                continue;
+            }
+            if (activityCreatedAtMs >= startOfYesterdayMs) {
+                nextSections[2]!.conversations.push(conversation);
+                continue;
+            }
+
+            const ageMs = Math.max(0, now - activityCreatedAtMs);
+            if (ageMs <= 7 * dayMs) {
+                nextSections[3]!.conversations.push(conversation);
+                continue;
+            }
+            if (ageMs <= 30 * dayMs) {
+                nextSections[4]!.conversations.push(conversation);
+                continue;
+            }
+            nextSections[5]!.conversations.push(conversation);
+        }
+        return nextSections;
+    }, [conversations, newConversationIds]);
     const isContextMessageLiked = Boolean(
         messageContextMenu?.message.viewerLiked,
     );
@@ -882,6 +1127,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         const text = messageText.trim();
         if (!selectedFriend || !canInteract || !canSend) return;
         const spaceId = selectedFriend.spaceId ?? selectedFriend.id;
+        stickToThreadBottomRef.current = true;
+        smoothNextMessageScrollRef.current = true;
         setSendPhase("sending");
         const sendPromise = replyingTo
             ? onReplyToMessage(spaceId, replyingTo.id, text)
@@ -890,10 +1137,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             .then(() => {
                 setMessageText("");
                 setReplyingTo(null);
-                setSendPhase("done");
-                window.setTimeout(() => setSendPhase("idle"), 900);
+                setSendPhase("idle");
             })
             .catch((error: unknown) => {
+                smoothNextMessageScrollRef.current = false;
                 console.error("Failed to send message", error);
                 setSendPhase("idle");
             });
@@ -907,6 +1154,23 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     };
 
     const closeMessageActions = () => setMessageContextMenu(null);
+
+    const shareProfileLink = async () => {
+        if (!onShareProfileLink) return;
+        const profileLink = await onShareProfileLink();
+
+        if (typeof navigator.share == "function") {
+            try {
+                await navigator.share({ url: profileLink });
+                return;
+            } catch (error) {
+                if (error instanceof DOMException && error.name == "AbortError")
+                    return;
+            }
+        }
+
+        await copyTextToClipboard(profileLink);
+    };
 
     const handleMessageAction = (
         action: "copy" | "delete" | "like" | "reply",
@@ -946,21 +1210,68 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         }
     };
 
-    const handleComposerKeyDown = (event: React.KeyboardEvent) => {
-        if (event.key != "Enter" || event.shiftKey) return;
+    const scrollThreadToBottom = React.useCallback(
+        (behavior: ScrollBehavior = "auto") => {
+            const scroller = threadScrollRef.current;
+            if (!scroller) return;
 
-        event.preventDefault();
-        sendMessage();
+            if (behavior == "smooth") {
+                scroller.scrollTo({ behavior, top: scroller.scrollHeight });
+                return;
+            }
+
+            scroller.scrollTop = scroller.scrollHeight;
+        },
+        [],
+    );
+
+    const scheduleThreadBottomScroll = React.useCallback(
+        (behavior: ScrollBehavior = "auto") => {
+            if (bottomScrollFrameRef.current != undefined) {
+                window.cancelAnimationFrame(bottomScrollFrameRef.current);
+            }
+            if (bottomScrollSecondFrameRef.current != undefined) {
+                window.cancelAnimationFrame(bottomScrollSecondFrameRef.current);
+            }
+
+            bottomScrollFrameRef.current = window.requestAnimationFrame(() => {
+                bottomScrollFrameRef.current = undefined;
+                bottomScrollSecondFrameRef.current =
+                    window.requestAnimationFrame(() => {
+                        bottomScrollSecondFrameRef.current = undefined;
+                        scrollThreadToBottom(behavior);
+                    });
+            });
+        },
+        [scrollThreadToBottom],
+    );
+
+    const handleThreadScroll = () => {
+        const scroller = threadScrollRef.current;
+        if (!scroller) return;
+        stickToThreadBottomRef.current = isThreadNearBottom(scroller);
+    };
+
+    const handleComposerFocus = () => {
+        const scroller = threadScrollRef.current;
+        if (scroller && !isThreadNearBottom(scroller)) return;
+        stickToThreadBottomRef.current = true;
+        scheduleThreadBottomScroll("smooth");
     };
 
     React.useLayoutEffect(() => {
         resizeComposer(composerRef.current);
-    }, [messageText, replyingTo]);
+        if (!selectedFriend || !stickToThreadBottomRef.current) return;
+        if (smoothNextMessageScrollRef.current) return;
+        scrollThreadToBottom();
+    }, [messageText, replyingTo, scrollThreadToBottom, selectedFriend]);
 
     React.useEffect(() => {
         setReplyingTo(null);
         setMessageContextMenu(null);
         setMessageText("");
+        stickToThreadBottomRef.current = true;
+        smoothNextMessageScrollRef.current = false;
     }, [selectedFriend]);
 
     React.useEffect(() => {
@@ -972,12 +1283,130 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
 
     React.useLayoutEffect(() => {
         if (!selectedFriend || isThreadLoading) return;
+        if (!stickToThreadBottomRef.current) return;
+        if (smoothNextMessageScrollRef.current) {
+            smoothNextMessageScrollRef.current = false;
+            scheduleThreadBottomScroll("smooth");
+            return;
+        }
+        scrollThreadToBottom();
+    }, [
+        isThreadLoading,
+        messages.length,
+        scheduleThreadBottomScroll,
+        scrollThreadToBottom,
+        selectedFriend,
+    ]);
 
-        const scroller = threadScrollRef.current;
-        if (!scroller) return;
+    React.useEffect(() => {
+        if (!isThreadOpen) return;
 
-        scroller.scrollTop = scroller.scrollHeight;
-    }, [isThreadLoading, messages.length, selectedFriend]);
+        const html = document.documentElement;
+        const body = document.body;
+        const previous = {
+            bodyBackground: body.style.backgroundColor,
+            bodyHeight: body.style.height,
+            bodyOverscroll: body.style.overscrollBehavior,
+            bodyOverflow: body.style.overflow,
+            htmlBackground: html.style.backgroundColor,
+            htmlHeight: html.style.height,
+            htmlOverscroll: html.style.overscrollBehavior,
+            htmlOverflow: html.style.overflow,
+            viewportTop: html.style.getPropertyValue(
+                "--space-messages-viewport-top",
+            ),
+            viewportHeight: html.style.getPropertyValue(
+                "--space-messages-viewport-height",
+            ),
+        };
+
+        const updateViewportHeight = () => {
+            const viewport = window.visualViewport;
+            const height = viewport?.height ?? window.innerHeight;
+            const top = viewport?.offsetTop ?? 0;
+            html.style.setProperty("--space-messages-viewport-top", `${top}px`);
+            html.style.setProperty(
+                "--space-messages-viewport-height",
+                `${height}px`,
+            );
+
+            if (
+                document.activeElement == composerRef.current &&
+                stickToThreadBottomRef.current
+            ) {
+                scheduleThreadBottomScroll();
+            }
+        };
+
+        updateViewportHeight();
+        window.addEventListener("resize", updateViewportHeight);
+        window.addEventListener("orientationchange", updateViewportHeight);
+        window.visualViewport?.addEventListener("resize", updateViewportHeight);
+        window.visualViewport?.addEventListener("scroll", updateViewportHeight);
+
+        html.style.backgroundColor = threadBackground;
+        html.style.height = "100%";
+        html.style.overflow = "hidden";
+        html.style.overscrollBehavior = "none";
+        body.style.backgroundColor = threadBackground;
+        body.style.height = "100%";
+        body.style.overflow = "hidden";
+        body.style.overscrollBehavior = "none";
+
+        return () => {
+            window.removeEventListener("resize", updateViewportHeight);
+            window.removeEventListener(
+                "orientationchange",
+                updateViewportHeight,
+            );
+            window.visualViewport?.removeEventListener(
+                "resize",
+                updateViewportHeight,
+            );
+            window.visualViewport?.removeEventListener(
+                "scroll",
+                updateViewportHeight,
+            );
+
+            if (previous.viewportHeight) {
+                html.style.setProperty(
+                    "--space-messages-viewport-height",
+                    previous.viewportHeight,
+                );
+            } else {
+                html.style.removeProperty("--space-messages-viewport-height");
+            }
+            if (previous.viewportTop) {
+                html.style.setProperty(
+                    "--space-messages-viewport-top",
+                    previous.viewportTop,
+                );
+            } else {
+                html.style.removeProperty("--space-messages-viewport-top");
+            }
+
+            html.style.backgroundColor = previous.htmlBackground;
+            html.style.height = previous.htmlHeight;
+            html.style.overflow = previous.htmlOverflow;
+            html.style.overscrollBehavior = previous.htmlOverscroll;
+            body.style.backgroundColor = previous.bodyBackground;
+            body.style.height = previous.bodyHeight;
+            body.style.overflow = previous.bodyOverflow;
+            body.style.overscrollBehavior = previous.bodyOverscroll;
+        };
+    }, [isThreadOpen, scheduleThreadBottomScroll]);
+
+    React.useEffect(
+        () => () => {
+            if (bottomScrollFrameRef.current != undefined) {
+                window.cancelAnimationFrame(bottomScrollFrameRef.current);
+            }
+            if (bottomScrollSecondFrameRef.current != undefined) {
+                window.cancelAnimationFrame(bottomScrollSecondFrameRef.current);
+            }
+        },
+        [],
+    );
 
     return (
         <Box
@@ -986,17 +1415,35 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 bgcolor: isThreadOpen ? threadBackground : messagesBackground,
                 color: isThreadOpen ? threadText : textBase,
                 display: "grid",
-                minHeight: "100svh",
+                height: isThreadOpen
+                    ? "var(--space-messages-viewport-height, 100svh)"
+                    : undefined,
+                left: isThreadOpen ? 0 : undefined,
+                minHeight: isThreadOpen ? 0 : "100svh",
+                overflow: isThreadOpen ? "hidden" : undefined,
                 overflowX: "hidden",
                 placeItems: { xs: "stretch", sm: "start center" },
+                position: isThreadOpen ? "fixed" : undefined,
+                right: isThreadOpen ? 0 : undefined,
+                top: isThreadOpen
+                    ? "var(--space-messages-viewport-top, 0px)"
+                    : undefined,
             }}
         >
             <Box
                 sx={{
                     bgcolor: "inherit",
                     boxSizing: "border-box",
-                    minHeight: "100svh",
+                    display: isThreadOpen ? "grid" : undefined,
+                    gridTemplateRows: isThreadOpen
+                        ? isThreadReadOnly
+                            ? "56px minmax(0, 1fr)"
+                            : "56px minmax(0, 1fr) auto"
+                        : undefined,
+                    height: isThreadOpen ? "100%" : undefined,
+                    minHeight: isThreadOpen ? 0 : "100svh",
                     mx: "auto",
+                    overflow: isThreadOpen ? "hidden" : undefined,
                     position: "relative",
                     width: "100%",
                     "@media (min-width: 600px)": { maxWidth: 390 },
@@ -1016,9 +1463,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     <Box
                         component="button"
                         type="button"
-                        aria-label={
-                            isThreadOpen ? "Back to notifications" : "Back"
-                        }
+                        aria-label={isThreadOpen ? "Back to messages" : "Back"}
                         onClick={isThreadOpen ? onCloseThread : onBack}
                         sx={{
                             alignItems: "center",
@@ -1120,7 +1565,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                 whiteSpace: "nowrap",
                             }}
                         >
-                            Notifications
+                            Messages
                         </Box>
                     )}
                     <Box aria-hidden />
@@ -1130,13 +1575,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     <>
                         <Box
                             ref={threadScrollRef}
+                            onScroll={handleThreadScroll}
                             sx={{
                                 boxSizing: "border-box",
-                                height: isThreadReadOnly
-                                    ? "calc(100svh - 56px)"
-                                    : replyingTo
-                                      ? "calc(100svh - 56px - 142px - env(safe-area-inset-bottom))"
-                                      : "calc(100svh - 56px - 72px - env(safe-area-inset-bottom))",
+                                minHeight: 0,
+                                overscrollBehaviorY: "contain",
                                 overflowY: "auto",
                                 px: "14px",
                                 py: "12px",
@@ -1398,16 +1841,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                             <Box
                                 sx={{
                                     bgcolor: threadBackground,
-                                    bottom: 0,
                                     boxSizing: "border-box",
                                     display: "grid",
                                     gap: "8px",
-                                    left: 0,
-                                    maxWidth: { sm: 390 },
-                                    mx: { sm: "auto" },
                                     p: "10px 14px calc(10px + env(safe-area-inset-bottom))",
-                                    position: "fixed",
-                                    right: 0,
                                     width: "100%",
                                 }}
                             >
@@ -1525,7 +1962,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             setMessageText(nextText);
                                             resizeComposer(event.currentTarget);
                                         }}
-                                        onKeyDown={handleComposerKeyDown}
+                                        onFocus={handleComposerFocus}
                                         placeholder="Message"
                                         rows={1}
                                         value={messageText}
@@ -1562,32 +1999,19 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     <Box
                                         component="button"
                                         type="button"
-                                        aria-label={
-                                            sendPhase == "sending"
-                                                ? "Sending"
-                                                : sendPhase == "done"
-                                                  ? "Sent"
-                                                  : "Send message"
-                                        }
+                                        aria-label="Send message"
                                         disabled={!canSend}
                                         onClick={sendMessage}
                                         sx={{
                                             alignItems: "center",
-                                            bgcolor: isSendStatus
-                                                ? threadSurfaceHover
-                                                : canSend
-                                                  ? "#FFFFFF"
-                                                  : threadSurfaceHover,
+                                            bgcolor: canSend
+                                                ? "#FFFFFF"
+                                                : threadSurfaceHover,
                                             border: 0,
                                             borderRadius: "50%",
-                                            color:
-                                                sendPhase == "sending"
-                                                    ? "#D8D8D8"
-                                                    : sendPhase == "done"
-                                                      ? green
-                                                      : canSend
-                                                        ? "#3A3A3A"
-                                                        : "#D8D8D8",
+                                            color: canSend
+                                                ? "#3A3A3A"
+                                                : "#D8D8D8",
                                             cursor: canSend
                                                 ? "pointer"
                                                 : "default",
@@ -1595,12 +2019,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             flexShrink: 0,
                                             height: composerHeight,
                                             justifyContent: "center",
-                                            opacity:
-                                                sendPhase == "sending"
-                                                    ? 0.72
-                                                    : isSendButtonActive
-                                                      ? 1
-                                                      : 0.42,
+                                            opacity: canSend ? 1 : 0.42,
                                             p: 0,
                                             transition:
                                                 "background-color 180ms ease, color 180ms ease, opacity 180ms ease, transform 120ms ease",
@@ -1615,61 +2034,26 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 outlineOffset: 2,
                                             },
                                             "&:hover": {
-                                                bgcolor: isSendStatus
-                                                    ? threadSurfaceHover
-                                                    : canSend
-                                                      ? "#F2F2F2"
-                                                      : "rgba(255, 255, 255, 0.14)",
+                                                bgcolor: canSend
+                                                    ? "#F2F2F2"
+                                                    : "rgba(255, 255, 255, 0.14)",
                                             },
                                         }}
                                     >
-                                        {sendPhase == "sending" ? (
-                                            <Box
-                                                component="span"
-                                                sx={{
-                                                    animation: `${sendSpin} 1s linear infinite`,
-                                                    display: "flex",
-                                                    transform: "none",
-                                                }}
-                                            >
-                                                <HugeiconsIcon
-                                                    icon={Loading03Icon}
-                                                    size={22}
-                                                    strokeWidth={1.8}
-                                                />
-                                            </Box>
-                                        ) : sendPhase == "done" ? (
-                                            <Box
-                                                component="span"
-                                                sx={{
-                                                    display: "flex",
-                                                    transform:
-                                                        "translate(-1px, 1px)",
-                                                }}
-                                            >
-                                                <HugeiconsIcon
-                                                    icon={Tick02Icon}
-                                                    primaryColor={green}
-                                                    size={22}
-                                                    strokeWidth={1.8}
-                                                />
-                                            </Box>
-                                        ) : (
-                                            <Box
-                                                component="span"
-                                                sx={{
-                                                    display: "flex",
-                                                    transform:
-                                                        "translate(-1px, 1px)",
-                                                }}
-                                            >
-                                                <HugeiconsIcon
-                                                    icon={Navigation03Icon}
-                                                    size={24}
-                                                    strokeWidth={1.8}
-                                                />
-                                            </Box>
-                                        )}
+                                        <Box
+                                            component="span"
+                                            sx={{
+                                                display: "flex",
+                                                transform:
+                                                    "translate(-1px, 1px)",
+                                            }}
+                                        >
+                                            <HugeiconsIcon
+                                                icon={Navigation03Icon}
+                                                size={24}
+                                                strokeWidth={1.8}
+                                            />
+                                        </Box>
                                     </Box>
                                 </Box>
                             </Box>
@@ -1698,6 +2082,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     boxSizing: "border-box",
                                     display: "flex",
                                     flexDirection: "column",
+                                    gap: "22px",
                                     inset: 0,
                                     justifyContent: "center",
                                     pointerEvents: "none",
@@ -1716,197 +2101,66 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         fontWeight: 500,
                                         lineHeight: "20px",
                                         m: 0,
+                                        maxWidth: 260,
                                     }}
                                 >
-                                    No notifications yet
+                                    {showInviteEmptyState
+                                        ? "No messages yet. Invite people to start conversations here."
+                                        : "No messages yet."}
                                 </Box>
+                                {showInviteEmptyState && (
+                                    <Box
+                                        component="button"
+                                        type="button"
+                                        onClick={() => void shareProfileLink()}
+                                        sx={{
+                                            alignItems: "center",
+                                            bgcolor: "#F2F2F2",
+                                            border: 0,
+                                            borderRadius: "18px",
+                                            color: textBase,
+                                            cursor: "pointer",
+                                            display: "inline-flex",
+                                            fontFamily:
+                                                '"Inter Variable", Inter, sans-serif',
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            gap: "6px",
+                                            height: 36,
+                                            justifyContent: "center",
+                                            lineHeight: "18px",
+                                            pointerEvents: "auto",
+                                            px: "14px",
+                                            whiteSpace: "nowrap",
+                                            "&:focus-visible": {
+                                                outline: `2px solid ${green}`,
+                                                outlineOffset: 2,
+                                            },
+                                            "&:hover": { bgcolor: "#E8E8E8" },
+                                        }}
+                                    >
+                                        <ShareIcon />
+                                        Invite people
+                                    </Box>
+                                )}
                             </Box>
                         ) : (
                             <Box
-                                component="ul"
                                 sx={{
                                     boxSizing: "border-box",
-                                    listStyle: "none",
                                     m: 0,
-                                    p: "12px 16px 28px",
+                                    p: "6px 16px 28px",
                                 }}
                             >
-                                {conversations.map((conversation) => {
-                                    const name =
-                                        conversation.friend.fullName.trim() ||
-                                        conversation.friend.username;
-                                    const currentlyFriends = isCurrentFriend(
-                                        conversation.friend,
-                                        friends,
-                                    );
-                                    const timestampLabel = formatTimeAgo(
-                                        microsForTimestamp(
-                                            conversation.latestActivity
-                                                .createdAtMs,
-                                        ),
-                                    );
-                                    const postThumbnailUrl =
-                                        conversation.latestActivity.post
-                                            ?.imageUrl;
-                                    return (
-                                        <Box
-                                            component="li"
-                                            key={conversation.friend.id}
-                                            sx={{ listStyle: "none" }}
-                                        >
-                                            <Box
-                                                component="button"
-                                                type="button"
-                                                onClick={() =>
-                                                    onOpenThread(conversation)
-                                                }
-                                                sx={{
-                                                    alignItems: "center",
-                                                    appearance: "none",
-                                                    bgcolor: "transparent",
-                                                    border: 0,
-                                                    borderRadius: "8px",
-                                                    color: textBase,
-                                                    cursor: "pointer",
-                                                    display: "grid",
-                                                    gap: "10px",
-                                                    gridTemplateColumns:
-                                                        postThumbnailUrl
-                                                            ? "44px minmax(0, 1fr) 44px"
-                                                            : "44px minmax(0, 1fr)",
-                                                    minHeight: 64,
-                                                    p: "8px 0",
-                                                    textAlign: "left",
-                                                    width: "100%",
-                                                    "&:focus-visible": {
-                                                        outline: `2px solid ${green}`,
-                                                        outlineOffset: 2,
-                                                    },
-                                                }}
-                                            >
-                                                <Avatar
-                                                    avatarUrl={
-                                                        conversation.friend
-                                                            .avatarUrl
-                                                    }
-                                                    name={name}
-                                                    size={44}
-                                                />
-                                                <Box sx={{ minWidth: 0 }}>
-                                                    <Box
-                                                        sx={{
-                                                            alignItems:
-                                                                "center",
-                                                            display: "flex",
-                                                            gap: "4px",
-                                                            minWidth: 0,
-                                                        }}
-                                                    >
-                                                        <Box
-                                                            sx={{
-                                                                flex: "0 1 auto",
-                                                                fontFamily:
-                                                                    '"Inter Variable", Inter, sans-serif',
-                                                                fontSize: 14,
-                                                                fontWeight: 700,
-                                                                lineHeight:
-                                                                    "20px",
-                                                                minWidth: 0,
-                                                                overflow:
-                                                                    "hidden",
-                                                                textOverflow:
-                                                                    "ellipsis",
-                                                                whiteSpace:
-                                                                    "nowrap",
-                                                            }}
-                                                        >
-                                                            {firstNameFrom(
-                                                                name,
-                                                            )}
-                                                        </Box>
-                                                        <Box
-                                                            aria-hidden
-                                                            component="span"
-                                                            sx={{
-                                                                color: textSecondary,
-                                                                flexShrink: 0,
-                                                                fontFamily:
-                                                                    '"Inter Variable", Inter, sans-serif',
-                                                                fontSize: 12,
-                                                                fontWeight: 600,
-                                                                lineHeight:
-                                                                    "16px",
-                                                            }}
-                                                        >
-                                                            &middot;
-                                                        </Box>
-                                                        <Box
-                                                            component="time"
-                                                            dateTime={new Date(
-                                                                conversation.latestActivity.createdAtMs,
-                                                            ).toISOString()}
-                                                            sx={{
-                                                                color: textSecondary,
-                                                                flexShrink: 0,
-                                                                fontFamily:
-                                                                    '"Inter Variable", Inter, sans-serif',
-                                                                fontSize: 12,
-                                                                fontWeight: 600,
-                                                                lineHeight:
-                                                                    "16px",
-                                                                whiteSpace:
-                                                                    "nowrap",
-                                                            }}
-                                                        >
-                                                            {timestampLabel}
-                                                        </Box>
-                                                        {conversation.unread && (
-                                                            <Box
-                                                                aria-hidden
-                                                                sx={{
-                                                                    bgcolor:
-                                                                        green,
-                                                                    borderRadius:
-                                                                        "50%",
-                                                                    flexShrink: 0,
-                                                                    height: 8,
-                                                                    width: 8,
-                                                                }}
-                                                            />
-                                                        )}
-                                                    </Box>
-                                                    <ConversationPreviewLine
-                                                        conversation={
-                                                            conversation
-                                                        }
-                                                        currentlyFriends={
-                                                            isFriendsLoaded
-                                                                ? currentlyFriends
-                                                                : undefined
-                                                        }
-                                                        profile={profile}
-                                                    />
-                                                </Box>
-                                                {postThumbnailUrl && (
-                                                    <Box
-                                                        component="img"
-                                                        alt=""
-                                                        src={postThumbnailUrl}
-                                                        sx={{
-                                                            borderRadius: "6px",
-                                                            display: "block",
-                                                            height: 44,
-                                                            objectFit: "cover",
-                                                            objectPosition:
-                                                                "center",
-                                                            width: 44,
-                                                        }}
-                                                    />
-                                                )}
-                                            </Box>
-                                        </Box>
-                                    );
-                                })}
+                                {groupedConversations.map((section) => (
+                                    <ConversationSection
+                                        key={section.title}
+                                        conversations={section.conversations}
+                                        onOpenThread={onOpenThread}
+                                        profile={profile}
+                                        title={section.title}
+                                    />
+                                ))}
                             </Box>
                         )}
                     </>

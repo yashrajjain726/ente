@@ -1,14 +1,6 @@
 export const firstNameFrom = (name: string) =>
     name.trim().split(/\s+/)[0] || name;
 
-export const initialsFor = (name: string) =>
-    name
-        .trim()
-        .split(/\s+/)
-        .slice(0, 1)
-        .map((part) => part[0]?.toUpperCase())
-        .join("");
-
 export const formatSpaceDate = (timestampMs: number): string => {
     const now = Date.now();
     const diff = now - timestampMs;

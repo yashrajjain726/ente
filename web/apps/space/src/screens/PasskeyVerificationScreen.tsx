@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React from "react";
 
 export const passkeyVerificationBackground = "#FAFAFA";
@@ -7,7 +8,6 @@ const green = "#08C225";
 const primaryLight = "#DDEEDF";
 const primaryDark = "#069D1E";
 const textBase = "#000";
-const textLight = "#969696";
 const warning = "#F63A3A";
 
 export type PasskeyVerificationStatus = "waiting" | "checking" | "pending";
@@ -269,13 +269,15 @@ export const PasskeyVerificationScreen: React.FC<
                         component="button"
                         type="button"
                         disabled={isChecking}
+                        aria-label={isChecking ? "Checking status" : undefined}
+                        aria-busy={isChecking ? true : undefined}
                         onClick={onCheckStatus}
                         sx={{
                             alignItems: "center",
                             bgcolor: primaryLight,
                             border: 0,
                             borderRadius: "20px",
-                            color: isChecking ? textLight : primaryDark,
+                            color: primaryDark,
                             cursor: isChecking ? "default" : "pointer",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -292,7 +294,7 @@ export const PasskeyVerificationScreen: React.FC<
                             },
                         }}
                     >
-                        {isChecking ? "Checking..." : "Check status"}
+                        {isChecking ? <SpaceButtonSpinner /> : "Check status"}
                     </Box>
                 </Box>
             </Box>

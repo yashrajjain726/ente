@@ -3,6 +3,10 @@
         repeat;
 }
 
+:where(a, button, [role="button"]) {
+    -webkit-tap-highlight-color: transparent;
+}
+
 .pswp-space-viewer {
     --pswp-root-z-index: 0;
     --pswp-bg: #000000;

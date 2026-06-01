@@ -206,6 +206,7 @@ const Page: React.FC = () => {
                         ? ""
                         : undefined
                 }
+                isResending={isResending}
                 isSubmitting={isSubmitting}
                 onBack={() =>
                     void router.push(

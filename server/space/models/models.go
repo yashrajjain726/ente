@@ -208,11 +208,11 @@ type SpaceSlugAvailabilityResponse struct {
 }
 
 type RotateSpaceKeyRequest struct {
-	SpaceID           string  `json:"spaceId"`
-	KeyVersion        int     `json:"keyVersion"`
-	EncryptedSpaceKey string  `json:"encryptedSpaceKey"`
-	WrappedPrevKey    string  `json:"wrappedPrevKey"`
-	EncryptedProfile  *string `json:"encryptedProfile,omitempty"`
+	SpaceID           string `json:"spaceId"`
+	KeyVersion        int    `json:"keyVersion"`
+	EncryptedSpaceKey string `json:"encryptedSpaceKey"`
+	WrappedPrevKey    string `json:"wrappedPrevKey"`
+	EncryptedProfile  string `json:"encryptedProfile"`
 }
 
 type SpaceKeyVersionResponse struct {
@@ -311,15 +311,18 @@ type MessagePage struct {
 }
 
 type MessageConversationResponse struct {
-	Friend         SpaceActorResponse                  `json:"friend"`
-	LatestActivity MessageConversationActivityResponse `json:"latestActivity"`
-	Unread         bool                                `json:"unread"`
+	Friend             SpaceActorResponse                  `json:"friend"`
+	LatestActivity     MessageConversationActivityResponse `json:"latestActivity"`
+	Unread             bool                                `json:"unread"`
+	UnreadCount        int64                               `json:"unreadCount"`
+	NotificationUnread bool                                `json:"notificationUnread"`
 }
 
 type MessageConversationActivityResponse struct {
 	ID        string                           `json:"id"`
 	Type      string                           `json:"type"`
 	CreatedAt string                           `json:"createdAt"`
+	Outgoing  bool                             `json:"outgoing,omitempty"`
 	Message   *MessageResponse                 `json:"message,omitempty"`
 	Post      *MessageConversationPostResponse `json:"post,omitempty"`
 }
@@ -342,11 +345,7 @@ type PostObjectPayload struct {
 	ObjectKey      string `json:"objectKey"`
 	Size           int64  `json:"size,omitempty"`
 	Position       int    `json:"position,omitempty"`
-	Variant        string `json:"variant,omitempty"`
-	BlurHashCipher string `json:"blurHashCipher,omitempty"`
-	Width          int    `json:"width,omitempty"`
-	Height         int    `json:"height,omitempty"`
-	MediaType      string `json:"mediaType,omitempty"`
+	MetadataCipher string `json:"metadataCipher,omitempty"`
 }
 
 type PostResponse struct {
@@ -362,16 +361,10 @@ type PostResponse struct {
 	CreatedAt        string              `json:"createdAt"`
 	Likes            int64               `json:"likes"`
 	ViewerLiked      bool                `json:"viewerLiked"`
-	ViewerUnread     bool                `json:"viewerUnread"`
 }
 
 type SpaceUnreadStatusResponse struct {
-	FeedUnread          bool `json:"feedUnread"`
 	NotificationsUnread bool `json:"notificationsUnread"`
-}
-
-type MarkFeedReadRequest struct {
-	PostID int64 `json:"postId"`
 }
 
 type MarkNotificationsReadRequest struct {

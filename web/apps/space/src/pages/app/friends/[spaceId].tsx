@@ -5,12 +5,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { friendsBackground } from "screens/FriendsScreen";
 import { ProfileScreen } from "screens/ProfileScreen";
 import {
-    loadCurrentPostLikers,
     loadCurrentSpaceFriends,
-    loadCurrentSpacePostsPage,
+    loadCurrentSpacePostAssetURL,
     loadCurrentSpaceProfile,
+    loadCurrentSpaceProfilePostsPage,
+    replyToCurrentPost,
     setCurrentPostLiked,
-    type SpacePost,
+    type SpaceProfilePost,
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
 import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
@@ -44,12 +45,29 @@ const Page: React.FC = () => {
             friend.spaceId == friendSpaceId || friend.id == friendSpaceId,
     );
     const [friendsLoadAttempted, setFriendsLoadAttempted] = useState(false);
+    const [isProfileLoading, setIsProfileLoading] = useState(false);
+    const [isPostsLoading, setIsPostsLoading] = useState(false);
+    const [loadedProfileSpaceId, setLoadedProfileSpaceId] = useState<string>();
+    const [loadedPostsSpaceId, setLoadedPostsSpaceId] = useState<string>();
     const [selectedProfile, setSelectedProfile] = useState(selectedFriend);
-    const [posts, setPosts] = useState<SpacePost[]>([]);
+    const [posts, setPosts] = useState<SpaceProfilePost[]>([]);
     const postGroups = useMemo(
         () => profilePostGroupsFromPosts(posts),
         [posts],
     );
+    const selectedFriendSpaceId = selectedFriend?.spaceId;
+    const showProfileLoading = Boolean(
+        selectedFriendSpaceId &&
+            (isProfileLoading || loadedProfileSpaceId != selectedFriendSpaceId),
+    );
+    const showPostsLoading = Boolean(
+        selectedFriendSpaceId &&
+            (isPostsLoading || loadedPostsSpaceId != selectedFriendSpaceId),
+    );
+    const currentSelectedProfile =
+        selectedProfile?.spaceId == selectedFriendSpaceId
+            ? selectedProfile
+            : undefined;
 
     useEffect(() => {
         if (!router.isReady) return;
@@ -84,27 +102,53 @@ const Page: React.FC = () => {
     }, [profile?.spaceId, setFriends]);
 
     useEffect(() => {
-        if (!selectedFriend?.spaceId) return;
+        if (!selectedFriendSpaceId) {
+            setIsProfileLoading(false);
+            setIsPostsLoading(false);
+            setLoadedProfileSpaceId(undefined);
+            setLoadedPostsSpaceId(undefined);
+            setSelectedProfile(undefined);
+            setPosts([]);
+            return;
+        }
 
         let cancelled = false;
-        setSelectedProfile(selectedFriend);
-        void Promise.all([
-            loadCurrentSpaceProfile(selectedFriend.spaceId),
-            loadCurrentSpacePostsPage(selectedFriend.spaceId),
-        ])
-            .then(([nextProfile, page]) => {
+        setSelectedProfile(undefined);
+        setPosts([]);
+        setIsProfileLoading(true);
+        setIsPostsLoading(true);
+        void loadCurrentSpaceProfile(selectedFriendSpaceId)
+            .then((nextProfile) => {
                 if (cancelled) return;
                 setSelectedProfile(nextProfile);
-                setPosts(page.items);
+            })
+            .catch((error: unknown) =>
+                console.error("Failed to load friend profile", error),
+            )
+            .finally(() => {
+                if (!cancelled) {
+                    setLoadedProfileSpaceId(selectedFriendSpaceId);
+                    setIsProfileLoading(false);
+                }
+            });
+        void loadCurrentSpaceProfilePostsPage(selectedFriendSpaceId)
+            .then((page) => {
+                if (!cancelled) setPosts(page.items);
             })
             .catch((error: unknown) =>
                 console.error("Failed to load friend posts", error),
-            );
+            )
+            .finally(() => {
+                if (!cancelled) {
+                    setLoadedPostsSpaceId(selectedFriendSpaceId);
+                    setIsPostsLoading(false);
+                }
+            });
 
         return () => {
             cancelled = true;
         };
-    }, [selectedFriend]);
+    }, [selectedFriendSpaceId]);
 
     const goBack = () => {
         if (typeof window != "undefined" && window.history.length > 1) {
@@ -133,31 +177,38 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={friendsBackground} />
             <ProfileScreen
                 friendsCount={
-                    selectedProfile?.friendsCount ?? selectedFriend.friendsCount
+                    currentSelectedProfile?.friendsCount ??
+                    selectedFriend.friendsCount
                 }
                 headerVariant="friend"
+                isCoverLoading={showProfileLoading}
+                isPostsLoading={showPostsLoading}
+                isStatsLoading={showProfileLoading || showPostsLoading}
                 postGroups={postGroups}
                 profile={{
                     avatarUrl:
-                        selectedProfile?.avatarUrl ??
+                        currentSelectedProfile?.avatarUrl ??
                         selectedFriend.avatarUrl ??
                         null,
-                    coverUrl: selectedProfile?.coverUrl ?? null,
-                    coverObjectKey: selectedProfile?.coverObjectKey,
-                    coverUpdatedAt: selectedProfile?.coverUpdatedAt,
+                    coverUrl: currentSelectedProfile?.coverUrl ?? null,
+                    coverObjectKey: currentSelectedProfile?.coverObjectKey,
+                    coverUpdatedAt: currentSelectedProfile?.coverUpdatedAt,
                     fullName:
-                        selectedProfile?.fullName ?? selectedFriend.fullName,
+                        currentSelectedProfile?.fullName ??
+                        selectedFriend.fullName,
                     username:
-                        selectedProfile?.username ?? selectedFriend.username,
-                    spaceId: selectedProfile?.spaceId ?? selectedFriend.spaceId,
+                        currentSelectedProfile?.username ??
+                        selectedFriend.username,
+                    spaceId:
+                        currentSelectedProfile?.spaceId ??
+                        selectedFriend.spaceId,
                     spaceSlug:
-                        selectedProfile?.spaceSlug ?? selectedFriend.spaceSlug,
+                        currentSelectedProfile?.spaceSlug ??
+                        selectedFriend.spaceSlug,
                 }}
                 onBack={goBack}
-                onOpenFriend={(nextFriendID) =>
-                    void router.push(spaceRoutes.friend(nextFriendID))
-                }
-                onLoadPostLikers={loadCurrentPostLikers}
+                onLoadPostImage={loadCurrentSpacePostAssetURL}
+                onReplyToPost={replyToCurrentPost}
                 onSetPostLiked={setCurrentPostLiked}
             />
         </>

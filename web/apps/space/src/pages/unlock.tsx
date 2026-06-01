@@ -32,6 +32,13 @@ const Page: React.FC = () => {
             ? error.message
             : "Couldn't unlock Space. Please try again.";
 
+    const changeEmail = () => {
+        void accountLogout().then(() => {
+            resetAfterLogout();
+            void router.replace(spaceRoutes.onboarding);
+        });
+    };
+
     const handleLoginResult = async (
         result: SpaceLoginResult,
         credentials: SpaceLoginCredentials,
@@ -94,15 +101,10 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={loginBackground} />
             <LoginScreen
                 errorMessage={unlockError}
-                focusPassword
                 initialEmail={email}
                 isSubmitting={isSubmitting}
-                onChangeEmail={() => {
-                    void accountLogout().then(() => {
-                        resetAfterLogout();
-                        void router.replace(spaceRoutes.onboarding);
-                    });
-                }}
+                onBack={changeEmail}
+                onChangeEmail={changeEmail}
                 onContinue={async (credentials) => {
                     setIsSubmitting(true);
                     setUnlockError(undefined);
@@ -117,8 +119,7 @@ const Page: React.FC = () => {
                     }
                 }}
                 readOnlyEmail
-                showBack={false}
-                title="Unlock space"
+                title="Unlock Space"
             />
         </>
     );

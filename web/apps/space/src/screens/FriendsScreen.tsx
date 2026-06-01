@@ -4,7 +4,7 @@ import {
     UserRemove01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Menu, MenuItem } from "@mui/material";
+import { Box, Menu, MenuItem, Skeleton } from "@mui/material";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
     spaceActionDoneDurationMs,
@@ -12,32 +12,45 @@ import {
 } from "components/SpaceActionFeedback";
 import type { FriendProfile } from "data/friends";
 import React, { useState } from "react";
-import { initialsFor } from "utils/spaceDisplay";
 
 export const friendsBackground = "#FFFFFF";
 
 const green = "#08C225";
-const paleGreen = "#E7F6E9";
+const avatarSkeletonBackground = "#E6E6E6";
 const textBase = "#000";
 const textStrong = "#303030";
 const textSoft = "#777777";
 const dangerColor = "#F63A3A";
+const friendAvatarLoadRootMargin = "800px 0px";
+
+const friendAvatarCacheKey = (friend: FriendProfile) =>
+    [
+        friend.id,
+        friend.avatarObjectKey ?? "",
+        friend.avatarUpdatedAt ?? "",
+        friend.avatarSize ?? "",
+    ].join(":");
 
 interface FriendsScreenProps {
     friends: FriendProfile[];
+    onLoadFriendAvatar?: (friend: FriendProfile) => Promise<string | null>;
     onBack?: () => void;
     onOpenFriend?: (friendID: string) => void;
     onUnfriend?: (friendID: string) => Promise<void> | void;
 }
 
 interface FriendRowProps {
+    avatarUrl?: string | null;
     friend: FriendProfile;
+    onLoadAvatar?: () => Promise<string | null | undefined>;
     onOpenFriend?: (friendID: string) => void;
     onUnfriend?: (friendID: string) => void;
 }
 
 const FriendRow: React.FC<FriendRowProps> = ({
+    avatarUrl,
     friend,
+    onLoadAvatar,
     onOpenFriend,
     onUnfriend,
 }) => {
@@ -48,7 +61,10 @@ const FriendRow: React.FC<FriendRowProps> = ({
     const actionsMenuID = `friend-actions-menu-${friend.id}`;
     const actionsButtonID = `friend-actions-button-${friend.id}`;
     const displayName = friend.fullName.trim() || friend.username.trim();
-    const initials = initialsFor(displayName || friend.username);
+    const avatarRef = React.useRef<HTMLDivElement | null>(null);
+    const [shouldLoadAvatar, setShouldLoadAvatar] = useState(
+        Boolean(avatarUrl || !friend.avatarObjectKey),
+    );
 
     const closeActions = () => setActionsAnchor(null);
 
@@ -56,6 +72,42 @@ const FriendRow: React.FC<FriendRowProps> = ({
         closeActions();
         onUnfriend?.(friend.id);
     };
+
+    React.useEffect(() => {
+        if (avatarUrl) setShouldLoadAvatar(true);
+    }, [avatarUrl]);
+
+    React.useEffect(() => {
+        if (shouldLoadAvatar || avatarUrl || !friend.avatarObjectKey) return;
+        const element = avatarRef.current;
+        if (!element) return;
+        if (
+            typeof window == "undefined" ||
+            !("IntersectionObserver" in window)
+        ) {
+            setShouldLoadAvatar(true);
+            return;
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    setShouldLoadAvatar(true);
+                    observer.disconnect();
+                }
+            },
+            { rootMargin: friendAvatarLoadRootMargin },
+        );
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [avatarUrl, friend.avatarObjectKey, shouldLoadAvatar]);
+
+    React.useEffect(() => {
+        if (!shouldLoadAvatar || avatarUrl || !friend.avatarObjectKey) return;
+        void onLoadAvatar?.().catch((error: unknown) => {
+            console.warn("Failed to load friend avatar", error);
+        });
+    }, [avatarUrl, friend.avatarObjectKey, onLoadAvatar, shouldLoadAvatar]);
 
     return (
         <Box
@@ -98,11 +150,11 @@ const FriendRow: React.FC<FriendRowProps> = ({
                 }}
             >
                 <Box
+                    ref={avatarRef}
                     sx={{
                         alignItems: "center",
-                        bgcolor: friend.avatarUrl ? "transparent" : paleGreen,
+                        bgcolor: avatarSkeletonBackground,
                         borderRadius: "50%",
-                        color: green,
                         display: "flex",
                         flexShrink: 0,
                         height: 48,
@@ -111,11 +163,11 @@ const FriendRow: React.FC<FriendRowProps> = ({
                         width: 48,
                     }}
                 >
-                    {friend.avatarUrl ? (
+                    {avatarUrl ? (
                         <Box
                             component="img"
                             alt=""
-                            src={friend.avatarUrl}
+                            src={avatarUrl}
                             sx={{
                                 display: "block",
                                 height: "100%",
@@ -125,17 +177,15 @@ const FriendRow: React.FC<FriendRowProps> = ({
                             }}
                         />
                     ) : (
-                        <Box
+                        <Skeleton
+                            variant="circular"
                             sx={{
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 15,
-                                fontWeight: 800,
-                                lineHeight: 1,
+                                bgcolor: avatarSkeletonBackground,
+                                height: "100%",
+                                transform: "none",
+                                width: "100%",
                             }}
-                        >
-                            {initials}
-                        </Box>
+                        />
                     )}
                 </Box>
                 <Box
@@ -276,6 +326,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
 
 export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     friends,
+    onLoadFriendAvatar,
     onBack,
     onOpenFriend,
     onUnfriend,
@@ -287,7 +338,56 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     const [unfriendErrorMessage, setUnfriendErrorMessage] = React.useState<
         string | null
     >(null);
+    const [loadedAvatarURLsByKey, setLoadedAvatarURLsByKey] = React.useState<
+        Record<string, string>
+    >({});
+    const avatarLoadsInFlightRef = React.useRef<
+        Map<string, Promise<string | null | undefined>>
+    >(new Map());
     const isUnfriendActionRunning = unfriendActionPhase != null;
+
+    const loadedAvatarURLFor = React.useCallback(
+        (friend: FriendProfile) =>
+            friend.avatarUrl ??
+            loadedAvatarURLsByKey[friendAvatarCacheKey(friend)],
+        [loadedAvatarURLsByKey],
+    );
+
+    const loadFriendAvatar = React.useCallback(
+        (friend: FriendProfile) => {
+            const loadedAvatarUrl = loadedAvatarURLFor(friend);
+            if (loadedAvatarUrl) return Promise.resolve(loadedAvatarUrl);
+            if (!friend.avatarObjectKey || !onLoadFriendAvatar) {
+                return Promise.resolve(undefined);
+            }
+
+            const cacheKey = friendAvatarCacheKey(friend);
+            const inFlight = avatarLoadsInFlightRef.current.get(cacheKey);
+            if (inFlight) return inFlight;
+
+            const load = onLoadFriendAvatar(friend)
+                .then((avatarUrl) => {
+                    if (avatarUrl) {
+                        setLoadedAvatarURLsByKey((currentURLs) =>
+                            currentURLs[cacheKey] == avatarUrl
+                                ? currentURLs
+                                : { ...currentURLs, [cacheKey]: avatarUrl },
+                        );
+                    }
+                    return avatarUrl;
+                })
+                .catch((error: unknown) => {
+                    console.warn("Failed to load friend avatar", error);
+                    return undefined;
+                })
+                .finally(() => {
+                    avatarLoadsInFlightRef.current.delete(cacheKey);
+                });
+            avatarLoadsInFlightRef.current.set(cacheKey, load);
+            return load;
+        },
+        [loadedAvatarURLFor, onLoadFriendAvatar],
+    );
 
     const cancelUnfriend = () => {
         if (isUnfriendActionRunning) return;
@@ -423,7 +523,9 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                         {friends.map((friend) => (
                             <FriendRow
                                 key={friend.id}
+                                avatarUrl={loadedAvatarURLFor(friend)}
                                 friend={friend}
+                                onLoadAvatar={() => loadFriendAvatar(friend)}
                                 onOpenFriend={onOpenFriend}
                                 onUnfriend={() => {
                                     setUnfriendErrorMessage(null);

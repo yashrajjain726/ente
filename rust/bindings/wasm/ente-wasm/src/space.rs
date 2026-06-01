@@ -161,11 +161,10 @@ struct PostJs {
     caption: Option<String>,
     encrypted_post_key: String,
     key_version: i32,
-    objects: Vec<ente_space::PostObjectPayload>,
+    objects: Vec<PostObjectJs>,
     created_at: String,
     likes: i64,
     viewer_liked: bool,
-    viewer_unread: bool,
 }
 
 #[derive(Serialize)]
@@ -234,6 +233,8 @@ struct MessageConversationJs {
     friend: ActorJs,
     latest_activity: MessageConversationActivityJs,
     unread: bool,
+    unread_count: i64,
+    notification_unread: bool,
 }
 
 #[derive(Serialize)]
@@ -243,6 +244,7 @@ struct MessageConversationActivityJs {
     #[serde(rename = "type")]
     activity_type: String,
     created_at: String,
+    outgoing: bool,
     message: Option<MessageJs>,
     post: Option<MessageConversationPostJs>,
 }
@@ -255,7 +257,27 @@ struct MessageConversationPostJs {
     space_slug: String,
     owner_user_id: i64,
     is_deleted: bool,
-    objects: Vec<ente_space::PostObjectPayload>,
+    objects: Vec<PostObjectJs>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PostObjectJs {
+    object_key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    size: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    position: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    variant: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    blur_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    width: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    height: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    media_type: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -356,6 +378,36 @@ async fn link_actor_to_js(
     actor_to_js(actor, profile)
 }
 
+fn post_object_to_js(
+    post_key: Option<&[u8]>,
+    object: ente_space::PostObjectPayload,
+) -> Result<PostObjectJs, WasmSpaceError> {
+    let metadata = match post_key {
+        Some(post_key) => ente_space::client::decrypt_post_object_metadata(post_key, &object)?,
+        None => None,
+    };
+    Ok(PostObjectJs {
+        object_key: object.object_key,
+        size: object.size,
+        position: object.position,
+        variant: metadata.as_ref().and_then(|value| value.variant.clone()),
+        blur_hash: metadata.as_ref().and_then(|value| value.blur_hash.clone()),
+        width: metadata.as_ref().and_then(|value| value.width),
+        height: metadata.as_ref().and_then(|value| value.height),
+        media_type: metadata.and_then(|value| value.media_type),
+    })
+}
+
+fn post_objects_to_js(
+    post_key: Option<&[u8]>,
+    objects: Vec<ente_space::PostObjectPayload>,
+) -> Result<Vec<PostObjectJs>, WasmSpaceError> {
+    objects
+        .into_iter()
+        .map(|object| post_object_to_js(post_key, object))
+        .collect()
+}
+
 async fn account_post_to_js(
     ctx: &AccountSpaceCtx,
     post: PostResponse,
@@ -371,11 +423,10 @@ async fn account_post_to_js(
         caption: optional_utf8_field(decrypted.caption_plaintext, "caption")?,
         encrypted_post_key: post.encrypted_post_key,
         key_version: post.key_version,
-        objects: post.objects,
+        objects: post_objects_to_js(Some(&decrypted.post_key), post.objects)?,
         created_at: post.created_at,
         likes: post.likes,
         viewer_liked: post.viewer_liked,
-        viewer_unread: post.viewer_unread,
     })
 }
 
@@ -394,11 +445,10 @@ async fn link_post_to_js(
         caption: optional_utf8_field(decrypted.caption_plaintext, "caption")?,
         encrypted_post_key: post.encrypted_post_key,
         key_version: post.key_version,
-        objects: post.objects,
+        objects: post_objects_to_js(Some(&decrypted.post_key), post.objects)?,
         created_at: post.created_at,
         likes: post.likes,
         viewer_liked: post.viewer_liked,
-        viewer_unread: post.viewer_unread,
     })
 }
 
@@ -482,20 +532,26 @@ async fn message_conversation_activity_to_js(
         id: activity.id,
         activity_type: activity.activity_type,
         created_at: activity.created_at,
+        outgoing: activity.outgoing,
         message,
-        post: activity.post.map(message_conversation_post_to_js),
+        post: activity
+            .post
+            .map(message_conversation_post_to_js)
+            .transpose()?,
     })
 }
 
-fn message_conversation_post_to_js(post: MessageConversationPost) -> MessageConversationPostJs {
-    MessageConversationPostJs {
+fn message_conversation_post_to_js(
+    post: MessageConversationPost,
+) -> Result<MessageConversationPostJs, WasmSpaceError> {
+    Ok(MessageConversationPostJs {
         post_id: post.post_id,
         space_id: post.space_id,
         space_slug: post.space_slug,
         owner_user_id: post.owner_user_id,
         is_deleted: post.is_deleted,
-        objects: post.objects,
-    }
+        objects: post_objects_to_js(None, post.objects)?,
+    })
 }
 
 /// Open an authenticated space context for web.
@@ -770,7 +826,6 @@ impl SpaceAccountCtxHandle {
                             created_at: item.created_at,
                             likes: item.likes,
                             viewer_liked: item.viewer_liked,
-                            viewer_unread: item.viewer_unread,
                         })
                         .collect(),
                     next_cursor: page.next_cursor,
@@ -781,14 +836,9 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
-    /// Return whether the current account has unread feed or notification activity.
+    /// Return whether the current account has unread notification activity.
     pub async fn unread_status(&self) -> Result<JsValue, WasmSpaceError> {
         swb::to_value(&self.inner.unread_status().await?).map_err(Into::into)
-    }
-
-    /// Mark feed posts read through the given visible post.
-    pub async fn mark_feed_read(&self, post_id: i64) -> Result<JsValue, WasmSpaceError> {
-        swb::to_value(&self.inner.mark_feed_read(post_id).await?).map_err(Into::into)
     }
 
     /// Mark notification activity for one friend as read.
@@ -1029,6 +1079,8 @@ impl SpaceAccountCtxHandle {
                 )
                 .await?,
                 unread: conversation.unread,
+                unread_count: conversation.unread_count,
+                notification_unread: conversation.notification_unread,
             });
         }
         swb::to_value(&MessageConversationPageJs {

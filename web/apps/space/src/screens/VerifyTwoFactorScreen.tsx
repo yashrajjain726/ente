@@ -1,6 +1,7 @@
 import { Shield01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
+import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React, { useEffect, useRef, useState } from "react";
 
 export const verifyTwoFactorBackground = "#FAFAFA";
@@ -139,6 +140,7 @@ export const VerifyTwoFactorScreen: React.FC<VerifyTwoFactorScreenProps> = ({
     );
     const otpComplete = otp.every((digit) => digit.length == 1);
     const canVerify = otpComplete && !isSubmitting;
+    const isVerifyButtonActive = canVerify || isSubmitting;
 
     const focusInput = (index: number) => {
         inputRefs.current[index]?.focus();
@@ -414,17 +416,21 @@ export const VerifyTwoFactorScreen: React.FC<VerifyTwoFactorScreenProps> = ({
                     }}
                 >
                     <Box
-                        className={canVerify ? "green-bg" : undefined}
+                        className={
+                            isVerifyButtonActive ? "green-bg" : undefined
+                        }
                         component="button"
                         form={verifyTwoFactorFormID}
                         type="submit"
                         disabled={!canVerify}
+                        aria-label={isSubmitting ? "Verifying" : undefined}
+                        aria-busy={isSubmitting ? true : undefined}
                         sx={{
                             alignItems: "center",
-                            bgcolor: canVerify ? green : "#F5F5F5",
+                            bgcolor: isVerifyButtonActive ? green : "#F5F5F5",
                             border: 0,
                             borderRadius: "20px",
-                            color: canVerify ? "white" : textLight,
+                            color: isVerifyButtonActive ? "white" : textLight,
                             cursor: canVerify ? "pointer" : "default",
                             display: "flex",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -444,7 +450,7 @@ export const VerifyTwoFactorScreen: React.FC<VerifyTwoFactorScreenProps> = ({
                                 : undefined,
                         }}
                     >
-                        {isSubmitting ? "Verifying..." : "Verify"}
+                        {isSubmitting ? <SpaceButtonSpinner /> : "Verify"}
                     </Box>
                 </Box>
             </Box>

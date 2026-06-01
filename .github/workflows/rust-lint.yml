@@ -9,6 +9,7 @@ on:
             - "rust/crates/core/**"
             - "rust/crates/contacts/**"
             - "rust/crates/image/**"
+            - "rust/space/**"
             - "rust/bindings/wasm/ente-wasm/**"
             - "rust/crates/photos/**"
             - "rust/Cargo.lock"
