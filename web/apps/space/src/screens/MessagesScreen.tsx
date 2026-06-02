@@ -1617,7 +1617,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             m: 0,
                                         }}
                                     >
-                                        Say hello!
+                                        {isThreadReadOnly
+                                            ? "No messages"
+                                            : "Say hello!"}
                                     </Box>
                                 </Box>
                             ) : (

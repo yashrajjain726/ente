@@ -1,19 +1,11 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import { useRouter } from "next/router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     SetupProfileScreen,
     setupProfileBackground,
 } from "screens/SetupProfileScreen";
-import { joinSpaceInvite } from "services/space";
-import {
-    clearPendingSpaceInvite,
-    clearPendingSpaceInviteFriend,
-    saveAcceptedSpaceInviteFriend,
-    savedPendingSpaceInvite,
-    savedPendingSpaceInviteFriend,
-} from "services/spaceInvite";
 import {
     saveSpaceProfile,
     spaceProfileErrorMessage,
@@ -21,6 +13,7 @@ import {
     spaceUsernameValidationError,
 } from "services/spaceProfile";
 import { useSpaceAppState } from "state/spaceAppState";
+import { acceptPendingSpaceInvite } from "utils/spacePendingInvite";
 import { setupProfileSourceFromQuery, spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
@@ -51,40 +44,19 @@ const Page: React.FC = () => {
         [backSource, isAddFriendLinkOnboarding],
     );
 
-    const acceptPendingInvite = useCallback(async () => {
-        const pendingInvite = savedPendingSpaceInvite();
-        if (!pendingInvite) return false;
-
-        const pendingFriend = savedPendingSpaceInviteFriend() ?? {
-            fullName: "",
-            username: pendingInvite.spaceUsername,
-        };
-        await joinSpaceInvite(pendingInvite);
-        clearPendingSpaceInvite();
-        clearPendingSpaceInviteFriend();
-        saveAcceptedSpaceInviteFriend(pendingFriend);
-        return true;
-    }, []);
-
     useEffect(() => {
         if (router.isReady) void refreshProfile();
     }, [refreshProfile, router.isReady]);
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && profile) {
-            void acceptPendingInvite()
+            void acceptPendingSpaceInvite()
                 .catch((error: unknown) =>
                     console.error("Failed to accept pending invite", error),
                 )
                 .finally(() => void router.replace(existingProfileRoute));
         }
-    }, [
-        acceptPendingInvite,
-        existingProfileRoute,
-        profile,
-        profileLoadStatus,
-        router,
-    ]);
+    }, [existingProfileRoute, profile, profileLoadStatus, router]);
 
     useEffect(() => {
         if (profileLoadStatus != "ready" || profile) return;
@@ -155,7 +127,7 @@ const Page: React.FC = () => {
                     try {
                         const savedProfile =
                             await saveSpaceProfile(nextProfile);
-                        const acceptedInvite = await acceptPendingInvite();
+                        const acceptedInvite = await acceptPendingSpaceInvite();
                         setProfile(savedProfile);
                         if (!acceptedInvite) {
                             setSkipNextHomeFeedSkeleton(true);
