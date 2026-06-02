@@ -9,9 +9,9 @@ export interface SpaceInviteFriendSummary {
 }
 
 const pendingSpaceInviteFriendKey = "spacePendingInviteFriend";
-const acceptedSpaceInviteFriendKey = "spaceAcceptedInviteFriend";
 const pendingSpaceInviteKey = "spacePendingInvite";
 const spaceInviteAccessKeyPattern = /^[0-9A-Za-z]{12}$/;
+let acceptedSpaceInviteFriend: SpaceInviteFriendSummary | undefined;
 
 const isPendingSpaceInvite = (value: unknown): value is PendingSpaceInvite => {
     if (!value || typeof value != "object") return false;
@@ -89,11 +89,13 @@ export const clearPendingSpaceInviteFriend = () => {
 
 export const saveAcceptedSpaceInviteFriend = (
     friend: SpaceInviteFriendSummary,
-) => saveSpaceInviteFriendSummary(acceptedSpaceInviteFriendKey, friend);
+) => {
+    acceptedSpaceInviteFriend = friend;
+};
 
 export const consumeAcceptedSpaceInviteFriend = () => {
-    const friend = savedSpaceInviteFriendSummary(acceptedSpaceInviteFriendKey);
-    sessionStorage.removeItem(acceptedSpaceInviteFriendKey);
+    const friend = acceptedSpaceInviteFriend;
+    acceptedSpaceInviteFriend = undefined;
     return friend;
 };
 

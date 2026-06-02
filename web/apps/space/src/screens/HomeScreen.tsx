@@ -1170,13 +1170,13 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
 }) => (
     <Box
         sx={{
-            bottom: "calc(env(safe-area-inset-bottom) + 16px)",
             boxSizing: "border-box",
             left: "50%",
             maxWidth: 390,
             px: 2,
             pointerEvents: "none",
             position: "fixed",
+            top: "calc(env(safe-area-inset-top) + 12px)",
             transform: "translateX(-50%)",
             width: "100%",
             zIndex: 20,
@@ -1709,7 +1709,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         pb: 2,
                         position: "fixed",
                         pt: 1.5,
-                        px: 1.5,
+                        px: 2,
                         top: 0,
                         transform: isHeaderHidden
                             ? "translate(-50%, calc(-100% - 4px))"
@@ -2052,7 +2052,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         bgcolor: green,
                         border: 0,
                         borderRadius: "50%",
-                        bottom: "calc(env(safe-area-inset-bottom) + 16px)",
+                        bottom: "calc(env(safe-area-inset-bottom) + 20px)",
                         boxShadow: "0 10px 24px rgba(0, 0, 0, 0.22)",
                         color: "#FFFFFF",
                         cursor: isPostPhotoOpening ? "default" : "pointer",
@@ -2064,7 +2064,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         opacity: isPostPhotoOpening ? 0.72 : 1,
                         p: 0,
                         position: "fixed",
-                        right: "max(16px, calc((100vw - 390px) / 2 + 16px))",
+                        right: "max(20px, calc((100vw - 390px) / 2 + 20px))",
                         transition:
                             "background-color 120ms ease, box-shadow 120ms ease, transform 120ms ease",
                         width: floatingAddButtonSize,
