@@ -19,6 +19,7 @@ import {
     spacePostLikePopDurationMs,
     spacePostLikePopTiming,
 } from "components/SpacePostLikeAnimation";
+import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
@@ -64,15 +65,6 @@ const feedLikeActionSize = 38;
 const feedActionIconSize = 20;
 const feedReplyIconSize = 17;
 const emptyFeedItemGap = "22px";
-const feedSkeletonAspectRatios = [
-    "3 / 4",
-    "16 / 9",
-    "4 / 5",
-    "16 / 9",
-    "3 / 4",
-    "4 / 5",
-    "16 / 9",
-];
 const minimumFeedPhotoFrameAspectRatio = 3 / 4;
 const feedMediaLoadRootMargin = "640px 0px";
 
@@ -119,8 +111,7 @@ interface HomeScreenProps {
     onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onShareProfileLink?: () => Promise<string>;
-    profile: SetupProfile;
-    showInitialFeedSkeleton?: boolean;
+    profile: SetupProfile | null;
 }
 
 interface FeedPhotoDimensions {
@@ -493,23 +484,6 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({
                 </Box>
             </Box>
         )}
-    </Box>
-);
-
-const FeedLoadingSkeletons: React.FC = () => (
-    <Box
-        role="status"
-        aria-label="Loading posts"
-        sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "24px",
-            width: "100%",
-        }}
-    >
-        {feedSkeletonAspectRatios.map((aspectRatio, index) => (
-            <FeedSkeletonItem key={index} aspectRatio={aspectRatio} />
-        ))}
     </Box>
 );
 
@@ -1284,7 +1258,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onSetPostLiked,
     onShareProfileLink,
     profile,
-    showInitialFeedSkeleton = false,
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
@@ -1308,9 +1281,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const feedImageLoadsInFlightRef = React.useRef<
         Map<string, Promise<string | undefined>>
     >(new Map());
+    const profileSpaceId = profile?.spaceId;
+    const isPostPhotoButtonDisabled =
+        isPostPhotoOpening || !profileSpaceId || !onCreatePost;
     const selectedPhotoFriendID = selectedViewer?.photo.friendID;
     const selectedPhotoIsOwn =
-        Boolean(profile.spaceId) && selectedPhotoFriendID == profile.spaceId;
+        Boolean(profileSpaceId) && selectedPhotoFriendID == profileSpaceId;
     const localResolvedPostIds = new Set(
         localFeedPosts
             .filter((item) => item.status == "posted" || item.status == "ready")
@@ -1322,16 +1298,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const hasFeedItems =
         localFeedPosts.length > 0 || remoteFeedItems.length > 0;
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
-    const shouldShowEmptyFeedSkeleton =
-        isEmptyFeedLoading && showInitialFeedSkeleton;
-    const showFeedCards = hasFeedItems || shouldShowEmptyFeedSkeleton;
+    const showFeedCards = hasFeedItems;
     const showUnreadIndicator = hasUnreadMessages === true;
     const emptyFeedMessage =
         friendsCount == 0
             ? "When you add friends, their posts will appear here."
             : "When your friends share posts, they'll appear here.";
     const profileDisplayName =
-        profile.fullName.trim() || profile.username.trim();
+        profile?.fullName.trim() || profile?.username.trim() || "";
     const revokeLocalPostObjectUrls = React.useCallback(() => {
         localPostObjectUrlsRef.current.forEach((objectUrl) =>
             URL.revokeObjectURL(objectUrl),
@@ -1343,7 +1317,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }, []);
 
     const openPostPhotoPicker = () => {
-        if (isPostPhotoOpening) return;
+        if (isPostPhotoButtonDisabled) return;
 
         postInputRef.current?.click();
     };
@@ -1352,7 +1326,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         focusReplyOnOpen = false,
     ) => {
         const isOwnPost =
-            Boolean(profile.spaceId) && photo.friendID == profile.spaceId;
+            Boolean(profileSpaceId) && photo.friendID == profileSpaceId;
         setSelectedViewer({
             focusReplyOnOpen: isOwnPost ? false : focusReplyOnOpen,
             photo,
@@ -1481,7 +1455,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 friendID={item.friendID}
                 imageUrl={imageUrl}
                 isOwnPost={
-                    Boolean(profile.spaceId) && item.spaceId == profile.spaceId
+                    Boolean(profileSpaceId) && item.spaceId == profileSpaceId
                 }
                 name={item.name}
                 onLoadAvatar={
@@ -1556,6 +1530,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
 
     const prepareSelectedPostPhoto = async (file: File) => {
+        if (!profile) return;
+
         const canShowLocalPreview = canPreviewSpaceImageFile(file);
         if (!canShowLocalPreview) {
             const timestampMs = Date.now();
@@ -1772,7 +1748,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 width: headerAvatarSize,
                             }}
                         >
-                            {profile.avatarUrl ? (
+                            {profile?.avatarUrl ? (
                                 <Box
                                     component="img"
                                     alt=""
@@ -1960,9 +1936,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 </Box>
                             )}
                         </>
-                    ) : shouldShowEmptyFeedSkeleton ? (
-                        <FeedLoadingSkeletons />
-                    ) : isEmptyFeedLoading ? null : (
+                    ) : isEmptyFeedLoading ? (
+                        <Box
+                            sx={{
+                                alignItems: "center",
+                                display: "flex",
+                                justifyContent: "center",
+                                width: "100%",
+                            }}
+                        >
+                            <SpaceLoadingSpinner ariaLabel="Loading posts" />
+                        </Box>
+                    ) : (
                         <Box
                             sx={{
                                 alignItems: "center",
@@ -2044,7 +2029,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     component="button"
                     type="button"
                     aria-label="Post photo"
-                    disabled={isPostPhotoOpening}
+                    disabled={isPostPhotoButtonDisabled}
                     onClick={openPostPhotoPicker}
                     sx={{
                         alignItems: "center",
@@ -2055,13 +2040,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         bottom: "calc(env(safe-area-inset-bottom) + 20px)",
                         boxShadow: "0 10px 24px rgba(0, 0, 0, 0.22)",
                         color: "#FFFFFF",
-                        cursor: isPostPhotoOpening ? "default" : "pointer",
+                        cursor: isPostPhotoButtonDisabled
+                            ? "default"
+                            : "pointer",
                         display: "flex",
                         fontSize: 0,
                         height: floatingAddButtonSize,
                         justifyContent: "center",
                         lineHeight: 0,
-                        opacity: isPostPhotoOpening ? 0.72 : 1,
+                        opacity: isPostPhotoButtonDisabled ? 0.72 : 1,
                         p: 0,
                         position: "fixed",
                         right: "max(20px, calc((100vw - 390px) / 2 + 20px))",
@@ -2071,7 +2058,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         zIndex: 5,
                         "& svg": { display: "block" },
                         "&:active": {
-                            transform: isPostPhotoOpening
+                            transform: isPostPhotoButtonDisabled
                                 ? "none"
                                 : "translateY(1px)",
                         },
@@ -2080,8 +2067,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             outlineOffset: 3,
                         },
                         "&:hover": {
-                            bgcolor: isPostPhotoOpening ? green : "#07B422",
-                            boxShadow: isPostPhotoOpening
+                            bgcolor: isPostPhotoButtonDisabled
+                                ? green
+                                : "#07B422",
+                            boxShadow: isPostPhotoButtonDisabled
                                 ? "0 10px 24px rgba(0, 0, 0, 0.22)"
                                 : "0 12px 28px rgba(0, 0, 0, 0.26)",
                         },
@@ -2129,7 +2118,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         onSwipeLeft={closeSelectedPhoto}
                         onReplyToPost={
                             !selectedPhotoIsOwn &&
-                            selectedViewer.photo.friendID != profile.spaceId
+                            selectedViewer.photo.friendID != profileSpaceId
                                 ? onReplyToPost
                                 : undefined
                         }
