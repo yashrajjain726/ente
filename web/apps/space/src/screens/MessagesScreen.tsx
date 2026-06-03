@@ -20,14 +20,18 @@ const green = "#08C225";
 const avatarSkeletonBackground = "#E6E6E6";
 const textBase = "#000000";
 const textSecondary = "#777777";
-const threadBackground = "#202020";
-const threadSurface = "#2C2C2C";
-const threadSurfaceHover = "#343434";
+const lightSurface = "#F2F2F2";
+const lightSurfaceHover = "#E8E8E8";
+const composerSurface = "#FFFFFF";
+const composerBorder = "#DEDEDE";
 const outgoingBubble = "#3FA43D";
-const incomingBubble = "#2C2C2C";
-const threadText = "#F4F4F4";
-const threadMuted = "rgba(244, 244, 244, 0.54)";
-const threadTimestamp = "rgba(255, 255, 255, 0.55)";
+const incomingBubble = lightSurface;
+const outgoingMessageText = "#FFFFFF";
+const incomingMessageText = "#111111";
+const outgoingMessageSecondary = "rgba(255, 255, 255, 0.82)";
+const incomingMessageSecondary = "#5F5F5F";
+const quoteRuleOnGreen = "rgba(255, 255, 255, 0.55)";
+const quoteRuleOnLight = "#BDBDBD";
 const dangerColor = "#F63A3A";
 const composerHeight = 48;
 const composerMaxHeight = 112;
@@ -610,7 +614,7 @@ const QuotePreview: React.FC<{ isOwn: boolean; message: SpaceMessage }> = ({
                 aria-hidden
                 sx={{
                     alignSelf: "stretch",
-                    bgcolor: isOwn ? "rgba(255, 255, 255, 0.55)" : "#8C8C8C",
+                    bgcolor: isOwn ? quoteRuleOnGreen : quoteRuleOnLight,
                     borderRadius: "999px",
                     flexShrink: 0,
                     width: 3,
@@ -631,7 +635,9 @@ const QuotePreview: React.FC<{ isOwn: boolean; message: SpaceMessage }> = ({
                 <Box sx={{ minWidth: 0 }}>
                     <Box
                         sx={{
-                            color: "rgba(244, 244, 244, 0.92)",
+                            color: isOwn
+                                ? outgoingMessageText
+                                : incomingMessageText,
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 12,
                             fontWeight: 750,
@@ -645,7 +651,9 @@ const QuotePreview: React.FC<{ isOwn: boolean; message: SpaceMessage }> = ({
                     </Box>
                     <Box
                         sx={{
-                            color: "rgba(244, 244, 244, 0.82)",
+                            color: isOwn
+                                ? outgoingMessageSecondary
+                                : incomingMessageSecondary,
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 12,
                             fontWeight: 500,
@@ -711,7 +719,7 @@ const MessageReplyPreview: React.FC<{
                 aria-hidden
                 sx={{
                     alignSelf: "stretch",
-                    bgcolor: isOwn ? "rgba(255, 255, 255, 0.55)" : "#8C8C8C",
+                    bgcolor: isOwn ? quoteRuleOnGreen : quoteRuleOnLight,
                     borderRadius: "999px",
                     flexShrink: 0,
                     width: 3,
@@ -721,7 +729,9 @@ const MessageReplyPreview: React.FC<{
                 {parentName && (
                     <Box
                         sx={{
-                            color: "rgba(244, 244, 244, 0.92)",
+                            color: isOwn
+                                ? outgoingMessageText
+                                : incomingMessageText,
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 12,
                             fontWeight: 750,
@@ -736,7 +746,9 @@ const MessageReplyPreview: React.FC<{
                 )}
                 <Box
                     sx={{
-                        color: "rgba(244, 244, 244, 0.82)",
+                        color: isOwn
+                            ? outgoingMessageSecondary
+                            : incomingMessageSecondary,
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 12,
                         fontWeight: 500,
@@ -871,7 +883,9 @@ const MessageBubble: React.FC<{
                     sx={{
                         bgcolor: isOwn ? outgoingBubble : incomingBubble,
                         borderRadius: bubbleBorderRadius,
-                        color: threadText,
+                        color: isOwn
+                            ? outgoingMessageText
+                            : incomingMessageText,
                         cursor: "context-menu",
                         display: "block",
                         maxWidth: "100%",
@@ -892,9 +906,7 @@ const MessageBubble: React.FC<{
                             WebkitUserSelect: "none",
                         },
                         "&:hover": {
-                            bgcolor: isOwn
-                                ? outgoingBubble
-                                : threadSurfaceHover,
+                            bgcolor: isOwn ? outgoingBubble : lightSurfaceHover,
                         },
                     }}
                 >
@@ -908,7 +920,9 @@ const MessageBubble: React.FC<{
                     )}
                     <Box
                         sx={{
-                            color: "rgba(244, 244, 244, 0.94)",
+                            color: isOwn
+                                ? outgoingMessageText
+                                : incomingMessageText,
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 14,
                             fontWeight: 600,
@@ -931,9 +945,11 @@ const MessageBubble: React.FC<{
                             slotProps={{
                                 tooltip: {
                                     sx: {
-                                        bgcolor: "#111111",
+                                        bgcolor: messagesBackground,
                                         borderRadius: "6px",
-                                        color: threadText,
+                                        boxShadow:
+                                            "0 8px 24px rgba(0, 0, 0, 0.14)",
+                                        color: textBase,
                                         fontFamily:
                                             '"Inter Variable", Inter, sans-serif',
                                         fontSize: 12,
@@ -943,7 +959,7 @@ const MessageBubble: React.FC<{
                                         py: "5px",
                                     },
                                 },
-                                arrow: { sx: { color: "#111111" } },
+                                arrow: { sx: { color: messagesBackground } },
                             }}
                         >
                             <Box
@@ -958,11 +974,11 @@ const MessageBubble: React.FC<{
                                 sx={{
                                     alignItems: "center",
                                     appearance: "none",
-                                    bgcolor: "#2B2B2B",
-                                    border: `2px solid ${threadBackground}`,
+                                    bgcolor: messagesBackground,
+                                    border: `2px solid ${messagesBackground}`,
                                     borderRadius: "999px",
                                     bottom: -11,
-                                    boxShadow: "0 4px 10px rgba(0, 0, 0, 0.2)",
+                                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
                                     boxSizing: "border-box",
                                     color: green,
                                     cursor: "pointer",
@@ -999,7 +1015,7 @@ const MessageBubble: React.FC<{
                     component="time"
                     dateTime={timestampDateTime}
                     sx={{
-                        color: threadTimestamp,
+                        color: textSecondary,
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 12,
                         fontWeight: 600,
@@ -1302,11 +1318,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         const html = document.documentElement;
         const body = document.body;
         const previous = {
-            bodyBackground: body.style.backgroundColor,
             bodyHeight: body.style.height,
             bodyOverscroll: body.style.overscrollBehavior,
             bodyOverflow: body.style.overflow,
-            htmlBackground: html.style.backgroundColor,
             htmlHeight: html.style.height,
             htmlOverscroll: html.style.overscrollBehavior,
             htmlOverflow: html.style.overflow,
@@ -1342,11 +1356,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         window.visualViewport?.addEventListener("resize", updateViewportHeight);
         window.visualViewport?.addEventListener("scroll", updateViewportHeight);
 
-        html.style.backgroundColor = threadBackground;
         html.style.height = "100%";
         html.style.overflow = "hidden";
         html.style.overscrollBehavior = "none";
-        body.style.backgroundColor = threadBackground;
         body.style.height = "100%";
         body.style.overflow = "hidden";
         body.style.overscrollBehavior = "none";
@@ -1383,11 +1395,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 html.style.removeProperty("--space-messages-viewport-top");
             }
 
-            html.style.backgroundColor = previous.htmlBackground;
             html.style.height = previous.htmlHeight;
             html.style.overflow = previous.htmlOverflow;
             html.style.overscrollBehavior = previous.htmlOverscroll;
-            body.style.backgroundColor = previous.bodyBackground;
             body.style.height = previous.bodyHeight;
             body.style.overflow = previous.bodyOverflow;
             body.style.overscrollBehavior = previous.bodyOverscroll;
@@ -1410,8 +1420,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         <Box
             component="main"
             sx={{
-                bgcolor: isThreadOpen ? threadBackground : messagesBackground,
-                color: isThreadOpen ? threadText : textBase,
+                bgcolor: messagesBackground,
+                color: textBase,
                 display: "grid",
                 height: isThreadOpen
                     ? "var(--space-messages-viewport-height, 100svh)"
@@ -1608,7 +1618,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     <Box
                                         component="p"
                                         sx={{
-                                            color: threadTimestamp,
+                                            color: textSecondary,
                                             fontFamily:
                                                 '"Inter Variable", Inter, sans-serif',
                                             fontSize: 14,
@@ -1691,10 +1701,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                             slotProps={{
                                 paper: {
                                     sx: {
-                                        bgcolor: "#1E1E1E",
+                                        bgcolor: messagesBackground,
                                         borderRadius: "16px",
                                         boxShadow:
-                                            "0 14px 40px rgba(0, 0, 0, 0.22)",
+                                            "0 14px 40px rgba(0, 0, 0, 0.14)",
                                         minWidth: 132,
                                         p: "4px",
                                     },
@@ -1711,14 +1721,13 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         }
                                         sx={{
                                             borderRadius: "12px",
-                                            color: threadText,
+                                            color: textBase,
                                             gap: "8px",
                                             minHeight: 38,
                                             px: "8px",
                                             py: "7px",
                                             "&:hover": {
-                                                bgcolor:
-                                                    "rgba(255, 255, 255, 0.1)",
+                                                bgcolor: lightSurface,
                                             },
                                         }}
                                     >
@@ -1744,14 +1753,13 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         }
                                         sx={{
                                             borderRadius: "12px",
-                                            color: threadText,
+                                            color: textBase,
                                             gap: "8px",
                                             minHeight: 38,
                                             px: "8px",
                                             py: "7px",
                                             "&:hover": {
-                                                bgcolor:
-                                                    "rgba(255, 255, 255, 0.1)",
+                                                bgcolor: lightSurface,
                                             },
                                         }}
                                     >
@@ -1775,14 +1783,12 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                 onClick={() => handleMessageAction("copy")}
                                 sx={{
                                     borderRadius: "12px",
-                                    color: threadText,
+                                    color: textBase,
                                     gap: "8px",
                                     minHeight: 38,
                                     px: "8px",
                                     py: "7px",
-                                    "&:hover": {
-                                        bgcolor: "rgba(255, 255, 255, 0.1)",
-                                    },
+                                    "&:hover": { bgcolor: lightSurface },
                                 }}
                             >
                                 <CopyIcon />
@@ -1840,7 +1846,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                         {!isThreadReadOnly && (
                             <Box
                                 sx={{
-                                    bgcolor: threadBackground,
+                                    bgcolor: messagesBackground,
                                     boxSizing: "border-box",
                                     display: "grid",
                                     gap: "8px",
@@ -1851,8 +1857,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                 {replyingTo && (
                                     <Box
                                         sx={{
-                                            bgcolor: "#262626",
-                                            borderLeft: "3px solid #8C8C8C",
+                                            bgcolor: lightSurface,
+                                            borderLeft: `3px solid ${quoteRuleOnLight}`,
                                             borderRadius: "12px",
                                             boxSizing: "border-box",
                                             display: "grid",
@@ -1866,7 +1872,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         <Box sx={{ minWidth: 0 }}>
                                             <Box
                                                 sx={{
-                                                    color: threadTimestamp,
+                                                    color: textSecondary,
                                                     fontFamily:
                                                         '"Inter Variable", Inter, sans-serif',
                                                     fontSize: 12,
@@ -1887,7 +1893,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             </Box>
                                             <Box
                                                 sx={{
-                                                    color: threadText,
+                                                    color: textBase,
                                                     fontFamily:
                                                         '"Inter Variable", Inter, sans-serif',
                                                     fontSize: 13,
@@ -1916,7 +1922,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 bgcolor: "transparent",
                                                 border: 0,
                                                 borderRadius: "50%",
-                                                color: "#D8D8D8",
+                                                color: textSecondary,
                                                 cursor: "pointer",
                                                 display: "flex",
                                                 height: 24,
@@ -1927,9 +1933,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                     outline: `2px solid ${green}`,
                                                     outlineOffset: 2,
                                                 },
-                                                "&:hover": {
-                                                    color: threadText,
-                                                },
+                                                "&:hover": { color: textBase },
                                             }}
                                         >
                                             <HugeiconsIcon
@@ -1967,11 +1971,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         rows={1}
                                         value={messageText}
                                         sx={{
-                                            bgcolor: threadSurface,
-                                            border: 0,
+                                            bgcolor: composerSurface,
+                                            border: `1px solid ${composerBorder}`,
                                             borderRadius: "24px",
                                             boxSizing: "border-box",
-                                            color: threadText,
+                                            color: textBase,
                                             flex: "1 1 auto",
                                             fontFamily:
                                                 '"Inter Variable", Inter, sans-serif',
@@ -1989,29 +1993,30 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             pt: `${composerPadding}px`,
                                             resize: "none",
                                             "&::placeholder": {
-                                                color: threadMuted,
+                                                color: textSecondary,
                                             },
-                                            "&:focus": {
-                                                bgcolor: threadSurfaceHover,
-                                            },
+                                            "&:focus": { borderColor: green },
                                         }}
                                     />
                                     <Box
                                         component="button"
                                         type="button"
                                         aria-label="Send message"
+                                        className={
+                                            canSend ? "green-bg" : undefined
+                                        }
                                         disabled={!canSend}
                                         onClick={sendMessage}
                                         sx={{
                                             alignItems: "center",
                                             bgcolor: canSend
-                                                ? "#FFFFFF"
-                                                : threadSurfaceHover,
+                                                ? green
+                                                : lightSurfaceHover,
                                             border: 0,
                                             borderRadius: "50%",
                                             color: canSend
-                                                ? "#3A3A3A"
-                                                : "#D8D8D8",
+                                                ? "#FFFFFF"
+                                                : textSecondary,
                                             cursor: canSend
                                                 ? "pointer"
                                                 : "default",
@@ -2035,8 +2040,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             },
                                             "&:hover": {
                                                 bgcolor: canSend
-                                                    ? "#F2F2F2"
-                                                    : "rgba(255, 255, 255, 0.14)",
+                                                    ? "#07AE22"
+                                                    : lightSurfaceHover,
                                             },
                                         }}
                                     >
