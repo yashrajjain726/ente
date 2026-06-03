@@ -65,6 +65,7 @@ const feedLikeActionSize = 38;
 const feedActionIconSize = 20;
 const feedReplyIconSize = 17;
 const emptyFeedItemGap = "22px";
+const feedHorizontalPadding = "16px";
 const minimumFeedPhotoFrameAspectRatio = 3 / 4;
 const feedMediaLoadRootMargin = "640px 0px";
 
@@ -354,18 +355,22 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({
             boxSizing: "border-box",
             display: "flex",
             flexDirection: "column",
-            mx: "16px",
+            maxWidth: "100%",
+            minWidth: 0,
+            overflow: "hidden",
             pb,
             pl: "5px",
             pr: "5px",
             pt: "5px",
-            width: "calc(100% - 32px)",
+            width: "100%",
         }}
     >
         <Box
             sx={{
                 aspectRatio,
                 borderRadius: "13px",
+                maxWidth: "100%",
+                minWidth: 0,
                 overflow: "hidden",
                 position: "relative",
                 width: "100%",
@@ -800,12 +805,14 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 boxSizing: "border-box",
                 display: "flex",
                 flexDirection: "column",
-                mx: "16px",
+                maxWidth: "100%",
+                minWidth: 0,
+                overflow: "hidden",
                 pl: "5px",
                 pb: isOwnPost ? "5px" : "8px",
                 pr: "5px",
                 pt: "5px",
-                width: "calc(100% - 32px)",
+                width: "100%",
             }}
         >
             <Box
@@ -813,6 +820,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     aspectRatio: `${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`,
                     bgcolor: "transparent",
                     borderRadius: "13px",
+                    maxWidth: "100%",
+                    minWidth: 0,
                     overflow: "hidden",
                     position: "relative",
                     width: "100%",
@@ -830,6 +839,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         cursor: onOpenPhoto ? "pointer" : "default",
                         display: "block",
                         height: "100%",
+                        maxWidth: "100%",
+                        minWidth: 0,
                         p: 0,
                         width: "100%",
                         "&:focus-visible": {
@@ -846,6 +857,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         sx={{
                             display: "block",
                             height: "100%",
+                            maxWidth: "100%",
+                            minWidth: 0,
                             objectFit: "cover",
                             objectPosition: "center",
                             width: "100%",
@@ -1653,8 +1666,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 sx={{
                     bgcolor: homeBackground,
                     boxSizing: "border-box",
+                    maxWidth: "100%",
                     minHeight: "100svh",
+                    minWidth: 0,
                     mx: "auto",
+                    overflowX: "hidden",
                     width: "100%",
                     "@media (min-width: 600px)": { maxWidth: 390 },
                 }}
@@ -1877,7 +1893,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         gap: showFeedCards ? "24px" : 0,
                         justifyContent: showFeedCards ? "flex-start" : "center",
                         minHeight: "calc(100svh - 64px)",
+                        minWidth: 0,
                         pb: showFeedCards ? "72px" : "56px",
+                        px: showFeedCards ? feedHorizontalPadding : 0,
                         pt: showFeedCards ? "4px" : 0,
                         width: "100%",
                     }}
