@@ -301,7 +301,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [referralSource, setReferralSource] = useState("");
-    const [acceptedTerms, setAcceptedTerms] = useState(false);
+    const [acceptedTerms, setAcceptedTerms] = useState(true);
     const passwordStrength = useMemo(
         () => estimatePasswordStrength(password),
         [password],
