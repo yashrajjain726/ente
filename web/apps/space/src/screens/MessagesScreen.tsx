@@ -8,6 +8,7 @@ import { Box, Menu, MenuItem, Skeleton, Tooltip } from "@mui/material";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
+import { flushSync } from "react-dom";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type { SpaceMessage, SpaceMessageConversation } from "services/space";
@@ -1270,17 +1271,21 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     ) => {
         const targetMessage = messageContextMenu?.message;
         if (!targetMessage) return;
-        closeMessageActions();
-        if (isThreadReadOnly && action != "copy") return;
+        if (isThreadReadOnly && action != "copy") {
+            closeMessageActions();
+            return;
+        }
 
         switch (action) {
             case "copy":
+                closeMessageActions();
                 void copyTextToClipboard(targetMessage.text).catch(
                     (error: unknown) =>
                         console.error("Failed to copy message", error),
                 );
                 break;
             case "like":
+                closeMessageActions();
                 void onSetMessageLiked(
                     targetMessage.id,
                     !targetMessage.viewerLiked,
@@ -1289,10 +1294,14 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 );
                 break;
             case "reply":
-                setReplyingTo(targetMessage);
-                window.setTimeout(() => composerRef.current?.focus(), 0);
+                flushSync(() => {
+                    closeMessageActions();
+                    setReplyingTo(targetMessage);
+                });
+                composerRef.current?.focus();
                 break;
             case "delete":
+                closeMessageActions();
                 void onDeleteMessage(targetMessage.id).catch((error: unknown) =>
                     console.error("Failed to delete message", error),
                 );
@@ -1767,6 +1776,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                         </Box>
                         <Menu
                             anchorEl={messageContextMenu?.anchorEl}
+                            disableRestoreFocus
                             open={Boolean(messageContextMenu?.open)}
                             onClose={closeMessageActions}
                             anchorOrigin={{
@@ -1940,7 +1950,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     <Box
                                         sx={{
                                             bgcolor: lightSurface,
-                                            borderLeft: `3px solid ${quoteRuleOnLight}`,
+                                            borderLeft: `3px solid ${green}`,
                                             borderRadius: "12px",
                                             boxSizing: "border-box",
                                             display: "grid",
@@ -1997,7 +2007,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             aria-label="Cancel reply"
                                             onClick={() => {
                                                 setReplyingTo(null);
-                                                composerRef.current?.focus();
                                             }}
                                             sx={{
                                                 alignItems: "center",
