@@ -1141,6 +1141,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const bottomScrollSecondFrameRef = React.useRef<number | undefined>(
         undefined,
     );
+    const composerBlurResetTimeoutRef = React.useRef<number | undefined>(
+        undefined,
+    );
     const isThreadOpen = Boolean(selectedFriend);
     const canInteract = isThreadOpen && !isThreadReadOnly;
     const canSend =
@@ -1361,6 +1364,18 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         scheduleThreadBottomScroll("smooth");
     };
 
+    const handleComposerBlur = () => {
+        if (composerBlurResetTimeoutRef.current != undefined) {
+            window.clearTimeout(composerBlurResetTimeoutRef.current);
+        }
+
+        composerBlurResetTimeoutRef.current = window.setTimeout(() => {
+            composerBlurResetTimeoutRef.current = undefined;
+            window.scrollTo({ left: 0, top: 0 });
+            document.scrollingElement?.scrollTo({ left: 0, top: 0 });
+        }, 300);
+    };
+
     React.useLayoutEffect(() => {
         resizeComposer(composerRef.current);
         if (!selectedFriend || !stickToThreadBottomRef.current) return;
@@ -1400,98 +1415,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         selectedFriend,
     ]);
 
-    React.useEffect(() => {
-        if (!isThreadOpen) return;
-
-        const html = document.documentElement;
-        const body = document.body;
-        const previous = {
-            bodyHeight: body.style.height,
-            bodyOverscroll: body.style.overscrollBehavior,
-            bodyOverflow: body.style.overflow,
-            htmlHeight: html.style.height,
-            htmlOverscroll: html.style.overscrollBehavior,
-            htmlOverflow: html.style.overflow,
-            viewportTop: html.style.getPropertyValue(
-                "--space-messages-viewport-top",
-            ),
-            viewportHeight: html.style.getPropertyValue(
-                "--space-messages-viewport-height",
-            ),
-        };
-
-        const updateViewportHeight = () => {
-            const viewport = window.visualViewport;
-            const height = viewport?.height ?? window.innerHeight;
-            const top = viewport?.offsetTop ?? 0;
-            html.style.setProperty("--space-messages-viewport-top", `${top}px`);
-            html.style.setProperty(
-                "--space-messages-viewport-height",
-                `${height}px`,
-            );
-
-            if (
-                document.activeElement == composerRef.current &&
-                stickToThreadBottomRef.current
-            ) {
-                scheduleThreadBottomScroll();
-            }
-        };
-
-        updateViewportHeight();
-        window.addEventListener("resize", updateViewportHeight);
-        window.addEventListener("orientationchange", updateViewportHeight);
-        window.visualViewport?.addEventListener("resize", updateViewportHeight);
-        window.visualViewport?.addEventListener("scroll", updateViewportHeight);
-
-        html.style.height = "100%";
-        html.style.overflow = "hidden";
-        html.style.overscrollBehavior = "none";
-        body.style.height = "100%";
-        body.style.overflow = "hidden";
-        body.style.overscrollBehavior = "none";
-
-        return () => {
-            window.removeEventListener("resize", updateViewportHeight);
-            window.removeEventListener(
-                "orientationchange",
-                updateViewportHeight,
-            );
-            window.visualViewport?.removeEventListener(
-                "resize",
-                updateViewportHeight,
-            );
-            window.visualViewport?.removeEventListener(
-                "scroll",
-                updateViewportHeight,
-            );
-
-            if (previous.viewportHeight) {
-                html.style.setProperty(
-                    "--space-messages-viewport-height",
-                    previous.viewportHeight,
-                );
-            } else {
-                html.style.removeProperty("--space-messages-viewport-height");
-            }
-            if (previous.viewportTop) {
-                html.style.setProperty(
-                    "--space-messages-viewport-top",
-                    previous.viewportTop,
-                );
-            } else {
-                html.style.removeProperty("--space-messages-viewport-top");
-            }
-
-            html.style.height = previous.htmlHeight;
-            html.style.overflow = previous.htmlOverflow;
-            html.style.overscrollBehavior = previous.htmlOverscroll;
-            body.style.height = previous.bodyHeight;
-            body.style.overflow = previous.bodyOverflow;
-            body.style.overscrollBehavior = previous.bodyOverscroll;
-        };
-    }, [isThreadOpen, scheduleThreadBottomScroll]);
-
     React.useEffect(
         () => () => {
             if (bottomScrollFrameRef.current != undefined) {
@@ -1499,6 +1422,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             }
             if (bottomScrollSecondFrameRef.current != undefined) {
                 window.cancelAnimationFrame(bottomScrollSecondFrameRef.current);
+            }
+            if (composerBlurResetTimeoutRef.current != undefined) {
+                window.clearTimeout(composerBlurResetTimeoutRef.current);
             }
         },
         [],
@@ -1511,19 +1437,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 bgcolor: messagesBackground,
                 color: textBase,
                 display: "grid",
-                height: isThreadOpen
-                    ? "var(--space-messages-viewport-height, 100svh)"
-                    : undefined,
-                left: isThreadOpen ? 0 : undefined,
+                height: isThreadOpen ? "100dvh" : undefined,
                 minHeight: isThreadOpen ? 0 : "100svh",
                 overflow: isThreadOpen ? "hidden" : undefined,
                 overflowX: "hidden",
                 placeItems: { xs: "stretch", sm: "start center" },
-                position: isThreadOpen ? "fixed" : undefined,
-                right: isThreadOpen ? 0 : undefined,
-                top: isThreadOpen
-                    ? "var(--space-messages-viewport-top, 0px)"
-                    : undefined,
             }}
         >
             <Box
@@ -2057,6 +1975,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             setMessageText(nextText);
                                             resizeComposer(event.currentTarget);
                                         }}
+                                        onBlur={handleComposerBlur}
                                         onFocus={handleComposerFocus}
                                         placeholder="Message"
                                         rows={1}

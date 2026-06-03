@@ -10,6 +10,8 @@ export const spaceRoutes = {
     home: "/app",
     invite: "/invite",
     login: "/login",
+    message: (spaceId: string) =>
+        `/app/messages/${encodeURIComponent(spaceId)}`,
     messages: "/app/messages",
     onboarding: "/",
     passkeysFinish: "/passkeys/finish",
