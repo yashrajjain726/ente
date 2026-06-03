@@ -39,6 +39,8 @@ const composerPadding = 14;
 const composerPaddingLeft = 18;
 const threadBottomThresholdPx = 96;
 const messageGroupTimeThresholdMs = 10 * 60 * 1000;
+const messageLongPressMs = 520;
+const messageLongPressMoveTolerancePx = 10;
 
 interface MessagesScreenProps {
     conversations: SpaceMessageConversation[];
@@ -767,6 +769,9 @@ const MessageReplyPreview: React.FC<{
     );
 };
 
+const isMessageLongPressIgnoredTarget = (target: EventTarget | null) =>
+    target instanceof Element && Boolean(target.closest("button"));
+
 const MessageBubble: React.FC<{
     isHighlighted: boolean;
     isLastInSequence: boolean;
@@ -804,6 +809,11 @@ const MessageBubble: React.FC<{
     const hasInlinePreview = message.kind == "post_reply" || hasMessageReply;
     const [isLikeTooltipOpen, setIsLikeTooltipOpen] = React.useState(false);
     const likeTooltipTimerRef = React.useRef<number | undefined>(undefined);
+    const longPressTimerRef = React.useRef<number | undefined>(undefined);
+    const longPressStartRef = React.useRef<
+        { x: number; y: number } | undefined
+    >(undefined);
+    const didOpenLongPressRef = React.useRef(false);
     const likeTooltipLabel = messageLikeTooltipLabel(message, profile);
 
     const clearLikeTooltipTimer = React.useCallback(() => {
@@ -811,6 +821,18 @@ const MessageBubble: React.FC<{
         window.clearTimeout(likeTooltipTimerRef.current);
         likeTooltipTimerRef.current = undefined;
     }, []);
+
+    const clearLongPressTimer = React.useCallback(() => {
+        if (longPressTimerRef.current == undefined) return;
+        window.clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = undefined;
+    }, []);
+
+    const cancelLongPress = React.useCallback(() => {
+        clearLongPressTimer();
+        longPressStartRef.current = undefined;
+        didOpenLongPressRef.current = false;
+    }, [clearLongPressTimer]);
 
     const showLikeTooltip = (event: React.MouseEvent) => {
         event.preventDefault();
@@ -823,17 +845,68 @@ const MessageBubble: React.FC<{
         }, 1800);
     };
 
-    const handleContextMenu = (
-        event: React.MouseEvent,
-        bubbleElement: HTMLElement,
-    ) => {
+    const openActions = React.useCallback(
+        (bubbleElement: HTMLElement) => {
+            clearLongPressTimer();
+            longPressStartRef.current = undefined;
+            window.getSelection()?.removeAllRanges();
+            onOpenActions(message, bubbleElement);
+        },
+        [clearLongPressTimer, message, onOpenActions],
+    );
+
+    const handleContextMenu = (event: React.MouseEvent<HTMLElement>) => {
         event.preventDefault();
         event.stopPropagation();
-        window.getSelection()?.removeAllRanges();
-        onOpenActions(message, bubbleElement);
+        openActions(event.currentTarget);
+    };
+
+    const handleTouchStart = (event: React.TouchEvent<HTMLElement>) => {
+        if (
+            event.touches.length != 1 ||
+            isMessageLongPressIgnoredTarget(event.target)
+        ) {
+            cancelLongPress();
+            return;
+        }
+
+        const touch = event.touches[0]!;
+        const bubbleElement = event.currentTarget;
+        clearLongPressTimer();
+        didOpenLongPressRef.current = false;
+        longPressStartRef.current = { x: touch.clientX, y: touch.clientY };
+        longPressTimerRef.current = window.setTimeout(() => {
+            longPressTimerRef.current = undefined;
+            didOpenLongPressRef.current = true;
+            openActions(bubbleElement);
+        }, messageLongPressMs);
+    };
+
+    const handleTouchMove = (event: React.TouchEvent<HTMLElement>) => {
+        const start = longPressStartRef.current;
+        const touch = event.touches[0];
+        if (!start || !touch) return;
+
+        if (
+            Math.hypot(touch.clientX - start.x, touch.clientY - start.y) >
+            messageLongPressMoveTolerancePx
+        ) {
+            cancelLongPress();
+        }
+    };
+
+    const handleTouchEnd = (event: React.TouchEvent<HTMLElement>) => {
+        clearLongPressTimer();
+        longPressStartRef.current = undefined;
+        if (!didOpenLongPressRef.current) return;
+
+        if (event.cancelable) event.preventDefault();
+        event.stopPropagation();
+        didOpenLongPressRef.current = false;
     };
 
     React.useEffect(() => clearLikeTooltipTimer, [clearLikeTooltipTimer]);
+    React.useEffect(() => cancelLongPress, [cancelLongPress]);
 
     React.useEffect(() => {
         clearLikeTooltipTimer();
@@ -862,15 +935,6 @@ const MessageBubble: React.FC<{
             }}
         >
             <Box
-                onContextMenu={(event) => {
-                    const bubbleElement =
-                        event.currentTarget.querySelector<HTMLElement>(
-                            "[data-message-bubble]",
-                        );
-                    if (bubbleElement) {
-                        handleContextMenu(event, bubbleElement);
-                    }
-                }}
                 sx={{
                     maxWidth: "min(calc(100vw - 72px), 360px)",
                     position: "relative",
@@ -880,6 +944,11 @@ const MessageBubble: React.FC<{
                 <Box
                     data-message-bubble
                     className={isOwn ? "green-bg" : undefined}
+                    onContextMenu={handleContextMenu}
+                    onTouchCancel={cancelLongPress}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchMove={handleTouchMove}
+                    onTouchStart={handleTouchStart}
                     sx={{
                         bgcolor: isOwn ? outgoingBubble : incomingBubble,
                         borderRadius: bubbleBorderRadius,
@@ -896,6 +965,7 @@ const MessageBubble: React.FC<{
                         px: "16px",
                         py: hasInlinePreview ? "16px" : "14px",
                         textAlign: "left",
+                        touchAction: "pan-y",
                         userSelect: "none",
                         WebkitTouchCallout: "none",
                         WebkitUserSelect: "none",
