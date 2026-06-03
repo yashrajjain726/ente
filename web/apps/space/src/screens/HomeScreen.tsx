@@ -9,6 +9,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import {
     SpaceFileViewer,
+    SpaceViewerFeedBackdrop,
     type SpaceViewerDraftPostEdit,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
@@ -1660,8 +1661,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 minHeight: "100svh",
                 overflowX: "hidden",
                 placeItems: { xs: "stretch", sm: "start center" },
+                position: "relative",
             }}
         >
+            {selectedViewer && <SpaceViewerFeedBackdrop />}
             <Box
                 sx={{
                     bgcolor: homeBackground,

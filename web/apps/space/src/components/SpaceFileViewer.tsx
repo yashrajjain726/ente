@@ -194,6 +194,22 @@ const viewerActionButtonSx = {
     "&:hover": { bgcolor: controlBackgroundHover },
 };
 
+export const SpaceViewerFeedBackdrop: React.FC = () => (
+    <Box
+        aria-hidden
+        sx={{
+            bgcolor: viewerBackground,
+            bottom: "-100vh",
+            left: 0,
+            pointerEvents: "none",
+            position: "absolute",
+            right: 0,
+            top: "-100vh",
+            zIndex: 1299,
+        }}
+    />
+);
+
 const viewerHeaderButtonSx = {
     alignItems: "center",
     bgcolor: controlBackground,
