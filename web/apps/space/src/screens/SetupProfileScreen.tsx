@@ -1,3 +1,5 @@
+import { User02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpaceAvatarCropPage } from "components/SpaceAvatarCropPage";
 import { SpaceAvatarEditButton } from "components/SpaceAvatarEditButton";
@@ -17,8 +19,18 @@ const green = "#08C225";
 const textBase = "#000";
 const textLight = "#969696";
 const warning = "#F63A3A";
-const paleGreen = "#E7F6E9";
 const setupProfileFormID = "space-setup-profile-form";
+const filledUser02BodyPath =
+    "M18.5 20V16.5C18.5 15.2577 17.9407 14.0395 16.8103 13.5242C15.4315 12.8957 13.7779 12.5296 12 12.5296C10.2221 12.5296 8.5685 12.8957 7.18968 13.5242C6.05927 14.0395 5.5 15.2577 5.5 16.5V20";
+const filledUserIcon = User02Icon.map(([tag, attrs]) => [
+    tag,
+    {
+        ...attrs,
+        d: attrs.key == "0" ? filledUser02BodyPath : attrs.d,
+        fill: "currentColor",
+        stroke: "none",
+    },
+]) as IconSvgElement;
 
 export interface SetupProfile {
     avatarUrl: string | null;
@@ -80,27 +92,26 @@ const BackIcon: React.FC = () => (
     </Box>
 );
 
-const UploadIcon: React.FC = () => (
+const AvatarPlaceholder: React.FC = () => (
     <Box
-        component="svg"
-        viewBox="0 0 24 24"
         aria-hidden
-        sx={{ display: "block", height: 40, width: 40 }}
+        sx={{
+            alignItems: "center",
+            bgcolor: "#C8D2DB",
+            border: "4px solid white",
+            borderRadius: "50%",
+            color: "white",
+            display: "flex",
+            height: "100%",
+            justifyContent: "center",
+            overflow: "hidden",
+            width: "100%",
+        }}
     >
-        <path
-            d="M8.5 7.5L9.75 5.75H14.25L15.5 7.5H18C19.1 7.5 20 8.4 20 9.5V17C20 18.1 19.1 19 18 19H6C4.9 19 4 18.1 4 17V9.5C4 8.4 4.9 7.5 6 7.5H8.5Z"
-            fill="none"
-            stroke="currentColor"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-        />
-        <circle
-            cx="12"
-            cy="13"
-            fill="none"
-            r="3"
-            stroke="currentColor"
-            strokeWidth="1.8"
+        <HugeiconsIcon
+            icon={filledUserIcon}
+            size={120}
+            style={{ transform: "translateY(18px)" }}
         />
     </Box>
 );
@@ -267,6 +278,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
         !isApplyingAvatarCrop &&
         !isPreparingAvatar &&
         usernameStatus != "unavailable" &&
+        Boolean(avatarUrl) &&
         username.trim().length > 0 &&
         fullName.trim().length > 0;
     const isContinueButtonActive = canContinue || isSubmitting;
@@ -531,10 +543,10 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                             sx={{
                                 alignItems: "center",
                                 aspectRatio: "1 / 1",
-                                bgcolor: avatarUrl ? "transparent" : paleGreen,
+                                bgcolor: "transparent",
                                 border: 0,
                                 borderRadius: "50%",
-                                color: green,
+                                color: textBase,
                                 cursor: isPreparingAvatar
                                     ? "default"
                                     : "pointer",
@@ -555,7 +567,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                                 <Box
                                     component="span"
                                     sx={{
-                                        color: green,
+                                        color: textLight,
                                         fontFamily:
                                             '"Inter Variable", Inter, sans-serif',
                                         fontSize: 13,
@@ -579,7 +591,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                                     }}
                                 />
                             ) : (
-                                <UploadIcon />
+                                <AvatarPlaceholder />
                             )}
                         </Box>
                         <SpaceAvatarEditButton
@@ -598,21 +610,21 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                         }}
                     >
                         <TextInput
+                            label="Name"
+                            onChange={setFullName}
+                            placeholder="Enter your name"
+                            required
+                            value={fullName}
+                        />
+                        <TextInput
                             endAdornment={
                                 <UsernameStatusIcon status={usernameStatus} />
                             }
                             label="Username"
                             onChange={handleUsernameChange}
-                            placeholder="Choose a username"
+                            placeholder="Choose your username"
                             required
                             value={username}
-                        />
-                        <TextInput
-                            label="Full name"
-                            onChange={setFullName}
-                            placeholder="Enter your full name"
-                            required
-                            value={fullName}
                         />
                         {(avatarError || errorMessage) && (
                             <Box
