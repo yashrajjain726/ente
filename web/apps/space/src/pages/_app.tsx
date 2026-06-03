@@ -21,7 +21,10 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
             defaultMode="light"
             storageManager={null}
         >
-            <CustomHead title="Ente Space">
+            <CustomHead
+                title="Ente Space"
+                viewportContent="width=device-width, initial-scale=1, maximum-scale=1"
+            >
                 <meta name="application-name" content="Ente Space" />
                 <meta name="mobile-web-app-capable" content="yes" />
                 <meta name="apple-mobile-web-app-capable" content="yes" />
