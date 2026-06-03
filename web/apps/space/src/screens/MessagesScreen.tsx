@@ -71,6 +71,7 @@ interface MessagesScreenProps {
 
 interface MessageContextMenuState {
     anchorEl: HTMLElement;
+    open: boolean;
     message: SpaceMessage;
 }
 
@@ -1234,10 +1235,18 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         message: SpaceMessage,
         anchorEl: HTMLElement,
     ) => {
-        setMessageContextMenu({ anchorEl, message });
+        setMessageContextMenu({ anchorEl, message, open: true });
     };
 
-    const closeMessageActions = () => setMessageContextMenu(null);
+    const closeMessageActions = () =>
+        setMessageContextMenu((currentMenu) =>
+            currentMenu ? { ...currentMenu, open: false } : null,
+        );
+
+    const clearClosedMessageActions = () =>
+        setMessageContextMenu((currentMenu) =>
+            currentMenu?.open ? currentMenu : null,
+        );
 
     const shareProfileLink = async () => {
         if (!onShareProfileLink) return;
@@ -1758,7 +1767,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                         </Box>
                         <Menu
                             anchorEl={messageContextMenu?.anchorEl}
-                            open={Boolean(messageContextMenu)}
+                            open={Boolean(messageContextMenu?.open)}
                             onClose={closeMessageActions}
                             anchorOrigin={{
                                 horizontal: "right",
@@ -1780,6 +1789,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     },
                                 },
                                 list: { sx: { p: 0 } },
+                                transition: {
+                                    onExited: clearClosedMessageActions,
+                                },
                             }}
                         >
                             {!isThreadReadOnly && (
