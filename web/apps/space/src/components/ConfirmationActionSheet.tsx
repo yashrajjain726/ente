@@ -70,20 +70,21 @@ export const ConfirmationActionSheet: React.FC<
                 paper: {
                     sx: {
                         bgcolor: isDark ? "#1E1E1E" : "#FAFAFA",
-                        borderRadius: "20px 20px 0 0",
+                        borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "none",
                         boxSizing: "border-box",
-                        left: "50%",
+                        left: 0,
                         m: 0,
+                        maxWidth: "none",
                         p: "26px 20px 24px",
                         position: "fixed",
-                        transform: "translateX(-50%)",
-                        width: "calc(100vw - 12px)",
-                        maxWidth: 363,
+                        width: "100vw",
                         "@media (min-width: 600px)": {
                             borderRadius: "20px",
                             bottom: "auto",
+                            left: "50%",
+                            maxWidth: 363,
                             top: "50%",
                             transform: "translate(-50%, -50%)",
                             width: 363,
@@ -94,60 +95,70 @@ export const ConfirmationActionSheet: React.FC<
             }}
         >
             <Box
-                component="h2"
-                id={titleID}
                 sx={{
-                    color: isDark ? "#F4F4F4" : textBase,
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 15,
-                    fontWeight: 600,
-                    lineHeight: "20px",
-                    m: 0,
-                    px: "20px",
-                    textAlign: "center",
+                    maxWidth: 320,
+                    mx: "auto",
+                    width: "100%",
+                    "@media (min-width: 600px)": { maxWidth: "none" },
                 }}
             >
-                {title}
-            </Box>
-            <Box
-                sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                    mt: "28px",
-                }}
-            >
-                <SheetButton
-                    label={confirmLabel}
-                    backgroundColor={dangerColor}
-                    color="#FFFFFF"
-                    disabled={confirmDisabled}
-                    actionPhase={confirmActionPhase}
-                    onClick={onConfirm}
-                />
-                <SheetButton
-                    label={cancelLabel}
-                    backgroundColor={isDark ? "#333333" : "#F2F2F2"}
-                    color={isDark ? "#D8D8D8" : "#666666"}
-                    disabled={cancelDisabled}
-                    onClick={onCancel}
-                />
-                {errorMessage && (
-                    <Box
-                        role="alert"
-                        sx={{
-                            color: dangerColor,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 13,
-                            fontWeight: 600,
-                            lineHeight: "18px",
-                            px: "12px",
-                            textAlign: "center",
-                        }}
-                    >
-                        {errorMessage}
-                    </Box>
-                )}
+                <Box
+                    component="h2"
+                    id={titleID}
+                    sx={{
+                        color: isDark ? "#F4F4F4" : textBase,
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 15,
+                        fontWeight: 600,
+                        lineHeight: "20px",
+                        m: 0,
+                        px: "20px",
+                        textAlign: "center",
+                    }}
+                >
+                    {title}
+                </Box>
+                <Box
+                    sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px",
+                        mt: "28px",
+                    }}
+                >
+                    <SheetButton
+                        label={confirmLabel}
+                        backgroundColor={dangerColor}
+                        color="#FFFFFF"
+                        disabled={confirmDisabled}
+                        actionPhase={confirmActionPhase}
+                        onClick={onConfirm}
+                    />
+                    <SheetButton
+                        label={cancelLabel}
+                        backgroundColor={isDark ? "#333333" : "#F2F2F2"}
+                        color={isDark ? "#D8D8D8" : "#666666"}
+                        disabled={cancelDisabled}
+                        onClick={onCancel}
+                    />
+                    {errorMessage && (
+                        <Box
+                            role="alert"
+                            sx={{
+                                color: dangerColor,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 13,
+                                fontWeight: 600,
+                                lineHeight: "18px",
+                                px: "12px",
+                                textAlign: "center",
+                            }}
+                        >
+                            {errorMessage}
+                        </Box>
+                    )}
+                </Box>
             </Box>
         </Dialog>
     );
