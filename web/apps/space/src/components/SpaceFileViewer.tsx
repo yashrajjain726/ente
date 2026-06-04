@@ -120,6 +120,7 @@ interface SpaceFileViewerProps {
     onClose: () => void;
     onDeletePost?: () => Promise<void> | void;
     onDraftPostPublished?: () => void;
+    onAddFriendForPostAction?: () => void;
     onOpenProfile?: () => void;
     onPublishDraftPost?: (
         caption: string,
@@ -263,6 +264,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     onClose,
     onDeletePost,
     onDraftPostPublished,
+    onAddFriendForPostAction,
     onOpenProfile,
     onPublishDraftPost,
     onReplyToPost,
@@ -341,6 +343,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const isActionsOpen = Boolean(actionsAnchor);
     const isDeleteActionRunning = deleteActionPhase != null;
     const isDraftPostActionRunning = draftPostActionPhase != null;
+    const canAddFriendForPostAction = Boolean(
+        !isDraftPost && onAddFriendForPostAction,
+    );
     const hasDraftPostPreparationError = Boolean(draftPostPreparationError);
     const canQueueDraftPostPublish =
         isDraftPostPreparing &&
@@ -352,9 +357,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         hasDraftPostPreparationError ||
         (!onPublishDraftPost && !canQueueDraftPostPublish);
     const isReplyActionRunning = replyActionPhase != null;
-    const canReplyToPost = Boolean(
-        !isDraftPost && activePhoto.postId && onReplyToPost,
-    );
+    const canReplyToPost =
+        canAddFriendForPostAction ||
+        Boolean(!isDraftPost && activePhoto.postId && onReplyToPost);
     const isReplyMode =
         canReplyToPost &&
         (isReplyFocused || replyText.trim().length > 0 || isReplyActionRunning);
@@ -363,9 +368,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const usePhotoSwipeViewer = !isDraftPost || isDesktopViewer;
     const canSendReply =
         canReplyToPost &&
-        Boolean(activePhoto.postId) &&
-        replyText.trim().length > 0 &&
-        !isReplyActionRunning;
+        !isReplyActionRunning &&
+        (canAddFriendForPostAction ||
+            Boolean(activePhoto.postId && replyText.trim().length > 0));
     const swipeGestureRef = React.useRef<ViewerSwipeGesture | null>(null);
     const swipeActionsRef = React.useRef({ onSwipeLeft, onSwipeRight });
     swipeActionsRef.current = { onSwipeLeft, onSwipeRight };
@@ -378,6 +383,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         isDraftPostPreviewPending;
 
     const handlePhotoLikeClick = () => {
+        if (canAddFriendForPostAction) {
+            onAddFriendForPostAction?.();
+            return;
+        }
+
         const nextLiked = !isPhotoLiked;
         if (!activePhoto.postId || !onSetPostLiked) {
             setIsPhotoLiked(nextLiked);
@@ -485,6 +495,11 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     };
 
     const sendReply = () => {
+        if (canAddFriendForPostAction) {
+            onAddFriendForPostAction?.();
+            return;
+        }
+
         const text = replyText.trim();
         if (!canSendReply || !activePhoto.postId || !onReplyToPost) return;
 
@@ -502,10 +517,25 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     };
 
     const handleReplyKeyDown = (event: React.KeyboardEvent) => {
+        if (canAddFriendForPostAction) {
+            if (event.key == "Enter" || event.key == " ") {
+                event.preventDefault();
+                onAddFriendForPostAction?.();
+            }
+            return;
+        }
+
         if (event.key != "Enter" || event.shiftKey) return;
 
         event.preventDefault();
         sendReply();
+    };
+
+    const handleReplyInputPointerDown = (event: React.PointerEvent) => {
+        if (!canAddFriendForPostAction) return;
+
+        event.preventDefault();
+        onAddFriendForPostAction?.();
     };
 
     const handleReplyActionPointerDown = (event: React.PointerEvent) => {
@@ -1459,7 +1489,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 }}
                                 onFocus={() => setIsReplyFocused(true)}
                                 onKeyDown={handleReplyKeyDown}
+                                onPointerDown={handleReplyInputPointerDown}
                                 placeholder={`Reply to ${displayName}...`}
+                                readOnly={canAddFriendForPostAction}
                                 rows={1}
                                 value={replyText}
                                 sx={{

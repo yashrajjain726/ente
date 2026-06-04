@@ -487,7 +487,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const shouldShowCoverSkeleton =
         isCoverLoading || isCoverURLPending || isCoverImageLoading;
     const selectedPostActionMode: SpaceViewerPostActionMode = isPublicProfile
-        ? "hidden"
+        ? "like-only"
         : isOwnerProfile
           ? "hidden"
           : "like-only";
@@ -1613,6 +1613,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         onClose={closeSelectedPost}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
+                        }
+                        onAddFriendForPostAction={
+                            isPublicProfile ? onAddFriend : undefined
                         }
                         onOpenProfile={closeSelectedPost}
                         onReplyToPost={
