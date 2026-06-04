@@ -18,6 +18,7 @@ import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type { SpacePostAsset } from "services/space";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
 import { firstNameFrom } from "utils/spaceDisplay";
 import {
@@ -973,7 +974,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         display: "grid",
                         gridTemplateColumns: isPublicProfile
                             ? "1fr auto"
-                            : "24px 1fr 24px",
+                            : `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
                         height: profileHeaderHeight,
                         position: "relative",
                         px: 2,
@@ -1026,11 +1027,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 color: "inherit",
                                 cursor: "pointer",
                                 display: "flex",
-                                height: 24,
+                                height: spaceTouchTargetSize,
                                 justifyContent: "flex-start",
                                 ml: "-2px",
                                 p: 0,
-                                width: 24,
+                                width: spaceTouchTargetSize,
                                 "&:focus-visible": {
                                     borderRadius: "50%",
                                     outline: `2px solid ${green}`,
@@ -1062,7 +1063,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     '"Inter Variable", Inter, sans-serif',
                                 fontSize: 13,
                                 fontWeight: 700,
-                                height: 36,
+                                height: spaceTouchTargetSize,
                                 justifyContent: "center",
                                 justifySelf: "flex-end",
                                 lineHeight: "18px",
@@ -1114,10 +1115,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 color: "inherit",
                                 cursor: onOpenSettings ? "pointer" : "default",
                                 display: "flex",
-                                height: 24,
+                                height: spaceTouchTargetSize,
                                 justifyContent: "flex-end",
                                 p: 0,
-                                width: 24,
+                                width: spaceTouchTargetSize,
                                 "&:focus-visible": {
                                     borderRadius: "50%",
                                     outline: `2px solid ${green}`,
@@ -1133,7 +1134,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         </Box>
                     ) : (
                         !isPublicProfile && (
-                            <Box aria-hidden sx={{ width: 24 }} />
+                            <Box
+                                aria-hidden
+                                sx={{ width: spaceTouchTargetSize }}
+                            />
                         )
                     )}
                 </Box>
@@ -1271,12 +1275,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                             : "default",
                                         display: "flex",
                                         gridColumn: 3,
-                                        height: 24,
+                                        height: spaceTouchTargetSize,
                                         justifyContent: "center",
                                         justifySelf: "start",
                                         ml: "4px",
                                         p: 0,
-                                        width: 24,
+                                        width: spaceTouchTargetSize,
                                         "&:focus-visible": {
                                             borderRadius: "50%",
                                             outline: `2px solid ${green}`,
@@ -1582,7 +1586,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         fontSize: 14,
                                         fontWeight: 600,
                                         gap: "8px",
-                                        height: 40,
+                                        height: spaceTouchTargetSize,
                                         justifyContent: "center",
                                         lineHeight: "20px",
                                         mt: "24px",

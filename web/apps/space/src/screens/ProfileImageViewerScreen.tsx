@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import React, { useRef } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 import {
     spaceAvatarImageInputAccept,
     spaceCoverImageInputAccept,
@@ -90,7 +91,7 @@ export const ProfileImageViewerScreen: React.FC<
                     sx={{
                         alignItems: "center",
                         display: "grid",
-                        gridTemplateColumns: "24px 1fr 24px",
+                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
                         height: 56,
                         px: 2,
                         width: "100%",
@@ -108,11 +109,11 @@ export const ProfileImageViewerScreen: React.FC<
                             color: textBase,
                             cursor: "pointer",
                             display: "flex",
-                            height: 24,
+                            height: spaceTouchTargetSize,
                             justifyContent: "flex-start",
                             ml: "-2px",
                             p: 0,
-                            width: 24,
+                            width: spaceTouchTargetSize,
                             "&:focus-visible": {
                                 borderRadius: "50%",
                                 outline: `2px solid ${green}`,

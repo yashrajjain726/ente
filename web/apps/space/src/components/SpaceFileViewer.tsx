@@ -23,6 +23,7 @@ import {
 } from "components/SpacePostLikeAnimation";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
 import { clampSpaceMessageText } from "utils/spaceMessageLimits";
 import type { SpaceImageCropArea } from "utils/spacePostImage";
@@ -53,6 +54,7 @@ const defaultPhotoWidth = 900;
 const defaultPhotoHeight = 680;
 const viewerSwipeMinDeltaPx = 72;
 const viewerSwipeAxisRatio = 1.5;
+const viewerHeaderAvatarSize = 28;
 
 const postButtonSpin = keyframes`
     from {
@@ -218,10 +220,10 @@ const viewerHeaderButtonSx = {
     color: controlIcon,
     cursor: "pointer",
     display: "flex",
-    height: 28,
+    height: spaceTouchTargetSize,
     justifyContent: "center",
     p: 0,
-    width: 28,
+    width: spaceTouchTargetSize,
     "&:focus-visible": { outline: `2px solid ${green}`, outlineOffset: 2 },
     "&:hover": { bgcolor: controlBackgroundHover },
 };
@@ -852,41 +854,49 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             cursor: onOpenProfile ? "pointer" : "default",
                             display: "flex",
                             flexShrink: 0,
-                            height: 28,
+                            height: spaceTouchTargetSize,
                             justifyContent: "center",
-                            overflow: "hidden",
                             p: 0,
-                            width: 28,
+                            width: spaceTouchTargetSize,
                             "&:focus-visible": {
                                 outline: `2px solid ${green}`,
                                 outlineOffset: 2,
                             },
                         }}
                     >
-                        {activePhoto.avatarUrl ? (
-                            <Box
-                                component="img"
-                                alt=""
-                                src={activePhoto.avatarUrl}
-                                sx={{
-                                    display: "block",
-                                    height: "100%",
-                                    objectFit: "cover",
-                                    objectPosition: "center",
-                                    width: "100%",
-                                }}
-                            />
-                        ) : (
-                            <Skeleton
-                                variant="circular"
-                                sx={{
-                                    bgcolor: avatarSkeletonBackground,
-                                    height: "100%",
-                                    transform: "none",
-                                    width: "100%",
-                                }}
-                            />
-                        )}
+                        <Box
+                            sx={{
+                                borderRadius: "50%",
+                                height: viewerHeaderAvatarSize,
+                                overflow: "hidden",
+                                width: viewerHeaderAvatarSize,
+                            }}
+                        >
+                            {activePhoto.avatarUrl ? (
+                                <Box
+                                    component="img"
+                                    alt=""
+                                    src={activePhoto.avatarUrl}
+                                    sx={{
+                                        display: "block",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                        objectPosition: "center",
+                                        width: "100%",
+                                    }}
+                                />
+                            ) : (
+                                <Skeleton
+                                    variant="circular"
+                                    sx={{
+                                        bgcolor: avatarSkeletonBackground,
+                                        height: "100%",
+                                        transform: "none",
+                                        width: "100%",
+                                    }}
+                                />
+                            )}
+                        </Box>
                     </Box>
                     <Box
                         sx={{
@@ -995,10 +1005,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 color: controlIcon,
                                 cursor: "pointer",
                                 display: "flex",
-                                height: 32,
+                                height: spaceTouchTargetSize,
                                 justifyContent: "center",
                                 p: 0,
-                                width: 32,
+                                width: spaceTouchTargetSize,
                                 "&:focus-visible": {
                                     borderRadius: "50%",
                                     outline: `2px solid ${green}`,
@@ -1070,7 +1080,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 color: dangerColor,
                                 display: "flex",
                                 gap: "8px",
-                                minHeight: 38,
+                                minHeight: spaceTouchTargetSize,
                                 px: "8px",
                                 py: "7px",
                                 whiteSpace: "nowrap",

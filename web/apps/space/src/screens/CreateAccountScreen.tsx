@@ -5,6 +5,7 @@ import {
     type PasswordStrength,
 } from "ente-accounts-rs/utils/password";
 import React, { useId, useMemo, useState } from "react";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 
 export const createAccountBackground = "#FAFAFA";
 
@@ -271,11 +272,11 @@ const TextInput: React.FC<TextInputProps> = ({
                             cursor: "pointer",
                             display: "flex",
                             flexShrink: 0,
-                            height: 32,
+                            height: spaceTouchTargetSize,
                             justifyContent: "center",
                             mr: -0.5,
                             p: 0,
-                            width: 32,
+                            width: spaceTouchTargetSize,
                             "&:focus-visible": {
                                 borderRadius: "50%",
                                 outline: `2px solid ${green}`,
@@ -375,8 +376,8 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                     component="header"
                     sx={{
                         display: "grid",
-                        gridTemplateColumns: "42px 1fr 42px",
-                        height: 42,
+                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
+                        height: spaceTouchTargetSize,
                         mt: "32px",
                         width: "100%",
                     }}
@@ -393,10 +394,10 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                             color: textBase,
                             cursor: "pointer",
                             display: "flex",
-                            height: 42,
+                            height: spaceTouchTargetSize,
                             justifyContent: "flex-start",
                             p: 0,
-                            width: 42,
+                            width: spaceTouchTargetSize,
                             "&:focus-visible": {
                                 borderRadius: "50%",
                                 outline: `2px solid ${green}`,

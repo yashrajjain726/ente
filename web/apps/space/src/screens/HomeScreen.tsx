@@ -32,6 +32,7 @@ import type {
     SpacePostAvatarURLLoader,
 } from "services/space";
 import type { LocalSpaceFeedPost } from "state/spaceAppState";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
 import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
 import {
@@ -52,17 +53,17 @@ const feedSkeletonElementBackground = "#E6E6E6";
 const textBase = "#000";
 const textSecondary = "#6B6B6B";
 const dangerColor = "#F63A3A";
-const headerActionSize = 32;
+const headerActionSize = spaceTouchTargetSize;
 const headerAvatarSize = 27;
 const feedAvatarSize = 38;
 const headerHeight = 64;
 const headerIconSize = 30;
 const headerHideStartY = 96;
 const headerScrollDelta = 4;
-const headerSideWidth = headerActionSize;
+const headerSideWidth = 32;
 const floatingAddButtonSize = 64;
 const floatingAddIconSize = 34;
-const feedLikeActionSize = 38;
+const feedLikeActionSize = spaceTouchTargetSize;
 const feedActionIconSize = 20;
 const feedReplyIconSize = 17;
 const emptyFeedItemGap = "22px";
@@ -1228,11 +1229,11 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                     cursor: onClose ? "pointer" : "default",
                     display: "flex",
                     flexShrink: 0,
-                    height: 24,
+                    height: spaceTouchTargetSize,
                     justifyContent: "center",
                     opacity: 0.9,
                     p: 0,
-                    width: 24,
+                    width: spaceTouchTargetSize,
                     "&:focus-visible": {
                         outline: "2px solid rgba(0 0 0 / 0.72)",
                         outlineOffset: 2,
@@ -1744,6 +1745,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             height: headerActionSize,
                             justifyContent: "center",
                             lineHeight: 0,
+                            ml: "-6px",
                             overflow: "hidden",
                             p: 0,
                             placeSelf: "center start",
@@ -1931,7 +1933,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                             '"Inter Variable", Inter, sans-serif',
                                         fontSize: 13,
                                         fontWeight: 600,
-                                        height: 36,
+                                        height: spaceTouchTargetSize,
                                         justifyContent: "center",
                                         lineHeight: "18px",
                                         mb: 0,
@@ -2025,7 +2027,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                         fontSize: 13,
                                         fontWeight: 600,
                                         gap: "6px",
-                                        height: 36,
+                                        height: spaceTouchTargetSize,
                                         justifyContent: "center",
                                         lineHeight: "18px",
                                         mt: emptyFeedItemGap,

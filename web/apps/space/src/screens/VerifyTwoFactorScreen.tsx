@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React, { useEffect, useRef, useState } from "react";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 
 export const verifyTwoFactorBackground = "#FAFAFA";
 
@@ -250,8 +251,8 @@ export const VerifyTwoFactorScreen: React.FC<VerifyTwoFactorScreenProps> = ({
                     component="header"
                     sx={{
                         display: "grid",
-                        gridTemplateColumns: "42px 1fr 42px",
-                        height: 42,
+                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
+                        height: spaceTouchTargetSize,
                         mt: "32px",
                         width: "100%",
                     }}
@@ -268,10 +269,10 @@ export const VerifyTwoFactorScreen: React.FC<VerifyTwoFactorScreenProps> = ({
                             color: textBase,
                             cursor: "pointer",
                             display: "flex",
-                            height: 42,
+                            height: spaceTouchTargetSize,
                             justifyContent: "flex-start",
                             p: 0,
-                            width: 42,
+                            width: spaceTouchTargetSize,
                             "&:focus-visible": {
                                 borderRadius: "50%",
                                 outline: `2px solid ${green}`,

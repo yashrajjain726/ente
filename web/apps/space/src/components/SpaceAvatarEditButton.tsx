@@ -1,7 +1,9 @@
 import { Box } from "@mui/material";
 import React from "react";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 
 const green = "#08C225";
+const editButtonVisualSize = 30;
 
 const PencilIcon: React.FC = () => (
     <Box
@@ -33,7 +35,6 @@ export const SpaceAvatarEditButton: React.FC<SpaceAvatarEditButtonProps> = ({
     onClick,
 }) => (
     <Box
-        className="green-bg"
         component="button"
         type="button"
         aria-label={ariaLabel}
@@ -41,25 +42,39 @@ export const SpaceAvatarEditButton: React.FC<SpaceAvatarEditButtonProps> = ({
         onClick={onClick}
         sx={{
             alignItems: "center",
-            bgcolor: green,
+            bgcolor: "transparent",
             border: 0,
             borderRadius: "50%",
-            bottom: 10,
-            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
+            bottom: 3,
             color: "white",
             cursor: disabled ? "default" : "pointer",
             display: "flex",
-            height: 30,
+            height: spaceTouchTargetSize,
             justifyContent: "center",
             position: "absolute",
-            right: 2,
-            width: 30,
+            right: -5,
+            width: spaceTouchTargetSize,
             "&:focus-visible": {
                 outline: `2px solid ${green}`,
                 outlineOffset: 3,
             },
         }}
     >
-        <PencilIcon />
+        <Box
+            className="green-bg"
+            component="span"
+            sx={{
+                alignItems: "center",
+                bgcolor: green,
+                borderRadius: "50%",
+                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
+                display: "flex",
+                height: editButtonVisualSize,
+                justifyContent: "center",
+                width: editButtonVisualSize,
+            }}
+        >
+            <PencilIcon />
+        </Box>
     </Box>
 );

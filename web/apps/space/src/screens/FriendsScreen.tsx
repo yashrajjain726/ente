@@ -12,6 +12,7 @@ import {
 } from "components/SpaceActionFeedback";
 import type { FriendProfile } from "data/friends";
 import React, { useState } from "react";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 
 export const friendsBackground = "#FFFFFF";
 
@@ -115,7 +116,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
             sx={{
                 alignItems: "center",
                 display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) 32px",
+                gridTemplateColumns: `minmax(0, 1fr) ${spaceTouchTargetSize}px`,
                 gap: "12px",
                 listStyle: "none",
                 minHeight: 72,
@@ -246,11 +247,11 @@ const FriendRow: React.FC<FriendRowProps> = ({
                     color: textBase,
                     cursor: "pointer",
                     display: "flex",
-                    height: 32,
+                    height: spaceTouchTargetSize,
                     justifyContent: "center",
                     justifySelf: "flex-end",
                     p: 0,
-                    width: 32,
+                    width: spaceTouchTargetSize,
                     "&:focus-visible": {
                         outline: `2px solid ${green}`,
                         outlineOffset: 2,
@@ -292,7 +293,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
                         borderRadius: "10px",
                         color: dangerColor,
                         gap: "8px",
-                        minHeight: 38,
+                        minHeight: spaceTouchTargetSize,
                         px: "9px",
                         py: "7px",
                         whiteSpace: "nowrap",
@@ -455,7 +456,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     sx={{
                         alignItems: "center",
                         display: "grid",
-                        gridTemplateColumns: "24px 1fr 24px",
+                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
                         height: 56,
                         px: 2,
                         width: "100%",
@@ -473,11 +474,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             color: textBase,
                             cursor: onBack ? "pointer" : "default",
                             display: "flex",
-                            height: 24,
+                            height: spaceTouchTargetSize,
                             justifyContent: "flex-start",
                             ml: "-2px",
                             p: 0,
-                            width: 24,
+                            width: spaceTouchTargetSize,
                             "&:focus-visible": {
                                 borderRadius: "50%",
                                 outline: `2px solid ${green}`,

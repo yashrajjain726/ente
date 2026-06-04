@@ -6,6 +6,7 @@ import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import React, { useEffect, useRef, useState } from "react";
 import type { Area, Point } from "react-easy-crop";
 import { profileBackground } from "screens/ProfileScreen";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 import {
     prepareSpaceAvatarImageFromCrop,
     prepareSpaceCoverImageFromCrop,
@@ -71,7 +72,7 @@ const EditProfilePhotoShell: React.FC<
                 sx={{
                     alignItems: "center",
                     display: "grid",
-                    gridTemplateColumns: "24px 1fr 24px",
+                    gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
                     height: 56,
                     px: 2,
                     width: "100%",
@@ -89,11 +90,11 @@ const EditProfilePhotoShell: React.FC<
                         color: textBase,
                         cursor: "pointer",
                         display: "flex",
-                        height: 24,
+                        height: spaceTouchTargetSize,
                         justifyContent: "flex-start",
                         ml: "-2px",
                         p: 0,
-                        width: 24,
+                        width: spaceTouchTargetSize,
                         "&:focus-visible": {
                             borderRadius: "50%",
                             outline: `2px solid ${green}`,

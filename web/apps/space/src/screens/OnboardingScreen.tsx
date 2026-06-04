@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import React, { useEffect, useRef, useState } from "react";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 
 export const onboardingGreen = "#08C225";
 export const onboardingTitle = "Share your life";
@@ -116,27 +117,40 @@ const OnboardingPaginationDots: React.FC<OnboardingPaginationDotsProps> = ({
                 aria-current={activeSlideIndex == index ? "page" : undefined}
                 onClick={() => onShowSlide(index)}
                 sx={{
-                    bgcolor:
-                        activeSlideIndex == index
-                            ? activePaginationGreen
-                            : inactivePaginationGreen,
+                    alignItems: "center",
+                    bgcolor: "transparent",
                     border: 0,
                     borderRadius: "999px",
                     cursor: "pointer",
-                    height: 10,
+                    display: "flex",
+                    height: spaceTouchTargetSize,
+                    justifyContent: "center",
                     p: 0,
-                    transition:
-                        "background-color 180ms ease, height 180ms ease, width 180ms ease",
-                    width: activeSlideIndex == index ? 24 : 10,
+                    width: spaceTouchTargetSize,
                     "&:focus-visible": {
                         outline: "2px solid white",
                         outlineOffset: 4,
                     },
-                    "@media (prefers-reduced-motion: reduce)": {
-                        transition: "none",
-                    },
                 }}
-            />
+            >
+                <Box
+                    component="span"
+                    sx={{
+                        bgcolor:
+                            activeSlideIndex == index
+                                ? activePaginationGreen
+                                : inactivePaginationGreen,
+                        borderRadius: "999px",
+                        height: 10,
+                        transition:
+                            "background-color 180ms ease, height 180ms ease, width 180ms ease",
+                        width: activeSlideIndex == index ? 24 : 10,
+                        "@media (prefers-reduced-motion: reduce)": {
+                            transition: "none",
+                        },
+                    }}
+                />
+            </Box>
         ))}
     </Box>
 );

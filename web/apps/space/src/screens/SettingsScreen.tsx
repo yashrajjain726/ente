@@ -9,6 +9,7 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import React from "react";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 
 export const settingsBackground = "#FAFAFA";
 
@@ -170,12 +171,12 @@ const SpaceIcon: React.FC<SpaceIconProps> = ({ label, src, url }) => (
             borderRadius: "10px",
             cursor: "pointer",
             display: "flex",
-            height: 36,
+            height: spaceTouchTargetSize,
             justifyContent: "center",
             p: 0,
             textDecoration: "none",
             transition: "background-color 120ms ease",
-            width: 36,
+            width: spaceTouchTargetSize,
             "&:active": { bgcolor: "rgba(0, 0, 0, 0.025)" },
             "&:focus-visible": {
                 outline: `2px solid ${green}`,
@@ -234,7 +235,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     sx={{
                         alignItems: "center",
                         display: "grid",
-                        gridTemplateColumns: "24px 1fr 24px",
+                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
                         height: 56,
                         px: 2,
                         width: "100%",
@@ -252,11 +253,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                             color: textBase,
                             cursor: onBack ? "pointer" : "default",
                             display: "flex",
-                            height: 24,
+                            height: spaceTouchTargetSize,
                             justifyContent: "flex-start",
                             ml: "-2px",
                             p: 0,
-                            width: 24,
+                            width: spaceTouchTargetSize,
                             "&:focus-visible": {
                                 borderRadius: "50%",
                                 outline: `2px solid ${green}`,

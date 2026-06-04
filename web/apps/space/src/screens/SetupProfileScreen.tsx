@@ -6,6 +6,7 @@ import { SpaceAvatarEditButton } from "components/SpaceAvatarEditButton";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React, { useEffect, useRef, useState } from "react";
 import type { Area, Point } from "react-easy-crop";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 import {
     prepareSpaceAvatarImageFromCrop,
     spaceAvatarCropImageForFile,
@@ -465,8 +466,8 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                     component="header"
                     sx={{
                         display: "grid",
-                        gridTemplateColumns: "42px 1fr 42px",
-                        height: 42,
+                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
+                        height: spaceTouchTargetSize,
                         mt: "32px",
                         width: "100%",
                     }}
@@ -483,10 +484,10 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                             color: textBase,
                             cursor: "pointer",
                             display: "flex",
-                            height: 42,
+                            height: spaceTouchTargetSize,
                             justifyContent: "flex-start",
                             p: 0,
-                            width: 42,
+                            width: spaceTouchTargetSize,
                             "&:focus-visible": {
                                 borderRadius: "50%",
                                 outline: `2px solid ${green}`,

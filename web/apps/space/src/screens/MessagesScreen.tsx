@@ -12,6 +12,7 @@ import { flushSync } from "react-dom";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type { SpaceMessage, SpaceMessageConversation } from "services/space";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 import { firstNameFrom } from "utils/spaceDisplay";
 import { clampSpaceMessageText } from "utils/spaceMessageLimits";
 
@@ -1046,11 +1047,10 @@ const MessageBubble: React.FC<{
                                 sx={{
                                     alignItems: "center",
                                     appearance: "none",
-                                    bgcolor: messagesBackground,
-                                    border: `2px solid ${messagesBackground}`,
+                                    bgcolor: "transparent",
+                                    border: 0,
                                     borderRadius: "999px",
-                                    bottom: -11,
-                                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
+                                    bottom: -22,
                                     boxSizing: "border-box",
                                     color: green,
                                     cursor: "pointer",
@@ -1060,23 +1060,42 @@ const MessageBubble: React.FC<{
                                     fontSize: 10,
                                     fontWeight: 800,
                                     gap: "4px",
-                                    height: 22,
+                                    height: spaceTouchTargetSize,
                                     justifyContent: "center",
                                     lineHeight: 1,
-                                    minWidth: 34,
-                                    pb: "1px",
-                                    px: "7px",
+                                    minWidth: spaceTouchTargetSize,
+                                    p: 0,
                                     position: "absolute",
                                     zIndex: 2,
-                                    ...(isOwn ? { left: 8 } : { right: 8 }),
+                                    ...(isOwn ? { left: -3 } : { right: -3 }),
                                     "&:focus-visible": {
                                         outline: `2px solid ${green}`,
                                         outlineOffset: 2,
                                     },
                                 }}
                             >
-                                <HeartIcon filled small />
-                                {message.likeCount}
+                                <Box
+                                    component="span"
+                                    sx={{
+                                        alignItems: "center",
+                                        bgcolor: messagesBackground,
+                                        border: `2px solid ${messagesBackground}`,
+                                        borderRadius: "999px",
+                                        boxShadow:
+                                            "0 1px 3px rgba(0, 0, 0, 0.08)",
+                                        boxSizing: "border-box",
+                                        display: "inline-flex",
+                                        gap: "4px",
+                                        height: 22,
+                                        justifyContent: "center",
+                                        minWidth: 34,
+                                        pb: "1px",
+                                        px: "7px",
+                                    }}
+                                >
+                                    <HeartIcon filled small />
+                                    {message.likeCount}
+                                </Box>
                             </Box>
                         </Tooltip>
                     )}
@@ -1468,7 +1487,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     sx={{
                         alignItems: "center",
                         display: "grid",
-                        gridTemplateColumns: "24px 1fr 24px",
+                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
                         height: 56,
                         px: 2,
                         width: "100%",
@@ -1487,11 +1506,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                             cursor:
                                 isThreadOpen || onBack ? "pointer" : "default",
                             display: "flex",
-                            height: 24,
+                            height: spaceTouchTargetSize,
                             justifyContent: "flex-start",
                             ml: "-2px",
                             p: 0,
-                            width: 24,
+                            width: spaceTouchTargetSize,
                             "&:focus-visible": {
                                 borderRadius: "50%",
                                 outline: `2px solid ${green}`,
@@ -1733,7 +1752,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             borderRadius: "12px",
                                             color: textBase,
                                             gap: "8px",
-                                            minHeight: 38,
+                                            minHeight: spaceTouchTargetSize,
                                             px: "8px",
                                             py: "7px",
                                             "&:hover": {
@@ -1765,7 +1784,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             borderRadius: "12px",
                                             color: textBase,
                                             gap: "8px",
-                                            minHeight: 38,
+                                            minHeight: spaceTouchTargetSize,
                                             px: "8px",
                                             py: "7px",
                                             "&:hover": {
@@ -1795,7 +1814,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     borderRadius: "12px",
                                     color: textBase,
                                     gap: "8px",
-                                    minHeight: 38,
+                                    minHeight: spaceTouchTargetSize,
                                     px: "8px",
                                     py: "7px",
                                     "&:hover": { bgcolor: lightSurface },
@@ -1829,7 +1848,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             borderRadius: "12px",
                                             color: dangerColor,
                                             gap: "8px",
-                                            minHeight: 38,
+                                            minHeight: spaceTouchTargetSize,
                                             px: "8px",
                                             py: "7px",
                                             "&:hover": {
@@ -1934,10 +1953,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 color: textSecondary,
                                                 cursor: "pointer",
                                                 display: "flex",
-                                                height: 24,
+                                                height: spaceTouchTargetSize,
                                                 justifyContent: "center",
                                                 p: 0,
-                                                width: 24,
+                                                width: spaceTouchTargetSize,
                                                 "&:focus-visible": {
                                                     outline: `2px solid ${green}`,
                                                     outlineOffset: 2,
@@ -2141,7 +2160,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             fontSize: 13,
                                             fontWeight: 600,
                                             gap: "6px",
-                                            height: 36,
+                                            height: spaceTouchTargetSize,
                                             justifyContent: "center",
                                             lineHeight: "18px",
                                             pointerEvents: "auto",

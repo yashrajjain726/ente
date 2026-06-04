@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 
 export const shareProfileLinkBackground = "#FAFAFA";
 
@@ -237,8 +238,8 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                     component="header"
                     sx={{
                         display: "grid",
-                        gridTemplateColumns: "42px minmax(0, 1fr) 42px",
-                        height: 42,
+                        gridTemplateColumns: `${spaceTouchTargetSize}px minmax(0, 1fr) ${spaceTouchTargetSize}px`,
+                        height: spaceTouchTargetSize,
                         minWidth: 0,
                         mt: "32px",
                         width: "100%",
@@ -256,10 +257,10 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             color: textBase,
                             cursor: "pointer",
                             display: "flex",
-                            height: 42,
+                            height: spaceTouchTargetSize,
                             justifyContent: "flex-start",
                             p: 0,
-                            width: 42,
+                            width: spaceTouchTargetSize,
                             "&:focus-visible": {
                                 borderRadius: "50%",
                                 outline: `2px solid ${green}`,
