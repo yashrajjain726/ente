@@ -1520,7 +1520,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 }}
                             >
                                 {isOwnerProfile
-                                    ? "Create your first post"
+                                    ? "What are you up to?"
                                     : isPublicProfile
                                       ? `${firstName} hasn't posted anything yet. Add them as a friend to get their latest posts.`
                                       : `${firstName} hasn't posted anything yet.`}
@@ -1575,7 +1575,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         size={20}
                                         strokeWidth={1.8}
                                     />
-                                    Create
+                                    Post
                                 </Box>
                             )}
                         </Box>
