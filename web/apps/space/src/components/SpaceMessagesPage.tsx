@@ -3,6 +3,7 @@ import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import { useRouter } from "next/router";
 import React from "react";
 import { MessagesScreen, messagesBackground } from "screens/MessagesScreen";
+import type { SetupProfile } from "screens/SetupProfileScreen";
 import {
     createCurrentProfileLink,
     deleteCurrentMessage,
@@ -29,6 +30,13 @@ const friendSpaceId = (friend: SpaceMessageConversation["friend"]) =>
 const conversationId = (conversation: SpaceMessageConversation) =>
     friendSpaceId(conversation.friend);
 
+let nextLocalMessageID = 0;
+
+const localMessageIdPrefix = "space-local-message-";
+
+const createLocalMessageID = () =>
+    `${localMessageIdPrefix}${Date.now()}-${nextLocalMessageID++}`;
+
 const placeholderFriend = (
     spaceId: string,
 ): SpaceMessageConversation["friend"] => ({
@@ -39,6 +47,47 @@ const placeholderFriend = (
     spaceId,
     username: "",
 });
+
+const currentProfileMessageActor = (
+    profile: SetupProfile,
+): SpaceMessage["sender"] => ({
+    avatarObjectKey: profile.avatarObjectKey,
+    avatarUpdatedAt: profile.avatarUpdatedAt,
+    avatarUrl: profile.avatarUrl,
+    friendsCount: 0,
+    fullName: profile.fullName,
+    id: profile.spaceId ?? profile.username,
+    spaceId: profile.spaceId,
+    spaceSlug: profile.spaceSlug,
+    username: profile.username,
+});
+
+const createLocalMessage = ({
+    profile,
+    recipient,
+    replyMessageId,
+    text,
+}: {
+    profile: SetupProfile;
+    recipient: SpaceMessageConversation["friend"];
+    replyMessageId?: string;
+    text: string;
+}): SpaceMessage => {
+    const createdAtMs = Date.now();
+    return {
+        createdAtMs,
+        id: createLocalMessageID(),
+        isDeleted: false,
+        kind: "regular",
+        likeCount: 0,
+        recipient,
+        replyMessageId,
+        sender: currentProfileMessageActor(profile),
+        text,
+        updatedAtMs: createdAtMs,
+        viewerLiked: false,
+    };
+};
 
 export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     selectedSpaceId,
@@ -187,6 +236,51 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         [],
     );
 
+    const replaceMessageIfThreadIsCurrent = React.useCallback(
+        (spaceId: string, localMessageId: string, message: SpaceMessage) => {
+            if (selectedFriendSpaceIdRef.current != spaceId) return;
+            setMessages((currentMessages) => {
+                const hasConfirmedMessage = currentMessages.some(
+                    (currentMessage) => currentMessage.id == message.id,
+                );
+                if (hasConfirmedMessage) {
+                    return currentMessages
+                        .filter(
+                            (currentMessage) =>
+                                currentMessage.id != localMessageId,
+                        )
+                        .map((currentMessage) =>
+                            currentMessage.id == message.id
+                                ? message
+                                : currentMessage,
+                        );
+                }
+
+                const hasLocalMessage = currentMessages.some(
+                    (currentMessage) => currentMessage.id == localMessageId,
+                );
+                if (!hasLocalMessage) return [...currentMessages, message];
+
+                return currentMessages.map((currentMessage) =>
+                    currentMessage.id == localMessageId
+                        ? message
+                        : currentMessage,
+                );
+            });
+        },
+        [],
+    );
+
+    const removeMessageIfThreadIsCurrent = React.useCallback(
+        (spaceId: string, messageId: string) => {
+            if (selectedFriendSpaceIdRef.current != spaceId) return;
+            setMessages((currentMessages) =>
+                currentMessages.filter((message) => message.id != messageId),
+            );
+        },
+        [],
+    );
+
     React.useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
             void router.replace(spaceRoutes.onboarding);
@@ -246,7 +340,17 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         setIsThreadLoading(true);
         void loadCurrentMessageThread(selectedSpaceId)
             .then((page) => {
-                if (!cancelled) setMessages(page.items);
+                if (!cancelled) {
+                    const loadedMessageIds = new Set(
+                        page.items.map((message) => message.id),
+                    );
+                    setMessages((currentMessages) => [
+                        ...page.items,
+                        ...currentMessages.filter(
+                            (message) => !loadedMessageIds.has(message.id),
+                        ),
+                    ]);
+                }
             })
             .catch((error: unknown) =>
                 console.error("Failed to load message thread", error),
@@ -290,17 +394,54 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 }
                 onOpenThread={openConversation}
                 onSendMessage={async (spaceId, text) => {
-                    const message = await sendCurrentMessage(spaceId, text);
-                    appendMessageIfThreadIsCurrent(spaceId, message);
+                    const optimisticMessage = createLocalMessage({
+                        profile,
+                        recipient: selectedFriend ?? placeholderFriend(spaceId),
+                        text,
+                    });
+                    appendMessageIfThreadIsCurrent(spaceId, optimisticMessage);
+                    try {
+                        const message = await sendCurrentMessage(spaceId, text);
+                        replaceMessageIfThreadIsCurrent(
+                            spaceId,
+                            optimisticMessage.id,
+                            message,
+                        );
+                    } catch (error) {
+                        removeMessageIfThreadIsCurrent(
+                            spaceId,
+                            optimisticMessage.id,
+                        );
+                        throw error;
+                    }
                     refreshConversations();
                 }}
                 onReplyToMessage={async (spaceId, messageId, text) => {
-                    const message = await replyToCurrentMessage(
-                        spaceId,
-                        messageId,
+                    const optimisticMessage = createLocalMessage({
+                        profile,
+                        recipient: selectedFriend ?? placeholderFriend(spaceId),
+                        replyMessageId: messageId,
                         text,
-                    );
-                    appendMessageIfThreadIsCurrent(spaceId, message);
+                    });
+                    appendMessageIfThreadIsCurrent(spaceId, optimisticMessage);
+                    try {
+                        const message = await replyToCurrentMessage(
+                            spaceId,
+                            messageId,
+                            text,
+                        );
+                        replaceMessageIfThreadIsCurrent(
+                            spaceId,
+                            optimisticMessage.id,
+                            message,
+                        );
+                    } catch (error) {
+                        removeMessageIfThreadIsCurrent(
+                            spaceId,
+                            optimisticMessage.id,
+                        );
+                        throw error;
+                    }
                     refreshConversations();
                 }}
                 onSetMessageLiked={async (messageId, liked) => {

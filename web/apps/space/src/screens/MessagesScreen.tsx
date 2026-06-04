@@ -1235,21 +1235,26 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         const text = messageText.trim();
         if (!selectedFriend || !canInteract || !canSend) return;
         const spaceId = selectedFriend.spaceId ?? selectedFriend.id;
+        const repliedMessage = replyingTo;
         stickToThreadBottomRef.current = true;
         smoothNextMessageScrollRef.current = true;
         setSendPhase("sending");
-        const sendPromise = replyingTo
-            ? onReplyToMessage(spaceId, replyingTo.id, text)
+        setMessageText("");
+        setReplyingTo(null);
+        const sendPromise = repliedMessage
+            ? onReplyToMessage(spaceId, repliedMessage.id, text)
             : onSendMessage(spaceId, text);
         void sendPromise
             .then(() => {
-                setMessageText("");
-                setReplyingTo(null);
                 setSendPhase("idle");
             })
             .catch((error: unknown) => {
                 smoothNextMessageScrollRef.current = false;
                 console.error("Failed to send message", error);
+                setMessageText((currentText) => currentText || text);
+                setReplyingTo(
+                    (currentReplyingTo) => currentReplyingTo ?? repliedMessage,
+                );
                 setSendPhase("idle");
             });
     };
