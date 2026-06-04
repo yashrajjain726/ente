@@ -1857,6 +1857,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             justifyContent: "center",
                             justifySelf: "end",
                             lineHeight: 0,
+                            mr: "-6px",
                             p: 0,
                             position: "relative",
                             width: headerActionSize,
@@ -1891,8 +1892,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     borderRadius: "50%",
                                     height: 13,
                                     position: "absolute",
-                                    right: -1,
-                                    top: 1,
+                                    right: 7,
+                                    top: 7,
                                     width: 13,
                                     zIndex: 0,
                                     "&::after": {
