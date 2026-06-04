@@ -51,18 +51,23 @@ const Page: React.FC = () => {
     const [loadedPostsSpaceId, setLoadedPostsSpaceId] = useState<string>();
     const [selectedProfile, setSelectedProfile] = useState(selectedFriend);
     const [posts, setPosts] = useState<SpaceProfilePost[]>([]);
-    const postGroups = useMemo(
-        () => profilePostGroupsFromPosts(posts),
-        [posts],
-    );
     const selectedFriendSpaceId = selectedFriend?.spaceId;
+    const hasLoadedPostsForSelectedFriend =
+        loadedPostsSpaceId == selectedFriendSpaceId;
+    const postGroups = useMemo(
+        () =>
+            hasLoadedPostsForSelectedFriend
+                ? profilePostGroupsFromPosts(posts)
+                : [],
+        [hasLoadedPostsForSelectedFriend, posts],
+    );
     const showProfileLoading = Boolean(
         selectedFriendSpaceId &&
             (isProfileLoading || loadedProfileSpaceId != selectedFriendSpaceId),
     );
     const showPostsLoading = Boolean(
         selectedFriendSpaceId &&
-            (isPostsLoading || loadedPostsSpaceId != selectedFriendSpaceId),
+            (isPostsLoading || !hasLoadedPostsForSelectedFriend),
     );
     const currentSelectedProfile =
         selectedProfile?.spaceId == selectedFriendSpaceId
@@ -210,6 +215,7 @@ const Page: React.FC = () => {
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onReplyToPost={replyToCurrentPost}
                 onSetPostLiked={setCurrentPostLiked}
+                showPostLoadingSkeleton={false}
             />
         </>
     );
