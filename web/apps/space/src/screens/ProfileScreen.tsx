@@ -12,6 +12,7 @@ import {
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
+import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
@@ -1564,6 +1565,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         </Box>
                     )}
                 </Box>
+                {isOwnerProfile && (
+                    <SpacePostFloatingActionButton
+                        disabled={isPostPhotoOpening}
+                        onClick={openPostPhotoPicker}
+                    />
+                )}
                 {selectedPost && (
                     <SpaceFileViewer
                         photo={selectedPost.photo}

@@ -1,5 +1,4 @@
 import {
-    Add01Icon,
     BubbleChatIcon,
     FavouriteIcon,
     MultiplicationSignIcon,
@@ -14,6 +13,7 @@ import {
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
+import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
 import {
     spacePostLikeButtonPop,
     spacePostLikeHeartPop,
@@ -61,8 +61,6 @@ const headerIconSize = 30;
 const headerHideStartY = 96;
 const headerScrollDelta = 4;
 const headerSideWidth = 32;
-const floatingAddButtonSize = 64;
-const floatingAddIconSize = 34;
 const feedLikeActionSize = spaceTouchTargetSize;
 const feedActionIconSize = 20;
 const feedReplyIconSize = 17;
@@ -2047,64 +2045,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         </Box>
                     )}
                 </Box>
-                <Box
-                    className="green-bg"
-                    component="button"
-                    type="button"
-                    aria-label="Post photo"
+                <SpacePostFloatingActionButton
                     disabled={isPostPhotoButtonDisabled}
                     onClick={openPostPhotoPicker}
-                    sx={{
-                        alignItems: "center",
-                        appearance: "none",
-                        bgcolor: green,
-                        border: 0,
-                        borderRadius: "50%",
-                        bottom: "calc(env(safe-area-inset-bottom) + 20px)",
-                        boxShadow: "0 10px 24px rgba(0, 0, 0, 0.22)",
-                        color: "#FFFFFF",
-                        cursor: isPostPhotoButtonDisabled
-                            ? "default"
-                            : "pointer",
-                        display: "flex",
-                        fontSize: 0,
-                        height: floatingAddButtonSize,
-                        justifyContent: "center",
-                        lineHeight: 0,
-                        opacity: isPostPhotoButtonDisabled ? 0.72 : 1,
-                        p: 0,
-                        position: "fixed",
-                        right: "max(20px, calc((100vw - 390px) / 2 + 20px))",
-                        transition:
-                            "background-color 120ms ease, box-shadow 120ms ease, transform 120ms ease",
-                        width: floatingAddButtonSize,
-                        zIndex: 5,
-                        "& svg": { display: "block" },
-                        "&:active": {
-                            transform: isPostPhotoButtonDisabled
-                                ? "none"
-                                : "translateY(1px)",
-                        },
-                        "&:focus-visible": {
-                            outline: `3px solid ${paleGreen}`,
-                            outlineOffset: 3,
-                        },
-                        "&:hover": {
-                            bgcolor: isPostPhotoButtonDisabled
-                                ? green
-                                : "#07B422",
-                            boxShadow: isPostPhotoButtonDisabled
-                                ? "0 10px 24px rgba(0, 0, 0, 0.22)"
-                                : "0 12px 28px rgba(0, 0, 0, 0.26)",
-                        },
-                    }}
-                >
-                    <HugeiconsIcon
-                        icon={Add01Icon}
-                        size={floatingAddIconSize}
-                        strokeWidth={2.1}
-                    />
-                </Box>
+                />
                 {selectedViewer && (
                     <SpaceFileViewer
                         focusReplyOnOpen={selectedViewer.focusReplyOnOpen}
