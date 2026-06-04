@@ -623,7 +623,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                             }
                             label="Username"
                             onChange={handleUsernameChange}
-                            placeholder="Choose your username"
+                            placeholder="Choose your public username"
                             required
                             value={username}
                         />

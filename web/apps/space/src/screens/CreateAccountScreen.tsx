@@ -585,7 +585,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
                                     textDecoration: "underline",
                                 }}
                             >
-                                terms of service
+                                terms
                             </Box>{" "}
                             and{" "}
                             <Box
