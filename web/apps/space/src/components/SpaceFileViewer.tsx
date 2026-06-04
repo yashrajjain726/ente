@@ -55,6 +55,7 @@ const defaultPhotoHeight = 680;
 const viewerSwipeMinDeltaPx = 72;
 const viewerSwipeAxisRatio = 1.5;
 const viewerHeaderAvatarSize = 28;
+const viewerHeaderButtonVisualSize = 28;
 
 const postButtonSpin = keyframes`
     from {
@@ -214,7 +215,7 @@ export const SpaceViewerFeedBackdrop: React.FC = () => (
 
 const viewerHeaderButtonSx = {
     alignItems: "center",
-    bgcolor: controlBackground,
+    bgcolor: "transparent",
     border: 0,
     borderRadius: "50%",
     color: controlIcon,
@@ -222,10 +223,23 @@ const viewerHeaderButtonSx = {
     display: "flex",
     height: spaceTouchTargetSize,
     justifyContent: "center",
+    mx: "-8px",
     p: 0,
     width: spaceTouchTargetSize,
     "&:focus-visible": { outline: `2px solid ${green}`, outlineOffset: 2 },
-    "&:hover": { bgcolor: controlBackgroundHover },
+    "&:hover .space-viewer-header-button-visual": {
+        bgcolor: controlBackgroundHover,
+    },
+};
+
+const viewerHeaderButtonVisualSx = {
+    alignItems: "center",
+    bgcolor: controlBackground,
+    borderRadius: "50%",
+    display: "flex",
+    height: viewerHeaderButtonVisualSize,
+    justifyContent: "center",
+    width: viewerHeaderButtonVisualSize,
 };
 
 const resizeCaptionInput = (
@@ -848,7 +862,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         sx={{
                             appearance: "none",
                             alignItems: "center",
-                            bgcolor: avatarSkeletonBackground,
+                            bgcolor: "transparent",
                             border: 0,
                             borderRadius: "50%",
                             cursor: onOpenProfile ? "pointer" : "default",
@@ -856,6 +870,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             flexShrink: 0,
                             height: spaceTouchTargetSize,
                             justifyContent: "center",
+                            mx: "-8px",
                             p: 0,
                             width: spaceTouchTargetSize,
                             "&:focus-visible": {
@@ -866,6 +881,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     >
                         <Box
                             sx={{
+                                bgcolor: avatarSkeletonBackground,
                                 borderRadius: "50%",
                                 height: viewerHeaderAvatarSize,
                                 overflow: "hidden",
@@ -1031,11 +1047,17 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         onClick={onClose}
                         sx={viewerHeaderButtonSx}
                     >
-                        <HugeiconsIcon
-                            icon={Cancel01Icon}
-                            size={18}
-                            strokeWidth={1.8}
-                        />
+                        <Box
+                            className="space-viewer-header-button-visual"
+                            component="span"
+                            sx={viewerHeaderButtonVisualSx}
+                        >
+                            <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={18}
+                                strokeWidth={1.8}
+                            />
+                        </Box>
                     </Box>
                 </Box>
                 {onDeletePost && (
