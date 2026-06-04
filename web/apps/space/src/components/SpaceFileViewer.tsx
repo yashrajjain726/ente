@@ -279,6 +279,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const isDraftPost = activePostActionMode == "draft-post";
     const { showLikeButton: showPhotoLikeButton } =
         spaceViewerPostActionConfigs[activePostActionMode];
+    const canDeletePost = !isDraftPost && Boolean(onDeletePost);
     const viewerPhotos = photos && photos.length > 0 ? photos : [photo];
     const activePhotoIndex = Math.min(
         Math.max(photoIndex, 0),
@@ -371,7 +372,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const isSwipeBlockedRef = React.useRef(false);
     isSwipeBlockedRef.current =
         isActionsOpen ||
-        deleteSheetOpen ||
+        (canDeletePost && deleteSheetOpen) ||
         isDeleteExit ||
         isDraftPost ||
         isDraftPostPreviewPending;
@@ -397,7 +398,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const closeActions = () => setActionsAnchor(null);
 
     const requestDeletePost = () => {
-        if (isDeleteActionRunning || isDeleteExit) return;
+        if (!canDeletePost || isDeleteActionRunning || isDeleteExit) return;
         closeActions();
         setDeleteSheetOpen(true);
     };
@@ -408,11 +409,17 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     };
 
     const confirmDeletePost = () => {
-        if (isDeleteActionRunning || isDeleteExit) return;
+        if (
+            !onDeletePost ||
+            !canDeletePost ||
+            isDeleteActionRunning ||
+            isDeleteExit
+        )
+            return;
         setDeleteActionPhase("busy");
         void (async () => {
             try {
-                await Promise.resolve(onDeletePost?.());
+                await Promise.resolve(onDeletePost());
                 setDeleteActionPhase("done");
             } catch (error) {
                 console.error("Failed to delete space post", error);
@@ -1000,7 +1007,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         justifySelf: "flex-end",
                     }}
                 >
-                    {onDeletePost && (
+                    {canDeletePost && (
                         <Box
                             component="button"
                             id={actionsButtonID}
@@ -1060,7 +1067,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                         </Box>
                     </Box>
                 </Box>
-                {onDeletePost && (
+                {canDeletePost && (
                     <Menu
                         id={actionsMenuID}
                         anchorEl={actionsAnchor}
@@ -1622,7 +1629,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     </Box>
                 </Box>
             )}
-            {onDeletePost && (
+            {canDeletePost && (
                 <ConfirmationActionSheet
                     appearance="dark"
                     open={deleteSheetOpen}
