@@ -13,6 +13,7 @@ import {
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
+import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
 import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
 import {
     spacePostLikeButtonPop,
@@ -1299,6 +1300,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
+    const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+    const [isInviteSharing, setIsInviteSharing] = useState(false);
+    const [inviteShareError, setInviteShareError] = useState<string | null>(
+        null,
+    );
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
     const [loadedFeedAvatarURLsByKey, setLoadedFeedAvatarURLsByKey] = useState<
         Record<string, string | null>
@@ -1551,20 +1557,45 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         return scheduleScrollPageToTop();
     }, [feedScrollRequest]);
 
-    const shareProfileLink = async () => {
-        if (!onShareProfileLink) return;
-        const profileLink = await onShareProfileLink();
-        if (typeof navigator.share == "function") {
-            try {
-                await navigator.share({ url: profileLink });
-                return;
-            } catch (error) {
-                if (error instanceof DOMException && error.name == "AbortError")
-                    return;
-            }
-        }
+    const openInviteDialog = () => {
+        setInviteShareError(null);
+        setIsInviteDialogOpen(true);
+    };
 
-        await navigator.clipboard.writeText(profileLink);
+    const closeInviteDialog = () => {
+        if (isInviteSharing) return;
+        setIsInviteDialogOpen(false);
+    };
+
+    const shareInviteLink = async () => {
+        if (!onShareProfileLink || isInviteSharing) return;
+        setIsInviteSharing(true);
+        setInviteShareError(null);
+
+        try {
+            const profileLink = await onShareProfileLink();
+            if (typeof navigator.share == "function") {
+                try {
+                    await navigator.share({ url: profileLink });
+                    setIsInviteDialogOpen(false);
+                    return;
+                } catch (error) {
+                    if (
+                        error instanceof DOMException &&
+                        error.name == "AbortError"
+                    )
+                        return;
+                }
+            }
+
+            await navigator.clipboard.writeText(profileLink);
+            setIsInviteDialogOpen(false);
+        } catch (error) {
+            console.error("Failed to share space invite", error);
+            setInviteShareError("Couldn't share invite. Please try again.");
+        } finally {
+            setIsInviteSharing(false);
+        }
     };
 
     const prepareSelectedPostPhoto = async (file: File) => {
@@ -2037,7 +2068,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 <Box
                                     component="button"
                                     type="button"
-                                    onClick={shareProfileLink}
+                                    onClick={openInviteDialog}
                                     sx={{
                                         alignItems: "center",
                                         bgcolor: "#E8E8E8",
@@ -2156,6 +2187,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         onClose={onAddedFriendToastClose}
                     />
                 )}
+                <SpaceInviteFriendsDialog
+                    errorMessage={inviteShareError}
+                    open={isInviteDialogOpen}
+                    sharing={isInviteSharing}
+                    onClose={closeInviteDialog}
+                    onShare={() => void shareInviteLink()}
+                />
             </Box>
         </Box>
     );

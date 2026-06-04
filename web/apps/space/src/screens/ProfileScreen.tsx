@@ -475,8 +475,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         (count, group) => count + group.items.length,
         0,
     );
-    const canOpenFriends =
-        isOwnerProfile && friendsCount > 0 && Boolean(onOpenFriends);
+    const canOpenFriends = isOwnerProfile && Boolean(onOpenFriends);
     const canOpenProfileCover = isOwnerProfile && Boolean(onOpenProfileCover);
     const canOpenProfilePhoto = isOwnerProfile && Boolean(onOpenProfilePhoto);
     const hasProfilePosts = postsSharedCount > 0;
