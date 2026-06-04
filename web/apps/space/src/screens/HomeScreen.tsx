@@ -68,6 +68,18 @@ const emptyFeedItemGap = "22px";
 const feedHorizontalPadding = "16px";
 const minimumFeedPhotoFrameAspectRatio = 3 / 4;
 const feedMediaLoadRootMargin = "640px 0px";
+const feedCaptionTextSx = {
+    color: textBase,
+    fontFamily: '"Inter Variable", Inter, sans-serif',
+    fontSize: 13,
+    fontWeight: 600,
+    lineHeight: "18px",
+    m: 0,
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+};
 
 const FeedReplyIcon: React.FC = () => (
     <svg
@@ -1079,24 +1091,37 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         width: "100%",
                     }}
                 >
-                    <Box
-                        component="p"
-                        title={displayCaption || undefined}
-                        sx={{
-                            color: textBase,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 13,
-                            fontWeight: 600,
-                            lineHeight: "18px",
-                            m: 0,
-                            minWidth: 0,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                        }}
-                    >
-                        {displayCaption || ""}
-                    </Box>
+                    {displayCaption ? (
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={`Open ${name} post`}
+                            disabled={!onOpenPhoto}
+                            onClick={() => openPhoto()}
+                            title={displayCaption}
+                            sx={{
+                                ...feedCaptionTextSx,
+                                appearance: "none",
+                                bgcolor: "transparent",
+                                border: 0,
+                                cursor: onOpenPhoto ? "pointer" : "default",
+                                display: "block",
+                                p: 0,
+                                textAlign: "left",
+                                width: "100%",
+                                "&:disabled": { color: textBase },
+                                "&:focus-visible": {
+                                    borderRadius: "4px",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                            }}
+                        >
+                            {displayCaption}
+                        </Box>
+                    ) : (
+                        <Box component="p" sx={feedCaptionTextSx} />
+                    )}
                     {!isOwnPost && (
                         <Box
                             sx={{
