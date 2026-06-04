@@ -69,6 +69,7 @@ const emptyFeedItemGap = "22px";
 const feedHorizontalPadding = "16px";
 const minimumFeedPhotoFrameAspectRatio = 3 / 4;
 const feedMediaLoadRootMargin = "640px 0px";
+const feedLoadMoreRootMargin = "0px 0px 160px 0px";
 const feedCaptionTextSx = {
     color: textBase,
     fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -1317,6 +1318,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const [isHeaderFocused, setIsHeaderFocused] = useState(false);
     const isHeaderHidden = isHeaderTriggered && !isHeaderFocused;
     const postInputRef = React.useRef<HTMLInputElement | null>(null);
+    const feedLoadMoreRef = React.useRef<HTMLDivElement | null>(null);
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
     const feedAvatarLoadsInFlightRef = React.useRef<
@@ -1556,6 +1558,44 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         return scheduleScrollPageToTop();
     }, [feedScrollRequest]);
+
+    React.useEffect(() => {
+        if (!hasMoreFeedItems || isFeedLoadingMore || !onLoadMoreFeedItems) {
+            return;
+        }
+
+        const element = feedLoadMoreRef.current;
+        if (!element) return;
+
+        let didRequestLoad = false;
+        const loadMore = () => {
+            if (didRequestLoad) return;
+
+            didRequestLoad = true;
+            void Promise.resolve(onLoadMoreFeedItems()).catch(
+                (error: unknown) => {
+                    console.error("Failed to load more space feed", error);
+                },
+            );
+        };
+
+        if (
+            typeof window == "undefined" ||
+            !("IntersectionObserver" in window)
+        ) {
+            loadMore();
+            return;
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) loadMore();
+            },
+            { rootMargin: feedLoadMoreRootMargin },
+        );
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [hasMoreFeedItems, isFeedLoadingMore, onLoadMoreFeedItems]);
 
     const openInviteDialog = () => {
         setInviteShareError(null);
@@ -1968,49 +2008,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             )}
                             {hasMoreFeedItems && onLoadMoreFeedItems && (
                                 <Box
-                                    component="button"
-                                    type="button"
-                                    disabled={isFeedLoadingMore}
-                                    onClick={onLoadMoreFeedItems}
+                                    ref={feedLoadMoreRef}
+                                    aria-live="polite"
                                     sx={{
                                         alignItems: "center",
                                         alignSelf: "center",
-                                        appearance: "none",
-                                        bgcolor: paleGreen,
-                                        border: 0,
-                                        borderRadius: "18px",
-                                        color: green,
-                                        cursor: isFeedLoadingMore
-                                            ? "default"
-                                            : "pointer",
-                                        display: "inline-flex",
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 13,
-                                        fontWeight: 600,
-                                        height: spaceTouchTargetSize,
+                                        display: "flex",
+                                        height: 48,
                                         justifyContent: "center",
-                                        lineHeight: "18px",
                                         mb: 0,
-                                        minWidth: 116,
                                         mt: "12px",
-                                        opacity: isFeedLoadingMore ? 0.7 : 1,
-                                        px: "18px",
-                                        whiteSpace: "nowrap",
-                                        "&:focus-visible": {
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                        "&:hover": {
-                                            bgcolor: isFeedLoadingMore
-                                                ? paleGreen
-                                                : "#DDF1E1",
-                                        },
+                                        width: "100%",
                                     }}
                                 >
-                                    {isFeedLoadingMore
-                                        ? "Loading..."
-                                        : "Load more"}
+                                    <SpaceLoadingSpinner
+                                        ariaLabel="Loading more posts"
+                                        size={22}
+                                    />
                                 </Box>
                             )}
                         </>

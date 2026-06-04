@@ -45,10 +45,6 @@ func (n *SpaceEmailSender) send(actorSlug, action, event string, recipientUserID
 	if n == nil || n.UserRepo == nil || len(recipientUserIDs) == 0 {
 		return
 	}
-	actorSlug = strings.TrimSpace(actorSlug)
-	if actorSlug == "" {
-		actorSlug = "A friend"
-	}
 	recipientUserIDs = uniqueUserIDs(recipientUserIDs)
 	if len(recipientUserIDs) == 0 {
 		return
@@ -59,7 +55,7 @@ func (n *SpaceEmailSender) send(actorSlug, action, event string, recipientUserID
 		return
 	}
 
-	subject := fmt.Sprintf("%s %s", actorSlug, action)
+	subject := spaceEmailSubject(actorSlug, action)
 	templateData := map[string]interface{}{
 		"Message": subject,
 		"AppURL":  spaceAppURL(),
@@ -86,6 +82,14 @@ func (n *SpaceEmailSender) send(actorSlug, action, event string, recipientUserID
 			}).WithError(err).Error("Error sending space email")
 		}
 	}
+}
+
+func spaceEmailSubject(actorSlug, action string) string {
+	actorSlug = strings.TrimSpace(actorSlug)
+	if actorSlug == "" {
+		return fmt.Sprintf("A friend %s", action)
+	}
+	return fmt.Sprintf("@%s %s", actorSlug, action)
 }
 
 func uniqueUserIDs(userIDs []int64) []int64 {
