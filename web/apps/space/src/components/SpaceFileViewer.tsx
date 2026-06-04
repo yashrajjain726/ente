@@ -1490,7 +1490,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 onFocus={() => setIsReplyFocused(true)}
                                 onKeyDown={handleReplyKeyDown}
                                 onPointerDown={handleReplyInputPointerDown}
-                                placeholder={`Reply to ${displayName}...`}
+                                placeholder={`Reply privately to ${displayName}...`}
                                 readOnly={canAddFriendForPostAction}
                                 rows={1}
                                 value={replyText}
