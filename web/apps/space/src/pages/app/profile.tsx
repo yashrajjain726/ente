@@ -5,7 +5,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
 import {
     createCurrentPhotoPost,
-    createCurrentProfileLink,
     deleteCurrentPost,
     loadCurrentSpaceFriendsCount,
     loadCurrentSpacePostAssetURL,
@@ -191,11 +190,6 @@ const Page: React.FC = () => {
                 onOpenSettings={() => void router.push(spaceRoutes.settings)}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onSetPostLiked={setCurrentPostLiked}
-                onShareProfileLink={async () => {
-                    if (!profile.spaceId) throw new Error("Missing space.");
-                    return (await createCurrentProfileLink(profile.spaceId))
-                        .url;
-                }}
             />
         </>
     );

@@ -1,10 +1,12 @@
 import {
     ArrowLeft02Icon,
     MoreVerticalIcon,
+    Share08Icon,
+    UserAdd02Icon,
     UserRemove01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Menu, MenuItem, Skeleton } from "@mui/material";
+import { Box, Dialog, Menu, MenuItem, Skeleton } from "@mui/material";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
     spaceActionDoneDurationMs,
@@ -37,6 +39,7 @@ interface FriendsScreenProps {
     onLoadFriendAvatar?: (friend: FriendProfile) => Promise<string | null>;
     onBack?: () => void;
     onOpenFriend?: (friendID: string) => void;
+    onShareProfileLink?: () => Promise<string>;
     onUnfriend?: (friendID: string) => Promise<void> | void;
 }
 
@@ -243,12 +246,11 @@ const FriendRow: React.FC<FriendRowProps> = ({
                     alignItems: "center",
                     bgcolor: "transparent",
                     border: 0,
-                    borderRadius: "50%",
                     color: textBase,
                     cursor: "pointer",
                     display: "flex",
                     height: spaceTouchTargetSize,
-                    justifyContent: "center",
+                    justifyContent: "flex-end",
                     justifySelf: "flex-end",
                     p: 0,
                     width: spaceTouchTargetSize,
@@ -256,7 +258,6 @@ const FriendRow: React.FC<FriendRowProps> = ({
                         outline: `2px solid ${green}`,
                         outlineOffset: 2,
                     },
-                    "&:hover": { bgcolor: "rgba(0, 0, 0, 0.035)" },
                 }}
             >
                 <HugeiconsIcon
@@ -325,11 +326,148 @@ const FriendRow: React.FC<FriendRowProps> = ({
     );
 };
 
+interface InviteFriendsDialogProps {
+    errorMessage?: string | null;
+    open: boolean;
+    sharing: boolean;
+    onClose: () => void;
+    onShare: () => void;
+}
+
+const InviteFriendsDialog: React.FC<InviteFriendsDialogProps> = ({
+    errorMessage,
+    open,
+    sharing,
+    onClose,
+    onShare,
+}) => {
+    const titleID = React.useId();
+
+    return (
+        <Dialog
+            open={open}
+            onClose={sharing ? undefined : onClose}
+            maxWidth={false}
+            aria-labelledby={titleID}
+            slotProps={{
+                backdrop: { sx: { backgroundColor: "rgba(0, 0, 0, 0.48)" } },
+                paper: {
+                    sx: {
+                        bgcolor: friendsBackground,
+                        borderRadius: "20px",
+                        boxShadow: "0 18px 48px rgba(0, 0, 0, 0.18)",
+                        boxSizing: "border-box",
+                        m: "16px",
+                        maxWidth: 342,
+                        p: "24px 20px 20px",
+                        width: "calc(100vw - 32px)",
+                    },
+                },
+            }}
+        >
+            <Box
+                component="h2"
+                id={titleID}
+                sx={{
+                    color: textBase,
+                    fontFamily: '"Inter Variable", Inter, sans-serif',
+                    fontSize: 18,
+                    fontWeight: 650,
+                    lineHeight: "24px",
+                    m: 0,
+                    textAlign: "center",
+                }}
+            >
+                Invite friends
+            </Box>
+            <Box
+                component="p"
+                sx={{
+                    color: textSoft,
+                    fontFamily: '"Inter Variable", Inter, sans-serif',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    lineHeight: "20px",
+                    m: 0,
+                    mt: "10px",
+                    textAlign: "center",
+                }}
+            >
+                Invite friends and family by sharing your private profile link.
+                Only you and the people you share it with can see your posts.
+            </Box>
+            <Box
+                sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                    mt: "22px",
+                }}
+            >
+                <Box
+                    className="green-bg"
+                    component="button"
+                    type="button"
+                    disabled={sharing}
+                    onClick={onShare}
+                    sx={{
+                        alignItems: "center",
+                        border: 0,
+                        borderRadius: "18px",
+                        boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
+                        color: "#FFFFFF",
+                        cursor: sharing ? "default" : "pointer",
+                        display: "flex",
+                        gap: "10px",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 15,
+                        fontWeight: 650,
+                        justifyContent: "center",
+                        lineHeight: "20px",
+                        minHeight: 48,
+                        px: "16px",
+                        py: "10px",
+                        width: "100%",
+                        "&:disabled": { opacity: 0.7 },
+                        "&:focus-visible": {
+                            outline: "2px solid rgba(0 0 0 / 0.72)",
+                            outlineOffset: 2,
+                        },
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={Share08Icon}
+                        size={18}
+                        strokeWidth={1.8}
+                    />
+                    {sharing ? "Sharing..." : "Share invite"}
+                </Box>
+                {errorMessage && (
+                    <Box
+                        role="alert"
+                        sx={{
+                            color: dangerColor,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 650,
+                            lineHeight: "18px",
+                            textAlign: "center",
+                        }}
+                    >
+                        {errorMessage}
+                    </Box>
+                )}
+            </Box>
+        </Dialog>
+    );
+};
+
 export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     friends,
     onLoadFriendAvatar,
     onBack,
     onOpenFriend,
+    onShareProfileLink,
     onUnfriend,
 }) => {
     const [friendToUnfriend, setFriendToUnfriend] =
@@ -342,6 +480,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     const [loadedAvatarURLsByKey, setLoadedAvatarURLsByKey] = React.useState<
         Record<string, string>
     >({});
+    const [isInviteDialogOpen, setIsInviteDialogOpen] = React.useState(false);
+    const [isInviteSharing, setIsInviteSharing] = React.useState(false);
+    const [inviteShareError, setInviteShareError] = React.useState<
+        string | null
+    >(null);
     const avatarLoadsInFlightRef = React.useRef<
         Map<string, Promise<string | null | undefined>>
     >(new Map());
@@ -427,6 +570,48 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         setUnfriendErrorMessage(null);
     };
 
+    const openInviteDialog = () => {
+        setInviteShareError(null);
+        setIsInviteDialogOpen(true);
+    };
+
+    const closeInviteDialog = () => {
+        if (isInviteSharing) return;
+        setIsInviteDialogOpen(false);
+    };
+
+    const shareInviteLink = async () => {
+        if (!onShareProfileLink || isInviteSharing) return;
+        setIsInviteSharing(true);
+        setInviteShareError(null);
+
+        try {
+            const profileLink = await onShareProfileLink();
+
+            if (typeof navigator.share == "function") {
+                try {
+                    await navigator.share({ url: profileLink });
+                    setIsInviteDialogOpen(false);
+                    return;
+                } catch (error) {
+                    if (
+                        error instanceof DOMException &&
+                        error.name == "AbortError"
+                    )
+                        return;
+                }
+            }
+
+            await navigator.clipboard.writeText(profileLink);
+            setIsInviteDialogOpen(false);
+        } catch (error) {
+            console.error("Failed to share space invite", error);
+            setInviteShareError("Couldn't share invite. Please try again.");
+        } finally {
+            setIsInviteSharing(false);
+        }
+    };
+
     return (
         <Box
             component="main"
@@ -506,6 +691,39 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     >
                         Friends
                     </Box>
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label="Invite friends"
+                        disabled={!onShareProfileLink}
+                        onClick={openInviteDialog}
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: "transparent",
+                            border: 0,
+                            color: textBase,
+                            cursor: onShareProfileLink
+                                ? "pointer"
+                                : "default",
+                            display: "flex",
+                            height: spaceTouchTargetSize,
+                            justifyContent: "flex-end",
+                            justifySelf: "flex-end",
+                            p: 0,
+                            width: spaceTouchTargetSize,
+                            "&:disabled": { opacity: 0.45 },
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={UserAdd02Icon}
+                            size={22}
+                            strokeWidth={1.8}
+                        />
+                    </Box>
                 </Box>
 
                 {friends.length > 0 ? (
@@ -568,6 +786,13 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 onCancel={cancelUnfriend}
                 onConfirm={confirmUnfriend}
                 onExited={handleUnfriendSheetExited}
+            />
+            <InviteFriendsDialog
+                errorMessage={inviteShareError}
+                open={isInviteDialogOpen}
+                sharing={isInviteSharing}
+                onClose={closeInviteDialog}
+                onShare={() => void shareInviteLink()}
             />
         </Box>
     );

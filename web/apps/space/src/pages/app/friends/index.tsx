@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import {
+    createCurrentProfileLink,
     loadCurrentFriendAvatarURL,
     loadCurrentSpaceFriends,
     removeCurrentSpaceFriend,
@@ -56,6 +57,11 @@ const Page: React.FC = () => {
                 onOpenFriend={(friendID) =>
                     void router.push(spaceRoutes.friend(friendID))
                 }
+                onShareProfileLink={async () => {
+                    if (!profile.spaceId) throw new Error("Missing space.");
+                    return (await createCurrentProfileLink(profile.spaceId))
+                        .url;
+                }}
                 onUnfriend={async (friendID) => {
                     const friend = friends.find(
                         (candidate) => candidate.id == friendID,
