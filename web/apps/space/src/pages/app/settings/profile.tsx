@@ -1,16 +1,17 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { accountLogout } from "ente-accounts-rs/services/logout";
 import { useRouter } from "next/router";
 import React, { useEffect } from "react";
-import { SettingsScreen, settingsBackground } from "screens/SettingsScreen";
+import {
+    ProfileSettingsScreen,
+    settingsBackground,
+} from "screens/SettingsScreen";
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { profile, profileLoadError, profileLoadStatus, resetAfterLogout } =
-        useSpaceAppState();
+    const { profile, profileLoadError, profileLoadStatus } = useSpaceAppState();
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -30,17 +31,17 @@ const Page: React.FC = () => {
     return (
         <>
             <SpacePageMeta themeColor={settingsBackground} />
-            <SettingsScreen
-                onBack={() => void router.push(spaceRoutes.profile)}
-                onOpenProfile={() =>
-                    void router.push(spaceRoutes.settingsProfile)
+            <ProfileSettingsScreen
+                onBack={() => void router.push(spaceRoutes.settings)}
+                onChangeCoverImage={() =>
+                    void router.push(spaceRoutes.profileCoverFrom("settings"))
                 }
-                onLogout={() => {
-                    void accountLogout().then(() => {
-                        resetAfterLogout();
-                        void router.push(spaceRoutes.onboarding);
-                    });
-                }}
+                onChangeName={() =>
+                    void router.push(spaceRoutes.settingsProfileName)
+                }
+                onChangeProfilePicture={() =>
+                    void router.push(spaceRoutes.profilePhotoFrom("settings"))
+                }
             />
         </>
     );

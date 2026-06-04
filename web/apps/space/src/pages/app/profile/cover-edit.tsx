@@ -9,7 +9,10 @@ import {
     spaceProfileErrorMessage,
 } from "services/spaceProfile";
 import { useSpaceAppState } from "state/spaceAppState";
-import { spaceRoutes } from "utils/spaceRoutes";
+import {
+    profileImageFlowSourceFromQuery,
+    spaceRoutes,
+} from "utils/spaceRoutes";
 
 const Page: React.FC = () => {
     const router = useRouter();
@@ -21,6 +24,12 @@ const Page: React.FC = () => {
         setPendingProfileCoverFile,
         setProfile,
     } = useSpaceAppState();
+    const imageFlowSource = profileImageFlowSourceFromQuery(router.query.from);
+    const profileCoverRoute = spaceRoutes.profileCoverFrom(imageFlowSource);
+    const savedRoute =
+        imageFlowSource == "settings"
+            ? spaceRoutes.settingsProfile
+            : spaceRoutes.profile;
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -34,9 +43,15 @@ const Page: React.FC = () => {
             profile &&
             !pendingProfileCoverFile
         ) {
-            void router.replace(spaceRoutes.profileCover);
+            void router.replace(profileCoverRoute);
         }
-    }, [pendingProfileCoverFile, profile, profileLoadStatus, router]);
+    }, [
+        pendingProfileCoverFile,
+        profile,
+        profileCoverRoute,
+        profileLoadStatus,
+        router,
+    ]);
 
     if (profileLoadStatus != "ready" || !profile || !pendingProfileCoverFile) {
         return (
@@ -54,7 +69,7 @@ const Page: React.FC = () => {
                 coverFile={pendingProfileCoverFile}
                 onBack={() => {
                     setPendingProfileCoverFile(null);
-                    void router.push(spaceRoutes.profileCover);
+                    void router.push(profileCoverRoute);
                 }}
                 onSave={async (coverFile) => {
                     try {
@@ -63,7 +78,7 @@ const Page: React.FC = () => {
                             coverFile,
                         });
                         setProfile(savedProfile);
-                        await router.push(spaceRoutes.profile);
+                        await router.push(savedRoute);
                         setPendingProfileCoverFile(null);
                     } catch (error) {
                         console.error("Space cover update failed", error);

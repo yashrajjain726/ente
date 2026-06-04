@@ -1,13 +1,18 @@
 import {
     ArrowLeft02Icon,
+    Camera01Icon,
     ArrowRight01Icon as ChevronRightIcon,
     CustomerSupportIcon,
     HelpCircleIcon,
+    Image01Icon,
     Logout05Icon,
+    UserEdit01Icon,
+    UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
+import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React from "react";
 import { spaceTouchTargetSize } from "styles/touchTargets";
 
@@ -18,6 +23,7 @@ const textBase = "#000";
 const rowBackground = "#FFFFFF";
 const dangerColor = "#F63A3A";
 const iconMuted = "#8C8C8C";
+const textLight = "#969696";
 const helpURL = "https://ente.com/help/photos/features/profile";
 const supportMailURL = "mailto:support@ente.com";
 const spaceLinks = [
@@ -56,6 +62,7 @@ const spaceLinks = [
 interface SettingsScreenProps {
     onLogout: () => void;
     onBack?: () => void;
+    onOpenProfile: () => void;
 }
 
 interface SettingsRowProps {
@@ -70,6 +77,21 @@ interface SpaceIconProps {
     label: string;
     src: string;
     url: string;
+}
+
+interface ProfileSettingsScreenProps {
+    onBack: () => void;
+    onChangeCoverImage: () => void;
+    onChangeName: () => void;
+    onChangeProfilePicture: () => void;
+}
+
+interface ChangeNameSettingsScreenProps {
+    errorMessage?: string;
+    initialName: string;
+    isSaving?: boolean;
+    onBack: () => void;
+    onSave: (name: string) => void;
 }
 
 const SettingsRow: React.FC<SettingsRowProps> = ({
@@ -198,6 +220,7 @@ const SpaceIcon: React.FC<SpaceIconProps> = ({ label, src, url }) => (
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     onLogout,
     onBack,
+    onOpenProfile,
 }) => {
     const [logoutSheetOpen, setLogoutSheetOpen] = React.useState(false);
 
@@ -299,6 +322,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     }}
                 >
                     <SettingsRow
+                        icon={UserIcon}
+                        label="Profile"
+                        onClick={onOpenProfile}
+                    />
+                    <SettingsRow
                         href={helpURL}
                         icon={HelpCircleIcon}
                         label="Help"
@@ -344,6 +372,365 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onCancel={() => setLogoutSheetOpen(false)}
                 onConfirm={handleConfirmLogout}
             />
+        </Box>
+    );
+};
+
+export const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({
+    onBack,
+    onChangeCoverImage,
+    onChangeName,
+    onChangeProfilePicture,
+}) => (
+    <Box
+        component="main"
+        sx={{
+            bgcolor: settingsBackground,
+            color: textBase,
+            display: "grid",
+            minHeight: "100svh",
+            overflowX: "hidden",
+            placeItems: { xs: "stretch", sm: "start center" },
+        }}
+    >
+        <Box
+            sx={{
+                bgcolor: settingsBackground,
+                boxSizing: "border-box",
+                display: "flex",
+                flexDirection: "column",
+                minHeight: "100svh",
+                mx: "auto",
+                width: "100%",
+                "@media (min-width: 600px)": { maxWidth: 390 },
+            }}
+        >
+            <Box
+                component="header"
+                sx={{
+                    alignItems: "center",
+                    display: "grid",
+                    gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
+                    height: 56,
+                    px: 2,
+                    width: "100%",
+                }}
+            >
+                <Box
+                    component="button"
+                    type="button"
+                    aria-label="Back to settings"
+                    onClick={onBack}
+                    sx={{
+                        alignItems: "center",
+                        bgcolor: "transparent",
+                        border: 0,
+                        color: textBase,
+                        cursor: "pointer",
+                        display: "flex",
+                        height: spaceTouchTargetSize,
+                        justifyContent: "flex-start",
+                        ml: "-2px",
+                        p: 0,
+                        width: spaceTouchTargetSize,
+                        "&:focus-visible": {
+                            borderRadius: "50%",
+                            outline: `2px solid ${green}`,
+                            outlineOffset: 2,
+                        },
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={ArrowLeft02Icon}
+                        size={24}
+                        strokeWidth={1.8}
+                    />
+                </Box>
+                <Box
+                    component="h1"
+                    sx={{
+                        color: textBase,
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 18,
+                        fontWeight: 700,
+                        justifySelf: "center",
+                        lineHeight: "24px",
+                        m: 0,
+                    }}
+                >
+                    Profile
+                </Box>
+            </Box>
+
+            <Box
+                component="section"
+                sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    mt: "24px",
+                    px: "14px",
+                    width: "100%",
+                }}
+            >
+                <SettingsRow
+                    icon={UserEdit01Icon}
+                    label="Change name"
+                    onClick={onChangeName}
+                />
+                <SettingsRow
+                    icon={Camera01Icon}
+                    label="Change profile picture"
+                    onClick={onChangeProfilePicture}
+                />
+                <SettingsRow
+                    icon={Image01Icon}
+                    label="Change cover image"
+                    onClick={onChangeCoverImage}
+                />
+            </Box>
+        </Box>
+    </Box>
+);
+
+export const ChangeNameSettingsScreen: React.FC<
+    ChangeNameSettingsScreenProps
+> = ({ errorMessage, initialName, isSaving = false, onBack, onSave }) => {
+    const [name, setName] = React.useState(initialName);
+    const trimmedName = name.trim();
+    const canSave =
+        !isSaving &&
+        trimmedName.length > 0 &&
+        trimmedName != initialName.trim();
+
+    const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+        event.preventDefault();
+        if (canSave) onSave(trimmedName);
+    };
+
+    return (
+        <Box
+            component="main"
+            sx={{
+                bgcolor: settingsBackground,
+                color: textBase,
+                display: "grid",
+                minHeight: "100svh",
+                overflowX: "hidden",
+                placeItems: { xs: "stretch", sm: "start center" },
+            }}
+        >
+            <Box
+                sx={{
+                    bgcolor: settingsBackground,
+                    boxSizing: "border-box",
+                    display: "flex",
+                    flexDirection: "column",
+                    minHeight: "100svh",
+                    mx: "auto",
+                    width: "100%",
+                    "@media (min-width: 600px)": { maxWidth: 390 },
+                }}
+            >
+                <Box
+                    component="header"
+                    sx={{
+                        alignItems: "center",
+                        display: "grid",
+                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
+                        height: 56,
+                        px: 2,
+                        width: "100%",
+                    }}
+                >
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label="Back to profile settings"
+                        onClick={onBack}
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: "transparent",
+                            border: 0,
+                            color: textBase,
+                            cursor: "pointer",
+                            display: "flex",
+                            height: spaceTouchTargetSize,
+                            justifyContent: "flex-start",
+                            ml: "-2px",
+                            p: 0,
+                            width: spaceTouchTargetSize,
+                            "&:focus-visible": {
+                                borderRadius: "50%",
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={ArrowLeft02Icon}
+                            size={24}
+                            strokeWidth={1.8}
+                        />
+                    </Box>
+                    <Box
+                        component="h1"
+                        sx={{
+                            color: textBase,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 18,
+                            fontWeight: 700,
+                            justifySelf: "center",
+                            lineHeight: "24px",
+                            m: 0,
+                        }}
+                    >
+                        Change name
+                    </Box>
+                </Box>
+
+                <Box
+                    component="form"
+                    onSubmit={handleSubmit}
+                    sx={{
+                        boxSizing: "border-box",
+                        display: "flex",
+                        flex: 1,
+                        flexDirection: "column",
+                        width: "100%",
+                    }}
+                >
+                    <Box sx={{ px: "14px", pt: "24px", width: "100%" }}>
+                        <Box
+                            component="label"
+                            htmlFor="space-profile-name"
+                            sx={{
+                                color: textBase,
+                                display: "block",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 500,
+                                lineHeight: "20px",
+                                mb: "9px",
+                            }}
+                        >
+                            Name
+                        </Box>
+                        <Box
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: rowBackground,
+                                borderRadius: "16px",
+                                display: "flex",
+                                height: 52,
+                                px: 2,
+                                width: "100%",
+                                "&:focus-within": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 1,
+                                },
+                            }}
+                        >
+                            <Box
+                                id="space-profile-name"
+                                component="input"
+                                autoComplete="name"
+                                onChange={(event) =>
+                                    setName(event.target.value)
+                                }
+                                placeholder="Enter your name"
+                                type="text"
+                                value={name}
+                                sx={{
+                                    bgcolor: "transparent",
+                                    border: 0,
+                                    color: textBase,
+                                    flex: 1,
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    lineHeight: "20px",
+                                    minWidth: 0,
+                                    outline: 0,
+                                    p: 0,
+                                    "&::placeholder": {
+                                        color: textLight,
+                                        opacity: 1,
+                                    },
+                                }}
+                            />
+                        </Box>
+                    </Box>
+
+                    {errorMessage && (
+                        <Box
+                            role="alert"
+                            sx={{
+                                color: dangerColor,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 13,
+                                fontWeight: 500,
+                                lineHeight: "18px",
+                                mt: 2,
+                                px: "14px",
+                            }}
+                        >
+                            {errorMessage}
+                        </Box>
+                    )}
+
+                    <Box sx={{ flex: 1, minHeight: 72 }} />
+
+                    <Box
+                        sx={{
+                            boxSizing: "border-box",
+                            mb: "calc(24px + env(safe-area-inset-bottom))",
+                            px: 3,
+                            width: "100%",
+                        }}
+                    >
+                        <Box
+                            className="green-bg"
+                            component="button"
+                            type="submit"
+                            aria-label={isSaving ? "Saving name" : undefined}
+                            aria-busy={isSaving ? true : undefined}
+                            disabled={!canSave}
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: green,
+                                border: 0,
+                                borderRadius: "20px",
+                                color: "white",
+                                cursor: canSave ? "pointer" : "default",
+                                display: "flex",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 500,
+                                height: 44,
+                                justifyContent: "center",
+                                lineHeight: "20px",
+                                opacity: canSave || isSaving ? 1 : 0.45,
+                                px: 2,
+                                width: "100%",
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 3,
+                                },
+                                "&:hover": {
+                                    bgcolor: canSave ? "#07AE22" : green,
+                                },
+                            }}
+                        >
+                            {isSaving ? <SpaceButtonSpinner /> : "Save"}
+                        </Box>
+                    </Box>
+                </Box>
+            </Box>
         </Box>
     );
 };
