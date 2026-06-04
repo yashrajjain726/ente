@@ -1,8 +1,9 @@
-import { Box, Dialog } from "@mui/material";
+import { Box, Dialog, useMediaQuery } from "@mui/material";
 import {
     SpaceActionFeedbackIcon,
     type SpaceActionPhase,
 } from "components/SpaceActionFeedback";
+import { SpaceBottomSheetTransition } from "components/SpaceBottomSheetTransition";
 import React from "react";
 
 const green = "#08C225";
@@ -42,6 +43,7 @@ export const ConfirmationActionSheet: React.FC<
 }) => {
     const titleID = React.useId();
     const isDark = appearance == "dark";
+    const isBottomSheet = useMediaQuery("(max-width: 599px)");
 
     return (
         <Dialog
@@ -49,6 +51,11 @@ export const ConfirmationActionSheet: React.FC<
             onClose={confirmActionPhase ? undefined : onCancel}
             maxWidth={false}
             aria-labelledby={titleID}
+            slots={
+                isBottomSheet
+                    ? { transition: SpaceBottomSheetTransition }
+                    : undefined
+            }
             sx={
                 isDark
                     ? {
