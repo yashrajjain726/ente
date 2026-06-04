@@ -1211,11 +1211,11 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                 fontWeight: 650,
                 gap: "10px",
                 lineHeight: "20px",
-                minHeight: 48,
+                minHeight: 50,
                 pointerEvents: "auto",
                 pl: "16px",
-                pr: "10px",
-                py: "10px",
+                pr: "6px",
+                py: "3px",
                 width: "100%",
             }}
         >
@@ -1257,7 +1257,7 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                     justifyContent: "center",
                     opacity: 0.9,
                     p: 0,
-                    width: spaceTouchTargetSize,
+                    width: 34,
                     "&:focus-visible": {
                         outline: "2px solid rgba(0 0 0 / 0.72)",
                         outlineOffset: 2,
