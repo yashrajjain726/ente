@@ -1034,31 +1034,48 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             onClick={onAddFriend}
                             sx={{
                                 alignItems: "center",
-                                backgroundColor: "#FFFFFF",
+                                backgroundColor: "transparent",
                                 border: 0,
-                                borderRadius: "999px",
                                 color: green,
                                 cursor: onAddFriend ? "pointer" : "default",
                                 display: "inline-flex",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 13,
-                                fontWeight: 700,
                                 height: spaceTouchTargetSize,
                                 justifyContent: "center",
                                 justifySelf: "flex-end",
-                                lineHeight: "18px",
                                 minWidth: 0,
-                                paddingInline: "16px",
-                                whiteSpace: "nowrap",
+                                p: 0,
                                 "&:focus-visible": {
+                                    borderRadius: "999px",
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 2,
                                 },
-                                "&:hover": { backgroundColor: "#F3FFF5" },
+                                "&:hover .space-add-friend-pill": {
+                                    backgroundColor: "#F3FFF5",
+                                },
                             }}
                         >
-                            Add friend
+                            <Box
+                                className="space-add-friend-pill"
+                                component="span"
+                                sx={{
+                                    alignItems: "center",
+                                    backgroundColor: "#FFFFFF",
+                                    borderRadius: "999px",
+                                    display: "inline-flex",
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    height: 32,
+                                    justifyContent: "center",
+                                    lineHeight: "18px",
+                                    px: "14px",
+                                    transition: "background-color 120ms ease",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                Add friend
+                            </Box>
                         </Box>
                     )}
                     {!isPublicProfile && (
