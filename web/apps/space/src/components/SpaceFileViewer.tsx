@@ -1755,12 +1755,12 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             fontSize: 14,
                             fontWeight: 750,
                             height: 48,
+                            gap: "5px",
                             justifyContent: "center",
                             lineHeight: "20px",
-                            position: "relative",
-                            width: 48,
+                            minWidth: 48,
                             p: 0,
-                            py: 0,
+                            px: "2px",
                             "&:disabled": { opacity: 1 },
                             "&:focus-visible": {
                                 outline: `2px solid ${green}`,
@@ -1783,30 +1783,20 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 fill="none"
                                 icon={FavouriteIcon}
                                 primaryColor="currentColor"
-                                size={30}
+                                size={24}
                                 strokeWidth={1.8}
                             />
                         </Box>
                         <Box
                             component="span"
                             sx={{
-                                alignItems: "center",
-                                bgcolor: textBase,
-                                border: "2px solid #000000",
-                                borderRadius: "999px",
-                                color: "#111111",
-                                display: "flex",
+                                color: "currentColor",
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
-                                fontSize: 10,
-                                fontWeight: 800,
-                                height: 18,
-                                justifyContent: "center",
-                                lineHeight: "11px",
-                                width: 18,
-                                position: "absolute",
-                                right: 2,
-                                top: 8,
+                                fontSize: 14,
+                                fontWeight: 750,
+                                lineHeight: "20px",
+                                transform: "translateY(0.5px)",
                             }}
                         >
                             {activePhoto.likeCount ?? 0}
@@ -1830,6 +1820,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             )}
             <SpacePostLikersDialog
                 errorMessage={postLikersError}
+                likeCount={activePhoto.likeCount ?? 0}
                 likers={postLikers}
                 loading={postLikersLoading}
                 open={postLikersOpen}

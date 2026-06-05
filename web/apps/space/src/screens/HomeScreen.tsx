@@ -21,6 +21,7 @@ import {
     spacePostLikePopDurationMs,
     spacePostLikePopTiming,
 } from "components/SpacePostLikeAnimation";
+import { SpacePostLikersDialog } from "components/SpacePostLikersDialog";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
@@ -31,6 +32,7 @@ import type {
     SpacePost,
     SpacePostAssetURLLoader,
     SpacePostAvatarURLLoader,
+    SpacePostLiker,
     SpacePostLikersLoader,
 } from "services/space";
 import type { LocalSpaceFeedPost } from "state/spaceAppState";
@@ -184,6 +186,7 @@ interface FeedItemProps {
     name: string;
     onLoadAvatar?: () => Promise<string | null | undefined>;
     onLoadImage?: () => Promise<string | undefined>;
+    onLoadPostLikers?: SpacePostLikersLoader;
     onOpenFriend?: (friendID: string) => void;
     onOpenPhoto?: (photo: SpaceViewerPhoto, focusReplyOnOpen?: boolean) => void;
     onOpenProfile?: () => void;
@@ -628,6 +631,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     name,
     onLoadAvatar,
     onLoadImage,
+    onLoadPostLikers,
     onOpenFriend,
     onOpenPhoto,
     onOpenProfile,
@@ -647,7 +651,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const dateLabel = formatSpaceDate(timestampMs);
     const postingDotCount = usePostingDotCount(timestampStatus == "posting");
     const displayCaption = caption?.trim();
-    const showFooter = !isOwnPost || Boolean(displayCaption);
+    const showOwnPostLikeButton = isOwnPost && postId > 0;
+    const showFooter = !isOwnPost || Boolean(displayCaption) || showOwnPostLikeButton;
     const canOpenAuthor = isOwnPost
         ? Boolean(onOpenProfile)
         : Boolean(onOpenFriend);
@@ -1094,12 +1099,12 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         display: "grid",
                         gap: "8px",
                         gridTemplateColumns: isOwnPost
-                            ? "minmax(0, 1fr)"
+                            ? "minmax(0, 1fr) auto"
                             : "minmax(0, 1fr) auto",
                         minHeight: feedLikeActionSize,
                         mt: "8px",
                         pl: "9px",
-                        pr: isOwnPost ? "9px" : 0,
+                        pr: isOwnPost ? "3px" : 0,
                         width: "100%",
                     }}
                 >
@@ -1182,9 +1187,143 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             />
                         </Box>
                     )}
+                    {showOwnPostLikeButton && (
+                        <FeedOwnPostLikeButton
+                            likeCount={likeCount}
+                            onLoadPostLikers={onLoadPostLikers}
+                            postId={postId}
+                        />
+                    )}
                 </Box>
             )}
         </Box>
+    );
+};
+
+const FeedOwnPostLikeButton: React.FC<{
+    likeCount: number;
+    onLoadPostLikers?: SpacePostLikersLoader;
+    postId: number;
+}> = ({ likeCount, onLoadPostLikers, postId }) => {
+    const [postLikersOpen, setPostLikersOpen] = React.useState(false);
+    const [postLikersLoading, setPostLikersLoading] = React.useState(false);
+    const [postLikersError, setPostLikersError] = React.useState<string | null>(
+        null,
+    );
+    const [postLikers, setPostLikers] = React.useState<SpacePostLiker[]>([]);
+    const postLikersRequestIDRef = React.useRef(0);
+
+    const openPostLikers = () => {
+        if (!onLoadPostLikers) return;
+
+        const requestID = postLikersRequestIDRef.current + 1;
+        postLikersRequestIDRef.current = requestID;
+        setPostLikersOpen(true);
+        setPostLikersLoading(true);
+        setPostLikersError(null);
+
+        void onLoadPostLikers(postId)
+            .then((likers) => {
+                if (postLikersRequestIDRef.current == requestID) {
+                    setPostLikers(likers);
+                }
+            })
+            .catch((error: unknown) => {
+                console.error("Failed to load post likers", error);
+                if (postLikersRequestIDRef.current == requestID) {
+                    setPostLikers([]);
+                    setPostLikersError(
+                        "Couldn't load likes. Please try again.",
+                    );
+                }
+            })
+            .finally(() => {
+                if (postLikersRequestIDRef.current == requestID) {
+                    setPostLikersLoading(false);
+                }
+            });
+    };
+
+    const closePostLikers = () => {
+        postLikersRequestIDRef.current += 1;
+        setPostLikersOpen(false);
+        setPostLikersLoading(false);
+    };
+
+    React.useEffect(() => {
+        postLikersRequestIDRef.current += 1;
+        setPostLikers([]);
+        setPostLikersError(null);
+        setPostLikersLoading(false);
+        setPostLikersOpen(false);
+    }, [postId]);
+
+    return (
+        <>
+            <Box
+                component="button"
+                type="button"
+                aria-label={`View ${likeCount} likes`}
+                disabled={!onLoadPostLikers}
+                onClick={openPostLikers}
+                sx={{
+                    alignItems: "center",
+                    appearance: "none",
+                    bgcolor: "transparent",
+                    border: 0,
+                    borderRadius: "8px",
+                    color: textBase,
+                    cursor: onLoadPostLikers ? "pointer" : "default",
+                    display: "inline-flex",
+                    fontFamily: '"Inter Variable", Inter, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 750,
+                    gap: "4px",
+                    height: feedLikeActionSize,
+                    justifyContent: "center",
+                    justifySelf: "flex-end",
+                    lineHeight: "18px",
+                    minWidth: feedLikeActionSize,
+                    px: "6px",
+                    "&:disabled": { opacity: 1 },
+                    "&:focus-visible": {
+                        outline: `2px solid ${green}`,
+                        outlineOffset: 2,
+                    },
+                }}
+            >
+                <Box
+                    component="span"
+                    sx={{ alignItems: "center", display: "flex", lineHeight: 0 }}
+                >
+                    <HugeiconsIcon
+                        fill="none"
+                        icon={FavouriteIcon}
+                        primaryColor="currentColor"
+                        size={feedActionIconSize}
+                        strokeWidth={2}
+                    />
+                </Box>
+                <Box
+                    component="span"
+                    sx={{
+                        color: "currentColor",
+                        transform: "translateY(0.5px)",
+                    }}
+                >
+                    {likeCount}
+                </Box>
+            </Box>
+            <SpacePostLikersDialog
+                appearance="light"
+                errorMessage={postLikersError}
+                likeCount={likeCount}
+                likers={postLikers}
+                loading={postLikersLoading}
+                open={postLikersOpen}
+                onClose={closePostLikers}
+            />
+        </>
     );
 };
 
@@ -1527,6 +1666,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onLoadImage={
                     imageUrl ? undefined : () => loadFeedPostImage(item)
                 }
+                onLoadPostLikers={onLoadPostLikers}
                 onOpenFriend={onOpenFriend}
                 onOpenPhoto={openFeedPhoto}
                 onOpenProfile={onOpenProfile}

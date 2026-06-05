@@ -15,7 +15,6 @@ const green = "#08C225";
 const avatarSkeletonBackground = "#E6E6E6";
 const textBase = "#000000";
 const textSecondary = "#777777";
-const rowHover = "#F6F6F6";
 const dayMs = 24 * 60 * 60 * 1000;
 
 const microsForTimestamp = (timestampMs: number) => timestampMs * 1000;
@@ -317,7 +316,6 @@ const NotificationRow: React.FC<{
                         outline: `2px solid ${green}`,
                         outlineOffset: 2,
                     },
-                    "&:hover": { bgcolor: rowHover },
                 }}
             >
                 <AvatarStack actors={avatarActors} />

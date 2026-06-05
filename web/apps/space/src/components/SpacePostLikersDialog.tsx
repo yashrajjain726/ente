@@ -5,12 +5,22 @@ import type { SpacePostLiker } from "services/space";
 
 const textBase = "#F4F4F4";
 const textSecondary = "#A6A6A6";
+const lightTextBase = "#000000";
+const lightTextSecondary = "#777777";
 const dangerColor = "#F63A3A";
 const sheetBackground = "#1E1E1E";
+const lightSheetBackground = "#F2F2F2";
 const avatarBackground = "#333333";
+const lightAvatarBackground = "#E6E6E6";
+const skeletonFill = "#3A3A3A";
+const lightSkeletonFill = "#D7D7D7";
+const darkBackdropBackground = "rgba(0, 0, 0, 0.86)";
+const lightBackdropBackground = "rgba(255, 255, 255, 0.72)";
 
 interface SpacePostLikersDialogProps {
+    appearance?: "dark" | "light";
     errorMessage?: string | null;
+    likeCount: number;
     likers: SpacePostLiker[];
     loading: boolean;
     open: boolean;
@@ -18,13 +28,24 @@ interface SpacePostLikersDialogProps {
 }
 
 export const SpacePostLikersDialog: React.FC<SpacePostLikersDialogProps> = ({
+    appearance = "dark",
     errorMessage,
+    likeCount,
     likers,
     loading,
     open,
     onClose,
 }) => {
     const isBottomSheet = useMediaQuery("(max-width: 599px)");
+    const isLight = appearance == "light";
+    const panelBackground = isLight ? lightSheetBackground : sheetBackground;
+    const primaryText = isLight ? lightTextBase : textBase;
+    const secondaryText = isLight ? lightTextSecondary : textSecondary;
+    const avatarFill = isLight ? lightAvatarBackground : avatarBackground;
+    const loadingFill = isLight ? lightSkeletonFill : skeletonFill;
+    const backdropBackground = isLight
+        ? lightBackdropBackground
+        : darkBackdropBackground;
 
     return (
         <Dialog
@@ -40,19 +61,20 @@ export const SpacePostLikersDialog: React.FC<SpacePostLikersDialogProps> = ({
             sx={{
                 zIndex: 1500,
                 "& .MuiBackdrop-root": {
-                    backgroundColor: "rgba(0, 0, 0, 0.86) !important",
+                    backgroundColor: `${backdropBackground} !important`,
                 },
                 "& .MuiDialog-container": { backgroundColor: "transparent" },
                 "& .MuiPaper-root": {
-                    backgroundColor: `${sheetBackground} !important`,
+                    backgroundColor: `${panelBackground} !important`,
                 },
             }}
             slotProps={{
-                backdrop: { sx: { backgroundColor: "rgba(0, 0, 0, 0.86)" } },
+                backdrop: { sx: { backgroundColor: backdropBackground } },
                 paper: {
                     sx: {
-                        bgcolor: sheetBackground,
-                        backgroundColor: sheetBackground,
+                        bgcolor: panelBackground,
+                        backgroundColor: panelBackground,
+                        border: 0,
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
                         boxShadow: "none",
@@ -80,7 +102,12 @@ export const SpacePostLikersDialog: React.FC<SpacePostLikersDialogProps> = ({
         >
             <Box sx={{ width: "100%" }}>
                 <Box sx={{ maxHeight: "min(420px, 62vh)", overflowY: "auto" }}>
-                    {loading ? null : errorMessage ? (
+                    {loading ? (
+                        <SpacePostLikerSkeletonRows
+                            rowCount={likeCount}
+                            skeletonFill={loadingFill}
+                        />
+                    ) : errorMessage ? (
                         <Box
                             role="alert"
                             sx={{
@@ -99,7 +126,7 @@ export const SpacePostLikersDialog: React.FC<SpacePostLikersDialogProps> = ({
                     ) : likers.length == 0 ? (
                         <Box
                             sx={{
-                                color: textSecondary,
+                                color: secondaryText,
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
                                 fontSize: 14,
@@ -126,7 +153,9 @@ export const SpacePostLikersDialog: React.FC<SpacePostLikersDialogProps> = ({
                             {likers.map((liker) => (
                                 <SpacePostLikerRow
                                     key={`${liker.profile.id}:${liker.createdAtMs}`}
+                                    avatarFill={avatarFill}
                                     liker={liker}
+                                    textColor={primaryText}
                                 />
                             ))}
                         </Box>
@@ -137,7 +166,70 @@ export const SpacePostLikersDialog: React.FC<SpacePostLikersDialogProps> = ({
     );
 };
 
-const SpacePostLikerRow: React.FC<{ liker: SpacePostLiker }> = ({ liker }) => {
+const SpacePostLikerSkeletonRows: React.FC<{
+    rowCount: number;
+    skeletonFill: string;
+}> = ({ rowCount, skeletonFill }) => (
+    <Box
+        component="ul"
+        sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+            listStyle: "none",
+            m: 0,
+            p: 0,
+        }}
+    >
+        {Array.from({ length: rowCount }, (_, index) => (
+            <Box
+                component="li"
+                key={index}
+                sx={{
+                    alignItems: "center",
+                    display: "grid",
+                    gap: "8px",
+                    gridTemplateColumns: "32px minmax(0, 1fr) 24px",
+                    minHeight: 42,
+                    py: "4px",
+                }}
+            >
+                <Box
+                    sx={{
+                        bgcolor: skeletonFill,
+                        borderRadius: "50%",
+                        height: 32,
+                        width: 32,
+                    }}
+                />
+                <Box
+                    sx={{
+                        bgcolor: skeletonFill,
+                        borderRadius: "999px",
+                        height: 12,
+                        opacity: 0.9,
+                        width: "42%",
+                    }}
+                />
+                <Box
+                    sx={{
+                        bgcolor: skeletonFill,
+                        borderRadius: "50%",
+                        height: 18,
+                        justifySelf: "center",
+                        width: 18,
+                    }}
+                />
+            </Box>
+        ))}
+    </Box>
+);
+
+const SpacePostLikerRow: React.FC<{
+    avatarFill: string;
+    liker: SpacePostLiker;
+    textColor: string;
+}> = ({ avatarFill, liker, textColor }) => {
     const profile = liker.profile;
     const displayName =
         profile.fullName.trim() || profile.username.trim() || "Someone";
@@ -156,7 +248,7 @@ const SpacePostLikerRow: React.FC<{ liker: SpacePostLiker }> = ({ liker }) => {
         >
             <Box
                 sx={{
-                    bgcolor: avatarBackground,
+                    bgcolor: avatarFill,
                     borderRadius: "50%",
                     height: 32,
                     overflow: "hidden",
@@ -180,7 +272,7 @@ const SpacePostLikerRow: React.FC<{ liker: SpacePostLiker }> = ({ liker }) => {
             </Box>
             <Box
                 sx={{
-                    color: textBase,
+                    color: textColor,
                     fontFamily: '"Inter Variable", Inter, sans-serif',
                     fontSize: 15,
                     fontWeight: 650,
