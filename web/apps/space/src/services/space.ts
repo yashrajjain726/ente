@@ -1077,6 +1077,22 @@ export const loadCurrentSpaceProfilePostsPage = async (
     }
 };
 
+export const loadCurrentSpacePost = async (
+    spaceId: string,
+    postId: number,
+): Promise<SpacePost | null> => {
+    const ctx = await ensureCurrentSpaceContext();
+    try {
+        const post = await postFromAccountPost(
+            ctx,
+            (await ctx.get_post(BigInt(postId))) as SpacePostResponse,
+        );
+        return post?.spaceId == spaceId ? post : null;
+    } finally {
+        releaseCurrentSpaceContext(ctx);
+    }
+};
+
 export const loadCurrentSpacePostAssetURL: SpacePostAssetURLLoader = async (
     asset,
 ) => {

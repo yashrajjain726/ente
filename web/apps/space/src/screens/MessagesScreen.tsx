@@ -12,7 +12,11 @@ import React from "react";
 import { flushSync } from "react-dom";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
-import type { SpaceMessage, SpaceMessageConversation } from "services/space";
+import type {
+    SpaceMessage,
+    SpaceMessageConversation,
+    SpaceMessageQuote,
+} from "services/space";
 import { spaceTouchTargetSize } from "styles/touchTargets";
 import { firstNameFrom } from "utils/spaceDisplay";
 import { clampSpaceMessageText } from "utils/spaceMessageLimits";
@@ -59,6 +63,7 @@ interface MessagesScreenProps {
     onOpenSelectedFriendProfile: (
         friend: SpaceMessageConversation["friend"],
     ) => void;
+    onOpenQuotePost: (quote: SpaceMessageQuote) => void;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
     onReplyToMessage: (
         spaceId: string,
@@ -654,13 +659,15 @@ const CopyIcon: React.FC = () => (
     </svg>
 );
 
-const QuotePreview: React.FC<{ isOwn: boolean; message: SpaceMessage }> = ({
-    isOwn,
-    message,
-}) => {
+const QuotePreview: React.FC<{
+    isOwn: boolean;
+    message: SpaceMessage;
+    onOpenQuotePost: (quote: SpaceMessageQuote) => void;
+}> = ({ isOwn, message, onOpenQuotePost }) => {
     if (message.kind != "post_reply") return null;
     const quote = message.quote;
     const isUnavailable = !quote || quote.isUnavailable || !quote.imageUrl;
+    const canOpen = Boolean(quote && !isUnavailable);
 
     return (
         <Box
@@ -684,15 +691,36 @@ const QuotePreview: React.FC<{ isOwn: boolean; message: SpaceMessage }> = ({
                 }}
             />
             <Box
+                component={canOpen ? "button" : "div"}
+                type={canOpen ? "button" : undefined}
+                aria-label={canOpen ? "Open quoted post" : undefined}
+                onClick={(event: React.MouseEvent) => {
+                    if (!quote || !canOpen) return;
+                    event.stopPropagation();
+                    onOpenQuotePost(quote);
+                }}
                 sx={{
+                    appearance: "none",
                     alignItems: "center",
+                    bgcolor: "transparent",
+                    border: 0,
+                    borderRadius: "8px",
+                    color: "inherit",
+                    cursor: canOpen ? "pointer" : "default",
                     display: "grid",
                     gap: "10px",
                     gridTemplateColumns: isUnavailable
                         ? "minmax(0, 1fr)"
                         : "minmax(0, 1fr) 44px",
+                    font: "inherit",
                     minWidth: 0,
+                    p: 0,
+                    textAlign: "left",
                     width: "100%",
+                    "&:focus-visible": {
+                        outline: `2px solid ${green}`,
+                        outlineOffset: 2,
+                    },
                 }}
             >
                 <Box sx={{ minWidth: 0 }}>
@@ -838,6 +866,7 @@ const MessageBubble: React.FC<{
     isLastInSequence: boolean;
     message: SpaceMessage;
     onOpenActions: (message: SpaceMessage, anchorEl: HTMLElement) => void;
+    onOpenQuotePost: (quote: SpaceMessageQuote) => void;
     ownSpaceID?: string;
     parentMessage?: SpaceMessage;
     profile: SetupProfile;
@@ -847,6 +876,7 @@ const MessageBubble: React.FC<{
     isLastInSequence,
     message,
     onOpenActions,
+    onOpenQuotePost,
     ownSpaceID,
     parentMessage,
     profile,
@@ -1041,7 +1071,11 @@ const MessageBubble: React.FC<{
                         },
                     }}
                 >
-                    <QuotePreview isOwn={isOwn} message={message} />
+                    <QuotePreview
+                        isOwn={isOwn}
+                        message={message}
+                        onOpenQuotePost={onOpenQuotePost}
+                    />
                     {hasMessageReply && (
                         <MessageReplyPreview
                             isOwn={isOwn}
@@ -1192,6 +1226,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     onCloseThread,
     onDeleteMessage,
     onOpenSelectedFriendProfile,
+    onOpenQuotePost,
     onOpenThread,
     onReplyToMessage,
     onSendMessage,
@@ -1740,6 +1775,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 onOpenActions={
                                                     openMessageActions
                                                 }
+                                                onOpenQuotePost={
+                                                    onOpenQuotePost
+                                                }
                                                 ownSpaceID={profile.spaceId}
                                                 parentMessage={
                                                     message.replyMessageId
@@ -1935,11 +1973,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             borderLeft: `3px solid ${green}`,
                                             borderRadius: "12px",
                                             boxSizing: "border-box",
-                                            display: "grid",
-                                            gap: "8px",
-                                            gridTemplateColumns:
-                                                "minmax(0, 1fr) 24px",
-                                            p: "9px 8px 9px 12px",
+                                            p: "9px 40px 9px 12px",
+                                            position: "relative",
                                             width: "100%",
                                         }}
                                     >
@@ -2001,12 +2036,20 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 height: spaceTouchTargetSize,
                                                 justifyContent: "center",
                                                 p: 0,
+                                                position: "absolute",
+                                                right: 0,
+                                                top: 0,
                                                 width: spaceTouchTargetSize,
                                                 "&:focus-visible": {
                                                     outline: `2px solid ${green}`,
                                                     outlineOffset: 2,
                                                 },
                                                 "&:hover": { color: textBase },
+                                                "& svg": {
+                                                    position: "absolute",
+                                                    right: 8,
+                                                    top: 8,
+                                                },
                                             }}
                                         >
                                             <HugeiconsIcon

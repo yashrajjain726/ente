@@ -26,6 +26,8 @@ export const spaceRoutes = {
     onboarding: "/",
     passkeysFinish: "/passkeys/finish",
     passkeysVerify: "/passkeys/verify",
+    post: (spaceId: string, postId: number) =>
+        `/app/posts/${encodeURIComponent(spaceId)}/${encodeURIComponent(String(postId))}`,
     editProfileCover: "/app/profile/cover-edit",
     editProfileCoverFrom: (source?: ProfileImageFlowSource) =>
         routeWithProfileImageFlowSource("/app/profile/cover-edit", source),

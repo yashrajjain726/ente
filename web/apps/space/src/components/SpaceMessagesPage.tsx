@@ -9,8 +9,8 @@ import {
     deleteCurrentMessage,
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
-    loadCurrentSpaceProfile,
     loadCurrentSpaceFriends,
+    loadCurrentSpaceProfile,
     markCurrentMessageLikesRead,
     markCurrentMessagesRead,
     replyToCurrentMessage,
@@ -444,6 +444,11 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 onCloseThread={closeConversation}
                 onOpenSelectedFriendProfile={(friend) =>
                     void router.push(spaceRoutes.friend(friendSpaceId(friend)))
+                }
+                onOpenQuotePost={(quote) =>
+                    void router.push(
+                        spaceRoutes.post(quote.spaceId, quote.postId),
+                    )
                 }
                 onOpenThread={openConversation}
                 onSendMessage={async (spaceId, text) => {

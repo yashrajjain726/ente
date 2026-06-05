@@ -933,6 +933,16 @@ impl SpaceAccountCtxHandle {
         .map_err(Into::into)
     }
 
+    /// Fetch one post with its caption decrypted.
+    pub async fn get_post(&self, post_id: i64) -> Result<JsValue, WasmSpaceError> {
+        let post = self.inner.get_post(post_id).await?;
+        let decrypted = self
+            .inner
+            .decrypt_post_for_space(&post.space_id, &post)
+            .await?;
+        swb::to_value(&account_post_to_js(&self.inner, post, decrypted).await?).map_err(Into::into)
+    }
+
     /// Create a single-photo post with optional caption.
     pub async fn create_photo_post(
         &self,
