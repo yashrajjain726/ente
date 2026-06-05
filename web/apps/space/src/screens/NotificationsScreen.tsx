@@ -18,10 +18,13 @@ const textSecondary = "#777777";
 const rowHover = "#F6F6F6";
 const dayMs = 24 * 60 * 60 * 1000;
 
+const microsForTimestamp = (timestampMs: number) => timestampMs * 1000;
+
 interface NotificationsScreenProps {
     isLoading?: boolean;
     notifications: SpaceNotification[];
     onBack?: () => void;
+    onOpenFriendMessages?: (spaceId: string) => void;
     onShareProfileLink?: () => Promise<string>;
 }
 
@@ -41,31 +44,77 @@ interface NotificationGroup {
 const fullName = (actor: SpaceNotification["actor"]) =>
     actor.fullName.trim() || actor.username.trim() || "Someone";
 
-const actorSummary = (actors: SpaceNotification["actor"][]) => {
-    if (actors.length == 0) return "Someone";
-    const first = fullName(actors[0]!);
-    if (actors.length == 1) return first;
-    const second = fullName(actors[1]!);
-    if (actors.length == 2) return `${first} and ${second}`;
-    return `${first} and ${actors.length - 1} others`;
+const actorSpaceId = (actor: SpaceNotification["actor"]) =>
+    actor.spaceId ?? actor.id;
+
+const ActorName: React.FC<{ actor: SpaceNotification["actor"] }> = ({
+    actor,
+}) => (
+    <Box component="span" sx={{ fontWeight: 700 }}>
+        {fullName(actor)}
+    </Box>
+);
+
+const PostLikeText: React.FC<{ actors: SpaceNotification["actor"][] }> = ({
+    actors,
+}) => {
+    if (actors.length == 1) {
+        return (
+            <>
+                <ActorName actor={actors[0]!} /> liked your post.
+            </>
+        );
+    }
+    if (actors.length == 2) {
+        return (
+            <>
+                <ActorName actor={actors[0]!} /> and{" "}
+                <ActorName actor={actors[1]!} /> liked your post.
+            </>
+        );
+    }
+    if (actors.length == 3) {
+        return (
+            <>
+                <ActorName actor={actors[0]!} />,{" "}
+                <ActorName actor={actors[1]!} /> and{" "}
+                <ActorName actor={actors[2]!} /> liked your post.
+            </>
+        );
+    }
+
+    return (
+        <>
+            <ActorName actor={actors[0]!} />, <ActorName actor={actors[1]!} />{" "}
+            and {actors.length == 4 ? "2" : "2+"} others liked your post.
+        </>
+    );
 };
 
-const notificationText = (group: NotificationGroup) => {
-    const actors = actorSummary(group.actors);
+const NotificationText: React.FC<{ group: NotificationGroup }> = ({ group }) => {
+    const actor = group.actors[0]!;
     switch (group.type) {
         case "friend_add":
-            return `${actors} became friends with you`;
+            return (
+                <>
+                    <ActorName actor={actor} /> is now a friend.
+                </>
+            );
         case "friend_remove":
-            return `${actors} removed you as a friend`;
+            return (
+                <>
+                    <ActorName actor={actor} /> is no longer friends with you.
+                </>
+            );
         case "post_like":
-            return `${actors} liked your post`;
+            return <PostLikeText actors={group.actors} />;
     }
 };
 
 const AvatarStack: React.FC<{ actors: SpaceNotification["actor"][] }> = ({
     actors,
 }) => (
-    <Box sx={{ flexShrink: 0, height: 42, position: "relative", width: 42 }}>
+    <Box sx={{ flexShrink: 0, height: 44, position: "relative", width: 44 }}>
         {actors.slice(0, 3).map((actor, index) => (
             <Box
                 key={`${actor.spaceId ?? actor.id}-${index}`}
@@ -73,12 +122,12 @@ const AvatarStack: React.FC<{ actors: SpaceNotification["actor"][] }> = ({
                     bgcolor: avatarSkeletonBackground,
                     border: `2px solid ${notificationsBackground}`,
                     borderRadius: "50%",
-                    height: actors.length == 1 ? 42 : 30,
+                    height: actors.length == 1 ? 44 : 30,
                     left: actors.length == 1 ? 0 : index * 6,
                     overflow: "hidden",
                     position: "absolute",
                     top: actors.length == 1 ? 0 : index * 5,
-                    width: actors.length == 1 ? 42 : 30,
+                    width: actors.length == 1 ? 44 : 30,
                     zIndex: 3 - index,
                 }}
             >
@@ -91,6 +140,7 @@ const AvatarStack: React.FC<{ actors: SpaceNotification["actor"][] }> = ({
                             display: "block",
                             height: "100%",
                             objectFit: "cover",
+                            objectPosition: "center",
                             width: "100%",
                         }}
                     />
@@ -156,7 +206,7 @@ const groupSectionNotifications = (items: SpaceNotification[]) => {
         const key =
             item.type == "post_like"
                 ? `post_like:${item.post?.postId ?? item.id}`
-                : item.type;
+                : item.id;
         const existing = groups.get(key);
         if (existing) {
             existing.actors.push(item.actor);
@@ -177,71 +227,108 @@ const groupSectionNotifications = (items: SpaceNotification[]) => {
     return [...groups.values()].sort((a, b) => b.createdAtMs - a.createdAtMs);
 };
 
-const NotificationRow: React.FC<{ group: NotificationGroup }> = ({ group }) => (
-    <Box
-        component="li"
-        sx={{
-            alignItems: "center",
-            borderRadius: "8px",
-            display: "grid",
-            gap: "12px",
-            gridTemplateColumns: "42px minmax(0, 1fr) auto",
-            minHeight: 62,
-            px: "6px",
-            py: "7px",
-            "&:hover": { bgcolor: rowHover },
-        }}
-    >
-        <AvatarStack actors={group.actors} />
-        <Box sx={{ minWidth: 0 }}>
+const NotificationRow: React.FC<{
+    group: NotificationGroup;
+    onOpenFriendMessages?: (spaceId: string) => void;
+}> = ({ group, onOpenFriendMessages }) => {
+    const postImageUrl = group.post?.imageUrl;
+    const friendActivityActor =
+        group.type == "post_like" ? undefined : group.actors[0];
+    const friendActivitySpaceId = friendActivityActor
+        ? actorSpaceId(friendActivityActor)
+        : undefined;
+    const canOpenFriendMessages = Boolean(
+        friendActivitySpaceId && onOpenFriendMessages,
+    );
+
+    const openFriendMessages = () => {
+        if (!friendActivitySpaceId) return;
+        onOpenFriendMessages?.(friendActivitySpaceId);
+    };
+
+    return (
+        <Box component="li">
             <Box
-                component="p"
+                component={canOpenFriendMessages ? "button" : "div"}
+                type={canOpenFriendMessages ? "button" : undefined}
+                onClick={canOpenFriendMessages ? openFriendMessages : undefined}
                 sx={{
+                    alignItems: "center",
+                    appearance: "none",
+                    bgcolor: "transparent",
+                    border: 0,
+                    borderRadius: "8px",
                     color: textBase,
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 14,
-                    fontWeight: 650,
-                    lineHeight: "19px",
-                    m: 0,
+                    cursor: canOpenFriendMessages ? "pointer" : "default",
+                    display: "grid",
+                    gap: "10px",
+                    gridTemplateColumns: postImageUrl
+                        ? "44px minmax(0, 1fr) 44px"
+                        : "44px minmax(0, 1fr)",
+                    minHeight: 64,
+                    p: "8px 0",
+                    textAlign: "left",
+                    width: "100%",
+                    "&:focus-visible": {
+                        outline: `2px solid ${green}`,
+                        outlineOffset: 2,
+                    },
+                    "&:hover": { bgcolor: rowHover },
                 }}
             >
-                {notificationText(group)}
-            </Box>
-            <Box
-                component="p"
-                sx={{
-                    color: textSecondary,
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 12,
-                    fontWeight: 500,
-                    lineHeight: "16px",
-                    m: 0,
-                    mt: "2px",
-                }}
-            >
-                {formatTimeAgo(group.createdAtMs)}
+                <AvatarStack actors={group.actors} />
+                <Box sx={{ minWidth: 0 }}>
+                    <Box
+                        component="p"
+                        sx={{
+                            color: textBase,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 14,
+                            fontWeight: 500,
+                            lineHeight: "20px",
+                            m: 0,
+                        }}
+                    >
+                        <NotificationText group={group} />
+                    </Box>
+                    <Box
+                        component="p"
+                        sx={{
+                            color: textSecondary,
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 500,
+                            lineHeight: "18px",
+                            m: 0,
+                        }}
+                    >
+                        {formatTimeAgo(microsForTimestamp(group.createdAtMs))}
+                    </Box>
+                </Box>
+                {postImageUrl && (
+                    <Box
+                        component="img"
+                        alt=""
+                        src={postImageUrl}
+                        sx={{
+                            borderRadius: "6px",
+                            display: "block",
+                            height: 44,
+                            objectFit: "cover",
+                            objectPosition: "center",
+                            width: 44,
+                        }}
+                    />
+                )}
             </Box>
         </Box>
-        {group.post?.imageUrl && (
-            <Box
-                component="img"
-                alt=""
-                src={group.post.imageUrl}
-                sx={{
-                    borderRadius: "6px",
-                    display: "block",
-                    height: 44,
-                    objectFit: "cover",
-                    width: 44,
-                }}
-            />
-        )}
-    </Box>
-);
+    );
+};
 
-const NotificationSection: React.FC<{ section: NotificationSection }> = ({
-    section,
-}) => {
+const NotificationSection: React.FC<{
+    onOpenFriendMessages?: (spaceId: string) => void;
+    section: NotificationSection;
+}> = ({ onOpenFriendMessages, section }) => {
     const groups = groupSectionNotifications(section.items);
     if (groups.length == 0) return null;
 
@@ -264,7 +351,11 @@ const NotificationSection: React.FC<{ section: NotificationSection }> = ({
             </Box>
             <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
                 {groups.map((group) => (
-                    <NotificationRow key={group.id} group={group} />
+                    <NotificationRow
+                        key={group.id}
+                        group={group}
+                        onOpenFriendMessages={onOpenFriendMessages}
+                    />
                 ))}
             </Box>
         </Box>
@@ -275,6 +366,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
     isLoading = false,
     notifications,
     onBack,
+    onOpenFriendMessages,
     onShareProfileLink,
 }) => {
     const [isInviteDialogOpen, setIsInviteDialogOpen] = React.useState(false);
@@ -354,11 +446,12 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                         bgcolor: notificationsBackground,
                         boxSizing: "border-box",
                         display: "grid",
-                        gridTemplateColumns: "44px minmax(0, 1fr) 44px",
-                        height: 58,
-                        px: "10px",
+                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
+                        height: 56,
+                        px: 2,
                         position: "sticky",
                         top: 0,
+                        width: "100%",
                         zIndex: 2,
                     }}
                 >
@@ -376,7 +469,8 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                             cursor: onBack ? "pointer" : "default",
                             display: "flex",
                             height: spaceTouchTargetSize,
-                            justifyContent: "center",
+                            justifyContent: "flex-start",
+                            ml: "-2px",
                             p: 0,
                             width: spaceTouchTargetSize,
                             "&:focus-visible": {
@@ -488,6 +582,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                         sections.map((section) => (
                             <NotificationSection
                                 key={section.title}
+                                onOpenFriendMessages={onOpenFriendMessages}
                                 section={section}
                             />
                         ))

@@ -69,6 +69,7 @@ interface MessagesScreenProps {
     onShareProfileLink?: () => Promise<string>;
     profile: SetupProfile;
     selectedFriend?: SpaceMessageConversation["friend"];
+    threadBackLabel?: string;
 }
 
 interface MessageContextMenuState {
@@ -205,7 +206,7 @@ const conversationPreview = (
     profile: SetupProfile,
 ) => {
     const activity = conversation.latestActivity;
-    if (!activity) return "No messages yet";
+    if (!activity) return "Say hello!";
     if (activity.type == "post_reply") {
         return "Replied";
     }
@@ -1095,6 +1096,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     onShareProfileLink,
     profile,
     selectedFriend,
+    threadBackLabel = "Back to messages",
 }) => {
     const [messageText, setMessageText] = React.useState("");
     const [messageContextMenu, setMessageContextMenu] =
@@ -1432,7 +1434,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     <Box
                         component="button"
                         type="button"
-                        aria-label={isThreadOpen ? "Back to messages" : "Back"}
+                        aria-label={isThreadOpen ? threadBackLabel : "Back"}
                         onClick={isThreadOpen ? onCloseThread : onBack}
                         sx={{
                             alignItems: "center",

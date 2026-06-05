@@ -83,6 +83,9 @@ export const SpaceNotificationsPage: React.FC = () => {
                 isLoading={isLoading}
                 notifications={notifications}
                 onBack={() => void router.push(spaceRoutes.home)}
+                onOpenFriendMessages={(spaceId) =>
+                    void router.push(spaceRoutes.messageFromNotifications(spaceId))
+                }
                 onShareProfileLink={async () => {
                     if (!profile.spaceId) throw new Error("Missing space.");
                     return (await createCurrentProfileLink(profile.spaceId))

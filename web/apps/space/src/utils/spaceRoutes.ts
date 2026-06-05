@@ -1,5 +1,6 @@
 export type SetupProfileSource = "login" | "verify";
 export type ProfileImageFlowSource = "profile" | "settings";
+export type MessageThreadSource = "messages" | "notifications";
 export type VerifyFlow = "login" | "signup";
 
 const valueFromQuery = (value: string | string[] | undefined) =>
@@ -18,6 +19,8 @@ export const spaceRoutes = {
     login: "/login",
     message: (spaceId: string) =>
         `/app/messages/${encodeURIComponent(spaceId)}`,
+    messageFromNotifications: (spaceId: string) =>
+        `/app/messages/${encodeURIComponent(spaceId)}?from=notifications`,
     messages: "/app/messages",
     notifications: "/app/notifications",
     onboarding: "/",
@@ -61,6 +64,11 @@ export const profileImageFlowSourceFromQuery = (
     value: string | string[] | undefined,
 ): ProfileImageFlowSource =>
     valueFromQuery(value) == "settings" ? "settings" : "profile";
+
+export const messageThreadSourceFromQuery = (
+    value: string | string[] | undefined,
+): MessageThreadSource =>
+    valueFromQuery(value) == "notifications" ? "notifications" : "messages";
 
 export const friendSpaceIdFromQuery = (value: string | string[] | undefined) =>
     valueFromQuery(value) ?? "";

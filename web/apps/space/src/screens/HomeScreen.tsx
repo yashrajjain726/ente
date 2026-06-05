@@ -1263,7 +1263,7 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                     justifyContent: "center",
                     opacity: 0.9,
                     p: 0,
-                    width: 34,
+                    width: spaceTouchTargetSize,
                     "&:focus-visible": {
                         outline: "2px solid rgba(0 0 0 / 0.72)",
                         outlineOffset: 2,
