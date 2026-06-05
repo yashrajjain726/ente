@@ -140,15 +140,38 @@ func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesReque
 	}
 	items := make([]models.MessageConversationResponse, 0, len(conversations))
 	for _, conversation := range conversations {
-		items = append(items, models.MessageConversationResponse{
-			Friend:             toActorResponse(conversation.Friend, true),
-			LatestActivity:     toMessageConversationActivityResponse(conversation.LatestActivity),
-			Unread:             conversation.Unread,
-			UnreadCount:        conversation.UnreadCount,
-			NotificationUnread: conversation.NotificationUnread,
-		})
+		item := models.MessageConversationResponse{
+			Friend:      toActorResponse(conversation.Friend, true),
+			Unread:      conversation.Unread,
+			UnreadCount: conversation.UnreadCount,
+		}
+		if strings.TrimSpace(conversation.LatestActivity.Type) != "" {
+			latestActivity := toMessageConversationActivityResponse(conversation.LatestActivity)
+			item.LatestActivity = &latestActivity
+		}
+		items = append(items, item)
 	}
 	return &models.MessageConversationPage{Items: items, NextCursor: nextCursor}, nil
+}
+
+func (c *MessagesController) ListNotifications(ctx *gin.Context, req models.ListNotificationsRequest) (*models.SpaceNotificationPage, error) {
+	userID, err := c.auth.requireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	notifications, nextCursor, err := c.MessagesRepo.ListNotifications(ctx.Request.Context(), viewerSpace.SpaceID, req.Cursor, req.Limit)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]models.SpaceNotificationResponse, 0, len(notifications))
+	for _, notification := range notifications {
+		items = append(items, toSpaceNotificationResponse(notification))
+	}
+	return &models.SpaceNotificationPage{Items: items, NextCursor: nextCursor}, nil
 }
 
 func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, req models.ListMessageThreadRequest) (*models.MessagePage, error) {
@@ -350,23 +373,42 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 		resp.Message = toMessageResponse(*activity.Message)
 	}
 	if activity.Post != nil {
-		resp.Post = &models.MessageConversationPostResponse{
-			PostID:      activity.Post.PostID,
-			SpaceID:     activity.Post.SpaceID,
-			SpaceSlug:   activity.Post.SpaceSlug,
-			OwnerUserID: activity.Post.OwnerID,
-			IsDeleted:   activity.Post.IsDeleted,
-		}
-		if activity.Post.ObjectKey.Valid {
-			resp.Post.Objects = []models.PostObjectPayload{
-				toPostObjectPayload(repo.SpacePostAssetRecord{
-					PostID:         activity.Post.PostID,
-					ObjectKey:      activity.Post.ObjectKey.String,
-					Size:           activity.Post.ObjectSize,
-					Position:       int(activity.Post.ObjectPosition.Int64),
-					MetadataCipher: activity.Post.ObjectMetadataCipher.String,
-				}),
-			}
+		resp.Post = toMessageConversationPostResponse(*activity.Post)
+	}
+	return resp
+}
+
+func toSpaceNotificationResponse(notification repo.SpaceNotificationRecord) models.SpaceNotificationResponse {
+	resp := models.SpaceNotificationResponse{
+		ID:        notification.ID,
+		Type:      notification.Type,
+		CreatedAt: formatMicros(notification.CreatedAt),
+		Unread:    notification.Unread,
+		Actor:     toActorResponse(notification.Actor, true),
+	}
+	if notification.Post != nil {
+		resp.Post = toMessageConversationPostResponse(*notification.Post)
+	}
+	return resp
+}
+
+func toMessageConversationPostResponse(post repo.SpaceMessageConversationPostRecord) *models.MessageConversationPostResponse {
+	resp := &models.MessageConversationPostResponse{
+		PostID:      post.PostID,
+		SpaceID:     post.SpaceID,
+		SpaceSlug:   post.SpaceSlug,
+		OwnerUserID: post.OwnerID,
+		IsDeleted:   post.IsDeleted,
+	}
+	if post.ObjectKey.Valid {
+		resp.Objects = []models.PostObjectPayload{
+			toPostObjectPayload(repo.SpacePostAssetRecord{
+				PostID:         post.PostID,
+				ObjectKey:      post.ObjectKey.String,
+				Size:           post.ObjectSize,
+				Position:       int(post.ObjectPosition.Int64),
+				MetadataCipher: post.ObjectMetadataCipher.String,
+			}),
 		}
 	}
 	return resp

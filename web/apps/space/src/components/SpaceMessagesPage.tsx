@@ -10,6 +10,7 @@ import {
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
     loadCurrentSpaceFriends,
+    markCurrentMessageLikesRead,
     markCurrentMessagesRead,
     replyToCurrentMessage,
     sendCurrentMessage,
@@ -107,9 +108,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         React.useState(true);
     const [isThreadLoading, setIsThreadLoading] = React.useState(false);
     const [messages, setMessages] = React.useState<SpaceMessage[]>([]);
-    const [newConversationIds, setNewConversationIds] = React.useState<
-        string[]
-    >([]);
     const selectedFriendSpaceIdRef = React.useRef<string | undefined>(
         undefined,
     );
@@ -163,18 +161,10 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         Boolean(selectedFriend) && !isSelectedFriendCurrent;
 
     const markConversationRead = React.useCallback((spaceId: string) => {
-        setNewConversationIds((currentIds) =>
-            currentIds.filter((id) => id != spaceId),
-        );
         setConversations((currentConversations) => {
             return currentConversations.map((conversation) =>
                 conversationId(conversation) == spaceId
-                    ? {
-                          ...conversation,
-                          notificationUnread: false,
-                          unread: false,
-                          unreadCount: 0,
-                      }
+                    ? { ...conversation, unread: false, unreadCount: 0 }
                     : conversation,
             );
         });
@@ -187,29 +177,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         setIsConversationsLoading(true);
         void loadCurrentMessageConversations()
             .then((page) => {
-                const unreadConversationIds = page.items
-                    .filter((conversation) => conversation.notificationUnread)
-                    .map(conversationId);
-                const passiveUnreadConversationIds = page.items
-                    .filter(
-                        (conversation) =>
-                            conversation.notificationUnread &&
-                            !conversation.unread,
-                    )
-                    .map(conversationId);
-                setNewConversationIds(unreadConversationIds);
                 setConversations(page.items);
-                if (passiveUnreadConversationIds.length == 0) return;
-                void Promise.all(
-                    passiveUnreadConversationIds.map((spaceId) =>
-                        markCurrentMessagesRead(spaceId),
-                    ),
-                ).catch((error: unknown) =>
-                    console.warn(
-                        "Failed to mark passive message activity read",
-                        error,
-                    ),
-                );
             })
             .catch((error: unknown) =>
                 console.error("Failed to load message conversations", error),
@@ -290,6 +258,9 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     React.useEffect(() => {
         if (!profile) return;
         refreshConversations();
+        void markCurrentMessageLikesRead().catch((error: unknown) =>
+            console.warn("Failed to mark message likes read", error),
+        );
     }, [profile, refreshConversations]);
 
     React.useEffect(() => {
@@ -306,6 +277,12 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 
     React.useEffect(() => {
         if (!selectedSpaceId || !selectedConversation) return;
+        if (
+            !selectedConversation.unread &&
+            selectedConversation.unreadCount <= 0
+        ) {
+            return;
+        }
         if (markedReadSpaceIdRef.current == selectedSpaceId) return;
 
         markedReadSpaceIdRef.current = selectedSpaceId;
@@ -386,7 +363,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 isThreadLoading={isThreadLoading}
                 isThreadReadOnly={isThreadReadOnly}
                 messages={messages}
-                newConversationIds={newConversationIds}
                 onBack={() => void router.push(spaceRoutes.home)}
                 onCloseThread={closeConversation}
                 onOpenSelectedFriendProfile={(friend) =>

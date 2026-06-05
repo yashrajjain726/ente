@@ -5,6 +5,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Menu, MenuItem, Skeleton, Tooltip } from "@mui/material";
+import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
@@ -66,7 +67,6 @@ interface MessagesScreenProps {
     onSendMessage: (spaceId: string, text: string) => Promise<void>;
     onSetMessageLiked: (messageId: string, liked: boolean) => Promise<void>;
     onShareProfileLink?: () => Promise<string>;
-    newConversationIds?: string[];
     profile: SetupProfile;
     selectedFriend?: SpaceMessageConversation["friend"];
 }
@@ -205,15 +205,7 @@ const conversationPreview = (
     profile: SetupProfile,
 ) => {
     const activity = conversation.latestActivity;
-    if (activity.type == "friend_add") {
-        return "You're now friends";
-    }
-    if (activity.type == "friend_remove") {
-        return activity.outgoing
-            ? "You're no longer friends"
-            : "Removed you as a friend";
-    }
-    if (activity.type == "post_like") return "Liked your post";
+    if (!activity) return "No messages yet";
     if (activity.type == "post_reply") {
         return "Replied";
     }
@@ -235,6 +227,7 @@ const conversationPreview = (
 const quotedConversationActivityPreview = (
     activity: SpaceMessageConversation["latestActivity"],
 ) => {
+    if (!activity) return undefined;
     const text = activity.message?.text.trim();
     if (!text) return undefined;
     const previewText = truncateMessageText(text);
@@ -254,10 +247,12 @@ const ConversationPreviewLine: React.FC<{
 }> = ({ conversation, profile }) => {
     const activity = conversation.latestActivity;
     const quotedPreview = quotedConversationActivityPreview(activity);
+    const isEmptyConversation = !activity;
     const previewLineSx = {
         color: textSecondary,
         fontFamily: '"Inter Variable", Inter, sans-serif',
         fontSize: 13,
+        fontStyle: isEmptyConversation ? "italic" : "normal",
         fontWeight: 500,
         lineHeight: "18px",
         minWidth: 0,
@@ -303,8 +298,6 @@ const conversationId = (conversation: SpaceMessageConversation) =>
 const conversationUnreadLabel = (count: number) =>
     count > 99 ? "99+" : String(count);
 
-const dayMs = 24 * 60 * 60 * 1000;
-
 const ConversationListItem: React.FC<{
     conversation: SpaceMessageConversation;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
@@ -312,10 +305,11 @@ const ConversationListItem: React.FC<{
 }> = ({ conversation, onOpenThread, profile }) => {
     const name =
         conversation.friend.fullName.trim() || conversation.friend.username;
-    const timestampLabel = formatTimeAgo(
-        microsForTimestamp(conversation.latestActivity.createdAtMs),
-    );
-    const postThumbnailUrl = conversation.latestActivity.post?.imageUrl;
+    const latestActivity = conversation.latestActivity;
+    const timestampLabel = latestActivity
+        ? formatTimeAgo(microsForTimestamp(latestActivity.createdAtMs))
+        : undefined;
+    const postThumbnailUrl = latestActivity?.post?.imageUrl;
     const unreadCount = conversation.unreadCount;
 
     return (
@@ -415,39 +409,43 @@ const ConversationListItem: React.FC<{
                         >
                             {firstNameFrom(name)}
                         </Box>
-                        <Box
-                            aria-hidden
-                            component="span"
-                            sx={{
-                                color: textSecondary,
-                                flexShrink: 0,
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 12,
-                                fontWeight: 600,
-                                lineHeight: "16px",
-                            }}
-                        >
-                            &middot;
-                        </Box>
-                        <Box
-                            component="time"
-                            dateTime={new Date(
-                                conversation.latestActivity.createdAtMs,
-                            ).toISOString()}
-                            sx={{
-                                color: textSecondary,
-                                flexShrink: 0,
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 12,
-                                fontWeight: 600,
-                                lineHeight: "16px",
-                                whiteSpace: "nowrap",
-                            }}
-                        >
-                            {timestampLabel}
-                        </Box>
+                        {timestampLabel && (
+                            <>
+                                <Box
+                                    aria-hidden
+                                    component="span"
+                                    sx={{
+                                        color: textSecondary,
+                                        flexShrink: 0,
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        lineHeight: "16px",
+                                    }}
+                                >
+                                    &middot;
+                                </Box>
+                                <Box
+                                    component="time"
+                                    dateTime={new Date(
+                                        latestActivity!.createdAtMs,
+                                    ).toISOString()}
+                                    sx={{
+                                        color: textSecondary,
+                                        flexShrink: 0,
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        lineHeight: "16px",
+                                        whiteSpace: "nowrap",
+                                    }}
+                                >
+                                    {timestampLabel}
+                                </Box>
+                            </>
+                        )}
                     </Box>
                     <ConversationPreviewLine
                         conversation={conversation}
@@ -469,50 +467,6 @@ const ConversationListItem: React.FC<{
                         }}
                     />
                 )}
-            </Box>
-        </Box>
-    );
-};
-
-interface ConversationSectionItem {
-    conversations: SpaceMessageConversation[];
-    title: string;
-}
-
-const ConversationSection: React.FC<{
-    conversations: SpaceMessageConversation[];
-    onOpenThread: (conversation: SpaceMessageConversation) => void;
-    profile: SetupProfile;
-    title: string;
-}> = ({ conversations, onOpenThread, profile, title }) => {
-    if (conversations.length == 0) return null;
-
-    return (
-        <Box component="section" sx={{ mb: "10px" }}>
-            <Box
-                component="h2"
-                sx={{
-                    color: textSecondary,
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    lineHeight: "18px",
-                    m: 0,
-                    pb: "4px",
-                    pt: "12px",
-                }}
-            >
-                {title}
-            </Box>
-            <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
-                {conversations.map((conversation) => (
-                    <ConversationListItem
-                        key={conversationId(conversation)}
-                        conversation={conversation}
-                        onOpenThread={onOpenThread}
-                        profile={profile}
-                    />
-                ))}
             </Box>
         </Box>
     );
@@ -1130,7 +1084,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     isThreadLoading = false,
     isThreadReadOnly = false,
     messages,
-    newConversationIds = [],
     onBack,
     onCloseThread,
     onDeleteMessage,
@@ -1152,6 +1105,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const [sendPhase, setSendPhase] = React.useState<"idle" | "sending">(
         "idle",
     );
+    const [isInviteDialogOpen, setIsInviteDialogOpen] = React.useState(false);
+    const [isInviteSharing, setIsInviteSharing] = React.useState(false);
+    const [inviteShareError, setInviteShareError] = React.useState<
+        string | null
+    >(null);
     const composerRef = React.useRef<HTMLTextAreaElement | null>(null);
     const threadScrollRef = React.useRef<HTMLDivElement | null>(null);
     const stickToThreadBottomRef = React.useRef(true);
@@ -1176,57 +1134,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         () => new Map(messages.map((message) => [message.id, message])),
         [messages],
     );
-    const groupedConversations = React.useMemo(() => {
-        const newIds = new Set(newConversationIds);
-        const now = Date.now();
-        const today = new Date(now);
-        const startOfTodayMs = new Date(
-            today.getFullYear(),
-            today.getMonth(),
-            today.getDate(),
-        ).getTime();
-        const startOfYesterdayMs = new Date(
-            today.getFullYear(),
-            today.getMonth(),
-            today.getDate() - 1,
-        ).getTime();
-        const nextSections: ConversationSectionItem[] = [
-            { title: "New", conversations: [] },
-            { title: "Today", conversations: [] },
-            { title: "Yesterday", conversations: [] },
-            { title: "Last 7 days", conversations: [] },
-            { title: "Last 30 days", conversations: [] },
-            { title: "Older", conversations: [] },
-        ];
-        for (const conversation of conversations) {
-            if (newIds.has(conversationId(conversation))) {
-                nextSections[0]!.conversations.push(conversation);
-                continue;
-            }
-
-            const activityCreatedAtMs = conversation.latestActivity.createdAtMs;
-            if (activityCreatedAtMs >= startOfTodayMs) {
-                nextSections[1]!.conversations.push(conversation);
-                continue;
-            }
-            if (activityCreatedAtMs >= startOfYesterdayMs) {
-                nextSections[2]!.conversations.push(conversation);
-                continue;
-            }
-
-            const ageMs = Math.max(0, now - activityCreatedAtMs);
-            if (ageMs <= 7 * dayMs) {
-                nextSections[3]!.conversations.push(conversation);
-                continue;
-            }
-            if (ageMs <= 30 * dayMs) {
-                nextSections[4]!.conversations.push(conversation);
-                continue;
-            }
-            nextSections[5]!.conversations.push(conversation);
-        }
-        return nextSections;
-    }, [conversations, newConversationIds]);
     const isContextMessageLiked = Boolean(
         messageContextMenu?.message.viewerLiked,
     );
@@ -1276,21 +1183,45 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             currentMenu?.open ? currentMenu : null,
         );
 
-    const shareProfileLink = async () => {
-        if (!onShareProfileLink) return;
-        const profileLink = await onShareProfileLink();
+    const openInviteDialog = () => {
+        setInviteShareError(null);
+        setIsInviteDialogOpen(true);
+    };
 
-        if (typeof navigator.share == "function") {
-            try {
-                await navigator.share({ url: profileLink });
-                return;
-            } catch (error) {
-                if (error instanceof DOMException && error.name == "AbortError")
+    const closeInviteDialog = () => {
+        if (isInviteSharing) return;
+        setIsInviteDialogOpen(false);
+    };
+
+    const shareInviteLink = async () => {
+        if (!onShareProfileLink || isInviteSharing) return;
+        setIsInviteSharing(true);
+        setInviteShareError(null);
+
+        try {
+            const profileLink = await onShareProfileLink();
+            if (typeof navigator.share == "function") {
+                try {
+                    await navigator.share({ url: profileLink });
+                    setIsInviteDialogOpen(false);
                     return;
+                } catch (error) {
+                    if (
+                        error instanceof DOMException &&
+                        error.name == "AbortError"
+                    )
+                        return;
+                }
             }
-        }
 
-        await copyTextToClipboard(profileLink);
+            await copyTextToClipboard(profileLink);
+            setIsInviteDialogOpen(false);
+        } catch (error) {
+            console.error("Failed to share space invite", error);
+            setInviteShareError("Couldn't share invite. Please try again.");
+        } finally {
+            setIsInviteSharing(false);
+        }
     };
 
     const handleMessageAction = (
@@ -2143,15 +2074,15 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         maxWidth: 260,
                                     }}
                                 >
-                                    {showInviteEmptyState
-                                        ? "No messages yet. Invite people to start conversations here."
-                                        : "No messages yet."}
+                                    No messages yet. Once you add friends,
+                                    you&apos;ll see their messages and replies
+                                    to your posts here.
                                 </Box>
                                 {showInviteEmptyState && (
                                     <Box
                                         component="button"
                                         type="button"
-                                        onClick={() => void shareProfileLink()}
+                                        onClick={openInviteDialog}
                                         sx={{
                                             alignItems: "center",
                                             bgcolor: "#F2F2F2",
@@ -2179,7 +2110,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         }}
                                     >
                                         <ShareIcon />
-                                        Invite people
+                                        Invite friends
                                     </Box>
                                 )}
                             </Box>
@@ -2191,13 +2122,12 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     p: "6px 16px 28px",
                                 }}
                             >
-                                {groupedConversations.map((section) => (
-                                    <ConversationSection
-                                        key={section.title}
-                                        conversations={section.conversations}
+                                {conversations.map((conversation) => (
+                                    <ConversationListItem
+                                        key={conversationId(conversation)}
+                                        conversation={conversation}
                                         onOpenThread={onOpenThread}
                                         profile={profile}
-                                        title={section.title}
                                     />
                                 ))}
                             </Box>
@@ -2205,6 +2135,13 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     </>
                 )}
             </Box>
+            <SpaceInviteFriendsDialog
+                errorMessage={inviteShareError}
+                open={isInviteDialogOpen}
+                sharing={isInviteSharing}
+                onClose={closeInviteDialog}
+                onShare={() => void shareInviteLink()}
+            />
         </Box>
     );
 };

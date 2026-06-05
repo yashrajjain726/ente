@@ -51,6 +51,16 @@ func (h *Handlers) ListMessages(c *gin.Context) {
 	respondJSON(c, resp, err)
 }
 
+func (h *Handlers) ListNotifications(c *gin.Context) {
+	var req models.ListNotificationsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		respondJSON(c, nil, ente.ErrBadRequest)
+		return
+	}
+	resp, err := h.Module.Messages.ListNotifications(c, req)
+	respondJSON(c, resp, err)
+}
+
 func (h *Handlers) ListMessageThread(c *gin.Context) {
 	var req models.ListMessageThreadRequest
 	if err := c.ShouldBindQuery(&req); err != nil {

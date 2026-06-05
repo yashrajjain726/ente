@@ -29,6 +29,11 @@ type ListMessagesRequest struct {
 	Limit  int    `form:"limit"`
 }
 
+type ListNotificationsRequest struct {
+	Cursor string `form:"cursor"`
+	Limit  int    `form:"limit"`
+}
+
 type ListMessageThreadRequest struct {
 	Cursor string `form:"cursor"`
 	Limit  int    `form:"limit"`
@@ -311,11 +316,10 @@ type MessagePage struct {
 }
 
 type MessageConversationResponse struct {
-	Friend             SpaceActorResponse                  `json:"friend"`
-	LatestActivity     MessageConversationActivityResponse `json:"latestActivity"`
-	Unread             bool                                `json:"unread"`
-	UnreadCount        int64                               `json:"unreadCount"`
-	NotificationUnread bool                                `json:"notificationUnread"`
+	Friend         SpaceActorResponse                   `json:"friend"`
+	LatestActivity *MessageConversationActivityResponse `json:"latestActivity,omitempty"`
+	Unread         bool                                 `json:"unread"`
+	UnreadCount    int64                                `json:"unreadCount"`
 }
 
 type MessageConversationActivityResponse struct {
@@ -339,6 +343,20 @@ type MessageConversationPostResponse struct {
 type MessageConversationPage struct {
 	Items      []MessageConversationResponse `json:"items"`
 	NextCursor string                        `json:"nextCursor,omitempty"`
+}
+
+type SpaceNotificationResponse struct {
+	ID        string                           `json:"id"`
+	Type      string                           `json:"type"`
+	CreatedAt string                           `json:"createdAt"`
+	Unread    bool                             `json:"unread"`
+	Actor     SpaceActorResponse               `json:"actor"`
+	Post      *MessageConversationPostResponse `json:"post,omitempty"`
+}
+
+type SpaceNotificationPage struct {
+	Items      []SpaceNotificationResponse `json:"items"`
+	NextCursor string                      `json:"nextCursor,omitempty"`
 }
 
 type PostObjectPayload struct {
@@ -365,9 +383,15 @@ type PostResponse struct {
 
 type SpaceUnreadStatusResponse struct {
 	NotificationsUnread bool `json:"notificationsUnread"`
+	MessagesUnread      bool `json:"messagesUnread"`
+	MessageLikesUnread  bool `json:"messageLikesUnread"`
 }
 
 type MarkNotificationsReadRequest struct {
+	ReadAt string `json:"readAt,omitempty"`
+}
+
+type MarkMessageThreadReadRequest struct {
 	FriendSpaceID string `json:"friendSpaceId"`
 }
 

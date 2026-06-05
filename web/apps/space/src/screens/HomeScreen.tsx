@@ -1,7 +1,7 @@
 import {
-    BubbleChatIcon,
     FavouriteIcon,
     MultiplicationSignIcon,
+    SentIcon,
     UserCheck01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -56,12 +56,15 @@ const textSecondary = "#6B6B6B";
 const dangerColor = "#F63A3A";
 const headerActionSize = spaceTouchTargetSize;
 const headerAvatarSize = 27;
+const headerAvatarBorderGap = 1;
+const headerAvatarBorderColor = "#757575";
+const headerIconStrokeWidth = 1.8;
 const feedAvatarSize = 38;
 const headerHeight = 64;
 const headerIconSize = 30;
 const headerHideStartY = 96;
 const headerScrollDelta = 4;
-const headerSideWidth = 32;
+const headerSideWidth = 76;
 const feedLikeActionSize = spaceTouchTargetSize;
 const feedActionIconSize = 20;
 const feedReplyIconSize = 17;
@@ -108,6 +111,7 @@ interface HomeScreenProps {
     friendsCount: number;
     hasMoreFeedItems?: boolean;
     hasUnreadMessages?: boolean;
+    hasUnreadNotifications?: boolean;
     isFeedLoading?: boolean;
     isFeedLoadingMore?: boolean;
     localFeedPosts?: LocalSpaceFeedPost[];
@@ -122,6 +126,7 @@ interface HomeScreenProps {
     onLoadPostImage?: SpacePostAssetURLLoader;
     onOpenFriend?: (friendID: string) => void;
     onOpenMessages?: () => void;
+    onOpenNotifications?: () => void;
     onOpenProfile?: () => void;
     onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
@@ -1282,6 +1287,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     friendsCount,
     hasMoreFeedItems = false,
     hasUnreadMessages,
+    hasUnreadNotifications,
     isFeedLoading = false,
     isFeedLoadingMore = false,
     localFeedPosts = [],
@@ -1293,6 +1299,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onLoadPostImage,
     onOpenFriend,
     onOpenMessages,
+    onOpenNotifications,
     onOpenProfile,
     onReplyToPost,
     onSetPostLiked,
@@ -1345,7 +1352,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         localFeedPosts.length > 0 || remoteFeedItems.length > 0;
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
     const showFeedCards = hasFeedItems;
-    const showUnreadIndicator = hasUnreadMessages === true;
+    const showMessagesUnreadIndicator = hasUnreadMessages === true;
+    const showNotificationsUnreadIndicator = hasUnreadNotifications === true;
     const emptyFeedMessage =
         friendsCount == 0
             ? "When you add friends, their posts will appear here."
@@ -1840,7 +1848,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             justifyContent: "center",
                             lineHeight: 0,
                             ml: "-6px",
-                            overflow: "hidden",
+                            overflow: "visible",
                             p: 0,
                             placeSelf: "center start",
                             width: headerActionSize,
@@ -1856,10 +1864,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 alignItems: "center",
                                 bgcolor: feedSkeletonElementBackground,
                                 borderRadius: "50%",
+                                boxShadow: `0 0 0 ${headerAvatarBorderGap}px ${homeBackground}, 0 0 0 ${headerAvatarBorderGap + headerIconStrokeWidth}px ${headerAvatarBorderColor}`,
                                 display: "flex",
                                 height: headerAvatarSize,
                                 justifyContent: "center",
-                                overflow: "hidden",
+                                overflow: "visible",
                                 width: headerAvatarSize,
                             }}
                         >
@@ -1906,81 +1915,113 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         <EnteLogo height={18} />
                     </Box>
                     <Box
-                        component="button"
-                        type="button"
-                        aria-label={
-                            showUnreadIndicator
-                                ? "Open messages with unread activity"
-                                : "Open messages"
-                        }
-                        onClick={onOpenMessages}
                         sx={{
-                            appearance: "none",
-                            alignItems: "center",
-                            bgcolor: "transparent",
-                            border: 0,
-                            boxSizing: "border-box",
-                            color: textBase,
-                            cursor: onOpenMessages ? "pointer" : "default",
                             display: "flex",
-                            fontSize: 0,
-                            height: headerActionSize,
-                            justifyContent: "center",
+                            gap: "2px",
                             justifySelf: "end",
-                            lineHeight: 0,
                             mr: "-6px",
-                            p: 0,
-                            position: "relative",
-                            width: headerActionSize,
-                            "& svg": { display: "block" },
-                            "&:focus-visible": {
-                                borderRadius: "50%",
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
                         }}
                     >
-                        <HugeiconsIcon
-                            icon={BubbleChatIcon}
-                            size={headerIconSize}
-                            strokeWidth={1.5}
-                        />
-                        {showUnreadIndicator && (
-                            <Box
-                                aria-hidden
-                                sx={{
-                                    "@keyframes spaceUnreadBadgePing": {
-                                        "75%, 100%": {
-                                            opacity: 0,
-                                            transform: "scale(2.5)",
+                        {[
+                            {
+                                ariaLabel: showNotificationsUnreadIndicator
+                                    ? "Open notifications with unread activity"
+                                    : "Open notifications",
+                                icon: FavouriteIcon,
+                                key: "notifications",
+                                onClick: onOpenNotifications,
+                                showUnread: showNotificationsUnreadIndicator,
+                            },
+                            {
+                                ariaLabel: showMessagesUnreadIndicator
+                                    ? "Open messages with unread activity"
+                                    : "Open messages",
+                                icon: SentIcon,
+                                key: "messages",
+                                onClick: onOpenMessages,
+                                showUnread: showMessagesUnreadIndicator,
+                            },
+                        ].map(
+                            ({ ariaLabel, icon, key, onClick, showUnread }) => (
+                                <Box
+                                    key={key}
+                                    component="button"
+                                    type="button"
+                                    aria-label={ariaLabel}
+                                    onClick={onClick}
+                                    sx={{
+                                        appearance: "none",
+                                        alignItems: "center",
+                                        bgcolor: "transparent",
+                                        border: 0,
+                                        boxSizing: "border-box",
+                                        color: textBase,
+                                        cursor: onClick ? "pointer" : "default",
+                                        display: "flex",
+                                        fontSize: 0,
+                                        height: headerActionSize,
+                                        justifyContent: "center",
+                                        lineHeight: 0,
+                                        p: 0,
+                                        position: "relative",
+                                        width: headerActionSize,
+                                        "& svg": { display: "block" },
+                                        "&:focus-visible": {
+                                            borderRadius: "50%",
+                                            outline: `2px solid ${green}`,
+                                            outlineOffset: 2,
                                         },
-                                    },
-                                    "@media (prefers-reduced-motion: reduce)": {
-                                        "&::after": { display: "none" },
-                                    },
-                                    bgcolor: dangerColor,
-                                    border: `2px solid ${homeBackground}`,
-                                    borderRadius: "50%",
-                                    height: 13,
-                                    position: "absolute",
-                                    right: 7,
-                                    top: 7,
-                                    width: 13,
-                                    zIndex: 0,
-                                    "&::after": {
-                                        animation:
-                                            "spaceUnreadBadgePing 1.25s cubic-bezier(0, 0, 0.2, 1) 1",
-                                        bgcolor: dangerColor,
-                                        borderRadius: "50%",
-                                        content: '""',
-                                        inset: 0,
-                                        opacity: 0.75,
-                                        pointerEvents: "none",
-                                        position: "absolute",
-                                        zIndex: -1,
-                                    },
-                                }}
-                            />
+                                    }}
+                                >
+                                    <HugeiconsIcon
+                                        icon={icon}
+                                        size={headerIconSize}
+                                        strokeWidth={headerIconStrokeWidth}
+                                    />
+                                    {showUnread && (
+                                        <Box
+                                            aria-hidden
+                                            sx={{
+                                                "@keyframes spaceUnreadBadgePing":
+                                                    {
+                                                        "75%, 100%": {
+                                                            opacity: 0,
+                                                            transform:
+                                                                "scale(2.5)",
+                                                        },
+                                                    },
+                                                "@media (prefers-reduced-motion: reduce)":
+                                                    {
+                                                        "&::after": {
+                                                            display: "none",
+                                                        },
+                                                    },
+                                                bgcolor: dangerColor,
+                                                border: `2px solid ${homeBackground}`,
+                                                borderRadius: "50%",
+                                                height: 13,
+                                                position: "absolute",
+                                                right: 5,
+                                                top: 6,
+                                                width: 13,
+                                                zIndex: 0,
+                                                "&::after": {
+                                                    animation:
+                                                        "spaceUnreadBadgePing 1.25s cubic-bezier(0, 0, 0.2, 1) 1",
+                                                    bgcolor: dangerColor,
+                                                    borderRadius: "50%",
+                                                    content: '""',
+                                                    inset: 0,
+                                                    opacity: 0.75,
+                                                    pointerEvents: "none",
+                                                    position: "absolute",
+                                                    zIndex: -1,
+                                                },
+                                            }}
+                                        />
+                                    )}
+                                </Box>
+                            ),
                         )}
                     </Box>
                 </Box>
