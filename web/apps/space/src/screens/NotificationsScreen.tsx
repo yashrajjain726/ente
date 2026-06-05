@@ -73,25 +73,20 @@ const PostLikeText: React.FC<{ actors: SpaceNotification["actor"][] }> = ({
             </>
         );
     }
-    if (actors.length == 3) {
-        return (
-            <>
-                <ActorName actor={actors[0]!} />,{" "}
-                <ActorName actor={actors[1]!} /> and{" "}
-                <ActorName actor={actors[2]!} /> liked your post.
-            </>
-        );
-    }
-
     return (
         <>
-            <ActorName actor={actors[0]!} />, <ActorName actor={actors[1]!} />{" "}
-            and {actors.length == 4 ? "2" : "2+"} others liked your post.
+            <ActorName actor={actors[0]!} /> and{" "}
+            <Box component="span" sx={{ fontWeight: 700 }}>
+                {actors.length - 1} others
+            </Box>{" "}
+            liked your post.
         </>
     );
 };
 
-const NotificationText: React.FC<{ group: NotificationGroup }> = ({ group }) => {
+const NotificationText: React.FC<{ group: NotificationGroup }> = ({
+    group,
+}) => {
     const actor = group.actors[0]!;
     switch (group.type) {
         case "friend_add":
@@ -113,42 +108,65 @@ const NotificationText: React.FC<{ group: NotificationGroup }> = ({ group }) => 
 
 const AvatarStack: React.FC<{ actors: SpaceNotification["actor"][] }> = ({
     actors,
-}) => (
-    <Box sx={{ flexShrink: 0, height: 44, position: "relative", width: 44 }}>
-        {actors.slice(0, 3).map((actor, index) => (
-            <Box
-                key={`${actor.spaceId ?? actor.id}-${index}`}
-                sx={{
-                    bgcolor: avatarSkeletonBackground,
-                    border: `2px solid ${notificationsBackground}`,
-                    borderRadius: "50%",
-                    height: actors.length == 1 ? 44 : 30,
-                    left: actors.length == 1 ? 0 : index * 6,
-                    overflow: "hidden",
-                    position: "absolute",
-                    top: actors.length == 1 ? 0 : index * 5,
-                    width: actors.length == 1 ? 44 : 30,
-                    zIndex: 3 - index,
-                }}
-            >
-                {actor.avatarUrl && (
+}) => {
+    const isPair = actors.length == 2;
+    const displayedActors = isPair
+        ? [actors[1]!, actors[0]!]
+        : actors.slice(0, 3);
+    const stackSize = isPair ? 48 : 44;
+
+    return (
+        <Box
+            sx={{
+                flexShrink: 0,
+                height: stackSize,
+                position: "relative",
+                width: stackSize,
+            }}
+        >
+            {displayedActors.map((actor, index) => {
+                const isSingle = actors.length == 1;
+                const avatarSize = isSingle ? 44 : isPair ? 34 : 30;
+                const offset = isPair ? (index == 0 ? 0 : 12) : index * 6;
+                const top = isPair ? (index == 0 ? 0 : 12) : index * 5;
+                const zIndex = isPair ? index + 1 : 3 - index;
+
+                return (
                     <Box
-                        component="img"
-                        alt=""
-                        src={actor.avatarUrl}
+                        key={`${actor.spaceId ?? actor.id}-${index}`}
                         sx={{
-                            display: "block",
-                            height: "100%",
-                            objectFit: "cover",
-                            objectPosition: "center",
-                            width: "100%",
+                            bgcolor: avatarSkeletonBackground,
+                            border: `2px solid ${notificationsBackground}`,
+                            borderRadius: "50%",
+                            height: avatarSize,
+                            left: isSingle ? 0 : offset,
+                            overflow: "hidden",
+                            position: "absolute",
+                            top: isSingle ? 0 : top,
+                            width: avatarSize,
+                            zIndex,
                         }}
-                    />
-                )}
-            </Box>
-        ))}
-    </Box>
-);
+                    >
+                        {actor.avatarUrl && (
+                            <Box
+                                component="img"
+                                alt=""
+                                src={actor.avatarUrl}
+                                sx={{
+                                    display: "block",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    objectPosition: "center",
+                                    width: "100%",
+                                }}
+                            />
+                        )}
+                    </Box>
+                );
+            })}
+        </Box>
+    );
+};
 
 const timeSections = (notifications: SpaceNotification[]) => {
     const now = Date.now();
@@ -209,7 +227,11 @@ const groupSectionNotifications = (items: SpaceNotification[]) => {
                 : item.id;
         const existing = groups.get(key);
         if (existing) {
-            existing.actors.push(item.actor);
+            if (item.createdAtMs > existing.createdAtMs) {
+                existing.actors.unshift(item.actor);
+            } else {
+                existing.actors.push(item.actor);
+            }
             existing.createdAtMs = Math.max(
                 existing.createdAtMs,
                 item.createdAtMs,
@@ -232,6 +254,11 @@ const NotificationRow: React.FC<{
     onOpenFriendMessages?: (spaceId: string) => void;
 }> = ({ group, onOpenFriendMessages }) => {
     const postImageUrl = group.post?.imageUrl;
+    const avatarActors =
+        group.type == "post_like" && group.actors.length > 2
+            ? group.actors.slice(0, 1)
+            : group.actors;
+    const avatarColumnWidth = avatarActors.length == 2 ? 52 : 44;
     const friendActivityActor =
         group.type == "post_like" ? undefined : group.actors[0];
     const friendActivitySpaceId = friendActivityActor
@@ -263,8 +290,8 @@ const NotificationRow: React.FC<{
                     display: "grid",
                     gap: "10px",
                     gridTemplateColumns: postImageUrl
-                        ? "44px minmax(0, 1fr) 44px"
-                        : "44px minmax(0, 1fr)",
+                        ? `${avatarColumnWidth}px minmax(0, 1fr) 44px`
+                        : `${avatarColumnWidth}px minmax(0, 1fr)`,
                     minHeight: 64,
                     p: "8px 0",
                     textAlign: "left",
@@ -276,7 +303,7 @@ const NotificationRow: React.FC<{
                     "&:hover": { bgcolor: rowHover },
                 }}
             >
-                <AvatarStack actors={group.actors} />
+                <AvatarStack actors={avatarActors} />
                 <Box sx={{ minWidth: 0 }}>
                     <Box
                         component="p"

@@ -44,6 +44,7 @@ const threadBottomThresholdPx = 96;
 const messageGroupTimeThresholdMs = 10 * 60 * 1000;
 const messageLongPressMs = 520;
 const messageLongPressMoveTolerancePx = 10;
+const dayMs = 24 * 60 * 60 * 1000;
 
 interface MessagesScreenProps {
     conversations: SpaceMessageConversation[];
@@ -76,6 +77,11 @@ interface MessageContextMenuState {
     anchorEl: HTMLElement;
     open: boolean;
     message: SpaceMessage;
+}
+
+interface ConversationSection {
+    items: SpaceMessageConversation[];
+    title: string;
 }
 
 const microsForTimestamp = (timestampMs: number) => timestampMs * 1000;
@@ -296,6 +302,65 @@ const ConversationPreviewLine: React.FC<{
 const conversationId = (conversation: SpaceMessageConversation) =>
     conversation.friend.spaceId ?? conversation.friend.id;
 
+const conversationTimeSections = (
+    conversations: SpaceMessageConversation[],
+) => {
+    const now = Date.now();
+    const today = new Date(now);
+    const startOfTodayMs = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+    ).getTime();
+    const startOfYesterdayMs = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate() - 1,
+    ).getTime();
+    const sections: ConversationSection[] = [
+        { title: "New", items: [] },
+        { title: "Today", items: [] },
+        { title: "Yesterday", items: [] },
+        { title: "Last 7 days", items: [] },
+        { title: "Last 30 days", items: [] },
+        { title: "Older", items: [] },
+        { title: "No messages", items: [] },
+    ];
+
+    for (const conversation of conversations) {
+        if (conversation.unread) {
+            sections[0]!.items.push(conversation);
+            continue;
+        }
+
+        const activity = conversation.latestActivity;
+        if (!activity) {
+            sections[6]!.items.push(conversation);
+            continue;
+        }
+        if (activity.createdAtMs >= startOfTodayMs) {
+            sections[1]!.items.push(conversation);
+            continue;
+        }
+        if (activity.createdAtMs >= startOfYesterdayMs) {
+            sections[2]!.items.push(conversation);
+            continue;
+        }
+
+        const ageMs = Math.max(0, now - activity.createdAtMs);
+        if (ageMs <= 7 * dayMs) {
+            sections[3]!.items.push(conversation);
+            continue;
+        }
+        if (ageMs <= 30 * dayMs) {
+            sections[4]!.items.push(conversation);
+            continue;
+        }
+        sections[5]!.items.push(conversation);
+    }
+    return sections;
+};
+
 const conversationUnreadLabel = (count: number) =>
     count > 99 ? "99+" : String(count);
 
@@ -468,6 +533,44 @@ const ConversationListItem: React.FC<{
                         }}
                     />
                 )}
+            </Box>
+        </Box>
+    );
+};
+
+const ConversationSection: React.FC<{
+    onOpenThread: (conversation: SpaceMessageConversation) => void;
+    profile: SetupProfile;
+    section: ConversationSection;
+}> = ({ onOpenThread, profile, section }) => {
+    if (section.items.length == 0) return null;
+
+    return (
+        <Box component="section" sx={{ mb: "10px" }}>
+            <Box
+                component="h2"
+                sx={{
+                    color: textSecondary,
+                    fontFamily: '"Inter Variable", Inter, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    lineHeight: "18px",
+                    m: 0,
+                    pb: "4px",
+                    pt: "12px",
+                }}
+            >
+                {section.title}
+            </Box>
+            <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+                {section.items.map((conversation) => (
+                    <ConversationListItem
+                        key={conversationId(conversation)}
+                        conversation={conversation}
+                        onOpenThread={onOpenThread}
+                        profile={profile}
+                    />
+                ))}
             </Box>
         </Box>
     );
@@ -1132,6 +1235,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         : "";
     const showInviteEmptyState =
         friendsCount == 0 && Boolean(onShareProfileLink);
+    const conversationSections = React.useMemo(
+        () => conversationTimeSections(conversations),
+        [conversations],
+    );
     const messageByID = React.useMemo(
         () => new Map(messages.map((message) => [message.id, message])),
         [messages],
@@ -2124,12 +2231,12 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     p: "6px 16px 28px",
                                 }}
                             >
-                                {conversations.map((conversation) => (
-                                    <ConversationListItem
-                                        key={conversationId(conversation)}
-                                        conversation={conversation}
+                                {conversationSections.map((section) => (
+                                    <ConversationSection
+                                        key={section.title}
                                         onOpenThread={onOpenThread}
                                         profile={profile}
+                                        section={section}
                                     />
                                 ))}
                             </Box>
