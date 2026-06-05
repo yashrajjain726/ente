@@ -6,6 +6,7 @@ import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
 import {
     createCurrentPhotoPost,
     deleteCurrentPost,
+    loadCurrentPostLikers,
     loadCurrentSpaceFriendsCount,
     loadCurrentSpacePostAssetURL,
     loadCurrentSpaceProfilePostsPage,
@@ -189,6 +190,7 @@ const Page: React.FC = () => {
                 }
                 onOpenSettings={() => void router.push(spaceRoutes.settings)}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
+                onLoadPostLikers={loadCurrentPostLikers}
                 onSetPostLiked={setCurrentPostLiked}
             />
         </>

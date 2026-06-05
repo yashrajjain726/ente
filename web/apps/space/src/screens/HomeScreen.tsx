@@ -31,6 +31,7 @@ import type {
     SpacePost,
     SpacePostAssetURLLoader,
     SpacePostAvatarURLLoader,
+    SpacePostLikersLoader,
 } from "services/space";
 import type { LocalSpaceFeedPost } from "state/spaceAppState";
 import { spaceTouchTargetSize } from "styles/touchTargets";
@@ -124,6 +125,7 @@ interface HomeScreenProps {
     onLoadMoreFeedItems?: () => Promise<void> | void;
     onLoadPostAvatar?: SpacePostAvatarURLLoader;
     onLoadPostImage?: SpacePostAssetURLLoader;
+    onLoadPostLikers?: SpacePostLikersLoader;
     onOpenFriend?: (friendID: string) => void;
     onOpenMessages?: () => void;
     onOpenNotifications?: () => void;
@@ -178,6 +180,7 @@ interface FeedItemProps {
     friendID: string;
     imageUrl?: string;
     isOwnPost: boolean;
+    likeCount?: number;
     name: string;
     onLoadAvatar?: () => Promise<string | null | undefined>;
     onLoadImage?: () => Promise<string | undefined>;
@@ -621,6 +624,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     friendID,
     imageUrl,
     isOwnPost,
+    likeCount = 0,
     name,
     onLoadAvatar,
     onLoadImage,
@@ -711,6 +715,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 friendID,
                 height: photoDimensions.height,
                 imageUrl: displayImageUrl,
+                likeCount,
                 name,
                 postId,
                 timestampMs,
@@ -1297,6 +1302,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onLoadMoreFeedItems,
     onLoadPostAvatar,
     onLoadPostImage,
+    onLoadPostLikers,
     onOpenFriend,
     onOpenMessages,
     onOpenNotifications,
@@ -1384,7 +1390,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         setSelectedViewer({
             focusReplyOnOpen: isOwnPost ? false : focusReplyOnOpen,
             photo,
-            postActionMode: isOwnPost ? "hidden" : "like-only",
+            postActionMode: isOwnPost ? "own-post-likes" : "like-only",
         });
     };
     const closeSelectedPhoto = () => {
@@ -1511,6 +1517,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 isOwnPost={
                     Boolean(profileSpaceId) && item.spaceId == profileSpaceId
                 }
+                likeCount={item.likeCount}
                 name={item.name}
                 onLoadAvatar={
                     avatarUrl === undefined
@@ -2233,6 +2240,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         onDraftPostPublished={() =>
                             setFeedScrollRequest((request) => request + 1)
                         }
+                        onLoadPostLikers={onLoadPostLikers}
                         onSetPostLiked={onSetPostLiked}
                     />
                 )}
