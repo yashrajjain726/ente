@@ -1295,7 +1295,11 @@ const FeedOwnPostLikeButton: React.FC<{
             >
                 <Box
                     component="span"
-                    sx={{ alignItems: "center", display: "flex", lineHeight: 0 }}
+                    sx={{
+                        alignItems: "center",
+                        display: "flex",
+                        lineHeight: 0,
+                    }}
                 >
                     <HugeiconsIcon
                         fill="none"
@@ -2183,7 +2187,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         justifyContent: showFeedCards ? "flex-start" : "center",
                         minHeight: "calc(100svh - 64px)",
                         minWidth: 0,
-                        pb: showFeedCards ? "72px" : "56px",
+                        pb: showFeedCards
+                            ? "calc(env(safe-area-inset-bottom) + 112px)"
+                            : "56px",
                         px: showFeedCards ? feedHorizontalPadding : 0,
                         pt: showFeedCards ? "4px" : 0,
                         width: "100%",
