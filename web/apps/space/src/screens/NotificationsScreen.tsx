@@ -25,6 +25,7 @@ interface NotificationsScreenProps {
     notifications: SpaceNotification[];
     onBack?: () => void;
     onOpenFriendMessages?: (spaceId: string) => void;
+    onOpenPost?: (spaceId: string, postId: number) => void;
     onShareProfileLink?: () => Promise<string>;
 }
 
@@ -252,7 +253,8 @@ const groupSectionNotifications = (items: SpaceNotification[]) => {
 const NotificationRow: React.FC<{
     group: NotificationGroup;
     onOpenFriendMessages?: (spaceId: string) => void;
-}> = ({ group, onOpenFriendMessages }) => {
+    onOpenPost?: (spaceId: string, postId: number) => void;
+}> = ({ group, onOpenFriendMessages, onOpenPost }) => {
     const postImageUrl = group.post?.imageUrl;
     const avatarActors =
         group.type == "post_like" && group.actors.length > 2
@@ -267,18 +269,33 @@ const NotificationRow: React.FC<{
     const canOpenFriendMessages = Boolean(
         friendActivitySpaceId && onOpenFriendMessages,
     );
+    const canOpenPost = Boolean(
+        group.type == "post_like" &&
+            group.post &&
+            !group.post.isDeleted &&
+            onOpenPost,
+    );
+    const canOpen = canOpenFriendMessages || canOpenPost;
 
     const openFriendMessages = () => {
         if (!friendActivitySpaceId) return;
         onOpenFriendMessages?.(friendActivitySpaceId);
     };
 
+    const openRow = () => {
+        if (canOpenPost && group.post) {
+            onOpenPost?.(group.post.spaceId, group.post.postId);
+            return;
+        }
+        if (canOpenFriendMessages) openFriendMessages();
+    };
+
     return (
         <Box component="li">
             <Box
-                component={canOpenFriendMessages ? "button" : "div"}
-                type={canOpenFriendMessages ? "button" : undefined}
-                onClick={canOpenFriendMessages ? openFriendMessages : undefined}
+                component={canOpen ? "button" : "div"}
+                type={canOpen ? "button" : undefined}
+                onClick={canOpen ? openRow : undefined}
                 sx={{
                     alignItems: "center",
                     appearance: "none",
@@ -286,7 +303,7 @@ const NotificationRow: React.FC<{
                     border: 0,
                     borderRadius: "8px",
                     color: textBase,
-                    cursor: canOpenFriendMessages ? "pointer" : "default",
+                    cursor: canOpen ? "pointer" : "default",
                     display: "grid",
                     gap: "10px",
                     gridTemplateColumns: postImageUrl
@@ -354,8 +371,9 @@ const NotificationRow: React.FC<{
 
 const NotificationSection: React.FC<{
     onOpenFriendMessages?: (spaceId: string) => void;
+    onOpenPost?: (spaceId: string, postId: number) => void;
     section: NotificationSection;
-}> = ({ onOpenFriendMessages, section }) => {
+}> = ({ onOpenFriendMessages, onOpenPost, section }) => {
     const groups = groupSectionNotifications(section.items);
     if (groups.length == 0) return null;
 
@@ -382,6 +400,7 @@ const NotificationSection: React.FC<{
                         key={group.id}
                         group={group}
                         onOpenFriendMessages={onOpenFriendMessages}
+                        onOpenPost={onOpenPost}
                     />
                 ))}
             </Box>
@@ -394,6 +413,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
     notifications,
     onBack,
     onOpenFriendMessages,
+    onOpenPost,
     onShareProfileLink,
 }) => {
     const [isInviteDialogOpen, setIsInviteDialogOpen] = React.useState(false);
@@ -610,6 +630,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                             <NotificationSection
                                 key={section.title}
                                 onOpenFriendMessages={onOpenFriendMessages}
+                                onOpenPost={onOpenPost}
                                 section={section}
                             />
                         ))

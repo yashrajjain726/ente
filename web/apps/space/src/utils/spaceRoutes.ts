@@ -1,6 +1,7 @@
 export type SetupProfileSource = "login" | "verify";
 export type ProfileImageFlowSource = "profile" | "settings";
 export type MessageThreadSource = "messages" | "notifications";
+export type PostRouteSource = "default" | "notifications";
 export type VerifyFlow = "login" | "signup";
 
 const valueFromQuery = (value: string | string[] | undefined) =>
@@ -28,6 +29,8 @@ export const spaceRoutes = {
     passkeysVerify: "/passkeys/verify",
     post: (spaceId: string, postId: number) =>
         `/app/posts/${encodeURIComponent(spaceId)}/${encodeURIComponent(String(postId))}`,
+    postFromNotifications: (spaceId: string, postId: number) =>
+        `/app/posts/${encodeURIComponent(spaceId)}/${encodeURIComponent(String(postId))}?from=notifications`,
     editProfileCover: "/app/profile/cover-edit",
     editProfileCoverFrom: (source?: ProfileImageFlowSource) =>
         routeWithProfileImageFlowSource("/app/profile/cover-edit", source),
@@ -71,6 +74,11 @@ export const messageThreadSourceFromQuery = (
     value: string | string[] | undefined,
 ): MessageThreadSource =>
     valueFromQuery(value) == "notifications" ? "notifications" : "messages";
+
+export const postRouteSourceFromQuery = (
+    value: string | string[] | undefined,
+): PostRouteSource =>
+    valueFromQuery(value) == "notifications" ? "notifications" : "default";
 
 export const friendSpaceIdFromQuery = (value: string | string[] | undefined) =>
     valueFromQuery(value) ?? "";
