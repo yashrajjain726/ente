@@ -19,11 +19,6 @@ import {
     passkeySessionExpiredErrorMessage,
 } from "ente-accounts-rs/services/passkey";
 import {
-    saveMasterKeyInSessionAndSafeStore,
-    stashKeyEncryptionKeyInSessionStore,
-    unstashKeyEncryptionKeyFromSession,
-} from "ente-accounts-rs/services/session-storage";
-import {
     getSRPAttributes,
     srpVerificationUnauthorizedErrorMessage,
     verifySRP,
@@ -42,6 +37,12 @@ import { HTTPError } from "ente-base/http";
 import log from "ente-base/log";
 import { saveAuthToken } from "ente-base/token";
 import { nullToUndefined } from "ente-utils/transform";
+import { createSpaceBrowserSession } from "services/spacePersistentSession";
+import {
+    saveMasterKeyInSpaceSession,
+    stashSpaceKeyEncryptionKeyInSessionStore,
+    unstashSpaceKeyEncryptionKeyFromSession,
+} from "services/spaceSecureSessionStorage";
 import { z } from "zod";
 
 export interface SpaceLoginInput {
@@ -250,7 +251,7 @@ const finishSpaceLoginVerification = async ({
         if (!accountsUrl) {
             throw new Error("Passkey verification URL is missing.");
         }
-        if (kek) await stashKeyEncryptionKeyInSessionStore(kek);
+        if (kek) await stashSpaceKeyEncryptionKeyInSessionStore(kek);
         updateSavedLocalUser({
             passkeySessionID,
             twoFactorSessionID: secondFactorSessionID,
@@ -270,7 +271,7 @@ const finishSpaceLoginVerification = async ({
     }
 
     if (secondFactorSessionID) {
-        if (kek) await stashKeyEncryptionKeyInSessionStore(kek);
+        if (kek) await stashSpaceKeyEncryptionKeyInSessionStore(kek);
         updateSavedLocalUser({
             passkeySessionID: undefined,
             twoFactorSessionID: secondFactorSessionID,
@@ -361,7 +362,7 @@ const finishSpaceLoginAuthorization = async ({
     keyAttributes,
 }: TwoFactorAuthorizationResponse): Promise<SpaceLoginResult> => {
     const [stashedKEK, pendingCredentials] = await Promise.all([
-        unstashKeyEncryptionKeyFromSession(),
+        unstashSpaceKeyEncryptionKeyFromSession(),
         savedPendingSpaceLoginCredentials(),
     ]);
     const kek =
@@ -420,6 +421,7 @@ const saveCompletedSpaceLogin = async ({
               masterKey,
           )
         : keyAttributes;
-    await saveMasterKeyInSessionAndSafeStore(masterKey);
+    await saveMasterKeyInSpaceSession(masterKey);
     await decryptAndStoreTokenIfNeeded(tokenKeyAttributes, masterKey);
+    await createSpaceBrowserSession(masterKey);
 };

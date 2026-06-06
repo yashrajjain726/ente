@@ -50,6 +50,42 @@ CREATE TRIGGER update_space_read_markers_updated_at
     FOR EACH ROW
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
+CREATE TABLE IF NOT EXISTS space_browser_sessions (
+    token_hash BYTEA PRIMARY KEY,
+    user_id    BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    client_key TEXT   NOT NULL,
+    expires_at BIGINT NOT NULL,
+    created_at BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    updated_at BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    last_used_at BIGINT NOT NULL DEFAULT now_utc_micro_seconds()
+);
+
+CREATE INDEX IF NOT EXISTS idx_space_browser_sessions_user
+    ON space_browser_sessions (user_id, last_used_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_space_browser_sessions_expires
+    ON space_browser_sessions (expires_at ASC);
+
+CREATE TRIGGER update_space_browser_sessions_updated_at
+    BEFORE UPDATE ON space_browser_sessions
+    FOR EACH ROW
+EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
+
+CREATE TABLE IF NOT EXISTS space_entity_keys (
+    user_id       BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    key_type      TEXT   NOT NULL,
+    encrypted_key TEXT   NOT NULL,
+    header        TEXT   NOT NULL,
+    created_at    BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    updated_at    BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    PRIMARY KEY (user_id, key_type)
+);
+
+CREATE TRIGGER update_space_entity_keys_updated_at
+    BEFORE UPDATE ON space_entity_keys
+    FOR EACH ROW
+EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
+
 CREATE TABLE IF NOT EXISTS space_key_versions (
     space_id             TEXT    NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     version             INTEGER NOT NULL,

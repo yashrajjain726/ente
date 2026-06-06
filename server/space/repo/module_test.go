@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"strconv"
 	"testing"
@@ -36,6 +37,25 @@ func insertSpaceUser(t *testing.T, module *Module, email string, publicKey strin
 	`, userID, "salt", []byte{1, 2, 3}, "encrypted-key", "nonce", publicKey, "encrypted-secret-key", "secret-nonce")
 	require.NoError(t, err)
 	return userID
+}
+
+func TestGetBrowserSession(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+	userID := insertSpaceUser(t, module, "browser-session@example.com", "browser-session-public")
+	tokenHash := sha256.Sum256([]byte("browser-session-token"))
+	expiresAt := timeutil.NDaysFromNow(1)
+
+	err := module.Sessions.CreateBrowserSession(ctx, tokenHash[:], userID, "client-key", expiresAt)
+	require.NoError(t, err)
+
+	session, err := module.Sessions.GetBrowserSession(ctx, tokenHash[:])
+	require.NoError(t, err)
+	require.Equal(t, userID, session.UserID)
+	require.Equal(t, "client-key", session.ClientKey)
+	require.Equal(t, expiresAt, session.ExpiresAt)
+	require.Equal(t, "salt", session.KeyAttributes.KEKSalt)
+	require.Equal(t, "browser-session-public", session.KeyAttributes.PublicKey)
 }
 
 func TestCreateSpaceRejectsReservedSlugs(t *testing.T) {
@@ -1834,10 +1854,6 @@ func ptr(value string) *string {
 
 func sqlNullInt64(value int64) sql.NullInt64 {
 	return sql.NullInt64{Int64: value, Valid: true}
-}
-
-func sqlNullString(value string) sql.NullString {
-	return sql.NullString{String: value, Valid: value != ""}
 }
 
 func requireQueuedTempObject(t *testing.T, module *Module, objectKey, purpose, bucketID string) {

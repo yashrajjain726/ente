@@ -1766,9 +1766,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                                 outline: `2px solid ${green}`,
                                 outlineOffset: 2,
                             },
-                            "&:hover": {
-                                bgcolor: "transparent",
-                            },
+                            "&:hover": { bgcolor: "transparent" },
                         }}
                     >
                         <Box

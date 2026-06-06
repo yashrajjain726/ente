@@ -11,10 +11,6 @@ import {
     unstashReferralSource,
 } from "ente-accounts-rs/services/accounts-db";
 import {
-    masterKeyFromSession,
-    saveMasterKeyInSessionAndSafeStore,
-} from "ente-accounts-rs/services/session-storage";
-import {
     generateSRPSetupAttributes,
     getAndSaveSRPAttributes,
     setupSRP,
@@ -29,6 +25,11 @@ import {
 } from "ente-accounts-rs/services/user";
 import { isMuseumHTTPError } from "ente-base/http";
 import { saveAuthToken } from "ente-base/token";
+import { createSpaceBrowserSession } from "services/spacePersistentSession";
+import {
+    masterKeyFromSpaceSession,
+    saveMasterKeyInSpaceSession,
+} from "services/spaceSecureSessionStorage";
 
 export interface SpaceSignupInput {
     email: string;
@@ -58,7 +59,7 @@ export const beginSpaceSignup = async ({
         keyAttributes,
         masterKey,
     );
-    await saveMasterKeyInSessionAndSafeStore(masterKey);
+    await saveMasterKeyInSpaceSession(masterKey);
     saveJustSignedUp();
 
     return { email: cleanedEmail };
@@ -88,7 +89,7 @@ export const completeSpaceSignup = async (email: string, code: string) => {
     if (keyAttributes) {
         saveKeyAttributes(keyAttributes);
         saveOriginalKeyAttributes(keyAttributes);
-        const masterKey = await masterKeyFromSession();
+        const masterKey = await masterKeyFromSpaceSession();
         if (!token && encryptedToken && masterKey) {
             await decryptAndStoreTokenIfNeeded(keyAttributes, masterKey);
         }
@@ -96,7 +97,7 @@ export const completeSpaceSignup = async (email: string, code: string) => {
         const originalKeyAttributes = savedOriginalKeyAttributes();
         if (originalKeyAttributes) {
             await putUserKeyAttributes(originalKeyAttributes);
-            const masterKey = await masterKeyFromSession();
+            const masterKey = await masterKeyFromSpaceSession();
             if (!token && encryptedToken && masterKey) {
                 await decryptAndStoreTokenIfNeeded(
                     originalKeyAttributes,
@@ -108,6 +109,9 @@ export const completeSpaceSignup = async (email: string, code: string) => {
         await getAndSaveSRPAttributes(email);
     }
 
+    const masterKey = await masterKeyFromSpaceSession();
+    if (!masterKey) throw new Error("Signup session expired. Please sign in.");
+    await createSpaceBrowserSession(masterKey);
     saveIsFirstLogin();
 };
 

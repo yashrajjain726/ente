@@ -1,17 +1,17 @@
 import {
     savedKeyAttributes,
-    savedLocalUser,
+    savedPartialLocalUser,
 } from "ente-accounts-rs/services/accounts-db";
-import { masterKeyFromSession } from "ente-accounts-rs/services/session-storage";
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
 import { apiOrigin, apiURL } from "ente-base/origins";
-import { savedAuthToken } from "ente-base/token";
 import type { SpaceAccountCtxHandle } from "ente-wasm";
 import { loadEnteWasm } from "ente-wasm/load";
 import type {
     SetupProfile,
     SetupProfileInput,
 } from "screens/SetupProfileScreen";
+import { restoreSpaceBrowserSessionIfNeeded } from "services/spacePersistentSession";
+import { masterKeyFromSpaceSession } from "services/spaceSecureSessionStorage";
 
 const usernamePattern = /^[a-z0-9][a-z0-9._-]*$/;
 const minUsernameLength = 3;
@@ -113,27 +113,25 @@ const spaceHTTPStatus = (error: unknown) => {
 const defaultOwnedSpace = (spaces: OwnedSpace[]) => spaces[0];
 
 const currentSpaceContextConfig = async () => {
-    const [authToken, baseUrl, masterKeyB64] = await Promise.all([
-        savedAuthToken(),
+    await restoreSpaceBrowserSessionIfNeeded();
+    const [baseUrl, masterKeyB64] = await Promise.all([
         apiOrigin(),
-        masterKeyFromSession(),
+        masterKeyFromSpaceSession(),
     ]);
-    const user = savedLocalUser();
+    const user = savedPartialLocalUser();
     const keyAttributes = savedKeyAttributes();
 
-    if (!authToken || !masterKeyB64 || !user || !keyAttributes) {
+    if (!masterKeyB64 || !user?.id || !keyAttributes) {
         return undefined;
     }
 
     return {
-        cacheKey: [user.id, authToken, baseUrl, keyAttributes.publicKey].join(
-            ":",
-        ),
+        cacheKey: [user.id, baseUrl, keyAttributes.publicKey].join(":"),
         input: {
-            authToken,
             baseUrl,
             clientPackage: clientPackageName,
             clientVersion: isDesktop ? desktopAppVersion : undefined,
+            includeCredentials: true,
             keyAttributes,
             masterKeyB64,
             publicKeyB64: keyAttributes.publicKey,

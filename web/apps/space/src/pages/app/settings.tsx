@@ -1,9 +1,9 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { accountLogout } from "ente-accounts-rs/services/logout";
 import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { SettingsScreen, settingsBackground } from "screens/SettingsScreen";
+import { spaceLogout } from "services/spaceLogout";
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
 
@@ -36,7 +36,7 @@ const Page: React.FC = () => {
                     void router.push(spaceRoutes.settingsProfile)
                 }
                 onLogout={() => {
-                    void accountLogout().then(() => {
+                    void spaceLogout().then(() => {
                         resetAfterLogout();
                         void router.push(spaceRoutes.onboarding);
                     });

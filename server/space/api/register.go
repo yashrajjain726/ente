@@ -3,6 +3,9 @@ package api
 import "github.com/gin-gonic/gin"
 
 func Register(privateAPI, publicAPI gin.IRoutes, handlers *Handlers) {
+	privateAPI.POST("/space/entity-key", handlers.CreateSpaceEntityKey)
+	privateAPI.POST("/space/entity-key/ensure", handlers.EnsureSpaceEntityKey)
+	privateAPI.GET("/space/entity-key", handlers.GetSpaceEntityKey)
 	privateAPI.GET("/space", handlers.ListSpaces)
 	privateAPI.POST("/space", handlers.CreateSpace)
 	privateAPI.POST("/space/profile", handlers.UpdateSpaceProfile)
@@ -47,4 +50,10 @@ func Register(privateAPI, publicAPI gin.IRoutes, handlers *Handlers) {
 	publicAPI.GET("/space/public/by-slug/:spaceSlug", handlers.LookupSpaceBySlug)
 	publicAPI.GET("/space/public/slug-availability/:spaceSlug", handlers.SpaceSlugAvailability)
 	publicAPI.POST("/space/links/session", handlers.SpaceLinkLogin)
+	publicAPI.POST("/space/sessions/bootstrap", handlers.BootstrapBrowserSession)
+	publicAPI.DELETE("/space/sessions/current", handlers.DeleteBrowserSession)
+}
+
+func RegisterTokenSessionRoutes(privateAPI gin.IRoutes, handlers *Handlers) {
+	privateAPI.POST("/space/sessions", handlers.CreateBrowserSession)
 }

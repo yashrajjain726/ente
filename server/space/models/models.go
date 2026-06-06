@@ -7,6 +7,51 @@ type AssetRedirectRequest struct {
 
 type ListSpacesRequest struct{}
 
+type SpaceBrowserSessionRequest struct {
+	ClientKey string `json:"clientKey" binding:"required"`
+}
+
+type SpaceBrowserSessionResponse struct {
+	ClientKey string `json:"clientKey"`
+}
+
+type SpaceBrowserSessionBootstrapResponse struct {
+	ID            int64              `json:"id"`
+	ClientKey     string             `json:"clientKey"`
+	KeyAttributes SpaceKeyAttributes `json:"keyAttributes"`
+}
+
+type SpaceKeyAttributes struct {
+	KEKSalt                           string `json:"kekSalt"`
+	EncryptedKey                      string `json:"encryptedKey"`
+	KeyDecryptionNonce                string `json:"keyDecryptionNonce"`
+	PublicKey                         string `json:"publicKey"`
+	EncryptedSecretKey                string `json:"encryptedSecretKey"`
+	SecretKeyDecryptionNonce          string `json:"secretKeyDecryptionNonce"`
+	MemLimit                          int    `json:"memLimit"`
+	OpsLimit                          int    `json:"opsLimit"`
+	MasterKeyEncryptedWithRecoveryKey string `json:"masterKeyEncryptedWithRecoveryKey,omitempty"`
+	MasterKeyDecryptionNonce          string `json:"masterKeyDecryptionNonce,omitempty"`
+	RecoveryKeyEncryptedWithMasterKey string `json:"recoveryKeyEncryptedWithMasterKey,omitempty"`
+	RecoveryKeyDecryptionNonce        string `json:"recoveryKeyDecryptionNonce,omitempty"`
+}
+
+type SpaceEntityKeyRequest struct {
+	Type         string `json:"type" binding:"required"`
+	EncryptedKey string `json:"encryptedKey" binding:"required"`
+	Header       string `json:"header" binding:"required"`
+}
+
+type GetSpaceEntityKeyRequest struct {
+	Type string `form:"type" binding:"required"`
+}
+
+type SpaceEntityKeyResponse struct {
+	Type         string `json:"type"`
+	EncryptedKey string `json:"encryptedKey"`
+	Header       string `json:"header"`
+}
+
 type GetSpaceProfileRequest struct {
 	SpaceID string `form:"spaceId" binding:"required"`
 	Version *int   `form:"version"`

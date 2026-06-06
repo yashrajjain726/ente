@@ -1,6 +1,7 @@
 pub mod client;
 pub mod crypto;
 pub mod error;
+pub mod http;
 pub mod models;
 pub mod transport;
 
