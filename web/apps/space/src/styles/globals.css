@@ -7,6 +7,89 @@
     -webkit-tap-highlight-color: transparent;
 }
 
+html[data-space-route-motion] {
+    overflow-x: hidden;
+}
+
+html[data-space-route-motion]::view-transition-old(root),
+html[data-space-route-motion]::view-transition-new(root) {
+    animation-duration: 220ms;
+    animation-fill-mode: both;
+    animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    mix-blend-mode: normal;
+}
+
+html[data-space-route-motion="forward"]::view-transition-old(root) {
+    animation-name: space-route-forward-old;
+}
+
+html[data-space-route-motion="forward"]::view-transition-new(root) {
+    animation-name: space-route-forward-new;
+}
+
+html[data-space-route-motion="back"]::view-transition-old(root) {
+    animation-name: space-route-back-old;
+}
+
+html[data-space-route-motion="back"]::view-transition-new(root) {
+    animation-name: space-route-back-new;
+}
+
+@keyframes space-route-forward-old {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    to {
+        opacity: 0.92;
+        transform: translateX(-18px);
+    }
+}
+
+@keyframes space-route-forward-new {
+    from {
+        opacity: 0.96;
+        transform: translateX(28px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes space-route-back-old {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    to {
+        opacity: 0.92;
+        transform: translateX(18px);
+    }
+}
+
+@keyframes space-route-back-new {
+    from {
+        opacity: 0.96;
+        transform: translateX(-28px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html[data-space-route-motion]::view-transition-old(root),
+    html[data-space-route-motion]::view-transition-new(root) {
+        animation: none;
+    }
+}
+
 .pswp-space-viewer {
     --pswp-root-z-index: 0;
     --pswp-bg: #000000;

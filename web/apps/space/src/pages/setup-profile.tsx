@@ -1,6 +1,5 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
     SetupProfileScreen,
@@ -15,9 +14,10 @@ import {
 import { useSpaceAppState } from "state/spaceAppState";
 import { acceptPendingSpaceInvite } from "utils/spacePendingInvite";
 import { setupProfileSourceFromQuery, spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         onboardingEntrySource,
         profile,

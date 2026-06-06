@@ -1,7 +1,6 @@
 import { SpaceFileViewer } from "components/SpaceFileViewer";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React from "react";
 import {
     loadCurrentPostLikers,
@@ -12,6 +11,7 @@ import {
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
 import { postRouteSourceFromQuery, spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const postBackground = "#000000";
 
@@ -60,7 +60,7 @@ const viewerPhotoFromPost = (post: SpacePost) => ({
 });
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const { profile, profileLoadError, profileLoadStatus } = useSpaceAppState();
     const pathParams = routeParamsFromPath();
     const spaceId =

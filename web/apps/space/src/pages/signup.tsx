@@ -1,5 +1,4 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
-import { useRouter } from "next/router";
 import React, { useState } from "react";
 import {
     CreateAccountScreen,
@@ -12,9 +11,10 @@ import {
 } from "services/spaceSignup";
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const { setIsLiveSignupVerification, setSignupEmail } = useSpaceAppState();
     const [signupError, setSignupError] = useState<string>();
     const [isSubmitting, setIsSubmitting] = useState(false);

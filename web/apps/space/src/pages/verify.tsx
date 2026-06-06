@@ -1,7 +1,6 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import { isHTTPErrorWithStatus } from "ente-base/http";
-import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 import {
     VerifyEmailScreen,
@@ -22,6 +21,7 @@ import {
 import { useSpaceAppState } from "state/spaceAppState";
 import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
 import { spaceRoutes, verifyFlowFromQuery } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const verificationErrorMessage = (error: unknown) => {
     if (isHTTPErrorWithStatus(error, 401)) {
@@ -36,7 +36,7 @@ const verificationErrorMessage = (error: unknown) => {
 };
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         isLiveSignupVerification,
         pendingLoginCredentials,

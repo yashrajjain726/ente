@@ -59,7 +59,7 @@ export const beginSpaceSignup = async ({
         keyAttributes,
         masterKey,
     );
-    await saveMasterKeyInSpaceSession(masterKey);
+    saveMasterKeyInSpaceSession(masterKey);
     saveJustSignedUp();
 
     return { email: cleanedEmail };
@@ -89,7 +89,7 @@ export const completeSpaceSignup = async (email: string, code: string) => {
     if (keyAttributes) {
         saveKeyAttributes(keyAttributes);
         saveOriginalKeyAttributes(keyAttributes);
-        const masterKey = await masterKeyFromSpaceSession();
+        const masterKey = masterKeyFromSpaceSession();
         if (!token && encryptedToken && masterKey) {
             await decryptAndStoreTokenIfNeeded(keyAttributes, masterKey);
         }
@@ -97,7 +97,7 @@ export const completeSpaceSignup = async (email: string, code: string) => {
         const originalKeyAttributes = savedOriginalKeyAttributes();
         if (originalKeyAttributes) {
             await putUserKeyAttributes(originalKeyAttributes);
-            const masterKey = await masterKeyFromSpaceSession();
+            const masterKey = masterKeyFromSpaceSession();
             if (!token && encryptedToken && masterKey) {
                 await decryptAndStoreTokenIfNeeded(
                     originalKeyAttributes,
@@ -109,7 +109,7 @@ export const completeSpaceSignup = async (email: string, code: string) => {
         await getAndSaveSRPAttributes(email);
     }
 
-    const masterKey = await masterKeyFromSpaceSession();
+    const masterKey = masterKeyFromSpaceSession();
     if (!masterKey) throw new Error("Signup session expired. Please sign in.");
     await createSpaceBrowserSession(masterKey);
     saveIsFirstLogin();

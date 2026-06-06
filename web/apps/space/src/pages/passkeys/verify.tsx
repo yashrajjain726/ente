@@ -2,7 +2,6 @@ import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import { savedPartialLocalUser } from "ente-accounts-rs/services/accounts-db";
 import { openPasskeyVerificationURL } from "ente-accounts-rs/services/passkey";
-import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 import {
     PasskeyVerificationScreen,
@@ -24,6 +23,7 @@ import {
 import { useSpaceAppState } from "state/spaceAppState";
 import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const passkeyErrorMessage = (error: unknown) => {
     if (
@@ -38,7 +38,7 @@ const passkeyErrorMessage = (error: unknown) => {
 };
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         pendingPasskeyVerification,
         refreshProfile,

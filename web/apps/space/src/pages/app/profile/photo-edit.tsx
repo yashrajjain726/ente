@@ -1,6 +1,5 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { EditProfilePhotoScreen } from "screens/EditProfilePhotoScreen";
 import { profileBackground } from "screens/ProfileScreen";
@@ -13,9 +12,10 @@ import {
     profileImageFlowSourceFromQuery,
     spaceRoutes,
 } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         pendingProfileAvatarFile,
         profile,

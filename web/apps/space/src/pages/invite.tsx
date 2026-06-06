@@ -1,6 +1,5 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
     ShareProfileLinkScreen,
@@ -9,9 +8,10 @@ import {
 import { createCurrentProfileLink } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const { profile, profileLoadError, profileLoadStatus } = useSpaceAppState();
     const [profileLink, setProfileLink] = useState<string>();
     const [linkError, setLinkError] = useState<string>();

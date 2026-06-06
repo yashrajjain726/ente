@@ -1,6 +1,5 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React from "react";
 import {
     NotificationsScreen,
@@ -14,9 +13,10 @@ import {
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 export const SpaceNotificationsPage: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const { profile, profileLoadError, profileLoadStatus } = useSpaceAppState();
     const [notifications, setNotifications] = React.useState<
         SpaceNotification[]

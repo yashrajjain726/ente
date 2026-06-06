@@ -1,7 +1,6 @@
 import { Box } from "@mui/material";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
     OnboardingScreen,
@@ -33,6 +32,7 @@ import {
 } from "state/spaceAppState";
 import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 type RouteMode =
     | { kind: "checking" }
@@ -92,7 +92,7 @@ const onboardingEntrySourceFromPendingInvite = (): OnboardingEntrySource =>
     savedPendingSpaceInvite() ? "add-friend-link" : "direct";
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         onboardingEntrySource,
         profile,

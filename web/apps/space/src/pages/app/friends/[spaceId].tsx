@@ -1,6 +1,5 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useEffect, useMemo, useState } from "react";
 import { friendsBackground } from "screens/FriendsScreen";
 import { ProfileScreen } from "screens/ProfileScreen";
@@ -16,6 +15,7 @@ import {
 import { useSpaceAppState } from "state/spaceAppState";
 import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
 import { friendSpaceIdFromQuery, spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const friendSpaceIdFromPath = () => {
     if (typeof window == "undefined") return "";
@@ -30,7 +30,7 @@ const friendSpaceIdFromPath = () => {
 };
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         friends,
         profile,

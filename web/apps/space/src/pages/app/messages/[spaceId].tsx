@@ -1,7 +1,7 @@
 import { SpaceMessagesPage } from "components/SpaceMessagesPage";
-import { useRouter } from "next/router";
 import React from "react";
 import { friendSpaceIdFromQuery } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const messageSpaceIdFromPath = () => {
     if (typeof window == "undefined") return "";
@@ -16,7 +16,7 @@ const messageSpaceIdFromPath = () => {
 };
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const spaceId =
         friendSpaceIdFromQuery(router.query.spaceId) ||
         messageSpaceIdFromPath();

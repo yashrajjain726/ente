@@ -108,7 +108,7 @@ let pendingRestore: Promise<boolean> | undefined;
 
 export const restoreSpaceBrowserSessionIfNeeded = async () => {
     if (
-        (await masterKeyFromSpaceSession()) &&
+        masterKeyFromSpaceSession() &&
         savedPartialLocalUser()?.id &&
         savedKeyAttributes()
     ) {
@@ -148,10 +148,8 @@ const restoreSpaceBrowserSession = async () => {
     replaceSavedLocalUser({ id: bootstrap.id, email: persisted.email });
     saveKeyAttributes(bootstrap.keyAttributes);
     saveOriginalKeyAttributes(bootstrap.keyAttributes);
-    await Promise.all([
-        saveMasterKeyInSpaceSession(masterKey),
-        removeAuthToken(),
-    ]);
+    saveMasterKeyInSpaceSession(masterKey);
+    await removeAuthToken();
     return true;
 };
 

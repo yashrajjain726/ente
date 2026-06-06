@@ -1,5 +1,4 @@
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { verifyEmailBackground } from "screens/VerifyEmailScreen";
 import { completeSpaceLoginPasskey } from "services/spaceLogin";
@@ -7,9 +6,10 @@ import { clearPendingSpacePasskeyVerification } from "services/spacePasskeyVerif
 import { useSpaceAppState } from "state/spaceAppState";
 import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const { refreshProfile, setPendingPasskeyVerification } =
         useSpaceAppState();
 

@@ -1,6 +1,5 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React from "react";
 import { MessagesScreen, messagesBackground } from "screens/MessagesScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -21,6 +20,7 @@ import {
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
 import { messageThreadSourceFromQuery, spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 interface SpaceMessagesPageProps {
     selectedSpaceId?: string;
@@ -94,7 +94,7 @@ const createLocalMessage = ({
 export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     selectedSpaceId,
 }) => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         friends,
         profile,

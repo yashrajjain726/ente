@@ -251,7 +251,7 @@ const finishSpaceLoginVerification = async ({
         if (!accountsUrl) {
             throw new Error("Passkey verification URL is missing.");
         }
-        if (kek) await stashSpaceKeyEncryptionKeyInSessionStore(kek);
+        if (kek) stashSpaceKeyEncryptionKeyInSessionStore(kek);
         updateSavedLocalUser({
             passkeySessionID,
             twoFactorSessionID: secondFactorSessionID,
@@ -271,7 +271,7 @@ const finishSpaceLoginVerification = async ({
     }
 
     if (secondFactorSessionID) {
-        if (kek) await stashSpaceKeyEncryptionKeyInSessionStore(kek);
+        if (kek) stashSpaceKeyEncryptionKeyInSessionStore(kek);
         updateSavedLocalUser({
             passkeySessionID: undefined,
             twoFactorSessionID: secondFactorSessionID,
@@ -421,7 +421,7 @@ const saveCompletedSpaceLogin = async ({
               masterKey,
           )
         : keyAttributes;
-    await saveMasterKeyInSpaceSession(masterKey);
+    saveMasterKeyInSpaceSession(masterKey);
     await decryptAndStoreTokenIfNeeded(tokenKeyAttributes, masterKey);
     await createSpaceBrowserSession(masterKey);
 };

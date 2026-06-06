@@ -1,6 +1,5 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 import { HomeScreen, homeBackground } from "screens/HomeScreen";
 import {
@@ -27,9 +26,10 @@ import {
 import { firstNameFrom } from "utils/spaceDisplay";
 import { prepareSpacePostImageFromEdit } from "utils/spacePostImage";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         friends,
         localFeedPosts,

@@ -1,6 +1,5 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 import {
     ChangeNameSettingsScreen,
@@ -12,9 +11,10 @@ import {
 } from "services/spaceProfile";
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const { profile, profileLoadError, profileLoadStatus, setProfile } =
         useSpaceAppState();
     const [errorMessage, setErrorMessage] = useState<string>();

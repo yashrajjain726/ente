@@ -1,6 +1,5 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import {
@@ -11,9 +10,10 @@ import {
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         friends,
         profile,
