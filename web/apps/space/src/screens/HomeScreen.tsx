@@ -651,7 +651,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const dateLabel = formatSpaceDate(timestampMs);
     const postingDotCount = usePostingDotCount(timestampStatus == "posting");
     const displayCaption = caption?.trim();
-    const showOwnPostLikeButton = isOwnPost && postId > 0 && likeCount > 0;
+    const showOwnPostLikeButton = isOwnPost && postId > 0;
     const showFooter =
         !isOwnPost || Boolean(displayCaption) || showOwnPostLikeButton;
     const canOpenAuthor = isOwnPost

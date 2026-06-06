@@ -1724,7 +1724,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     </Box>
                 </Box>
             )}
-            {showPhotoLikeCountButton && (activePhoto.likeCount ?? 0) > 0 && (
+            {showPhotoLikeCountButton && (
                 <Box
                     data-space-viewer-bottom="true"
                     sx={{
