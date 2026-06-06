@@ -15,6 +15,7 @@ interface ConfirmationActionSheetProps {
     open: boolean;
     title: string;
     confirmLabel: string;
+    confirmBackgroundColor?: string;
     confirmActionPhase?: SpaceActionPhase | null;
     confirmDisabled?: boolean;
     errorMessage?: string | null;
@@ -32,6 +33,7 @@ export const ConfirmationActionSheet: React.FC<
     open,
     title,
     confirmLabel,
+    confirmBackgroundColor = dangerColor,
     confirmActionPhase = null,
     confirmDisabled = false,
     errorMessage = null,
@@ -135,7 +137,7 @@ export const ConfirmationActionSheet: React.FC<
                 >
                     <SheetButton
                         label={confirmLabel}
-                        backgroundColor={dangerColor}
+                        backgroundColor={confirmBackgroundColor}
                         color="#FFFFFF"
                         disabled={confirmDisabled}
                         actionPhase={confirmActionPhase}

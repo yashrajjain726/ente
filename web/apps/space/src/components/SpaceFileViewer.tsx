@@ -156,6 +156,8 @@ interface ViewerSwipeGesture {
     startY: number;
 }
 
+type AddFriendPostAction = "like" | "reply";
+
 const viewerSwipePointFromEvent = (event: Event) => {
     if (event.type.startsWith("mouse")) return undefined;
     if (
@@ -348,6 +350,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const [actionsAnchor, setActionsAnchor] =
         React.useState<HTMLElement | null>(null);
     const [deleteSheetOpen, setDeleteSheetOpen] = React.useState(false);
+    const [addFriendSheetOpen, setAddFriendSheetOpen] = React.useState(false);
+    const [addFriendPostAction, setAddFriendPostAction] =
+        React.useState<AddFriendPostAction>("like");
     const [deleteActionPhase, setDeleteActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
     const [isDeleteExit, setIsDeleteExit] = React.useState(false);
@@ -391,21 +396,36 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         !isReplyActionRunning &&
         (canAddFriendForPostAction ||
             Boolean(activePhoto.postId && replyText.trim().length > 0));
+    const addFriendSheetTitle = `Add ${displayName || "them"} as a friend to ${addFriendPostAction}?`;
     const swipeGestureRef = React.useRef<ViewerSwipeGesture | null>(null);
     const swipeActionsRef = React.useRef({ onSwipeLeft, onSwipeRight });
     swipeActionsRef.current = { onSwipeLeft, onSwipeRight };
     const isSwipeBlockedRef = React.useRef(false);
     isSwipeBlockedRef.current =
         isActionsOpen ||
+        addFriendSheetOpen ||
         (canDeletePost && deleteSheetOpen) ||
         postLikersOpen ||
         isDeleteExit ||
         isDraftPost ||
         isDraftPostPreviewPending;
 
+    const requestAddFriendForPostAction = (action: AddFriendPostAction) => {
+        if (!canAddFriendForPostAction) return;
+        setAddFriendPostAction(action);
+        setAddFriendSheetOpen(true);
+    };
+
+    const closeAddFriendSheet = () => setAddFriendSheetOpen(false);
+
+    const confirmAddFriendForPostAction = () => {
+        setAddFriendSheetOpen(false);
+        onAddFriendForPostAction?.();
+    };
+
     const handlePhotoLikeClick = () => {
         if (canAddFriendForPostAction) {
-            onAddFriendForPostAction?.();
+            requestAddFriendForPostAction("like");
             return;
         }
 
@@ -554,7 +574,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 
     const sendReply = () => {
         if (canAddFriendForPostAction) {
-            onAddFriendForPostAction?.();
+            requestAddFriendForPostAction("reply");
             return;
         }
 
@@ -578,7 +598,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         if (canAddFriendForPostAction) {
             if (event.key == "Enter" || event.key == " ") {
                 event.preventDefault();
-                onAddFriendForPostAction?.();
+                requestAddFriendForPostAction("reply");
             }
             return;
         }
@@ -593,7 +613,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         if (!canAddFriendForPostAction) return;
 
         event.preventDefault();
-        onAddFriendForPostAction?.();
+        requestAddFriendForPostAction("reply");
     };
 
     const handleReplyActionPointerDown = (event: React.PointerEvent) => {
@@ -658,6 +678,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         setReplyText("");
         setIsReplyFocused(focusReplyOnOpen && canReplyToPost);
         setReplyActionPhase(null);
+        setAddFriendSheetOpen(false);
     }, [
         activePhoto.caption,
         activePhoto.imageUrl,
@@ -1814,6 +1835,17 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     onCancel={closeDeleteSheet}
                     onConfirm={confirmDeletePost}
                     onExited={handleDeleteSheetExited}
+                />
+            )}
+            {canAddFriendForPostAction && (
+                <ConfirmationActionSheet
+                    appearance="dark"
+                    open={addFriendSheetOpen}
+                    title={addFriendSheetTitle}
+                    confirmLabel="Add friend"
+                    confirmBackgroundColor={green}
+                    onCancel={closeAddFriendSheet}
+                    onConfirm={confirmAddFriendForPostAction}
                 />
             )}
             <SpacePostLikersDialog
