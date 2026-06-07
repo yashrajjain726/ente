@@ -897,8 +897,8 @@ const FeedItem: React.FC<FeedItemProps> = ({
                     aria-hidden
                     sx={{
                         background:
-                            "linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.32) 24%, rgba(0, 0, 0, 0.2) 48%, rgba(0, 0, 0, 0.1) 72%, rgba(0, 0, 0, 0) 100%)",
-                        height: 56,
+                            "linear-gradient(180deg, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.48) 24%, rgba(0, 0, 0, 0.3) 48%, rgba(0, 0, 0, 0.14) 72%, rgba(0, 0, 0, 0) 100%)",
+                        height: 72,
                         left: 0,
                         pointerEvents: "none",
                         position: "absolute",
