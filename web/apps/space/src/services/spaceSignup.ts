@@ -13,18 +13,20 @@ import {
 import {
     generateSRPSetupAttributes,
     getAndSaveSRPAttributes,
-    setupSRP,
 } from "ente-accounts-rs/services/srp";
 import {
-    decryptAndStoreTokenIfNeeded,
     generateAndSaveInteractiveKeyAttributes,
     generateKeysAndAttributes,
-    putUserKeyAttributes,
     sendOTT,
     verifyEmail,
+    type KeyAttributes,
 } from "ente-accounts-rs/services/user";
 import { isMuseumHTTPError } from "ente-base/http";
-import { saveAuthToken } from "ente-base/token";
+import {
+    decryptSpaceBootstrapAuthToken,
+    putSpaceSignupKeyAttributes,
+    setupSpaceSignupSRP,
+} from "services/spaceBootstrapAuth";
 import { createSpaceBrowserSession } from "services/spacePersistentSession";
 import {
     masterKeyFromSpaceSession,
@@ -65,6 +67,28 @@ export const beginSpaceSignup = async ({
     return { email: cleanedEmail };
 };
 
+const verifiedSignupAuthToken = async ({
+    encryptedToken,
+    keyAttributes,
+    masterKey,
+    token,
+}: {
+    encryptedToken?: string;
+    keyAttributes: KeyAttributes;
+    masterKey: string;
+    token?: string;
+}) => {
+    if (token) return token;
+    if (encryptedToken) {
+        return decryptSpaceBootstrapAuthToken(
+            encryptedToken,
+            keyAttributes,
+            masterKey,
+        );
+    }
+    throw new Error("Signup session expired. Please sign in.");
+};
+
 export const completeSpaceSignup = async (email: string, code: string) => {
     const referralSource = unstashReferralSource();
     const cleanedReferralSource = referralSource
@@ -83,35 +107,43 @@ export const completeSpaceSignup = async (email: string, code: string) => {
         throw new Error("Unexpected second factor during signup");
     }
 
-    if (token) await saveAuthToken(token);
-    replaceSavedLocalUser({ id, email, token, encryptedToken });
-
-    if (keyAttributes) {
-        saveKeyAttributes(keyAttributes);
-        saveOriginalKeyAttributes(keyAttributes);
-        const masterKey = masterKeyFromSpaceSession();
-        if (!token && encryptedToken && masterKey) {
-            await decryptAndStoreTokenIfNeeded(keyAttributes, masterKey);
-        }
-    } else {
-        const originalKeyAttributes = savedOriginalKeyAttributes();
-        if (originalKeyAttributes) {
-            await putUserKeyAttributes(originalKeyAttributes);
-            const masterKey = masterKeyFromSpaceSession();
-            if (!token && encryptedToken && masterKey) {
-                await decryptAndStoreTokenIfNeeded(
-                    originalKeyAttributes,
-                    masterKey,
-                );
-            }
-        }
-        await unstashAfterUseSRPSetupAttributes(setupSRP);
-        await getAndSaveSRPAttributes(email);
-    }
+    replaceSavedLocalUser({ id, email });
 
     const masterKey = masterKeyFromSpaceSession();
     if (!masterKey) throw new Error("Signup session expired. Please sign in.");
-    await createSpaceBrowserSession(masterKey);
+
+    let bootstrapAuthToken: string;
+    if (keyAttributes) {
+        saveKeyAttributes(keyAttributes);
+        saveOriginalKeyAttributes(keyAttributes);
+        bootstrapAuthToken = await verifiedSignupAuthToken({
+            encryptedToken,
+            keyAttributes,
+            masterKey,
+            token,
+        });
+    } else {
+        const originalKeyAttributes = savedOriginalKeyAttributes();
+        if (!originalKeyAttributes) {
+            throw new Error("Signup session expired. Please sign in.");
+        }
+        bootstrapAuthToken = await verifiedSignupAuthToken({
+            encryptedToken,
+            keyAttributes: originalKeyAttributes,
+            masterKey,
+            token,
+        });
+        await putSpaceSignupKeyAttributes(
+            originalKeyAttributes,
+            bootstrapAuthToken,
+        );
+        await unstashAfterUseSRPSetupAttributes((srpSetupAttributes) =>
+            setupSpaceSignupSRP(srpSetupAttributes, bootstrapAuthToken),
+        );
+        await getAndSaveSRPAttributes(email);
+    }
+
+    await createSpaceBrowserSession(masterKey, bootstrapAuthToken);
     saveIsFirstLogin();
 };
 

@@ -24,7 +24,6 @@ import {
     verifySRP,
 } from "ente-accounts-rs/services/srp";
 import {
-    decryptAndStoreTokenIfNeeded,
     type EmailOrSRPVerificationResponse,
     generateAndSaveInteractiveKeyAttributes,
     sendOTT,
@@ -35,8 +34,8 @@ import {
 import { clientPackageName } from "ente-base/app";
 import { HTTPError } from "ente-base/http";
 import log from "ente-base/log";
-import { saveAuthToken } from "ente-base/token";
 import { nullToUndefined } from "ente-utils/transform";
+import { decryptSpaceBootstrapAuthToken } from "services/spaceBootstrapAuth";
 import { createSpaceBrowserSession } from "services/spacePersistentSession";
 import {
     saveMasterKeyInSpaceSession,
@@ -283,13 +282,12 @@ const finishSpaceLoginVerification = async ({
 
     updateSavedLocalUser({
         id,
-        token,
-        encryptedToken,
+        token: undefined,
+        encryptedToken: undefined,
         isTwoFactorEnabled: undefined,
         twoFactorSessionID: undefined,
         passkeySessionID: undefined,
     });
-    if (token) await saveAuthToken(token);
     if (!keyAttributes) {
         throw new Error("This account has not finished setup.");
     }
@@ -301,7 +299,13 @@ const finishSpaceLoginVerification = async ({
         throw new Error("Login session expired. Please sign in again.");
     }
 
-    await saveCompletedSpaceLogin({ keyAttributes, kek: loginKEK, password });
+    await saveCompletedSpaceLogin({
+        authToken: token,
+        encryptedToken,
+        keyAttributes,
+        kek: loginKEK,
+        password,
+    });
     clearPendingSpaceLoginCredentials();
 
     return { status: "complete", email };
@@ -375,12 +379,13 @@ const finishSpaceLoginAuthorization = async ({
     updateSavedLocalUser({
         id,
         token: undefined,
-        encryptedToken,
+        encryptedToken: undefined,
         isTwoFactorEnabled: undefined,
         twoFactorSessionID: undefined,
         passkeySessionID: undefined,
     });
     await saveCompletedSpaceLogin({
+        encryptedToken,
         keyAttributes,
         kek,
         password: pendingCredentials?.password,
@@ -391,10 +396,14 @@ const finishSpaceLoginAuthorization = async ({
 };
 
 const saveCompletedSpaceLogin = async ({
+    authToken,
+    encryptedToken,
     keyAttributes,
     kek,
     password,
 }: {
+    authToken?: string;
+    encryptedToken?: string;
     keyAttributes: EmailOrSRPVerificationResponse["keyAttributes"];
     kek: string;
     password?: string;
@@ -421,7 +430,18 @@ const saveCompletedSpaceLogin = async ({
               masterKey,
           )
         : keyAttributes;
+    const bootstrapAuthToken =
+        authToken ??
+        (encryptedToken
+            ? await decryptSpaceBootstrapAuthToken(
+                  encryptedToken,
+                  tokenKeyAttributes,
+                  masterKey,
+              )
+            : undefined);
+    if (!bootstrapAuthToken) {
+        throw new Error("Login session expired. Please sign in again.");
+    }
+    await createSpaceBrowserSession(masterKey, bootstrapAuthToken);
     saveMasterKeyInSpaceSession(masterKey);
-    await decryptAndStoreTokenIfNeeded(tokenKeyAttributes, masterKey);
-    await createSpaceBrowserSession(masterKey);
 };

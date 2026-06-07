@@ -58,9 +58,7 @@ const textBase = "#000";
 const textSecondary = "#6B6B6B";
 const dangerColor = "#F63A3A";
 const headerActionSize = spaceTouchTargetSize;
-const headerAvatarSize = 25;
-const headerAvatarBorderGap = 1;
-const headerAvatarBorderColor = textBase;
+const headerAvatarSize = 30;
 const headerIconStrokeWidth = 1.8;
 const feedAvatarSize = 38;
 const headerHeight = 64;
@@ -1340,14 +1338,14 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
         sx={{
             boxSizing: "border-box",
             left: "50%",
-            maxWidth: 390,
-            px: 2,
+            px: feedHorizontalPadding,
             pointerEvents: "none",
             position: "fixed",
-            top: "calc(env(safe-area-inset-top) + 12px)",
+            top: "calc(env(safe-area-inset-top) + 10px)",
             transform: "translateX(-50%)",
             width: "100%",
             zIndex: 20,
+            "@media (min-width: 600px)": { maxWidth: 390 },
         }}
     >
         <Box
@@ -2016,7 +2014,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 alignItems: "center",
                                 bgcolor: feedSkeletonElementBackground,
                                 borderRadius: "50%",
-                                boxShadow: `0 0 0 ${headerAvatarBorderGap}px ${homeBackground}, 0 0 0 ${headerAvatarBorderGap + headerIconStrokeWidth}px ${headerAvatarBorderColor}`,
                                 display: "flex",
                                 height: headerAvatarSize,
                                 justifyContent: "center",

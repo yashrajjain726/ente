@@ -313,6 +313,23 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				WHERE ra.readable_created_at > COALESCE(nrm.read_at, 0)
 				GROUP BY ra.friend_space_id
 			),
+			message_like_unread_counts AS (
+				SELECT
+					ml.actor_space_id AS friend_space_id,
+					COUNT(*) AS unread_count
+				FROM space_message_likes ml
+				JOIN space_messages m ON m.message_id = ml.message_id
+				LEFT JOIN space_read_markers nrm
+				  ON nrm.viewer_space_id = $2
+				 AND nrm.scope = 'message_likes'
+				 AND nrm.friend_space_id = ''
+				WHERE m.sender_space_id = $2
+				  AND m.recipient_space_id = ml.actor_space_id
+				  AND ml.actor_space_id <> $2
+				  AND m.is_deleted = FALSE
+				  AND ml.created_at > COALESCE(nrm.read_at, 0)
+				GROUP BY ml.actor_space_id
+			),
 			latest_activities AS (
 				SELECT DISTINCT ON (friend_space_id)
 					friend_space_id,
@@ -335,6 +352,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 					la.post_id,
 					COALESCE(la.is_outgoing, FALSE) AS is_outgoing,
 					COALESCE(ruc.unread_count, 0) AS unread_count,
+					COALESCE(mluc.unread_count, 0) AS message_like_unread_count,
 					COALESCE(la.activity_created_at, current_friends.friendship_created_at, 0) AS sort_created_at,
 					COALESCE(la.activity_id, 'friend:' || cf.friend_space_id) AS sort_id
 				FROM conversation_friends cf
@@ -344,13 +362,15 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				  ON la.friend_space_id = cf.friend_space_id
 				LEFT JOIN readable_unread_counts ruc
 				  ON ruc.friend_space_id = cf.friend_space_id
+				LEFT JOIN message_like_unread_counts mluc
+				  ON mluc.friend_space_id = cf.friend_space_id
 		)
 		SELECT
 			c.activity_type,
 			c.activity_id,
 				c.activity_created_at,
 				c.is_outgoing,
-				(c.unread_count > 0) AS unread,
+				(c.unread_count > 0 OR c.message_like_unread_count > 0) AS unread,
 				c.unread_count AS unread_count,
 				c.sort_created_at,
 			c.sort_id,

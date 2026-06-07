@@ -192,16 +192,18 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         );
     }, []);
 
-    const refreshConversations = React.useCallback(() => {
+    const refreshConversations = React.useCallback(async () => {
         setIsConversationsLoading(true);
-        void loadCurrentMessageConversations()
-            .then((page) => {
-                setConversations(page.items);
-            })
-            .catch((error: unknown) =>
-                console.error("Failed to load message conversations", error),
-            )
-            .finally(() => setIsConversationsLoading(false));
+        try {
+            const page = await loadCurrentMessageConversations();
+            setConversations(page.items);
+            return true;
+        } catch (error: unknown) {
+            console.error("Failed to load message conversations", error);
+            return false;
+        } finally {
+            setIsConversationsLoading(false);
+        }
     }, []);
 
     const openConversation = React.useCallback(
@@ -276,10 +278,16 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 
     React.useEffect(() => {
         if (!profile) return;
-        refreshConversations();
-        void markCurrentMessageLikesRead().catch((error: unknown) =>
-            console.warn("Failed to mark message likes read", error),
-        );
+        let cancelled = false;
+        void refreshConversations().then((loaded) => {
+            if (cancelled || !loaded) return;
+            void markCurrentMessageLikesRead().catch((error: unknown) =>
+                console.warn("Failed to mark message likes read", error),
+            );
+        });
+        return () => {
+            cancelled = true;
+        };
     }, [profile, refreshConversations]);
 
     React.useEffect(() => {
@@ -472,7 +480,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                         );
                         throw error;
                     }
-                    refreshConversations();
+                    void refreshConversations();
                 }}
                 onReplyToMessage={async (spaceId, messageId, text) => {
                     const optimisticMessage = createLocalMessage({
@@ -500,7 +508,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                         );
                         throw error;
                     }
-                    refreshConversations();
+                    void refreshConversations();
                 }}
                 onSetMessageLiked={async (messageId, liked) => {
                     await setCurrentMessageLiked(messageId, liked);
@@ -518,7 +526,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                                 : message,
                         ),
                     );
-                    refreshConversations();
+                    void refreshConversations();
                 }}
                 onShareProfileLink={async () => {
                     if (!profile.spaceId) throw new Error("Missing space.");
@@ -532,7 +540,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                             (message) => message.id != messageId,
                         ),
                     );
-                    refreshConversations();
+                    void refreshConversations();
                 }}
                 profile={profile}
                 selectedFriend={selectedFriend}

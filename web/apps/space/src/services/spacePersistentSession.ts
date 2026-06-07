@@ -11,13 +11,10 @@ import {
     generateKey,
 } from "ente-accounts-rs/services/crypto";
 import { RemoteKeyAttributes } from "ente-accounts-rs/services/user";
-import {
-    authenticatedRequestHeaders,
-    ensureOk,
-    publicRequestHeaders,
-} from "ente-base/http";
+import { ensureOk, publicRequestHeaders } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
 import { removeAuthToken } from "ente-base/token";
+import { spaceBootstrapAuthHeaders } from "services/spaceBootstrapAuth";
 import {
     clearSpaceSecureSessionStorage,
     masterKeyFromSpaceSession,
@@ -72,12 +69,15 @@ const forgetBootstrapToken = async () => {
     await removeAuthToken();
 };
 
-export const createSpaceBrowserSession = async (masterKey: string) => {
+export const createSpaceBrowserSession = async (
+    masterKey: string,
+    authToken: string,
+) => {
     const clientKey = await generateKey();
     const res = await fetch(await apiURL("/space/sessions"), {
         method: "POST",
         headers: {
-            ...(await authenticatedRequestHeaders()),
+            ...spaceBootstrapAuthHeaders(authToken),
             "Content-Type": "application/json",
         },
         credentials: "include",
