@@ -1,31 +1,32 @@
 import type { NextRouter } from "next/router";
-import type { SetupProfile } from "screens/SetupProfileScreen";
+import type { SpaceAppState } from "state/spaceAppState";
 import { acceptPendingSpaceInvite } from "utils/spacePendingInvite";
 import { spaceRoutes } from "utils/spaceRoutes";
 
-type RefreshProfile = () => Promise<SetupProfile | null>;
+type RefreshProfile = SpaceAppState["refreshProfile"];
 
 export const routeAfterCompletedLogin = async (
     router: NextRouter,
     refreshProfile: RefreshProfile,
     mode: "push" | "replace" = "push",
 ) => {
-    const profile = await refreshProfile();
+    const routeTo = (route: string) =>
+        mode == "replace" ? router.replace(route) : router.push(route);
+    let profile: Awaited<ReturnType<RefreshProfile>>;
+    try {
+        profile = await refreshProfile({ throwOnError: true });
+    } catch {
+        await routeTo(spaceRoutes.onboarding);
+        return;
+    }
+
     if (profile) {
         await acceptPendingSpaceInvite().catch((error: unknown) =>
             console.error("Failed to accept pending invite", error),
         );
-        if (mode == "replace") {
-            await router.replace(spaceRoutes.home);
-            return;
-        }
-        await router.push(spaceRoutes.home);
+        await routeTo(spaceRoutes.home);
         return;
     }
 
-    if (mode == "replace") {
-        await router.replace(spaceRoutes.setupProfile("login"));
-        return;
-    }
-    await router.push(spaceRoutes.setupProfile("login"));
+    await routeTo(spaceRoutes.setupProfile("login"));
 };

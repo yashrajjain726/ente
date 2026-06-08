@@ -58,7 +58,7 @@ const textBase = "#000";
 const textSecondary = "#6B6B6B";
 const dangerColor = "#F63A3A";
 const headerActionSize = spaceTouchTargetSize;
-const headerAvatarSize = 30;
+const headerAvatarSize = 29;
 const headerIconStrokeWidth = 1.8;
 const feedAvatarSize = 38;
 const headerHeight = 64;
@@ -2264,7 +2264,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             <Box
                                 component="img"
                                 alt=""
-                                src="/images/share-memories.svg"
+                                src="/images/ducky-space.svg"
                                 sx={{
                                     display: "block",
                                     height: "auto",
