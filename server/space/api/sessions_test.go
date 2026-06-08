@@ -1,8 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -41,61 +43,29 @@ func setupSpaceSessionAPITest(t *testing.T) (*Handlers, *spacerepo.Module, int64
 	return NewHandlers(controller.NewModule(repos, &baserepo.UserAuthRepository{DB: db})), repos, userID
 }
 
-func TestSpaceBrowserSessionCookieAttributes(t *testing.T) {
-	gin.SetMode(gin.TestMode)
+func TestCreateSpaceBrowserSessionReturnsToken(t *testing.T) {
+	handlers, repos, userID := setupSpaceSessionAPITest(t)
+	router := gin.New()
+	router.POST("/space/sessions", handlers.CreateBrowserSession)
+	req := httptest.NewRequest(http.MethodPost, "/space/sessions", bytes.NewBufferString(`{"clientKey":"client-key"}`))
+	req.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
+	recorder := httptest.NewRecorder()
 
-	for _, tt := range []struct {
-		name     string
-		origin   string
-		expected []string
-		absent   []string
-	}{
-		{
-			name:   "production",
-			origin: "https://ente.space",
-			expected: []string{
-				"ente_space_session=session-token",
-				"Path=/space",
-				"Max-Age=31536000",
-				"HttpOnly",
-				"Secure",
-				"SameSite=None",
-			},
-			absent: []string{"Domain="},
-		},
-		{
-			name:   "local dev",
-			origin: "http://localhost:3012",
-			expected: []string{
-				"ente_space_session=session-token",
-				"Path=/space",
-				"Max-Age=31536000",
-				"HttpOnly",
-				"SameSite=Lax",
-			},
-			absent: []string{"Domain=", "Secure"},
-		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			recorder := httptest.NewRecorder()
-			ctx, _ := gin.CreateTestContext(recorder)
-			ctx.Request = httptest.NewRequest(http.MethodPost, "/space/sessions", nil)
-			ctx.Request.Header.Set("Origin", tt.origin)
+	router.ServeHTTP(recorder, req)
 
-			setSpaceBrowserSessionCookie(ctx, "session-token", spaceBrowserSessionCookieMaxAgeSeconds)
-
-			header := recorder.Header().Get("Set-Cookie")
-			for _, expected := range tt.expected {
-				require.Contains(t, header, expected)
-			}
-			for _, absent := range tt.absent {
-				require.NotContains(t, header, absent)
-			}
-		})
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var resp struct {
+		SessionToken string `json:"sessionToken"`
 	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &resp))
+	require.NotEmpty(t, resp.SessionToken)
+	tokenHash := sha256.Sum256([]byte(resp.SessionToken))
+	session, err := repos.Sessions.GetBrowserSession(context.Background(), tokenHash[:])
+	require.NoError(t, err)
+	require.Equal(t, userID, session.UserID)
 }
 
-func TestRequireSpaceBrowserSessionAcceptsValidCookie(t *testing.T) {
+func TestRequireSpaceBrowserSessionAcceptsValidHeader(t *testing.T) {
 	handlers, repos, userID := setupSpaceSessionAPITest(t)
 	token := "valid-space-session-token"
 	tokenHash := sha256.Sum256([]byte(token))
@@ -107,7 +77,7 @@ func TestRequireSpaceBrowserSessionAcceptsValidCookie(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodGet, "/space", nil)
 	req.Header.Set("Origin", "https://ente.space")
-	req.AddCookie(&http.Cookie{Name: controller.SpaceBrowserSessionCookieName, Value: token})
+	req.Header.Set(controller.SpaceBrowserSessionTokenHeader, token)
 	recorder := httptest.NewRecorder()
 
 	router.ServeHTTP(recorder, req)
@@ -116,7 +86,7 @@ func TestRequireSpaceBrowserSessionAcceptsValidCookie(t *testing.T) {
 	require.JSONEq(t, `{"userID":"`+strconv.FormatInt(userID, 10)+`"}`, recorder.Body.String())
 }
 
-func TestRequireSpaceBrowserSessionClearsInvalidCookie(t *testing.T) {
+func TestRequireSpaceBrowserSessionRejectsInvalidHeader(t *testing.T) {
 	handlers, _, _ := setupSpaceSessionAPITest(t)
 	router := gin.New()
 	router.GET("/space", handlers.RequireSpaceBrowserSession(), func(c *gin.Context) {
@@ -124,36 +94,45 @@ func TestRequireSpaceBrowserSessionClearsInvalidCookie(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodGet, "/space", nil)
 	req.Header.Set("Origin", "https://ente.space")
-	req.AddCookie(&http.Cookie{Name: controller.SpaceBrowserSessionCookieName, Value: "invalid-session-token"})
+	req.Header.Set(controller.SpaceBrowserSessionTokenHeader, "invalid-session-token")
 	recorder := httptest.NewRecorder()
 
 	router.ServeHTTP(recorder, req)
 
 	require.Equal(t, http.StatusUnauthorized, recorder.Code)
-	setCookie := recorder.Header().Get("Set-Cookie")
-	require.Contains(t, setCookie, "ente_space_session=")
-	require.Contains(t, setCookie, "Path=/space")
-	require.Contains(t, setCookie, "Max-Age=0")
-	require.Contains(t, setCookie, "HttpOnly")
-	require.Contains(t, setCookie, "Secure")
-	require.Contains(t, setCookie, "SameSite=None")
 }
 
-func TestBootstrapBrowserSessionClearsInvalidCookie(t *testing.T) {
-	handlers, _, _ := setupSpaceSessionAPITest(t)
+func TestBootstrapBrowserSessionAcceptsHeader(t *testing.T) {
+	handlers, repos, userID := setupSpaceSessionAPITest(t)
+	token := "valid-space-session-token"
+	tokenHash := sha256.Sum256([]byte(token))
+	require.NoError(t, repos.Sessions.CreateBrowserSession(context.Background(), tokenHash[:], userID, "client-key", timeutil.NDaysFromNow(1)))
 	router := gin.New()
 	router.POST("/space/sessions/bootstrap", handlers.BootstrapBrowserSession)
 	req := httptest.NewRequest(http.MethodPost, "/space/sessions/bootstrap", nil)
-	req.Header.Set("Origin", "https://ente.space")
-	req.AddCookie(&http.Cookie{Name: controller.SpaceBrowserSessionCookieName, Value: "invalid-session-token"})
+	req.Header.Set(controller.SpaceBrowserSessionTokenHeader, token)
 	recorder := httptest.NewRecorder()
 
 	router.ServeHTTP(recorder, req)
 
-	require.Equal(t, http.StatusUnauthorized, recorder.Code)
-	setCookie := recorder.Header().Get("Set-Cookie")
-	require.Contains(t, setCookie, "ente_space_session=")
-	require.Contains(t, setCookie, "Path=/space")
-	require.Contains(t, setCookie, "Max-Age=0")
-	require.Contains(t, setCookie, "SameSite=None")
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.JSONEq(t, `{"id":`+strconv.FormatInt(userID, 10)+`,"clientKey":"client-key","keyAttributes":{"kekSalt":"salt","encryptedKey":"encrypted-key","keyDecryptionNonce":"nonce","publicKey":"public-key","encryptedSecretKey":"encrypted-secret-key","secretKeyDecryptionNonce":"secret-nonce","memLimit":0,"opsLimit":0}}`, recorder.Body.String())
+}
+
+func TestDeleteBrowserSessionRevokesHeaderSession(t *testing.T) {
+	handlers, repos, userID := setupSpaceSessionAPITest(t)
+	token := "valid-space-session-token"
+	tokenHash := sha256.Sum256([]byte(token))
+	require.NoError(t, repos.Sessions.CreateBrowserSession(context.Background(), tokenHash[:], userID, "client-key", timeutil.NDaysFromNow(1)))
+	router := gin.New()
+	router.DELETE("/space/sessions/current", handlers.DeleteBrowserSession)
+	req := httptest.NewRequest(http.MethodDelete, "/space/sessions/current", nil)
+	req.Header.Set(controller.SpaceBrowserSessionTokenHeader, token)
+	recorder := httptest.NewRecorder()
+
+	router.ServeHTTP(recorder, req)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	_, err := repos.Sessions.GetBrowserSession(context.Background(), tokenHash[:])
+	require.Error(t, err)
 }

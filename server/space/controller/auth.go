@@ -73,7 +73,7 @@ func (a authDeps) resolveViewer(c *gin.Context) (*viewerAuth, error) {
 		}
 		return &viewerAuth{Link: session}, nil
 	}
-	if sessionToken, err := c.Cookie(SpaceBrowserSessionCookieName); err == nil {
+	if sessionToken := strings.TrimSpace(c.GetHeader(SpaceBrowserSessionTokenHeader)); sessionToken != "" {
 		session, err := validateBrowserSession(c, a.SessionsRepo, sessionToken)
 		if err != nil {
 			return nil, err

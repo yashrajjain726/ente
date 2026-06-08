@@ -16,15 +16,13 @@ import (
 )
 
 const spaceBrowserSessionDurationDays = 365
-const SpaceBrowserSessionCookieName = "ente_space_session"
-const SpaceBrowserSessionCookiePath = "/space"
+const SpaceBrowserSessionTokenHeader = "X-Space-Session-Token"
 
 type SessionsController struct {
 	SessionsRepo *repo.SessionsRepository
 }
 
 type CreatedBrowserSession struct {
-	Token    string
 	Response models.SpaceBrowserSessionResponse
 }
 
@@ -43,8 +41,7 @@ func (c *SessionsController) CreateBrowserSession(ctx *gin.Context, userID int64
 		return nil, err
 	}
 	return &CreatedBrowserSession{
-		Token:    sessionToken,
-		Response: models.SpaceBrowserSessionResponse{ClientKey: clientKey},
+		Response: models.SpaceBrowserSessionResponse{SessionToken: sessionToken},
 	}, nil
 }
 

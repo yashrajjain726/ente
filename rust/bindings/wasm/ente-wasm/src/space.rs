@@ -79,8 +79,7 @@ impl From<swb::Error> for WasmSpaceError {
 #[serde(rename_all = "camelCase")]
 struct OpenAccountSpaceCtxJsInput {
     base_url: String,
-    auth_token: Option<String>,
-    include_credentials: Option<bool>,
+    space_session_token: Option<String>,
     master_key_b64: String,
     public_key_b64: String,
     private_key_b64: Option<String>,
@@ -607,8 +606,7 @@ pub async fn space_open_account_ctx(
     };
     let ctx = AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
         base_url: input.base_url.clone(),
-        auth_token: input.auth_token,
-        include_credentials: input.include_credentials.unwrap_or(false),
+        space_session_token: input.space_session_token,
         master_key,
         public_key,
         private_key_source,

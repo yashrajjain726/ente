@@ -23,16 +23,18 @@ import {
 import { z } from "zod";
 
 const spaceBrowserSessionStorageKey = "spaceBrowserSession";
+const spaceSessionTokenHeader = "X-Space-Session-Token";
 
 const PersistedSpaceBrowserSession = z.object({
     encryptedMasterKey: z.string(),
     email: z.string(),
     nonce: z.string(),
+    sessionToken: z.string(),
     userId: z.number(),
-    version: z.literal(2),
+    version: z.literal(3),
 });
 
-const SpaceBrowserSessionResponse = z.object({ clientKey: z.string() });
+const SpaceBrowserSessionResponse = z.object({ sessionToken: z.string() });
 
 const SpaceBrowserSessionBootstrapResponse = z.object({
     id: z.number(),
@@ -61,6 +63,9 @@ export const clearSpaceBrowserSession = () => {
     clearSpaceSecureSessionStorage();
 };
 
+export const savedSpaceSessionToken = () =>
+    savedPersistedSession()?.sessionToken;
+
 const forgetBootstrapToken = async () => {
     const user = savedPartialLocalUser();
     if (user?.id && user.email) {
@@ -80,11 +85,12 @@ export const createSpaceBrowserSession = async (
             ...spaceBootstrapAuthHeaders(authToken),
             "Content-Type": "application/json",
         },
-        credentials: "include",
         body: JSON.stringify({ clientKey }),
     });
     ensureOk(res);
-    SpaceBrowserSessionResponse.parse(await res.json());
+    const { sessionToken } = SpaceBrowserSessionResponse.parse(
+        await res.json(),
+    );
 
     const user = savedPartialLocalUser();
     if (!user?.id || !user.email) {
@@ -97,8 +103,9 @@ export const createSpaceBrowserSession = async (
             encryptedMasterKey: box.encryptedData,
             email: user.email,
             nonce: box.nonce,
+            sessionToken,
             userId: user.id,
-            version: 2,
+            version: 3,
         }),
     );
     await forgetBootstrapToken();
@@ -110,7 +117,8 @@ export const restoreSpaceBrowserSessionIfNeeded = async () => {
     if (
         masterKeyFromSpaceSession() &&
         savedPartialLocalUser()?.id &&
-        savedKeyAttributes()
+        savedKeyAttributes() &&
+        savedSpaceSessionToken()
     ) {
         return true;
     }
@@ -126,8 +134,10 @@ const restoreSpaceBrowserSession = async () => {
 
     const res = await fetch(await apiURL("/space/sessions/bootstrap"), {
         method: "POST",
-        headers: publicRequestHeaders(),
-        credentials: "include",
+        headers: {
+            ...publicRequestHeaders(),
+            [spaceSessionTokenHeader]: persisted.sessionToken,
+        },
     });
     if (res.status == 401) {
         clearSpaceBrowserSession();
@@ -154,11 +164,15 @@ const restoreSpaceBrowserSession = async () => {
 };
 
 export const revokeSpaceBrowserSession = async () => {
+    const sessionToken = savedSpaceSessionToken();
     try {
+        if (!sessionToken) return;
         const res = await fetch(await apiURL("/space/sessions/current"), {
             method: "DELETE",
-            headers: publicRequestHeaders(),
-            credentials: "include",
+            headers: {
+                ...publicRequestHeaders(),
+                [spaceSessionTokenHeader]: sessionToken,
+            },
         });
         if (res.status != 401) ensureOk(res);
     } catch {

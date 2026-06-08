@@ -35,9 +35,9 @@ async fn space_bootstrap_posts_friend_share_and_link_suite() {
     )
     .await;
 
-    let owner_ctx = space::open_ctx(&endpoint, &owner);
-    let friend_ctx = space::open_ctx(&endpoint, &friend);
-    let outsider_ctx = space::open_ctx(&endpoint, &outsider);
+    let owner_ctx = space::open_ctx(&endpoint, &owner).await;
+    let friend_ctx = space::open_ctx(&endpoint, &friend).await;
+    let outsider_ctx = space::open_ctx(&endpoint, &outsider).await;
 
     let owner_slug = format!("owner-{}", owner.user_id);
     let friend_slug = format!("friend-{}", friend.user_id);
@@ -312,8 +312,8 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite() {
     )
     .await;
 
-    let owner_ctx = space::open_ctx(&endpoint, &owner);
-    let friend_ctx = space::open_ctx(&endpoint, &friend);
+    let owner_ctx = space::open_ctx(&endpoint, &owner).await;
+    let friend_ctx = space::open_ctx(&endpoint, &friend).await;
 
     let owner_slug = format!("unfriend-owner-{}", owner.user_id);
     let friend_slug = format!("unfriend-friend-{}", friend.user_id);
@@ -549,8 +549,8 @@ async fn space_rotation_history_refresh_and_link_suite() {
     )
     .await;
 
-    let owner_ctx = space::open_ctx(&endpoint, &owner);
-    let friend_ctx = space::open_ctx(&endpoint, &friend);
+    let owner_ctx = space::open_ctx(&endpoint, &owner).await;
+    let friend_ctx = space::open_ctx(&endpoint, &friend).await;
 
     let owner_slug = format!("rotation-owner-{}", owner.user_id);
     let friend_slug = format!("rotation-friend-{}", friend.user_id);

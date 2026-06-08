@@ -10,7 +10,10 @@ import type {
     SetupProfile,
     SetupProfileInput,
 } from "screens/SetupProfileScreen";
-import { restoreSpaceBrowserSessionIfNeeded } from "services/spacePersistentSession";
+import {
+    restoreSpaceBrowserSessionIfNeeded,
+    savedSpaceSessionToken,
+} from "services/spacePersistentSession";
 import { masterKeyFromSpaceSession } from "services/spaceSecureSessionStorage";
 
 const usernamePattern = /^[a-z0-9][a-z0-9._-]*$/;
@@ -120,8 +123,9 @@ const currentSpaceContextConfig = async () => {
     ]);
     const user = savedPartialLocalUser();
     const keyAttributes = savedKeyAttributes();
+    const spaceSessionToken = savedSpaceSessionToken();
 
-    if (!masterKeyB64 || !user?.id || !keyAttributes) {
+    if (!masterKeyB64 || !user?.id || !keyAttributes || !spaceSessionToken) {
         return undefined;
     }
 
@@ -131,10 +135,10 @@ const currentSpaceContextConfig = async () => {
             baseUrl,
             clientPackage: clientPackageName,
             clientVersion: isDesktop ? desktopAppVersion : undefined,
-            includeCredentials: true,
             keyAttributes,
             masterKeyB64,
             publicKeyB64: keyAttributes.publicKey,
+            spaceSessionToken,
             userId: user.id,
         },
     };

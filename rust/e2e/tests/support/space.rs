@@ -1,14 +1,38 @@
 use ente_core::http::Error as HttpError;
 use ente_rs::models::account::App;
 use ente_space::{AccountSpaceCtx, OpenAccountSpaceCtxInput, PrivateKeySource, SpaceError};
+use serde::Deserialize;
 
 use crate::support::auth::TestAccount;
 
-pub fn open_ctx(endpoint: &str, account: &TestAccount) -> AccountSpaceCtx {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SpaceBrowserSessionResponse {
+    session_token: String,
+}
+
+pub async fn open_ctx(endpoint: &str, account: &TestAccount) -> AccountSpaceCtx {
+    let session = reqwest::Client::new()
+        .post(format!("{endpoint}/space/sessions"))
+        .header("X-Auth-Token", &account.auth_token)
+        .header("X-Client-Package", App::Photos.client_package())
+        .json(&serde_json::json!({ "clientKey": "space-e2e-client-key" }))
+        .send()
+        .await
+        .expect("space session create request failed");
+    assert!(
+        session.status().is_success(),
+        "space session create failed with HTTP {}",
+        session.status()
+    );
+    let session = session
+        .json::<SpaceBrowserSessionResponse>()
+        .await
+        .expect("space session create response parse failed");
+
     AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
         base_url: endpoint.to_string(),
-        auth_token: Some(account.auth_token.clone()),
-        include_credentials: false,
+        space_session_token: Some(session.session_token),
         master_key: account.master_key.clone(),
         public_key: account.public_key.clone(),
         private_key_source: PrivateKeySource::Plain(account.secret_key.clone()),

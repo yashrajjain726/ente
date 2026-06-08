@@ -69,6 +69,24 @@ func TestResolveViewerAcceptsValidatedUserToken(t *testing.T) {
 	require.Equal(t, space.SpaceID, resp.SpaceID)
 }
 
+func TestResolveViewerAcceptsSpaceBrowserSessionHeader(t *testing.T) {
+	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
+	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
+	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key", "alice-profile")
+	require.NoError(t, err)
+	sessionHash := sha256.Sum256([]byte("space-session-token"))
+	require.NoError(t, repos.Sessions.CreateBrowserSession(ctx, sessionHash[:], aliceID, "client-key", timeutil.MicrosecondsAfterMinutes(5)))
+	ginCtx := newPublicSpaceContext()
+	ginCtx.Request.Header.Set(SpaceBrowserSessionTokenHeader, "space-session-token")
+	ginCtx.Request.Header.Set("X-Auth-User-ID", "999999")
+
+	resp, err := module.Spaces.GetProfile(ginCtx, models.GetSpaceProfileRequest{SpaceID: space.SpaceID})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, space.SpaceID, resp.SpaceID)
+}
+
 func TestResolveViewerAcceptsSpaceLinkSessionToken(t *testing.T) {
 	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")

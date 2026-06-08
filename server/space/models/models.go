@@ -12,7 +12,7 @@ type SpaceBrowserSessionRequest struct {
 }
 
 type SpaceBrowserSessionResponse struct {
-	ClientKey string `json:"clientKey"`
+	SessionToken string `json:"sessionToken"`
 }
 
 type SpaceBrowserSessionBootstrapResponse struct {

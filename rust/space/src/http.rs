@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
 const TOKEN_HEADER: &str = "X-Auth-Token";
+const SPACE_SESSION_TOKEN_HEADER: &str = "X-Space-Session-Token";
 const CLIENT_PKG_HEADER: &str = "X-Client-Package";
 const CLIENT_VERSION_HEADER: &str = "X-Client-Version";
 
@@ -19,7 +20,7 @@ const CLIENT_VERSION_HEADER: &str = "X-Client-Version";
 pub struct HttpConfig {
     pub base_url: String,
     pub auth_token: Option<String>,
-    pub include_credentials: bool,
+    pub space_session_token: Option<String>,
     pub user_agent: Option<String>,
     pub client_package: Option<String>,
     pub client_version: Option<String>,
@@ -31,8 +32,7 @@ pub struct HttpClient {
     no_redirect_client: reqwest::Client,
     base_url: String,
     auth_token: RwLock<Option<Zeroizing<String>>>,
-    #[cfg(target_arch = "wasm32")]
-    include_credentials: bool,
+    space_session_token: Option<Zeroizing<String>>,
     #[cfg(not(target_arch = "wasm32"))]
     user_agent: Option<String>,
     client_package: Option<String>,
@@ -79,8 +79,7 @@ impl HttpClient {
             no_redirect_client,
             base_url,
             auth_token: RwLock::new(config.auth_token.map(Zeroizing::new)),
-            #[cfg(target_arch = "wasm32")]
-            include_credentials: config.include_credentials,
+            space_session_token: config.space_session_token.map(Zeroizing::new),
             #[cfg(not(target_arch = "wasm32"))]
             user_agent: config.user_agent,
             client_package: config.client_package,
@@ -111,8 +110,7 @@ impl HttpClient {
             .get(&url)
             .headers(self.build_headers()?)
             .query(query);
-        let response = self
-            .with_credentials(request)
+        let response = request
             .send()
             .await
             .map_err(Error::from)
@@ -134,8 +132,7 @@ impl HttpClient {
             .get(&url)
             .headers(self.build_headers()?)
             .query(query);
-        let response = self
-            .with_credentials(request)
+        let response = request
             .send()
             .await
             .map_err(Error::from)
@@ -161,8 +158,7 @@ impl HttpClient {
             .post(&url)
             .headers(self.build_headers()?)
             .json(body);
-        let response = self
-            .with_credentials(request)
+        let response = request
             .send()
             .await
             .map_err(Error::from)
@@ -184,8 +180,7 @@ impl HttpClient {
             .post(&url)
             .headers(self.build_headers()?)
             .json(body);
-        let response = self
-            .with_credentials(request)
+        let response = request
             .send()
             .await
             .map_err(Error::from)
@@ -207,8 +202,7 @@ impl HttpClient {
             .put(&url)
             .headers(self.build_headers()?)
             .json(body);
-        let response = self
-            .with_credentials(request)
+        let response = request
             .send()
             .await
             .map_err(Error::from)
@@ -230,8 +224,7 @@ impl HttpClient {
             .put(&url)
             .headers(self.build_headers()?)
             .json(body);
-        let response = self
-            .with_credentials(request)
+        let response = request
             .send()
             .await
             .map_err(Error::from)
@@ -249,8 +242,7 @@ impl HttpClient {
             .delete(&url)
             .headers(self.build_headers()?)
             .query(query);
-        let response = self
-            .with_credentials(request)
+        let response = request
             .send()
             .await
             .map_err(Error::from)
@@ -272,8 +264,7 @@ impl HttpClient {
             .delete(&url)
             .headers(self.build_headers()?)
             .query(query);
-        let response = self
-            .with_credentials(request)
+        let response = request
             .send()
             .await
             .map_err(Error::from)
@@ -317,6 +308,11 @@ impl HttpClient {
                 HeaderValue::from_str(auth_token).map_err(|e| Error::Parse(e.to_string()))?;
             headers.insert(TOKEN_HEADER, token);
         }
+        if let Some(space_session_token) = self.space_session_token.as_ref() {
+            let token = HeaderValue::from_str(space_session_token)
+                .map_err(|e| Error::Parse(e.to_string()))?;
+            headers.insert(SPACE_SESSION_TOKEN_HEADER, token);
+        }
         Ok(headers)
     }
 
@@ -339,14 +335,6 @@ impl HttpClient {
             headers.insert(CLIENT_VERSION_HEADER, value);
         }
         Ok(headers)
-    }
-
-    fn with_credentials(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        #[cfg(target_arch = "wasm32")]
-        if self.include_credentials {
-            return request.fetch_credentials_include();
-        }
-        request
     }
 }
 

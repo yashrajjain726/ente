@@ -94,8 +94,8 @@ impl AccountSpaceCtx {
     pub fn open(input: OpenAccountSpaceCtxInput) -> Result<Self> {
         let client = build_http_client(
             &input.base_url,
-            input.auth_token,
-            input.include_credentials,
+            None,
+            input.space_session_token,
             input.user_agent,
             input.client_package,
             input.client_version,
@@ -1722,7 +1722,7 @@ impl SpaceLinkCtx {
         let client = build_http_client(
             &input.base_url,
             None,
-            false,
+            None,
             input.user_agent,
             input.client_package,
             input.client_version,
@@ -1995,7 +1995,7 @@ impl SpaceLinkCtx {
 fn build_http_client(
     base_url: &str,
     auth_token: Option<String>,
-    include_credentials: bool,
+    space_session_token: Option<String>,
     user_agent: Option<String>,
     client_package: Option<String>,
     client_version: Option<String>,
@@ -2003,7 +2003,7 @@ fn build_http_client(
     HttpClient::new_with_config(HttpConfig {
         base_url: base_url.to_owned(),
         auth_token,
-        include_credentials,
+        space_session_token,
         user_agent,
         client_package,
         client_version,
@@ -2092,8 +2092,7 @@ mod tests {
         let (public_key, private_key) = keys::generate_keypair().expect("valid keypair");
         AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
             base_url: base_url.to_owned(),
-            auth_token: Some("token".to_owned()),
-            include_credentials: false,
+            space_session_token: Some("space-session-token".to_owned()),
             master_key: generate_key(),
             public_key,
             private_key_source: PrivateKeySource::Plain(private_key),
@@ -2103,6 +2102,31 @@ mod tests {
             client_version: None,
         })
         .expect("account space ctx should open")
+    }
+
+    #[tokio::test]
+    async fn account_http_client_sends_space_session_token_header() {
+        let mut server = Server::new_async().await;
+        let request = server
+            .mock("GET", "/space")
+            .match_header("x-space-session-token", "space-session-token")
+            .with_status(200)
+            .with_body("{}")
+            .create_async()
+            .await;
+        let client = build_http_client(
+            &server.url(),
+            None,
+            Some("space-session-token".to_owned()),
+            None,
+            None,
+            None,
+        )
+        .expect("http client");
+
+        let _: serde_json::Value = client.get_json("/space", &[]).await.unwrap();
+
+        request.assert_async().await;
     }
 
     fn root_entity_response(master_key: &[u8], root_space_key: &[u8]) -> String {
@@ -2141,7 +2165,7 @@ mod tests {
         let expected_root = generate_key();
         let ensure = server
             .mock("POST", "/space/entity-key/ensure")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(root_entity_response(&ctx.master_key, &expected_root))
             .create_async()
@@ -2356,7 +2380,7 @@ mod tests {
             client: build_http_client(
                 &server.url(),
                 Some("link-token".to_owned()),
-                false,
+                None,
                 None,
                 None,
                 None,
@@ -2441,7 +2465,7 @@ mod tests {
             client: build_http_client(
                 &server.url(),
                 Some("link-token".to_owned()),
-                false,
+                None,
                 None,
                 None,
                 None,
@@ -2481,7 +2505,7 @@ mod tests {
 
         let entity = server
             .mock("GET", "/space/entity-key")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
                 ROOT_SPACE_KEY_TYPE.into(),
@@ -2493,7 +2517,7 @@ mod tests {
             .await;
         let spaces = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
                 &root_space_key,
@@ -2507,7 +2531,7 @@ mod tests {
             .await;
         let shares = server
             .mock("GET", "/space/friends/shares")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
                 json!([{
@@ -2554,7 +2578,7 @@ mod tests {
 
         let presign = server
             .mock("POST", "/space/uploads/presign")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"size\"".into()),
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
@@ -2599,7 +2623,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let presign = server
             .mock("POST", "/space/uploads/presign")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()))
             .with_status(200)
             .with_body(
@@ -2734,7 +2758,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let presign = server
             .mock("POST", "/space/uploads/presign")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"purpose\":\"avatar\"".into()),
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
@@ -2792,7 +2816,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let presign = server
             .mock("POST", "/space/uploads/presign")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"purpose\":\"cover\"".into()),
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
@@ -2839,7 +2863,7 @@ mod tests {
         let root_space_key = generate_key();
         let ensure_root = server
             .mock("POST", "/space/entity-key/ensure")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"type\":\"space\"".into()),
                 Matcher::Regex("\"encryptedKey\":\"[^\"]+\"".into()),
@@ -2851,7 +2875,7 @@ mod tests {
             .await;
         let create_space = server
             .mock("POST", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"spaceSlug\":\"owner-main\"".into()),
                 Matcher::Regex("\"encryptedSpaceKey\":\"[^\"]+\"".into()),
@@ -2895,7 +2919,7 @@ mod tests {
         let root_space_key = generate_key();
         let list_spaces = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body("[]")
             .expect(1)
@@ -2903,14 +2927,14 @@ mod tests {
             .await;
         let ensure_root = server
             .mock("POST", "/space/entity-key/ensure")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(root_entity_response(&ctx.master_key, &root_space_key))
             .create_async()
             .await;
         let create_space = server
             .mock("POST", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
                 json!({
@@ -2926,7 +2950,7 @@ mod tests {
             .await;
         let update_profile = server
             .mock("POST", "/space/profile")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
                 Matcher::Regex("\"encryptedProfile\":\"[^\"]+\"".into()),
@@ -2974,7 +2998,7 @@ mod tests {
         let space_key = generate_key();
         let list_spaces = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
                 &root_space_key,
@@ -3013,7 +3037,7 @@ mod tests {
         let space_key = generate_key();
         let entity = server
             .mock("GET", "/space/entity-key")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
                 ROOT_SPACE_KEY_TYPE.into(),
@@ -3024,7 +3048,7 @@ mod tests {
             .await;
         let spaces = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
                 json!([{
@@ -3040,7 +3064,7 @@ mod tests {
             .await;
         let create = server
             .mock("POST", "/space/posts")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::Regex("\"keyVersion\":3".into()))
             .with_status(200)
             .with_body(json!({"postId": 42}).to_string())
@@ -3099,7 +3123,7 @@ mod tests {
         let space_key = generate_key();
         let entity = server
             .mock("GET", "/space/entity-key")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
                 ROOT_SPACE_KEY_TYPE.into(),
@@ -3110,7 +3134,7 @@ mod tests {
             .await;
         let spaces = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
                 &root_space_key,
@@ -3123,7 +3147,7 @@ mod tests {
             .await;
         let update = server
             .mock("POST", "/space/profile")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
                 Matcher::Regex("\"keyVersion\":3".into()),
@@ -3204,7 +3228,7 @@ mod tests {
         );
         let profile = server
             .mock("GET", "/space/profile")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "spaceId".into(),
                 "space_owner_main".into(),
@@ -3225,7 +3249,7 @@ mod tests {
             .await;
         let entity = server
             .mock("GET", "/space/entity-key")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
                 ROOT_SPACE_KEY_TYPE.into(),
@@ -3236,7 +3260,7 @@ mod tests {
             .await;
         let spaces = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
                 &root_space_key,
@@ -3276,7 +3300,7 @@ mod tests {
 
         let entity = server
             .mock("GET", "/space/entity-key")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
                 ROOT_SPACE_KEY_TYPE.into(),
@@ -3294,7 +3318,7 @@ mod tests {
             .await;
         let spaces = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
                 json!([{
@@ -3310,7 +3334,7 @@ mod tests {
             .await;
         let add = server
             .mock("POST", "/space/friends/add")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"targetSpaceId\":\"space_owner_main\"".into()),
                 Matcher::Regex("\"linkSessionToken\":\"link-session-token\"".into()),
@@ -3328,7 +3352,7 @@ mod tests {
             client: build_http_client(
                 &server.url(),
                 Some("link-session-token".to_owned()),
-                false,
+                None,
                 None,
                 None,
                 None,
@@ -3361,13 +3385,13 @@ mod tests {
 
         let delete_post = server
             .mock("DELETE", "/space/posts/42")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .create_async()
             .await;
         let unfriend_space = server
             .mock("POST", "/space/friends/unfriend")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::JsonString(
                 json!({"targetSpaceId": "space_owner_main"}).to_string(),
             ))
@@ -3376,7 +3400,7 @@ mod tests {
             .await;
         let unfriend_username = server
             .mock("POST", "/space/friends/unfriend")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::JsonString(
                 json!({"targetUsername": "owner"}).to_string(),
             ))
@@ -3405,7 +3429,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let update = server
             .mock("POST", "/space/posts/42/caption")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::Regex("\"captionCipher\":\"[^\"]+\"".into()))
             .with_status(200)
             .create_async()
@@ -3424,7 +3448,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let like = server
             .mock("POST", "/space/posts/42/like")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::JsonString(json!({"like": true}).to_string()))
             .with_status(200)
             .with_body(json!({"liked": true}).to_string())
@@ -3446,7 +3470,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let status = server
             .mock("GET", "/space/unread")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
                 json!({
@@ -3460,7 +3484,7 @@ mod tests {
             .await;
         let notifications_read = server
             .mock("POST", "/space/notifications/read")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::JsonString(
                 json!({"readAt": "2026-04-16T00:00:00Z"}).to_string(),
             ))
@@ -3477,7 +3501,7 @@ mod tests {
             .await;
         let message_likes_read = server
             .mock("POST", "/space/messages/likes/read")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
                 json!({
@@ -3491,7 +3515,7 @@ mod tests {
             .await;
         let thread_read = server
             .mock("POST", "/space/messages/read")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::JsonString(
                 json!({"friendSpaceId": "space_friend"}).to_string(),
             ))
@@ -3549,7 +3573,7 @@ mod tests {
 
         let entity = server
             .mock("GET", "/space/entity-key")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
                 ROOT_SPACE_KEY_TYPE.into(),
@@ -3560,7 +3584,7 @@ mod tests {
             .await;
         let spaces = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
                 &root_space_key,
@@ -3573,7 +3597,7 @@ mod tests {
             .await;
         let friends = server
             .mock("GET", "/space/friends")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "spaceId".into(),
                 "space_owner_main".into(),
@@ -3597,7 +3621,7 @@ mod tests {
             .await;
         let reply = server
             .mock("POST", "/space/messages/space_friend")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"replyMessageId\":\"wmsg_parent\"".into()),
                 Matcher::Regex("\"messageCipher\":\"[^\"]+\"".into()),
@@ -3638,7 +3662,7 @@ mod tests {
             .await;
         let like = server
             .mock("POST", "/space/message/wmsg_reply/like")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::JsonString(json!({"like": true}).to_string()))
             .with_status(200)
             .with_body(json!({"liked": true}).to_string())
@@ -3646,7 +3670,7 @@ mod tests {
             .await;
         let delete = server
             .mock("DELETE", "/space/message/wmsg_reply")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .create_async()
             .await;
@@ -3721,7 +3745,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let likers = server
             .mock("GET", "/space/posts/42/likes")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::AllOf(vec![
                 Matcher::UrlEncoded("cursor".into(), "3000:7".into()),
                 Matcher::UrlEncoded("limit".into(), "5".into()),
@@ -3760,7 +3784,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let notifications = server
             .mock("GET", "/space/notifications")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::AllOf(vec![
                 Matcher::UrlEncoded("cursor".into(), "3000:post_like:1".into()),
                 Matcher::UrlEncoded("limit".into(), "10".into()),
@@ -3812,7 +3836,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let friends = server
             .mock("GET", "/space/friends")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "spaceId".into(),
                 "space_owner_main".into(),
@@ -3853,7 +3877,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let relationship = server
             .mock("GET", "/space/friends/relationship")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "targetSpaceId".into(),
                 "space_friend".into(),
@@ -3879,7 +3903,7 @@ mod tests {
             client: build_http_client(
                 &server.url(),
                 Some("link-session-token".to_owned()),
-                false,
+                None,
                 None,
                 None,
                 None,
@@ -3922,7 +3946,7 @@ mod tests {
 
         let entity = server
             .mock("GET", "/space/entity-key")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
                 ROOT_SPACE_KEY_TYPE.into(),
@@ -3940,7 +3964,7 @@ mod tests {
             .await;
         let spaces = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
                 json!([{
@@ -3956,7 +3980,7 @@ mod tests {
             .await;
         let friends = server
             .mock("GET", "/space/friends")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "spaceId".into(),
                 "space_owner_main".into(),
@@ -3980,7 +4004,7 @@ mod tests {
             .await;
         let refresh = server
             .mock("POST", "/space/friends/shares/refresh")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"friendId\":7".into()),
                 Matcher::Regex("\"friendSpaceId\":\"space_viewer\"".into()),
@@ -4021,7 +4045,7 @@ mod tests {
 
         let entity = server
             .mock("GET", "/space/entity-key")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
                 ROOT_SPACE_KEY_TYPE.into(),
@@ -4033,7 +4057,7 @@ mod tests {
             .await;
         let spaces = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
                 &root_space_key,
@@ -4047,7 +4071,7 @@ mod tests {
             .await;
         let status = server
             .mock("GET", "/space/links/space_owner_main")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
                 json!({
@@ -4066,7 +4090,7 @@ mod tests {
             .await;
         let create = server
             .mock("POST", "/space/links")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
                 Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
@@ -4091,7 +4115,7 @@ mod tests {
             .await;
         let rotate = server
             .mock("POST", "/space/links/rotate")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
                 Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
@@ -4116,7 +4140,7 @@ mod tests {
             .await;
         let delete = server
             .mock("DELETE", "/space/links/space_owner_main")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .create_async()
             .await;
@@ -4168,7 +4192,7 @@ mod tests {
 
         let entity = server
             .mock("GET", "/space/entity-key")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
                 ROOT_SPACE_KEY_TYPE.into(),
@@ -4179,7 +4203,7 @@ mod tests {
             .await;
         let spaces = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
                 &root_space_key,
@@ -4192,7 +4216,7 @@ mod tests {
             .await;
         let create = server
             .mock("POST", "/space/links")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
                 Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
@@ -4236,7 +4260,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let feed = server
             .mock("GET", "/space/feed")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::AllOf(vec![
                 Matcher::UrlEncoded("cursor".into(), "cursor-1".into()),
                 Matcher::UrlEncoded("limit".into(), "5".into()),
@@ -4286,7 +4310,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let posts = server
             .mock("GET", "/space/posts")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::AllOf(vec![
                 Matcher::UrlEncoded("spaceId".into(), "space_owner_gallery".into()),
                 Matcher::UrlEncoded("cursor".into(), "42".into()),
@@ -4344,7 +4368,7 @@ mod tests {
 
         let entity = server
             .mock("GET", "/space/entity-key")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
                 ROOT_SPACE_KEY_TYPE.into(),
@@ -4362,7 +4386,7 @@ mod tests {
             .await;
         let spaces = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
                 json!([{
@@ -4378,7 +4402,7 @@ mod tests {
             .await;
         let post = server
             .mock("GET", "/space/posts/42")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
                 json!({
@@ -4432,7 +4456,7 @@ mod tests {
 
         let entity = server
             .mock("GET", "/space/entity-key")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
                 ROOT_SPACE_KEY_TYPE.into(),
@@ -4450,7 +4474,7 @@ mod tests {
             .await;
         let owned = server
             .mock("GET", "/space")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
                 json!([{
@@ -4466,7 +4490,7 @@ mod tests {
             .await;
         let shares = server
             .mock("GET", "/space/friends/shares")
-            .match_header("x-auth-token", "token")
+            .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
                 json!([{
