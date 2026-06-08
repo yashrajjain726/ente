@@ -122,6 +122,11 @@ export interface SpaceViewerPhoto {
     width?: number;
 }
 
+interface SpaceViewerDeleteSnapshot {
+    photoIndex: number;
+    photos: SpaceViewerPhoto[];
+}
+
 interface SpaceFileViewerProps {
     draftPostPreparationError?: string;
     isDraftPostPreparing?: boolean;
@@ -297,9 +302,24 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         showLikeCountButton: showPhotoLikeCountButton,
     } = spaceViewerPostActionConfigs[activePostActionMode];
     const canDeletePost = !isDraftPost && Boolean(onDeletePost);
-    const viewerPhotos = photos && photos.length > 0 ? photos : [photo];
+    const [deleteActionPhase, setDeleteActionPhase] =
+        React.useState<SpaceActionPhase | null>(null);
+    const [isDeleteExit, setIsDeleteExit] = React.useState(false);
+    const deleteSnapshotRef = React.useRef<SpaceViewerDeleteSnapshot | null>(
+        null,
+    );
+    const isDeleteViewerLocked = Boolean(deleteActionPhase) || isDeleteExit;
+    const incomingViewerPhotos = photos && photos.length > 0 ? photos : [photo];
+    const viewerPhotos = isDeleteViewerLocked
+        ? (deleteSnapshotRef.current?.photos ?? incomingViewerPhotos)
+        : incomingViewerPhotos;
     const activePhotoIndex = Math.min(
-        Math.max(photoIndex, 0),
+        Math.max(
+            isDeleteViewerLocked
+                ? (deleteSnapshotRef.current?.photoIndex ?? photoIndex)
+                : photoIndex,
+            0,
+        ),
         viewerPhotos.length - 1,
     );
     const activePhoto = viewerPhotos[activePhotoIndex] ?? photo;
@@ -353,9 +373,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const [addFriendSheetOpen, setAddFriendSheetOpen] = React.useState(false);
     const [addFriendPostAction, setAddFriendPostAction] =
         React.useState<AddFriendPostAction>("like");
-    const [deleteActionPhase, setDeleteActionPhase] =
-        React.useState<SpaceActionPhase | null>(null);
-    const [isDeleteExit, setIsDeleteExit] = React.useState(false);
     const [postLikersOpen, setPostLikersOpen] = React.useState(false);
     const [postLikersLoading, setPostLikersLoading] = React.useState(false);
     const [postLikersError, setPostLikersError] = React.useState<string | null>(
@@ -504,6 +521,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             isDeleteExit
         )
             return;
+        deleteSnapshotRef.current = {
+            photoIndex: activePhotoIndex,
+            photos: viewerPhotos.map((item) => ({ ...item })),
+        };
         setDeleteActionPhase("busy");
         void (async () => {
             try {
@@ -511,6 +532,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 setDeleteActionPhase("done");
             } catch (error) {
                 console.error("Failed to delete space post", error);
+                deleteSnapshotRef.current = null;
                 setDeleteActionPhase(null);
             }
         })();
