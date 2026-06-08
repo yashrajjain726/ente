@@ -1,4 +1,4 @@
-import { ArrowLeft02Icon } from "@hugeicons/core-free-icons";
+import { ArrowLeft02Icon, FavouriteIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
@@ -108,9 +108,10 @@ const NotificationText: React.FC<{ group: NotificationGroup }> = ({
     }
 };
 
-const AvatarStack: React.FC<{ actors: SpaceNotification["actor"][] }> = ({
-    actors,
-}) => {
+const AvatarStack: React.FC<{
+    actors: SpaceNotification["actor"][];
+    showPostLikeBadge?: boolean;
+}> = ({ actors, showPostLikeBadge = false }) => {
     const isPair = actors.length == 2;
     const displayedActors = isPair
         ? [actors[1]!, actors[0]!]
@@ -166,6 +167,33 @@ const AvatarStack: React.FC<{ actors: SpaceNotification["actor"][] }> = ({
                     </Box>
                 );
             })}
+            {showPostLikeBadge && (
+                <Box
+                    aria-hidden
+                    className="green-bg"
+                    sx={{
+                        alignItems: "center",
+                        border: `2px solid ${notificationsBackground}`,
+                        borderRadius: "50%",
+                        bottom: -1,
+                        display: "flex",
+                        height: 18,
+                        justifyContent: "center",
+                        position: "absolute",
+                        right: -1,
+                        width: 18,
+                        zIndex: 10,
+                    }}
+                >
+                    <HugeiconsIcon
+                        fill="#FFFFFF"
+                        icon={FavouriteIcon}
+                        primaryColor="#FFFFFF"
+                        size={9}
+                        strokeWidth={2.4}
+                    />
+                </Box>
+            )}
         </Box>
     );
 };
@@ -322,7 +350,10 @@ const NotificationRow: React.FC<{
                     },
                 }}
             >
-                <AvatarStack actors={avatarActors} />
+                <AvatarStack
+                    actors={avatarActors}
+                    showPostLikeBadge={group.type == "post_like"}
+                />
                 <Box sx={{ minWidth: 0 }}>
                     <Box
                         component="p"

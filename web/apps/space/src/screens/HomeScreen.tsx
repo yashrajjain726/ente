@@ -197,6 +197,7 @@ interface FeedItemProps {
 
 interface FeedSkeletonItemProps {
     aspectRatio: string;
+    isOwnPost?: boolean;
     pb?: string;
     rootRef?: React.Ref<HTMLElement>;
     showFooter?: boolean;
@@ -364,6 +365,7 @@ const useHideHeaderOnScrollDirection = () => {
 
 const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({
     aspectRatio,
+    isOwnPost = false,
     pb = "8px",
     rootRef,
     showFooter = true,
@@ -467,7 +469,7 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({
                     minHeight: feedLikeActionSize,
                     mt: "8px",
                     pl: "9px",
-                    pr: 0,
+                    pr: isOwnPost ? "3px" : 0,
                     width: "100%",
                 }}
             >
@@ -482,34 +484,49 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({
                         width: "60%",
                     }}
                 />
-                <Box
-                    sx={{
-                        alignItems: "center",
-                        display: "flex",
-                        gap: "6px",
-                        justifyContent: "flex-end",
-                    }}
-                >
+                {isOwnPost ? (
                     <Skeleton
-                        variant="circular"
+                        variant="rectangular"
                         sx={{
                             bgcolor: feedActionBackground,
-                            height: feedLikeActionSize,
+                            borderRadius: "999px",
+                            height: 14,
+                            justifySelf: "flex-end",
+                            mr: "4px",
                             transform: "none",
-                            width: feedLikeActionSize,
+                            width: 34,
                         }}
                     />
-                    <Skeleton
-                        variant="circular"
+                ) : (
+                    <Box
                         sx={{
-                            bgcolor: feedActionBackground,
-                            height: feedLikeActionSize,
-                            mr: "9px",
-                            transform: "none",
-                            width: feedLikeActionSize,
+                            alignItems: "center",
+                            display: "flex",
+                            gap: "6px",
+                            justifyContent: "flex-end",
                         }}
-                    />
-                </Box>
+                    >
+                        <Skeleton
+                            variant="circular"
+                            sx={{
+                                bgcolor: feedActionBackground,
+                                height: feedLikeActionSize,
+                                transform: "none",
+                                width: feedLikeActionSize,
+                            }}
+                        />
+                        <Skeleton
+                            variant="circular"
+                            sx={{
+                                bgcolor: feedActionBackground,
+                                height: feedLikeActionSize,
+                                mr: "9px",
+                                transform: "none",
+                                width: feedLikeActionSize,
+                            }}
+                        />
+                    </Box>
+                )}
             </Box>
         )}
     </Box>
@@ -816,6 +833,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
         return (
             <FeedSkeletonItem
                 aspectRatio={`${feedPhotoFrameDimensions.width} / ${feedPhotoFrameDimensions.height}`}
+                isOwnPost={isOwnPost}
                 pb={isOwnPost ? "5px" : "8px"}
                 rootRef={rootRef}
                 showFooter={showFooter}
@@ -981,9 +999,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         <Box
                             aria-hidden
                             sx={{
-                                border: "1px solid rgba(255, 255, 255, 0.5)",
+                                border: "2px solid rgba(255, 255, 255, 0.35)",
                                 borderRadius: "50%",
-                                inset: -1,
+                                inset: -2,
                                 pointerEvents: "none",
                                 position: "absolute",
                             }}
