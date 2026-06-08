@@ -189,8 +189,8 @@ const SpacePostLikerSkeletonRows: React.FC<{
                     alignItems: "center",
                     display: "grid",
                     gap: "8px",
-                    gridTemplateColumns: "32px minmax(0, 1fr) 24px",
-                    minHeight: 42,
+                    gridTemplateColumns: "28px minmax(0, 1fr) 24px",
+                    minHeight: 38,
                     py: "4px",
                 }}
             >
@@ -198,8 +198,8 @@ const SpacePostLikerSkeletonRows: React.FC<{
                     sx={{
                         bgcolor: skeletonFill,
                         borderRadius: "50%",
-                        height: 32,
-                        width: 32,
+                        height: 28,
+                        width: 28,
                     }}
                 />
                 <Box
@@ -241,8 +241,8 @@ const SpacePostLikerRow: React.FC<{
                 alignItems: "center",
                 display: "grid",
                 gap: "8px",
-                gridTemplateColumns: "32px minmax(0, 1fr) 24px",
-                minHeight: 42,
+                gridTemplateColumns: "28px minmax(0, 1fr) 24px",
+                minHeight: 38,
                 py: "4px",
             }}
         >
@@ -250,9 +250,9 @@ const SpacePostLikerRow: React.FC<{
                 sx={{
                     bgcolor: avatarFill,
                     borderRadius: "50%",
-                    height: 32,
+                    height: 28,
                     overflow: "hidden",
-                    width: 32,
+                    width: 28,
                 }}
             >
                 {profile.avatarUrl ? (
@@ -274,7 +274,7 @@ const SpacePostLikerRow: React.FC<{
                 sx={{
                     color: textColor,
                     fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: 650,
                     lineHeight: "20px",
                     minWidth: 0,

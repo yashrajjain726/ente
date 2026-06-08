@@ -30,7 +30,7 @@ interface NotificationsScreenProps {
 }
 
 interface NotificationSection {
-    items: SpaceNotification[];
+    items: NotificationGroup[];
     title: string;
 }
 
@@ -40,6 +40,7 @@ interface NotificationGroup {
     id: string;
     post?: SpaceNotification["post"];
     type: SpaceNotification["type"];
+    unread: boolean;
 }
 
 const fullName = (actor: SpaceNotification["actor"]) =>
@@ -169,7 +170,40 @@ const AvatarStack: React.FC<{ actors: SpaceNotification["actor"][] }> = ({
     );
 };
 
-const timeSections = (notifications: SpaceNotification[]) => {
+const groupNotifications = (notifications: SpaceNotification[]) => {
+    const groups = new Map<string, NotificationGroup>();
+    for (const notification of notifications) {
+        const key =
+            notification.type == "post_like" && notification.post
+                ? `post_like:${notification.post.postId}`
+                : notification.id;
+        const existing = groups.get(key);
+        if (existing) {
+            if (notification.createdAtMs > existing.createdAtMs) {
+                existing.actors.unshift(notification.actor);
+            } else {
+                existing.actors.push(notification.actor);
+            }
+            existing.createdAtMs = Math.max(
+                existing.createdAtMs,
+                notification.createdAtMs,
+            );
+            existing.unread ||= notification.unread;
+            continue;
+        }
+        groups.set(key, {
+            actors: [notification.actor],
+            createdAtMs: notification.createdAtMs,
+            id: key,
+            post: notification.post,
+            type: notification.type,
+            unread: notification.unread,
+        });
+    }
+    return [...groups.values()].sort((a, b) => b.createdAtMs - a.createdAtMs);
+};
+
+const timeSections = (groups: NotificationGroup[]) => {
     const now = Date.now();
     const today = new Date(now);
     const startOfTodayMs = new Date(
@@ -191,63 +225,32 @@ const timeSections = (notifications: SpaceNotification[]) => {
         { title: "Older", items: [] },
     ];
 
-    for (const notification of notifications) {
-        if (notification.unread) {
-            sections[0]!.items.push(notification);
+    for (const group of groups) {
+        if (group.unread) {
+            sections[0]!.items.push(group);
             continue;
         }
-        if (notification.createdAtMs >= startOfTodayMs) {
-            sections[1]!.items.push(notification);
+        if (group.createdAtMs >= startOfTodayMs) {
+            sections[1]!.items.push(group);
             continue;
         }
-        if (notification.createdAtMs >= startOfYesterdayMs) {
-            sections[2]!.items.push(notification);
+        if (group.createdAtMs >= startOfYesterdayMs) {
+            sections[2]!.items.push(group);
             continue;
         }
 
-        const ageMs = Math.max(0, now - notification.createdAtMs);
+        const ageMs = Math.max(0, now - group.createdAtMs);
         if (ageMs <= 7 * dayMs) {
-            sections[3]!.items.push(notification);
+            sections[3]!.items.push(group);
             continue;
         }
         if (ageMs <= 30 * dayMs) {
-            sections[4]!.items.push(notification);
+            sections[4]!.items.push(group);
             continue;
         }
-        sections[5]!.items.push(notification);
+        sections[5]!.items.push(group);
     }
     return sections;
-};
-
-const groupSectionNotifications = (items: SpaceNotification[]) => {
-    const groups = new Map<string, NotificationGroup>();
-    for (const item of items) {
-        const key =
-            item.type == "post_like"
-                ? `post_like:${item.post?.postId ?? item.id}`
-                : item.id;
-        const existing = groups.get(key);
-        if (existing) {
-            if (item.createdAtMs > existing.createdAtMs) {
-                existing.actors.unshift(item.actor);
-            } else {
-                existing.actors.push(item.actor);
-            }
-            existing.createdAtMs = Math.max(
-                existing.createdAtMs,
-                item.createdAtMs,
-            );
-            continue;
-        }
-        groups.set(key, {
-            actors: [item.actor],
-            createdAtMs: item.createdAtMs,
-            id: key,
-            post: item.post,
-            type: item.type,
-        });
-    }
-    return [...groups.values()].sort((a, b) => b.createdAtMs - a.createdAtMs);
 };
 
 const NotificationRow: React.FC<{
@@ -373,8 +376,7 @@ const NotificationSection: React.FC<{
     onOpenPost?: (spaceId: string, postId: number) => void;
     section: NotificationSection;
 }> = ({ onOpenFriendMessages, onOpenPost, section }) => {
-    const groups = groupSectionNotifications(section.items);
-    if (groups.length == 0) return null;
+    if (section.items.length == 0) return null;
 
     return (
         <Box component="section" sx={{ mb: "10px" }}>
@@ -394,7 +396,7 @@ const NotificationSection: React.FC<{
                 {section.title}
             </Box>
             <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
-                {groups.map((group) => (
+                {section.items.map((group) => (
                     <NotificationRow
                         key={group.id}
                         group={group}
@@ -421,10 +423,11 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
     const [inviteShareError, setInviteShareError] = React.useState<
         string | null
     >(null);
-    const sections = React.useMemo(
-        () => timeSections(notifications),
+    const groups = React.useMemo(
+        () => groupNotifications(notifications),
         [notifications],
     );
+    const sections = React.useMemo(() => timeSections(groups), [groups]);
     const showInviteEmptyState =
         friendsCount == 0 && Boolean(onShareProfileLink);
     const emptyStateCopy =
