@@ -1270,6 +1270,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         : "";
     const showInviteEmptyState =
         friendsCount == 0 && Boolean(onShareProfileLink);
+    const emptyConversationsCopy =
+        friendsCount == 0
+            ? "No messages yet. Once you add friends, you'll see your their messages and replies to your posts here."
+            : "No messages yet. You'll see your friends' messages and replies to your posts here.";
     const conversationSections = React.useMemo(
         () => conversationTimeSections(conversations),
         [conversations],
@@ -2226,9 +2230,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         maxWidth: 260,
                                     }}
                                 >
-                                    No messages yet. Once you add friends,
-                                    you&apos;ll see their messages and replies
-                                    to your posts here.
+                                    {emptyConversationsCopy}
                                 </Box>
                                 {showInviteEmptyState && (
                                     <Box

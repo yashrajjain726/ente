@@ -20,6 +20,7 @@ const dayMs = 24 * 60 * 60 * 1000;
 const microsForTimestamp = (timestampMs: number) => timestampMs * 1000;
 
 interface NotificationsScreenProps {
+    friendsCount?: number;
     isLoading?: boolean;
     notifications: SpaceNotification[];
     onBack?: () => void;
@@ -407,6 +408,7 @@ const NotificationSection: React.FC<{
 };
 
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
+    friendsCount,
     isLoading = false,
     notifications,
     onBack,
@@ -423,7 +425,12 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
         () => timeSections(notifications),
         [notifications],
     );
-    const showInviteEmptyState = Boolean(onShareProfileLink);
+    const showInviteEmptyState =
+        friendsCount == 0 && Boolean(onShareProfileLink);
+    const emptyStateCopy =
+        friendsCount == 0
+            ? "No notifications yet. Once you add friends, you'll see likes on posts and friend updates here."
+            : "No notifications yet. You'll see likes on posts and friend updates here.";
 
     const openInviteDialog = () => {
         setInviteShareError(null);
@@ -584,9 +591,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                                     maxWidth: 292,
                                 }}
                             >
-                                No notifications yet. Once you add friends,
-                                you&apos;ll see post likes and friend updates
-                                here.
+                                {emptyStateCopy}
                             </Box>
                             {showInviteEmptyState && (
                                 <Box

@@ -8,6 +8,7 @@ import {
 import {
     createCurrentProfileLink,
     loadCurrentNotifications,
+    loadCurrentSpaceFriends,
     markCurrentNotificationsRead,
     type SpaceNotification,
 } from "services/space";
@@ -17,10 +18,17 @@ import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 export const SpaceNotificationsPage: React.FC = () => {
     const router = useSpaceRouter();
-    const { profile, profileLoadError, profileLoadStatus } = useSpaceAppState();
+    const {
+        friends,
+        profile,
+        profileLoadError,
+        profileLoadStatus,
+        setFriends,
+    } = useSpaceAppState();
     const [notifications, setNotifications] = React.useState<
         SpaceNotification[]
     >([]);
+    const [isFriendsLoading, setIsFriendsLoading] = React.useState(true);
     const [isLoading, setIsLoading] = React.useState(true);
 
     React.useEffect(() => {
@@ -64,6 +72,30 @@ export const SpaceNotificationsPage: React.FC = () => {
         };
     }, [profile]);
 
+    React.useEffect(() => {
+        if (!profile?.spaceId) {
+            setIsFriendsLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        setIsFriendsLoading(true);
+        void loadCurrentSpaceFriends(profile.spaceId)
+            .then((nextFriends) => {
+                if (!cancelled) setFriends(nextFriends);
+            })
+            .catch((error: unknown) =>
+                console.error("Failed to load space friends", error),
+            )
+            .finally(() => {
+                if (!cancelled) setIsFriendsLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [profile?.spaceId, setFriends]);
+
     if (profileLoadStatus != "ready" || !profile) {
         return (
             <SpaceRouteFallback
@@ -80,7 +112,8 @@ export const SpaceNotificationsPage: React.FC = () => {
                 title="Notifications | Ente Space"
             />
             <NotificationsScreen
-                isLoading={isLoading}
+                friendsCount={friends.length}
+                isLoading={isLoading || isFriendsLoading}
                 notifications={notifications}
                 onBack={() => void router.push(spaceRoutes.home)}
                 onOpenFriendMessages={(spaceId) =>
