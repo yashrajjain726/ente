@@ -7,7 +7,8 @@ use crate::support::auth::TestAccount;
 pub fn open_ctx(endpoint: &str, account: &TestAccount) -> AccountSpaceCtx {
     AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
         base_url: endpoint.to_string(),
-        auth_token: account.auth_token.clone(),
+        auth_token: Some(account.auth_token.clone()),
+        include_credentials: false,
         master_key: account.master_key.clone(),
         public_key: account.public_key.clone(),
         private_key_source: PrivateKeySource::Plain(account.secret_key.clone()),

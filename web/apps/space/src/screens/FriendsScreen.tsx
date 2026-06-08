@@ -1,6 +1,7 @@
 import {
     ArrowLeft02Icon,
     MoreVerticalIcon,
+    UserAdd02Icon,
     UserRemove01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -10,8 +11,11 @@ import {
     spaceActionDoneDurationMs,
     type SpaceActionPhase,
 } from "components/SpaceActionFeedback";
+import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
 import type { FriendProfile } from "data/friends";
 import React, { useState } from "react";
+import { ShareIcon } from "screens/ShareProfileLinkScreen";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 
 export const friendsBackground = "#FFFFFF";
 
@@ -36,6 +40,7 @@ interface FriendsScreenProps {
     onLoadFriendAvatar?: (friend: FriendProfile) => Promise<string | null>;
     onBack?: () => void;
     onOpenFriend?: (friendID: string) => void;
+    onShareProfileLink?: () => Promise<string>;
     onUnfriend?: (friendID: string) => Promise<void> | void;
 }
 
@@ -115,7 +120,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
             sx={{
                 alignItems: "center",
                 display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) 32px",
+                gridTemplateColumns: `minmax(0, 1fr) ${spaceTouchTargetSize}px`,
                 gap: "12px",
                 listStyle: "none",
                 minHeight: 72,
@@ -242,20 +247,18 @@ const FriendRow: React.FC<FriendRowProps> = ({
                     alignItems: "center",
                     bgcolor: "transparent",
                     border: 0,
-                    borderRadius: "50%",
                     color: textBase,
                     cursor: "pointer",
                     display: "flex",
-                    height: 32,
-                    justifyContent: "center",
+                    height: spaceTouchTargetSize,
+                    justifyContent: "flex-end",
                     justifySelf: "flex-end",
                     p: 0,
-                    width: 32,
+                    width: spaceTouchTargetSize,
                     "&:focus-visible": {
                         outline: `2px solid ${green}`,
                         outlineOffset: 2,
                     },
-                    "&:hover": { bgcolor: "rgba(0, 0, 0, 0.035)" },
                 }}
             >
                 <HugeiconsIcon
@@ -292,7 +295,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
                         borderRadius: "10px",
                         color: dangerColor,
                         gap: "8px",
-                        minHeight: 38,
+                        minHeight: spaceTouchTargetSize,
                         px: "9px",
                         py: "7px",
                         whiteSpace: "nowrap",
@@ -329,6 +332,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     onLoadFriendAvatar,
     onBack,
     onOpenFriend,
+    onShareProfileLink,
     onUnfriend,
 }) => {
     const [friendToUnfriend, setFriendToUnfriend] =
@@ -341,6 +345,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     const [loadedAvatarURLsByKey, setLoadedAvatarURLsByKey] = React.useState<
         Record<string, string>
     >({});
+    const [isInviteDialogOpen, setIsInviteDialogOpen] = React.useState(false);
+    const [isInviteSharing, setIsInviteSharing] = React.useState(false);
+    const [inviteShareError, setInviteShareError] = React.useState<
+        string | null
+    >(null);
     const avatarLoadsInFlightRef = React.useRef<
         Map<string, Promise<string | null | undefined>>
     >(new Map());
@@ -426,6 +435,48 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         setUnfriendErrorMessage(null);
     };
 
+    const openInviteDialog = () => {
+        setInviteShareError(null);
+        setIsInviteDialogOpen(true);
+    };
+
+    const closeInviteDialog = () => {
+        if (isInviteSharing) return;
+        setIsInviteDialogOpen(false);
+    };
+
+    const shareInviteLink = async () => {
+        if (!onShareProfileLink || isInviteSharing) return;
+        setIsInviteSharing(true);
+        setInviteShareError(null);
+
+        try {
+            const profileLink = await onShareProfileLink();
+
+            if (typeof navigator.share == "function") {
+                try {
+                    await navigator.share({ url: profileLink });
+                    setIsInviteDialogOpen(false);
+                    return;
+                } catch (error) {
+                    if (
+                        error instanceof DOMException &&
+                        error.name == "AbortError"
+                    )
+                        return;
+                }
+            }
+
+            await navigator.clipboard.writeText(profileLink);
+            setIsInviteDialogOpen(false);
+        } catch (error) {
+            console.error("Failed to share space invite", error);
+            setInviteShareError("Couldn't share invite. Please try again.");
+        } finally {
+            setIsInviteSharing(false);
+        }
+    };
+
     return (
         <Box
             component="main"
@@ -455,7 +506,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     sx={{
                         alignItems: "center",
                         display: "grid",
-                        gridTemplateColumns: "24px 1fr 24px",
+                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
                         height: 56,
                         px: 2,
                         width: "100%",
@@ -473,11 +524,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             color: textBase,
                             cursor: onBack ? "pointer" : "default",
                             display: "flex",
-                            height: 24,
+                            height: spaceTouchTargetSize,
                             justifyContent: "flex-start",
                             ml: "-2px",
                             p: 0,
-                            width: 24,
+                            width: spaceTouchTargetSize,
                             "&:focus-visible": {
                                 borderRadius: "50%",
                                 outline: `2px solid ${green}`,
@@ -504,6 +555,37 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                         }}
                     >
                         Friends
+                    </Box>
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label="Invite friends"
+                        disabled={!onShareProfileLink}
+                        onClick={openInviteDialog}
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: "transparent",
+                            border: 0,
+                            color: textBase,
+                            cursor: onShareProfileLink ? "pointer" : "default",
+                            display: "flex",
+                            height: spaceTouchTargetSize,
+                            justifyContent: "flex-end",
+                            justifySelf: "flex-end",
+                            p: 0,
+                            width: spaceTouchTargetSize,
+                            "&:disabled": { opacity: 0.45 },
+                            "&:focus-visible": {
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={UserAdd02Icon}
+                            size={22}
+                            strokeWidth={1.8}
+                        />
                     </Box>
                 </Box>
 
@@ -540,6 +622,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             alignItems: "center",
                             color: textSoft,
                             display: "flex",
+                            flexDirection: "column",
                             inset: 0,
                             justifyContent: "center",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -553,6 +636,46 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                         }}
                     >
                         No friends yet
+                        <Box
+                            component="button"
+                            type="button"
+                            disabled={!onShareProfileLink}
+                            onClick={openInviteDialog}
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "#F2F2F2",
+                                border: 0,
+                                borderRadius: "18px",
+                                color: textBase,
+                                cursor: onShareProfileLink
+                                    ? "pointer"
+                                    : "default",
+                                display: "inline-flex",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 13,
+                                fontWeight: 600,
+                                gap: "6px",
+                                height: spaceTouchTargetSize,
+                                justifyContent: "center",
+                                lineHeight: "18px",
+                                mt: "22px",
+                                pointerEvents: "auto",
+                                px: "14px",
+                                whiteSpace: "nowrap",
+                                "&:disabled": { opacity: 0.45 },
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                                "&:hover": onShareProfileLink
+                                    ? { bgcolor: "#E8E8E8" }
+                                    : undefined,
+                            }}
+                        >
+                            <ShareIcon />
+                            Invite friends
+                        </Box>
                     </Box>
                 )}
             </Box>
@@ -567,6 +690,13 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 onCancel={cancelUnfriend}
                 onConfirm={confirmUnfriend}
                 onExited={handleUnfriendSheetExited}
+            />
+            <SpaceInviteFriendsDialog
+                errorMessage={inviteShareError}
+                open={isInviteDialogOpen}
+                sharing={isInviteSharing}
+                onClose={closeInviteDialog}
+                onShare={() => void shareInviteLink()}
             />
         </Box>
     );

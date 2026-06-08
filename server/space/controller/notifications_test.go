@@ -62,6 +62,12 @@ func requireNoSpaceEmail(t *testing.T, notifier *recordingSpaceEmailNotifier) {
 	}
 }
 
+func TestSpaceEmailSubjectPrefixesUsernameWithAt(t *testing.T) {
+	require.Equal(t, "@alice liked your post", spaceEmailSubject("alice", "liked your post"))
+	require.Equal(t, "@alice posted a new photo", spaceEmailSubject(" alice ", "posted a new photo"))
+	require.Equal(t, "A friend liked your post", spaceEmailSubject(" ", "liked your post"))
+}
+
 func TestPostLikeSendsEmailOnce(t *testing.T) {
 	_, repos, ctx := setupPostsControllerTest(t)
 	notifier := newRecordingSpaceEmailNotifier()

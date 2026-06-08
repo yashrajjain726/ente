@@ -2,7 +2,6 @@ import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import { savedPartialLocalUser } from "ente-accounts-rs/services/accounts-db";
 import { isHTTPErrorWithStatus } from "ente-base/http";
-import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 import {
     VerifyTwoFactorScreen,
@@ -12,6 +11,7 @@ import { completeSpaceLoginSecondFactor } from "services/spaceLogin";
 import { useSpaceAppState } from "state/spaceAppState";
 import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const twoFactorErrorMessage = (error: unknown) => {
     if (isHTTPErrorWithStatus(error, 401)) {
@@ -26,7 +26,7 @@ const twoFactorErrorMessage = (error: unknown) => {
 };
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const { refreshProfile } = useSpaceAppState();
     const [twoFactorSessionID, setTwoFactorSessionID] = useState("");
     const [errorMessage, setErrorMessage] = useState<string>();

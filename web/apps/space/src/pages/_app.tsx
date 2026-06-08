@@ -2,6 +2,7 @@ import "@fontsource-variable/inter";
 import "@fontsource/nunito/800.css";
 import { CssBaseline } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
+import { SpaceRouteTransitionBoundary } from "components/SpaceRouteTransitionBoundary";
 import { CustomHead } from "ente-base/components/Head";
 import { useSetupLogs } from "ente-base/components/utils/hooks-app";
 import { shareTheme } from "ente-base/components/utils/theme";
@@ -21,7 +22,10 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
             defaultMode="light"
             storageManager={null}
         >
-            <CustomHead title="Ente Space">
+            <CustomHead
+                title="Ente Space"
+                viewportContent="width=device-width, initial-scale=1, maximum-scale=1"
+            >
                 <meta name="application-name" content="Ente Space" />
                 <meta name="mobile-web-app-capable" content="yes" />
                 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -37,9 +41,11 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
                 />
             </CustomHead>
             <CssBaseline enableColorScheme />
-            <SpaceAppStateProvider>
-                <Component {...pageProps} />
-            </SpaceAppStateProvider>
+            <SpaceRouteTransitionBoundary>
+                <SpaceAppStateProvider>
+                    <Component {...pageProps} />
+                </SpaceAppStateProvider>
+            </SpaceRouteTransitionBoundary>
         </ThemeProvider>
     );
 };

@@ -1,6 +1,5 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useEffect, useMemo, useState } from "react";
 import { friendsBackground } from "screens/FriendsScreen";
 import { ProfileScreen } from "screens/ProfileScreen";
@@ -16,6 +15,7 @@ import {
 import { useSpaceAppState } from "state/spaceAppState";
 import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
 import { friendSpaceIdFromQuery, spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const friendSpaceIdFromPath = () => {
     if (typeof window == "undefined") return "";
@@ -30,7 +30,7 @@ const friendSpaceIdFromPath = () => {
 };
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         friends,
         profile,
@@ -51,18 +51,23 @@ const Page: React.FC = () => {
     const [loadedPostsSpaceId, setLoadedPostsSpaceId] = useState<string>();
     const [selectedProfile, setSelectedProfile] = useState(selectedFriend);
     const [posts, setPosts] = useState<SpaceProfilePost[]>([]);
-    const postGroups = useMemo(
-        () => profilePostGroupsFromPosts(posts),
-        [posts],
-    );
     const selectedFriendSpaceId = selectedFriend?.spaceId;
+    const hasLoadedPostsForSelectedFriend =
+        loadedPostsSpaceId == selectedFriendSpaceId;
+    const postGroups = useMemo(
+        () =>
+            hasLoadedPostsForSelectedFriend
+                ? profilePostGroupsFromPosts(posts)
+                : [],
+        [hasLoadedPostsForSelectedFriend, posts],
+    );
     const showProfileLoading = Boolean(
         selectedFriendSpaceId &&
             (isProfileLoading || loadedProfileSpaceId != selectedFriendSpaceId),
     );
     const showPostsLoading = Boolean(
         selectedFriendSpaceId &&
-            (isPostsLoading || loadedPostsSpaceId != selectedFriendSpaceId),
+            (isPostsLoading || !hasLoadedPostsForSelectedFriend),
     );
     const currentSelectedProfile =
         selectedProfile?.spaceId == selectedFriendSpaceId
@@ -210,6 +215,7 @@ const Page: React.FC = () => {
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onReplyToPost={replyToCurrentPost}
                 onSetPostLiked={setCurrentPostLiked}
+                showPostLoadingSkeleton={false}
             />
         </>
     );

@@ -1,12 +1,11 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useEffect, useMemo, useState } from "react";
 import { ProfileScreen, profileBackground } from "screens/ProfileScreen";
 import {
     createCurrentPhotoPost,
-    createCurrentProfileLink,
     deleteCurrentPost,
+    loadCurrentPostLikers,
     loadCurrentSpaceFriendsCount,
     loadCurrentSpacePostAssetURL,
     loadCurrentSpaceProfilePostsPage,
@@ -22,11 +21,12 @@ import {
 import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
 import { prepareSpacePostImageFromEdit } from "utils/spacePostImage";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const initialPostSkeletonDelayMs = 350;
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const { profile, profileLoadError, profileLoadStatus, setLocalFeedPosts } =
         useSpaceAppState();
     const [friendsCount, setFriendsCount] = useState(0);
@@ -190,12 +190,8 @@ const Page: React.FC = () => {
                 }
                 onOpenSettings={() => void router.push(spaceRoutes.settings)}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
+                onLoadPostLikers={loadCurrentPostLikers}
                 onSetPostLiked={setCurrentPostLiked}
-                onShareProfileLink={async () => {
-                    if (!profile.spaceId) throw new Error("Missing space.");
-                    return (await createCurrentProfileLink(profile.spaceId))
-                        .url;
-                }}
             />
         </>
     );

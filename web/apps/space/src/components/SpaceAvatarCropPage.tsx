@@ -4,6 +4,7 @@ import { Box } from "@mui/material";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React from "react";
 import Cropper, { type Area, type Point } from "react-easy-crop";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 
 const green = "#08C225";
 const textBase = "#000";
@@ -205,15 +206,15 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                             ? {
                                   alignItems: "center",
                                   display: "grid",
-                                  gridTemplateColumns: "24px 1fr 24px",
+                                  gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
                                   height: 56,
                                   px: 2,
                                   width: "100%",
                               }
                             : {
                                   display: "grid",
-                                  gridTemplateColumns: "42px 1fr 42px",
-                                  height: 42,
+                                  gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
+                                  height: spaceTouchTargetSize,
                                   width: "100%",
                               }
                     }
@@ -233,11 +234,11 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                                       color: textBase,
                                       cursor: isSaving ? "default" : "pointer",
                                       display: "flex",
-                                      height: 24,
+                                      height: spaceTouchTargetSize,
                                       justifyContent: "flex-start",
                                       ml: "-2px",
                                       p: 0,
-                                      width: 24,
+                                      width: spaceTouchTargetSize,
                                       "&:focus-visible": {
                                           borderRadius: "50%",
                                           outline: `2px solid ${green}`,
@@ -251,10 +252,10 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                                       color: textBase,
                                       cursor: isSaving ? "default" : "pointer",
                                       display: "flex",
-                                      height: 42,
+                                      height: spaceTouchTargetSize,
                                       justifyContent: "flex-start",
                                       p: 0,
-                                      width: 42,
+                                      width: spaceTouchTargetSize,
                                       "&:focus-visible": {
                                           borderRadius: "50%",
                                           outline: `2px solid ${green}`,

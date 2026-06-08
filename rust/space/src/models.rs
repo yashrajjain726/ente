@@ -26,7 +26,8 @@ pub enum PrivateKeySource {
 #[derive(Debug, Clone)]
 pub struct OpenAccountSpaceCtxInput {
     pub base_url: String,
-    pub auth_token: String,
+    pub auth_token: Option<String>,
+    pub include_credentials: bool,
     pub master_key: Vec<u8>,
     pub public_key: Vec<u8>,
     pub private_key_source: PrivateKeySource,

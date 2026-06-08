@@ -1,5 +1,4 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
-import { useRouter } from "next/router";
 import React, { useState } from "react";
 import {
     LoginScreen,
@@ -11,9 +10,10 @@ import { savePendingSpacePasskeyVerification } from "services/spacePasskeyVerifi
 import { useSpaceAppState } from "state/spaceAppState";
 import { routeAfterCompletedLogin } from "utils/spaceLoginNavigation";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         refreshProfile,
         setPendingLoginCredentials,

@@ -27,6 +27,7 @@ type authDeps struct {
 	LinksRepo    *spacerepo.LinksRepository
 	SpacesRepo   *spacerepo.SpacesRepository
 	FriendsRepo  *spacerepo.FriendsRepository
+	SessionsRepo *spacerepo.SessionsRepository
 }
 
 func (a authDeps) requireUser(c *gin.Context) (int64, error) {
@@ -39,10 +40,7 @@ func (a authDeps) requireUser(c *gin.Context) (int64, error) {
 
 func (a authDeps) resolveViewer(c *gin.Context) (*viewerAuth, error) {
 	token := auth.GetToken(c)
-	if token == "" {
-		return nil, ente.ErrAuthenticationRequired
-	}
-	if a.UserAuthRepo != nil {
+	if token != "" && a.UserAuthRepo != nil {
 		userID, expired, err := a.UserAuthRepo.GetUserIDWithToken(token, auth.GetApp(c))
 		if err == nil && !expired && userID > 0 {
 			viewer := &viewerAuth{UserID: userID}
@@ -60,22 +58,41 @@ func (a authDeps) resolveViewer(c *gin.Context) (*viewerAuth, error) {
 			return nil, err
 		}
 	}
-	if a.LinksRepo == nil {
-		return nil, ente.ErrAuthenticationRequired
-	}
-	sum := sha256.Sum256([]byte(token))
-	session, err := a.LinksRepo.GetSession(c, sum[:])
-	if err != nil {
-		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+	if token != "" && a.LinksRepo != nil {
+		sum := sha256.Sum256([]byte(token))
+		session, err := a.LinksRepo.GetSession(c, sum[:])
+		if err != nil {
+			if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+				return nil, ente.ErrAuthenticationRequired
+			}
+			return nil, err
+		}
+		if session.ExpiresAt <= timeutil.Microseconds() {
+			_ = a.LinksRepo.DeleteSession(c, sum[:])
 			return nil, ente.ErrAuthenticationRequired
 		}
-		return nil, err
+		return &viewerAuth{Link: session}, nil
 	}
-	if session.ExpiresAt <= timeutil.Microseconds() {
-		_ = a.LinksRepo.DeleteSession(c, sum[:])
+	if sessionToken, err := c.Cookie(SpaceBrowserSessionCookieName); err == nil {
+		session, err := validateBrowserSession(c, a.SessionsRepo, sessionToken)
+		if err != nil {
+			return nil, err
+		}
+		viewer := &viewerAuth{UserID: session.UserID}
+		if a.SpacesRepo != nil {
+			space, err := a.SpacesRepo.GetDefaultSpaceByOwner(c.Request.Context(), session.UserID)
+			if err == nil {
+				viewer.SpaceID = space.SpaceID
+			} else if !errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+				return nil, err
+			}
+		}
+		return viewer, nil
+	}
+	if token == "" || a.LinksRepo == nil {
 		return nil, ente.ErrAuthenticationRequired
 	}
-	return &viewerAuth{Link: session}, nil
+	return nil, ente.ErrAuthenticationRequired
 }
 
 func (a authDeps) requireSpaceOwner(ctx context.Context, ownerID int64, spaceID string) (*spacerepo.SpaceRecord, error) {

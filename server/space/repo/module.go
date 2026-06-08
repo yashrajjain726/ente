@@ -7,13 +7,15 @@ import (
 )
 
 type Module struct {
-	Spaces   *SpacesRepository
-	Posts    *PostsRepository
-	Friends  *FriendsRepository
-	Messages *MessagesRepository
-	Links    *LinksRepository
-	Assets   *AssetsRepository
-	Read     *ReadMarkersRepository
+	Spaces     *SpacesRepository
+	Posts      *PostsRepository
+	Friends    *FriendsRepository
+	Messages   *MessagesRepository
+	Links      *LinksRepository
+	Assets     *AssetsRepository
+	Read       *ReadMarkersRepository
+	Sessions   *SessionsRepository
+	EntityKeys *EntityKeysRepository
 }
 
 type SpacesRepository struct {
@@ -42,6 +44,14 @@ type AssetsRepository struct {
 }
 
 type ReadMarkersRepository struct {
+	DB *sql.DB
+}
+
+type SessionsRepository struct {
+	DB *sql.DB
+}
+
+type EntityKeysRepository struct {
 	DB *sql.DB
 }
 
@@ -140,13 +150,23 @@ type SpaceMessageRecord struct {
 }
 
 type SpaceMessageConversationRecord struct {
-	Friend             SpaceActorRecord
-	LatestActivity     SpaceMessageConversationActivityRecord
-	Unread             bool
-	UnreadCount        int64
-	NotificationUnread bool
-	SortCreatedAt      int64
-	SortID             string
+	Friend         SpaceActorRecord
+	LatestActivity SpaceMessageConversationActivityRecord
+	Unread         bool
+	UnreadCount    int64
+	SortCreatedAt  int64
+	SortID         string
+}
+
+type SpaceNotificationRecord struct {
+	ID            string
+	Type          string
+	CreatedAt     int64
+	Unread        bool
+	Actor         SpaceActorRecord
+	Post          *SpaceMessageConversationPostRecord
+	SortCreatedAt int64
+	SortID        string
 }
 
 type SpaceMessageConversationActivityRecord struct {
@@ -248,14 +268,50 @@ type SpaceLinkSessionRecord struct {
 	EncryptedSpaceKey string
 }
 
+type SpaceBrowserSessionRecord struct {
+	TokenHash     []byte
+	UserID        int64
+	ClientKey     string
+	ExpiresAt     int64
+	CreatedAt     int64
+	UpdatedAt     int64
+	LastUsedAt    int64
+	KeyAttributes SpaceKeyAttributesRecord
+}
+
+type SpaceKeyAttributesRecord struct {
+	KEKSalt                           string
+	EncryptedKey                      string
+	KeyDecryptionNonce                string
+	PublicKey                         string
+	EncryptedSecretKey                string
+	SecretKeyDecryptionNonce          string
+	MemLimit                          int
+	OpsLimit                          int
+	MasterKeyEncryptedWithRecoveryKey sql.NullString
+	MasterKeyDecryptionNonce          sql.NullString
+	RecoveryKeyEncryptedWithMasterKey sql.NullString
+	RecoveryKeyDecryptionNonce        sql.NullString
+}
+
+type SpaceEntityKeyRecord struct {
+	UserID       int64
+	KeyType      string
+	EncryptedKey string
+	Header       string
+	CreatedAt    int64
+}
+
 func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {
 	return &Module{
-		Spaces:   &SpacesRepository{DB: db},
-		Posts:    &PostsRepository{DB: db},
-		Friends:  &FriendsRepository{DB: db},
-		Messages: &MessagesRepository{DB: db},
-		Links:    &LinksRepository{DB: db},
-		Assets:   &AssetsRepository{DB: db, S3Config: s3Config},
-		Read:     &ReadMarkersRepository{DB: db},
+		Spaces:     &SpacesRepository{DB: db},
+		Posts:      &PostsRepository{DB: db},
+		Friends:    &FriendsRepository{DB: db},
+		Messages:   &MessagesRepository{DB: db},
+		Links:      &LinksRepository{DB: db},
+		Assets:     &AssetsRepository{DB: db, S3Config: s3Config},
+		Read:       &ReadMarkersRepository{DB: db},
+		Sessions:   &SessionsRepository{DB: db},
+		EntityKeys: &EntityKeysRepository{DB: db},
 	}
 }

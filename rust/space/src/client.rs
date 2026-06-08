@@ -10,6 +10,7 @@ use crate::crypto::{
     pack_payload, space_link_access_key_material, unpack_payload,
 };
 use crate::error::{Result, SpaceError};
+use crate::http::{HttpClient, HttpConfig};
 use crate::models::{
     CreatedSpace, CreatedSpaceLink, DecryptedFriendShare, DecryptedMessage, DecryptedPost,
     DecryptedSpaceProfile, FeedItem, FeedPage, HydratedKeys, MessagePayload, MessageQuote,
@@ -20,17 +21,18 @@ use crate::transport::{
     CreatePostRequest, CreatePostResponse, CreateSpaceRequest, EntityKeyPayload, EntityKeyResponse,
     FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse, FriendTargetPayload,
     LikeMessageRequest, LikeMessageResponse, LikePostRequest, LikePostResponse,
-    ListPostLikersResponse, MarkNotificationsReadRequest, MessageConversationPage, MessagePage,
-    MessageResponse, PostObjectPayload, PostPage, PostResponse, PresignUploadRequest,
-    PresignUploadResponse, ProfileAvatarPayload, ProfileCoverPayload, RefreshFriendSharesRequest,
-    RotateSpaceKeyRequest, ShareUpdatePayload, SpaceActorResponse, SpaceFriendResponse,
-    SpaceKeyResponse, SpaceKeyVersionResponse, SpaceLinkCreateRequest, SpaceLinkLoginRequest,
-    SpaceLinkLoginResponse, SpaceLinkStatusResponse, SpaceLookupResponse, SpaceProfileResponse,
-    SpaceUnreadStatusResponse, UpdatePostCaptionRequest, UpdateSpaceProfileRequest,
-    UpdateSpaceProfileResponse, UpdateSpaceSlugRequest,
+    ListPostLikersResponse, MarkMessageThreadReadRequest, MarkNotificationsReadRequest,
+    MessageConversationPage, MessagePage, MessageResponse, PostObjectPayload, PostPage,
+    PostResponse, PresignUploadRequest, PresignUploadResponse, ProfileAvatarPayload,
+    ProfileCoverPayload, RefreshFriendSharesRequest, RotateSpaceKeyRequest, ShareUpdatePayload,
+    SpaceActorResponse, SpaceFriendResponse, SpaceKeyResponse, SpaceKeyVersionResponse,
+    SpaceLinkCreateRequest, SpaceLinkLoginRequest, SpaceLinkLoginResponse, SpaceLinkStatusResponse,
+    SpaceLookupResponse, SpaceNotificationPage, SpaceProfileResponse, SpaceUnreadStatusResponse,
+    UpdatePostCaptionRequest, UpdateSpaceProfileRequest, UpdateSpaceProfileResponse,
+    UpdateSpaceSlugRequest,
 };
 use ente_core::crypto::{sealed, secretbox};
-use ente_core::http::{Error as HttpError, HttpClient, HttpConfig};
+use ente_core::http::Error as HttpError;
 
 const ROOT_SPACE_KEY_TYPE: &str = "space";
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
@@ -92,7 +94,8 @@ impl AccountSpaceCtx {
     pub fn open(input: OpenAccountSpaceCtxInput) -> Result<Self> {
         let client = build_http_client(
             &input.base_url,
-            Some(input.auth_token),
+            input.auth_token,
+            input.include_credentials,
             input.user_agent,
             input.client_package,
             input.client_version,
@@ -134,7 +137,7 @@ impl AccountSpaceCtx {
         let query = vec![("type", key_type.to_owned())];
         let payload = self
             .client
-            .get_json_optional::<EntityKeyResponse>("/user-entity/key", &query)
+            .get_json_optional::<EntityKeyResponse>("/space/entity-key", &query)
             .await?;
         Ok(payload.map(|value| EntityKeyPayload {
             encrypted_key: value.encrypted_key,
@@ -152,7 +155,7 @@ impl AccountSpaceCtx {
             encrypted_key: payload.encrypted_key.clone(),
             header: payload.header.clone(),
         };
-        match self.client.post_empty("/user-entity/key", &request).await {
+        match self.client.post_empty("/space/entity-key", &request).await {
             Ok(_) => Ok(()),
             Err(HttpError::Http { status: 409, .. }) => Err(SpaceError::EntityKeyConflict),
             Err(err) => Err(err.into()),
@@ -171,7 +174,7 @@ impl AccountSpaceCtx {
         };
         let response = self
             .client
-            .post_json::<EntityKeyResponse, _>("/user-entity/key/ensure", &request)
+            .post_json::<EntityKeyResponse, _>("/space/entity-key/ensure", &request)
             .await?;
         Ok(EntityKeyPayload {
             encrypted_key: response.encrypted_key,
@@ -775,7 +778,45 @@ impl AccountSpaceCtx {
             .map_err(Into::into)
     }
 
+    pub async fn list_notifications(
+        &self,
+        cursor: Option<String>,
+        limit: Option<i32>,
+    ) -> Result<SpaceNotificationPage> {
+        let mut query = Vec::new();
+        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
+            query.push(("cursor", value));
+        }
+        if let Some(value) = limit {
+            query.push(("limit", value.to_string()));
+        }
+        self.client
+            .get_json("/space/notifications", &query)
+            .await
+            .map_err(Into::into)
+    }
+
     pub async fn mark_notifications_read(
+        &self,
+        read_at: Option<String>,
+    ) -> Result<SpaceUnreadStatusResponse> {
+        self.client
+            .post_json(
+                "/space/notifications/read",
+                &MarkNotificationsReadRequest { read_at },
+            )
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn mark_message_likes_read(&self) -> Result<SpaceUnreadStatusResponse> {
+        self.client
+            .post_json("/space/messages/likes/read", &())
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn mark_message_thread_read(
         &self,
         friend_space_id: impl Into<String>,
     ) -> Result<SpaceUnreadStatusResponse> {
@@ -788,7 +829,7 @@ impl AccountSpaceCtx {
         self.client
             .post_json(
                 "/space/messages/read",
-                &MarkNotificationsReadRequest { friend_space_id },
+                &MarkMessageThreadReadRequest { friend_space_id },
             )
             .await
             .map_err(Into::into)
@@ -1681,6 +1722,7 @@ impl SpaceLinkCtx {
         let client = build_http_client(
             &input.base_url,
             None,
+            false,
             input.user_agent,
             input.client_package,
             input.client_version,
@@ -1953,6 +1995,7 @@ impl SpaceLinkCtx {
 fn build_http_client(
     base_url: &str,
     auth_token: Option<String>,
+    include_credentials: bool,
     user_agent: Option<String>,
     client_package: Option<String>,
     client_version: Option<String>,
@@ -1960,12 +2003,13 @@ fn build_http_client(
     HttpClient::new_with_config(HttpConfig {
         base_url: base_url.to_owned(),
         auth_token,
+        include_credentials,
         user_agent,
         client_package,
         client_version,
         ..HttpConfig::default()
     })
-    .map_err(Into::into)
+    .map_err(SpaceError::from)
 }
 
 fn cache_lock<'a, T>(cache: &'a Mutex<T>, name: &str) -> Result<MutexGuard<'a, T>> {
@@ -2048,7 +2092,8 @@ mod tests {
         let (public_key, private_key) = keys::generate_keypair().expect("valid keypair");
         AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
             base_url: base_url.to_owned(),
-            auth_token: "token".to_owned(),
+            auth_token: Some("token".to_owned()),
+            include_credentials: false,
             master_key: generate_key(),
             public_key,
             private_key_source: PrivateKeySource::Plain(private_key),
@@ -2095,7 +2140,7 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
         let expected_root = generate_key();
         let ensure = server
-            .mock("POST", "/user-entity/key/ensure")
+            .mock("POST", "/space/entity-key/ensure")
             .match_header("x-auth-token", "token")
             .with_status(200)
             .with_body(root_entity_response(&ctx.master_key, &expected_root))
@@ -2118,7 +2163,7 @@ mod tests {
         let expected_root = generate_key();
 
         let ensure = server
-            .mock("POST", "/user-entity/key/ensure")
+            .mock("POST", "/space/entity-key/ensure")
             .with_status(200)
             .with_body(root_entity_response(&ctx.master_key, &expected_root))
             .expect(1)
@@ -2311,6 +2356,7 @@ mod tests {
             client: build_http_client(
                 &server.url(),
                 Some("link-token".to_owned()),
+                false,
                 None,
                 None,
                 None,
@@ -2395,6 +2441,7 @@ mod tests {
             client: build_http_client(
                 &server.url(),
                 Some("link-token".to_owned()),
+                false,
                 None,
                 None,
                 None,
@@ -2433,7 +2480,7 @@ mod tests {
         let encrypted_space_key = encode_b64(&pack_payload(&sealed_share, &[]));
 
         let entity = server
-            .mock("GET", "/user-entity/key")
+            .mock("GET", "/space/entity-key")
             .match_header("x-auth-token", "token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
@@ -2791,7 +2838,7 @@ mod tests {
         let space_key = generate_key();
         let root_space_key = generate_key();
         let ensure_root = server
-            .mock("POST", "/user-entity/key/ensure")
+            .mock("POST", "/space/entity-key/ensure")
             .match_header("x-auth-token", "token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"type\":\"space\"".into()),
@@ -2855,7 +2902,7 @@ mod tests {
             .create_async()
             .await;
         let ensure_root = server
-            .mock("POST", "/user-entity/key/ensure")
+            .mock("POST", "/space/entity-key/ensure")
             .match_header("x-auth-token", "token")
             .with_status(200)
             .with_body(root_entity_response(&ctx.master_key, &root_space_key))
@@ -2965,7 +3012,7 @@ mod tests {
         let root_space_key = generate_key();
         let space_key = generate_key();
         let entity = server
-            .mock("GET", "/user-entity/key")
+            .mock("GET", "/space/entity-key")
             .match_header("x-auth-token", "token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
@@ -3051,7 +3098,7 @@ mod tests {
         let root_space_key = generate_key();
         let space_key = generate_key();
         let entity = server
-            .mock("GET", "/user-entity/key")
+            .mock("GET", "/space/entity-key")
             .match_header("x-auth-token", "token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
@@ -3177,7 +3224,7 @@ mod tests {
             .create_async()
             .await;
         let entity = server
-            .mock("GET", "/user-entity/key")
+            .mock("GET", "/space/entity-key")
             .match_header("x-auth-token", "token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
@@ -3228,7 +3275,7 @@ mod tests {
             encrypt_entity_key(&ctx.master_key, &root_space_key).expect("root space entity");
 
         let entity = server
-            .mock("GET", "/user-entity/key")
+            .mock("GET", "/space/entity-key")
             .match_header("x-auth-token", "token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
@@ -3281,6 +3328,7 @@ mod tests {
             client: build_http_client(
                 &server.url(),
                 Some("link-session-token".to_owned()),
+                false,
                 None,
                 None,
                 None,
@@ -3400,17 +3448,62 @@ mod tests {
             .mock("GET", "/space/unread")
             .match_header("x-auth-token", "token")
             .with_status(200)
-            .with_body(json!({"notificationsUnread": false}).to_string())
+            .with_body(
+                json!({
+                    "notificationsUnread": false,
+                    "messagesUnread": false,
+                    "messageLikesUnread": false
+                })
+                .to_string(),
+            )
             .create_async()
             .await;
         let notifications_read = server
+            .mock("POST", "/space/notifications/read")
+            .match_header("x-auth-token", "token")
+            .match_body(Matcher::JsonString(
+                json!({"readAt": "2026-04-16T00:00:00Z"}).to_string(),
+            ))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "notificationsUnread": false,
+                    "messagesUnread": false,
+                    "messageLikesUnread": false
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let message_likes_read = server
+            .mock("POST", "/space/messages/likes/read")
+            .match_header("x-auth-token", "token")
+            .with_status(200)
+            .with_body(
+                json!({
+                    "notificationsUnread": false,
+                    "messagesUnread": false,
+                    "messageLikesUnread": false
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let thread_read = server
             .mock("POST", "/space/messages/read")
             .match_header("x-auth-token", "token")
             .match_body(Matcher::JsonString(
                 json!({"friendSpaceId": "space_friend"}).to_string(),
             ))
             .with_status(200)
-            .with_body(json!({"notificationsUnread": false}).to_string())
+            .with_body(
+                json!({
+                    "notificationsUnread": false,
+                    "messagesUnread": false,
+                    "messageLikesUnread": false
+                })
+                .to_string(),
+            )
             .create_async()
             .await;
 
@@ -3419,15 +3512,31 @@ mod tests {
             .await
             .expect("unread status should load");
         assert!(!unread.notifications_unread);
+        assert!(!unread.messages_unread);
+        assert!(!unread.message_likes_unread);
         assert!(
-            !ctx.mark_notifications_read("space_friend")
+            !ctx.mark_notifications_read(Some("2026-04-16T00:00:00Z".to_owned()))
                 .await
                 .expect("notifications read")
                 .notifications_unread
         );
+        assert!(
+            !ctx.mark_message_likes_read()
+                .await
+                .expect("message likes read")
+                .message_likes_unread
+        );
+        assert!(
+            !ctx.mark_message_thread_read("space_friend")
+                .await
+                .expect("thread read")
+                .messages_unread
+        );
 
         status.assert_async().await;
         notifications_read.assert_async().await;
+        message_likes_read.assert_async().await;
+        thread_read.assert_async().await;
     }
 
     #[tokio::test]
@@ -3439,7 +3548,7 @@ mod tests {
         let (friend_public_key, _) = keys::generate_keypair().expect("valid friend keypair");
 
         let entity = server
-            .mock("GET", "/user-entity/key")
+            .mock("GET", "/space/entity-key")
             .match_header("x-auth-token", "token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
@@ -3646,6 +3755,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn list_notifications_uses_notifications_endpoint() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let notifications = server
+            .mock("GET", "/space/notifications")
+            .match_header("x-auth-token", "token")
+            .match_query(Matcher::AllOf(vec![
+                Matcher::UrlEncoded("cursor".into(), "3000:post_like:1".into()),
+                Matcher::UrlEncoded("limit".into(), "10".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "items": [{
+                        "id": "post_like:42:space_liker",
+                        "type": "post_like",
+                        "createdAt": "2026-04-16T00:00:00Z",
+                        "unread": true,
+                        "actor": {
+                            "userId": 8,
+                            "spaceId": "space_liker",
+                            "spaceSlug": "liker"
+                        },
+                        "post": {
+                            "postId": 42,
+                            "spaceId": "space_owner",
+                            "spaceSlug": "owner",
+                            "ownerUserId": 7,
+                            "isDeleted": false
+                        }
+                    }],
+                    "nextCursor": "2000:friend_event:2"
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+        let response = ctx
+            .list_notifications(Some("3000:post_like:1".to_owned()), Some(10))
+            .await
+            .expect("notifications should load");
+
+        assert_eq!(response.items[0].notification_type, "post_like");
+        assert_eq!(response.items[0].actor.space_id, "space_liker");
+        assert!(response.items[0].unread);
+        assert_eq!(response.items[0].post.as_ref().unwrap().post_id, 42);
+        assert_eq!(response.next_cursor, "2000:friend_event:2");
+        notifications.assert_async().await;
+    }
+
+    #[tokio::test]
     async fn list_space_friends_uses_space_friends_endpoint() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
@@ -3718,6 +3879,7 @@ mod tests {
             client: build_http_client(
                 &server.url(),
                 Some("link-session-token".to_owned()),
+                false,
                 None,
                 None,
                 None,
@@ -3759,7 +3921,7 @@ mod tests {
             encrypt_entity_key(&ctx.master_key, &root_space_key).expect("root space entity");
 
         let entity = server
-            .mock("GET", "/user-entity/key")
+            .mock("GET", "/space/entity-key")
             .match_header("x-auth-token", "token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
@@ -3858,7 +4020,7 @@ mod tests {
         );
 
         let entity = server
-            .mock("GET", "/user-entity/key")
+            .mock("GET", "/space/entity-key")
             .match_header("x-auth-token", "token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
@@ -4005,7 +4167,7 @@ mod tests {
         );
 
         let entity = server
-            .mock("GET", "/user-entity/key")
+            .mock("GET", "/space/entity-key")
             .match_header("x-auth-token", "token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
@@ -4181,7 +4343,7 @@ mod tests {
             encrypt_entity_key(&ctx.master_key, &root_space_key).expect("root space entity");
 
         let entity = server
-            .mock("GET", "/user-entity/key")
+            .mock("GET", "/space/entity-key")
             .match_header("x-auth-token", "token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),
@@ -4269,7 +4431,7 @@ mod tests {
             sealed::seal(&shared_space_key, &ctx.public_key).expect("sealed space share");
 
         let entity = server
-            .mock("GET", "/user-entity/key")
+            .mock("GET", "/space/entity-key")
             .match_header("x-auth-token", "token")
             .match_query(Matcher::UrlEncoded(
                 "type".into(),

@@ -6,7 +6,7 @@ use ente_space::{
     DecryptedPost, DecryptedSpaceProfile, MessageConversationActivity, MessageConversationPost,
     MessageResponse, OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostResponse,
     PrivateKeySource, ProfileAvatarResponse, ProfileCoverResponse, SpaceActorResponse,
-    SpaceError as CoreSpaceError, SpaceLinkCtx,
+    SpaceError as CoreSpaceError, SpaceLinkCtx, SpaceNotificationResponse,
     crypto::{decode_b64, encode_b64},
 };
 use serde::{Deserialize, Serialize};
@@ -79,7 +79,8 @@ impl From<swb::Error> for WasmSpaceError {
 #[serde(rename_all = "camelCase")]
 struct OpenAccountSpaceCtxJsInput {
     base_url: String,
-    auth_token: String,
+    auth_token: Option<String>,
+    include_credentials: Option<bool>,
     master_key_b64: String,
     public_key_b64: String,
     private_key_b64: Option<String>,
@@ -231,10 +232,9 @@ struct MessagePageJs {
 #[serde(rename_all = "camelCase")]
 struct MessageConversationJs {
     friend: ActorJs,
-    latest_activity: MessageConversationActivityJs,
+    latest_activity: Option<MessageConversationActivityJs>,
     unread: bool,
     unread_count: i64,
-    notification_unread: bool,
 }
 
 #[derive(Serialize)]
@@ -284,6 +284,25 @@ struct PostObjectJs {
 #[serde(rename_all = "camelCase")]
 struct MessageConversationPageJs {
     items: Vec<MessageConversationJs>,
+    next_cursor: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SpaceNotificationJs {
+    id: String,
+    #[serde(rename = "type")]
+    notification_type: String,
+    created_at: String,
+    unread: bool,
+    actor: ActorJs,
+    post: Option<MessageConversationPostJs>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SpaceNotificationPageJs {
+    items: Vec<SpaceNotificationJs>,
     next_cursor: String,
 }
 
@@ -554,6 +573,23 @@ fn message_conversation_post_to_js(
     })
 }
 
+async fn account_notification_to_js(
+    ctx: &AccountSpaceCtx,
+    notification: SpaceNotificationResponse,
+) -> Result<SpaceNotificationJs, WasmSpaceError> {
+    Ok(SpaceNotificationJs {
+        id: notification.id,
+        notification_type: notification.notification_type,
+        created_at: notification.created_at,
+        unread: notification.unread,
+        actor: account_actor_to_js(ctx, notification.actor).await?,
+        post: notification
+            .post
+            .map(message_conversation_post_to_js)
+            .transpose()?,
+    })
+}
+
 /// Open an authenticated space context for web.
 #[wasm_bindgen]
 pub async fn space_open_account_ctx(
@@ -572,6 +608,7 @@ pub async fn space_open_account_ctx(
     let ctx = AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
         base_url: input.base_url.clone(),
         auth_token: input.auth_token,
+        include_credentials: input.include_credentials.unwrap_or(false),
         master_key,
         public_key,
         private_key_source,
@@ -841,12 +878,43 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&self.inner.unread_status().await?).map_err(Into::into)
     }
 
-    /// Mark notification activity for one friend as read.
+    /// List post-like and friend notifications.
+    pub async fn list_notifications(
+        &self,
+        cursor: Option<String>,
+        limit: Option<i32>,
+    ) -> Result<JsValue, WasmSpaceError> {
+        let page = self.inner.list_notifications(cursor, limit).await?;
+        let mut items = Vec::with_capacity(page.items.len());
+        for notification in page.items {
+            items.push(account_notification_to_js(&self.inner, notification).await?);
+        }
+        swb::to_value(&SpaceNotificationPageJs {
+            items,
+            next_cursor: page.next_cursor,
+        })
+        .map_err(Into::into)
+    }
+
+    /// Mark post-like and friend notifications as read.
     pub async fn mark_notifications_read(
+        &self,
+        read_at: Option<String>,
+    ) -> Result<JsValue, WasmSpaceError> {
+        swb::to_value(&self.inner.mark_notifications_read(read_at).await?).map_err(Into::into)
+    }
+
+    /// Mark message-like notifications as read.
+    pub async fn mark_message_likes_read(&self) -> Result<JsValue, WasmSpaceError> {
+        swb::to_value(&self.inner.mark_message_likes_read().await?).map_err(Into::into)
+    }
+
+    /// Mark one message conversation as read.
+    pub async fn mark_message_thread_read(
         &self,
         friend_space_id: String,
     ) -> Result<JsValue, WasmSpaceError> {
-        swb::to_value(&self.inner.mark_notifications_read(friend_space_id).await?)
+        swb::to_value(&self.inner.mark_message_thread_read(friend_space_id).await?)
             .map_err(Into::into)
     }
 
@@ -865,6 +933,16 @@ impl SpaceAccountCtxHandle {
             .await?,
         )
         .map_err(Into::into)
+    }
+
+    /// Fetch one post with its caption decrypted.
+    pub async fn get_post(&self, post_id: i64) -> Result<JsValue, WasmSpaceError> {
+        let post = self.inner.get_post(post_id).await?;
+        let decrypted = self
+            .inner
+            .decrypt_post_for_space(&post.space_id, &post)
+            .await?;
+        swb::to_value(&account_post_to_js(&self.inner, post, decrypted).await?).map_err(Into::into)
     }
 
     /// Create a single-photo post with optional caption.
@@ -1071,16 +1149,17 @@ impl SpaceAccountCtxHandle {
         let mut items = Vec::with_capacity(page.items.len());
         for conversation in page.items {
             let friend = account_actor_to_js(&self.inner, conversation.friend).await?;
+            let latest_activity = match conversation.latest_activity {
+                Some(activity) => {
+                    Some(message_conversation_activity_to_js(&self.inner, activity).await?)
+                }
+                None => None,
+            };
             items.push(MessageConversationJs {
                 friend,
-                latest_activity: message_conversation_activity_to_js(
-                    &self.inner,
-                    conversation.latest_activity,
-                )
-                .await?,
+                latest_activity,
                 unread: conversation.unread,
                 unread_count: conversation.unread_count,
-                notification_unread: conversation.notification_unread,
             });
         }
         swb::to_value(&MessageConversationPageJs {

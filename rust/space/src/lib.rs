@@ -1,6 +1,7 @@
 pub mod client;
 pub mod crypto;
 pub mod error;
+pub mod http;
 pub mod models;
 pub mod transport;
 
@@ -26,5 +27,6 @@ pub use transport::{
     PresignUploadResponse, ProfileAvatarPayload, ProfileAvatarResponse, ProfileCoverPayload,
     ProfileCoverResponse, SpaceActorResponse, SpaceFriendResponse, SpaceKeyResponse,
     SpaceKeyVersionResponse, SpaceLinkLoginResponse, SpaceLinkStatusResponse, SpaceLookupResponse,
-    SpaceProfileResponse, SpaceUnreadStatusResponse,
+    SpaceNotificationPage, SpaceNotificationResponse, SpaceProfileResponse,
+    SpaceUnreadStatusResponse,
 };

@@ -976,7 +976,10 @@ func main() {
 	userEntityHandler := &api.UserEntityHandler{Controller: userEntityController}
 	spaceRepos := spacerepo.NewModule(db, s3Config)
 	spaceModule := spacecontroller.NewModule(spaceRepos, userAuthRepo, &spacecontroller.SpaceEmailSender{UserRepo: userRepo})
+	spaceModule.UserTokens = userController
 	spaceHandlers := spaceapi.NewHandlers(spaceModule)
+	spacePrivateAPI := server.Group("/")
+	spacePrivateAPI.Use(rateLimiter.GlobalRateLimiter(), spaceHandlers.RequireSpaceBrowserSession(), rateLimiter.APIRateLimitForUserMiddleware(urlSanitizer))
 
 	privateAPI.POST("/user-entity/key", userEntityHandler.CreateKey)
 	privateAPI.POST("/user-entity/key/ensure", userEntityHandler.EnsureKey)
@@ -985,7 +988,8 @@ func main() {
 	privateAPI.PUT("/user-entity/entity", userEntityHandler.UpdateEntity)
 	privateAPI.DELETE("/user-entity/entity", userEntityHandler.DeleteEntity)
 	privateAPI.GET("/user-entity/entity/diff", userEntityHandler.GetDiff)
-	spaceapi.Register(privateAPI, publicAPI, spaceHandlers)
+	spaceapi.RegisterTokenSessionRoutes(privateAPI, spaceHandlers)
+	spaceapi.Register(spacePrivateAPI, publicAPI, spaceHandlers)
 
 	contactController := contactCtrl.New(contactRepository, objectCleanupController, s3Config)
 	contactHandler := &api.ContactHandler{Controller: contactController}

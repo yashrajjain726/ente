@@ -1,18 +1,19 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { FriendsScreen, friendsBackground } from "screens/FriendsScreen";
 import {
+    createCurrentProfileLink,
     loadCurrentFriendAvatarURL,
     loadCurrentSpaceFriends,
     removeCurrentSpaceFriend,
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         friends,
         profile,
@@ -56,6 +57,11 @@ const Page: React.FC = () => {
                 onOpenFriend={(friendID) =>
                     void router.push(spaceRoutes.friend(friendID))
                 }
+                onShareProfileLink={async () => {
+                    if (!profile.spaceId) throw new Error("Missing space.");
+                    return (await createCurrentProfileLink(profile.spaceId))
+                        .url;
+                }}
                 onUnfriend={async (friendID) => {
                     const friend = friends.find(
                         (candidate) => candidate.id == friendID,

@@ -28,20 +28,20 @@ export const spacePostLikeButtonPop = keyframes`
 export const spacePostLikeHeartPop = keyframes`
     0% {
         opacity: 0.72;
-        transform: scale(0.58) rotate(-10deg);
+        transform: scale(0.58);
     }
 
     44% {
         opacity: 1;
-        transform: scale(1.38) rotate(6deg);
+        transform: scale(1.38);
     }
 
     72% {
-        transform: scale(0.93) rotate(-3deg);
+        transform: scale(0.93);
     }
 
     100% {
         opacity: 1;
-        transform: scale(1) rotate(0deg);
+        transform: scale(1);
     }
 `;

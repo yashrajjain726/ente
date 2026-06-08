@@ -1,20 +1,28 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { ProfileImageViewerScreen } from "screens/ProfileImageViewerScreen";
 import { profileBackground } from "screens/ProfileScreen";
 import { useSpaceAppState } from "state/spaceAppState";
-import { spaceRoutes } from "utils/spaceRoutes";
+import {
+    profileImageFlowSourceFromQuery,
+    spaceRoutes,
+} from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
-    const router = useRouter();
+    const router = useSpaceRouter();
     const {
         profile,
         profileLoadError,
         profileLoadStatus,
         setPendingProfileCoverFile,
     } = useSpaceAppState();
+    const imageFlowSource = profileImageFlowSourceFromQuery(router.query.from);
+    const backRoute =
+        imageFlowSource == "settings"
+            ? spaceRoutes.settingsProfile
+            : spaceRoutes.profile;
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -37,10 +45,12 @@ const Page: React.FC = () => {
             <ProfileImageViewerScreen
                 profile={profile}
                 variant="cover"
-                onBack={() => void router.push(spaceRoutes.profile)}
+                onBack={() => void router.push(backRoute)}
                 onSelectFile={(file) => {
                     setPendingProfileCoverFile(file);
-                    void router.push(spaceRoutes.editProfileCover);
+                    void router.push(
+                        spaceRoutes.editProfileCoverFrom(imageFlowSource),
+                    );
                 }}
             />
         </>

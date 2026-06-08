@@ -1,20 +1,16 @@
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { accountLogout } from "ente-accounts-rs/services/logout";
-import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { SettingsScreen, settingsBackground } from "screens/SettingsScreen";
+import { spaceLogout } from "services/spaceLogout";
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
+import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const Page: React.FC = () => {
-    const router = useRouter();
-    const {
-        profile,
-        profileLoadError,
-        profileLoadStatus,
-        resetAfterLogout,
-    } = useSpaceAppState();
+    const router = useSpaceRouter();
+    const { profile, profileLoadError, profileLoadStatus, resetAfterLogout } =
+        useSpaceAppState();
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -36,8 +32,11 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={settingsBackground} />
             <SettingsScreen
                 onBack={() => void router.push(spaceRoutes.profile)}
+                onOpenProfile={() =>
+                    void router.push(spaceRoutes.settingsProfile)
+                }
                 onLogout={() => {
-                    void accountLogout().then(() => {
+                    void spaceLogout().then(() => {
                         resetAfterLogout();
                         void router.push(spaceRoutes.onboarding);
                     });

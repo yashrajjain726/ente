@@ -25,21 +25,64 @@ CREATE TRIGGER update_spaces_updated_at
     FOR EACH ROW
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
-CREATE TABLE IF NOT EXISTS space_notification_read_markers (
-    user_id        BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS space_read_markers (
+    user_id         BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     viewer_space_id TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    friend_space_id TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    read_at        BIGINT NOT NULL DEFAULT 0,
-    created_at     BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    updated_at     BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    PRIMARY KEY (viewer_space_id, friend_space_id)
+    scope           TEXT   NOT NULL,
+    friend_space_id TEXT   NOT NULL DEFAULT '',
+    read_at         BIGINT NOT NULL DEFAULT 0,
+    created_at      BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    updated_at      BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    PRIMARY KEY (viewer_space_id, scope, friend_space_id),
+    CONSTRAINT chk_space_read_markers_scope CHECK (scope IN ('notifications', 'message_likes', 'message_thread')),
+    CONSTRAINT chk_space_read_markers_friend_scope CHECK (
+        (scope = 'message_thread' AND friend_space_id <> '')
+        OR
+        (scope <> 'message_thread' AND friend_space_id = '')
+    )
 );
 
-CREATE INDEX IF NOT EXISTS idx_space_notification_read_markers_user
-    ON space_notification_read_markers (user_id, read_at DESC);
+CREATE INDEX IF NOT EXISTS idx_space_read_markers_user
+    ON space_read_markers (user_id, scope, read_at DESC);
 
-CREATE TRIGGER update_space_notification_read_markers_updated_at
-    BEFORE UPDATE ON space_notification_read_markers
+CREATE TRIGGER update_space_read_markers_updated_at
+    BEFORE UPDATE ON space_read_markers
+    FOR EACH ROW
+EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
+
+CREATE TABLE IF NOT EXISTS space_browser_sessions (
+    token_hash BYTEA PRIMARY KEY,
+    user_id    BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    client_key TEXT   NOT NULL,
+    expires_at BIGINT NOT NULL,
+    created_at BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    updated_at BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    last_used_at BIGINT NOT NULL DEFAULT now_utc_micro_seconds()
+);
+
+CREATE INDEX IF NOT EXISTS idx_space_browser_sessions_user
+    ON space_browser_sessions (user_id, last_used_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_space_browser_sessions_expires
+    ON space_browser_sessions (expires_at ASC);
+
+CREATE TRIGGER update_space_browser_sessions_updated_at
+    BEFORE UPDATE ON space_browser_sessions
+    FOR EACH ROW
+EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
+
+CREATE TABLE IF NOT EXISTS space_entity_keys (
+    user_id       BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    key_type      TEXT   NOT NULL,
+    encrypted_key TEXT   NOT NULL,
+    header        TEXT   NOT NULL,
+    created_at    BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    updated_at    BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    PRIMARY KEY (user_id, key_type)
+);
+
+CREATE TRIGGER update_space_entity_keys_updated_at
+    BEFORE UPDATE ON space_entity_keys
     FOR EACH ROW
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 

@@ -56,6 +56,7 @@ export interface SpaceAppState {
     profile: SetupProfile | null;
     profileLoadError?: string;
     profileLoadStatus: SpaceProfileLoadStatus;
+    skipNextHomeFeedSkeleton: boolean;
     signupEmail: string;
     refreshProfile: () => Promise<SetupProfile | null>;
     resetAfterLogout: () => void;
@@ -80,6 +81,7 @@ export interface SpaceAppState {
         React.SetStateAction<File | null>
     >;
     setProfile: (profile: SetupProfile | null) => void;
+    setSkipNextHomeFeedSkeleton: React.Dispatch<React.SetStateAction<boolean>>;
     setSignupEmail: React.Dispatch<React.SetStateAction<string>>;
 }
 

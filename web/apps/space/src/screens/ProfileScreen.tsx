@@ -7,16 +7,18 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import {
     SpaceFileViewer,
+    SpaceViewerFeedBackdrop,
     type SpaceViewerDraftPostEdit,
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
+import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
 import { EnteLogo } from "ente-base/components/EnteLogo";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import { ShareIcon } from "screens/ShareProfileLinkScreen";
-import type { SpacePostAsset } from "services/space";
+import type { SpacePostAsset, SpacePostLikersLoader } from "services/space";
+import { spaceTouchTargetSize } from "styles/touchTargets";
 import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
 import { firstNameFrom } from "utils/spaceDisplay";
 import {
@@ -64,6 +66,7 @@ export interface ProfilePostItem {
     id: string;
     imageAsset?: SpacePostAsset;
     imageUrl?: string;
+    likeCount?: number;
     name?: string;
     postId?: number;
     timestampMs: number;
@@ -400,9 +403,9 @@ interface ProfileScreenProps {
     onOpenProfilePhoto?: () => void;
     onOpenSettings?: () => void;
     onLoadPostImage?: (asset: SpacePostAsset) => Promise<string>;
+    onLoadPostLikers?: SpacePostLikersLoader;
     onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
-    onShareProfileLink?: () => Promise<string>;
     postGroups?: ProfilePostGroup[];
     profile: SetupProfile;
 }
@@ -423,9 +426,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onOpenProfilePhoto,
     onOpenSettings,
     onLoadPostImage,
+    onLoadPostLikers,
     onReplyToPost,
     onSetPostLiked,
-    onShareProfileLink,
     postGroups = [],
     profile,
     showPostLoadingSkeleton,
@@ -475,8 +478,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         (count, group) => count + group.items.length,
         0,
     );
-    const canOpenFriends =
-        isOwnerProfile && friendsCount > 0 && Boolean(onOpenFriends);
+    const canOpenFriends = isOwnerProfile && Boolean(onOpenFriends);
     const canOpenProfileCover = isOwnerProfile && Boolean(onOpenProfileCover);
     const canOpenProfilePhoto = isOwnerProfile && Boolean(onOpenProfilePhoto);
     const hasProfilePosts = postsSharedCount > 0;
@@ -487,9 +489,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const shouldShowCoverSkeleton =
         isCoverLoading || isCoverURLPending || isCoverImageLoading;
     const selectedPostActionMode: SpaceViewerPostActionMode = isPublicProfile
-        ? "hidden"
+        ? "like-only"
         : isOwnerProfile
-          ? "hidden"
+          ? "own-post-likes"
           : "like-only";
 
     const revokeLocalPostObjectUrls = React.useCallback(() => {
@@ -604,6 +606,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     caption: item.caption,
                     height: dimensions.height,
                     imageUrl,
+                    likeCount: item.likeCount ?? 0,
                     name: displayName,
                     postId: item.postId,
                     timestampMs: item.timestampMs,
@@ -633,6 +636,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     name: displayName,
                     postId: item.postId,
                     timestampMs: item.timestampMs,
+                    likeCount: item.likeCount ?? 0,
                     viewerLiked: item.viewerLiked,
                     width: dimensions.width,
                 };
@@ -800,23 +804,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             });
     };
 
-    const shareProfile = async () => {
-        if (!onShareProfileLink) return;
-        const profileLink = await onShareProfileLink();
-
-        if (typeof navigator.share == "function") {
-            try {
-                await navigator.share({ url: profileLink });
-                return;
-            } catch (error) {
-                if (error instanceof DOMException && error.name == "AbortError")
-                    return;
-            }
-        }
-
-        await navigator.clipboard.writeText(profileLink);
-    };
-
     const deleteSelectedPost = async () => {
         if (!selectedPost) return;
 
@@ -848,8 +835,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 minHeight: "100svh",
                 overflowX: "hidden",
                 placeItems: { xs: "stretch", sm: "start center" },
+                position: "relative",
             }}
         >
+            {selectedPost && <SpaceViewerFeedBackdrop />}
             <Box
                 sx={{
                     bgcolor: profileBackground,
@@ -970,7 +959,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         display: "grid",
                         gridTemplateColumns: isPublicProfile
                             ? "1fr auto"
-                            : "24px 1fr 24px",
+                            : `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
                         height: profileHeaderHeight,
                         position: "relative",
                         px: 2,
@@ -1023,11 +1012,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 color: "inherit",
                                 cursor: "pointer",
                                 display: "flex",
-                                height: 24,
+                                height: spaceTouchTargetSize,
                                 justifyContent: "flex-start",
                                 ml: "-2px",
                                 p: 0,
-                                width: 24,
+                                width: spaceTouchTargetSize,
                                 "&:focus-visible": {
                                     borderRadius: "50%",
                                     outline: `2px solid ${green}`,
@@ -1049,31 +1038,48 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             onClick={onAddFriend}
                             sx={{
                                 alignItems: "center",
-                                backgroundColor: "#FFFFFF",
+                                backgroundColor: "transparent",
                                 border: 0,
-                                borderRadius: "999px",
                                 color: green,
                                 cursor: onAddFriend ? "pointer" : "default",
                                 display: "inline-flex",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 13,
-                                fontWeight: 700,
-                                height: 36,
+                                height: spaceTouchTargetSize,
                                 justifyContent: "center",
                                 justifySelf: "flex-end",
-                                lineHeight: "18px",
                                 minWidth: 0,
-                                paddingInline: "16px",
-                                whiteSpace: "nowrap",
+                                p: 0,
                                 "&:focus-visible": {
+                                    borderRadius: "999px",
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 2,
                                 },
-                                "&:hover": { backgroundColor: "#F3FFF5" },
+                                "&:hover .space-add-friend-pill": {
+                                    backgroundColor: "#F3FFF5",
+                                },
                             }}
                         >
-                            Add friend
+                            <Box
+                                className="space-add-friend-pill"
+                                component="span"
+                                sx={{
+                                    alignItems: "center",
+                                    backgroundColor: "#FFFFFF",
+                                    borderRadius: "999px",
+                                    display: "inline-flex",
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    height: 32,
+                                    justifyContent: "center",
+                                    lineHeight: "18px",
+                                    px: "14px",
+                                    transition: "background-color 120ms ease",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                Add friend
+                            </Box>
                         </Box>
                     )}
                     {!isPublicProfile && (
@@ -1111,10 +1117,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 color: "inherit",
                                 cursor: onOpenSettings ? "pointer" : "default",
                                 display: "flex",
-                                height: 24,
+                                height: spaceTouchTargetSize,
                                 justifyContent: "flex-end",
                                 p: 0,
-                                width: 24,
+                                width: spaceTouchTargetSize,
                                 "&:focus-visible": {
                                     borderRadius: "50%",
                                     outline: `2px solid ${green}`,
@@ -1130,7 +1136,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         </Box>
                     ) : (
                         !isPublicProfile && (
-                            <Box aria-hidden sx={{ width: 24 }} />
+                            <Box
+                                aria-hidden
+                                sx={{ width: spaceTouchTargetSize }}
+                            />
                         )
                     )}
                 </Box>
@@ -1221,9 +1230,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         <Box
                             sx={{
                                 alignItems: "center",
-                                display: "grid",
-                                gridTemplateColumns:
-                                    "minmax(0, 1fr) minmax(0, max-content) minmax(0, 1fr)",
+                                display: "flex",
+                                justifyContent: "center",
                                 minWidth: 0,
                                 width: "100%",
                             }}
@@ -1235,7 +1243,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         '"Nunito", "Inter Variable", sans-serif',
                                     fontSize: 26,
                                     fontWeight: 800,
-                                    gridColumn: 2,
                                     lineHeight: "32px",
                                     maxWidth: isPublicProfile
                                         ? "100%"
@@ -1252,38 +1259,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             >
                                 {displayName}
                             </Box>
-                            {isOwnerProfile && (
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    aria-label="Share profile"
-                                    onClick={() => void shareProfile()}
-                                    sx={{
-                                        alignItems: "center",
-                                        bgcolor: "transparent",
-                                        border: 0,
-                                        color: textStrong,
-                                        cursor: onShareProfileLink
-                                            ? "pointer"
-                                            : "default",
-                                        display: "flex",
-                                        gridColumn: 3,
-                                        height: 24,
-                                        justifyContent: "center",
-                                        justifySelf: "start",
-                                        ml: "4px",
-                                        p: 0,
-                                        width: 24,
-                                        "&:focus-visible": {
-                                            borderRadius: "50%",
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                    }}
-                                >
-                                    <ShareIcon strokeWidth={2.2} />
-                                </Box>
-                            )}
                         </Box>
                         {isStatsLoading ? (
                             <ProfileStatsSkeleton />
@@ -1550,7 +1525,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 }}
                             >
                                 {isOwnerProfile
-                                    ? "Create your first post"
+                                    ? "What are you up to?"
                                     : isPublicProfile
                                       ? `${firstName} hasn't posted anything yet. Add them as a friend to get their latest posts.`
                                       : `${firstName} hasn't posted anything yet.`}
@@ -1579,7 +1554,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         fontSize: 14,
                                         fontWeight: 600,
                                         gap: "8px",
-                                        height: 40,
+                                        height: spaceTouchTargetSize,
                                         justifyContent: "center",
                                         lineHeight: "20px",
                                         mt: "24px",
@@ -1605,12 +1580,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         size={20}
                                         strokeWidth={1.8}
                                     />
-                                    Create
+                                    Post
                                 </Box>
                             )}
                         </Box>
                     )}
                 </Box>
+                {isOwnerProfile && (
+                    <SpacePostFloatingActionButton
+                        disabled={isPostPhotoOpening}
+                        onClick={openPostPhotoPicker}
+                    />
+                )}
                 {selectedPost && (
                     <SpaceFileViewer
                         photo={selectedPost.photo}
@@ -1637,6 +1618,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
                         }
+                        onAddFriendForPostAction={
+                            isPublicProfile ? onAddFriend : undefined
+                        }
+                        onLoadPostLikers={onLoadPostLikers}
                         onOpenProfile={closeSelectedPost}
                         onReplyToPost={
                             isFriendProfile ? onReplyToPost : undefined
