@@ -32,7 +32,7 @@ const spaceMessageSelectColumns = `
 	sender_space.owner_id,
 	sender_space.space_id,
 	sender_space.space_slug,
-	sender_ka.public_key,
+	sender_space.public_key,
 	sender_space.current_version,
 	sender_space.encrypted_profile,
 	sender_space.avatar_object_key,
@@ -43,7 +43,7 @@ const spaceMessageSelectColumns = `
 	recipient_space.owner_id,
 	recipient_space.space_id,
 	recipient_space.space_slug,
-	recipient_ka.public_key,
+	recipient_space.public_key,
 	recipient_space.current_version,
 	recipient_space.encrypted_profile,
 	recipient_space.avatar_object_key,
@@ -55,9 +55,7 @@ const spaceMessageSelectColumns = `
 
 const spaceMessageJoins = `
 	JOIN spaces sender_space ON sender_space.space_id = m.sender_space_id
-	JOIN key_attributes sender_ka ON sender_ka.user_id = sender_space.owner_id
 	JOIN spaces recipient_space ON recipient_space.space_id = m.recipient_space_id
-	JOIN key_attributes recipient_ka ON recipient_ka.user_id = recipient_space.owner_id
 `
 
 func (r *MessagesRepository) CreateMessage(ctx context.Context, input CreateSpaceMessageRecord) (*SpaceMessageRecord, error) {
@@ -377,7 +375,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				friend_space.owner_id,
 				friend_space.space_id,
 				friend_space.space_slug,
-			friend_ka.public_key,
+			friend_space.public_key,
 			friend_space.current_version,
 			friend_space.encrypted_profile,
 			friend_space.avatar_object_key,
@@ -407,7 +405,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			COALESCE(sender_space.owner_id, 0) AS sender_owner_id,
 			COALESCE(sender_space.space_id, '') AS sender_space_id,
 			COALESCE(sender_space.space_slug, '') AS sender_space_slug,
-			COALESCE(sender_ka.public_key, '') AS sender_public_key,
+			COALESCE(sender_space.public_key, '') AS sender_public_key,
 			COALESCE(sender_space.current_version, 0) AS sender_current_version,
 			COALESCE(sender_space.encrypted_profile, '') AS sender_profile,
 			sender_space.avatar_object_key,
@@ -418,7 +416,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			COALESCE(recipient_space.owner_id, 0) AS recipient_owner_id,
 			COALESCE(recipient_space.space_id, '') AS recipient_space_id,
 			COALESCE(recipient_space.space_slug, '') AS recipient_space_slug,
-			COALESCE(recipient_ka.public_key, '') AS recipient_public_key,
+			COALESCE(recipient_space.public_key, '') AS recipient_public_key,
 			COALESCE(recipient_space.current_version, 0) AS recipient_current_version,
 			COALESCE(recipient_space.encrypted_profile, '') AS recipient_profile,
 			recipient_space.avatar_object_key,
@@ -437,12 +435,9 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			asset.metadata_cipher AS post_object_metadata_cipher
 		FROM conversations c
 		JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
-			JOIN key_attributes friend_ka ON friend_ka.user_id = friend_space.owner_id
 		LEFT JOIN space_messages m ON m.message_id = c.message_id
 		LEFT JOIN spaces sender_space ON sender_space.space_id = m.sender_space_id
-		LEFT JOIN key_attributes sender_ka ON sender_ka.user_id = sender_space.owner_id
 		LEFT JOIN spaces recipient_space ON recipient_space.space_id = m.recipient_space_id
-		LEFT JOIN key_attributes recipient_ka ON recipient_ka.user_id = recipient_space.owner_id
 		LEFT JOIN space_posts p ON p.post_id = c.post_id
 		LEFT JOIN spaces post_space ON post_space.space_id = p.space_id
 		LEFT JOIN LATERAL (
@@ -529,7 +524,7 @@ func (r *MessagesRepository) ListNotifications(ctx context.Context, viewerSpaceI
 			actor_space.owner_id,
 			actor_space.space_id,
 			actor_space.space_slug,
-			actor_ka.public_key,
+			actor_space.public_key,
 			actor_space.current_version,
 			actor_space.encrypted_profile,
 			actor_space.avatar_object_key,
@@ -548,7 +543,6 @@ func (r *MessagesRepository) ListNotifications(ctx context.Context, viewerSpaceI
 			asset.metadata_cipher AS post_object_metadata_cipher
 		FROM notification_candidates n
 		JOIN spaces actor_space ON actor_space.space_id = n.actor_space_id
-		JOIN key_attributes actor_ka ON actor_ka.user_id = actor_space.owner_id
 		LEFT JOIN space_read_markers nrm
 		  ON nrm.viewer_space_id = $1
 		 AND nrm.scope = 'notifications'

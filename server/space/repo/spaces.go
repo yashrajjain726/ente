@@ -9,7 +9,7 @@ import (
 	"github.com/ente-io/stacktrace"
 )
 
-func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, spaceSlug, encryptedSpaceKey, encryptedProfile string) (*SpaceRecord, error) {
+func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, spaceSlug, encryptedSpaceKey, publicKey, encryptedSecretKey, secretKeyDecryptionNonce, encryptedProfile string) (*SpaceRecord, error) {
 	normalizedSpaceSlug, err := validateSpaceSlug(spaceSlug)
 	if err != nil {
 		return nil, err
@@ -22,9 +22,9 @@ func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, space
 	defer tx.Rollback()
 
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO spaces (space_id, owner_id, space_slug, encrypted_space_key, encrypted_profile, current_version)
-		VALUES ($1, $2, $3, $4, $5, 1)
-	`, spaceID, ownerID, normalizedSpaceSlug, encryptedSpaceKey, encryptedProfile); err != nil {
+		INSERT INTO spaces (space_id, owner_id, space_slug, encrypted_space_key, public_key, encrypted_secret_key, secret_key_decryption_nonce, encrypted_profile, current_version)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1)
+	`, spaceID, ownerID, normalizedSpaceSlug, encryptedSpaceKey, publicKey, encryptedSecretKey, secretKeyDecryptionNonce, encryptedProfile); err != nil {
 		return nil, wrapUnique(err, "space already exists")
 	}
 	if _, err := tx.ExecContext(ctx, `
@@ -35,6 +35,7 @@ func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, space
 	}
 	rec, err := scanSpaceRecord(tx.QueryRowContext(ctx, `
 		SELECT space_id, owner_id, space_slug, encrypted_space_key, encrypted_profile, current_version,
+		       public_key, encrypted_secret_key, secret_key_decryption_nonce,
 		       avatar_object_key, avatar_bucket_id, avatar_size, cover_object_key, cover_bucket_id, cover_size, created_at, updated_at
 		FROM spaces WHERE space_id = $1
 	`, spaceID))
@@ -50,6 +51,7 @@ func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, space
 func (r *SpacesRepository) ListSpacesByOwner(ctx context.Context, ownerID int64) ([]SpaceRecord, error) {
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT space_id, owner_id, space_slug, encrypted_space_key, encrypted_profile, current_version,
+		       public_key, encrypted_secret_key, secret_key_decryption_nonce,
 		       avatar_object_key, avatar_bucket_id, avatar_size, cover_object_key, cover_bucket_id, cover_size, created_at, updated_at
 		FROM spaces
 		WHERE owner_id = $1
@@ -73,6 +75,7 @@ func (r *SpacesRepository) ListSpacesByOwner(ctx context.Context, ownerID int64)
 func (r *SpacesRepository) GetDefaultSpaceByOwner(ctx context.Context, ownerID int64) (*SpaceRecord, error) {
 	return scanSpaceRecord(r.DB.QueryRowContext(ctx, `
 		SELECT space_id, owner_id, space_slug, encrypted_space_key, encrypted_profile, current_version,
+		       public_key, encrypted_secret_key, secret_key_decryption_nonce,
 		       avatar_object_key, avatar_bucket_id, avatar_size, cover_object_key, cover_bucket_id, cover_size, created_at, updated_at
 		FROM spaces
 		WHERE owner_id = $1
@@ -84,6 +87,7 @@ func (r *SpacesRepository) GetDefaultSpaceByOwner(ctx context.Context, ownerID i
 func (r *SpacesRepository) GetSpaceByID(ctx context.Context, spaceID string) (*SpaceRecord, error) {
 	return scanSpaceRecord(r.DB.QueryRowContext(ctx, `
 		SELECT space_id, owner_id, space_slug, encrypted_space_key, encrypted_profile, current_version,
+		       public_key, encrypted_secret_key, secret_key_decryption_nonce,
 		       avatar_object_key, avatar_bucket_id, avatar_size, cover_object_key, cover_bucket_id, cover_size, created_at, updated_at
 		FROM spaces
 		WHERE space_id = $1
@@ -93,6 +97,7 @@ func (r *SpacesRepository) GetSpaceByID(ctx context.Context, spaceID string) (*S
 func (r *SpacesRepository) GetSpaceBySlug(ctx context.Context, spaceSlug string) (*SpaceRecord, error) {
 	return scanSpaceRecord(r.DB.QueryRowContext(ctx, `
 		SELECT space_id, owner_id, space_slug, encrypted_space_key, encrypted_profile, current_version,
+		       public_key, encrypted_secret_key, secret_key_decryption_nonce,
 		       avatar_object_key, avatar_bucket_id, avatar_size, cover_object_key, cover_bucket_id, cover_size, created_at, updated_at
 		FROM spaces
 		WHERE space_slug = $1
@@ -103,8 +108,10 @@ func (r *SpacesRepository) GetOwnerPublicKey(ctx context.Context, ownerID int64)
 	var publicKey string
 	err := r.DB.QueryRowContext(ctx, `
 		SELECT public_key
-		FROM key_attributes
-		WHERE user_id = $1
+		FROM spaces
+		WHERE owner_id = $1
+		ORDER BY created_at ASC
+		LIMIT 1
 	`, ownerID).Scan(&publicKey)
 	return publicKey, stacktrace.Propagate(err, "")
 }
@@ -117,6 +124,7 @@ func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spa
 	defer tx.Rollback()
 	previous, err := scanSpaceRecord(tx.QueryRowContext(ctx, `
 		SELECT space_id, owner_id, space_slug, encrypted_space_key, encrypted_profile, current_version,
+		       public_key, encrypted_secret_key, secret_key_decryption_nonce,
 		       avatar_object_key, avatar_bucket_id, avatar_size, cover_object_key, cover_bucket_id, cover_size, created_at, updated_at
 		FROM spaces
 		WHERE owner_id = $1 AND space_id = $2
@@ -139,6 +147,7 @@ func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spa
 		    cover_size = CASE WHEN $6 THEN NULL ELSE COALESCE($9, cover_size) END
 		WHERE owner_id = $10 AND space_id = $11
 		RETURNING space_id, owner_id, space_slug, encrypted_space_key, encrypted_profile, current_version,
+		          public_key, encrypted_secret_key, secret_key_decryption_nonce,
 		          avatar_object_key, avatar_bucket_id, avatar_size, cover_object_key, cover_bucket_id, cover_size, created_at, updated_at
 	`
 	var objectKey, bucketID sql.NullString
@@ -228,6 +237,7 @@ func (r *SpacesRepository) UpdateSlug(ctx context.Context, ownerID int64, spaceI
 		SET space_slug = $1
 		WHERE owner_id = $2 AND space_id = $3
 		RETURNING space_id, owner_id, space_slug, encrypted_space_key, encrypted_profile, current_version,
+		          public_key, encrypted_secret_key, secret_key_decryption_nonce,
 		          avatar_object_key, avatar_bucket_id, avatar_size, cover_object_key, cover_bucket_id, cover_size, created_at, updated_at
 	`, normalizedSpaceSlug, ownerID, spaceID))
 	if err != nil {
@@ -247,6 +257,7 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID
 	defer tx.Rollback()
 	current, err := scanSpaceRecord(tx.QueryRowContext(ctx, `
 		SELECT space_id, owner_id, space_slug, encrypted_space_key, encrypted_profile, current_version,
+		       public_key, encrypted_secret_key, secret_key_decryption_nonce,
 		       avatar_object_key, avatar_bucket_id, avatar_size, cover_object_key, cover_bucket_id, cover_size, created_at, updated_at
 		FROM spaces
 		WHERE owner_id = $1 AND space_id = $2
@@ -270,6 +281,7 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID
 		SET encrypted_space_key = $1, encrypted_profile = $2, current_version = $3
 		WHERE owner_id = $4 AND space_id = $5
 		RETURNING space_id, owner_id, space_slug, encrypted_space_key, encrypted_profile, current_version,
+		          public_key, encrypted_secret_key, secret_key_decryption_nonce,
 		          avatar_object_key, avatar_bucket_id, avatar_size, cover_object_key, cover_bucket_id, cover_size, created_at, updated_at
 	`, encryptedSpaceKey, encryptedProfile, newVersion, ownerID, spaceID))
 	if err != nil {
@@ -328,6 +340,9 @@ func scanSpaceRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceRecord
 		&rec.EncryptedSpaceKey,
 		&rec.EncryptedProfile,
 		&rec.CurrentVersion,
+		&rec.PublicKey,
+		&rec.EncryptedSecretKey,
+		&rec.SecretKeyDecryptionNonce,
 		&rec.AvatarObjectKey,
 		&rec.AvatarBucketID,
 		&rec.AvatarSize,

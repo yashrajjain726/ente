@@ -4,32 +4,11 @@ use crate::transport::{
     PostObjectPayload, ProfileAvatarResponse, ProfileCoverResponse, SpaceActorResponse,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct AuthKeyAttributes {
-    pub kek_salt: String,
-    pub encrypted_key: String,
-    pub key_decryption_nonce: String,
-    pub public_key: String,
-    pub encrypted_secret_key: String,
-    pub secret_key_decryption_nonce: String,
-    pub mem_limit: u32,
-    pub ops_limit: u32,
-}
-
-#[derive(Debug, Clone)]
-pub enum PrivateKeySource {
-    Plain(Vec<u8>),
-    EncryptedKeyAttributes(AuthKeyAttributes),
-}
-
 #[derive(Debug, Clone)]
 pub struct OpenAccountSpaceCtxInput {
     pub base_url: String,
     pub space_session_token: Option<String>,
-    pub master_key: Vec<u8>,
-    pub public_key: Vec<u8>,
-    pub private_key_source: PrivateKeySource,
+    pub space_root_key: Vec<u8>,
     pub user_id: Option<i64>,
     pub user_agent: Option<String>,
     pub client_package: Option<String>,

@@ -59,7 +59,7 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID
 func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID int64, viewerSpaceID string) (*SpacePostRecord, error) {
 	return scanPostRecord(r.DB.QueryRowContext(ctx, `
 		SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
-		       w.owner_id, w.space_id, w.space_slug, owner_ka.public_key,
+		       w.owner_id, w.space_id, w.space_slug, w.public_key,
 		       w.current_version, w.encrypted_profile, w.avatar_object_key,
 		       w.avatar_size, w.updated_at,
 		       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = w.space_id) AS author_friends,
@@ -70,7 +70,6 @@ func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID in
 		       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
-			JOIN key_attributes owner_ka ON owner_ka.user_id = w.owner_id
 			WHERE p.post_id = $1 AND p.is_deleted = FALSE
 		`, postID, viewerSpaceID))
 }
@@ -83,7 +82,7 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 	args := []any{spaceID, viewerSpaceID}
 	query := `
 			SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
-			       w.owner_id, w.space_id, w.space_slug, owner_ka.public_key,
+			       w.owner_id, w.space_id, w.space_slug, w.public_key,
 			       w.current_version, w.encrypted_profile, w.avatar_object_key,
 			       w.avatar_size, w.updated_at,
 			       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = w.space_id) AS author_friends,
@@ -94,7 +93,6 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 			       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked
 				FROM space_posts p
 				JOIN spaces w ON w.space_id = p.space_id
-				JOIN key_attributes owner_ka ON owner_ka.user_id = w.owner_id
 				WHERE p.space_id = $1 AND p.is_deleted = FALSE`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorPostID)
@@ -134,7 +132,7 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 	args := []any{viewerID, viewerSpaceID}
 	query := `
 			SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
-			       w.owner_id, w.space_id, w.space_slug, owner_ka.public_key,
+			       w.owner_id, w.space_id, w.space_slug, w.public_key,
 			       w.current_version, w.encrypted_profile, w.avatar_object_key,
 			       w.avatar_size, w.updated_at,
 			       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = w.space_id) AS author_friends,
@@ -145,7 +143,6 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 			       CASE WHEN p.space_id = $2 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) END AS viewer_liked
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
-			JOIN key_attributes owner_ka ON owner_ka.user_id = w.owner_id
 			WHERE p.is_deleted = FALSE
 			  AND (
 			    p.space_id = $2 OR EXISTS (
@@ -317,7 +314,7 @@ func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, curs
 	}
 	args := []any{postID}
 	query := `
-		SELECT liker_space.owner_id, liker_space.space_id, liker_space.space_slug, liker_ka.public_key,
+		SELECT liker_space.owner_id, liker_space.space_id, liker_space.space_slug, liker_space.public_key,
 		       liker_space.current_version, liker_space.encrypted_profile, liker_space.avatar_object_key,
 		       liker_space.avatar_size, liker_space.updated_at,
 		       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = liker_space.space_id) AS liker_friends,
@@ -325,7 +322,6 @@ func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, curs
 		       pl.created_at
 		FROM space_post_likes pl
 		JOIN spaces liker_space ON liker_space.space_id = pl.actor_space_id
-		JOIN key_attributes liker_ka ON liker_ka.user_id = pl.user_id
 		WHERE pl.post_id = $1`
 	if cursorCreatedAt, cursorActorSpaceID, ok := parsePostLikerCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorActorSpaceID)

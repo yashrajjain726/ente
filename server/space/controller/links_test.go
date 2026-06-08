@@ -11,7 +11,7 @@ import (
 func TestCreateSpaceLinkReturnsExistingActiveLink(t *testing.T) {
 	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-link-create@example.com", "alice-public")
-	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-link-create", "alice-space-key", "alice-profile")
+	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-link-create", "alice-space-key", "alice-link-create-public", "alice-link-create-secret", "alice-link-create-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	existing, err := repos.Links.UpsertLink(ctx, space.SpaceID, []byte("old-hash"), space.CurrentVersion, "old-space-link-key", "old-owner-link-secret")
 	require.NoError(t, err)

@@ -2,10 +2,10 @@
 
 use ente_core::http::Error as HttpError;
 use ente_space::{
-    AccountSpaceCtx, AuthKeyAttributes, CreatedSpace, CreatedSpaceLink, DecryptedMessage,
+    AccountSpaceCtx, CreatedSpace, CreatedSpaceLink, DecryptedMessage,
     DecryptedPost, DecryptedSpaceProfile, MessageConversationActivity, MessageConversationPost,
     MessageResponse, OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostResponse,
-    PrivateKeySource, ProfileAvatarResponse, ProfileCoverResponse, SpaceActorResponse,
+    ProfileAvatarResponse, ProfileCoverResponse, SpaceActorResponse,
     SpaceError as CoreSpaceError, SpaceLinkCtx, SpaceNotificationResponse,
     crypto::{decode_b64, encode_b64},
 };
@@ -80,11 +80,7 @@ impl From<swb::Error> for WasmSpaceError {
 struct OpenAccountSpaceCtxJsInput {
     base_url: String,
     space_session_token: Option<String>,
-    master_key_b64: String,
-    public_key_b64: String,
-    private_key_b64: Option<String>,
-    key_attributes: Option<AuthKeyAttributes>,
-    auth_key_attributes: Option<AuthKeyAttributes>,
+    space_root_key_b64: String,
     user_id: Option<i64>,
     user_agent: Option<String>,
     client_package: Option<String>,
@@ -541,7 +537,7 @@ async fn message_conversation_activity_to_js(
 ) -> Result<MessageConversationActivityJs, WasmSpaceError> {
     let message = match activity.message {
         Some(message) => {
-            let decrypted = ctx.decrypt_message(&message)?;
+            let decrypted = ctx.decrypt_message(&message).await?;
             Some(account_message_to_js(ctx, message, decrypted).await?)
         }
         None => None,
@@ -595,21 +591,11 @@ pub async fn space_open_account_ctx(
     input: JsValue,
 ) -> Result<SpaceAccountCtxHandle, WasmSpaceError> {
     let input: OpenAccountSpaceCtxJsInput = swb::from_value(input)?;
-    let master_key = decode_b64_field(&input.master_key_b64)?;
-    let public_key = decode_b64_field(&input.public_key_b64)?;
-    let private_key_source = if let Some(private_key_b64) = input.private_key_b64.as_deref() {
-        PrivateKeySource::Plain(decode_b64_field(private_key_b64)?)
-    } else if let Some(attrs) = input.key_attributes.or(input.auth_key_attributes) {
-        PrivateKeySource::EncryptedKeyAttributes(attrs)
-    } else {
-        return Err(CoreSpaceError::MissingPrivateKey.into());
-    };
+    let space_root_key = decode_b64_field(&input.space_root_key_b64)?;
     let ctx = AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
         base_url: input.base_url.clone(),
         space_session_token: input.space_session_token,
-        master_key,
-        public_key,
-        private_key_source,
+        space_root_key,
         user_id: input.user_id,
         user_agent: input.user_agent.clone(),
         client_package: input.client_package.clone(),
@@ -1087,7 +1073,7 @@ impl SpaceAccountCtxHandle {
         text: String,
     ) -> Result<JsValue, WasmSpaceError> {
         let message = self.inner.send_message(&space_id, &text).await?;
-        let decrypted = self.inner.decrypt_message(&message)?;
+        let decrypted = self.inner.decrypt_message(&message).await?;
         swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
             .map_err(Into::into)
     }
@@ -1103,7 +1089,7 @@ impl SpaceAccountCtxHandle {
             .inner
             .reply_to_message(&space_id, &message_id, &text)
             .await?;
-        let decrypted = self.inner.decrypt_message(&message)?;
+        let decrypted = self.inner.decrypt_message(&message).await?;
         swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
             .map_err(Into::into)
     }
@@ -1115,7 +1101,7 @@ impl SpaceAccountCtxHandle {
         text: String,
     ) -> Result<JsValue, WasmSpaceError> {
         let message = self.inner.reply_to_post(post_id, &text).await?;
-        let decrypted = self.inner.decrypt_message(&message)?;
+        let decrypted = self.inner.decrypt_message(&message).await?;
         swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
             .map_err(Into::into)
     }
@@ -1180,7 +1166,7 @@ impl SpaceAccountCtxHandle {
             .await?;
         let mut items = Vec::with_capacity(page.items.len());
         for message in page.items {
-            let decrypted = self.inner.decrypt_message(&message)?;
+            let decrypted = self.inner.decrypt_message(&message).await?;
             items.push(account_message_to_js(&self.inner, message, decrypted).await?);
         }
         swb::to_value(&MessagePageJs {

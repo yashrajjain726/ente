@@ -27,10 +27,14 @@ import {
     putSpaceSignupKeyAttributes,
     setupSpaceSignupSRP,
 } from "services/spaceBootstrapAuth";
-import { createSpaceBrowserSession } from "services/spacePersistentSession";
 import {
-    masterKeyFromSpaceSession,
-    saveMasterKeyInSpaceSession,
+    createSpaceBrowserSession,
+    getOrCreateSpaceRootKey,
+} from "services/spacePersistentSession";
+import {
+    authMasterKeyFromSpaceSession,
+    clearAuthMasterKeyFromSpaceSession,
+    saveAuthMasterKeyInSpaceSession,
 } from "services/spaceSecureSessionStorage";
 
 export interface SpaceSignupInput {
@@ -61,7 +65,7 @@ export const beginSpaceSignup = async ({
         keyAttributes,
         masterKey,
     );
-    saveMasterKeyInSpaceSession(masterKey);
+    saveAuthMasterKeyInSpaceSession(masterKey);
     saveJustSignedUp();
 
     return { email: cleanedEmail };
@@ -109,7 +113,7 @@ export const completeSpaceSignup = async (email: string, code: string) => {
 
     replaceSavedLocalUser({ id, email });
 
-    const masterKey = masterKeyFromSpaceSession();
+    const masterKey = authMasterKeyFromSpaceSession();
     if (!masterKey) throw new Error("Signup session expired. Please sign in.");
 
     let bootstrapAuthToken: string;
@@ -143,7 +147,12 @@ export const completeSpaceSignup = async (email: string, code: string) => {
         await getAndSaveSRPAttributes(email);
     }
 
-    await createSpaceBrowserSession(masterKey, bootstrapAuthToken);
+    const spaceRootKey = await getOrCreateSpaceRootKey(
+        masterKey,
+        bootstrapAuthToken,
+    );
+    await createSpaceBrowserSession(spaceRootKey, bootstrapAuthToken);
+    clearAuthMasterKeyFromSpaceSession();
     saveIsFirstLogin();
 };
 

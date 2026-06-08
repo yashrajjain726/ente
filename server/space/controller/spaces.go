@@ -39,16 +39,25 @@ func (c *SpacesController) Create(ctx *gin.Context, req models.CreateSpaceReques
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.SpaceSlug) == "" || strings.TrimSpace(req.EncryptedSpaceKey) == "" {
-		return nil, ente.NewBadRequestWithMessage("spaceSlug and encryptedSpaceKey are required")
+	if strings.TrimSpace(req.SpaceSlug) == "" || strings.TrimSpace(req.EncryptedSpaceKey) == "" || strings.TrimSpace(req.PublicKey) == "" || strings.TrimSpace(req.EncryptedSecretKey) == "" || strings.TrimSpace(req.SecretKeyDecryptionNonce) == "" {
+		return nil, ente.NewBadRequestWithMessage("spaceSlug, encryptedSpaceKey and space identity keys are required")
 	}
 	if err := validateEncodedSpaceField("encryptedSpaceKey", req.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		return nil, err
+	}
+	if err := validateEncodedSpaceField("publicKey", req.PublicKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		return nil, err
+	}
+	if err := validateEncodedSpaceField("encryptedSecretKey", req.EncryptedSecretKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		return nil, err
+	}
+	if err := validateEncodedSpaceField("secretKeyDecryptionNonce", req.SecretKeyDecryptionNonce, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
 		return nil, err
 	}
 	if err := validateOptionalEncodedSpaceField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes); err != nil {
 		return nil, err
 	}
-	space, err := c.SpacesRepo.CreateSpace(ctx.Request.Context(), userID, req.SpaceSlug, req.EncryptedSpaceKey, req.EncryptedProfile)
+	space, err := c.SpacesRepo.CreateSpace(ctx.Request.Context(), userID, req.SpaceSlug, req.EncryptedSpaceKey, req.PublicKey, req.EncryptedSecretKey, req.SecretKeyDecryptionNonce, req.EncryptedProfile)
 	if err != nil {
 		return nil, err
 	}

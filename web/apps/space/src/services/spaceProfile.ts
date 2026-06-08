@@ -1,7 +1,4 @@
-import {
-    savedKeyAttributes,
-    savedPartialLocalUser,
-} from "ente-accounts-rs/services/accounts-db";
+import { savedPartialLocalUser } from "ente-accounts-rs/services/accounts-db";
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
 import { apiOrigin, apiURL } from "ente-base/origins";
 import type { SpaceAccountCtxHandle } from "ente-wasm";
@@ -14,7 +11,7 @@ import {
     restoreSpaceBrowserSessionIfNeeded,
     savedSpaceSessionToken,
 } from "services/spacePersistentSession";
-import { masterKeyFromSpaceSession } from "services/spaceSecureSessionStorage";
+import { spaceRootKeyFromSpaceSession } from "services/spaceSecureSessionStorage";
 
 const usernamePattern = /^[a-z0-9][a-z0-9._-]*$/;
 const minUsernameLength = 3;
@@ -117,27 +114,24 @@ const defaultOwnedSpace = (spaces: OwnedSpace[]) => spaces[0];
 
 const currentSpaceContextConfig = async () => {
     await restoreSpaceBrowserSessionIfNeeded();
-    const [baseUrl, masterKeyB64] = await Promise.all([
+    const [baseUrl, spaceRootKeyB64] = await Promise.all([
         apiOrigin(),
-        masterKeyFromSpaceSession(),
+        spaceRootKeyFromSpaceSession(),
     ]);
     const user = savedPartialLocalUser();
-    const keyAttributes = savedKeyAttributes();
     const spaceSessionToken = savedSpaceSessionToken();
 
-    if (!masterKeyB64 || !user?.id || !keyAttributes || !spaceSessionToken) {
+    if (!spaceRootKeyB64 || !user?.id || !spaceSessionToken) {
         return undefined;
     }
 
     return {
-        cacheKey: [user.id, baseUrl, keyAttributes.publicKey].join(":"),
+        cacheKey: [user.id, baseUrl, spaceSessionToken].join(":"),
         input: {
             baseUrl,
             clientPackage: clientPackageName,
             clientVersion: isDesktop ? desktopAppVersion : undefined,
-            keyAttributes,
-            masterKeyB64,
-            publicKeyB64: keyAttributes.publicKey,
+            spaceRootKeyB64,
             spaceSessionToken,
             userId: user.id,
         },

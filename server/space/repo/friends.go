@@ -226,20 +226,18 @@ func (r *FriendsRepository) DeleteShareBySpaceAndFriend(ctx context.Context, spa
 
 func (r *FriendsRepository) GetShareForFriendAndSpace(ctx context.Context, friendID int64, friendSpaceID string, spaceID string) (*SpaceShareRecord, error) {
 	return scanShareRecord(r.DB.QueryRowContext(ctx, `
-		SELECT s.space_id, s.friend_id, w.owner_id, w.space_slug, s.encrypted_space_key, s.key_version, s.created_at, ka.public_key
+		SELECT s.space_id, s.friend_id, w.owner_id, w.space_slug, s.encrypted_space_key, s.key_version, s.created_at, w.public_key
 		FROM space_friend_shares s
 		JOIN spaces w ON w.space_id = s.space_id
-		JOIN key_attributes ka ON ka.user_id = w.owner_id
 		WHERE s.friend_id = $1 AND s.friend_space_id = $2 AND s.space_id = $3
 	`, friendID, friendSpaceID, spaceID))
 }
 
 func (r *FriendsRepository) ListSharesForFriend(ctx context.Context, friendID int64) ([]SpaceShareRecord, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT s.space_id, s.friend_id, w.owner_id, w.space_slug, s.encrypted_space_key, s.key_version, s.created_at, ka.public_key
+		SELECT s.space_id, s.friend_id, w.owner_id, w.space_slug, s.encrypted_space_key, s.key_version, s.created_at, w.public_key
 		FROM space_friend_shares s
 		JOIN spaces w ON w.space_id = s.space_id
-		JOIN key_attributes ka ON ka.user_id = w.owner_id
 		WHERE s.friend_id = $1
 		ORDER BY s.created_at ASC
 	`, friendID)
@@ -263,7 +261,7 @@ func (r *FriendsRepository) ListFriendsForSpace(ctx context.Context, spaceID str
 		SELECT friend_space.owner_id,
 		       friend_space.space_id,
 		       friend_space.space_slug,
-		       friend_ka.public_key,
+		       friend_space.public_key,
 		       friend_space.current_version,
 		       friend_space.encrypted_profile,
 		       friend_space.avatar_object_key,
@@ -275,7 +273,6 @@ func (r *FriendsRepository) ListFriendsForSpace(ctx context.Context, spaceID str
 		       s.created_at
 		FROM space_friend_shares s
 		JOIN spaces friend_space ON friend_space.space_id = s.friend_space_id
-		JOIN key_attributes friend_ka ON friend_ka.user_id = s.friend_id
 		WHERE s.space_id = $1
 		ORDER BY lower(friend_space.space_slug) ASC
 	`, spaceID)

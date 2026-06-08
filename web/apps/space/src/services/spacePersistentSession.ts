@@ -1,24 +1,20 @@
 import {
     replaceSavedLocalUser,
-    savedKeyAttributes,
     savedPartialLocalUser,
-    saveKeyAttributes,
-    saveOriginalKeyAttributes,
 } from "ente-accounts-rs/services/accounts-db";
 import {
     decryptBox,
     encryptBox,
     generateKey,
 } from "ente-accounts-rs/services/crypto";
-import { RemoteKeyAttributes } from "ente-accounts-rs/services/user";
 import { ensureOk, publicRequestHeaders } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
 import { removeAuthToken } from "ente-base/token";
 import { spaceBootstrapAuthHeaders } from "services/spaceBootstrapAuth";
 import {
     clearSpaceSecureSessionStorage,
-    masterKeyFromSpaceSession,
-    saveMasterKeyInSpaceSession,
+    saveSpaceRootKeyInSpaceSession,
+    spaceRootKeyFromSpaceSession,
 } from "services/spaceSecureSessionStorage";
 import { z } from "zod";
 
@@ -26,12 +22,11 @@ const spaceBrowserSessionStorageKey = "spaceBrowserSession";
 const spaceSessionTokenHeader = "X-Space-Session-Token";
 
 const PersistedSpaceBrowserSession = z.object({
-    encryptedMasterKey: z.string(),
+    encryptedSpaceRootKey: z.string(),
     email: z.string(),
     nonce: z.string(),
     sessionToken: z.string(),
     userId: z.number(),
-    version: z.literal(3),
 });
 
 const SpaceBrowserSessionResponse = z.object({ sessionToken: z.string() });
@@ -39,7 +34,11 @@ const SpaceBrowserSessionResponse = z.object({ sessionToken: z.string() });
 const SpaceBrowserSessionBootstrapResponse = z.object({
     id: z.number(),
     clientKey: z.string(),
-    keyAttributes: RemoteKeyAttributes,
+});
+
+const SpaceEntityKeyResponse = z.object({
+    encryptedKey: z.string(),
+    header: z.string(),
 });
 
 const savedPersistedSession = () => {
@@ -75,7 +74,7 @@ const forgetBootstrapToken = async () => {
 };
 
 export const createSpaceBrowserSession = async (
-    masterKey: string,
+    spaceRootKey: string,
     authToken: string,
 ) => {
     const clientKey = await generateKey();
@@ -96,18 +95,18 @@ export const createSpaceBrowserSession = async (
     if (!user?.id || !user.email) {
         throw new Error("Space user is missing.");
     }
-    const box = await encryptBox(masterKey, clientKey);
+    const box = await encryptBox(spaceRootKey, clientKey);
     localStorage.setItem(
         spaceBrowserSessionStorageKey,
         JSON.stringify({
-            encryptedMasterKey: box.encryptedData,
+            encryptedSpaceRootKey: box.encryptedData,
             email: user.email,
             nonce: box.nonce,
             sessionToken,
             userId: user.id,
-            version: 3,
         }),
     );
+    saveSpaceRootKeyInSpaceSession(spaceRootKey);
     await forgetBootstrapToken();
 };
 
@@ -115,9 +114,8 @@ let pendingRestore: Promise<boolean> | undefined;
 
 export const restoreSpaceBrowserSessionIfNeeded = async () => {
     if (
-        masterKeyFromSpaceSession() &&
+        spaceRootKeyFromSpaceSession() &&
         savedPartialLocalUser()?.id &&
-        savedKeyAttributes() &&
         savedSpaceSessionToken()
     ) {
         return true;
@@ -151,16 +149,43 @@ const restoreSpaceBrowserSession = async () => {
         clearSpaceBrowserSession();
         return false;
     }
-    const masterKey = await decryptBox(
-        { encryptedData: persisted.encryptedMasterKey, nonce: persisted.nonce },
+    const spaceRootKey = await decryptBox(
+        {
+            encryptedData: persisted.encryptedSpaceRootKey,
+            nonce: persisted.nonce,
+        },
         bootstrap.clientKey,
     );
     replaceSavedLocalUser({ id: bootstrap.id, email: persisted.email });
-    saveKeyAttributes(bootstrap.keyAttributes);
-    saveOriginalKeyAttributes(bootstrap.keyAttributes);
-    saveMasterKeyInSpaceSession(masterKey);
+    saveSpaceRootKeyInSpaceSession(spaceRootKey);
     await removeAuthToken();
     return true;
+};
+
+export const getOrCreateSpaceRootKey = async (
+    masterKey: string,
+    authToken: string,
+) => {
+    const candidate = await generateKey();
+    const box = await encryptBox(candidate, masterKey);
+    const res = await fetch(await apiURL("/space/entity-key/ensure"), {
+        method: "POST",
+        headers: {
+            ...spaceBootstrapAuthHeaders(authToken),
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            type: "space",
+            encryptedKey: box.encryptedData,
+            header: box.nonce,
+        }),
+    });
+    ensureOk(res);
+    const ensured = SpaceEntityKeyResponse.parse(await res.json());
+    return decryptBox(
+        { encryptedData: ensured.encryptedKey, nonce: ensured.header },
+        masterKey,
+    );
 };
 
 export const revokeSpaceBrowserSession = async () => {

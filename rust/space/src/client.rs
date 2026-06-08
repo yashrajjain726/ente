@@ -4,17 +4,17 @@ use std::{
 };
 
 use crate::crypto::{
-    PACKED_SECRETBOX_OVERHEAD_BYTES, decode_b64, decrypt_entity_key, decrypt_secretbox_packed,
+    PACKED_SECRETBOX_OVERHEAD_BYTES, decode_b64, decrypt_secretbox_packed, decrypt_secretbox_split,
     derive_space_link_auth_key, derive_space_link_wrap_key, encode_b64, encrypt_asset_payload,
-    encrypt_entity_key, encrypt_secretbox_packed, generate_key, generate_space_link_access_key,
-    pack_payload, space_link_access_key_material, unpack_payload,
+    encrypt_secretbox_packed, encrypt_secretbox_split, generate_key,
+    generate_space_link_access_key, pack_payload, space_link_access_key_material, unpack_payload,
 };
 use crate::error::{Result, SpaceError};
 use crate::http::{HttpClient, HttpConfig};
 use crate::models::{
     CreatedSpace, CreatedSpaceLink, DecryptedFriendShare, DecryptedMessage, DecryptedPost,
     DecryptedSpaceProfile, FeedItem, FeedPage, HydratedKeys, MessagePayload, MessageQuote,
-    OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostObjectMetadata, PrivateKeySource,
+    OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostObjectMetadata,
 };
 use crate::transport::{
     AddFriendPayload, AssetDownloadResponse, CreateEntityKeyRequest, CreateMessageRequest,
@@ -31,10 +31,8 @@ use crate::transport::{
     UpdatePostCaptionRequest, UpdateSpaceProfileRequest, UpdateSpaceProfileResponse,
     UpdateSpaceSlugRequest,
 };
-use ente_core::crypto::{sealed, secretbox};
+use ente_core::crypto::{keys, sealed};
 use ente_core::http::Error as HttpError;
-
-const ROOT_SPACE_KEY_TYPE: &str = "space";
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
 const UPLOAD_PURPOSE_COVER: &str = "cover";
 const MESSAGE_KIND_REGULAR: &str = "regular";
@@ -68,13 +66,18 @@ struct ResolvedOwnedSpaceAccess {
     key_version: i32,
 }
 
-pub struct AccountSpaceCtx {
-    client: HttpClient,
-    master_key: Vec<u8>,
+#[derive(Debug, Clone)]
+struct SpaceIdentity {
     public_key: Vec<u8>,
     private_key: Vec<u8>,
+}
+
+pub struct AccountSpaceCtx {
+    client: HttpClient,
+    root_space_key: Vec<u8>,
     user_id: Option<i64>,
     root_space_key_cache: Mutex<Option<Option<Vec<u8>>>>,
+    space_identity_cache: Mutex<Option<SpaceIdentity>>,
     owned_spaces_cache: Mutex<Option<Vec<SpaceKeyResponse>>>,
     friend_shares_cache: Mutex<Option<Vec<DecryptedFriendShare>>>,
 }
@@ -100,14 +103,12 @@ impl AccountSpaceCtx {
             input.client_package,
             input.client_version,
         )?;
-        let private_key = decrypt_private_key(&input.master_key, input.private_key_source)?;
         Ok(Self {
             client,
-            master_key: input.master_key,
-            public_key: input.public_key,
-            private_key,
+            root_space_key: input.space_root_key,
             user_id: input.user_id,
             root_space_key_cache: Mutex::new(None),
+            space_identity_cache: Mutex::new(None),
             owned_spaces_cache: Mutex::new(None),
             friend_shares_cache: Mutex::new(None),
         })
@@ -121,16 +122,8 @@ impl AccountSpaceCtx {
         self.user_id
     }
 
-    pub fn master_key(&self) -> &[u8] {
-        &self.master_key
-    }
-
-    pub fn public_key(&self) -> &[u8] {
-        &self.public_key
-    }
-
-    pub fn private_key(&self) -> &[u8] {
-        &self.private_key
+    pub fn root_space_key(&self) -> &[u8] {
+        &self.root_space_key
     }
 
     pub async fn get_entity_key(&self, key_type: &str) -> Result<Option<EntityKeyPayload>> {
@@ -183,20 +176,11 @@ impl AccountSpaceCtx {
     }
 
     pub async fn get_root_space_key(&self) -> Result<Option<Vec<u8>>> {
-        let payload = match self.get_entity_key(ROOT_SPACE_KEY_TYPE).await? {
-            Some(value) => value,
-            None => return Ok(None),
-        };
-        Ok(Some(decrypt_entity_key(&self.master_key, &payload)?))
+        Ok(Some(self.root_space_key.clone()))
     }
 
     pub async fn get_or_create_root_space_key(&self) -> Result<Vec<u8>> {
-        let root_space_key = generate_key();
-        let payload = encrypt_entity_key(&self.master_key, &root_space_key)?;
-        let ensured = self
-            .ensure_entity_key(ROOT_SPACE_KEY_TYPE, &payload)
-            .await?;
-        let root_space_key = decrypt_entity_key(&self.master_key, &ensured)?;
+        let root_space_key = self.root_space_key.clone();
         *cache_lock(&self.root_space_key_cache, "root space key")? =
             Some(Some(root_space_key.clone()));
         Ok(root_space_key)
@@ -222,16 +206,53 @@ impl AccountSpaceCtx {
             .map_err(Into::into)
     }
 
-    pub fn decrypt_friend_share(
+    fn decrypt_space_identity(&self, space: &SpaceKeyResponse) -> Result<SpaceIdentity> {
+        if space.public_key.trim().is_empty()
+            || space.encrypted_secret_key.trim().is_empty()
+            || space.secret_key_decryption_nonce.trim().is_empty()
+        {
+            return Err(SpaceError::MissingPrivateKey);
+        }
+        let public_key = decode_b64(&space.public_key)?;
+        let encrypted_secret_key = decode_b64(&space.encrypted_secret_key)?;
+        let secret_key_decryption_nonce = decode_b64(&space.secret_key_decryption_nonce)?;
+        let private_key = decrypt_secretbox_split(
+            &self.root_space_key,
+            &encrypted_secret_key,
+            &secret_key_decryption_nonce,
+        )?;
+        Ok(SpaceIdentity {
+            public_key,
+            private_key,
+        })
+    }
+
+    async fn default_space_identity(&self) -> Result<SpaceIdentity> {
+        if let Some(value) = cache_lock(&self.space_identity_cache, "space identity")?.clone() {
+            return Ok(value);
+        }
+        let space = self
+            .list_owned_spaces_cached()
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| SpaceError::InvalidInput("no owned space is available".into()))?;
+        let identity = self.decrypt_space_identity(&space)?;
+        *cache_lock(&self.space_identity_cache, "space identity")? = Some(identity.clone());
+        Ok(identity)
+    }
+
+    pub async fn decrypt_friend_share(
         &self,
         share: &FriendShareResponse,
     ) -> Result<DecryptedFriendShare> {
+        let identity = self.default_space_identity().await?;
         let packed = decode_b64(&share.encrypted_space_key)?;
         let (ciphertext, _) = unpack_payload(&packed)?;
         if ciphertext.is_empty() {
             return Err(SpaceError::MissingEncryptedSpaceKey);
         }
-        let space_key = sealed::open(&ciphertext, &self.public_key, &self.private_key)?;
+        let space_key = sealed::open(&ciphertext, &identity.public_key, &identity.private_key)?;
         Ok(DecryptedFriendShare {
             friend: share.friend.clone(),
             space_id: share.space_id.clone(),
@@ -286,10 +307,16 @@ impl AccountSpaceCtx {
         let root_space_key = self.get_or_create_root_space_key().await?;
         let encrypted_space_key =
             encode_b64(&encrypt_secretbox_packed(&root_space_key, space_key)?);
+        let (public_key, private_key) = keys::generate_keypair()?;
+        let (encrypted_secret_key, secret_key_decryption_nonce) =
+            encrypt_secretbox_split(&root_space_key, &private_key)?;
         let encrypted_profile = encode_b64(&encrypt_secretbox_packed(space_key, profile)?);
         let request = CreateSpaceRequest {
             space_slug: space_slug.to_owned(),
             encrypted_space_key: encrypted_space_key.clone(),
+            public_key: encode_b64(&public_key),
+            encrypted_secret_key: encode_b64(&encrypted_secret_key),
+            secret_key_decryption_nonce: encode_b64(&secret_key_decryption_nonce),
             encrypted_profile: encrypted_profile.clone(),
         };
         let response = self
@@ -300,9 +327,16 @@ impl AccountSpaceCtx {
             space_id: response.space_id.clone(),
             space_slug: response.space_slug.clone(),
             encrypted_space_key: encrypted_space_key.clone(),
+            public_key: request.public_key.clone(),
+            encrypted_secret_key: request.encrypted_secret_key.clone(),
+            secret_key_decryption_nonce: request.secret_key_decryption_nonce.clone(),
             encrypted_profile: encrypted_profile.clone(),
             key_version: response.key_version,
         })?;
+        *cache_lock(&self.space_identity_cache, "space identity")? = Some(SpaceIdentity {
+            public_key,
+            private_key,
+        });
         Ok(CreatedSpace {
             space_id: response.space_id,
             space_slug: response.space_slug,
@@ -882,7 +916,7 @@ impl AccountSpaceCtx {
         let friends_records = self.list_friend_shares().await?;
         let mut friends = Vec::with_capacity(friends_records.len());
         for record in &friends_records {
-            friends.push(self.decrypt_friend_share(record)?);
+            friends.push(self.decrypt_friend_share(record).await?);
         }
 
         Ok(HydratedKeys { owned, friends })
@@ -1088,7 +1122,9 @@ impl AccountSpaceCtx {
             text: text.to_owned(),
             quote: None,
         };
-        let request = self.message_request_for_payload(&friend.public_key, &payload, None)?;
+        let request = self
+            .message_request_for_payload(&friend.public_key, &payload, None)
+            .await?;
         let path = format!("/space/messages/{space_id}");
         self.client
             .post_json(&path, &request)
@@ -1113,8 +1149,9 @@ impl AccountSpaceCtx {
             text: text.to_owned(),
             quote: None,
         };
-        let request =
-            self.message_request_for_payload(&friend.public_key, &payload, Some(reply_message_id))?;
+        let request = self
+            .message_request_for_payload(&friend.public_key, &payload, Some(reply_message_id))
+            .await?;
         let path = format!("/space/messages/{space_id}");
         self.client
             .post_json(&path, &request)
@@ -1157,7 +1194,9 @@ impl AccountSpaceCtx {
                 media_type: object_metadata.and_then(|value| value.media_type),
             }),
         };
-        let request = self.message_request_for_payload(&post.author.public_key, &payload, None)?;
+        let request = self
+            .message_request_for_payload(&post.author.public_key, &payload, None)
+            .await?;
         let path = format!("/space/posts/{post_id}/reply");
         self.client
             .post_json(&path, &request)
@@ -1165,13 +1204,14 @@ impl AccountSpaceCtx {
             .map_err(Into::into)
     }
 
-    pub fn decrypt_message(&self, message: &MessageResponse) -> Result<DecryptedMessage> {
+    pub async fn decrypt_message(&self, message: &MessageResponse) -> Result<DecryptedMessage> {
         if message.is_deleted {
             return Err(SpaceError::InvalidInput("message is deleted".into()));
         }
+        let identity = self.default_space_identity().await?;
         let packed_key = decode_b64(&message.encrypted_message_key)?;
         let (sealed_key, _) = unpack_payload(&packed_key)?;
-        let message_key = sealed::open(&sealed_key, &self.public_key, &self.private_key)?;
+        let message_key = sealed::open(&sealed_key, &identity.public_key, &identity.private_key)?;
         let packed_message = decode_b64(&message.message_cipher)?;
         let plaintext = decrypt_secretbox_packed(&message_key, &packed_message)?;
         let payload: MessagePayload = serde_json::from_slice(&plaintext)
@@ -1217,18 +1257,19 @@ impl AccountSpaceCtx {
             .ok_or_else(|| SpaceError::InvalidInput(format!("space {space_id} is not a friend")))
     }
 
-    fn message_request_for_payload(
+    async fn message_request_for_payload(
         &self,
         recipient_public_key: &str,
         payload: &MessagePayload,
         reply_message_id: Option<&str>,
     ) -> Result<CreateMessageRequest> {
+        let identity = self.default_space_identity().await?;
         let recipient_public_key = decode_b64(recipient_public_key)?;
         let message_key = generate_key();
         let plaintext = serde_json::to_vec(payload)
             .map_err(|err| SpaceError::InvalidInput(format!("invalid message payload: {err}")))?;
         validate_message_payload(payload, plaintext.len())?;
-        let sender_key = sealed::seal(&message_key, &self.public_key)?;
+        let sender_key = sealed::seal(&message_key, &identity.public_key)?;
         let recipient_key = sealed::seal(&message_key, &recipient_public_key)?;
         Ok(CreateMessageRequest {
             message_id: None,
@@ -1245,8 +1286,9 @@ impl AccountSpaceCtx {
                 "target public key is required".into(),
             ));
         }
+        let identity = self.default_space_identity().await?;
         let (requester_space, requester_space_key) = self.default_profile_space_access().await?;
-        let target_share = sealed::seal(link.space_key(), &self.public_key)?;
+        let target_share = sealed::seal(link.space_key(), &identity.public_key)?;
         let requester_share = sealed::seal(&requester_space_key, link.owner_public_key())?;
         let payload = AddFriendPayload {
             target_space_id: link.space_id().to_owned(),
@@ -1526,12 +1568,11 @@ impl AccountSpaceCtx {
         if let Some(value) = cache_lock(&self.friend_shares_cache, "friend shares")?.clone() {
             return Ok(value);
         }
-        let value = self
-            .list_friend_shares()
-            .await?
-            .into_iter()
-            .map(|share| self.decrypt_friend_share(&share))
-            .collect::<Result<Vec<_>>>()?;
+        let shares = self.list_friend_shares().await?;
+        let mut value = Vec::with_capacity(shares.len());
+        for share in shares {
+            value.push(self.decrypt_friend_share(&share).await?);
+        }
         *cache_lock(&self.friend_shares_cache, "friend shares")? = Some(value.clone());
         Ok(value)
     }
@@ -2018,17 +2059,6 @@ fn cache_lock<'a, T>(cache: &'a Mutex<T>, name: &str) -> Result<MutexGuard<'a, T
         .map_err(|_| SpaceError::InvalidInput(format!("{name} cache poisoned")))
 }
 
-fn decrypt_private_key(master_key: &[u8], source: PrivateKeySource) -> Result<Vec<u8>> {
-    match source {
-        PrivateKeySource::Plain(value) => Ok(value),
-        PrivateKeySource::EncryptedKeyAttributes(value) => {
-            let ciphertext = decode_b64(&value.encrypted_secret_key)?;
-            let nonce = decode_b64(&value.secret_key_decryption_nonce)?;
-            secretbox::decrypt(&ciphertext, &nonce, master_key).map_err(Into::into)
-        }
-    }
-}
-
 fn decrypt_space_profile(
     profile: &SpaceProfileResponse,
     space_key: &[u8],
@@ -2089,19 +2119,36 @@ mod tests {
     const TEST_MP4_BYTES: &[u8] = b"\0\0\0\x18ftypmp42";
 
     fn test_account_ctx(base_url: &str) -> AccountSpaceCtx {
+        test_account_ctx_with_root_key(base_url, generate_key())
+    }
+
+    fn test_account_ctx_with_root_key(base_url: &str, space_root_key: Vec<u8>) -> AccountSpaceCtx {
         let (public_key, private_key) = keys::generate_keypair().expect("valid keypair");
-        AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
+        let ctx = AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
             base_url: base_url.to_owned(),
             space_session_token: Some("space-session-token".to_owned()),
-            master_key: generate_key(),
-            public_key,
-            private_key_source: PrivateKeySource::Plain(private_key),
+            space_root_key,
             user_id: Some(1),
             user_agent: None,
             client_package: None,
             client_version: None,
         })
-        .expect("account space ctx should open")
+        .expect("account space ctx should open");
+        *cache_lock(&ctx.space_identity_cache, "space identity").expect("space identity cache") =
+            Some(SpaceIdentity {
+                public_key,
+                private_key,
+            });
+        ctx
+    }
+
+    fn test_public_key(ctx: &AccountSpaceCtx) -> Vec<u8> {
+        cache_lock(&ctx.space_identity_cache, "space identity")
+            .expect("space identity cache")
+            .as_ref()
+            .expect("test identity")
+            .public_key
+            .clone()
     }
 
     #[tokio::test]
@@ -2129,16 +2176,6 @@ mod tests {
         request.assert_async().await;
     }
 
-    fn root_entity_response(master_key: &[u8], root_space_key: &[u8]) -> String {
-        let payload = encrypt_entity_key(master_key, root_space_key).expect("root space entity");
-        json!({
-            "type": ROOT_SPACE_KEY_TYPE,
-            "encryptedKey": payload.encrypted_key,
-            "header": payload.header,
-        })
-        .to_string()
-    }
-
     fn owned_space_response(
         root_space_key: &[u8],
         space_key: &[u8],
@@ -2159,47 +2196,32 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_or_create_root_space_key_creates_when_missing() {
-        let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
+    async fn get_root_space_key_returns_context_root_key() {
+        let server = Server::new_async().await;
         let expected_root = generate_key();
-        let ensure = server
-            .mock("POST", "/space/entity-key/ensure")
-            .match_header("x-space-session-token", "space-session-token")
-            .with_status(200)
-            .with_body(root_entity_response(&ctx.master_key, &expected_root))
-            .create_async()
-            .await;
+        let ctx = test_account_ctx_with_root_key(&server.url(), expected_root.clone());
 
         let root = ctx
-            .get_or_create_root_space_key()
+            .get_root_space_key()
             .await
-            .expect("root space key should be created");
+            .expect("root space key should load")
+            .expect("root space key should exist");
 
         assert_eq!(root, expected_root);
-        ensure.assert_async().await;
     }
 
     #[tokio::test]
-    async fn get_or_create_root_space_key_uses_existing_key_from_ensure() {
-        let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
+    async fn get_or_create_root_space_key_returns_context_root_key() {
+        let server = Server::new_async().await;
         let expected_root = generate_key();
-
-        let ensure = server
-            .mock("POST", "/space/entity-key/ensure")
-            .with_status(200)
-            .with_body(root_entity_response(&ctx.master_key, &expected_root))
-            .expect(1)
-            .create_async()
-            .await;
+        let ctx = test_account_ctx_with_root_key(&server.url(), expected_root.clone());
 
         let root = ctx
             .get_or_create_root_space_key()
             .await
-            .expect("root space key should come from ensure response");
+            .expect("root space key should load");
+
         assert_eq!(root, expected_root);
-        ensure.assert_async().await;
     }
 
     #[tokio::test]
@@ -2493,28 +2515,16 @@ mod tests {
     #[tokio::test]
     async fn account_space_key_resolution_is_cached_within_context() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let friend_space_key = generate_key();
         let encrypted_profile = encode_b64(
             &encrypt_secretbox_packed(&friend_space_key, b"friend-profile").expect("profile wrap"),
         );
         let sealed_share =
-            sealed::seal(&friend_space_key, ctx.public_key()).expect("friend share seal");
+            sealed::seal(&friend_space_key, &test_public_key(&ctx)).expect("friend share seal");
         let encrypted_space_key = encode_b64(&pack_payload(&sealed_share, &[]));
 
-        let entity = server
-            .mock("GET", "/space/entity-key")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_SPACE_KEY_TYPE.into(),
-            ))
-            .with_status(200)
-            .with_body(root_entity_response(&ctx.master_key, &root_space_key))
-            .expect(1)
-            .create_async()
-            .await;
         let spaces = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
@@ -2566,7 +2576,6 @@ mod tests {
 
         assert_eq!(first.as_deref(), Some(b"friend-profile".as_slice()));
         assert_eq!(second.as_deref(), Some(b"friend-profile".as_slice()));
-        entity.assert_async().await;
         spaces.assert_async().await;
         shares.assert_async().await;
     }
@@ -2858,27 +2867,18 @@ mod tests {
     #[tokio::test]
     async fn create_space_with_key_sends_encrypted_space_and_profile_payloads() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
-        let space_key = generate_key();
         let root_space_key = generate_key();
-        let ensure_root = server
-            .mock("POST", "/space/entity-key/ensure")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_body(Matcher::AllOf(vec![
-                Matcher::Regex("\"type\":\"space\"".into()),
-                Matcher::Regex("\"encryptedKey\":\"[^\"]+\"".into()),
-                Matcher::Regex("\"header\":\"[^\"]+\"".into()),
-            ]))
-            .with_status(200)
-            .with_body(root_entity_response(&ctx.master_key, &root_space_key))
-            .create_async()
-            .await;
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key);
+        let space_key = generate_key();
         let create_space = server
             .mock("POST", "/space")
             .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"spaceSlug\":\"owner-main\"".into()),
                 Matcher::Regex("\"encryptedSpaceKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"publicKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"encryptedSecretKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"secretKeyDecryptionNonce\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"encryptedProfile\":\"[^\"]+\"".into()),
             ]))
             .with_status(200)
@@ -2907,29 +2907,21 @@ mod tests {
             decrypt_secretbox_packed(&space_key, &decode_b64(&created.encrypted_profile).unwrap())
                 .expect("created profile should decrypt");
         assert_eq!(profile_plaintext, b"profile-json");
-        ensure_root.assert_async().await;
         create_space.assert_async().await;
     }
 
     #[tokio::test]
     async fn create_space_updates_loaded_owned_space_cache() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
-        let space_key = generate_key();
         let root_space_key = generate_key();
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key);
+        let space_key = generate_key();
         let list_spaces = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body("[]")
             .expect(1)
-            .create_async()
-            .await;
-        let ensure_root = server
-            .mock("POST", "/space/entity-key/ensure")
-            .match_header("x-space-session-token", "space-session-token")
-            .with_status(200)
-            .with_body(root_entity_response(&ctx.master_key, &root_space_key))
             .create_async()
             .await;
         let create_space = server
@@ -2985,7 +2977,6 @@ mod tests {
         assert_eq!(cached_profile.as_slice(), b"profile-json-2");
 
         list_spaces.assert_async().await;
-        ensure_root.assert_async().await;
         create_space.assert_async().await;
         update_profile.assert_async().await;
     }
@@ -3032,20 +3023,9 @@ mod tests {
     #[tokio::test]
     async fn create_post_includes_space_key_version() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let space_key = generate_key();
-        let entity = server
-            .mock("GET", "/space/entity-key")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_SPACE_KEY_TYPE.into(),
-            ))
-            .with_status(200)
-            .with_body(root_entity_response(&ctx.master_key, &root_space_key))
-            .create_async()
-            .await;
         let spaces = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
@@ -3077,7 +3057,6 @@ mod tests {
             .expect("post creation should send key version");
 
         assert_eq!(post_id, 42);
-        entity.assert_async().await;
         spaces.assert_async().await;
         create.assert_async().await;
     }
@@ -3118,20 +3097,9 @@ mod tests {
     #[tokio::test]
     async fn update_space_profile_sends_encrypted_profile_and_profile_assets() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let space_key = generate_key();
-        let entity = server
-            .mock("GET", "/space/entity-key")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_SPACE_KEY_TYPE.into(),
-            ))
-            .with_status(200)
-            .with_body(root_entity_response(&ctx.master_key, &root_space_key))
-            .create_async()
-            .await;
         let spaces = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
@@ -3212,7 +3180,6 @@ mod tests {
                 .map(|cover| cover.object_key.as_str()),
             Some("cover-object")
         );
-        entity.assert_async().await;
         spaces.assert_async().await;
         update.assert_async().await;
     }
@@ -3220,8 +3187,8 @@ mod tests {
     #[tokio::test]
     async fn get_space_profile_decrypted_loads_and_decrypts_profile() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let space_key = generate_key();
         let encrypted_profile = encode_b64(
             &encrypt_secretbox_packed(&space_key, b"profile-json").expect("profile wrap"),
@@ -3245,17 +3212,6 @@ mod tests {
                 })
                 .to_string(),
             )
-            .create_async()
-            .await;
-        let entity = server
-            .mock("GET", "/space/entity-key")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_SPACE_KEY_TYPE.into(),
-            ))
-            .with_status(200)
-            .with_body(root_entity_response(&ctx.master_key, &root_space_key))
             .create_async()
             .await;
         let spaces = server
@@ -3283,39 +3239,18 @@ mod tests {
         assert_eq!(decrypted.friends, 2);
         assert_eq!(decrypted.profile, b"profile-json");
         profile.assert_async().await;
-        entity.assert_async().await;
         spaces.assert_async().await;
     }
 
     #[tokio::test]
     async fn add_friend_from_link_sends_reciprocal_space_shares() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let requester_space_key = generate_key();
         let target_space_key = generate_key();
         let (target_public_key, _) = keys::generate_keypair().expect("valid target keypair");
-        let entity_payload =
-            encrypt_entity_key(&ctx.master_key, &root_space_key).expect("root space entity");
 
-        let entity = server
-            .mock("GET", "/space/entity-key")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_SPACE_KEY_TYPE.into(),
-            ))
-            .with_status(200)
-            .with_body(
-                json!({
-                    "type": ROOT_SPACE_KEY_TYPE,
-                    "encryptedKey": entity_payload.encrypted_key,
-                    "header": entity_payload.header,
-                })
-                .to_string(),
-            )
-            .create_async()
-            .await;
         let spaces = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
@@ -3373,7 +3308,6 @@ mod tests {
             .expect("direct friendship should send reciprocal shares");
 
         assert_eq!(response.status, "friend");
-        entity.assert_async().await;
         spaces.assert_async().await;
         add.assert_async().await;
     }
@@ -3566,22 +3500,11 @@ mod tests {
     #[tokio::test]
     async fn message_actions_use_message_endpoints() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let space_key = generate_key();
         let (friend_public_key, _) = keys::generate_keypair().expect("valid friend keypair");
 
-        let entity = server
-            .mock("GET", "/space/entity-key")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_SPACE_KEY_TYPE.into(),
-            ))
-            .with_status(200)
-            .with_body(root_entity_response(&ctx.master_key, &root_space_key))
-            .create_async()
-            .await;
         let spaces = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
@@ -3637,7 +3560,7 @@ mod tests {
                         "userId": 1,
                         "spaceId": "space_owner_main",
                         "spaceSlug": "owner-main",
-                        "publicKey": encode_b64(&ctx.public_key),
+                        "publicKey": encode_b64(&test_public_key(&ctx)),
                         "keyVersion": 3
                     },
                     "recipient": {
@@ -3689,7 +3612,6 @@ mod tests {
 
         assert_eq!(created.reply_message_id.as_deref(), Some("wmsg_parent"));
         assert!(liked.liked);
-        entity.assert_async().await;
         spaces.assert_async().await;
         friends.assert_async().await;
         reply.assert_async().await;
@@ -3937,31 +3859,11 @@ mod tests {
     #[tokio::test]
     async fn refresh_friend_shares_accepts_empty_server_response() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let space_key = generate_key();
         let (friend_public_key, _) = keys::generate_keypair().expect("valid friend keypair");
-        let entity_payload =
-            encrypt_entity_key(&ctx.master_key, &root_space_key).expect("root space entity");
 
-        let entity = server
-            .mock("GET", "/space/entity-key")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_SPACE_KEY_TYPE.into(),
-            ))
-            .with_status(200)
-            .with_body(
-                json!({
-                    "type": ROOT_SPACE_KEY_TYPE,
-                    "encryptedKey": entity_payload.encrypted_key,
-                    "header": entity_payload.header,
-                })
-                .to_string(),
-            )
-            .create_async()
-            .await;
         let spaces = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
@@ -4020,7 +3922,6 @@ mod tests {
             .expect("refresh should accept empty response");
 
         assert_eq!(updated, 1);
-        entity.assert_async().await;
         spaces.assert_async().await;
         friends.assert_async().await;
         refresh.assert_async().await;
@@ -4029,8 +3930,8 @@ mod tests {
     #[tokio::test]
     async fn space_link_status_create_and_delete_use_link_endpoints() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let space_key = generate_key();
         let created_access_key = "AbC123xYz789";
         let encrypted_created_access_key = encode_b64(
@@ -4043,18 +3944,6 @@ mod tests {
                 .expect("encrypted rotated access key"),
         );
 
-        let entity = server
-            .mock("GET", "/space/entity-key")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_SPACE_KEY_TYPE.into(),
-            ))
-            .with_status(200)
-            .with_body(root_entity_response(&ctx.master_key, &root_space_key))
-            .expect(1)
-            .create_async()
-            .await;
         let spaces = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
@@ -4171,7 +4060,6 @@ mod tests {
         assert_eq!(rotated.access_key, rotated_access_key);
         assert_ne!(rotated.access_key, created.access_key);
         status.assert_async().await;
-        entity.assert_async().await;
         spaces.assert_async().await;
         create.assert_async().await;
         rotate.assert_async().await;
@@ -4181,8 +4069,8 @@ mod tests {
     #[tokio::test]
     async fn create_space_link_reuses_encrypted_access_key_returned_by_post() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let space_key = generate_key();
         let access_key = "AbC123xYz789";
         let encrypted_access_key = encode_b64(
@@ -4190,17 +4078,6 @@ mod tests {
                 .expect("encrypted access key"),
         );
 
-        let entity = server
-            .mock("GET", "/space/entity-key")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_SPACE_KEY_TYPE.into(),
-            ))
-            .with_status(200)
-            .with_body(root_entity_response(&ctx.master_key, &root_space_key))
-            .create_async()
-            .await;
         let spaces = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
@@ -4249,7 +4126,6 @@ mod tests {
         assert_eq!(created.space_id, "space_owner_main");
         assert_eq!(created.space_username, "owner-main");
         assert_eq!(created.key_version, 3);
-        entity.assert_async().await;
         spaces.assert_async().await;
         create.assert_async().await;
     }
@@ -4358,32 +4234,12 @@ mod tests {
     #[tokio::test]
     async fn fetch_post_decrypted_uses_post_by_id_endpoint() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let space_key = generate_key();
         let post_key = generate_key();
         let caption = b"hello from post";
-        let entity_payload =
-            encrypt_entity_key(&ctx.master_key, &root_space_key).expect("root space entity");
 
-        let entity = server
-            .mock("GET", "/space/entity-key")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_SPACE_KEY_TYPE.into(),
-            ))
-            .with_status(200)
-            .with_body(
-                json!({
-                    "type": ROOT_SPACE_KEY_TYPE,
-                    "encryptedKey": entity_payload.encrypted_key,
-                    "header": entity_payload.header,
-                })
-                .to_string(),
-            )
-            .create_async()
-            .await;
         let spaces = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
@@ -4437,7 +4293,6 @@ mod tests {
             decrypted.caption_plaintext.as_deref(),
             Some(caption.as_slice())
         );
-        entity.assert_async().await;
         spaces.assert_async().await;
         post.assert_async().await;
     }
@@ -4445,33 +4300,13 @@ mod tests {
     #[tokio::test]
     async fn hydrate_space_keys_loads_owned_and_friends_spaces() {
         let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
         let root_space_key = generate_key();
+        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let owned_space_key = generate_key();
         let shared_space_key = generate_key();
-        let entity_payload =
-            encrypt_entity_key(&ctx.master_key, &root_space_key).expect("root space entity");
         let sealed_share =
-            sealed::seal(&shared_space_key, &ctx.public_key).expect("sealed space share");
+            sealed::seal(&shared_space_key, &test_public_key(&ctx)).expect("sealed space share");
 
-        let entity = server
-            .mock("GET", "/space/entity-key")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_query(Matcher::UrlEncoded(
-                "type".into(),
-                ROOT_SPACE_KEY_TYPE.into(),
-            ))
-            .with_status(200)
-            .with_body(
-                json!({
-                    "type": ROOT_SPACE_KEY_TYPE,
-                    "encryptedKey": entity_payload.encrypted_key,
-                    "header": entity_payload.header,
-                })
-                .to_string(),
-            )
-            .create_async()
-            .await;
         let owned = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
@@ -4517,7 +4352,6 @@ mod tests {
         assert_eq!(hydrated.friends.len(), 1);
         assert_eq!(hydrated.friends[0].space_id, "space_shared_gallery");
         assert_eq!(hydrated.friends[0].space_key, shared_space_key);
-        entity.assert_async().await;
         owned.assert_async().await;
         shares.assert_async().await;
     }

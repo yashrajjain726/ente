@@ -65,6 +65,37 @@ func TestCreateSpaceBrowserSessionReturnsToken(t *testing.T) {
 	require.Equal(t, userID, session.UserID)
 }
 
+func TestRegisteredTokenSessionRoutesAllowEntityKeyEnsureBeforeBrowserSession(t *testing.T) {
+	handlers, _, userID := setupSpaceSessionAPITest(t)
+	router := gin.New()
+	tokenPrivateAPI := router.Group("")
+	spacePrivateAPI := router.Group("")
+	spacePrivateAPI.Use(handlers.RequireSpaceBrowserSession())
+	RegisterTokenSessionRoutes(tokenPrivateAPI, handlers)
+	Register(spacePrivateAPI, router.Group(""), handlers)
+
+	ensureReq := httptest.NewRequest(
+		http.MethodPost,
+		"/space/entity-key/ensure",
+		bytes.NewBufferString(`{"type":"space","encryptedKey":"encrypted-key","header":"nonce"}`),
+	)
+	ensureReq.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
+	ensureRecorder := httptest.NewRecorder()
+
+	router.ServeHTTP(ensureRecorder, ensureReq)
+
+	require.Equal(t, http.StatusOK, ensureRecorder.Code)
+	require.JSONEq(t, `{"type":"space","encryptedKey":"encrypted-key","header":"nonce"}`, ensureRecorder.Body.String())
+
+	getReq := httptest.NewRequest(http.MethodGet, "/space/entity-key?type=space", nil)
+	getReq.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
+	getRecorder := httptest.NewRecorder()
+
+	router.ServeHTTP(getRecorder, getReq)
+
+	require.Equal(t, http.StatusUnauthorized, getRecorder.Code)
+}
+
 func TestRequireSpaceBrowserSessionAcceptsValidHeader(t *testing.T) {
 	handlers, repos, userID := setupSpaceSessionAPITest(t)
 	token := "valid-space-session-token"
@@ -116,7 +147,7 @@ func TestBootstrapBrowserSessionAcceptsHeader(t *testing.T) {
 	router.ServeHTTP(recorder, req)
 
 	require.Equal(t, http.StatusOK, recorder.Code)
-	require.JSONEq(t, `{"id":`+strconv.FormatInt(userID, 10)+`,"clientKey":"client-key","keyAttributes":{"kekSalt":"salt","encryptedKey":"encrypted-key","keyDecryptionNonce":"nonce","publicKey":"public-key","encryptedSecretKey":"encrypted-secret-key","secretKeyDecryptionNonce":"secret-nonce","memLimit":0,"opsLimit":0}}`, recorder.Body.String())
+	require.JSONEq(t, `{"id":`+strconv.FormatInt(userID, 10)+`,"clientKey":"client-key"}`, recorder.Body.String())
 }
 
 func TestDeleteBrowserSessionRevokesHeaderSession(t *testing.T) {

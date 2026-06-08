@@ -4,7 +4,6 @@ import "github.com/gin-gonic/gin"
 
 func Register(privateAPI, publicAPI gin.IRoutes, handlers *Handlers) {
 	privateAPI.POST("/space/entity-key", handlers.CreateSpaceEntityKey)
-	privateAPI.POST("/space/entity-key/ensure", handlers.EnsureSpaceEntityKey)
 	privateAPI.GET("/space/entity-key", handlers.GetSpaceEntityKey)
 	privateAPI.GET("/space", handlers.ListSpaces)
 	privateAPI.POST("/space", handlers.CreateSpace)
@@ -55,5 +54,6 @@ func Register(privateAPI, publicAPI gin.IRoutes, handlers *Handlers) {
 }
 
 func RegisterTokenSessionRoutes(privateAPI gin.IRoutes, handlers *Handlers) {
+	privateAPI.POST("/space/entity-key/ensure", handlers.EnsureSpaceEntityKey)
 	privateAPI.POST("/space/sessions", handlers.CreateBrowserSession)
 }
