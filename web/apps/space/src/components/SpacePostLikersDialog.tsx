@@ -15,7 +15,7 @@ const avatarBackground = "#333333";
 const lightAvatarBackground = "#E6E6E6";
 const darkBackdropBackground = "rgba(0, 0, 0, 0.86)";
 const lightBackdropBackground = "rgba(255, 255, 255, 0.72)";
-const likersPanelHeight = "min(200px, 36vh)";
+const likersPanelHeight = "min(180px, 36vh)";
 
 interface SpacePostLikersDialogProps {
     appearance?: "dark" | "light";
