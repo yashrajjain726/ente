@@ -1289,7 +1289,7 @@ const FeedOwnPostLikeButton: React.FC<{
                     bgcolor: "transparent",
                     border: 0,
                     borderRadius: "8px",
-                    color: textBase,
+                    color: textSecondary,
                     cursor: onLoadPostLikers ? "pointer" : "default",
                     display: "inline-flex",
                     fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -1338,7 +1338,6 @@ const FeedOwnPostLikeButton: React.FC<{
             <SpacePostLikersDialog
                 appearance="light"
                 errorMessage={postLikersError}
-                likeCount={likeCount}
                 likers={postLikers}
                 loading={postLikersLoading}
                 open={postLikersOpen}
