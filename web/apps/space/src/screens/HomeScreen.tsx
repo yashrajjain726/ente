@@ -1288,7 +1288,7 @@ const FeedOwnPostLikeButton: React.FC<{
                     bgcolor: "transparent",
                     border: 0,
                     borderRadius: "8px",
-                    color: textSecondary,
+                    color: textBase,
                     cursor: onLoadPostLikers ? "pointer" : "default",
                     display: "inline-flex",
                     fontFamily: '"Inter Variable", Inter, sans-serif',
