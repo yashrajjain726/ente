@@ -5,9 +5,9 @@ const sessionStorageKey = "enteSpaceSecureSession";
 const legacyAccountsSessionKeys = ["encryptionKey", "keyEncryptionKey"];
 
 const SecureSessionState = z.object({
+    authMasterKey: z.string().optional(),
     keyEncryptionKey: z.string().optional(),
-    masterKey: z.string().optional(),
-    version: z.literal(1),
+    spaceRootKey: z.string().optional(),
 });
 
 type SecureSessionState = z.infer<typeof SecureSessionState>;
@@ -15,7 +15,6 @@ type SecureSessionState = z.infer<typeof SecureSessionState>;
 const SecureSessionShare = z.object({
     length: z.number().int().nonnegative(),
     share: z.string(),
-    version: z.literal(1),
 });
 
 type SecureSessionShare = z.infer<typeof SecureSessionShare>;
@@ -39,7 +38,9 @@ const base64ToBytes = (value: string) => {
 };
 
 const hasSecret = (state: SecureSessionState) =>
-    state.masterKey !== undefined || state.keyEncryptionKey !== undefined;
+    state.authMasterKey !== undefined ||
+    state.keyEncryptionKey !== undefined ||
+    state.spaceRootKey !== undefined;
 
 const clearLegacyAccountsSessionKeys = () => {
     for (const key of legacyAccountsSessionKeys) sessionStorage.removeItem(key);
@@ -81,12 +82,10 @@ const splitSecret = (
         {
             length: secretBytes.length,
             share: bytesToBase64(shareA),
-            version: 1,
         },
         {
             length: secretBytes.length,
             share: bytesToBase64(shareB),
-            version: 1,
         },
     ];
 };
@@ -111,14 +110,14 @@ const mergeSecret = (
 const secureSessionState = (): SecureSessionState => {
     const windowShare = readWindowShare();
     const sessionShare = readSessionShare();
-    if (!windowShare || !sessionShare) return { version: 1 };
+    if (!windowShare || !sessionShare) return {};
     const secret = mergeSecret(windowShare, sessionShare);
-    if (!secret) return { version: 1 };
+    if (!secret) return {};
     try {
         return SecureSessionState.parse(JSON.parse(secret));
     } catch {
         clearSpaceSecureSessionStorage();
-        return { version: 1 };
+        return {};
     }
 };
 
@@ -139,10 +138,25 @@ export const clearSpaceSecureSessionStorage = () => {
     clearLegacyAccountsSessionKeys();
 };
 
-export const masterKeyFromSpaceSession = () => secureSessionState().masterKey;
+export const authMasterKeyFromSpaceSession = () =>
+    secureSessionState().authMasterKey;
 
-export const saveMasterKeyInSpaceSession = (masterKey: string) => {
-    saveSecureSessionState({ ...secureSessionState(), masterKey });
+export const saveAuthMasterKeyInSpaceSession = (authMasterKey: string) => {
+    saveSecureSessionState({ ...secureSessionState(), authMasterKey });
+};
+
+export const clearAuthMasterKeyFromSpaceSession = () => {
+    saveSecureSessionState({
+        ...secureSessionState(),
+        authMasterKey: undefined,
+    });
+};
+
+export const spaceRootKeyFromSpaceSession = () =>
+    secureSessionState().spaceRootKey;
+
+export const saveSpaceRootKeyInSpaceSession = (spaceRootKey: string) => {
+    saveSecureSessionState({ ...secureSessionState(), spaceRootKey });
 };
 
 export const stashSpaceKeyEncryptionKeyInSessionStore = (kek: string) => {

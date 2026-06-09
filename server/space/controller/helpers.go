@@ -116,11 +116,14 @@ func visibleActor(visible map[string]bool, actor spacerepo.SpaceActorRecord) boo
 
 func toSpaceKeyResponse(space *spacerepo.SpaceRecord) *models.SpaceKeyResponse {
 	return &models.SpaceKeyResponse{
-		SpaceID:           space.SpaceID,
-		SpaceSlug:         space.SpaceSlug,
-		EncryptedSpaceKey: space.EncryptedSpaceKey,
-		EncryptedProfile:  space.EncryptedProfile,
-		KeyVersion:        space.CurrentVersion,
+		SpaceID:                  space.SpaceID,
+		SpaceSlug:                space.SpaceSlug,
+		EncryptedSpaceKey:        space.EncryptedSpaceKey,
+		PublicKey:                space.PublicKey,
+		EncryptedSecretKey:       space.EncryptedSecretKey,
+		SecretKeyDecryptionNonce: space.SecretKeyDecryptionNonce,
+		EncryptedProfile:         space.EncryptedProfile,
+		KeyVersion:               space.CurrentVersion,
 	}
 }
 

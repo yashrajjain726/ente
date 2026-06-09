@@ -4,7 +4,7 @@ import { Box } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import React from "react";
 
-export const spaceActionDoneDurationMs = 2400;
+export const spaceActionDoneDurationMs = 1300;
 export const spaceActionTransition = "220ms cubic-bezier(0.4, 0, 0.2, 1)";
 
 export type SpaceActionPhase = "busy" | "done";

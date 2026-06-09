@@ -128,7 +128,7 @@ func TestValidateCreateMessageRequestLimits(t *testing.T) {
 func createMessageControllerUserAndSpace(t *testing.T, repos *spacerepo.Module, slug string, publicKey string) (int64, *spacerepo.SpaceRecord) {
 	t.Helper()
 	userID := insertSpaceControllerUser(t, repos, slug+"@example.com", publicKey)
-	space, err := repos.Spaces.CreateSpace(context.Background(), userID, slug, slug+"-space-key", slug+"-profile")
+	space, err := repos.Spaces.CreateSpace(context.Background(), userID, slug, slug+"-space-key", slug+"-public", slug+"-secret", slug+"-secret-nonce", slug+"-profile")
 	require.NoError(t, err)
 	return userID, space
 }

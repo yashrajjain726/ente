@@ -36,9 +36,11 @@ import { HTTPError } from "ente-base/http";
 import log from "ente-base/log";
 import { nullToUndefined } from "ente-utils/transform";
 import { decryptSpaceBootstrapAuthToken } from "services/spaceBootstrapAuth";
-import { createSpaceBrowserSession } from "services/spacePersistentSession";
 import {
-    saveMasterKeyInSpaceSession,
+    createSpaceBrowserSession,
+    getOrCreateSpaceRootKey,
+} from "services/spacePersistentSession";
+import {
     stashSpaceKeyEncryptionKeyInSessionStore,
     unstashSpaceKeyEncryptionKeyFromSession,
 } from "services/spaceSecureSessionStorage";
@@ -442,6 +444,9 @@ const saveCompletedSpaceLogin = async ({
     if (!bootstrapAuthToken) {
         throw new Error("Login session expired. Please sign in again.");
     }
-    await createSpaceBrowserSession(masterKey, bootstrapAuthToken);
-    saveMasterKeyInSpaceSession(masterKey);
+    const spaceRootKey = await getOrCreateSpaceRootKey(
+        masterKey,
+        bootstrapAuthToken,
+    );
+    await createSpaceBrowserSession(spaceRootKey, bootstrapAuthToken);
 };

@@ -1,11 +1,10 @@
 import { Box } from "@mui/material";
-import { EnteLogo } from "ente-base/components/EnteLogo";
 import React from "react";
 
 export const onboardingGreen = "#08C225";
 export const onboardingTitle = "Share your life";
 export const onboardingDescription =
-    "A private space for sharing everyday moments with friends and family. No ads. No brain rot. No strangers.";
+    "A private space for sharing everyday moments with friends and family. No ads. No brain rot.";
 export const addFriendOnboardingTitle = "Follow their life";
 
 const softGreen = "#E7F6E9";
@@ -119,7 +118,12 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                             lineHeight: 0,
                         }}
                     >
-                        <EnteLogo height={24} />
+                        <Box
+                            component="img"
+                            alt="Ente Space"
+                            src="/images/space.svg"
+                            sx={{ display: "block", height: 30, width: 101 }}
+                        />
                     </Box>
                     <Box />
                 </Box>
@@ -150,7 +154,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                         <Box
                             component="img"
                             alt=""
-                            src="/images/share-memories.svg"
+                            src="/images/ducky-space.svg"
                             sx={{
                                 flexShrink: 0,
                                 height: "clamp(132px, 29svh, 245.189px)",

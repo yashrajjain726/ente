@@ -21,6 +21,7 @@ import {
 import {
     type LocalSpaceFeedPost,
     type OnboardingEntrySource,
+    type RefreshSpaceProfileOptions,
     type SpaceAppState,
     SpaceAppStateContext,
     type SpaceProfileLoadStatus,
@@ -155,30 +156,34 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             ? error.message
             : "Couldn't load this page. Please try again later or contact support.";
 
-    const refreshProfile = useCallback(async () => {
-        const generation = ++profileLoadGenerationRef.current;
-        setProfileLoadError(undefined);
-        setProfileLoadStatus("loading");
+    const refreshProfile = useCallback(
+        async (options?: RefreshSpaceProfileOptions) => {
+            const generation = ++profileLoadGenerationRef.current;
+            setProfileLoadError(undefined);
+            setProfileLoadStatus("loading");
 
-        try {
-            const nextProfile = await loadExistingSpaceProfile();
-            if (profileLoadGenerationRef.current == generation) {
-                setProfileLoadError(undefined);
-                applyProfile(nextProfile);
-                void loadProfileAvatar(nextProfile, generation);
-                void loadProfileCover(nextProfile, generation);
-                setProfileLoadStatus("ready");
+            try {
+                const nextProfile = await loadExistingSpaceProfile();
+                if (profileLoadGenerationRef.current == generation) {
+                    setProfileLoadError(undefined);
+                    applyProfile(nextProfile);
+                    void loadProfileAvatar(nextProfile, generation);
+                    void loadProfileCover(nextProfile, generation);
+                    setProfileLoadStatus("ready");
+                }
+                return nextProfile;
+            } catch (error) {
+                console.error("Failed to load space profile", error);
+                if (profileLoadGenerationRef.current == generation) {
+                    setProfileLoadError(profileErrorMessage(error));
+                    setProfileLoadStatus("error");
+                }
+                if (options?.throwOnError) throw error;
+                return null;
             }
-            return nextProfile;
-        } catch (error) {
-            console.error("Failed to load space profile", error);
-            if (profileLoadGenerationRef.current == generation) {
-                setProfileLoadError(profileErrorMessage(error));
-                setProfileLoadStatus("error");
-            }
-            return null;
-        }
-    }, [applyProfile, loadProfileAvatar, loadProfileCover]);
+        },
+        [applyProfile, loadProfileAvatar, loadProfileCover],
+    );
 
     const resetAfterLogout = useCallback(() => {
         profileLoadGenerationRef.current += 1;

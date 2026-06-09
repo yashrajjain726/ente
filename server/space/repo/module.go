@@ -56,20 +56,23 @@ type EntityKeysRepository struct {
 }
 
 type SpaceRecord struct {
-	SpaceID           string
-	OwnerID           int64
-	SpaceSlug         string
-	EncryptedSpaceKey string
-	EncryptedProfile  string
-	CurrentVersion    int
-	AvatarObjectKey   sql.NullString
-	AvatarBucketID    sql.NullString
-	AvatarSize        sql.NullInt64
-	CoverObjectKey    sql.NullString
-	CoverBucketID     sql.NullString
-	CoverSize         sql.NullInt64
-	CreatedAt         int64
-	UpdatedAt         int64
+	SpaceID                  string
+	OwnerID                  int64
+	SpaceSlug                string
+	EncryptedSpaceKey        string
+	PublicKey                string
+	EncryptedSecretKey       string
+	SecretKeyDecryptionNonce string
+	EncryptedProfile         string
+	CurrentVersion           int
+	AvatarObjectKey          sql.NullString
+	AvatarBucketID           sql.NullString
+	AvatarSize               sql.NullInt64
+	CoverObjectKey           sql.NullString
+	CoverBucketID            sql.NullString
+	CoverSize                sql.NullInt64
+	CreatedAt                int64
+	UpdatedAt                int64
 }
 
 type ProfileAssetUpdate struct {
@@ -269,29 +272,13 @@ type SpaceLinkSessionRecord struct {
 }
 
 type SpaceBrowserSessionRecord struct {
-	TokenHash     []byte
-	UserID        int64
-	ClientKey     string
-	ExpiresAt     int64
-	CreatedAt     int64
-	UpdatedAt     int64
-	LastUsedAt    int64
-	KeyAttributes SpaceKeyAttributesRecord
-}
-
-type SpaceKeyAttributesRecord struct {
-	KEKSalt                           string
-	EncryptedKey                      string
-	KeyDecryptionNonce                string
-	PublicKey                         string
-	EncryptedSecretKey                string
-	SecretKeyDecryptionNonce          string
-	MemLimit                          int
-	OpsLimit                          int
-	MasterKeyEncryptedWithRecoveryKey sql.NullString
-	MasterKeyDecryptionNonce          sql.NullString
-	RecoveryKeyEncryptedWithMasterKey sql.NullString
-	RecoveryKeyDecryptionNonce        sql.NullString
+	TokenHash  []byte
+	UserID     int64
+	ClientKey  string
+	ExpiresAt  int64
+	CreatedAt  int64
+	UpdatedAt  int64
+	LastUsedAt int64
 }
 
 type SpaceEntityKeyRecord struct {

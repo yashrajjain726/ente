@@ -17,12 +17,8 @@ func (r *SessionsRepository) CreateBrowserSession(ctx context.Context, tokenHash
 
 func (r *SessionsRepository) GetBrowserSession(ctx context.Context, tokenHash []byte) (*SpaceBrowserSessionRecord, error) {
 	row := r.DB.QueryRowContext(ctx, `
-		SELECT s.token_hash, s.user_id, s.client_key, s.expires_at, s.created_at, s.updated_at, s.last_used_at,
-		       k.kek_salt, k.encrypted_key, k.key_decryption_nonce, k.public_key, k.encrypted_secret_key,
-		       k.secret_key_decryption_nonce, k.mem_limit, k.ops_limit, k.master_key_encrypted_with_recovery_key,
-		       k.master_key_decryption_nonce, k.recovery_key_encrypted_with_master_key, k.recovery_key_decryption_nonce
+		SELECT s.token_hash, s.user_id, s.client_key, s.expires_at, s.created_at, s.updated_at, s.last_used_at
 		FROM space_browser_sessions s
-		JOIN key_attributes k ON k.user_id = s.user_id
 		WHERE s.token_hash = $1
 	`, tokenHash)
 	rec := &SpaceBrowserSessionRecord{}
@@ -34,18 +30,6 @@ func (r *SessionsRepository) GetBrowserSession(ctx context.Context, tokenHash []
 		&rec.CreatedAt,
 		&rec.UpdatedAt,
 		&rec.LastUsedAt,
-		&rec.KeyAttributes.KEKSalt,
-		&rec.KeyAttributes.EncryptedKey,
-		&rec.KeyAttributes.KeyDecryptionNonce,
-		&rec.KeyAttributes.PublicKey,
-		&rec.KeyAttributes.EncryptedSecretKey,
-		&rec.KeyAttributes.SecretKeyDecryptionNonce,
-		&rec.KeyAttributes.MemLimit,
-		&rec.KeyAttributes.OpsLimit,
-		&rec.KeyAttributes.MasterKeyEncryptedWithRecoveryKey,
-		&rec.KeyAttributes.MasterKeyDecryptionNonce,
-		&rec.KeyAttributes.RecoveryKeyEncryptedWithMasterKey,
-		&rec.KeyAttributes.RecoveryKeyDecryptionNonce,
 	)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")

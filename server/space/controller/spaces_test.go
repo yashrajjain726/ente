@@ -12,7 +12,7 @@ import (
 func TestGetProfileReturnsHistoricalVersion(t *testing.T) {
 	module, repos, userAuthRepo, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
-	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-profile-v1")
+	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile-v1")
 	require.NoError(t, err)
 	rotated, err := repos.Spaces.RotateKey(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
@@ -41,9 +41,9 @@ func TestGetProfileIncludesFriendsCount(t *testing.T) {
 	module, repos, userAuthRepo, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-friends@example.com", "alice-public")
 	bobID := insertSpaceControllerUser(t, repos, "bob-friends@example.com", "bob-public")
-	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-friends", "alice-space-key", "alice-profile")
+	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-friends", "alice-space-key", "alice-friends-public", "alice-friends-secret", "alice-friends-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := repos.Spaces.CreateSpace(ctx, bobID, "bob-friends", "bob-space-key", "bob-profile")
+	bobSpace, err := repos.Spaces.CreateSpace(ctx, bobID, "bob-friends", "bob-space-key", "bob-friends-public", "bob-friends-secret", "bob-friends-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, repos.Friends.AddFriend(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion))
 	require.NoError(t, userAuthRepo.AddToken(aliceID, ente.Photos, "alice-friends-token", "127.0.0.1", "space-test"))
@@ -62,7 +62,7 @@ func TestGetProfileIncludesFriendsCount(t *testing.T) {
 func TestGetProfileRejectsInvalidVersion(t *testing.T) {
 	module, repos, userAuthRepo, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
-	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key", "alice-profile")
+	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	require.NoError(t, userAuthRepo.AddToken(aliceID, ente.Photos, "alice-token", "127.0.0.1", "space-test"))
 	ginCtx := newPublicSpaceContext()
@@ -81,7 +81,7 @@ func TestGetProfileRejectsInvalidVersion(t *testing.T) {
 func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
 	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
-	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-profile-v1")
+	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile-v1")
 	require.NoError(t, err)
 	ginCtx := newPublicSpaceContext()
 	ginCtx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(aliceID, 10))
@@ -104,7 +104,7 @@ func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
 func TestUpdateProfileRejectsStaleKeyVersion(t *testing.T) {
 	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
-	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-profile-v1")
+	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key-v1", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile-v1")
 	require.NoError(t, err)
 	ginCtx := newPublicSpaceContext()
 	ginCtx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(aliceID, 10))
@@ -125,7 +125,7 @@ func TestUpdateProfileRejectsStaleKeyVersion(t *testing.T) {
 func TestSlugAvailabilityReturnsFalseForExistingAndReservedSlugs(t *testing.T) {
 	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-availability@example.com", "alice-public")
-	_, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key", "alice-profile")
+	_, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	ginCtx := newPublicSpaceContext()
 

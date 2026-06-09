@@ -45,6 +45,7 @@ func (r *AssetsRepository) GetAssetBucketID(ctx context.Context, spaceID, object
 func (r *AssetsRepository) GetSpaceForObjectKey(ctx context.Context, objectKey string) (*SpaceRecord, error) {
 	return scanSpaceRecord(r.DB.QueryRowContext(ctx, `
 		SELECT w.space_id, w.owner_id, w.space_slug, w.encrypted_space_key, w.encrypted_profile, w.current_version,
+		       w.public_key, w.encrypted_secret_key, w.secret_key_decryption_nonce,
 		       w.avatar_object_key, w.avatar_bucket_id, w.avatar_size, w.cover_object_key, w.cover_bucket_id, w.cover_size, w.created_at, w.updated_at
 		FROM spaces w
 		WHERE w.avatar_object_key = $1

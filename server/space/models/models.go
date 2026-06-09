@@ -12,28 +12,12 @@ type SpaceBrowserSessionRequest struct {
 }
 
 type SpaceBrowserSessionResponse struct {
-	ClientKey string `json:"clientKey"`
+	SessionToken string `json:"sessionToken"`
 }
 
 type SpaceBrowserSessionBootstrapResponse struct {
-	ID            int64              `json:"id"`
-	ClientKey     string             `json:"clientKey"`
-	KeyAttributes SpaceKeyAttributes `json:"keyAttributes"`
-}
-
-type SpaceKeyAttributes struct {
-	KEKSalt                           string `json:"kekSalt"`
-	EncryptedKey                      string `json:"encryptedKey"`
-	KeyDecryptionNonce                string `json:"keyDecryptionNonce"`
-	PublicKey                         string `json:"publicKey"`
-	EncryptedSecretKey                string `json:"encryptedSecretKey"`
-	SecretKeyDecryptionNonce          string `json:"secretKeyDecryptionNonce"`
-	MemLimit                          int    `json:"memLimit"`
-	OpsLimit                          int    `json:"opsLimit"`
-	MasterKeyEncryptedWithRecoveryKey string `json:"masterKeyEncryptedWithRecoveryKey,omitempty"`
-	MasterKeyDecryptionNonce          string `json:"masterKeyDecryptionNonce,omitempty"`
-	RecoveryKeyEncryptedWithMasterKey string `json:"recoveryKeyEncryptedWithMasterKey,omitempty"`
-	RecoveryKeyDecryptionNonce        string `json:"recoveryKeyDecryptionNonce,omitempty"`
+	ID        int64  `json:"id"`
+	ClientKey string `json:"clientKey"`
 }
 
 type SpaceEntityKeyRequest struct {
@@ -93,11 +77,14 @@ type FriendRelationshipRequest struct {
 }
 
 type SpaceKeyResponse struct {
-	SpaceID           string `json:"spaceId"`
-	SpaceSlug         string `json:"spaceSlug"`
-	EncryptedSpaceKey string `json:"encryptedSpaceKey"`
-	EncryptedProfile  string `json:"encryptedProfile,omitempty"`
-	KeyVersion        int    `json:"keyVersion"`
+	SpaceID                  string `json:"spaceId"`
+	SpaceSlug                string `json:"spaceSlug"`
+	EncryptedSpaceKey        string `json:"encryptedSpaceKey"`
+	PublicKey                string `json:"publicKey,omitempty"`
+	EncryptedSecretKey       string `json:"encryptedSecretKey,omitempty"`
+	SecretKeyDecryptionNonce string `json:"secretKeyDecryptionNonce,omitempty"`
+	EncryptedProfile         string `json:"encryptedProfile,omitempty"`
+	KeyVersion               int    `json:"keyVersion"`
 }
 
 type PresignUploadRequest struct {
@@ -226,9 +213,12 @@ type UpdateSpaceProfileResponse struct {
 }
 
 type CreateSpaceRequest struct {
-	SpaceSlug         string `json:"spaceSlug"`
-	EncryptedSpaceKey string `json:"encryptedSpaceKey"`
-	EncryptedProfile  string `json:"encryptedProfile"`
+	SpaceSlug                string `json:"spaceSlug"`
+	EncryptedSpaceKey        string `json:"encryptedSpaceKey"`
+	PublicKey                string `json:"publicKey"`
+	EncryptedSecretKey       string `json:"encryptedSecretKey"`
+	SecretKeyDecryptionNonce string `json:"secretKeyDecryptionNonce"`
+	EncryptedProfile         string `json:"encryptedProfile"`
 }
 
 type SpaceProfileResponse struct {

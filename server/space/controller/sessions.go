@@ -16,15 +16,13 @@ import (
 )
 
 const spaceBrowserSessionDurationDays = 365
-const SpaceBrowserSessionCookieName = "ente_space_session"
-const SpaceBrowserSessionCookiePath = "/space"
+const SpaceBrowserSessionTokenHeader = "X-Space-Session-Token"
 
 type SessionsController struct {
 	SessionsRepo *repo.SessionsRepository
 }
 
 type CreatedBrowserSession struct {
-	Token    string
 	Response models.SpaceBrowserSessionResponse
 }
 
@@ -43,8 +41,7 @@ func (c *SessionsController) CreateBrowserSession(ctx *gin.Context, userID int64
 		return nil, err
 	}
 	return &CreatedBrowserSession{
-		Token:    sessionToken,
-		Response: models.SpaceBrowserSessionResponse{ClientKey: clientKey},
+		Response: models.SpaceBrowserSessionResponse{SessionToken: sessionToken},
 	}, nil
 }
 
@@ -54,9 +51,8 @@ func (c *SessionsController) BootstrapBrowserSession(ctx *gin.Context, sessionTo
 		return nil, err
 	}
 	return &models.SpaceBrowserSessionBootstrapResponse{
-		ID:            session.UserID,
-		ClientKey:     session.ClientKey,
-		KeyAttributes: keyAttributesResponse(session.KeyAttributes),
+		ID:        session.UserID,
+		ClientKey: session.ClientKey,
 	}, nil
 }
 
@@ -92,21 +88,4 @@ func (c *SessionsController) RevokeBrowserSession(ctx *gin.Context, sessionToken
 	}
 	sessionHash := sha256.Sum256([]byte(sessionToken))
 	return c.SessionsRepo.DeleteBrowserSession(ctx.Request.Context(), sessionHash[:])
-}
-
-func keyAttributesResponse(attrs repo.SpaceKeyAttributesRecord) models.SpaceKeyAttributes {
-	return models.SpaceKeyAttributes{
-		KEKSalt:                           attrs.KEKSalt,
-		EncryptedKey:                      attrs.EncryptedKey,
-		KeyDecryptionNonce:                attrs.KeyDecryptionNonce,
-		PublicKey:                         attrs.PublicKey,
-		EncryptedSecretKey:                attrs.EncryptedSecretKey,
-		SecretKeyDecryptionNonce:          attrs.SecretKeyDecryptionNonce,
-		MemLimit:                          attrs.MemLimit,
-		OpsLimit:                          attrs.OpsLimit,
-		MasterKeyEncryptedWithRecoveryKey: attrs.MasterKeyEncryptedWithRecoveryKey.String,
-		MasterKeyDecryptionNonce:          attrs.MasterKeyDecryptionNonce.String,
-		RecoveryKeyEncryptedWithMasterKey: attrs.RecoveryKeyEncryptedWithMasterKey.String,
-		RecoveryKeyDecryptionNonce:        attrs.RecoveryKeyDecryptionNonce.String,
-	}
 }

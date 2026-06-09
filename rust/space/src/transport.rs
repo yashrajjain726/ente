@@ -39,6 +39,9 @@ pub struct StatusResponse {
 pub struct CreateSpaceRequest {
     pub space_slug: String,
     pub encrypted_space_key: String,
+    pub public_key: String,
+    pub encrypted_secret_key: String,
+    pub secret_key_decryption_nonce: String,
     pub encrypted_profile: String,
 }
 
@@ -48,6 +51,12 @@ pub struct SpaceKeyResponse {
     pub space_id: String,
     pub space_slug: String,
     pub encrypted_space_key: String,
+    #[serde(default)]
+    pub public_key: String,
+    #[serde(default)]
+    pub encrypted_secret_key: String,
+    #[serde(default)]
+    pub secret_key_decryption_nonce: String,
     #[serde(default)]
     pub encrypted_profile: String,
     pub key_version: i32,

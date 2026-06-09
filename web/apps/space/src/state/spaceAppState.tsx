@@ -8,6 +8,10 @@ import type { PendingSpacePasskeyVerification } from "services/spacePasskeyVerif
 export type OnboardingEntrySource = "direct" | "add-friend-link";
 export type SpaceProfileLoadStatus = "error" | "loading" | "ready";
 
+export interface RefreshSpaceProfileOptions {
+    throwOnError?: boolean;
+}
+
 export interface PendingSpaceFeedPost {
     avatarUrl?: string | null;
     caption?: string;
@@ -58,7 +62,9 @@ export interface SpaceAppState {
     profileLoadStatus: SpaceProfileLoadStatus;
     skipNextHomeFeedSkeleton: boolean;
     signupEmail: string;
-    refreshProfile: () => Promise<SetupProfile | null>;
+    refreshProfile: (
+        options?: RefreshSpaceProfileOptions,
+    ) => Promise<SetupProfile | null>;
     resetAfterLogout: () => void;
     setFriends: React.Dispatch<React.SetStateAction<FriendProfile[]>>;
     setIsLiveSignupVerification: React.Dispatch<React.SetStateAction<boolean>>;

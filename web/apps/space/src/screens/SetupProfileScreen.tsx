@@ -279,7 +279,6 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
         !isApplyingAvatarCrop &&
         !isPreparingAvatar &&
         usernameStatus != "unavailable" &&
-        Boolean(avatarUrl) &&
         username.trim().length > 0 &&
         fullName.trim().length > 0;
     const isContinueButtonActive = canContinue || isSubmitting;
@@ -611,21 +610,21 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                         }}
                     >
                         <TextInput
-                            label="Name"
-                            onChange={setFullName}
-                            placeholder="Enter your name"
-                            required
-                            value={fullName}
-                        />
-                        <TextInput
                             endAdornment={
                                 <UsernameStatusIcon status={usernameStatus} />
                             }
                             label="Username"
                             onChange={handleUsernameChange}
-                            placeholder="Choose your public username"
+                            placeholder="Choose your username"
                             required
                             value={username}
+                        />
+                        <TextInput
+                            label="Name"
+                            onChange={setFullName}
+                            placeholder="Enter your name"
+                            required
+                            value={fullName}
                         />
                         {(avatarError || errorMessage) && (
                             <Box
