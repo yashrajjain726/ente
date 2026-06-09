@@ -33,6 +33,7 @@ import type { SpaceImageCropArea } from "utils/spacePostImage";
 const green = "#08C225";
 const avatarSkeletonBackground = "#E6E6E6";
 const textBase = "#F4F4F4";
+const viewerLikeCountText = "#D8D8D8";
 const textSecondary = "#A6A6A6";
 const textTertiary = "rgba(244, 244, 244, 0.52)";
 const viewerBackground = "#000000";
@@ -1788,7 +1789,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                             bgcolor: "transparent",
                             border: 0,
                             borderRadius: "8px",
-                            color: textBase,
+                            color: viewerLikeCountText,
                             cursor:
                                 activePhoto.postId && onLoadPostLikers
                                     ? "pointer"
@@ -1872,7 +1873,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             )}
             <SpacePostLikersDialog
                 errorMessage={postLikersError}
-                likeCount={activePhoto.likeCount ?? 0}
                 likers={postLikers}
                 loading={postLikersLoading}
                 open={postLikersOpen}

@@ -1,9 +1,139 @@
-{{define "content"}}
-<div style="text-align: center;">
-  <p>Hi,</p>
-  <p>{{ .Message }}.</p>
-  <p>
-    <a class="button" href="{{ .AppURL }}" target="_blank">Open Space</a>
-  </p>
+<!DOCTYPE html>
+<html>
+<meta content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1,
+  minimum-scale=1" />
+<style>
+  body {
+    background-color: #f0f1f3;
+    font-family: "Helvetica Neue", "Segoe UI", Helvetica, sans-serif;
+    font-size: 16px;
+    line-height: 24px;
+    margin: 0;
+    color: #232323;
+  }
+
+  .wrap {
+    background-color: #ffffff;
+    padding: 34px 22px 22px;
+    max-width: 320px;
+    margin: 0 auto;
+    border-radius: 32px;
+  }
+
+  .button {
+    background: #08C225;
+    border-radius: 16px;
+    text-decoration: none !important;
+    color: #fff !important;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 16px 28px;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .button:hover {
+    background: #08B020;
+  }
+
+  .footer {
+    text-align: center;
+    font-size: 12px;
+    color: #888;
+  }
+
+  .footer a {
+    color: #888;
+    margin-right: 5px;
+  }
+
+  .gutter {
+    padding: 30px;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  a {
+    color: #08C225;
+  }
+
+  a:hover {
+    color: #111;
+  }
+
+  @media screen and (max-width: 600px) {
+    .wrap {
+      max-width: auto;
+    }
+
+    .gutter {
+      padding: 10px;
+    }
+  }
+
+  .footer-icons {
+    padding: 4px !important;
+    width: 24px !important;
+  }
+</style>
+
+<body>
+<div class="gutter" style="padding: 18px">&nbsp;</div>
+<div class="wrap" style=" background-color: rgb(255, 255, 255); padding: 34px
+    22px 22px; max-width: 320px; margin: 0 auto; border-radius: 32px;
+    font-size: 16px; color: #232323; " >
+  <main>
+    <div style="text-align: center;">
+      {{if .IllustrationURL}}
+      <p style="margin: 0 0 24px;">
+        <img src="{{ .IllustrationURL }}" alt="" style="display: block; margin: 0 auto; width: {{ .IllustrationWidth }}px; height: auto;" />
+      </p>
+      {{end}}
+      <p style="font-size: 26px; font-weight: 800; line-height: 30px; margin: 0 0 4px; color: #232323;">{{ .ActorLabel }}</p>
+      <p style="font-size: 15px; line-height: 21px; margin: 0 0 28px; color: #6b6b6b;">{{ .Notification }}</p>
+      <p style="margin: 0;">
+        <a class="button" href="{{ .AppURL }}" target="_blank">Open Ente Space</a>
+      </p>
+    </div>
+  </main>
 </div>
-{{end}}
+<br />
+<div class="footer" style="text-align: center; font-size: 12px; color:
+    rgb(136, 136, 136)" >
+  <div>
+    <a href="https://ente.com" target="_blank" ><img
+            src="https://email-assets.ente.com/ente-2026-green.png" style="width: 100px;
+        padding: 24px" title="Ente" alt="Ente" /></a>
+  </div>
+  <div>
+    <a href="https://fosstodon.org/@ente" target="_blank" ><img
+            src="https://email-assets.ente.com/mastodon-icon.png"
+            class="footer-icons" style="width: 24px; padding: 4px" title="Mastodon"
+            alt="Mastodon" /></a>
+    <a href="https://twitter.com/enteio" target="_blank" ><img
+            src="https://email-assets.ente.com/twitter-icon.png" class="footer-icons"
+            style="width: 24px; padding: 4px" title="Twitter" alt="Twitter" /></a>
+    <a href="https://ente.com/discord" target="_blank" ><img
+            src="https://email-assets.ente.com/discord-icon.png" class="footer-icons"
+            style="width: 24px; padding: 4px" title="Discord" alt="Discord" /></a>
+    <a href="https://github.com/ente-io" target="_blank" ><img
+            src="https://email-assets.ente.com/github-icon.png" class="footer-icons"
+            style="width: 24px; padding: 4px" title="GitHub" alt="GitHub" /></a>
+
+    <a href="https://www.youtube.com/@entestudio" target="_blank" ><img
+            src="https://email-assets.ente.com/youtube-icon.png" class="footer-icons"
+            style="width: 24px; padding: 4px" title="YouTube" alt="YouTube" /></a>
+  </div>
+  <p>
+    Ente Technologies, Inc.
+    <br /> 1111B S Governors Ave 6032 Dover, DE 19904
+  </p>
+  <br />
+</div>
+</body>
+</html>

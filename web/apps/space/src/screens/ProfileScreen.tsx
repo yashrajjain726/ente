@@ -13,7 +13,6 @@ import {
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
 import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
-import { EnteLogo } from "ente-base/components/EnteLogo";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -971,8 +970,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     {isPublicProfile ? (
                         <Box
                             component="a"
-                            href="https://ente.com/"
-                            aria-label="Go to ente.com"
+                            href="https://ente.com/space"
+                            aria-label="Go to ente.com/space"
                             sx={{
                                 alignSelf: "center",
                                 color: "inherit",
@@ -981,19 +980,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 lineHeight: 0,
                                 overflow: "visible",
                                 textDecoration: "none",
-                                width: 58,
+                                width: 61,
                                 "&:focus-visible": {
                                     borderRadius: "4px",
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 3,
                                 },
-                                "& svg": {
-                                    display: "block",
-                                    overflow: "visible",
-                                },
                             }}
                         >
-                            <EnteLogo height={18} />
+                            <Box
+                                component="img"
+                                alt=""
+                                src="/images/space.svg"
+                                sx={{
+                                    display: "block",
+                                    height: 18,
+                                    width: "auto",
+                                }}
+                            />
                         </Box>
                     ) : (
                         <Box

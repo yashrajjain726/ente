@@ -23,7 +23,6 @@ import {
 } from "components/SpacePostLikeAnimation";
 import { SpacePostLikersDialog } from "components/SpacePostLikersDialog";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
-import { EnteLogo } from "ente-base/components/EnteLogo";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
@@ -1289,7 +1288,7 @@ const FeedOwnPostLikeButton: React.FC<{
                     bgcolor: "transparent",
                     border: 0,
                     borderRadius: "8px",
-                    color: textBase,
+                    color: textSecondary,
                     cursor: onLoadPostLikers ? "pointer" : "default",
                     display: "inline-flex",
                     fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -1338,7 +1337,6 @@ const FeedOwnPostLikeButton: React.FC<{
             <SpacePostLikersDialog
                 appearance="light"
                 errorMessage={postLikersError}
-                likeCount={likeCount}
                 likers={postLikers}
                 loading={postLikersLoading}
                 open={postLikersOpen}
@@ -2075,11 +2073,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             minWidth: 0,
                             overflow: "visible",
                             placeSelf: "center",
-                            width: 58,
-                            "& svg": { display: "block", overflow: "visible" },
+                            width: 61,
                         }}
                     >
-                        <EnteLogo height={18} />
+                        <Box
+                            component="img"
+                            alt="Space"
+                            src="/images/space.svg"
+                            sx={{
+                                display: "block",
+                                filter: "invert(1)",
+                                height: 18,
+                                width: "auto",
+                            }}
+                        />
                     </Box>
                     <Box
                         sx={{

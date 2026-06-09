@@ -4,7 +4,16 @@ import {
     Navigation03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Menu, MenuItem, Skeleton, Tooltip } from "@mui/material";
+import {
+    Box,
+    ClickAwayListener,
+    Grow,
+    MenuItem,
+    MenuList,
+    Popper,
+    Skeleton,
+    Tooltip,
+} from "@mui/material";
 import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { formatTimeAgo } from "ente-base/date";
@@ -48,6 +57,7 @@ const threadBottomThresholdPx = 96;
 const messageGroupTimeThresholdMs = 10 * 60 * 1000;
 const messageLongPressMs = 520;
 const messageLongPressMoveTolerancePx = 10;
+const messageActionsTouchOpenMouseSuppressMs = 900;
 const dayMs = 24 * 60 * 60 * 1000;
 
 interface MessagesScreenProps {
@@ -80,9 +90,11 @@ interface MessagesScreenProps {
 
 interface MessageContextMenuState {
     anchorEl: HTMLElement;
-    open: boolean;
     message: SpaceMessage;
+    open: boolean;
 }
+
+type MessageActionsOpenSource = "contextmenu" | "touch";
 
 interface ConversationSection {
     items: SpaceMessageConversation[];
@@ -659,6 +671,58 @@ const CopyIcon: React.FC = () => (
     </svg>
 );
 
+const messageActionsPopperModifiers = [
+    { name: "offset", options: { offset: [0, 6] } },
+    { name: "preventOverflow", options: { padding: 14 } },
+    { name: "flip", options: { padding: 14 } },
+];
+const messageActionsTransitionDuration = { enter: 140, exit: 100 };
+
+const MessageActionMenuItem: React.FC<{
+    icon: React.ReactNode;
+    label: string;
+    onClick: () => void;
+    tone?: "default" | "danger";
+}> = ({ icon, label, onClick, tone = "default" }) => (
+    <MenuItem
+        disableRipple
+        onClick={onClick}
+        sx={{
+            WebkitTapHighlightColor: "transparent",
+            borderRadius: "12px",
+            color: tone == "danger" ? dangerColor : textBase,
+            gap: "8px",
+            minHeight: spaceTouchTargetSize,
+            outline: 0,
+            px: "8px",
+            py: "7px",
+            "&.Mui-focusVisible": {
+                bgcolor:
+                    tone == "danger" ? "rgba(246, 58, 58, 0.14)" : lightSurface,
+                outline: 0,
+            },
+            "&:focus": { outline: 0 },
+            "&:focus-visible": { outline: 0 },
+            "&:hover": {
+                bgcolor:
+                    tone == "danger" ? "rgba(246, 58, 58, 0.14)" : lightSurface,
+            },
+        }}
+    >
+        {icon}
+        <Box
+            sx={{
+                fontFamily: '"Inter Variable", Inter, sans-serif',
+                fontSize: 13,
+                fontWeight: 650,
+                lineHeight: "18px",
+            }}
+        >
+            {label}
+        </Box>
+    </MenuItem>
+);
+
 const QuotePreview: React.FC<{
     isOwn: boolean;
     message: SpaceMessage;
@@ -865,7 +929,11 @@ const MessageBubble: React.FC<{
     isHighlighted: boolean;
     isLastInSequence: boolean;
     message: SpaceMessage;
-    onOpenActions: (message: SpaceMessage, anchorEl: HTMLElement) => void;
+    onOpenActions: (
+        message: SpaceMessage,
+        anchorEl: HTMLElement,
+        source: MessageActionsOpenSource,
+    ) => void;
     onOpenQuotePost: (quote: SpaceMessageQuote) => void;
     ownSpaceID?: string;
     parentMessage?: SpaceMessage;
@@ -937,11 +1005,11 @@ const MessageBubble: React.FC<{
     };
 
     const openActions = React.useCallback(
-        (bubbleElement: HTMLElement) => {
+        (bubbleElement: HTMLElement, source: MessageActionsOpenSource) => {
             clearLongPressTimer();
             longPressStartRef.current = undefined;
             window.getSelection()?.removeAllRanges();
-            onOpenActions(message, bubbleElement);
+            onOpenActions(message, bubbleElement, source);
         },
         [clearLongPressTimer, message, onOpenActions],
     );
@@ -949,7 +1017,7 @@ const MessageBubble: React.FC<{
     const handleContextMenu = (event: React.MouseEvent<HTMLElement>) => {
         event.preventDefault();
         event.stopPropagation();
-        openActions(event.currentTarget);
+        openActions(event.currentTarget, "contextmenu");
     };
 
     const handleTouchStart = (event: React.TouchEvent<HTMLElement>) => {
@@ -969,7 +1037,7 @@ const MessageBubble: React.FC<{
         longPressTimerRef.current = window.setTimeout(() => {
             longPressTimerRef.current = undefined;
             didOpenLongPressRef.current = true;
-            openActions(bubbleElement);
+            openActions(bubbleElement, "touch");
         }, messageLongPressMs);
     };
 
@@ -1261,6 +1329,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const composerBlurResetTimeoutRef = React.useRef<number | undefined>(
         undefined,
     );
+    const ignoreMessageActionsMouseAwayUntilRef = React.useRef(0);
     const isThreadOpen = Boolean(selectedFriend);
     const canInteract = isThreadOpen && !isThreadReadOnly;
     const canSend =
@@ -1317,8 +1386,17 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const openMessageActions = (
         message: SpaceMessage,
         anchorEl: HTMLElement,
+        source: MessageActionsOpenSource,
     ) => {
-        setMessageContextMenu({ anchorEl, message, open: true });
+        ignoreMessageActionsMouseAwayUntilRef.current =
+            source == "touch"
+                ? Date.now() + messageActionsTouchOpenMouseSuppressMs
+                : 0;
+        setMessageContextMenu({
+            anchorEl,
+            message: messageByID.get(message.id) ?? message,
+            open: true,
+        });
     };
 
     const closeMessageActions = () =>
@@ -1330,6 +1408,25 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         setMessageContextMenu((currentMenu) =>
             currentMenu?.open ? currentMenu : null,
         );
+
+    const handleMessageActionsClickAway = (event: MouseEvent | TouchEvent) => {
+        if (
+            event instanceof MouseEvent &&
+            Date.now() < ignoreMessageActionsMouseAwayUntilRef.current
+        )
+            return;
+
+        closeMessageActions();
+    };
+
+    const handleMessageActionsKeyDown = (
+        event: React.KeyboardEvent<HTMLElement>,
+    ) => {
+        if (event.key != "Escape" && event.key != "Tab") return;
+        event.preventDefault();
+        event.stopPropagation();
+        closeMessageActions();
+    };
 
     const openInviteDialog = () => {
         setInviteShareError(null);
@@ -1493,6 +1590,25 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         stickToThreadBottomRef.current = true;
         smoothNextMessageScrollRef.current = false;
     }, [selectedFriend]);
+
+    React.useEffect(() => {
+        if (!messageContextMenu?.open) return;
+
+        const latestMessage = messageByID.get(messageContextMenu.message.id);
+        if (!latestMessage || latestMessage == messageContextMenu.message)
+            return;
+
+        setMessageContextMenu((currentMenu) =>
+            currentMenu?.open && currentMenu.message.id == latestMessage.id
+                ? { ...currentMenu, message: latestMessage }
+                : currentMenu,
+        );
+    }, [
+        messageByID,
+        messageContextMenu?.message,
+        messageContextMenu?.message.id,
+        messageContextMenu?.open,
+    ]);
 
     React.useEffect(() => {
         if (!isThreadReadOnly) return;
@@ -1798,167 +1914,129 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                 </Box>
                             )}
                         </Box>
-                        <Menu
-                            anchorEl={messageContextMenu?.anchorEl}
-                            disableRestoreFocus
+                        <Popper
+                            anchorEl={messageContextMenu?.anchorEl ?? null}
+                            modifiers={messageActionsPopperModifiers}
                             open={Boolean(messageContextMenu?.open)}
-                            onClose={closeMessageActions}
-                            anchorOrigin={{
-                                horizontal: "right",
-                                vertical: "bottom",
-                            }}
-                            transformOrigin={{
-                                horizontal: "right",
-                                vertical: "top",
-                            }}
-                            slotProps={{
-                                paper: {
-                                    sx: {
-                                        bgcolor: messagesBackground,
-                                        borderRadius: "16px",
-                                        boxShadow:
-                                            "0 14px 40px rgba(0, 0, 0, 0.14)",
-                                        minWidth: 132,
-                                        p: "4px",
-                                    },
-                                },
-                                list: { sx: { p: 0 } },
-                                transition: {
-                                    onExited: clearClosedMessageActions,
-                                },
-                            }}
+                            placement="bottom-end"
+                            sx={{ outline: 0, zIndex: 1300 }}
+                            transition
                         >
-                            {!isThreadReadOnly && (
-                                <>
-                                    <MenuItem
-                                        disableRipple
-                                        onClick={() =>
-                                            handleMessageAction("like")
-                                        }
-                                        sx={{
-                                            borderRadius: "12px",
-                                            color: textBase,
-                                            gap: "8px",
-                                            minHeight: spaceTouchTargetSize,
-                                            px: "8px",
-                                            py: "7px",
-                                            "&:hover": {
-                                                bgcolor: lightSurface,
-                                            },
-                                        }}
-                                    >
-                                        <HeartIcon small />
-                                        <Box
-                                            sx={{
-                                                fontFamily:
-                                                    '"Inter Variable", Inter, sans-serif',
-                                                fontSize: 13,
-                                                fontWeight: 650,
-                                                lineHeight: "18px",
-                                            }}
-                                        >
-                                            {isContextMessageLiked
-                                                ? "Unlike"
-                                                : "Like"}
-                                        </Box>
-                                    </MenuItem>
-                                    <MenuItem
-                                        disableRipple
-                                        onClick={() =>
-                                            handleMessageAction("reply")
-                                        }
-                                        sx={{
-                                            borderRadius: "12px",
-                                            color: textBase,
-                                            gap: "8px",
-                                            minHeight: spaceTouchTargetSize,
-                                            px: "8px",
-                                            py: "7px",
-                                            "&:hover": {
-                                                bgcolor: lightSurface,
-                                            },
-                                        }}
-                                    >
-                                        <ReplyIcon />
-                                        <Box
-                                            sx={{
-                                                fontFamily:
-                                                    '"Inter Variable", Inter, sans-serif',
-                                                fontSize: 13,
-                                                fontWeight: 650,
-                                                lineHeight: "18px",
-                                            }}
-                                        >
-                                            Reply
-                                        </Box>
-                                    </MenuItem>
-                                </>
-                            )}
-                            <MenuItem
-                                disableRipple
-                                onClick={() => handleMessageAction("copy")}
-                                sx={{
-                                    borderRadius: "12px",
-                                    color: textBase,
-                                    gap: "8px",
-                                    minHeight: spaceTouchTargetSize,
-                                    px: "8px",
-                                    py: "7px",
-                                    "&:hover": { bgcolor: lightSurface },
-                                }}
-                            >
-                                <CopyIcon />
-                                <Box
-                                    sx={{
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 13,
-                                        fontWeight: 650,
-                                        lineHeight: "18px",
-                                    }}
+                            {({ TransitionProps, placement }) => (
+                                <ClickAwayListener
+                                    mouseEvent="onMouseDown"
+                                    touchEvent="onTouchStart"
+                                    onClickAway={handleMessageActionsClickAway}
                                 >
-                                    Copy
-                                </Box>
-                            </MenuItem>
-                            {!isThreadReadOnly &&
-                                messageContextMenu?.message &&
-                                isCurrentProfileMessage(
-                                    messageContextMenu.message,
-                                    profile,
-                                ) && (
-                                    <MenuItem
-                                        disableRipple
-                                        onClick={() =>
-                                            handleMessageAction("delete")
-                                        }
-                                        sx={{
-                                            borderRadius: "12px",
-                                            color: dangerColor,
-                                            gap: "8px",
-                                            minHeight: spaceTouchTargetSize,
-                                            px: "8px",
-                                            py: "7px",
-                                            "&:hover": {
-                                                bgcolor:
-                                                    "rgba(246, 58, 58, 0.14)",
-                                            },
+                                    <Grow
+                                        {...(TransitionProps ?? {})}
+                                        style={{
+                                            transformOrigin:
+                                                placement.startsWith("top")
+                                                    ? "right bottom"
+                                                    : "right top",
                                         }}
+                                        onExited={() => {
+                                            TransitionProps?.onExited();
+                                            clearClosedMessageActions();
+                                        }}
+                                        timeout={
+                                            messageActionsTransitionDuration
+                                        }
                                     >
-                                        <DeleteIcon />
                                         <Box
                                             sx={{
-                                                fontFamily:
-                                                    '"Inter Variable", Inter, sans-serif',
-                                                fontSize: 13,
-                                                fontWeight: 650,
-                                                lineHeight: "18px",
+                                                WebkitTapHighlightColor:
+                                                    "transparent",
+                                                bgcolor: messagesBackground,
+                                                borderRadius: "16px",
+                                                boxShadow:
+                                                    "0 14px 40px rgba(0, 0, 0, 0.14)",
+                                                minWidth: 132,
+                                                outline: 0,
+                                                p: "4px",
                                             }}
                                         >
-                                            Delete
+                                            <MenuList
+                                                autoFocus
+                                                autoFocusItem
+                                                onKeyDown={
+                                                    handleMessageActionsKeyDown
+                                                }
+                                                sx={{
+                                                    outline: 0,
+                                                    p: 0,
+                                                    "&:focus": { outline: 0 },
+                                                    "&:focus-visible": {
+                                                        outline: 0,
+                                                    },
+                                                }}
+                                                variant="menu"
+                                            >
+                                                {!isThreadReadOnly && (
+                                                    <>
+                                                        <MessageActionMenuItem
+                                                            icon={
+                                                                <HeartIcon
+                                                                    small
+                                                                />
+                                                            }
+                                                            label={
+                                                                isContextMessageLiked
+                                                                    ? "Unlike"
+                                                                    : "Like"
+                                                            }
+                                                            onClick={() =>
+                                                                handleMessageAction(
+                                                                    "like",
+                                                                )
+                                                            }
+                                                        />
+                                                        <MessageActionMenuItem
+                                                            icon={<ReplyIcon />}
+                                                            label="Reply"
+                                                            onClick={() =>
+                                                                handleMessageAction(
+                                                                    "reply",
+                                                                )
+                                                            }
+                                                        />
+                                                    </>
+                                                )}
+                                                <MessageActionMenuItem
+                                                    icon={<CopyIcon />}
+                                                    label="Copy"
+                                                    onClick={() =>
+                                                        handleMessageAction(
+                                                            "copy",
+                                                        )
+                                                    }
+                                                />
+                                                {!isThreadReadOnly &&
+                                                    messageContextMenu?.message &&
+                                                    isCurrentProfileMessage(
+                                                        messageContextMenu.message,
+                                                        profile,
+                                                    ) && (
+                                                        <MessageActionMenuItem
+                                                            icon={
+                                                                <DeleteIcon />
+                                                            }
+                                                            label="Delete"
+                                                            onClick={() =>
+                                                                handleMessageAction(
+                                                                    "delete",
+                                                                )
+                                                            }
+                                                            tone="danger"
+                                                        />
+                                                    )}
+                                            </MenuList>
                                         </Box>
-                                    </MenuItem>
-                                )}
-                        </Menu>
+                                    </Grow>
+                                </ClickAwayListener>
+                            )}
+                        </Popper>
                         {!isThreadReadOnly && (
                             <Box
                                 sx={{
