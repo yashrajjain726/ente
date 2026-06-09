@@ -68,6 +68,23 @@ func TestSpaceEmailSubjectPrefixesUsernameWithAt(t *testing.T) {
 	require.Equal(t, "A friend liked your post", spaceEmailSubject(" ", "liked your post"))
 }
 
+func TestSpaceEmailTemplateData(t *testing.T) {
+	require.Equal(t, "@alice", spaceEmailActorLabel(" alice "))
+	require.Equal(t, "A friend", spaceEmailActorLabel(" "))
+	require.Equal(t, "just posted a new photo", spaceEmailNotificationText(spaceNotificationPostCreated, "posted a new photo"))
+	require.Equal(t, "just liked your post", spaceEmailNotificationText(spaceNotificationPostLiked, "liked your post"))
+	require.Equal(t, "just replied to your post", spaceEmailNotificationText(spaceNotificationPostReplied, "replied to your post"))
+	require.Equal(t, "is now your friend", spaceEmailNotificationText(spaceNotificationFriendAdded, "is now your friend"))
+	require.Equal(t, spaceNewPostIllustrationURL, spaceEmailIllustrationURL(spaceNotificationPostCreated))
+	require.Equal(t, spaceNewPostLikeIllustrationURL, spaceEmailIllustrationURL(spaceNotificationPostLiked))
+	require.Equal(t, spaceNewPostReplyIllustrationURL, spaceEmailIllustrationURL(spaceNotificationPostReplied))
+	require.Equal(t, spaceNewFriendIllustrationURL, spaceEmailIllustrationURL(spaceNotificationFriendAdded))
+	require.Equal(t, spaceNewPostIllustrationWidth, spaceEmailIllustrationWidth(spaceNotificationPostCreated))
+	require.Equal(t, spaceNewPostLikeIllustrationWidth, spaceEmailIllustrationWidth(spaceNotificationPostLiked))
+	require.Equal(t, spaceNewPostReplyIllustrationWidth, spaceEmailIllustrationWidth(spaceNotificationPostReplied))
+	require.Equal(t, spaceNewFriendIllustrationWidth, spaceEmailIllustrationWidth(spaceNotificationFriendAdded))
+}
+
 func TestPostLikeSendsEmailOnce(t *testing.T) {
 	_, repos, ctx := setupPostsControllerTest(t)
 	notifier := newRecordingSpaceEmailNotifier()
