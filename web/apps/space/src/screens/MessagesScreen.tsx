@@ -83,6 +83,7 @@ interface MessagesScreenProps {
     onSendMessage: (spaceId: string, text: string) => Promise<void>;
     onSetMessageLiked: (messageId: string, liked: boolean) => Promise<void>;
     onShareProfileLink?: () => Promise<string>;
+    newConversationIds?: string[];
     profile: SetupProfile;
     selectedFriend?: SpaceMessageConversation["friend"];
     threadBackLabel?: string;
@@ -229,7 +230,15 @@ const conversationPreview = (
     profile: SetupProfile,
 ) => {
     const activity = conversation.latestActivity;
-    if (!activity) return "Say hello!";
+    if (activity.type == "friend_add") {
+        return "You're now friends";
+    }
+    if (activity.type == "friend_remove") {
+        return activity.outgoing
+            ? "You're no longer friends"
+            : "Removed you as a friend";
+    }
+    if (activity.type == "post_like") return "Liked your post";
     if (activity.type == "post_reply") {
         return "Replied";
     }
@@ -251,7 +260,6 @@ const conversationPreview = (
 const quotedConversationActivityPreview = (
     activity: SpaceMessageConversation["latestActivity"],
 ) => {
-    if (!activity) return undefined;
     const text = activity.message?.text.trim();
     if (!text) return undefined;
     const previewText = truncateMessageText(text);
@@ -271,12 +279,10 @@ const ConversationPreviewLine: React.FC<{
 }> = ({ conversation, profile }) => {
     const activity = conversation.latestActivity;
     const quotedPreview = quotedConversationActivityPreview(activity);
-    const isEmptyConversation = !activity;
     const previewLineSx = {
         color: textSecondary,
         fontFamily: '"Inter Variable", Inter, sans-serif',
         fontSize: 13,
-        fontStyle: isEmptyConversation ? "italic" : "normal",
         fontWeight: 500,
         lineHeight: "18px",
         minWidth: 0,
@@ -321,7 +327,9 @@ const conversationId = (conversation: SpaceMessageConversation) =>
 
 const conversationTimeSections = (
     conversations: SpaceMessageConversation[],
+    newConversationIds: string[],
 ) => {
+    const newIds = new Set(newConversationIds);
     const now = Date.now();
     const today = new Date(now);
     const startOfTodayMs = new Date(
@@ -345,16 +353,12 @@ const conversationTimeSections = (
     ];
 
     for (const conversation of conversations) {
-        if (conversation.unread) {
+        if (newIds.has(conversationId(conversation))) {
             sections[0]!.items.push(conversation);
             continue;
         }
 
         const activity = conversation.latestActivity;
-        if (!activity) {
-            sections[6]!.items.push(conversation);
-            continue;
-        }
         if (activity.createdAtMs >= startOfTodayMs) {
             sections[1]!.items.push(conversation);
             continue;
@@ -388,11 +392,10 @@ const ConversationListItem: React.FC<{
 }> = ({ conversation, onOpenThread, profile }) => {
     const name =
         conversation.friend.fullName.trim() || conversation.friend.username;
-    const latestActivity = conversation.latestActivity;
-    const timestampLabel = latestActivity
-        ? formatTimeAgo(microsForTimestamp(latestActivity.createdAtMs))
-        : undefined;
-    const postThumbnailUrl = latestActivity?.post?.imageUrl;
+    const timestampLabel = formatTimeAgo(
+        microsForTimestamp(conversation.latestActivity.createdAtMs),
+    );
+    const postThumbnailUrl = conversation.latestActivity.post?.imageUrl;
     const unreadCount = conversation.unreadCount;
 
     return (
@@ -492,43 +495,39 @@ const ConversationListItem: React.FC<{
                         >
                             {firstNameFrom(name)}
                         </Box>
-                        {timestampLabel && (
-                            <>
-                                <Box
-                                    aria-hidden
-                                    component="span"
-                                    sx={{
-                                        color: textSecondary,
-                                        flexShrink: 0,
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 12,
-                                        fontWeight: 600,
-                                        lineHeight: "16px",
-                                    }}
-                                >
-                                    &middot;
-                                </Box>
-                                <Box
-                                    component="time"
-                                    dateTime={new Date(
-                                        latestActivity!.createdAtMs,
-                                    ).toISOString()}
-                                    sx={{
-                                        color: textSecondary,
-                                        flexShrink: 0,
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 12,
-                                        fontWeight: 600,
-                                        lineHeight: "16px",
-                                        whiteSpace: "nowrap",
-                                    }}
-                                >
-                                    {timestampLabel}
-                                </Box>
-                            </>
-                        )}
+                        <Box
+                            aria-hidden
+                            component="span"
+                            sx={{
+                                color: textSecondary,
+                                flexShrink: 0,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                lineHeight: "16px",
+                            }}
+                        >
+                            &middot;
+                        </Box>
+                        <Box
+                            component="time"
+                            dateTime={new Date(
+                                conversation.latestActivity.createdAtMs,
+                            ).toISOString()}
+                            sx={{
+                                color: textSecondary,
+                                flexShrink: 0,
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                lineHeight: "16px",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {timestampLabel}
+                        </Box>
                     </Box>
                     <ConversationPreviewLine
                         conversation={conversation}
@@ -1290,6 +1289,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     isThreadLoading = false,
     isThreadReadOnly = false,
     messages,
+    newConversationIds = [],
     onBack,
     onCloseThread,
     onDeleteMessage,
@@ -1341,11 +1341,11 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         friendsCount == 0 && Boolean(onShareProfileLink);
     const emptyConversationsCopy =
         friendsCount == 0
-            ? "No messages yet. Once you add friends, you'll see your their messages and replies to your posts here."
+            ? "No messages yet. Once you add friends, you'll see their messages and replies to your posts here."
             : "No messages yet. You'll see your friends' messages and replies to your posts here.";
     const conversationSections = React.useMemo(
-        () => conversationTimeSections(conversations),
-        [conversations],
+        () => conversationTimeSections(conversations, newConversationIds),
+        [conversations, newConversationIds],
     );
     const messageByID = React.useMemo(
         () => new Map(messages.map((message) => [message.id, message])),
@@ -1650,193 +1650,673 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     );
 
     return (
-        <Box
-            component="main"
-            sx={{
-                bgcolor: messagesBackground,
-                color: textBase,
-                display: "grid",
-                height: isThreadOpen ? "100dvh" : undefined,
-                minHeight: isThreadOpen ? 0 : "100svh",
-                overflow: isThreadOpen ? "hidden" : undefined,
-                overflowX: "hidden",
-                placeItems: { xs: "stretch", sm: "start center" },
-            }}
-        >
+        <>
             <Box
+                component="main"
                 sx={{
-                    bgcolor: "inherit",
-                    boxSizing: "border-box",
-                    display: isThreadOpen ? "grid" : undefined,
-                    gridTemplateRows: isThreadOpen
-                        ? isThreadReadOnly
-                            ? "56px minmax(0, 1fr)"
-                            : "56px minmax(0, 1fr) auto"
-                        : undefined,
-                    height: isThreadOpen ? "100%" : undefined,
+                    bgcolor: messagesBackground,
+                    color: textBase,
+                    display: "grid",
+                    height: isThreadOpen ? "100dvh" : undefined,
                     minHeight: isThreadOpen ? 0 : "100svh",
-                    mx: "auto",
                     overflow: isThreadOpen ? "hidden" : undefined,
-                    position: "relative",
-                    width: "100%",
-                    "@media (min-width: 600px)": { maxWidth: 390 },
+                    overflowX: "hidden",
+                    placeItems: { xs: "stretch", sm: "start center" },
                 }}
             >
                 <Box
-                    component="header"
                     sx={{
-                        alignItems: "center",
-                        display: "grid",
-                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
-                        height: 56,
-                        px: 2,
+                        bgcolor: "inherit",
+                        boxSizing: "border-box",
+                        display: isThreadOpen ? "grid" : undefined,
+                        gridTemplateRows: isThreadOpen
+                            ? isThreadReadOnly
+                                ? "56px minmax(0, 1fr)"
+                                : "56px minmax(0, 1fr) auto"
+                            : undefined,
+                        height: isThreadOpen ? "100%" : undefined,
+                        minHeight: isThreadOpen ? 0 : "100svh",
+                        mx: "auto",
+                        overflow: isThreadOpen ? "hidden" : undefined,
+                        position: "relative",
                         width: "100%",
+                        "@media (min-width: 600px)": { maxWidth: 390 },
                     }}
                 >
                     <Box
-                        component="button"
-                        type="button"
-                        aria-label={isThreadOpen ? threadBackLabel : "Back"}
-                        onClick={isThreadOpen ? onCloseThread : onBack}
+                        component="header"
                         sx={{
                             alignItems: "center",
-                            bgcolor: "transparent",
-                            border: 0,
-                            color: "inherit",
-                            cursor:
-                                isThreadOpen || onBack ? "pointer" : "default",
-                            display: "flex",
-                            height: spaceTouchTargetSize,
-                            justifyContent: "flex-start",
-                            ml: "-2px",
-                            p: 0,
-                            width: spaceTouchTargetSize,
-                            "&:focus-visible": {
-                                borderRadius: "50%",
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
+                            display: "grid",
+                            gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
+                            height: 56,
+                            px: 2,
+                            width: "100%",
                         }}
                     >
-                        <HugeiconsIcon
-                            icon={ArrowLeft02Icon}
-                            size={24}
-                            strokeWidth={1.8}
-                        />
-                    </Box>
-                    {isThreadOpen && selectedFriend ? (
                         <Box
-                            component="h1"
+                            component="button"
+                            type="button"
+                            aria-label={isThreadOpen ? threadBackLabel : "Back"}
+                            onClick={isThreadOpen ? onCloseThread : onBack}
                             sx={{
-                                justifySelf: "center",
-                                m: 0,
-                                minWidth: 0,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
+                                alignItems: "center",
+                                bgcolor: "transparent",
+                                border: 0,
+                                color: "inherit",
+                                cursor:
+                                    isThreadOpen || onBack
+                                        ? "pointer"
+                                        : "default",
+                                display: "flex",
+                                height: spaceTouchTargetSize,
+                                justifyContent: "flex-start",
+                                ml: "-2px",
+                                p: 0,
+                                width: spaceTouchTargetSize,
+                                "&:focus-visible": {
+                                    borderRadius: "50%",
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
                             }}
                         >
+                            <HugeiconsIcon
+                                icon={ArrowLeft02Icon}
+                                size={24}
+                                strokeWidth={1.8}
+                            />
+                        </Box>
+                        {isThreadOpen && selectedFriend ? (
                             <Box
-                                component="button"
-                                type="button"
-                                aria-label={
-                                    !canInteract
-                                        ? selectedName || "Conversation"
-                                        : selectedName
-                                          ? `Open ${selectedName}'s profile`
-                                          : "Open friend profile"
-                                }
-                                disabled={!canInteract}
-                                onClick={() =>
-                                    canInteract &&
-                                    onOpenSelectedFriendProfile(selectedFriend)
-                                }
+                                component="h1"
                                 sx={{
-                                    appearance: "none",
-                                    bgcolor: "transparent",
-                                    border: 0,
+                                    justifySelf: "center",
+                                    m: 0,
+                                    minWidth: 0,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                <Box
+                                    component="button"
+                                    type="button"
+                                    aria-label={
+                                        !canInteract
+                                            ? selectedName || "Conversation"
+                                            : selectedName
+                                              ? `Open ${selectedName}'s profile`
+                                              : "Open friend profile"
+                                    }
+                                    disabled={!canInteract}
+                                    onClick={() =>
+                                        canInteract &&
+                                        onOpenSelectedFriendProfile(
+                                            selectedFriend,
+                                        )
+                                    }
+                                    sx={{
+                                        appearance: "none",
+                                        bgcolor: "transparent",
+                                        border: 0,
+                                        color: "inherit",
+                                        cursor: canInteract
+                                            ? "pointer"
+                                            : "default",
+                                        display: "block",
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 18,
+                                        fontWeight: 700,
+                                        lineHeight: "24px",
+                                        m: 0,
+                                        maxWidth: "100%",
+                                        minWidth: 0,
+                                        overflow: "hidden",
+                                        p: 0,
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                        "&:focus-visible": {
+                                            borderRadius: "4px",
+                                            outline: `2px solid ${green}`,
+                                            outlineOffset: 3,
+                                        },
+                                    }}
+                                >
+                                    {firstNameFrom(selectedName)}
+                                </Box>
+                            </Box>
+                        ) : (
+                            <Box
+                                component="h1"
+                                sx={{
                                     color: "inherit",
-                                    cursor: canInteract ? "pointer" : "default",
-                                    display: "block",
                                     fontFamily:
                                         '"Inter Variable", Inter, sans-serif',
                                     fontSize: 18,
                                     fontWeight: 700,
+                                    justifySelf: "center",
                                     lineHeight: "24px",
                                     m: 0,
-                                    maxWidth: "100%",
                                     minWidth: 0,
                                     overflow: "hidden",
-                                    p: 0,
                                     textOverflow: "ellipsis",
                                     whiteSpace: "nowrap",
-                                    "&:focus-visible": {
-                                        borderRadius: "4px",
-                                        outline: `2px solid ${green}`,
-                                        outlineOffset: 3,
-                                    },
                                 }}
                             >
-                                {firstNameFrom(selectedName)}
+                                Messages
                             </Box>
-                        </Box>
-                    ) : (
-                        <Box
-                            component="h1"
-                            sx={{
-                                color: "inherit",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 18,
-                                fontWeight: 700,
-                                justifySelf: "center",
-                                lineHeight: "24px",
-                                m: 0,
-                                minWidth: 0,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                            }}
-                        >
-                            Messages
-                        </Box>
-                    )}
-                    <Box aria-hidden />
-                </Box>
+                        )}
+                        <Box aria-hidden />
+                    </Box>
 
-                {isThreadOpen && selectedFriend ? (
-                    <>
-                        <Box
-                            ref={threadScrollRef}
-                            onScroll={handleThreadScroll}
-                            sx={{
-                                boxSizing: "border-box",
-                                minHeight: 0,
-                                overscrollBehaviorY: "contain",
-                                overflowY: "auto",
-                                px: "14px",
-                                py: "12px",
-                            }}
-                        >
-                            {isThreadLoading ? (
+                    {isThreadOpen && selectedFriend ? (
+                        <>
+                            <Box
+                                ref={threadScrollRef}
+                                onScroll={handleThreadScroll}
+                                sx={{
+                                    boxSizing: "border-box",
+                                    minHeight: 0,
+                                    overscrollBehaviorY: "contain",
+                                    overflowY: "auto",
+                                    px: "14px",
+                                    py: "12px",
+                                }}
+                            >
+                                {isThreadLoading ? (
+                                    <Box
+                                        sx={{
+                                            alignItems: "center",
+                                            display: "flex",
+                                            height: "100%",
+                                            justifyContent: "center",
+                                        }}
+                                    >
+                                        <SpaceLoadingSpinner ariaLabel="Loading messages" />
+                                    </Box>
+                                ) : messages.length == 0 ? (
+                                    <Box
+                                        sx={{
+                                            alignItems: "center",
+                                            display: "flex",
+                                            height: "100%",
+                                            justifyContent: "center",
+                                            pointerEvents: "none",
+                                            textAlign: "center",
+                                        }}
+                                    >
+                                        <Box
+                                            component="p"
+                                            sx={{
+                                                color: textSecondary,
+                                                fontFamily:
+                                                    '"Inter Variable", Inter, sans-serif',
+                                                fontSize: 14,
+                                                fontWeight: 650,
+                                                lineHeight: "20px",
+                                                m: 0,
+                                            }}
+                                        >
+                                            {isThreadReadOnly
+                                                ? "No messages"
+                                                : "Say hello!"}
+                                        </Box>
+                                    </Box>
+                                ) : (
+                                    <Box
+                                        component="ol"
+                                        sx={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            listStyle: "none",
+                                            m: 0,
+                                            p: 0,
+                                        }}
+                                    >
+                                        {messages.map((message, index) => {
+                                            const nextMessage =
+                                                messages[index + 1];
+                                            const isSameSequenceAsNext =
+                                                sameMessageSender(
+                                                    message,
+                                                    nextMessage,
+                                                ) &&
+                                                nextMessage!.createdAtMs -
+                                                    message.createdAtMs <=
+                                                    messageGroupTimeThresholdMs;
+                                            const isLastInSequence =
+                                                !isSameSequenceAsNext;
+
+                                            return (
+                                                <MessageBubble
+                                                    key={message.id}
+                                                    isHighlighted={
+                                                        messageContextMenu
+                                                            ?.message.id ==
+                                                        message.id
+                                                    }
+                                                    isLastInSequence={
+                                                        isLastInSequence
+                                                    }
+                                                    message={message}
+                                                    onOpenActions={
+                                                        openMessageActions
+                                                    }
+                                                    onOpenQuotePost={
+                                                        onOpenQuotePost
+                                                    }
+                                                    ownSpaceID={profile.spaceId}
+                                                    parentMessage={
+                                                        message.replyMessageId
+                                                            ? messageByID.get(
+                                                                  message.replyMessageId,
+                                                              )
+                                                            : undefined
+                                                    }
+                                                    profile={profile}
+                                                    showTimestamp={
+                                                        isLastInSequence
+                                                    }
+                                                />
+                                            );
+                                        })}
+                                    </Box>
+                                )}
+                            </Box>
+                            <Popper
+                                anchorEl={messageContextMenu?.anchorEl ?? null}
+                                modifiers={messageActionsPopperModifiers}
+                                open={Boolean(messageContextMenu?.open)}
+                                placement="bottom-end"
+                                sx={{ outline: 0, zIndex: 1300 }}
+                                transition
+                            >
+                                {({ TransitionProps, placement }) => (
+                                    <ClickAwayListener
+                                        mouseEvent="onMouseDown"
+                                        touchEvent="onTouchStart"
+                                        onClickAway={
+                                            handleMessageActionsClickAway
+                                        }
+                                    >
+                                        <Grow
+                                            {...(TransitionProps ?? {})}
+                                            style={{
+                                                transformOrigin:
+                                                    placement.startsWith("top")
+                                                        ? "right bottom"
+                                                        : "right top",
+                                            }}
+                                            onExited={() => {
+                                                TransitionProps?.onExited();
+                                                clearClosedMessageActions();
+                                            }}
+                                            timeout={
+                                                messageActionsTransitionDuration
+                                            }
+                                        >
+                                            <Box
+                                                sx={{
+                                                    WebkitTapHighlightColor:
+                                                        "transparent",
+                                                    bgcolor: messagesBackground,
+                                                    borderRadius: "16px",
+                                                    boxShadow:
+                                                        "0 14px 40px rgba(0, 0, 0, 0.14)",
+                                                    minWidth: 132,
+                                                    outline: 0,
+                                                    p: "4px",
+                                                }}
+                                            >
+                                                <MenuList
+                                                    autoFocus
+                                                    autoFocusItem
+                                                    onKeyDown={
+                                                        handleMessageActionsKeyDown
+                                                    }
+                                                    sx={{
+                                                        outline: 0,
+                                                        p: 0,
+                                                        "&:focus": {
+                                                            outline: 0,
+                                                        },
+                                                        "&:focus-visible": {
+                                                            outline: 0,
+                                                        },
+                                                    }}
+                                                    variant="menu"
+                                                >
+                                                    {!isThreadReadOnly && (
+                                                        <>
+                                                            <MessageActionMenuItem
+                                                                icon={
+                                                                    <HeartIcon
+                                                                        small
+                                                                    />
+                                                                }
+                                                                label={
+                                                                    isContextMessageLiked
+                                                                        ? "Unlike"
+                                                                        : "Like"
+                                                                }
+                                                                onClick={() =>
+                                                                    handleMessageAction(
+                                                                        "like",
+                                                                    )
+                                                                }
+                                                            />
+                                                            <MessageActionMenuItem
+                                                                icon={
+                                                                    <ReplyIcon />
+                                                                }
+                                                                label="Reply"
+                                                                onClick={() =>
+                                                                    handleMessageAction(
+                                                                        "reply",
+                                                                    )
+                                                                }
+                                                            />
+                                                        </>
+                                                    )}
+                                                    <MessageActionMenuItem
+                                                        icon={<CopyIcon />}
+                                                        label="Copy"
+                                                        onClick={() =>
+                                                            handleMessageAction(
+                                                                "copy",
+                                                            )
+                                                        }
+                                                    />
+                                                    {!isThreadReadOnly &&
+                                                        messageContextMenu?.message &&
+                                                        isCurrentProfileMessage(
+                                                            messageContextMenu.message,
+                                                            profile,
+                                                        ) && (
+                                                            <MessageActionMenuItem
+                                                                icon={
+                                                                    <DeleteIcon />
+                                                                }
+                                                                label="Delete"
+                                                                onClick={() =>
+                                                                    handleMessageAction(
+                                                                        "delete",
+                                                                    )
+                                                                }
+                                                                tone="danger"
+                                                            />
+                                                        )}
+                                                </MenuList>
+                                            </Box>
+                                        </Grow>
+                                    </ClickAwayListener>
+                                )}
+                            </Popper>
+                            {!isThreadReadOnly && (
+                                <Box
+                                    sx={{
+                                        bgcolor: messagesBackground,
+                                        boxSizing: "border-box",
+                                        display: "grid",
+                                        gap: "8px",
+                                        p: "10px 14px calc(10px + env(safe-area-inset-bottom))",
+                                        width: "100%",
+                                    }}
+                                >
+                                    {replyingTo && (
+                                        <Box
+                                            sx={{
+                                                bgcolor: lightSurface,
+                                                borderLeft: `3px solid ${green}`,
+                                                borderRadius: "12px",
+                                                boxSizing: "border-box",
+                                                p: "9px 40px 9px 12px",
+                                                position: "relative",
+                                                width: "100%",
+                                            }}
+                                        >
+                                            <Box sx={{ minWidth: 0 }}>
+                                                <Box
+                                                    sx={{
+                                                        color: textSecondary,
+                                                        fontFamily:
+                                                            '"Inter Variable", Inter, sans-serif',
+                                                        fontSize: 12,
+                                                        fontWeight: 650,
+                                                        lineHeight: "16px",
+                                                    }}
+                                                >
+                                                    {isCurrentProfileMessage(
+                                                        replyingTo,
+                                                        profile,
+                                                    )
+                                                        ? "You"
+                                                        : firstNameFrom(
+                                                              replyingTo.sender.fullName.trim() ||
+                                                                  replyingTo
+                                                                      .sender
+                                                                      .username,
+                                                          )}
+                                                </Box>
+                                                <Box
+                                                    sx={{
+                                                        color: textBase,
+                                                        fontFamily:
+                                                            '"Inter Variable", Inter, sans-serif',
+                                                        fontSize: 13,
+                                                        fontWeight: 600,
+                                                        lineHeight: "18px",
+                                                        overflow: "hidden",
+                                                        textOverflow:
+                                                            "ellipsis",
+                                                        whiteSpace: "nowrap",
+                                                    }}
+                                                >
+                                                    {truncateMessageText(
+                                                        replyingTo.text,
+                                                    )}
+                                                </Box>
+                                            </Box>
+                                            <Box
+                                                component="button"
+                                                type="button"
+                                                aria-label="Cancel reply"
+                                                onClick={() => {
+                                                    setReplyingTo(null);
+                                                }}
+                                                sx={{
+                                                    alignItems: "center",
+                                                    bgcolor: "transparent",
+                                                    border: 0,
+                                                    borderRadius: "50%",
+                                                    color: textSecondary,
+                                                    cursor: "pointer",
+                                                    display: "flex",
+                                                    height: spaceTouchTargetSize,
+                                                    justifyContent: "center",
+                                                    p: 0,
+                                                    position: "absolute",
+                                                    right: 0,
+                                                    top: 0,
+                                                    width: spaceTouchTargetSize,
+                                                    "&:focus-visible": {
+                                                        outline: `2px solid ${green}`,
+                                                        outlineOffset: 2,
+                                                    },
+                                                    "&:hover": {
+                                                        color: textBase,
+                                                    },
+                                                    "& svg": {
+                                                        position: "absolute",
+                                                        right: 8,
+                                                        top: 8,
+                                                    },
+                                                }}
+                                            >
+                                                <HugeiconsIcon
+                                                    icon={Cancel01Icon}
+                                                    size={16}
+                                                    strokeWidth={1.8}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    )}
+                                    <Box
+                                        sx={{
+                                            alignItems: "flex-end",
+                                            display: "flex",
+                                            gap: "8px",
+                                            width: "100%",
+                                        }}
+                                    >
+                                        <Box
+                                            ref={composerRef}
+                                            component="textarea"
+                                            aria-label={`Message ${selectedName}`}
+                                            onChange={(event) => {
+                                                const nextText =
+                                                    clampSpaceMessageText(
+                                                        event.target.value,
+                                                    );
+                                                event.currentTarget.value =
+                                                    nextText;
+                                                setMessageText(nextText);
+                                                resizeComposer(
+                                                    event.currentTarget,
+                                                );
+                                            }}
+                                            onBlur={handleComposerBlur}
+                                            onFocus={handleComposerFocus}
+                                            placeholder="Message"
+                                            rows={1}
+                                            value={messageText}
+                                            sx={{
+                                                bgcolor: composerSurface,
+                                                border: `1px solid ${composerBorder}`,
+                                                borderRadius: "24px",
+                                                boxSizing: "border-box",
+                                                color: textBase,
+                                                flex: "1 1 auto",
+                                                fontFamily:
+                                                    '"Inter Variable", Inter, sans-serif',
+                                                fontSize: 14,
+                                                fontWeight: 600,
+                                                lineHeight: "20px",
+                                                maxHeight: composerMaxHeight,
+                                                minHeight: composerHeight,
+                                                minWidth: 0,
+                                                outline: 0,
+                                                overflow: "hidden",
+                                                pb: `${composerPadding}px`,
+                                                pl: `${composerPaddingLeft}px`,
+                                                pr: `${composerPadding}px`,
+                                                pt: `${composerPadding}px`,
+                                                resize: "none",
+                                                "&::placeholder": {
+                                                    color: textSecondary,
+                                                },
+                                                "&:focus": {
+                                                    borderColor: green,
+                                                },
+                                            }}
+                                        />
+                                        <Box
+                                            component="button"
+                                            type="button"
+                                            aria-label="Send message"
+                                            className={
+                                                canSend ? "green-bg" : undefined
+                                            }
+                                            disabled={!canSend}
+                                            onClick={sendMessage}
+                                            sx={{
+                                                alignItems: "center",
+                                                bgcolor: canSend
+                                                    ? green
+                                                    : lightSurfaceHover,
+                                                border: 0,
+                                                borderRadius: "50%",
+                                                color: canSend
+                                                    ? "#FFFFFF"
+                                                    : textSecondary,
+                                                cursor: canSend
+                                                    ? "pointer"
+                                                    : "default",
+                                                display: "flex",
+                                                flexShrink: 0,
+                                                height: composerHeight,
+                                                justifyContent: "center",
+                                                opacity: canSend ? 1 : 0.42,
+                                                p: 0,
+                                                transition:
+                                                    "background-color 180ms ease, color 180ms ease, opacity 180ms ease, transform 120ms ease",
+                                                width: composerHeight,
+                                                "&:active": {
+                                                    transform: canSend
+                                                        ? "scale(0.96)"
+                                                        : "none",
+                                                },
+                                                "&:focus-visible": {
+                                                    outline: `2px solid ${green}`,
+                                                    outlineOffset: 2,
+                                                },
+                                                "&:hover": {
+                                                    bgcolor: canSend
+                                                        ? "#07AE22"
+                                                        : lightSurfaceHover,
+                                                },
+                                            }}
+                                        >
+                                            <Box
+                                                component="span"
+                                                sx={{
+                                                    display: "flex",
+                                                    transform:
+                                                        "translate(-1px, 1px)",
+                                                }}
+                                            >
+                                                <HugeiconsIcon
+                                                    icon={Navigation03Icon}
+                                                    size={24}
+                                                    strokeWidth={1.8}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                </Box>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            {isConversationsLoading ? (
                                 <Box
                                     sx={{
                                         alignItems: "center",
+                                        boxSizing: "border-box",
                                         display: "flex",
-                                        height: "100%",
+                                        inset: 0,
                                         justifyContent: "center",
+                                        pointerEvents: "none",
+                                        position: "absolute",
                                     }}
                                 >
                                     <SpaceLoadingSpinner ariaLabel="Loading messages" />
                                 </Box>
-                            ) : messages.length == 0 ? (
+                            ) : conversations.length == 0 ? (
                                 <Box
                                     sx={{
                                         alignItems: "center",
+                                        boxSizing: "border-box",
                                         display: "flex",
-                                        height: "100%",
+                                        flexDirection: "column",
+                                        gap: "22px",
+                                        inset: 0,
                                         justifyContent: "center",
                                         pointerEvents: "none",
+                                        position: "absolute",
+                                        px: 3,
                                         textAlign: "center",
                                     }}
                                 >
@@ -1847,533 +2327,83 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             fontFamily:
                                                 '"Inter Variable", Inter, sans-serif',
                                             fontSize: 14,
-                                            fontWeight: 650,
+                                            fontWeight: 500,
                                             lineHeight: "20px",
                                             m: 0,
+                                            maxWidth: 260,
                                         }}
                                     >
-                                        {isThreadReadOnly
-                                            ? "No messages"
-                                            : "Say hello!"}
+                                        {emptyConversationsCopy}
                                     </Box>
-                                </Box>
-                            ) : (
-                                <Box
-                                    component="ol"
-                                    sx={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        listStyle: "none",
-                                        m: 0,
-                                        p: 0,
-                                    }}
-                                >
-                                    {messages.map((message, index) => {
-                                        const nextMessage = messages[index + 1];
-                                        const isSameSequenceAsNext =
-                                            sameMessageSender(
-                                                message,
-                                                nextMessage,
-                                            ) &&
-                                            nextMessage!.createdAtMs -
-                                                message.createdAtMs <=
-                                                messageGroupTimeThresholdMs;
-                                        const isLastInSequence =
-                                            !isSameSequenceAsNext;
-
-                                        return (
-                                            <MessageBubble
-                                                key={message.id}
-                                                isHighlighted={
-                                                    messageContextMenu?.message
-                                                        .id == message.id
-                                                }
-                                                isLastInSequence={
-                                                    isLastInSequence
-                                                }
-                                                message={message}
-                                                onOpenActions={
-                                                    openMessageActions
-                                                }
-                                                onOpenQuotePost={
-                                                    onOpenQuotePost
-                                                }
-                                                ownSpaceID={profile.spaceId}
-                                                parentMessage={
-                                                    message.replyMessageId
-                                                        ? messageByID.get(
-                                                              message.replyMessageId,
-                                                          )
-                                                        : undefined
-                                                }
-                                                profile={profile}
-                                                showTimestamp={isLastInSequence}
-                                            />
-                                        );
-                                    })}
-                                </Box>
-                            )}
-                        </Box>
-                        <Popper
-                            anchorEl={messageContextMenu?.anchorEl ?? null}
-                            modifiers={messageActionsPopperModifiers}
-                            open={Boolean(messageContextMenu?.open)}
-                            placement="bottom-end"
-                            sx={{ outline: 0, zIndex: 1300 }}
-                            transition
-                        >
-                            {({ TransitionProps, placement }) => (
-                                <ClickAwayListener
-                                    mouseEvent="onMouseDown"
-                                    touchEvent="onTouchStart"
-                                    onClickAway={handleMessageActionsClickAway}
-                                >
-                                    <Grow
-                                        {...(TransitionProps ?? {})}
-                                        style={{
-                                            transformOrigin:
-                                                placement.startsWith("top")
-                                                    ? "right bottom"
-                                                    : "right top",
-                                        }}
-                                        onExited={() => {
-                                            TransitionProps?.onExited();
-                                            clearClosedMessageActions();
-                                        }}
-                                        timeout={
-                                            messageActionsTransitionDuration
-                                        }
-                                    >
-                                        <Box
-                                            sx={{
-                                                WebkitTapHighlightColor:
-                                                    "transparent",
-                                                bgcolor: messagesBackground,
-                                                borderRadius: "16px",
-                                                boxShadow:
-                                                    "0 14px 40px rgba(0, 0, 0, 0.14)",
-                                                minWidth: 132,
-                                                outline: 0,
-                                                p: "4px",
-                                            }}
-                                        >
-                                            <MenuList
-                                                autoFocus
-                                                autoFocusItem
-                                                onKeyDown={
-                                                    handleMessageActionsKeyDown
-                                                }
-                                                sx={{
-                                                    outline: 0,
-                                                    p: 0,
-                                                    "&:focus": { outline: 0 },
-                                                    "&:focus-visible": {
-                                                        outline: 0,
-                                                    },
-                                                }}
-                                                variant="menu"
-                                            >
-                                                {!isThreadReadOnly && (
-                                                    <>
-                                                        <MessageActionMenuItem
-                                                            icon={
-                                                                <HeartIcon
-                                                                    small
-                                                                />
-                                                            }
-                                                            label={
-                                                                isContextMessageLiked
-                                                                    ? "Unlike"
-                                                                    : "Like"
-                                                            }
-                                                            onClick={() =>
-                                                                handleMessageAction(
-                                                                    "like",
-                                                                )
-                                                            }
-                                                        />
-                                                        <MessageActionMenuItem
-                                                            icon={<ReplyIcon />}
-                                                            label="Reply"
-                                                            onClick={() =>
-                                                                handleMessageAction(
-                                                                    "reply",
-                                                                )
-                                                            }
-                                                        />
-                                                    </>
-                                                )}
-                                                <MessageActionMenuItem
-                                                    icon={<CopyIcon />}
-                                                    label="Copy"
-                                                    onClick={() =>
-                                                        handleMessageAction(
-                                                            "copy",
-                                                        )
-                                                    }
-                                                />
-                                                {!isThreadReadOnly &&
-                                                    messageContextMenu?.message &&
-                                                    isCurrentProfileMessage(
-                                                        messageContextMenu.message,
-                                                        profile,
-                                                    ) && (
-                                                        <MessageActionMenuItem
-                                                            icon={
-                                                                <DeleteIcon />
-                                                            }
-                                                            label="Delete"
-                                                            onClick={() =>
-                                                                handleMessageAction(
-                                                                    "delete",
-                                                                )
-                                                            }
-                                                            tone="danger"
-                                                        />
-                                                    )}
-                                            </MenuList>
-                                        </Box>
-                                    </Grow>
-                                </ClickAwayListener>
-                            )}
-                        </Popper>
-                        {!isThreadReadOnly && (
-                            <Box
-                                sx={{
-                                    bgcolor: messagesBackground,
-                                    boxSizing: "border-box",
-                                    display: "grid",
-                                    gap: "8px",
-                                    p: "10px 14px calc(10px + env(safe-area-inset-bottom))",
-                                    width: "100%",
-                                }}
-                            >
-                                {replyingTo && (
-                                    <Box
-                                        sx={{
-                                            bgcolor: lightSurface,
-                                            borderLeft: `3px solid ${green}`,
-                                            borderRadius: "12px",
-                                            boxSizing: "border-box",
-                                            p: "9px 40px 9px 12px",
-                                            position: "relative",
-                                            width: "100%",
-                                        }}
-                                    >
-                                        <Box sx={{ minWidth: 0 }}>
-                                            <Box
-                                                sx={{
-                                                    color: textSecondary,
-                                                    fontFamily:
-                                                        '"Inter Variable", Inter, sans-serif',
-                                                    fontSize: 12,
-                                                    fontWeight: 650,
-                                                    lineHeight: "16px",
-                                                }}
-                                            >
-                                                {isCurrentProfileMessage(
-                                                    replyingTo,
-                                                    profile,
-                                                )
-                                                    ? "You"
-                                                    : firstNameFrom(
-                                                          replyingTo.sender.fullName.trim() ||
-                                                              replyingTo.sender
-                                                                  .username,
-                                                      )}
-                                            </Box>
-                                            <Box
-                                                sx={{
-                                                    color: textBase,
-                                                    fontFamily:
-                                                        '"Inter Variable", Inter, sans-serif',
-                                                    fontSize: 13,
-                                                    fontWeight: 600,
-                                                    lineHeight: "18px",
-                                                    overflow: "hidden",
-                                                    textOverflow: "ellipsis",
-                                                    whiteSpace: "nowrap",
-                                                }}
-                                            >
-                                                {truncateMessageText(
-                                                    replyingTo.text,
-                                                )}
-                                            </Box>
-                                        </Box>
+                                    {showInviteEmptyState && (
                                         <Box
                                             component="button"
                                             type="button"
-                                            aria-label="Cancel reply"
-                                            onClick={() => {
-                                                setReplyingTo(null);
-                                            }}
+                                            onClick={openInviteDialog}
                                             sx={{
                                                 alignItems: "center",
-                                                bgcolor: "transparent",
+                                                bgcolor: "#F2F2F2",
                                                 border: 0,
-                                                borderRadius: "50%",
-                                                color: textSecondary,
+                                                borderRadius: "18px",
+                                                color: textBase,
                                                 cursor: "pointer",
-                                                display: "flex",
+                                                display: "inline-flex",
+                                                fontFamily:
+                                                    '"Inter Variable", Inter, sans-serif',
+                                                fontSize: 13,
+                                                fontWeight: 600,
+                                                gap: "6px",
                                                 height: spaceTouchTargetSize,
                                                 justifyContent: "center",
-                                                p: 0,
-                                                position: "absolute",
-                                                right: 0,
-                                                top: 0,
-                                                width: spaceTouchTargetSize,
+                                                lineHeight: "18px",
+                                                pointerEvents: "auto",
+                                                px: "14px",
+                                                whiteSpace: "nowrap",
                                                 "&:focus-visible": {
                                                     outline: `2px solid ${green}`,
                                                     outlineOffset: 2,
                                                 },
-                                                "&:hover": { color: textBase },
-                                                "& svg": {
-                                                    position: "absolute",
-                                                    right: 8,
-                                                    top: 8,
+                                                "&:hover": {
+                                                    bgcolor: "#E8E8E8",
                                                 },
                                             }}
                                         >
-                                            <HugeiconsIcon
-                                                icon={Cancel01Icon}
-                                                size={16}
-                                                strokeWidth={1.8}
-                                            />
+                                            <ShareIcon />
+                                            Invite friends
                                         </Box>
-                                    </Box>
-                                )}
-                                <Box
-                                    sx={{
-                                        alignItems: "flex-end",
-                                        display: "flex",
-                                        gap: "8px",
-                                        width: "100%",
-                                    }}
-                                >
-                                    <Box
-                                        ref={composerRef}
-                                        component="textarea"
-                                        aria-label={`Message ${selectedName}`}
-                                        onChange={(event) => {
-                                            const nextText =
-                                                clampSpaceMessageText(
-                                                    event.target.value,
-                                                );
-                                            event.currentTarget.value =
-                                                nextText;
-                                            setMessageText(nextText);
-                                            resizeComposer(event.currentTarget);
-                                        }}
-                                        onBlur={handleComposerBlur}
-                                        onFocus={handleComposerFocus}
-                                        placeholder="Message"
-                                        rows={1}
-                                        value={messageText}
-                                        sx={{
-                                            bgcolor: composerSurface,
-                                            border: `1px solid ${composerBorder}`,
-                                            borderRadius: "24px",
-                                            boxSizing: "border-box",
-                                            color: textBase,
-                                            flex: "1 1 auto",
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 14,
-                                            fontWeight: 600,
-                                            lineHeight: "20px",
-                                            maxHeight: composerMaxHeight,
-                                            minHeight: composerHeight,
-                                            minWidth: 0,
-                                            outline: 0,
-                                            overflow: "hidden",
-                                            pb: `${composerPadding}px`,
-                                            pl: `${composerPaddingLeft}px`,
-                                            pr: `${composerPadding}px`,
-                                            pt: `${composerPadding}px`,
-                                            resize: "none",
-                                            "&::placeholder": {
-                                                color: textSecondary,
-                                            },
-                                            "&:focus": { borderColor: green },
-                                        }}
-                                    />
-                                    <Box
-                                        component="button"
-                                        type="button"
-                                        aria-label="Send message"
-                                        className={
-                                            canSend ? "green-bg" : undefined
-                                        }
-                                        disabled={!canSend}
-                                        onClick={sendMessage}
-                                        sx={{
-                                            alignItems: "center",
-                                            bgcolor: canSend
-                                                ? green
-                                                : lightSurfaceHover,
-                                            border: 0,
-                                            borderRadius: "50%",
-                                            color: canSend
-                                                ? "#FFFFFF"
-                                                : textSecondary,
-                                            cursor: canSend
-                                                ? "pointer"
-                                                : "default",
-                                            display: "flex",
-                                            flexShrink: 0,
-                                            height: composerHeight,
-                                            justifyContent: "center",
-                                            opacity: canSend ? 1 : 0.42,
-                                            p: 0,
-                                            transition:
-                                                "background-color 180ms ease, color 180ms ease, opacity 180ms ease, transform 120ms ease",
-                                            width: composerHeight,
-                                            "&:active": {
-                                                transform: canSend
-                                                    ? "scale(0.96)"
-                                                    : "none",
-                                            },
-                                            "&:focus-visible": {
-                                                outline: `2px solid ${green}`,
-                                                outlineOffset: 2,
-                                            },
-                                            "&:hover": {
-                                                bgcolor: canSend
-                                                    ? "#07AE22"
-                                                    : lightSurfaceHover,
-                                            },
-                                        }}
-                                    >
-                                        <Box
-                                            component="span"
-                                            sx={{
-                                                display: "flex",
-                                                transform:
-                                                    "translate(-1px, 1px)",
-                                            }}
-                                        >
-                                            <HugeiconsIcon
-                                                icon={Navigation03Icon}
-                                                size={24}
-                                                strokeWidth={1.8}
-                                            />
-                                        </Box>
-                                    </Box>
+                                    )}
                                 </Box>
-                            </Box>
-                        )}
-                    </>
-                ) : (
-                    <>
-                        {isConversationsLoading ? (
-                            <Box
-                                sx={{
-                                    alignItems: "center",
-                                    boxSizing: "border-box",
-                                    display: "flex",
-                                    inset: 0,
-                                    justifyContent: "center",
-                                    pointerEvents: "none",
-                                    position: "absolute",
-                                }}
-                            >
-                                <SpaceLoadingSpinner ariaLabel="Loading messages" />
-                            </Box>
-                        ) : conversations.length == 0 ? (
-                            <Box
-                                sx={{
-                                    alignItems: "center",
-                                    boxSizing: "border-box",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: "22px",
-                                    inset: 0,
-                                    justifyContent: "center",
-                                    pointerEvents: "none",
-                                    position: "absolute",
-                                    px: 3,
-                                    textAlign: "center",
-                                }}
-                            >
+                            ) : (
                                 <Box
-                                    component="p"
                                     sx={{
-                                        color: textSecondary,
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 14,
-                                        fontWeight: 500,
-                                        lineHeight: "20px",
+                                        boxSizing: "border-box",
                                         m: 0,
-                                        maxWidth: 260,
+                                        p: "6px 16px 28px",
                                     }}
                                 >
-                                    {emptyConversationsCopy}
+                                    {conversationSections.map((section) => (
+                                        <ConversationSection
+                                            key={section.title}
+                                            onOpenThread={onOpenThread}
+                                            profile={profile}
+                                            section={section}
+                                        />
+                                    ))}
                                 </Box>
-                                {showInviteEmptyState && (
-                                    <Box
-                                        component="button"
-                                        type="button"
-                                        onClick={openInviteDialog}
-                                        sx={{
-                                            alignItems: "center",
-                                            bgcolor: "#F2F2F2",
-                                            border: 0,
-                                            borderRadius: "18px",
-                                            color: textBase,
-                                            cursor: "pointer",
-                                            display: "inline-flex",
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 13,
-                                            fontWeight: 600,
-                                            gap: "6px",
-                                            height: spaceTouchTargetSize,
-                                            justifyContent: "center",
-                                            lineHeight: "18px",
-                                            pointerEvents: "auto",
-                                            px: "14px",
-                                            whiteSpace: "nowrap",
-                                            "&:focus-visible": {
-                                                outline: `2px solid ${green}`,
-                                                outlineOffset: 2,
-                                            },
-                                            "&:hover": { bgcolor: "#E8E8E8" },
-                                        }}
-                                    >
-                                        <ShareIcon />
-                                        Invite friends
-                                    </Box>
-                                )}
-                            </Box>
-                        ) : (
-                            <Box
-                                sx={{
-                                    boxSizing: "border-box",
-                                    m: 0,
-                                    p: "6px 16px 28px",
-                                }}
-                            >
-                                {conversationSections.map((section) => (
-                                    <ConversationSection
-                                        key={section.title}
-                                        onOpenThread={onOpenThread}
-                                        profile={profile}
-                                        section={section}
-                                    />
-                                ))}
-                            </Box>
-                        )}
-                    </>
-                )}
+                            )}
+                        </>
+                    )}
+                </Box>
             </Box>
-            <SpaceInviteFriendsDialog
-                errorMessage={inviteShareError}
-                open={isInviteDialogOpen}
-                sharing={isInviteSharing}
-                onClose={closeInviteDialog}
-                onShare={() => void shareInviteLink()}
-            />
-        </Box>
+            {showInviteEmptyState && (
+                <SpaceInviteFriendsDialog
+                    errorMessage={inviteShareError}
+                    open={isInviteDialogOpen}
+                    sharing={isInviteSharing}
+                    onClose={closeInviteDialog}
+                    onShare={() => void shareInviteLink()}
+                />
+            )}
+        </>
     );
 };

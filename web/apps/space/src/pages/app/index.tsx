@@ -45,8 +45,6 @@ const Page: React.FC = () => {
     const [feedItems, setFeedItems] = useState<SpacePost[]>([]);
     const [feedNextCursor, setFeedNextCursor] = useState<string>();
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
-    const [hasUnreadNotifications, setHasUnreadNotifications] =
-        useState<boolean>();
     const [isFeedLoading, setIsFeedLoading] = useState(true);
     const [isFeedLoadingMore, setIsFeedLoadingMore] = useState(false);
     const isInitialFeedLoading =
@@ -87,7 +85,6 @@ const Page: React.FC = () => {
             setFeedItems([]);
             setFeedNextCursor(undefined);
             setHasUnreadMessages(false);
-            setHasUnreadNotifications(false);
             setIsFeedLoading(false);
             setIsFeedLoadingMore(false);
             setSkipNextHomeFeedSkeleton(false);
@@ -98,7 +95,6 @@ const Page: React.FC = () => {
         setFeedItems([]);
         setFeedNextCursor(undefined);
         setHasUnreadMessages(undefined);
-        setHasUnreadNotifications(undefined);
         setIsFeedLoading(true);
         setIsFeedLoadingMore(false);
         void loadCurrentFeedPage()
@@ -121,11 +117,7 @@ const Page: React.FC = () => {
         void loadCurrentUnreadStatus()
             .then((unreadStatus) => {
                 if (!cancelled) {
-                    setHasUnreadMessages(
-                        unreadStatus.messagesUnread ||
-                            unreadStatus.messageLikesUnread,
-                    );
-                    setHasUnreadNotifications(unreadStatus.notificationsUnread);
+                    setHasUnreadMessages(unreadStatus.messagesUnread);
                 }
             })
             .catch((error: unknown) =>
@@ -209,7 +201,6 @@ const Page: React.FC = () => {
                 friendsCount={friends.length}
                 addedFriendToastName={addedFriendToastName}
                 hasUnreadMessages={hasUnreadMessages}
-                hasUnreadNotifications={hasUnreadNotifications}
                 hasMoreFeedItems={Boolean(feedNextCursor)}
                 isFeedLoading={
                     isSkippingInitialFeedSkeleton ? false : isFeedLoading
@@ -299,9 +290,6 @@ const Page: React.FC = () => {
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onLoadPostLikers={loadCurrentPostLikers}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
-                onOpenNotifications={() =>
-                    void router.push(spaceRoutes.notifications)
-                }
                 onOpenProfile={
                     profile
                         ? () => void router.push(spaceRoutes.profile)

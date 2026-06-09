@@ -10,7 +10,7 @@ import {
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
-import { postRouteSourceFromQuery, spaceRoutes } from "utils/spaceRoutes";
+import { spaceRoutes } from "utils/spaceRoutes";
 import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const postBackground = "#000000";
@@ -66,7 +66,6 @@ const Page: React.FC = () => {
     const spaceId =
         valueFromQuery(router.query.spaceId) ?? pathParams.spaceId ?? "";
     const postId = postIdFromQuery(router.query.postId) ?? pathParams.postId;
-    const postRouteSource = postRouteSourceFromQuery(router.query.from);
     const [post, setPost] = React.useState<SpacePost | null>(null);
     const [postLoadError, setPostLoadError] = React.useState<string>();
     const [isPostLoading, setIsPostLoading] = React.useState(false);
@@ -123,12 +122,8 @@ const Page: React.FC = () => {
             router.back();
             return;
         }
-        if (postRouteSource == "notifications") {
-            void router.push(spaceRoutes.notifications);
-            return;
-        }
         void router.push(ownerProfileRoute());
-    }, [ownerProfileRoute, postRouteSource, router]);
+    }, [ownerProfileRoute, router]);
 
     if (
         !router.isReady ||

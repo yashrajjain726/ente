@@ -198,38 +198,53 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 		cursorID = id
 	}
 	rows, err := r.DB.QueryContext(ctx, `
-			WITH message_candidates AS (
-				SELECT
-					'message' AS activity_type,
-					'message:' || m.message_id AS activity_id,
-					m.created_at AS activity_created_at,
-					CASE WHEN m.sender_space_id = $2 THEN m.recipient_space_id ELSE m.sender_space_id END AS friend_space_id,
-					m.message_id,
-					NULL::bigint AS post_id,
-					m.sender_space_id = $2 AS is_outgoing
-				FROM space_messages m
-				WHERE (m.sender_space_id = $2 OR m.recipient_space_id = $2)
-				  AND (m.sender_id = $1 OR m.recipient_id = $1)
-				  AND m.is_deleted = FALSE
-				  AND NOT (m.kind = 'post_reply' AND m.recipient_space_id = $2)
+		WITH message_candidates AS (
+			SELECT
+				'message' AS activity_type,
+				'message:' || m.message_id AS activity_id,
+				m.created_at AS activity_created_at,
+				CASE WHEN m.sender_space_id = $2 THEN m.recipient_space_id ELSE m.sender_space_id END AS friend_space_id,
+				m.message_id,
+				NULL::bigint AS post_id,
+				CASE WHEN m.recipient_space_id = $2 THEN m.created_at ELSE NULL::bigint END AS notification_created_at,
+				FALSE AS is_outgoing
+			FROM space_messages m
+			WHERE (m.sender_space_id = $2 OR m.recipient_space_id = $2)
+			  AND (m.sender_id = $1 OR m.recipient_id = $1)
+			  AND m.is_deleted = FALSE
+			  AND NOT (m.kind = 'post_reply' AND m.recipient_space_id = $2)
 
 			UNION ALL
 
 			SELECT
-					'message_like' AS activity_type,
-					'message_like:' || ml.message_id || ':' || ml.actor_space_id AS activity_id,
-					ml.created_at AS activity_created_at,
-					liker_space.space_id AS friend_space_id,
-					m.message_id,
-					NULL::bigint AS post_id,
-					FALSE AS is_outgoing
-				FROM space_message_likes ml
-				JOIN space_messages m ON m.message_id = ml.message_id
-				JOIN spaces liker_space ON liker_space.space_id = ml.actor_space_id
-				WHERE m.sender_space_id = $2
+				'message_like' AS activity_type,
+				'message_like:' || ml.message_id || ':' || ml.actor_space_id AS activity_id,
+				ml.created_at AS activity_created_at,
+				liker_space.space_id AS friend_space_id,
+				m.message_id,
+				NULL::bigint AS post_id,
+				ml.created_at AS notification_created_at,
+				FALSE AS is_outgoing
+			FROM space_message_likes ml
+			JOIN space_messages m ON m.message_id = ml.message_id
+			JOIN spaces liker_space ON liker_space.space_id = ml.actor_space_id
+			WHERE m.sender_space_id = $2
 			  AND m.recipient_space_id = ml.actor_space_id
 			  AND ml.actor_space_id <> $2
 			  AND m.is_deleted = FALSE
+		),
+		post_like_events AS (
+			SELECT
+				actor_space.space_id AS friend_space_id,
+				p.post_id,
+				MAX(pl.created_at) AS liked_at
+			FROM space_post_likes pl
+			JOIN space_posts p ON p.post_id = pl.post_id
+			JOIN spaces actor_space ON actor_space.space_id = pl.actor_space_id
+			WHERE p.space_id = $2
+			  AND pl.actor_space_id <> $2
+			  AND p.is_deleted = FALSE
+			GROUP BY actor_space.space_id, p.post_id
 		),
 		post_reply_events AS (
 			SELECT DISTINCT ON (m.sender_space_id, m.reply_post_id)
@@ -247,134 +262,143 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			  AND p.space_id = $2
 			ORDER BY m.sender_space_id, m.reply_post_id, m.created_at DESC, m.message_id DESC
 		),
-			post_reply_candidates AS (
-				SELECT
-					'post_reply' AS activity_type,
-					'post_reply:' || r.message_id AS activity_id,
-					r.replied_at AS activity_created_at,
-					r.friend_space_id,
-					r.message_id,
-					r.post_id,
-					FALSE AS is_outgoing
-				FROM post_reply_events r
-			),
-			candidates AS (
-				SELECT * FROM message_candidates
-				UNION ALL
-				SELECT * FROM post_reply_candidates
-			),
-			current_friends AS (
-				SELECT
-					fs.friend_space_id,
-					fs.created_at AS friendship_created_at
-				FROM space_friend_shares fs
-				WHERE fs.space_id = $2
-			),
-			conversation_friends AS (
-				SELECT friend_space_id FROM candidates
-				UNION
-				SELECT friend_space_id FROM current_friends
-			),
-			readable_activities AS (
-				SELECT
-					m.sender_space_id AS friend_space_id,
-					m.created_at AS readable_created_at
-				FROM space_messages m
-				WHERE m.recipient_space_id = $2
-				  AND m.sender_space_id <> $2
-				  AND m.kind = 'regular'
-				  AND m.is_deleted = FALSE
+		post_like_candidates AS (
+			SELECT
+				'post_like' AS activity_type,
+				'post_like:' || l.post_id::text || ':' || l.friend_space_id AS activity_id,
+				l.liked_at AS activity_created_at,
+				l.friend_space_id,
+				NULL::text AS message_id,
+				l.post_id,
+				l.liked_at AS notification_created_at,
+				FALSE AS is_outgoing
+			FROM post_like_events l
+		),
+		post_reply_candidates AS (
+			SELECT
+				'post_reply' AS activity_type,
+				'post_reply:' || r.message_id AS activity_id,
+				r.replied_at AS activity_created_at,
+				r.friend_space_id,
+				r.message_id,
+				r.post_id,
+				r.replied_at AS notification_created_at,
+				FALSE AS is_outgoing
+			FROM post_reply_events r
+		),
+		friend_candidates AS (
+			SELECT
+				CASE fe.event_type
+					WHEN 'friend_remove' THEN 'friend_remove'
+					ELSE 'friend_add'
+				END AS activity_type,
+				'friend_event:' || fe.event_id::text AS activity_id,
+				fe.created_at AS activity_created_at,
+				CASE WHEN fe.actor_space_id = $2 THEN fe.target_space_id ELSE fe.actor_space_id END AS friend_space_id,
+				NULL::text AS message_id,
+				NULL::bigint AS post_id,
+				CASE WHEN fe.target_space_id = $2 THEN fe.created_at ELSE NULL::bigint END AS notification_created_at,
+				fe.actor_space_id = $2 AS is_outgoing
+			FROM space_friend_events fe
+			WHERE (fe.target_space_id = $2 OR fe.actor_space_id = $2)
+			  AND fe.actor_space_id <> fe.target_space_id
+		),
+		candidates AS (
+			SELECT * FROM message_candidates
+			UNION ALL
+			SELECT * FROM post_like_candidates
+			UNION ALL
+			SELECT * FROM post_reply_candidates
+			UNION ALL
+			SELECT * FROM friend_candidates
+		),
+		readable_activities AS (
+			SELECT
+				m.sender_space_id AS friend_space_id,
+				m.created_at AS readable_created_at
+			FROM space_messages m
+			WHERE m.recipient_space_id = $2
+			  AND m.sender_space_id <> $2
+			  AND m.kind = 'regular'
+			  AND m.is_deleted = FALSE
 
-				UNION ALL
+			UNION ALL
 
-				SELECT
-					m.sender_space_id AS friend_space_id,
-					m.created_at AS readable_created_at
-				FROM space_messages m
-				JOIN space_posts p ON p.post_id = m.reply_post_id
-				WHERE m.recipient_space_id = $2
-				  AND m.sender_space_id <> $2
-				  AND m.kind = 'post_reply'
-				  AND m.is_deleted = FALSE
-				  AND m.reply_post_id IS NOT NULL
-				  AND p.space_id = $2
-			),
-			readable_unread_counts AS (
-				SELECT
-					ra.friend_space_id,
-					COUNT(*) AS unread_count
-				FROM readable_activities ra
-				LEFT JOIN space_read_markers nrm
-				  ON nrm.viewer_space_id = $2
-				 AND nrm.scope = 'message_thread'
-				 AND nrm.friend_space_id = ra.friend_space_id
-				WHERE ra.readable_created_at > COALESCE(nrm.read_at, 0)
-				GROUP BY ra.friend_space_id
-			),
-			message_like_unread_counts AS (
-				SELECT
-					ml.actor_space_id AS friend_space_id,
-					COUNT(*) AS unread_count
-				FROM space_message_likes ml
-				JOIN space_messages m ON m.message_id = ml.message_id
-				LEFT JOIN space_read_markers nrm
-				  ON nrm.viewer_space_id = $2
-				 AND nrm.scope = 'message_likes'
-				 AND nrm.friend_space_id = ''
-				WHERE m.sender_space_id = $2
-				  AND m.recipient_space_id = ml.actor_space_id
-				  AND ml.actor_space_id <> $2
-				  AND m.is_deleted = FALSE
-				  AND ml.created_at > COALESCE(nrm.read_at, 0)
-				GROUP BY ml.actor_space_id
-			),
-			latest_activities AS (
-				SELECT DISTINCT ON (friend_space_id)
-					friend_space_id,
-					activity_type,
-					activity_id,
-					activity_created_at,
-					message_id,
-					post_id,
-					is_outgoing
-				FROM candidates
+			SELECT
+				m.sender_space_id AS friend_space_id,
+				m.created_at AS readable_created_at
+			FROM space_messages m
+			JOIN space_posts p ON p.post_id = m.reply_post_id
+			WHERE m.recipient_space_id = $2
+			  AND m.sender_space_id <> $2
+			  AND m.kind = 'post_reply'
+			  AND m.is_deleted = FALSE
+			  AND m.reply_post_id IS NOT NULL
+			  AND p.space_id = $2
+		),
+		readable_unread_counts AS (
+			SELECT
+				ra.friend_space_id,
+				COUNT(*) AS unread_count
+			FROM readable_activities ra
+			LEFT JOIN space_notification_read_markers nrm
+			  ON nrm.viewer_space_id = $2
+			 AND nrm.friend_space_id = ra.friend_space_id
+			WHERE ra.readable_created_at > COALESCE(nrm.read_at, 0)
+			GROUP BY ra.friend_space_id
+		),
+		latest_activities AS (
+			SELECT DISTINCT ON (friend_space_id)
+				friend_space_id,
+				activity_created_at AS sort_created_at,
+				activity_id AS sort_id
+			FROM candidates
 			ORDER BY friend_space_id, activity_created_at DESC, activity_id DESC
-			),
-			conversations AS (
-				SELECT
-					cf.friend_space_id,
-					COALESCE(la.activity_type, '') AS activity_type,
-					COALESCE(la.activity_id, '') AS activity_id,
-					COALESCE(la.activity_created_at, 0) AS activity_created_at,
-					la.message_id,
-					la.post_id,
-					COALESCE(la.is_outgoing, FALSE) AS is_outgoing,
-					COALESCE(ruc.unread_count, 0) AS unread_count,
-					COALESCE(mluc.unread_count, 0) AS message_like_unread_count,
-					COALESCE(la.activity_created_at, current_friends.friendship_created_at, 0) AS sort_created_at,
-					COALESCE(la.activity_id, 'friend:' || cf.friend_space_id) AS sort_id
-				FROM conversation_friends cf
-				LEFT JOIN current_friends
-				  ON current_friends.friend_space_id = cf.friend_space_id
-				LEFT JOIN latest_activities la
-				  ON la.friend_space_id = cf.friend_space_id
-				LEFT JOIN readable_unread_counts ruc
-				  ON ruc.friend_space_id = cf.friend_space_id
-				LEFT JOIN message_like_unread_counts mluc
-				  ON mluc.friend_space_id = cf.friend_space_id
+		),
+		candidates_with_read_state AS (
+			SELECT
+				c.*,
+				COALESCE(nrm.read_at, 0) AS read_at,
+				COALESCE(ruc.unread_count, 0) AS unread_count,
+				la.sort_created_at,
+				la.sort_id,
+				(
+					c.notification_created_at IS NOT NULL
+					AND c.notification_created_at > COALESCE(nrm.read_at, 0)
+				) AS notification_unread
+			FROM candidates c
+			JOIN latest_activities la ON la.friend_space_id = c.friend_space_id
+			LEFT JOIN space_notification_read_markers nrm
+			  ON nrm.viewer_space_id = $2
+			 AND nrm.friend_space_id = c.friend_space_id
+			LEFT JOIN readable_unread_counts ruc
+			  ON ruc.friend_space_id = c.friend_space_id
+		),
+		ranked AS (
+			SELECT
+				c.*,
+				(c.unread_count > 0) AS conversation_unread,
+				c.unread_count AS conversation_unread_count,
+				BOOL_OR(c.notification_unread) OVER (PARTITION BY c.friend_space_id) AS conversation_notification_unread,
+				ROW_NUMBER() OVER (
+					PARTITION BY c.friend_space_id
+					ORDER BY c.activity_created_at DESC, c.activity_id DESC
+				) AS rn
+			FROM candidates_with_read_state c
 		)
 		SELECT
 			c.activity_type,
 			c.activity_id,
-				c.activity_created_at,
-				c.is_outgoing,
-				(c.unread_count > 0 OR c.message_like_unread_count > 0) AS unread,
-				c.unread_count AS unread_count,
-				c.sort_created_at,
+			c.activity_created_at,
+			c.is_outgoing,
+			c.conversation_unread AS unread,
+			c.conversation_unread_count AS unread_count,
+			c.conversation_notification_unread AS notification_unread,
+			c.sort_created_at,
 			c.sort_id,
-				friend_space.owner_id,
-				friend_space.space_id,
-				friend_space.space_slug,
+			friend_space.owner_id,
+			friend_space.space_id,
+			friend_space.space_slug,
 			friend_space.public_key,
 			friend_space.current_version,
 			friend_space.encrypted_profile,
@@ -433,7 +457,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			asset.size AS post_object_size,
 			asset.position AS post_object_position,
 			asset.metadata_cipher AS post_object_metadata_cipher
-		FROM conversations c
+		FROM ranked c
 		JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
 		LEFT JOIN space_messages m ON m.message_id = c.message_id
 		LEFT JOIN spaces sender_space ON sender_space.space_id = m.sender_space_id
@@ -447,10 +471,11 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			ORDER BY position ASC, asset_id ASC
 			LIMIT 1
 		) asset ON TRUE
-		WHERE ($3::bigint IS NULL OR (c.sort_created_at, c.sort_id) < ($3::bigint, $4::text))
+		WHERE c.rn = 1
+		  AND ($3::bigint IS NULL OR (c.sort_created_at, c.sort_id) < ($3::bigint, $4::text))
 		ORDER BY c.sort_created_at DESC, c.sort_id DESC
 		LIMIT $5
-			`, viewerID, viewerSpaceID, cursorCreatedAt, cursorID, limit+1)
+	`, viewerID, viewerSpaceID, cursorCreatedAt, cursorID, limit+1)
 	if err != nil {
 		return nil, "", stacktrace.Propagate(err, "")
 	}
@@ -474,116 +499,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 	return out, nextCursor, nil
 }
 
-func (r *MessagesRepository) ListNotifications(ctx context.Context, viewerSpaceID string, cursor string, limit int) ([]SpaceNotificationRecord, string, error) {
-	limit = optionalInt(limit, 50)
-	if limit > 100 {
-		limit = 100
-	}
-	var cursorCreatedAt any
-	var cursorID any
-	if createdAt, id, ok := parseMessageCursor(cursor); ok {
-		cursorCreatedAt = createdAt
-		cursorID = id
-	}
-	rows, err := r.DB.QueryContext(ctx, `
-		WITH notification_candidates AS (
-			SELECT
-				'post_like' AS activity_type,
-				'post_like:' || pl.post_id::text || ':' || pl.actor_space_id AS activity_id,
-				pl.created_at AS activity_created_at,
-				pl.actor_space_id AS actor_space_id,
-				pl.post_id
-			FROM space_post_likes pl
-			JOIN space_posts p ON p.post_id = pl.post_id
-			WHERE p.space_id = $1
-			  AND pl.actor_space_id <> $1
-			  AND p.is_deleted = FALSE
-
-			UNION ALL
-
-			SELECT
-				CASE fe.event_type
-					WHEN 'friend_remove' THEN 'friend_remove'
-					ELSE 'friend_add'
-				END AS activity_type,
-				'friend_event:' || fe.event_id::text AS activity_id,
-				fe.created_at AS activity_created_at,
-				fe.actor_space_id AS actor_space_id,
-				NULL::bigint AS post_id
-			FROM space_friend_events fe
-			WHERE fe.target_space_id = $1
-			  AND fe.actor_space_id <> fe.target_space_id
-		)
-		SELECT
-			n.activity_type,
-			n.activity_id,
-			n.activity_created_at,
-			n.activity_created_at > COALESCE(nrm.read_at, 0) AS unread,
-			n.activity_created_at AS sort_created_at,
-			n.activity_id AS sort_id,
-			actor_space.owner_id,
-			actor_space.space_id,
-			actor_space.space_slug,
-			actor_space.public_key,
-			actor_space.current_version,
-			actor_space.encrypted_profile,
-			actor_space.avatar_object_key,
-			actor_space.avatar_size,
-			actor_space.updated_at,
-			(SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = actor_space.space_id) AS actor_friends,
-			(SELECT COUNT(*) FROM space_posts ap WHERE ap.space_id = actor_space.space_id AND ap.is_deleted = FALSE) AS actor_posts,
-			p.post_id,
-			COALESCE(p.space_id, '') AS post_space_id,
-			COALESCE(post_space.space_slug, '') AS post_space_slug,
-			COALESCE(p.owner_id, 0) AS post_owner_id,
-			COALESCE(p.is_deleted, FALSE) AS post_is_deleted,
-			asset.object_key AS post_object_key,
-			asset.size AS post_object_size,
-			asset.position AS post_object_position,
-			asset.metadata_cipher AS post_object_metadata_cipher
-		FROM notification_candidates n
-		JOIN spaces actor_space ON actor_space.space_id = n.actor_space_id
-		LEFT JOIN space_read_markers nrm
-		  ON nrm.viewer_space_id = $1
-		 AND nrm.scope = 'notifications'
-		 AND nrm.friend_space_id = ''
-		LEFT JOIN space_posts p ON p.post_id = n.post_id
-		LEFT JOIN spaces post_space ON post_space.space_id = p.space_id
-		LEFT JOIN LATERAL (
-			SELECT object_key, size, position, metadata_cipher
-			FROM space_post_assets
-			WHERE post_id = p.post_id AND p.is_deleted = FALSE
-			ORDER BY position ASC, asset_id ASC
-			LIMIT 1
-		) asset ON TRUE
-		WHERE ($2::bigint IS NULL OR (n.activity_created_at, n.activity_id) < ($2::bigint, $3::text))
-		ORDER BY n.activity_created_at DESC, n.activity_id DESC
-		LIMIT $4
-	`, strings.TrimSpace(viewerSpaceID), cursorCreatedAt, cursorID, limit+1)
-	if err != nil {
-		return nil, "", stacktrace.Propagate(err, "")
-	}
-	defer rows.Close()
-	out := make([]SpaceNotificationRecord, 0, limit+1)
-	for rows.Next() {
-		notification, err := scanSpaceNotificationRecord(rows)
-		if err != nil {
-			return nil, "", err
-		}
-		out = append(out, *notification)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, "", stacktrace.Propagate(err, "")
-	}
-	nextCursor := ""
-	if len(out) > limit {
-		nextCursor = formatSpaceNotificationCursor(out[limit-1])
-		out = out[:limit]
-	}
-	return out, nextCursor, nil
-}
-
-func (r *MessagesRepository) GetLatestMessageThreadActivityAt(ctx context.Context, viewerID int64, viewerSpaceID string, friendSpaceID string) (int64, error) {
+func (r *MessagesRepository) GetLatestConversationActivityAt(ctx context.Context, viewerID int64, viewerSpaceID string, friendSpaceID string) (int64, error) {
 	var activityCreatedAt int64
 	if err := r.DB.QueryRowContext(ctx, `
 		WITH candidates AS (
@@ -593,137 +509,80 @@ func (r *MessagesRepository) GetLatestMessageThreadActivityAt(ctx context.Contex
 				CASE WHEN m.sender_space_id = $1 THEN m.recipient_space_id ELSE m.sender_space_id END AS friend_space_id
 			FROM space_messages m
 			WHERE (m.sender_space_id = $1 OR m.recipient_space_id = $1)
-			  AND (m.sender_id = $3 OR m.recipient_id = $3)
 			  AND m.is_deleted = FALSE
+			  AND NOT (m.kind = 'post_reply' AND m.recipient_space_id = $1)
+
+			UNION ALL
+
+			SELECT
+				ml.created_at AS activity_created_at,
+				'message_like:' || ml.message_id || ':' || ml.actor_space_id AS activity_id,
+				liker_space.space_id AS friend_space_id
+			FROM space_message_likes ml
+			JOIN space_messages m ON m.message_id = ml.message_id
+			JOIN spaces liker_space ON liker_space.space_id = ml.actor_space_id
+			WHERE m.sender_space_id = $1
+			  AND m.recipient_space_id = ml.actor_space_id
+			  AND ml.actor_space_id <> $1
+			  AND m.is_deleted = FALSE
+
+			UNION ALL
+
+			SELECT
+				pl.created_at AS activity_created_at,
+				'post_like:' || pl.post_id::text || ':' || pl.actor_space_id AS activity_id,
+				actor_space.space_id AS friend_space_id
+			FROM space_post_likes pl
+			JOIN space_posts p ON p.post_id = pl.post_id
+			JOIN spaces actor_space ON actor_space.space_id = pl.actor_space_id
+			WHERE p.space_id = $1
+			  AND pl.actor_space_id <> $1
+			  AND p.is_deleted = FALSE
+
+			UNION ALL
+
+			SELECT
+				m.created_at AS activity_created_at,
+				'post_reply:' || m.message_id AS activity_id,
+				m.sender_space_id AS friend_space_id
+			FROM space_messages m
+			JOIN space_posts p ON p.post_id = m.reply_post_id
+			WHERE m.recipient_space_id = $1
+			  AND m.sender_space_id <> $1
+			  AND m.kind = 'post_reply'
+			  AND m.is_deleted = FALSE
+			  AND m.reply_post_id IS NOT NULL
+			  AND p.space_id = $1
+
+			UNION ALL
+
+			SELECT
+				fe.created_at AS activity_created_at,
+				'friend_event:' || fe.event_id::text AS activity_id,
+				CASE WHEN fe.actor_space_id = $1 THEN fe.target_space_id ELSE fe.actor_space_id END AS friend_space_id
+			FROM space_friend_events fe
+			WHERE (fe.target_space_id = $1 OR fe.actor_space_id = $1)
+			  AND fe.actor_space_id <> fe.target_space_id
+
 		)
 		SELECT c.activity_created_at
 		FROM candidates c
 		WHERE c.friend_space_id = $2
 		ORDER BY c.activity_created_at DESC, c.activity_id DESC
 		LIMIT 1
-	`, strings.TrimSpace(viewerSpaceID), strings.TrimSpace(friendSpaceID), viewerID).Scan(&activityCreatedAt); err != nil {
+	`, strings.TrimSpace(viewerSpaceID), strings.TrimSpace(friendSpaceID)).Scan(&activityCreatedAt); err != nil {
 		return 0, stacktrace.Propagate(err, "")
 	}
 	return activityCreatedAt, nil
 }
 
-func (r *MessagesRepository) GetLatestNotificationActivityAt(ctx context.Context, viewerSpaceID string) (int64, error) {
-	var activityCreatedAt int64
-	if err := r.DB.QueryRowContext(ctx, `
-		WITH notification_candidates AS (
-			SELECT
-				pl.created_at AS activity_created_at,
-				'post_like:' || pl.post_id::text || ':' || pl.actor_space_id AS activity_id
-			FROM space_post_likes pl
-			JOIN space_posts p ON p.post_id = pl.post_id
-			WHERE p.space_id = $1
-			  AND pl.actor_space_id <> $1
-			  AND p.is_deleted = FALSE
-
-			UNION ALL
-
-			SELECT
-				fe.created_at AS activity_created_at,
-				'friend_event:' || fe.event_id::text AS activity_id
-			FROM space_friend_events fe
-			WHERE fe.target_space_id = $1
-			  AND fe.actor_space_id <> fe.target_space_id
-		)
-		SELECT c.activity_created_at
-		FROM notification_candidates c
-		ORDER BY c.activity_created_at DESC, c.activity_id DESC
-		LIMIT 1
-	`, strings.TrimSpace(viewerSpaceID)).Scan(&activityCreatedAt); err != nil {
-		return 0, stacktrace.Propagate(err, "")
-	}
-	return activityCreatedAt, nil
-}
-
-func (r *MessagesRepository) GetLatestMessageLikeActivityAt(ctx context.Context, viewerSpaceID string) (int64, error) {
-	var activityCreatedAt int64
-	if err := r.DB.QueryRowContext(ctx, `
-		SELECT ml.created_at
-		FROM space_message_likes ml
-		JOIN space_messages m ON m.message_id = ml.message_id
-		WHERE m.sender_space_id = $1
-		  AND m.recipient_space_id = ml.actor_space_id
-		  AND ml.actor_space_id <> $1
-		  AND m.is_deleted = FALSE
-		ORDER BY ml.created_at DESC, ml.message_id DESC, ml.actor_space_id DESC
-		LIMIT 1
-	`, strings.TrimSpace(viewerSpaceID)).Scan(&activityCreatedAt); err != nil {
-		return 0, stacktrace.Propagate(err, "")
-	}
-	return activityCreatedAt, nil
-}
-
-func (r *MessagesRepository) HasUnreadNotifications(ctx context.Context, viewerSpaceID string) (bool, error) {
+func (r *MessagesRepository) HasUnreadNotifications(ctx context.Context, viewerID int64, viewerSpaceID string) (bool, error) {
 	var exists bool
 	if err := r.DB.QueryRowContext(ctx, `
 		WITH notification_candidates AS (
-			SELECT
-				pl.created_at AS notification_created_at
-			FROM space_post_likes pl
-			JOIN space_posts p ON p.post_id = pl.post_id
-			WHERE p.space_id = $1
-			  AND pl.actor_space_id <> $1
-			  AND p.is_deleted = FALSE
-
-			UNION ALL
-
-			SELECT
-				fe.created_at AS notification_created_at
-			FROM space_friend_events fe
-			WHERE fe.target_space_id = $1
-			  AND fe.actor_space_id <> fe.target_space_id
-		)
-		SELECT EXISTS (
-			SELECT 1
-			FROM notification_candidates c
-			LEFT JOIN space_read_markers nrm
-			  ON nrm.viewer_space_id = $1
-			 AND nrm.scope = 'notifications'
-			 AND nrm.friend_space_id = ''
-			WHERE c.notification_created_at > COALESCE(nrm.read_at, 0)
-			LIMIT 1
-		)
-	`, strings.TrimSpace(viewerSpaceID)).Scan(&exists); err != nil {
-		return false, stacktrace.Propagate(err, "")
-	}
-	return exists, nil
-}
-
-func (r *MessagesRepository) HasUnreadMessageLikes(ctx context.Context, viewerSpaceID string) (bool, error) {
-	var exists bool
-	if err := r.DB.QueryRowContext(ctx, `
-		SELECT EXISTS (
-			SELECT 1
-			FROM space_message_likes ml
-			JOIN space_messages m ON m.message_id = ml.message_id
-			LEFT JOIN space_read_markers nrm
-			  ON nrm.viewer_space_id = $1
-			 AND nrm.scope = 'message_likes'
-			 AND nrm.friend_space_id = ''
-			WHERE m.sender_space_id = $1
-			  AND m.recipient_space_id = ml.actor_space_id
-			  AND ml.actor_space_id <> $1
-			  AND m.is_deleted = FALSE
-			  AND ml.created_at > COALESCE(nrm.read_at, 0)
-			LIMIT 1
-		)
-	`, strings.TrimSpace(viewerSpaceID)).Scan(&exists); err != nil {
-		return false, stacktrace.Propagate(err, "")
-	}
-	return exists, nil
-}
-
-func (r *MessagesRepository) HasUnreadMessages(ctx context.Context, viewerSpaceID string) (bool, error) {
-	var exists bool
-	if err := r.DB.QueryRowContext(ctx, `
-		WITH readable_activities AS (
 			SELECT
 				m.sender_space_id AS friend_space_id,
-				m.created_at AS readable_created_at
+				m.created_at AS notification_created_at
 			FROM space_messages m
 			WHERE m.recipient_space_id = $1
 			  AND m.sender_space_id <> $1
@@ -733,8 +592,33 @@ func (r *MessagesRepository) HasUnreadMessages(ctx context.Context, viewerSpaceI
 			UNION ALL
 
 			SELECT
+				liker_space.space_id AS friend_space_id,
+				ml.created_at AS notification_created_at
+			FROM space_message_likes ml
+			JOIN space_messages m ON m.message_id = ml.message_id
+			JOIN spaces liker_space ON liker_space.space_id = ml.actor_space_id
+			WHERE m.sender_space_id = $1
+			  AND m.recipient_space_id = ml.actor_space_id
+			  AND ml.actor_space_id <> $1
+			  AND m.is_deleted = FALSE
+
+			UNION ALL
+
+			SELECT
+				actor_space.space_id AS friend_space_id,
+				pl.created_at AS notification_created_at
+			FROM space_post_likes pl
+			JOIN space_posts p ON p.post_id = pl.post_id
+			JOIN spaces actor_space ON actor_space.space_id = pl.actor_space_id
+			WHERE p.space_id = $1
+			  AND pl.actor_space_id <> $1
+			  AND p.is_deleted = FALSE
+
+			UNION ALL
+
+			SELECT
 				m.sender_space_id AS friend_space_id,
-				m.created_at AS readable_created_at
+				m.created_at AS notification_created_at
 			FROM space_messages m
 			JOIN space_posts p ON p.post_id = m.reply_post_id
 			WHERE m.recipient_space_id = $1
@@ -743,15 +627,23 @@ func (r *MessagesRepository) HasUnreadMessages(ctx context.Context, viewerSpaceI
 			  AND m.is_deleted = FALSE
 			  AND m.reply_post_id IS NOT NULL
 			  AND p.space_id = $1
+
+			UNION ALL
+
+			SELECT
+				fe.actor_space_id AS friend_space_id,
+				fe.created_at AS notification_created_at
+			FROM space_friend_events fe
+			WHERE fe.target_space_id = $1
+			  AND fe.actor_space_id <> fe.target_space_id
 		)
 		SELECT EXISTS (
 			SELECT 1
-			FROM readable_activities ra
-			LEFT JOIN space_read_markers nrm
+			FROM notification_candidates c
+			LEFT JOIN space_notification_read_markers nrm
 			  ON nrm.viewer_space_id = $1
-			 AND nrm.scope = 'message_thread'
-			 AND nrm.friend_space_id = ra.friend_space_id
-			WHERE ra.readable_created_at > COALESCE(nrm.read_at, 0)
+			 AND nrm.friend_space_id = c.friend_space_id
+			WHERE c.notification_created_at > COALESCE(nrm.read_at, 0)
 			LIMIT 1
 		)
 	`, strings.TrimSpace(viewerSpaceID)).Scan(&exists); err != nil {
@@ -803,6 +695,7 @@ func scanMessageConversationRecord(scanner interface{ Scan(dest ...any) error })
 		&rec.LatestActivity.Outgoing,
 		&rec.Unread,
 		&rec.UnreadCount,
+		&rec.NotificationUnread,
 		&rec.SortCreatedAt,
 		&rec.SortID,
 	}
@@ -850,40 +743,6 @@ func scanMessageConversationRecord(scanner interface{ Scan(dest ...any) error })
 	return &rec, nil
 }
 
-func scanSpaceNotificationRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceNotificationRecord, error) {
-	var rec SpaceNotificationRecord
-	var postID sql.NullInt64
-	var post SpaceMessageConversationPostRecord
-	dest := []any{
-		&rec.Type,
-		&rec.ID,
-		&rec.CreatedAt,
-		&rec.Unread,
-		&rec.SortCreatedAt,
-		&rec.SortID,
-	}
-	dest = append(dest, spaceActorScanDest(&rec.Actor)...)
-	dest = append(dest,
-		&postID,
-		&post.SpaceID,
-		&post.SpaceSlug,
-		&post.OwnerID,
-		&post.IsDeleted,
-		&post.ObjectKey,
-		&post.ObjectSize,
-		&post.ObjectPosition,
-		&post.ObjectMetadataCipher,
-	)
-	if err := scanner.Scan(dest...); err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	if postID.Valid {
-		post.PostID = postID.Int64
-		rec.Post = &post
-	}
-	return &rec, nil
-}
-
 func parseMessageCursor(cursor string) (int64, string, bool) {
 	createdAtText, id, ok := strings.Cut(strings.TrimSpace(cursor), ":")
 	if !ok || strings.TrimSpace(id) == "" {
@@ -904,15 +763,5 @@ func formatMessageConversationCursor(conversation SpaceMessageConversationRecord
 	if conversation.SortCreatedAt > 0 && strings.TrimSpace(conversation.SortID) != "" {
 		return strconv.FormatInt(conversation.SortCreatedAt, 10) + ":" + conversation.SortID
 	}
-	if conversation.LatestActivity.CreatedAt <= 0 || strings.TrimSpace(conversation.LatestActivity.ID) == "" {
-		return ""
-	}
 	return strconv.FormatInt(conversation.LatestActivity.CreatedAt, 10) + ":" + conversation.LatestActivity.ID
-}
-
-func formatSpaceNotificationCursor(notification SpaceNotificationRecord) string {
-	if notification.SortCreatedAt > 0 && strings.TrimSpace(notification.SortID) != "" {
-		return strconv.FormatInt(notification.SortCreatedAt, 10) + ":" + notification.SortID
-	}
-	return strconv.FormatInt(notification.CreatedAt, 10) + ":" + notification.ID
 }

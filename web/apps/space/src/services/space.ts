@@ -88,14 +88,12 @@ interface SpacePostLikersPageResponse {
 }
 
 type SpaceMessageConversationActivityType =
-    | "message"
-    | "message_like"
-    | "post_reply";
-
-export type SpaceNotificationType =
     | "friend_add"
     | "friend_remove"
-    | "post_like";
+    | "message"
+    | "message_like"
+    | "post_like"
+    | "post_reply";
 
 interface SpaceMessageConversationPostResponse {
     isDeleted?: boolean;
@@ -158,27 +156,14 @@ interface SpaceMessagePageResponse {
 
 interface SpaceMessageConversationResponse {
     friend: SpaceActor;
-    latestActivity?: SpaceMessageConversationActivity;
+    latestActivity: SpaceMessageConversationActivity;
+    notificationUnread?: boolean;
     unread?: boolean;
     unreadCount: number;
 }
 
 interface SpaceMessageConversationPageResponse {
     items?: SpaceMessageConversationResponse[];
-    nextCursor?: string;
-}
-
-interface SpaceNotificationResponse {
-    actor: SpaceActor;
-    createdAt: string;
-    id: string;
-    post?: SpaceMessageConversationPostResponse;
-    type: SpaceNotificationType;
-    unread?: boolean;
-}
-
-interface SpaceNotificationPageResponse {
-    items?: SpaceNotificationResponse[];
     nextCursor?: string;
 }
 
@@ -320,7 +305,8 @@ export interface SpaceMessagePage {
 
 export interface SpaceMessageConversation {
     friend: FriendProfile;
-    latestActivity?: SpaceMessageActivity;
+    latestActivity: SpaceMessageActivity;
+    notificationUnread: boolean;
     unread: boolean;
     unreadCount: number;
 }
@@ -330,30 +316,11 @@ export interface SpaceMessageConversationPage {
     nextCursor?: string;
 }
 
-export interface SpaceNotification {
-    actor: FriendProfile;
-    createdAt: string;
-    createdAtMs: number;
-    id: string;
-    post?: SpaceMessageActivityPost;
-    type: SpaceNotificationType;
-    unread: boolean;
-}
-
-export interface SpaceNotificationPage {
-    items: SpaceNotification[];
-    nextCursor?: string;
-}
-
 export interface SpaceUnreadStatus {
-    messageLikesUnread: boolean;
     messagesUnread: boolean;
-    notificationsUnread: boolean;
 }
 
 interface SpaceUnreadStatusResponse {
-    messageLikesUnread?: boolean;
-    messagesUnread?: boolean;
     notificationsUnread: boolean;
 }
 
@@ -890,9 +857,8 @@ const messageActivityPostFromSpacePost = async (
 
 const messageActivityFromSpaceActivity = async (
     ctx: SpaceAccountCtxHandle,
-    activity?: SpaceMessageConversationActivity,
-): Promise<SpaceMessageActivity | undefined> => {
-    if (!activity) return undefined;
+    activity: SpaceMessageConversationActivity,
+): Promise<SpaceMessageActivity> => {
     const [message, post] = await Promise.all([
         activity.message
             ? messageFromSpaceMessage(ctx, activity.message, false)
@@ -906,31 +872,6 @@ const messageActivityFromSpaceActivity = async (
         outgoing: Boolean(activity.outgoing),
         post,
         type: activity.type,
-    };
-};
-
-const notificationFromSpaceNotification = async (
-    ctx: SpaceAccountCtxHandle,
-    notification: SpaceNotificationResponse,
-): Promise<SpaceNotification> => {
-    const actor = actorProfile(notification.actor);
-    const [avatarUrl, post] = await Promise.all([
-        accountAvatarURL(
-            ctx,
-            notification.actor.spaceId,
-            notification.actor.avatar,
-        ),
-        messageActivityPostFromSpacePost(ctx, notification.post),
-    ]);
-    actor.avatarUrl = avatarUrl;
-    return {
-        actor,
-        createdAt: notification.createdAt,
-        createdAtMs: timestampMsFromSpaceDate(notification.createdAt),
-        id: notification.id,
-        post,
-        type: notification.type,
-        unread: Boolean(notification.unread),
     };
 };
 
@@ -1065,12 +1006,8 @@ export const loadCurrentUnreadStatus = async (): Promise<SpaceUnreadStatus> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
         const status = (await ctx.unread_status()) as SpaceUnreadStatusResponse;
-        const messagesUnread = Boolean(status.messagesUnread);
-        const messageLikesUnread = Boolean(status.messageLikesUnread);
         return {
-            messageLikesUnread,
-            messagesUnread,
-            notificationsUnread: Boolean(status.notificationsUnread),
+            messagesUnread: status.notificationsUnread,
         };
     } finally {
         releaseCurrentSpaceContext(ctx);
@@ -1343,29 +1280,13 @@ export const loadCurrentMessageConversations =
                             ctx,
                             conversation.latestActivity,
                         ),
+                        notificationUnread: Boolean(
+                            conversation.notificationUnread,
+                        ),
                         unread: Boolean(conversation.unread),
                         unreadCount: conversation.unreadCount,
                     };
                 }),
-            );
-            return { items, nextCursor: page.nextCursor || undefined };
-        } finally {
-            releaseCurrentSpaceContext(ctx);
-        }
-    };
-
-export const loadCurrentNotifications =
-    async (): Promise<SpaceNotificationPage> => {
-        const ctx = await ensureCurrentSpaceContext();
-        try {
-            const page = (await ctx.list_notifications(
-                null,
-                100,
-            )) as SpaceNotificationPageResponse;
-            const items = await Promise.all(
-                (page.items ?? []).map((notification) =>
-                    notificationFromSpaceNotification(ctx, notification),
-                ),
             );
             return { items, nextCursor: page.nextCursor || undefined };
         } finally {
@@ -1400,25 +1321,7 @@ export const markCurrentMessagesRead = async (friendSpaceId: string) => {
     if (!friendSpaceId.trim()) return;
     const ctx = await ensureCurrentSpaceContext();
     try {
-        await ctx.mark_message_thread_read(friendSpaceId);
-    } finally {
-        releaseCurrentSpaceContext(ctx);
-    }
-};
-
-export const markCurrentNotificationsRead = async (readAt?: string) => {
-    const ctx = await ensureCurrentSpaceContext();
-    try {
-        await ctx.mark_notifications_read(readAt ?? null);
-    } finally {
-        releaseCurrentSpaceContext(ctx);
-    }
-};
-
-export const markCurrentMessageLikesRead = async () => {
-    const ctx = await ensureCurrentSpaceContext();
-    try {
-        await ctx.mark_message_likes_read();
+        await ctx.mark_notifications_read(friendSpaceId);
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

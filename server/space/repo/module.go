@@ -153,23 +153,13 @@ type SpaceMessageRecord struct {
 }
 
 type SpaceMessageConversationRecord struct {
-	Friend         SpaceActorRecord
-	LatestActivity SpaceMessageConversationActivityRecord
-	Unread         bool
-	UnreadCount    int64
-	SortCreatedAt  int64
-	SortID         string
-}
-
-type SpaceNotificationRecord struct {
-	ID            string
-	Type          string
-	CreatedAt     int64
-	Unread        bool
-	Actor         SpaceActorRecord
-	Post          *SpaceMessageConversationPostRecord
-	SortCreatedAt int64
-	SortID        string
+	Friend             SpaceActorRecord
+	LatestActivity     SpaceMessageConversationActivityRecord
+	Unread             bool
+	UnreadCount        int64
+	NotificationUnread bool
+	SortCreatedAt      int64
+	SortID             string
 }
 
 type SpaceMessageConversationActivityRecord struct {

@@ -10,7 +10,6 @@ import {
     loadCurrentMessageThread,
     loadCurrentSpaceFriends,
     loadCurrentSpaceProfile,
-    markCurrentMessageLikesRead,
     markCurrentMessagesRead,
     replyToCurrentMessage,
     sendCurrentMessage,
@@ -19,7 +18,7 @@ import {
     type SpaceMessageConversation,
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
-import { messageThreadSourceFromQuery, spaceRoutes } from "utils/spaceRoutes";
+import { spaceRoutes } from "utils/spaceRoutes";
 import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 interface SpaceMessagesPageProps {
@@ -116,15 +115,13 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         selectedFriendProfileLoadFailedSpaceId,
         setSelectedFriendProfileLoadFailedSpaceId,
     ] = React.useState<string>();
+    const [newConversationIds, setNewConversationIds] = React.useState<
+        string[]
+    >([]);
     const selectedFriendSpaceIdRef = React.useRef<string | undefined>(
         undefined,
     );
     const markedReadSpaceIdRef = React.useRef<string | undefined>(undefined);
-    const messageThreadSource = messageThreadSourceFromQuery(router.query.from);
-    const closeConversationRoute =
-        messageThreadSource == "notifications"
-            ? spaceRoutes.notifications
-            : spaceRoutes.messages;
     const selectedConversation = React.useMemo(
         () =>
             selectedSpaceId
@@ -180,10 +177,18 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         Boolean(selectedFriend) && !isSelectedFriendCurrent;
 
     const markConversationRead = React.useCallback((spaceId: string) => {
+        setNewConversationIds((currentIds) =>
+            currentIds.filter((id) => id != spaceId),
+        );
         setConversations((currentConversations) => {
             return currentConversations.map((conversation) =>
                 conversationId(conversation) == spaceId
-                    ? { ...conversation, unread: false, unreadCount: 0 }
+                    ? {
+                          ...conversation,
+                          notificationUnread: false,
+                          unread: false,
+                          unreadCount: 0,
+                      }
                     : conversation,
             );
         });
@@ -196,7 +201,29 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         setIsConversationsLoading(true);
         try {
             const page = await loadCurrentMessageConversations();
+            const unreadConversationIds = page.items
+                .filter((conversation) => conversation.notificationUnread)
+                .map(conversationId);
+            const passiveUnreadConversationIds = page.items
+                .filter(
+                    (conversation) =>
+                        conversation.notificationUnread && !conversation.unread,
+                )
+                .map(conversationId);
+            setNewConversationIds(unreadConversationIds);
             setConversations(page.items);
+            if (passiveUnreadConversationIds.length > 0) {
+                void Promise.all(
+                    passiveUnreadConversationIds.map((spaceId) =>
+                        markCurrentMessagesRead(spaceId),
+                    ),
+                ).catch((error: unknown) =>
+                    console.warn(
+                        "Failed to mark passive message activity read",
+                        error,
+                    ),
+                );
+            }
             return true;
         } catch (error: unknown) {
             console.error("Failed to load message conversations", error);
@@ -214,8 +241,8 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     );
 
     const closeConversation = React.useCallback(() => {
-        if (selectedSpaceId) void router.push(closeConversationRoute);
-    }, [closeConversationRoute, router, selectedSpaceId]);
+        if (selectedSpaceId) void router.push(spaceRoutes.messages);
+    }, [router, selectedSpaceId]);
 
     const appendMessageIfThreadIsCurrent = React.useCallback(
         (spaceId: string, message: SpaceMessage) => {
@@ -278,16 +305,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 
     React.useEffect(() => {
         if (!profile) return;
-        let cancelled = false;
-        void refreshConversations().then((loaded) => {
-            if (cancelled || !loaded) return;
-            void markCurrentMessageLikesRead().catch((error: unknown) =>
-                console.warn("Failed to mark message likes read", error),
-            );
-        });
-        return () => {
-            cancelled = true;
-        };
+        void refreshConversations();
     }, [profile, refreshConversations]);
 
     React.useEffect(() => {
@@ -316,12 +334,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 
     React.useEffect(() => {
         if (!selectedSpaceId || !selectedConversation) return;
-        if (
-            !selectedConversation.unread &&
-            selectedConversation.unreadCount <= 0
-        ) {
-            return;
-        }
         if (markedReadSpaceIdRef.current == selectedSpaceId) return;
 
         markedReadSpaceIdRef.current = selectedSpaceId;
@@ -448,6 +460,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 isThreadLoading={isThreadLoading}
                 isThreadReadOnly={isThreadReadOnly}
                 messages={messages}
+                newConversationIds={newConversationIds}
                 onBack={() => void router.push(spaceRoutes.home)}
                 onCloseThread={closeConversation}
                 onOpenSelectedFriendProfile={(friend) =>
@@ -544,11 +557,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 }}
                 profile={profile}
                 selectedFriend={selectedFriend}
-                threadBackLabel={
-                    messageThreadSource == "notifications"
-                        ? "Back to notifications"
-                        : undefined
-                }
             />
         </>
     );

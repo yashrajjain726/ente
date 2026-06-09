@@ -1,7 +1,5 @@
 export type SetupProfileSource = "login" | "verify";
 export type ProfileImageFlowSource = "profile" | "settings";
-export type MessageThreadSource = "messages" | "notifications";
-export type PostRouteSource = "default" | "notifications";
 export type VerifyFlow = "login" | "signup";
 
 const valueFromQuery = (value: string | string[] | undefined) =>
@@ -20,17 +18,12 @@ export const spaceRoutes = {
     login: "/login",
     message: (spaceId: string) =>
         `/app/messages/${encodeURIComponent(spaceId)}`,
-    messageFromNotifications: (spaceId: string) =>
-        `/app/messages/${encodeURIComponent(spaceId)}?from=notifications`,
     messages: "/app/messages",
-    notifications: "/app/notifications",
     onboarding: "/",
     passkeysFinish: "/passkeys/finish",
     passkeysVerify: "/passkeys/verify",
     post: (spaceId: string, postId: number) =>
         `/app/posts/${encodeURIComponent(spaceId)}/${encodeURIComponent(String(postId))}`,
-    postFromNotifications: (spaceId: string, postId: number) =>
-        `/app/posts/${encodeURIComponent(spaceId)}/${encodeURIComponent(String(postId))}?from=notifications`,
     editProfileCover: "/app/profile/cover-edit",
     editProfileCoverFrom: (source?: ProfileImageFlowSource) =>
         routeWithProfileImageFlowSource("/app/profile/cover-edit", source),
@@ -68,16 +61,6 @@ export const profileImageFlowSourceFromQuery = (
     value: string | string[] | undefined,
 ): ProfileImageFlowSource =>
     valueFromQuery(value) == "settings" ? "settings" : "profile";
-
-export const messageThreadSourceFromQuery = (
-    value: string | string[] | undefined,
-): MessageThreadSource =>
-    valueFromQuery(value) == "notifications" ? "notifications" : "messages";
-
-export const postRouteSourceFromQuery = (
-    value: string | string[] | undefined,
-): PostRouteSource =>
-    valueFromQuery(value) == "notifications" ? "notifications" : "default";
 
 export const friendSpaceIdFromQuery = (value: string | string[] | undefined) =>
     valueFromQuery(value) ?? "";

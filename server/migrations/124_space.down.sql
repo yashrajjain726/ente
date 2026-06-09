@@ -30,8 +30,8 @@ DROP TABLE IF EXISTS space_entity_keys;
 DROP TRIGGER IF EXISTS update_space_browser_sessions_updated_at ON space_browser_sessions;
 DROP TABLE IF EXISTS space_browser_sessions;
 
-DROP TRIGGER IF EXISTS update_space_read_markers_updated_at ON space_read_markers;
-DROP TABLE IF EXISTS space_read_markers;
+DROP TRIGGER IF EXISTS update_space_notification_read_markers_updated_at ON space_notification_read_markers;
+DROP TABLE IF EXISTS space_notification_read_markers;
 
 DROP TRIGGER IF EXISTS update_spaces_updated_at ON spaces;
 DROP TABLE IF EXISTS spaces;

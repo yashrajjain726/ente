@@ -26,6 +26,5 @@ pub use transport::{
     PresignUploadResponse, ProfileAvatarPayload, ProfileAvatarResponse, ProfileCoverPayload,
     ProfileCoverResponse, SpaceActorResponse, SpaceFriendResponse, SpaceKeyResponse,
     SpaceKeyVersionResponse, SpaceLinkLoginResponse, SpaceLinkStatusResponse, SpaceLookupResponse,
-    SpaceNotificationPage, SpaceNotificationResponse, SpaceProfileResponse,
-    SpaceUnreadStatusResponse,
+    SpaceProfileResponse, SpaceUnreadStatusResponse,
 };

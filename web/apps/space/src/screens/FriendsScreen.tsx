@@ -643,7 +643,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             onClick={openInviteDialog}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: "#F2F2F2",
+                                bgcolor: "#E8E8E8",
                                 border: 0,
                                 borderRadius: "18px",
                                 color: textBase,
@@ -669,7 +669,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                     outlineOffset: 2,
                                 },
                                 "&:hover": onShareProfileLink
-                                    ? { bgcolor: "#E8E8E8" }
+                                    ? { bgcolor: "#DEDEDE" }
                                     : undefined,
                             }}
                         >

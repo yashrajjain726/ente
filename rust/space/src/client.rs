@@ -21,15 +21,14 @@ use crate::transport::{
     CreatePostRequest, CreatePostResponse, CreateSpaceRequest, EntityKeyPayload, EntityKeyResponse,
     FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse, FriendTargetPayload,
     LikeMessageRequest, LikeMessageResponse, LikePostRequest, LikePostResponse,
-    ListPostLikersResponse, MarkMessageThreadReadRequest, MarkNotificationsReadRequest,
-    MessageConversationPage, MessagePage, MessageResponse, PostObjectPayload, PostPage,
-    PostResponse, PresignUploadRequest, PresignUploadResponse, ProfileAvatarPayload,
-    ProfileCoverPayload, RefreshFriendSharesRequest, RotateSpaceKeyRequest, ShareUpdatePayload,
-    SpaceActorResponse, SpaceFriendResponse, SpaceKeyResponse, SpaceKeyVersionResponse,
-    SpaceLinkCreateRequest, SpaceLinkLoginRequest, SpaceLinkLoginResponse, SpaceLinkStatusResponse,
-    SpaceLookupResponse, SpaceNotificationPage, SpaceProfileResponse, SpaceUnreadStatusResponse,
-    UpdatePostCaptionRequest, UpdateSpaceProfileRequest, UpdateSpaceProfileResponse,
-    UpdateSpaceSlugRequest,
+    ListPostLikersResponse, MarkNotificationsReadRequest, MessageConversationPage, MessagePage,
+    MessageResponse, PostObjectPayload, PostPage, PostResponse, PresignUploadRequest,
+    PresignUploadResponse, ProfileAvatarPayload, ProfileCoverPayload, RefreshFriendSharesRequest,
+    RotateSpaceKeyRequest, ShareUpdatePayload, SpaceActorResponse, SpaceFriendResponse,
+    SpaceKeyResponse, SpaceKeyVersionResponse, SpaceLinkCreateRequest, SpaceLinkLoginRequest,
+    SpaceLinkLoginResponse, SpaceLinkStatusResponse, SpaceLookupResponse, SpaceProfileResponse,
+    SpaceUnreadStatusResponse, UpdatePostCaptionRequest, UpdateSpaceProfileRequest,
+    UpdateSpaceProfileResponse, UpdateSpaceSlugRequest,
 };
 use ente_core::crypto::{keys, sealed};
 use ente_core::http::Error as HttpError;
@@ -812,45 +811,7 @@ impl AccountSpaceCtx {
             .map_err(Into::into)
     }
 
-    pub async fn list_notifications(
-        &self,
-        cursor: Option<String>,
-        limit: Option<i32>,
-    ) -> Result<SpaceNotificationPage> {
-        let mut query = Vec::new();
-        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
-            query.push(("cursor", value));
-        }
-        if let Some(value) = limit {
-            query.push(("limit", value.to_string()));
-        }
-        self.client
-            .get_json("/space/notifications", &query)
-            .await
-            .map_err(Into::into)
-    }
-
     pub async fn mark_notifications_read(
-        &self,
-        read_at: Option<String>,
-    ) -> Result<SpaceUnreadStatusResponse> {
-        self.client
-            .post_json(
-                "/space/notifications/read",
-                &MarkNotificationsReadRequest { read_at },
-            )
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn mark_message_likes_read(&self) -> Result<SpaceUnreadStatusResponse> {
-        self.client
-            .post_json("/space/messages/likes/read", &())
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn mark_message_thread_read(
         &self,
         friend_space_id: impl Into<String>,
     ) -> Result<SpaceUnreadStatusResponse> {
@@ -863,7 +824,7 @@ impl AccountSpaceCtx {
         self.client
             .post_json(
                 "/space/messages/read",
-                &MarkMessageThreadReadRequest { friend_space_id },
+                &MarkNotificationsReadRequest { friend_space_id },
             )
             .await
             .map_err(Into::into)
@@ -3406,62 +3367,17 @@ mod tests {
             .mock("GET", "/space/unread")
             .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
-            .with_body(
-                json!({
-                    "notificationsUnread": false,
-                    "messagesUnread": false,
-                    "messageLikesUnread": false
-                })
-                .to_string(),
-            )
+            .with_body(json!({"notificationsUnread": false}).to_string())
             .create_async()
             .await;
         let notifications_read = server
-            .mock("POST", "/space/notifications/read")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_body(Matcher::JsonString(
-                json!({"readAt": "2026-04-16T00:00:00Z"}).to_string(),
-            ))
-            .with_status(200)
-            .with_body(
-                json!({
-                    "notificationsUnread": false,
-                    "messagesUnread": false,
-                    "messageLikesUnread": false
-                })
-                .to_string(),
-            )
-            .create_async()
-            .await;
-        let message_likes_read = server
-            .mock("POST", "/space/messages/likes/read")
-            .match_header("x-space-session-token", "space-session-token")
-            .with_status(200)
-            .with_body(
-                json!({
-                    "notificationsUnread": false,
-                    "messagesUnread": false,
-                    "messageLikesUnread": false
-                })
-                .to_string(),
-            )
-            .create_async()
-            .await;
-        let thread_read = server
             .mock("POST", "/space/messages/read")
             .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::JsonString(
                 json!({"friendSpaceId": "space_friend"}).to_string(),
             ))
             .with_status(200)
-            .with_body(
-                json!({
-                    "notificationsUnread": false,
-                    "messagesUnread": false,
-                    "messageLikesUnread": false
-                })
-                .to_string(),
-            )
+            .with_body(json!({"notificationsUnread": false}).to_string())
             .create_async()
             .await;
 
@@ -3470,31 +3386,15 @@ mod tests {
             .await
             .expect("unread status should load");
         assert!(!unread.notifications_unread);
-        assert!(!unread.messages_unread);
-        assert!(!unread.message_likes_unread);
         assert!(
-            !ctx.mark_notifications_read(Some("2026-04-16T00:00:00Z".to_owned()))
+            !ctx.mark_notifications_read("space_friend")
                 .await
                 .expect("notifications read")
                 .notifications_unread
         );
-        assert!(
-            !ctx.mark_message_likes_read()
-                .await
-                .expect("message likes read")
-                .message_likes_unread
-        );
-        assert!(
-            !ctx.mark_message_thread_read("space_friend")
-                .await
-                .expect("thread read")
-                .messages_unread
-        );
 
         status.assert_async().await;
         notifications_read.assert_async().await;
-        message_likes_read.assert_async().await;
-        thread_read.assert_async().await;
     }
 
     #[tokio::test]
@@ -3698,58 +3598,6 @@ mod tests {
         assert_eq!(response.likers[0].actor.space_id, "space_liker");
         assert_eq!(response.next_cursor, "2000:8");
         likers.assert_async().await;
-    }
-
-    #[tokio::test]
-    async fn list_notifications_uses_notifications_endpoint() {
-        let mut server = Server::new_async().await;
-        let ctx = test_account_ctx(&server.url());
-        let notifications = server
-            .mock("GET", "/space/notifications")
-            .match_header("x-space-session-token", "space-session-token")
-            .match_query(Matcher::AllOf(vec![
-                Matcher::UrlEncoded("cursor".into(), "3000:post_like:1".into()),
-                Matcher::UrlEncoded("limit".into(), "10".into()),
-            ]))
-            .with_status(200)
-            .with_body(
-                json!({
-                    "items": [{
-                        "id": "post_like:42:space_liker",
-                        "type": "post_like",
-                        "createdAt": "2026-04-16T00:00:00Z",
-                        "unread": true,
-                        "actor": {
-                            "userId": 8,
-                            "spaceId": "space_liker",
-                            "spaceSlug": "liker"
-                        },
-                        "post": {
-                            "postId": 42,
-                            "spaceId": "space_owner",
-                            "spaceSlug": "owner",
-                            "ownerUserId": 7,
-                            "isDeleted": false
-                        }
-                    }],
-                    "nextCursor": "2000:friend_event:2"
-                })
-                .to_string(),
-            )
-            .create_async()
-            .await;
-
-        let response = ctx
-            .list_notifications(Some("3000:post_like:1".to_owned()), Some(10))
-            .await
-            .expect("notifications should load");
-
-        assert_eq!(response.items[0].notification_type, "post_like");
-        assert_eq!(response.items[0].actor.space_id, "space_liker");
-        assert!(response.items[0].unread);
-        assert_eq!(response.items[0].post.as_ref().unwrap().post_id, 42);
-        assert_eq!(response.next_cursor, "2000:friend_event:2");
-        notifications.assert_async().await;
     }
 
     #[tokio::test]
