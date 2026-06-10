@@ -231,7 +231,7 @@ const conversationPreview = (
 ) => {
     const activity = conversation.latestActivity;
     if (activity.type == "friend_add") {
-        return "You're now friends";
+        return "You're now friends. Say hello!";
     }
     if (activity.type == "friend_remove") {
         return activity.outgoing
