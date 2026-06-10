@@ -167,6 +167,9 @@ const Avatar: React.FC<{ avatarUrl?: string | null; size: number }> = ({
 );
 
 const messagePreview = (message: SpaceMessage) => {
+    if (message.kind == "post_like") {
+        return message.text;
+    }
     if (message.kind == "post_reply") {
         return message.text || "Replied to a post";
     }
@@ -238,15 +241,19 @@ const conversationPreview = (
             ? "You're no longer friends"
             : "Removed you as a friend";
     }
-    if (activity.type == "post_like") return "Liked your post";
+    if (activity.type == "post_like") {
+        return activity.outgoing ? "You liked a post" : "Liked your post";
+    }
     if (activity.type == "post_reply") {
         return "Replied";
     }
     if (activity.type == "message_like") {
         const text = activity.message?.text.trim();
         return text
-            ? `Liked "${truncateMessageText(text)}"`
-            : "Liked a message";
+            ? `${activity.outgoing ? "You liked" : "Liked"} "${truncateMessageText(text)}"`
+            : activity.outgoing
+              ? "You liked a message"
+              : "Liked a message";
     }
 
     const message = activity.message;
@@ -265,10 +272,14 @@ const quotedConversationActivityPreview = (
     const previewText = truncateMessageText(text);
 
     if (activity.type == "message_like") {
-        return { prefix: 'Liked "', previewText, suffix: '"' };
+        return {
+            prefix: activity.outgoing ? 'You liked "' : 'Liked "',
+            previewText,
+            suffix: '"',
+        };
     }
     if (activity.type == "post_reply") {
-        return { prefix: 'Replied "', previewText, suffix: '"' };
+        return { prefix: "", previewText, suffix: "" };
     }
     return undefined;
 };
@@ -727,7 +738,8 @@ const QuotePreview: React.FC<{
     message: SpaceMessage;
     onOpenQuotePost: (quote: SpaceMessageQuote) => void;
 }> = ({ isOwn, message, onOpenQuotePost }) => {
-    if (message.kind != "post_reply") return null;
+    if (message.kind != "post_like" && message.kind != "post_reply")
+        return null;
     const quote = message.quote;
     const isUnavailable = !quote || quote.isUnavailable || !quote.imageUrl;
     const canOpen = Boolean(quote && !isUnavailable);
@@ -963,8 +975,12 @@ const MessageBubble: React.FC<{
         : isLastInSequence
           ? "6px 20px 20px 20px"
           : "6px 20px 20px 6px";
+    const isSyntheticPostLike = message.kind == "post_like";
     const hasMessageReply = Boolean(message.replyMessageId);
-    const hasInlinePreview = message.kind == "post_reply" || hasMessageReply;
+    const hasInlinePreview =
+        message.kind == "post_like" ||
+        message.kind == "post_reply" ||
+        hasMessageReply;
     const [isLikeTooltipOpen, setIsLikeTooltipOpen] = React.useState(false);
     const likeTooltipTimerRef = React.useRef<number | undefined>(undefined);
     const longPressTimerRef = React.useRef<number | undefined>(undefined);
@@ -1005,21 +1021,27 @@ const MessageBubble: React.FC<{
 
     const openActions = React.useCallback(
         (bubbleElement: HTMLElement, source: MessageActionsOpenSource) => {
+            if (isSyntheticPostLike) return;
             clearLongPressTimer();
             longPressStartRef.current = undefined;
             window.getSelection()?.removeAllRanges();
             onOpenActions(message, bubbleElement, source);
         },
-        [clearLongPressTimer, message, onOpenActions],
+        [clearLongPressTimer, isSyntheticPostLike, message, onOpenActions],
     );
 
     const handleContextMenu = (event: React.MouseEvent<HTMLElement>) => {
+        if (isSyntheticPostLike) return;
         event.preventDefault();
         event.stopPropagation();
         openActions(event.currentTarget, "contextmenu");
     };
 
     const handleTouchStart = (event: React.TouchEvent<HTMLElement>) => {
+        if (isSyntheticPostLike) {
+            cancelLongPress();
+            return;
+        }
         if (
             event.touches.length != 1 ||
             isMessageLongPressIgnoredTarget(event.target)
@@ -1113,7 +1135,7 @@ const MessageBubble: React.FC<{
                         color: isOwn
                             ? outgoingMessageText
                             : incomingMessageText,
-                        cursor: "context-menu",
+                        cursor: isSyntheticPostLike ? "default" : "context-menu",
                         display: "block",
                         maxWidth: "100%",
                         minWidth: 0,

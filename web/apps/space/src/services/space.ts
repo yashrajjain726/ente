@@ -118,7 +118,7 @@ interface SpaceFriend {
     shareKeyVersion: number;
 }
 
-type SpaceMessageKindResponse = "post_reply" | "regular";
+type SpaceMessageKindResponse = "post_like" | "post_reply" | "regular";
 
 interface SpaceMessageQuoteResponse {
     caption?: string;

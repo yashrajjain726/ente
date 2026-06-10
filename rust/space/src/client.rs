@@ -905,6 +905,24 @@ impl AccountSpaceCtx {
         decrypt_secretbox_packed(&space_key, &packed)
     }
 
+    pub async fn decrypt_post_caption_fields(
+        &self,
+        space_id: &str,
+        post_id: i64,
+        encrypted_post_key: &str,
+        key_version: i32,
+        caption_cipher: &str,
+    ) -> Result<Option<Vec<u8>>> {
+        if caption_cipher.trim().is_empty() {
+            return Ok(None);
+        }
+        let post_key = self
+            .decrypt_post_key_fields(space_id, post_id, encrypted_post_key, key_version)
+            .await?;
+        let packed = decode_b64(caption_cipher)?;
+        Ok(Some(decrypt_secretbox_packed(&post_key, &packed)?))
+    }
+
     pub fn decrypt_post(&self, space_key: &[u8], post: &PostResponse) -> Result<DecryptedPost> {
         let post_key = self.decrypt_post_key(space_key, post)?;
         let caption_plaintext = if post.caption_cipher.is_empty() {

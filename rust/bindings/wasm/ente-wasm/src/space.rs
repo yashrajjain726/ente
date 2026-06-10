@@ -512,15 +512,81 @@ async fn account_message_to_js(
     })
 }
 
+async fn message_response_quote_to_js(
+    ctx: &AccountSpaceCtx,
+    quote: ente_space::transport::MessageQuoteResponse,
+) -> Result<MessageQuoteJs, WasmSpaceError> {
+    let caption = if !quote.caption_cipher.trim().is_empty()
+        && !quote.encrypted_post_key.trim().is_empty()
+        && quote.key_version > 0
+    {
+        optional_utf8_field(
+            ctx.decrypt_post_caption_fields(
+                &quote.space_id,
+                quote.post_id,
+                &quote.encrypted_post_key,
+                quote.key_version,
+                &quote.caption_cipher,
+            )
+            .await?,
+            "caption",
+        )?
+    } else {
+        None
+    };
+
+    Ok(MessageQuoteJs {
+        post_id: quote.post_id,
+        space_id: quote.space_id,
+        encrypted_post_key: (!quote.encrypted_post_key.trim().is_empty())
+            .then_some(quote.encrypted_post_key),
+        key_version: (quote.key_version > 0).then_some(quote.key_version),
+        caption,
+        object_key: (!quote.object_key.trim().is_empty()).then_some(quote.object_key),
+        width: None,
+        height: None,
+        media_type: None,
+    })
+}
+
+async fn account_message_response_to_js(
+    ctx: &AccountSpaceCtx,
+    message: MessageResponse,
+) -> Result<MessageJs, WasmSpaceError> {
+    if message.kind != "post_like" {
+        let decrypted = ctx.decrypt_message(&message).await?;
+        return account_message_to_js(ctx, message, decrypted).await;
+    }
+
+    let sender = account_actor_to_js(ctx, message.sender).await?;
+    let recipient = account_actor_to_js(ctx, message.recipient).await?;
+    let quote = match message.quote {
+        Some(quote) => Some(message_response_quote_to_js(ctx, quote).await?),
+        None => None,
+    };
+    Ok(MessageJs {
+        message_id: message.message_id,
+        kind: message.kind,
+        sender,
+        recipient,
+        text: message.text,
+        quote,
+        reply_post_id: message.reply_post_id,
+        reply_message_id: message.reply_message_id,
+        likes: message.likes,
+        viewer_liked: message.viewer_liked,
+        is_deleted: message.is_deleted,
+        created_at: message.created_at,
+        updated_at: message.updated_at,
+    })
+}
+
 async fn message_conversation_activity_to_js(
     ctx: &AccountSpaceCtx,
     activity: MessageConversationActivity,
 ) -> Result<MessageConversationActivityJs, WasmSpaceError> {
     let message = match activity.message {
-        Some(message) => {
-            let decrypted = ctx.decrypt_message(&message).await?;
-            Some(account_message_to_js(ctx, message, decrypted).await?)
-        }
+        Some(message) => Some(account_message_response_to_js(ctx, message).await?),
         None => None,
     };
     Ok(MessageConversationActivityJs {
@@ -1098,8 +1164,7 @@ impl SpaceAccountCtxHandle {
             .await?;
         let mut items = Vec::with_capacity(page.items.len());
         for message in page.items {
-            let decrypted = self.inner.decrypt_message(&message).await?;
-            items.push(account_message_to_js(&self.inner, message, decrypted).await?);
+            items.push(account_message_response_to_js(&self.inner, message).await?);
         }
         swb::to_value(&MessagePageJs {
             items,
