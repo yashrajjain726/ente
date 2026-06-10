@@ -207,6 +207,17 @@ const isCurrentProfileActor = (
 const actorName = (actor: SpaceMessage["sender"]) =>
     firstNameFrom(actor.fullName.trim() || actor.username);
 
+const quoteOwnerName = (message: SpaceMessage, profile: SetupProfile) => {
+    const quoteSpaceID = message.quote?.spaceId;
+    if (quoteSpaceID && quoteSpaceID == profile.spaceId) return "You";
+    const owner = quoteSpaceID
+        ? [message.sender, message.recipient].find(
+              (actor) => actor.spaceId == quoteSpaceID,
+          ) || message.recipient
+        : message.recipient;
+    return isCurrentProfileActor(owner, profile) ? "You" : actorName(owner);
+};
+
 const messageLikeTooltipLabel = (
     message: SpaceMessage,
     profile: SetupProfile,
@@ -737,19 +748,20 @@ const QuotePreview: React.FC<{
     isOwn: boolean;
     message: SpaceMessage;
     onOpenQuotePost: (quote: SpaceMessageQuote) => void;
-}> = ({ isOwn, message, onOpenQuotePost }) => {
-    if (message.kind != "post_like" && message.kind != "post_reply")
-        return null;
+    profile: SetupProfile;
+}> = ({ isOwn, message, onOpenQuotePost, profile }) => {
+    if (message.kind != "post_reply") return null;
     const quote = message.quote;
     const isUnavailable = !quote || quote.isUnavailable || !quote.imageUrl;
     const canOpen = Boolean(quote && !isUnavailable);
+    const title = quoteOwnerName(message, profile);
 
     return (
         <Box
             sx={{
                 alignItems: "stretch",
                 display: "flex",
-                gap: "10px",
+                gap: "8px",
                 mb: "8px",
                 maxWidth: "100%",
                 minWidth: 0,
@@ -783,7 +795,7 @@ const QuotePreview: React.FC<{
                     color: "inherit",
                     cursor: canOpen ? "pointer" : "default",
                     display: "grid",
-                    gap: "10px",
+                    gap: "8px",
                     gridTemplateColumns: isUnavailable
                         ? "minmax(0, 1fr)"
                         : "minmax(0, 1fr) 44px",
@@ -813,7 +825,7 @@ const QuotePreview: React.FC<{
                             whiteSpace: "nowrap",
                         }}
                     >
-                        Post
+                        {title}
                     </Box>
                     <Box
                         sx={{
@@ -829,7 +841,7 @@ const QuotePreview: React.FC<{
                             whiteSpace: "nowrap",
                         }}
                     >
-                        {isUnavailable ? "Deleted" : quote.caption || "Photo"}
+                        {isUnavailable ? "Deleted" : quote.caption || "Post"}
                     </Box>
                 </Box>
                 {!isUnavailable && (
@@ -848,6 +860,109 @@ const QuotePreview: React.FC<{
                     />
                 )}
             </Box>
+        </Box>
+    );
+};
+
+const PostLikeContent: React.FC<{
+    isOwn: boolean;
+    message: SpaceMessage;
+    onOpenQuotePost: (quote: SpaceMessageQuote) => void;
+}> = ({ isOwn, message, onOpenQuotePost }) => {
+    const quote = message.quote;
+    const imageUrl = quote && !quote.isUnavailable ? quote.imageUrl : undefined;
+    const canOpen = Boolean(quote && imageUrl);
+    const label = isOwn
+        ? "You liked a post"
+        : `${actorName(message.sender)} liked your post`;
+
+    return (
+        <Box
+            component={canOpen ? "button" : "div"}
+            type={canOpen ? "button" : undefined}
+            aria-label={canOpen ? "Open liked post" : undefined}
+            onClick={(event: React.MouseEvent) => {
+                if (!quote || !canOpen) return;
+                event.stopPropagation();
+                onOpenQuotePost(quote);
+            }}
+            sx={{
+                appearance: "none",
+                alignItems: "center",
+                bgcolor: "transparent",
+                border: 0,
+                color: "inherit",
+                cursor: canOpen ? "pointer" : "default",
+                display: "grid",
+                gap: "10px",
+                gridTemplateColumns: canOpen
+                    ? "24px minmax(0, 1fr) 42px"
+                    : "24px minmax(0, 1fr)",
+                font: "inherit",
+                minWidth: 0,
+                p: 0,
+                textAlign: "left",
+                width: "100%",
+                "&:focus-visible": {
+                    outline: `2px solid ${isOwn ? outgoingMessageText : green}`,
+                    outlineOffset: 2,
+                },
+            }}
+        >
+            <Box
+                aria-hidden
+                sx={{
+                    alignItems: "center",
+                    bgcolor: isOwn ? outgoingMessageText : green,
+                    borderRadius: "50%",
+                    color: isOwn ? green : outgoingMessageText,
+                    display: "flex",
+                    height: 24,
+                    justifyContent: "center",
+                    width: 24,
+                }}
+            >
+                <Box
+                    component="svg"
+                    viewBox="0 0 24 24"
+                    sx={{ display: "block", height: 13, width: 13 }}
+                >
+                    <path
+                        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                        fill="currentColor"
+                    />
+                </Box>
+            </Box>
+            <Box
+                sx={{
+                    color: isOwn ? outgoingMessageText : incomingMessageText,
+                    fontFamily: '"Inter Variable", Inter, sans-serif',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    lineHeight: "18px",
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                }}
+            >
+                {label}
+            </Box>
+            {canOpen && (
+                <Box
+                    component="img"
+                    alt=""
+                    src={imageUrl}
+                    sx={{
+                        borderRadius: "6px",
+                        display: "block",
+                        height: 42,
+                        objectFit: "cover",
+                        objectPosition: "center",
+                        width: 42,
+                    }}
+                />
+            )}
         </Box>
     );
 };
@@ -1135,15 +1250,21 @@ const MessageBubble: React.FC<{
                         color: isOwn
                             ? outgoingMessageText
                             : incomingMessageText,
-                        cursor: isSyntheticPostLike ? "default" : "context-menu",
+                        cursor: isSyntheticPostLike
+                            ? "default"
+                            : "context-menu",
                         display: "block",
                         maxWidth: "100%",
                         minWidth: 0,
                         ml: 0,
                         overflow: "visible",
                         position: "relative",
-                        px: "16px",
-                        py: hasInlinePreview ? "16px" : "14px",
+                        px: isSyntheticPostLike ? "12px" : "16px",
+                        py: isSyntheticPostLike
+                            ? "10px"
+                            : hasInlinePreview
+                              ? "16px"
+                              : "14px",
                         textAlign: "left",
                         touchAction: "pan-y",
                         userSelect: "none",
@@ -1160,33 +1281,45 @@ const MessageBubble: React.FC<{
                         },
                     }}
                 >
-                    <QuotePreview
-                        isOwn={isOwn}
-                        message={message}
-                        onOpenQuotePost={onOpenQuotePost}
-                    />
-                    {hasMessageReply && (
-                        <MessageReplyPreview
+                    {isSyntheticPostLike ? (
+                        <PostLikeContent
                             isOwn={isOwn}
-                            parentMessage={parentMessage}
-                            profile={profile}
+                            message={message}
+                            onOpenQuotePost={onOpenQuotePost}
                         />
+                    ) : (
+                        <>
+                            <QuotePreview
+                                isOwn={isOwn}
+                                message={message}
+                                onOpenQuotePost={onOpenQuotePost}
+                                profile={profile}
+                            />
+                            {hasMessageReply && (
+                                <MessageReplyPreview
+                                    isOwn={isOwn}
+                                    parentMessage={parentMessage}
+                                    profile={profile}
+                                />
+                            )}
+                            <Box
+                                sx={{
+                                    color: isOwn
+                                        ? outgoingMessageText
+                                        : incomingMessageText,
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    lineHeight: "21px",
+                                    overflowWrap: "anywhere",
+                                    whiteSpace: "pre-wrap",
+                                }}
+                            >
+                                {message.text}
+                            </Box>
+                        </>
                     )}
-                    <Box
-                        sx={{
-                            color: isOwn
-                                ? outgoingMessageText
-                                : incomingMessageText,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 600,
-                            lineHeight: "21px",
-                            overflowWrap: "anywhere",
-                            whiteSpace: "pre-wrap",
-                        }}
-                    >
-                        {message.text}
-                    </Box>
                     {message.likeCount > 0 && (
                         <Tooltip
                             arrow

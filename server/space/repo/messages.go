@@ -541,10 +541,11 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 		ranked AS (
 			SELECT
 				c.*,
-				(c.unread_count > 0) AS conversation_unread,
 				CASE
-					WHEN c.unread_count > 0 THEN c.unread_count + c.post_like_unread_count
-					ELSE 0
+					WHEN c.unread_count = 0
+					 AND c.post_like_unread_count = 1
+					 AND c.activity_type = 'post_like' THEN 0
+					ELSE c.unread_count + c.post_like_unread_count
 				END AS conversation_unread_count,
 				BOOL_OR(c.notification_unread) OVER (PARTITION BY c.friend_space_id) AS conversation_notification_unread,
 				ROW_NUMBER() OVER (
@@ -558,7 +559,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			c.activity_id,
 			c.activity_created_at,
 			c.is_outgoing,
-			c.conversation_unread AS unread,
+			(c.conversation_unread_count > 0) AS unread,
 			c.conversation_unread_count AS unread_count,
 			c.conversation_notification_unread AS notification_unread,
 			c.sort_created_at,
