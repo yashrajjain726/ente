@@ -83,9 +83,10 @@ type SpaceKeyResponse struct {
 }
 
 type PresignUploadRequest struct {
-	Size    int64   `json:"size" binding:"required"`
-	Purpose *string `json:"purpose,omitempty"`
-	SpaceID *string `json:"spaceId,omitempty"`
+	Size       int64   `json:"size" binding:"required"`
+	ContentMD5 string  `json:"contentMD5" binding:"required"`
+	Purpose    *string `json:"purpose,omitempty"`
+	SpaceID    *string `json:"spaceId,omitempty"`
 }
 
 type PresignUploadResponse struct {

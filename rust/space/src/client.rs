@@ -4,9 +4,9 @@ use std::{
 };
 
 use crate::crypto::{
-    PACKED_SECRETBOX_OVERHEAD_BYTES, decode_b64, decrypt_secretbox_packed, decrypt_secretbox_split,
-    derive_space_link_auth_key, derive_space_link_wrap_key, encode_b64, encrypt_asset_payload,
-    encrypt_secretbox_packed, encrypt_secretbox_split, generate_key,
+    PACKED_SECRETBOX_OVERHEAD_BYTES, content_md5_base64, decode_b64, decrypt_secretbox_packed,
+    decrypt_secretbox_split, derive_space_link_auth_key, derive_space_link_wrap_key, encode_b64,
+    encrypt_asset_payload, encrypt_secretbox_packed, encrypt_secretbox_split, generate_key,
     generate_space_link_access_key, pack_payload, space_link_access_key_material, unpack_payload,
 };
 use crate::error::{Result, SpaceError};
@@ -537,10 +537,12 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
         size: usize,
+        content_md5: &str,
     ) -> Result<PresignUploadResponse> {
         ensure_space_upload_size("post", size, MAX_SPACE_POST_UPLOAD_BYTES)?;
         let request = PresignUploadRequest {
             size: size as i64,
+            content_md5: content_md5.to_owned(),
             purpose: None,
             space_id: Some(space_id.to_owned()),
         };
@@ -554,10 +556,12 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
         size: usize,
+        content_md5: &str,
     ) -> Result<PresignUploadResponse> {
         ensure_space_upload_size("avatar", size, MAX_SPACE_AVATAR_UPLOAD_BYTES)?;
         let request = PresignUploadRequest {
             size: size as i64,
+            content_md5: content_md5.to_owned(),
             purpose: Some(UPLOAD_PURPOSE_AVATAR.to_owned()),
             space_id: Some(space_id.to_owned()),
         };
@@ -571,10 +575,12 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
         size: usize,
+        content_md5: &str,
     ) -> Result<PresignUploadResponse> {
         ensure_space_upload_size("cover", size, MAX_SPACE_COVER_UPLOAD_BYTES)?;
         let request = PresignUploadRequest {
             size: size as i64,
+            content_md5: content_md5.to_owned(),
             purpose: Some(UPLOAD_PURPOSE_COVER.to_owned()),
             space_id: Some(space_id.to_owned()),
         };
@@ -605,7 +611,10 @@ impl AccountSpaceCtx {
         position: Option<i32>,
     ) -> Result<PostObjectPayload> {
         let encrypted = encrypt_asset_payload(post_key, plaintext)?;
-        let presign = self.presign_post_upload(space_id, encrypted.len()).await?;
+        let content_md5 = content_md5_base64(&encrypted);
+        let presign = self
+            .presign_post_upload(space_id, encrypted.len(), &content_md5)
+            .await?;
         self.upload_bytes(&presign, &encrypted).await?;
         Ok(PostObjectPayload {
             object_key: presign.object_key,
@@ -671,12 +680,16 @@ impl AccountSpaceCtx {
     ) -> Result<ProfileAvatarPayload> {
         ensure_supported_photo_bytes(plaintext)?;
         let encrypted = encrypt_asset_payload(space_key, plaintext)?;
+        let content_md5 = content_md5_base64(&encrypted);
         let presign = match purpose {
             UPLOAD_PURPOSE_AVATAR => {
-                self.presign_avatar_upload(space_id, encrypted.len())
+                self.presign_avatar_upload(space_id, encrypted.len(), &content_md5)
                     .await?
             }
-            UPLOAD_PURPOSE_COVER => self.presign_cover_upload(space_id, encrypted.len()).await?,
+            UPLOAD_PURPOSE_COVER => {
+                self.presign_cover_upload(space_id, encrypted.len(), &content_md5)
+                    .await?
+            }
             _ => {
                 return Err(SpaceError::InvalidInput(
                     "invalid profile asset purpose".into(),
@@ -2569,6 +2582,7 @@ mod tests {
             .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"size\"".into()),
+                Matcher::Regex("\"contentMD5\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
             ]))
             .with_status(200)
@@ -2577,7 +2591,8 @@ mod tests {
                     "url": format!("{}/upload/object-1", server.url()),
                     "method": "PUT",
                     "headers": {
-                        "content-type": "application/octet-stream"
+                        "content-type": "application/octet-stream",
+                        "Content-MD5": "test-digest"
                     },
                     "objectKey": "object-1",
                     "expiresIn": 300
@@ -2589,6 +2604,7 @@ mod tests {
         let upload = server
             .mock("PUT", "/upload/object-1")
             .match_header("content-type", "application/octet-stream")
+            .match_header("content-md5", "test-digest")
             .with_status(200)
             .create_async()
             .await;
@@ -2612,14 +2628,18 @@ mod tests {
         let presign = server
             .mock("POST", "/space/uploads/presign")
             .match_header("x-space-session-token", "space-session-token")
-            .match_body(Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()))
+            .match_body(Matcher::AllOf(vec![
+                Matcher::Regex("\"contentMD5\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+            ]))
             .with_status(200)
             .with_body(
                 json!({
                     "url": format!("{}/upload/photo-object", server.url()),
                     "method": "PUT",
                     "headers": {
-                        "content-type": "application/octet-stream"
+                        "content-type": "application/octet-stream",
+                        "Content-MD5": "test-digest"
                     },
                     "objectKey": "photo-object",
                     "expiresIn": 300
@@ -2631,6 +2651,7 @@ mod tests {
         let upload = server
             .mock("PUT", "/upload/photo-object")
             .match_header("content-type", "application/octet-stream")
+            .match_header("content-md5", "test-digest")
             .with_status(200)
             .create_async()
             .await;
@@ -2707,7 +2728,11 @@ mod tests {
         let ctx = test_account_ctx(&server.url());
 
         let post_error = ctx
-            .presign_post_upload("space_owner_main", MAX_SPACE_POST_UPLOAD_BYTES + 1)
+            .presign_post_upload(
+                "space_owner_main",
+                MAX_SPACE_POST_UPLOAD_BYTES + 1,
+                "XUFAKrxLKna5cZ2REBfFkg==",
+            )
             .await
             .expect_err("oversized post upload should fail before presign");
         assert!(post_error.to_string().contains("post upload size"));
@@ -2718,7 +2743,11 @@ mod tests {
         );
 
         let avatar_error = ctx
-            .presign_avatar_upload("space_owner_main", MAX_SPACE_AVATAR_UPLOAD_BYTES + 1)
+            .presign_avatar_upload(
+                "space_owner_main",
+                MAX_SPACE_AVATAR_UPLOAD_BYTES + 1,
+                "XUFAKrxLKna5cZ2REBfFkg==",
+            )
             .await
             .expect_err("oversized avatar upload should fail before presign");
         assert!(avatar_error.to_string().contains("avatar upload size"));
@@ -2729,7 +2758,11 @@ mod tests {
         );
 
         let cover_error = ctx
-            .presign_cover_upload("space_owner_main", MAX_SPACE_COVER_UPLOAD_BYTES + 1)
+            .presign_cover_upload(
+                "space_owner_main",
+                MAX_SPACE_COVER_UPLOAD_BYTES + 1,
+                "XUFAKrxLKna5cZ2REBfFkg==",
+            )
             .await
             .expect_err("oversized cover upload should fail before presign");
         assert!(cover_error.to_string().contains("cover upload size"));
@@ -2749,6 +2782,7 @@ mod tests {
             .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"purpose\":\"avatar\"".into()),
+                Matcher::Regex("\"contentMD5\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
                 Matcher::Regex("\"size\"".into()),
             ]))
@@ -2758,7 +2792,8 @@ mod tests {
                     "url": format!("{}/upload/avatar-object", server.url()),
                     "method": "PUT",
                     "headers": {
-                        "content-type": "application/octet-stream"
+                        "content-type": "application/octet-stream",
+                        "Content-MD5": "test-digest"
                     },
                     "objectKey": "avatar-object",
                     "expiresIn": 300
@@ -2770,6 +2805,7 @@ mod tests {
         let upload = server
             .mock("PUT", "/upload/avatar-object")
             .match_header("content-type", "application/octet-stream")
+            .match_header("content-md5", "test-digest")
             .with_status(200)
             .create_async()
             .await;
@@ -2807,6 +2843,7 @@ mod tests {
             .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"purpose\":\"cover\"".into()),
+                Matcher::Regex("\"contentMD5\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
                 Matcher::Regex("\"size\"".into()),
             ]))
@@ -2816,7 +2853,8 @@ mod tests {
                     "url": format!("{}/upload/cover-object", server.url()),
                     "method": "PUT",
                     "headers": {
-                        "content-type": "application/octet-stream"
+                        "content-type": "application/octet-stream",
+                        "Content-MD5": "test-digest"
                     },
                     "objectKey": "cover-object",
                     "expiresIn": 300
@@ -2828,6 +2866,7 @@ mod tests {
         let upload = server
             .mock("PUT", "/upload/cover-object")
             .match_header("content-type", "application/octet-stream")
+            .match_header("content-md5", "test-digest")
             .with_status(200)
             .create_async()
             .await;

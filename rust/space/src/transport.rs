@@ -66,6 +66,8 @@ pub struct SpaceKeyResponse {
 #[serde(rename_all = "camelCase")]
 pub struct PresignUploadRequest {
     pub size: i64,
+    #[serde(rename = "contentMD5")]
+    pub content_md5: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

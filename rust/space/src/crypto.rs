@@ -1,5 +1,6 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
 use ente_core::crypto::{hash, kdf, keys, secretbox};
+use md5::{Digest, Md5};
 
 use crate::error::{Result, SpaceError};
 use crate::transport::EntityKeyPayload;
@@ -67,6 +68,11 @@ pub fn space_link_access_key_material(access_key: &str) -> Result<Vec<u8>> {
 
 pub fn encode_b64(bytes: &[u8]) -> String {
     STANDARD.encode(bytes)
+}
+
+pub fn content_md5_base64(bytes: &[u8]) -> String {
+    let digest = Md5::digest(bytes);
+    encode_b64(&digest)
 }
 
 pub fn decode_b64(value: &str) -> Result<Vec<u8>> {
@@ -230,5 +236,10 @@ mod tests {
         let encrypted = encrypt_asset_payload(&key, plaintext).unwrap();
         let decrypted = decrypt_asset_payload(&key, &encrypted).unwrap();
         assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn content_md5_base64_matches_vector() {
+        assert_eq!(content_md5_base64(b"hello"), "XUFAKrxLKna5cZ2REBfFkg==");
     }
 }
