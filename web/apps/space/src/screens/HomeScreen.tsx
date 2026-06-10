@@ -57,7 +57,7 @@ const textBase = "#000";
 const textSecondary = "#6B6B6B";
 const dangerColor = "#F63A3A";
 const headerActionSize = spaceTouchTargetSize;
-const headerAvatarSize = 29;
+const headerAvatarSize = 28;
 const feedAvatarSize = 38;
 const headerHeight = 64;
 const headerIconSize = 30;
@@ -1414,7 +1414,6 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                     appearance: "none",
                     bgcolor: "transparent",
                     border: 0,
-                    borderRadius: "50%",
                     color: textBase,
                     cursor: onClose ? "pointer" : "default",
                     display: "flex",
@@ -1428,7 +1427,6 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                         outline: "2px solid rgba(0 0 0 / 0.72)",
                         outlineOffset: 2,
                     },
-                    "&:hover": { bgcolor: "rgba(0, 0, 0, 0.06)" },
                 }}
             >
                 <HugeiconsIcon
