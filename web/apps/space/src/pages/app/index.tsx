@@ -46,6 +46,7 @@ const Page: React.FC = () => {
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
     const [isFeedLoading, setIsFeedLoading] = useState(true);
     const [isFeedLoadingMore, setIsFeedLoadingMore] = useState(false);
+    const [isFriendsLoading, setIsFriendsLoading] = useState(true);
     const isInitialFeedLoading =
         profileLoadStatus == "ready" &&
         Boolean(profile?.spaceId) &&
@@ -54,6 +55,9 @@ const Page: React.FC = () => {
         localFeedPosts.length == 0;
     const isSkippingInitialFeedSkeleton =
         isInitialFeedLoading && skipNextHomeFeedSkeleton;
+    const isHomeFeedLoading =
+        isFriendsLoading ||
+        (isFeedLoading && !isSkippingInitialFeedSkeleton);
     const closeAddedFriendToast = React.useCallback(
         () => setAddedFriendToastName(undefined),
         [],
@@ -86,6 +90,7 @@ const Page: React.FC = () => {
             setHasUnreadMessages(false);
             setIsFeedLoading(false);
             setIsFeedLoadingMore(false);
+            setIsFriendsLoading(false);
             setSkipNextHomeFeedSkeleton(false);
             return;
         }
@@ -96,6 +101,7 @@ const Page: React.FC = () => {
         setHasUnreadMessages(undefined);
         setIsFeedLoading(true);
         setIsFeedLoadingMore(false);
+        setIsFriendsLoading(true);
         void loadCurrentFeedPage()
             .then((feed) => {
                 if (cancelled) return;
@@ -129,7 +135,10 @@ const Page: React.FC = () => {
             })
             .catch((error: unknown) =>
                 console.error("Failed to load space friends", error),
-            );
+            )
+            .finally(() => {
+                if (!cancelled) setIsFriendsLoading(false);
+            });
 
         return () => {
             cancelled = true;
@@ -201,9 +210,7 @@ const Page: React.FC = () => {
                 addedFriendToastName={addedFriendToastName}
                 hasUnreadMessages={hasUnreadMessages}
                 hasMoreFeedItems={Boolean(feedNextCursor)}
-                isFeedLoading={
-                    isSkippingInitialFeedSkeleton ? false : isFeedLoading
-                }
+                isFeedLoading={isHomeFeedLoading}
                 isFeedLoadingMore={isFeedLoadingMore}
                 localFeedPosts={localFeedPosts}
                 profile={profile}

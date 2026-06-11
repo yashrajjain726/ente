@@ -57,6 +57,30 @@ const viewerSwipeAxisRatio = 1.5;
 const viewerHeaderAvatarSize = 28;
 const viewerHeaderButtonVisualSize = 28;
 
+interface ViewerViewportSize {
+    x: number;
+    y: number;
+}
+
+const currentViewerViewportSize = (
+    root: HTMLElement | null,
+): ViewerViewportSize => {
+    if (typeof window == "undefined" || typeof document == "undefined") {
+        return { x: defaultPhotoWidth, y: defaultPhotoHeight };
+    }
+
+    return {
+        x:
+            root?.clientWidth ||
+            document.documentElement.clientWidth ||
+            window.innerWidth,
+        y:
+            root?.clientHeight ||
+            document.documentElement.clientHeight ||
+            window.innerHeight,
+    };
+};
+
 const postButtonSpin = keyframes`
     from {
         transform: rotate(0deg);
@@ -352,6 +376,9 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const displayCaption = isDraftPost ? "" : caption.trim();
     const hasDisplayCaption = displayCaption.length > 0;
     const viewerRootRef = React.useRef<HTMLDivElement | null>(null);
+    const stableViewportSizeRef = React.useRef<ViewerViewportSize>(
+        currentViewerViewportSize(null),
+    );
     const captionInputRef = React.useRef<HTMLTextAreaElement | null>(null);
     const replyInputRef = React.useRef<HTMLTextAreaElement | null>(null);
     const [actionsAnchor, setActionsAnchor] =
@@ -405,6 +432,22 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         isDeleteExit ||
         isDraftPost ||
         isDraftPostPreviewPending;
+    const viewerViewportSize = React.useCallback(() => {
+        const currentSize = currentViewerViewportSize(viewerRootRef.current);
+        const stableSize = stableViewportSizeRef.current;
+
+        if (Math.abs(currentSize.x - stableSize.x) > 1) {
+            stableViewportSizeRef.current = currentSize;
+            return currentSize;
+        }
+
+        const nextSize = {
+            x: currentSize.x,
+            y: Math.max(currentSize.y, stableSize.y),
+        };
+        stableViewportSizeRef.current = nextSize;
+        return nextSize;
+    }, []);
 
     const requestAddFriendForPostAction = (action: AddFriendPostAction) => {
         if (!canAddFriendForPostAction) return;
@@ -732,6 +775,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 doubleTapAction: "zoom",
                 errorMsg: "Unable to preview this photo",
                 escKey: false,
+                getViewportSizeFn: viewerViewportSize,
                 imageClickAction: "zoom",
                 index: initialPhotoIndexRef.current,
                 loop: false,
@@ -859,7 +903,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
             pswpRef.current = undefined;
             pswp?.destroy();
         };
-    }, [isDraftPostPreviewPending, usePhotoSwipeViewer]);
+    }, [isDraftPostPreviewPending, usePhotoSwipeViewer, viewerViewportSize]);
 
     React.useEffect(() => {
         if (typeof document == "undefined") return;

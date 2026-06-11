@@ -93,4 +93,5 @@ html[data-space-route-motion="back"]::view-transition-new(root) {
 .pswp-space-viewer {
     --pswp-root-z-index: 0;
     --pswp-bg: #000000;
+    height: 100svh;
 }
