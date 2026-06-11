@@ -140,38 +140,15 @@ func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesReque
 	}
 	items := make([]models.MessageConversationResponse, 0, len(conversations))
 	for _, conversation := range conversations {
-		item := models.MessageConversationResponse{
-			Friend:      toActorResponse(conversation.Friend, true),
-			Unread:      conversation.Unread,
-			UnreadCount: conversation.UnreadCount,
-		}
-		if strings.TrimSpace(conversation.LatestActivity.Type) != "" {
-			latestActivity := toMessageConversationActivityResponse(conversation.LatestActivity)
-			item.LatestActivity = &latestActivity
-		}
-		items = append(items, item)
+		items = append(items, models.MessageConversationResponse{
+			Friend:             toActorResponse(conversation.Friend, true),
+			LatestActivity:     toMessageConversationActivityResponse(conversation.LatestActivity),
+			Unread:             conversation.Unread,
+			UnreadCount:        conversation.UnreadCount,
+			NotificationUnread: conversation.NotificationUnread,
+		})
 	}
 	return &models.MessageConversationPage{Items: items, NextCursor: nextCursor}, nil
-}
-
-func (c *MessagesController) ListNotifications(ctx *gin.Context, req models.ListNotificationsRequest) (*models.SpaceNotificationPage, error) {
-	userID, err := c.auth.requireUser(ctx)
-	if err != nil {
-		return nil, err
-	}
-	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
-	if err != nil {
-		return nil, err
-	}
-	notifications, nextCursor, err := c.MessagesRepo.ListNotifications(ctx.Request.Context(), viewerSpace.SpaceID, req.Cursor, req.Limit)
-	if err != nil {
-		return nil, err
-	}
-	items := make([]models.SpaceNotificationResponse, 0, len(notifications))
-	for _, notification := range notifications {
-		items = append(items, toSpaceNotificationResponse(notification))
-	}
-	return &models.SpaceNotificationPage{Items: items, NextCursor: nextCursor}, nil
 }
 
 func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, req models.ListMessageThreadRequest) (*models.MessagePage, error) {
@@ -345,11 +322,24 @@ func toMessageResponse(message repo.SpaceMessageRecord) *models.MessageResponse 
 		Recipient:           toActorResponse(message.Recipient, true),
 		MessageCipher:       message.MessageCipher,
 		EncryptedMessageKey: message.EncryptedMessageKey,
+		Text:                message.Text,
 		Likes:               message.Likes,
 		ViewerLiked:         message.ViewerLiked,
 		IsDeleted:           message.IsDeleted,
 		CreatedAt:           formatMicros(message.CreatedAt),
 		UpdatedAt:           formatMicros(message.UpdatedAt),
+	}
+	if message.Quote != nil {
+		resp.Quote = &models.MessageQuoteResponse{
+			PostID:           message.Quote.PostID,
+			SpaceID:          message.Quote.SpaceID,
+			EncryptedPostKey: message.Quote.EncryptedPostKey,
+			CaptionCipher:    message.Quote.CaptionCipher,
+			KeyVersion:       message.Quote.KeyVersion,
+		}
+		if message.Quote.ObjectKey.Valid {
+			resp.Quote.ObjectKey = message.Quote.ObjectKey.String
+		}
 	}
 	if message.ReplyPostID.Valid {
 		replyPostID := message.ReplyPostID.Int64
@@ -373,42 +363,23 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 		resp.Message = toMessageResponse(*activity.Message)
 	}
 	if activity.Post != nil {
-		resp.Post = toMessageConversationPostResponse(*activity.Post)
-	}
-	return resp
-}
-
-func toSpaceNotificationResponse(notification repo.SpaceNotificationRecord) models.SpaceNotificationResponse {
-	resp := models.SpaceNotificationResponse{
-		ID:        notification.ID,
-		Type:      notification.Type,
-		CreatedAt: formatMicros(notification.CreatedAt),
-		Unread:    notification.Unread,
-		Actor:     toActorResponse(notification.Actor, true),
-	}
-	if notification.Post != nil {
-		resp.Post = toMessageConversationPostResponse(*notification.Post)
-	}
-	return resp
-}
-
-func toMessageConversationPostResponse(post repo.SpaceMessageConversationPostRecord) *models.MessageConversationPostResponse {
-	resp := &models.MessageConversationPostResponse{
-		PostID:      post.PostID,
-		SpaceID:     post.SpaceID,
-		SpaceSlug:   post.SpaceSlug,
-		OwnerUserID: post.OwnerID,
-		IsDeleted:   post.IsDeleted,
-	}
-	if post.ObjectKey.Valid {
-		resp.Objects = []models.PostObjectPayload{
-			toPostObjectPayload(repo.SpacePostAssetRecord{
-				PostID:         post.PostID,
-				ObjectKey:      post.ObjectKey.String,
-				Size:           post.ObjectSize,
-				Position:       int(post.ObjectPosition.Int64),
-				MetadataCipher: post.ObjectMetadataCipher.String,
-			}),
+		resp.Post = &models.MessageConversationPostResponse{
+			PostID:      activity.Post.PostID,
+			SpaceID:     activity.Post.SpaceID,
+			SpaceSlug:   activity.Post.SpaceSlug,
+			OwnerUserID: activity.Post.OwnerID,
+			IsDeleted:   activity.Post.IsDeleted,
+		}
+		if activity.Post.ObjectKey.Valid {
+			resp.Post.Objects = []models.PostObjectPayload{
+				toPostObjectPayload(repo.SpacePostAssetRecord{
+					PostID:         activity.Post.PostID,
+					ObjectKey:      activity.Post.ObjectKey.String,
+					Size:           activity.Post.ObjectSize,
+					Position:       int(activity.Post.ObjectPosition.Int64),
+					MetadataCipher: activity.Post.ObjectMetadataCipher.String,
+				}),
+			}
 		}
 	}
 	return resp

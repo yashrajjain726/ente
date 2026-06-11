@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
+import { SpaceSharedInviteDialog } from "components/SpaceSharedInviteDialog";
 import React, { useEffect, useMemo, useState } from "react";
 import {
     OnboardingScreen,
@@ -26,6 +27,7 @@ import {
     spaceInviteFromLocation,
     type PendingSpaceInvite,
 } from "services/spaceInvite";
+import { savedSpaceSessionToken } from "services/spacePersistentSession";
 import {
     useSpaceAppState,
     type OnboardingEntrySource,
@@ -91,6 +93,15 @@ const PublicProfileUnavailable: React.FC = () => (
 const onboardingEntrySourceFromPendingInvite = (): OnboardingEntrySource =>
     savedPendingSpaceInvite() ? "add-friend-link" : "direct";
 
+const sharedInviteDialogStorageKey = "spaceSharedInviteDialogShown";
+
+const hasShownSharedInviteDialog = () =>
+    window.localStorage.getItem(sharedInviteDialogStorageKey) == "1";
+
+const markSharedInviteDialogShown = () => {
+    window.localStorage.setItem(sharedInviteDialogStorageKey, "1");
+};
+
 const Page: React.FC = () => {
     const router = useSpaceRouter();
     const {
@@ -109,10 +120,16 @@ const Page: React.FC = () => {
     const [publicPostAssetURLLoader, setPublicPostAssetURLLoader] =
         useState<SpacePostAssetURLLoader>();
     const [publicError, setPublicError] = useState<string>();
+    const [hasSavedSpaceSession, setHasSavedSpaceSession] = useState(false);
+    const [showSharedInviteDialog, setShowSharedInviteDialog] = useState(false);
     const publicPostGroups = useMemo(
         () => profilePostGroupsFromPosts(publicPosts),
         [publicPosts],
     );
+
+    useEffect(() => {
+        setHasSavedSpaceSession(Boolean(savedSpaceSessionToken()));
+    }, []);
 
     useEffect(() => {
         const publicInvite = spaceInviteFromLocation();
@@ -178,6 +195,23 @@ const Page: React.FC = () => {
         }
     }, [profile, profileLoadStatus, routeMode.kind, router]);
 
+    useEffect(() => {
+        if (
+            routeMode.kind != "public-profile" ||
+            !publicProfile ||
+            hasShownSharedInviteDialog()
+        ) {
+            setShowSharedInviteDialog(false);
+            return;
+        }
+
+        const timeoutID = window.setTimeout(
+            () => setShowSharedInviteDialog(true),
+            2500,
+        );
+        return () => window.clearTimeout(timeoutID);
+    }, [publicProfile, routeMode.kind]);
+
     const hasProfileLoadError =
         routeMode.kind == "app" && profileLoadStatus == "error";
 
@@ -212,6 +246,43 @@ const Page: React.FC = () => {
             );
         }
 
+        const inviteFriend = {
+            fullName: publicProfile.fullName,
+            username: publicProfile.username,
+        };
+        const inviteFriendName =
+            inviteFriend.fullName.trim() ||
+            inviteFriend.username.trim() ||
+            "Someone";
+        const addFriend = () => {
+            savePendingSpaceInvite(routeMode);
+            savePendingSpaceInviteFriend(inviteFriend);
+            setOnboardingEntrySource("add-friend-link");
+            if (profile) {
+                void joinSpaceInvite(routeMode)
+                    .then(() => {
+                        clearPendingSpaceInvite();
+                        clearPendingSpaceInviteFriend();
+                        saveAcceptedSpaceInviteFriend(inviteFriend);
+                        void router.push(spaceRoutes.home);
+                    })
+                    .catch((error: unknown) =>
+                        console.error("Failed to join space invite", error),
+                    );
+                return;
+            }
+            window.location.assign("/");
+        };
+        const closeSharedInviteDialog = () => {
+            markSharedInviteDialogShown();
+            setShowSharedInviteDialog(false);
+        };
+        const addFriendFromSharedInviteDialog = () => {
+            markSharedInviteDialogShown();
+            setShowSharedInviteDialog(false);
+            addFriend();
+        };
+
         return (
             <>
                 <SpacePageMeta themeColor={profileBackground} />
@@ -220,33 +291,19 @@ const Page: React.FC = () => {
                     onLoadPostImage={publicPostAssetURLLoader}
                     postGroups={publicPostGroups}
                     profile={publicProfile}
-                    onAddFriend={() => {
-                        const inviteFriend = {
-                            fullName: publicProfile.fullName,
-                            username: publicProfile.username,
-                        };
-
-                        savePendingSpaceInvite(routeMode);
-                        savePendingSpaceInviteFriend(inviteFriend);
-                        setOnboardingEntrySource("add-friend-link");
-                        if (profile) {
-                            void joinSpaceInvite(routeMode)
-                                .then(() => {
-                                    clearPendingSpaceInvite();
-                                    clearPendingSpaceInviteFriend();
-                                    saveAcceptedSpaceInviteFriend(inviteFriend);
-                                    void router.push(spaceRoutes.home);
-                                })
-                                .catch((error: unknown) =>
-                                    console.error(
-                                        "Failed to join space invite",
-                                        error,
-                                    ),
-                                );
-                            return;
-                        }
-                        window.location.assign("/");
-                    }}
+                    spaceLogoHref={
+                        profile || hasSavedSpaceSession
+                            ? spaceRoutes.home
+                            : undefined
+                    }
+                    onAddFriend={addFriend}
+                />
+                <SpaceSharedInviteDialog
+                    avatarUrl={publicProfile.avatarUrl}
+                    name={inviteFriendName}
+                    open={showSharedInviteDialog}
+                    onAddFriend={addFriendFromSharedInviteDialog}
+                    onClose={closeSharedInviteDialog}
                 />
             </>
         );

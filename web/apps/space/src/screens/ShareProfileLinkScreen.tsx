@@ -1,6 +1,7 @@
 import { Share08Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
+import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { spaceTouchTargetSize } from "styles/touchTargets";
@@ -313,19 +314,8 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             width: 112,
                         }}
                     >
-                        {profile.avatarUrl ? (
-                            <Box
-                                component="img"
-                                alt=""
-                                src={profile.avatarUrl}
-                                sx={{
-                                    display: "block",
-                                    height: "100%",
-                                    objectFit: "cover",
-                                    objectPosition: "center",
-                                    width: "100%",
-                                }}
-                            />
+                        {profile.avatarUrl || !profile.avatarObjectKey ? (
+                            <SpaceAvatarImage src={profile.avatarUrl} />
                         ) : (
                             <Skeleton
                                 variant="circular"

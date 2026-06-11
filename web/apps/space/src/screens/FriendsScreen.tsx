@@ -11,6 +11,7 @@ import {
     spaceActionDoneDurationMs,
     type SpaceActionPhase,
 } from "components/SpaceActionFeedback";
+import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
 import type { FriendProfile } from "data/friends";
 import React, { useState } from "react";
@@ -168,19 +169,8 @@ const FriendRow: React.FC<FriendRowProps> = ({
                         width: 48,
                     }}
                 >
-                    {avatarUrl ? (
-                        <Box
-                            component="img"
-                            alt=""
-                            src={avatarUrl}
-                            sx={{
-                                display: "block",
-                                height: "100%",
-                                objectFit: "cover",
-                                objectPosition: "center",
-                                width: "100%",
-                            }}
-                        />
+                    {avatarUrl || !friend.avatarObjectKey ? (
+                        <SpaceAvatarImage src={avatarUrl} />
                     ) : (
                         <Skeleton
                             variant="circular"
@@ -643,7 +633,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             onClick={openInviteDialog}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: "#F2F2F2",
+                                bgcolor: "#E8E8E8",
                                 border: 0,
                                 borderRadius: "18px",
                                 color: textBase,
@@ -669,7 +659,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                     outlineOffset: 2,
                                 },
                                 "&:hover": onShareProfileLink
-                                    ? { bgcolor: "#E8E8E8" }
+                                    ? { bgcolor: "#DEDEDE" }
                                     : undefined,
                             }}
                         >

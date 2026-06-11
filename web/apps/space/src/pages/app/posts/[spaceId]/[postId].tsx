@@ -3,14 +3,13 @@ import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import React from "react";
 import {
-    loadCurrentPostLikers,
     loadCurrentSpacePost,
     replyToCurrentPost,
     setCurrentPostLiked,
     type SpacePost,
 } from "services/space";
 import { useSpaceAppState } from "state/spaceAppState";
-import { postRouteSourceFromQuery, spaceRoutes } from "utils/spaceRoutes";
+import { spaceRoutes } from "utils/spaceRoutes";
 import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
 const postBackground = "#000000";
@@ -51,7 +50,6 @@ const viewerPhotoFromPost = (post: SpacePost) => ({
     friendID: post.friendID,
     height: post.height,
     imageUrl: post.imageUrl ?? "",
-    likeCount: post.likeCount,
     name: post.name,
     postId: post.postId,
     timestampMs: post.timestampMs,
@@ -66,7 +64,6 @@ const Page: React.FC = () => {
     const spaceId =
         valueFromQuery(router.query.spaceId) ?? pathParams.spaceId ?? "";
     const postId = postIdFromQuery(router.query.postId) ?? pathParams.postId;
-    const postRouteSource = postRouteSourceFromQuery(router.query.from);
     const [post, setPost] = React.useState<SpacePost | null>(null);
     const [postLoadError, setPostLoadError] = React.useState<string>();
     const [isPostLoading, setIsPostLoading] = React.useState(false);
@@ -123,12 +120,8 @@ const Page: React.FC = () => {
             router.back();
             return;
         }
-        if (postRouteSource == "notifications") {
-            void router.push(spaceRoutes.notifications);
-            return;
-        }
         void router.push(ownerProfileRoute());
-    }, [ownerProfileRoute, postRouteSource, router]);
+    }, [ownerProfileRoute, router]);
 
     if (
         !router.isReady ||
@@ -155,9 +148,8 @@ const Page: React.FC = () => {
             />
             <SpaceFileViewer
                 photo={viewerPhotoFromPost(post)}
-                postActionMode={isOwnPost ? "own-post-likes" : "like-only"}
+                postActionMode={isOwnPost ? "hidden" : "like-only"}
                 onClose={closePost}
-                onLoadPostLikers={loadCurrentPostLikers}
                 onOpenProfile={() => void router.push(ownerProfileRoute())}
                 onReplyToPost={isOwnPost ? undefined : replyToCurrentPost}
                 onSetPostLiked={setCurrentPostLiked}

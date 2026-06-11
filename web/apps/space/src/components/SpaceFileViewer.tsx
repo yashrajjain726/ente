@@ -8,32 +8,29 @@ import {
     Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Menu, MenuItem, Skeleton } from "@mui/material";
+import { Box, Menu, MenuItem } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
 import {
     spaceActionDoneDurationMs,
     type SpaceActionPhase,
 } from "components/SpaceActionFeedback";
+import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import {
     spacePostLikeButtonPop,
     spacePostLikeHeartPop,
     spacePostLikePopDurationMs,
     spacePostLikePopTiming,
 } from "components/SpacePostLikeAnimation";
-import { SpacePostLikersDialog } from "components/SpacePostLikersDialog";
 import type PhotoSwipe from "photoswipe";
 import React from "react";
-import type { SpacePostLiker, SpacePostLikersLoader } from "services/space";
 import { spaceTouchTargetSize } from "styles/touchTargets";
 import { firstNameFrom, formatSpaceDate } from "utils/spaceDisplay";
 import { clampSpaceMessageText } from "utils/spaceMessageLimits";
 import type { SpaceImageCropArea } from "utils/spacePostImage";
 
 const green = "#08C225";
-const avatarSkeletonBackground = "#E6E6E6";
 const textBase = "#F4F4F4";
-const viewerLikeCountText = "#D8D8D8";
 const textSecondary = "#A6A6A6";
 const textTertiary = "rgba(244, 244, 244, 0.52)";
 const viewerBackground = "#000000";
@@ -80,11 +77,7 @@ const photoPreviewSkeletonShimmer = keyframes`
     }
 `;
 
-export type SpaceViewerPostActionMode =
-    | "draft-post"
-    | "hidden"
-    | "like-only"
-    | "own-post-likes";
+export type SpaceViewerPostActionMode = "draft-post" | "hidden" | "like-only";
 
 export interface SpaceViewerDraftPostEdit {
     cropArea?: SpaceImageCropArea;
@@ -95,17 +88,15 @@ export interface SpaceViewerDraftPostEdit {
 
 interface SpaceViewerPostActionConfig {
     showLikeButton: boolean;
-    showLikeCountButton: boolean;
 }
 
 const spaceViewerPostActionConfigs: Record<
     SpaceViewerPostActionMode,
     SpaceViewerPostActionConfig
 > = {
-    "draft-post": { showLikeButton: false, showLikeCountButton: false },
-    hidden: { showLikeButton: false, showLikeCountButton: false },
-    "like-only": { showLikeButton: true, showLikeCountButton: false },
-    "own-post-likes": { showLikeButton: false, showLikeCountButton: true },
+    "draft-post": { showLikeButton: false },
+    hidden: { showLikeButton: false },
+    "like-only": { showLikeButton: true },
 };
 
 export interface SpaceViewerPhoto {
@@ -115,7 +106,6 @@ export interface SpaceViewerPhoto {
     friendID?: string;
     height?: number;
     imageUrl: string;
-    likeCount?: number;
     name: string;
     postId?: number;
     timestampMs: number;
@@ -136,7 +126,6 @@ interface SpaceFileViewerProps {
     onDeletePost?: () => Promise<void> | void;
     onDraftPostPublished?: () => void;
     onAddFriendForPostAction?: () => void;
-    onLoadPostLikers?: SpacePostLikersLoader;
     onOpenProfile?: () => void;
     onPublishDraftPost?: (
         caption: string,
@@ -283,7 +272,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     onDeletePost,
     onDraftPostPublished,
     onAddFriendForPostAction,
-    onLoadPostLikers,
     onOpenProfile,
     onPublishDraftPost,
     onReplyToPost,
@@ -298,10 +286,8 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 }) => {
     const activePostActionMode = postActionMode;
     const isDraftPost = activePostActionMode == "draft-post";
-    const {
-        showLikeButton: showPhotoLikeButton,
-        showLikeCountButton: showPhotoLikeCountButton,
-    } = spaceViewerPostActionConfigs[activePostActionMode];
+    const { showLikeButton: showPhotoLikeButton } =
+        spaceViewerPostActionConfigs[activePostActionMode];
     const canDeletePost = !isDraftPost && Boolean(onDeletePost);
     const [deleteActionPhase, setDeleteActionPhase] =
         React.useState<SpaceActionPhase | null>(null);
@@ -374,13 +360,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     const [addFriendSheetOpen, setAddFriendSheetOpen] = React.useState(false);
     const [addFriendPostAction, setAddFriendPostAction] =
         React.useState<AddFriendPostAction>("like");
-    const [postLikersOpen, setPostLikersOpen] = React.useState(false);
-    const [postLikersLoading, setPostLikersLoading] = React.useState(false);
-    const [postLikersError, setPostLikersError] = React.useState<string | null>(
-        null,
-    );
-    const [postLikers, setPostLikers] = React.useState<SpacePostLiker[]>([]);
-    const postLikersRequestIDRef = React.useRef(0);
     const actionsMenuID = "space-viewer-actions-menu";
     const actionsButtonID = "space-viewer-actions-button";
     const isActionsOpen = Boolean(actionsAnchor);
@@ -423,7 +402,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         isActionsOpen ||
         addFriendSheetOpen ||
         (canDeletePost && deleteSheetOpen) ||
-        postLikersOpen ||
         isDeleteExit ||
         isDraftPost ||
         isDraftPostPreviewPending;
@@ -462,43 +440,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                 setIsPhotoLiked(!nextLiked);
             },
         );
-    };
-
-    const openPostLikers = () => {
-        if (!activePhoto.postId || !onLoadPostLikers) return;
-
-        const requestID = postLikersRequestIDRef.current + 1;
-        postLikersRequestIDRef.current = requestID;
-        setPostLikersOpen(true);
-        setPostLikersLoading(true);
-        setPostLikersError(null);
-
-        void onLoadPostLikers(activePhoto.postId)
-            .then((likers) => {
-                if (postLikersRequestIDRef.current == requestID) {
-                    setPostLikers(likers);
-                }
-            })
-            .catch((error: unknown) => {
-                console.error("Failed to load post likers", error);
-                if (postLikersRequestIDRef.current == requestID) {
-                    setPostLikers([]);
-                    setPostLikersError(
-                        "Couldn't load likes. Please try again.",
-                    );
-                }
-            })
-            .finally(() => {
-                if (postLikersRequestIDRef.current == requestID) {
-                    setPostLikersLoading(false);
-                }
-            });
-    };
-
-    const closePostLikers = () => {
-        postLikersRequestIDRef.current += 1;
-        setPostLikersOpen(false);
-        setPostLikersLoading(false);
     };
 
     const closeActions = () => setActionsAnchor(null);
@@ -713,12 +654,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
     ]);
 
     React.useEffect(() => {
-        postLikersRequestIDRef.current += 1;
         setPhotoLikePopID(0);
-        setPostLikers([]);
-        setPostLikersError(null);
-        setPostLikersLoading(false);
-        setPostLikersOpen(false);
     }, [activePhoto.imageUrl, activePhoto.postId]);
 
     React.useEffect(() => {
@@ -937,7 +873,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 
     React.useEffect(() => {
         const closeOnEscape = (event: KeyboardEvent) => {
-            if (deleteSheetOpen || postLikersOpen) return;
+            if (deleteSheetOpen) return;
             if (event.key != "Escape") return;
 
             onCloseRef.current();
@@ -945,7 +881,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 
         window.addEventListener("keydown", closeOnEscape);
         return () => window.removeEventListener("keydown", closeOnEscape);
-    }, [deleteSheetOpen, postLikersOpen]);
+    }, [deleteSheetOpen]);
 
     return (
         <Box
@@ -1025,37 +961,13 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     >
                         <Box
                             sx={{
-                                bgcolor: avatarSkeletonBackground,
                                 borderRadius: "50%",
                                 height: viewerHeaderAvatarSize,
                                 overflow: "hidden",
                                 width: viewerHeaderAvatarSize,
                             }}
                         >
-                            {activePhoto.avatarUrl ? (
-                                <Box
-                                    component="img"
-                                    alt=""
-                                    src={activePhoto.avatarUrl}
-                                    sx={{
-                                        display: "block",
-                                        height: "100%",
-                                        objectFit: "cover",
-                                        objectPosition: "center",
-                                        width: "100%",
-                                    }}
-                                />
-                            ) : (
-                                <Skeleton
-                                    variant="circular"
-                                    sx={{
-                                        bgcolor: avatarSkeletonBackground,
-                                        height: "100%",
-                                        transform: "none",
-                                        width: "100%",
-                                    }}
-                                />
-                            )}
+                            <SpaceAvatarImage src={activePhoto.avatarUrl} />
                         </Box>
                     </Box>
                     <Box
@@ -1768,84 +1680,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     </Box>
                 </Box>
             )}
-            {showPhotoLikeCountButton && (
-                <Box
-                    data-space-viewer-bottom="true"
-                    sx={{
-                        bottom: "max(24px, calc(env(safe-area-inset-bottom) + 16px))",
-                        position: "fixed",
-                        right: "16px",
-                        zIndex: 2,
-                    }}
-                >
-                    <Box
-                        component="button"
-                        type="button"
-                        aria-label={`View ${activePhoto.likeCount ?? 0} likes`}
-                        disabled={!activePhoto.postId || !onLoadPostLikers}
-                        onClick={openPostLikers}
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: "transparent",
-                            border: 0,
-                            borderRadius: "8px",
-                            color: viewerLikeCountText,
-                            cursor:
-                                activePhoto.postId && onLoadPostLikers
-                                    ? "pointer"
-                                    : "default",
-                            display: "inline-flex",
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 750,
-                            height: 48,
-                            gap: "5px",
-                            justifyContent: "center",
-                            lineHeight: "20px",
-                            minWidth: 48,
-                            p: 0,
-                            px: "2px",
-                            "&:disabled": { opacity: 1 },
-                            "&:focus-visible": {
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                            "&:hover": { bgcolor: "transparent" },
-                        }}
-                    >
-                        <Box
-                            component="span"
-                            sx={{
-                                alignItems: "center",
-                                display: "flex",
-                                lineHeight: 0,
-                            }}
-                        >
-                            <HugeiconsIcon
-                                fill="none"
-                                icon={FavouriteIcon}
-                                primaryColor="currentColor"
-                                size={24}
-                                strokeWidth={1.8}
-                            />
-                        </Box>
-                        <Box
-                            component="span"
-                            sx={{
-                                color: "currentColor",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 14,
-                                fontWeight: 750,
-                                lineHeight: "20px",
-                                transform: "translateY(0.5px)",
-                            }}
-                        >
-                            {activePhoto.likeCount ?? 0}
-                        </Box>
-                    </Box>
-                </Box>
-            )}
             {canDeletePost && (
                 <ConfirmationActionSheet
                     appearance="dark"
@@ -1871,13 +1705,6 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     onConfirm={confirmAddFriendForPostAction}
                 />
             )}
-            <SpacePostLikersDialog
-                errorMessage={postLikersError}
-                likers={postLikers}
-                loading={postLikersLoading}
-                open={postLikersOpen}
-                onClose={closePostLikers}
-            />
         </Box>
     );
 };

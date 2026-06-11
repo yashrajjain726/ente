@@ -8,16 +8,12 @@ export const spacePostLikeButtonPop = keyframes`
         transform: scale(1);
     }
 
-    24% {
-        transform: scale(0.88);
+    36% {
+        transform: scale(1.045);
     }
 
-    55% {
-        transform: scale(1.16);
-    }
-
-    78% {
-        transform: scale(0.97);
+    68% {
+        transform: scale(0.99);
     }
 
     100% {

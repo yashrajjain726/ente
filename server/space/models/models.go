@@ -58,11 +58,6 @@ type ListMessagesRequest struct {
 	Limit  int    `form:"limit"`
 }
 
-type ListNotificationsRequest struct {
-	Cursor string `form:"cursor"`
-	Limit  int    `form:"limit"`
-}
-
 type ListMessageThreadRequest struct {
 	Cursor string `form:"cursor"`
 	Limit  int    `form:"limit"`
@@ -88,9 +83,10 @@ type SpaceKeyResponse struct {
 }
 
 type PresignUploadRequest struct {
-	Size    int64   `json:"size" binding:"required"`
-	Purpose *string `json:"purpose,omitempty"`
-	SpaceID *string `json:"spaceId,omitempty"`
+	Size       int64   `json:"size" binding:"required"`
+	ContentMD5 string  `json:"contentMD5" binding:"required"`
+	Purpose    *string `json:"purpose,omitempty"`
+	SpaceID    *string `json:"spaceId,omitempty"`
 }
 
 type PresignUploadResponse struct {
@@ -330,19 +326,30 @@ type LikeMessageResponse struct {
 }
 
 type MessageResponse struct {
-	MessageID           string             `json:"messageId"`
-	Kind                string             `json:"kind"`
-	Sender              SpaceActorResponse `json:"sender"`
-	Recipient           SpaceActorResponse `json:"recipient"`
-	MessageCipher       string             `json:"messageCipher,omitempty"`
-	EncryptedMessageKey string             `json:"encryptedMessageKey,omitempty"`
-	ReplyPostID         *int64             `json:"replyPostId,omitempty"`
-	ReplyMessageID      *string            `json:"replyMessageId,omitempty"`
-	Likes               int64              `json:"likes"`
-	ViewerLiked         bool               `json:"viewerLiked"`
-	IsDeleted           bool               `json:"isDeleted"`
-	CreatedAt           string             `json:"createdAt"`
-	UpdatedAt           string             `json:"updatedAt"`
+	MessageID           string                `json:"messageId"`
+	Kind                string                `json:"kind"`
+	Sender              SpaceActorResponse    `json:"sender"`
+	Recipient           SpaceActorResponse    `json:"recipient"`
+	MessageCipher       string                `json:"messageCipher,omitempty"`
+	EncryptedMessageKey string                `json:"encryptedMessageKey,omitempty"`
+	Text                string                `json:"text,omitempty"`
+	Quote               *MessageQuoteResponse `json:"quote,omitempty"`
+	ReplyPostID         *int64                `json:"replyPostId,omitempty"`
+	ReplyMessageID      *string               `json:"replyMessageId,omitempty"`
+	Likes               int64                 `json:"likes"`
+	ViewerLiked         bool                  `json:"viewerLiked"`
+	IsDeleted           bool                  `json:"isDeleted"`
+	CreatedAt           string                `json:"createdAt"`
+	UpdatedAt           string                `json:"updatedAt"`
+}
+
+type MessageQuoteResponse struct {
+	PostID           int64  `json:"postId"`
+	SpaceID          string `json:"spaceId"`
+	EncryptedPostKey string `json:"encryptedPostKey,omitempty"`
+	CaptionCipher    string `json:"captionCipher,omitempty"`
+	KeyVersion       int    `json:"keyVersion,omitempty"`
+	ObjectKey        string `json:"objectKey,omitempty"`
 }
 
 type MessagePage struct {
@@ -351,10 +358,11 @@ type MessagePage struct {
 }
 
 type MessageConversationResponse struct {
-	Friend         SpaceActorResponse                   `json:"friend"`
-	LatestActivity *MessageConversationActivityResponse `json:"latestActivity,omitempty"`
-	Unread         bool                                 `json:"unread"`
-	UnreadCount    int64                                `json:"unreadCount"`
+	Friend             SpaceActorResponse                  `json:"friend"`
+	LatestActivity     MessageConversationActivityResponse `json:"latestActivity"`
+	Unread             bool                                `json:"unread"`
+	UnreadCount        int64                               `json:"unreadCount"`
+	NotificationUnread bool                                `json:"notificationUnread"`
 }
 
 type MessageConversationActivityResponse struct {
@@ -378,20 +386,6 @@ type MessageConversationPostResponse struct {
 type MessageConversationPage struct {
 	Items      []MessageConversationResponse `json:"items"`
 	NextCursor string                        `json:"nextCursor,omitempty"`
-}
-
-type SpaceNotificationResponse struct {
-	ID        string                           `json:"id"`
-	Type      string                           `json:"type"`
-	CreatedAt string                           `json:"createdAt"`
-	Unread    bool                             `json:"unread"`
-	Actor     SpaceActorResponse               `json:"actor"`
-	Post      *MessageConversationPostResponse `json:"post,omitempty"`
-}
-
-type SpaceNotificationPage struct {
-	Items      []SpaceNotificationResponse `json:"items"`
-	NextCursor string                      `json:"nextCursor,omitempty"`
 }
 
 type PostObjectPayload struct {
@@ -418,15 +412,9 @@ type PostResponse struct {
 
 type SpaceUnreadStatusResponse struct {
 	NotificationsUnread bool `json:"notificationsUnread"`
-	MessagesUnread      bool `json:"messagesUnread"`
-	MessageLikesUnread  bool `json:"messageLikesUnread"`
 }
 
 type MarkNotificationsReadRequest struct {
-	ReadAt string `json:"readAt,omitempty"`
-}
-
-type MarkMessageThreadReadRequest struct {
 	FriendSpaceID string `json:"friendSpaceId"`
 }
 

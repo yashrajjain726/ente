@@ -12,10 +12,10 @@ import (
 
 const (
 	spaceNotificationTemplate          = "space_notification.html"
-	spaceNewPostIllustrationURL        = "https://email-assets.ente.com/space-new-post.svg"
-	spaceNewPostLikeIllustrationURL    = "https://email-assets.ente.com/space-new-post-like.svg"
-	spaceNewPostReplyIllustrationURL   = "https://email-assets.ente.com/space-new-post-reply.svg"
-	spaceNewFriendIllustrationURL      = "https://email-assets.ente.com/space-new-friend.svg"
+	spaceNewPostIllustrationURL        = "https://email-assets.ente.com/space-new-post.png"
+	spaceNewPostLikeIllustrationURL    = "https://email-assets.ente.com/space-new-post-like.png"
+	spaceNewPostReplyIllustrationURL   = "https://email-assets.ente.com/space-new-post-reply.png"
+	spaceNewFriendIllustrationURL      = "https://email-assets.ente.com/space-new-friend.png"
 	spaceNotificationPostCreated       = "post_created"
 	spaceNotificationPostLiked         = "post_liked"
 	spaceNotificationPostReplied       = "post_replied"

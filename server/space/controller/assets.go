@@ -1,7 +1,10 @@
 package controller
 
 import (
+	"crypto/md5"
 	"database/sql"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -51,6 +54,10 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	if req.Size <= 0 || req.Size > maxUploadBytes {
 		return nil, ente.NewBadRequestWithMessage(fmt.Sprintf("size must be between 1 and %d bytes", maxUploadBytes))
 	}
+	contentMD5, err := normalizeContentMD5(req.ContentMD5)
+	if err != nil {
+		return nil, err
+	}
 	var spaceID sql.NullString
 	switch purpose {
 	case uploadPurposePost:
@@ -91,6 +98,7 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 		Bucket:        bucket,
 		Key:           aws.String(objectKey),
 		ContentLength: aws.Int64(req.Size),
+		ContentMD5:    aws.String(contentMD5),
 		ContentType:   aws.String(uploadContentType),
 	}
 	putReq, _ := s3Client.PutObjectRequest(input)
@@ -113,10 +121,30 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	return &models.PresignUploadResponse{
 		URL:       url,
 		Method:    "PUT",
-		Headers:   map[string]string{"Content-Type": uploadContentType},
+		Headers:   map[string]string{"Content-Type": uploadContentType, "Content-MD5": contentMD5},
 		ObjectKey: objectKey,
 		ExpiresIn: int(uploadURLExpiry.Seconds()),
 	}, nil
+}
+
+func normalizeContentMD5(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", ente.NewBadRequestWithMessage("contentMD5 is required")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(trimmed)
+	if err != nil || len(decoded) != md5.Size {
+		hexDecoded, hexErr := hex.DecodeString(trimmed)
+		if hexErr == nil {
+			decoded = hexDecoded
+		} else if err != nil {
+			return "", ente.NewBadRequestWithMessage("contentMD5 must be base64 or hex encoded")
+		}
+	}
+	if len(decoded) != md5.Size {
+		return "", ente.NewBadRequestWithMessage("contentMD5 must be exactly 16 bytes")
+	}
+	return base64.StdEncoding.EncodeToString(decoded), nil
 }
 
 func maxUploadBytesForPurpose(purpose string) (int64, error) {

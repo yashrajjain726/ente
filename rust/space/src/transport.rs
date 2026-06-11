@@ -66,6 +66,8 @@ pub struct SpaceKeyResponse {
 #[serde(rename_all = "camelCase")]
 pub struct PresignUploadRequest {
     pub size: i64,
+    #[serde(rename = "contentMD5")]
+    pub content_md5: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -132,13 +134,6 @@ pub struct LikePostResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MarkNotificationsReadRequest {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub read_at: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MarkMessageThreadReadRequest {
     pub friend_space_id: String,
 }
 
@@ -146,8 +141,6 @@ pub struct MarkMessageThreadReadRequest {
 #[serde(rename_all = "camelCase")]
 pub struct SpaceUnreadStatusResponse {
     pub notifications_unread: bool,
-    pub messages_unread: bool,
-    pub message_likes_unread: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -175,6 +168,21 @@ pub struct CreateMessageRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MessageQuoteResponse {
+    pub post_id: i64,
+    pub space_id: String,
+    #[serde(default)]
+    pub encrypted_post_key: String,
+    #[serde(default)]
+    pub caption_cipher: String,
+    #[serde(default)]
+    pub key_version: i32,
+    #[serde(default)]
+    pub object_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MessageResponse {
     pub message_id: String,
     pub kind: String,
@@ -184,6 +192,10 @@ pub struct MessageResponse {
     pub message_cipher: String,
     #[serde(default)]
     pub encrypted_message_key: String,
+    #[serde(default)]
+    pub text: String,
+    #[serde(default)]
+    pub quote: Option<MessageQuoteResponse>,
     #[serde(default)]
     pub reply_post_id: Option<i64>,
     #[serde(default)]
@@ -210,12 +222,13 @@ pub struct MessagePage {
 #[serde(rename_all = "camelCase")]
 pub struct MessageConversationResponse {
     pub friend: SpaceActorResponse,
-    #[serde(default)]
-    pub latest_activity: Option<MessageConversationActivity>,
+    pub latest_activity: MessageConversationActivity,
     #[serde(default)]
     pub unread: bool,
     #[serde(default)]
     pub unread_count: i64,
+    #[serde(default)]
+    pub notification_unread: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -251,28 +264,6 @@ pub struct MessageConversationPost {
 #[serde(rename_all = "camelCase")]
 pub struct MessageConversationPage {
     pub items: Vec<MessageConversationResponse>,
-    #[serde(default)]
-    pub next_cursor: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SpaceNotificationResponse {
-    pub id: String,
-    #[serde(rename = "type")]
-    pub notification_type: String,
-    pub created_at: String,
-    #[serde(default)]
-    pub unread: bool,
-    pub actor: SpaceActorResponse,
-    #[serde(default)]
-    pub post: Option<MessageConversationPost>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SpaceNotificationPage {
-    pub items: Vec<SpaceNotificationResponse>,
     #[serde(default)]
     pub next_cursor: String,
 }

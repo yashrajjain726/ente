@@ -146,30 +146,31 @@ type SpaceMessageRecord struct {
 	Likes               int64
 	ViewerLiked         bool
 	IsDeleted           bool
+	Text                string
+	Quote               *SpaceMessageQuoteRecord
 	CreatedAt           int64
 	UpdatedAt           int64
 	Sender              SpaceActorRecord
 	Recipient           SpaceActorRecord
 }
 
-type SpaceMessageConversationRecord struct {
-	Friend         SpaceActorRecord
-	LatestActivity SpaceMessageConversationActivityRecord
-	Unread         bool
-	UnreadCount    int64
-	SortCreatedAt  int64
-	SortID         string
+type SpaceMessageQuoteRecord struct {
+	PostID           int64
+	SpaceID          string
+	EncryptedPostKey string
+	CaptionCipher    string
+	KeyVersion       int
+	ObjectKey        sql.NullString
 }
 
-type SpaceNotificationRecord struct {
-	ID            string
-	Type          string
-	CreatedAt     int64
-	Unread        bool
-	Actor         SpaceActorRecord
-	Post          *SpaceMessageConversationPostRecord
-	SortCreatedAt int64
-	SortID        string
+type SpaceMessageConversationRecord struct {
+	Friend             SpaceActorRecord
+	LatestActivity     SpaceMessageConversationActivityRecord
+	Unread             bool
+	UnreadCount        int64
+	NotificationUnread bool
+	SortCreatedAt      int64
+	SortID             string
 }
 
 type SpaceMessageConversationActivityRecord struct {

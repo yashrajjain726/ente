@@ -30,14 +30,13 @@ const parentRoutePaths = (path: string) => {
     if (/^\/app\/friends\/[^/]+$/.test(path)) return ["/app/friends"];
     if (/^\/app\/messages\/[^/]+$/.test(path)) return ["/app/messages"];
     if (/^\/app\/posts\/[^/]+\/[^/]+$/.test(path)) {
-        return ["/app", "/app/notifications"];
+        return ["/app"];
     }
 
     return (
         {
             "/app/friends": ["/app/profile"],
             "/app/messages": ["/app"],
-            "/app/notifications": ["/app"],
             "/app/profile": ["/app"],
             "/app/profile/cover": ["/app/profile"],
             "/app/profile/cover-edit": ["/app/profile/cover"],

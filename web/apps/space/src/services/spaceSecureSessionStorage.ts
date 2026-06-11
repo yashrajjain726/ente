@@ -79,14 +79,8 @@ const splitSecret = (
         shareB[i] = shareB[i]! ^ secretBytes[i]!;
     }
     return [
-        {
-            length: secretBytes.length,
-            share: bytesToBase64(shareA),
-        },
-        {
-            length: secretBytes.length,
-            share: bytesToBase64(shareB),
-        },
+        { length: secretBytes.length, share: bytesToBase64(shareA) },
+        { length: secretBytes.length, share: bytesToBase64(shareB) },
     ];
 };
 
