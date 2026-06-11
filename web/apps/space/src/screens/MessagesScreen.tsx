@@ -11,9 +11,9 @@ import {
     MenuItem,
     MenuList,
     Popper,
-    Skeleton,
     Tooltip,
 } from "@mui/material";
+import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { formatTimeAgo } from "ente-base/date";
@@ -33,7 +33,6 @@ import { clampSpaceMessageText } from "utils/spaceMessageLimits";
 export const messagesBackground = "#FFFFFF";
 
 const green = "#08C225";
-const avatarSkeletonBackground = "#E6E6E6";
 const textBase = "#000000";
 const textSecondary = "#777777";
 const lightSurface = "#F2F2F2";
@@ -129,7 +128,6 @@ const Avatar: React.FC<{ avatarUrl?: string | null; size: number }> = ({
     <Box
         sx={{
             alignItems: "center",
-            bgcolor: avatarSkeletonBackground,
             borderRadius: "50%",
             display: "flex",
             flexShrink: 0,
@@ -139,30 +137,7 @@ const Avatar: React.FC<{ avatarUrl?: string | null; size: number }> = ({
             width: size,
         }}
     >
-        {avatarUrl ? (
-            <Box
-                component="img"
-                alt=""
-                src={avatarUrl}
-                sx={{
-                    display: "block",
-                    height: "100%",
-                    objectFit: "cover",
-                    objectPosition: "center",
-                    width: "100%",
-                }}
-            />
-        ) : (
-            <Skeleton
-                variant="circular"
-                sx={{
-                    bgcolor: avatarSkeletonBackground,
-                    height: "100%",
-                    transform: "none",
-                    width: "100%",
-                }}
-            />
-        )}
+        <SpaceAvatarImage src={avatarUrl} />
     </Box>
 );
 

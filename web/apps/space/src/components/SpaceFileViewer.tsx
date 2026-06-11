@@ -8,9 +8,10 @@ import {
     Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Menu, MenuItem, Skeleton } from "@mui/material";
+import { Box, Menu, MenuItem } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import { ConfirmationActionSheet } from "components/ConfirmationActionSheet";
+import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import {
     spaceActionDoneDurationMs,
     type SpaceActionPhase,
@@ -31,7 +32,6 @@ import { clampSpaceMessageText } from "utils/spaceMessageLimits";
 import type { SpaceImageCropArea } from "utils/spacePostImage";
 
 const green = "#08C225";
-const avatarSkeletonBackground = "#E6E6E6";
 const textBase = "#F4F4F4";
 const viewerLikeCountText = "#D8D8D8";
 const textSecondary = "#A6A6A6";
@@ -1025,37 +1025,13 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
                     >
                         <Box
                             sx={{
-                                bgcolor: avatarSkeletonBackground,
                                 borderRadius: "50%",
                                 height: viewerHeaderAvatarSize,
                                 overflow: "hidden",
                                 width: viewerHeaderAvatarSize,
                             }}
                         >
-                            {activePhoto.avatarUrl ? (
-                                <Box
-                                    component="img"
-                                    alt=""
-                                    src={activePhoto.avatarUrl}
-                                    sx={{
-                                        display: "block",
-                                        height: "100%",
-                                        objectFit: "cover",
-                                        objectPosition: "center",
-                                        width: "100%",
-                                    }}
-                                />
-                            ) : (
-                                <Skeleton
-                                    variant="circular"
-                                    sx={{
-                                        bgcolor: avatarSkeletonBackground,
-                                        height: "100%",
-                                        transform: "none",
-                                        width: "100%",
-                                    }}
-                                />
-                            )}
+                            <SpaceAvatarImage src={activePhoto.avatarUrl} />
                         </Box>
                     </Box>
                     <Box

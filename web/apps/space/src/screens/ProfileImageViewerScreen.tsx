@@ -1,6 +1,7 @@
 import { ArrowLeft02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
+import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import React, { useRef } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import { spaceTouchTargetSize } from "styles/touchTargets";
@@ -35,6 +36,8 @@ export const ProfileImageViewerScreen: React.FC<
         : "Change profile picture";
     const imageUrl = isCover ? profile.coverUrl : profile.avatarUrl;
     const isCoverURLPending = isCover && Boolean(profile.coverObjectKey);
+    const isAvatarURLPending =
+        !isCover && Boolean(profile.avatarObjectKey) && !imageUrl;
     const displayImageUrl =
         isCover && !imageUrl
             ? isCoverURLPending
@@ -203,20 +206,7 @@ export const ProfileImageViewerScreen: React.FC<
                                 width: "min(64vw, 240px)",
                             }}
                         >
-                            {displayImageUrl ? (
-                                <Box
-                                    component="img"
-                                    alt=""
-                                    src={displayImageUrl}
-                                    sx={{
-                                        display: "block",
-                                        height: "100%",
-                                        objectFit: "cover",
-                                        objectPosition: "center",
-                                        width: "100%",
-                                    }}
-                                />
-                            ) : (
+                            {isAvatarURLPending ? (
                                 <Skeleton
                                     variant="circular"
                                     sx={{
@@ -227,6 +217,8 @@ export const ProfileImageViewerScreen: React.FC<
                                         width: "100%",
                                     }}
                                 />
+                            ) : (
+                                <SpaceAvatarImage src={displayImageUrl} />
                             )}
                         </Box>
                     )}

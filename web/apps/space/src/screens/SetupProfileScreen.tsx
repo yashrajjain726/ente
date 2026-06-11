@@ -1,6 +1,5 @@
-import { User02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { Box } from "@mui/material";
+import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import { SpaceAvatarCropPage } from "components/SpaceAvatarCropPage";
 import { SpaceAvatarEditButton } from "components/SpaceAvatarEditButton";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
@@ -21,17 +20,6 @@ const textBase = "#000";
 const textLight = "#969696";
 const warning = "#F63A3A";
 const setupProfileFormID = "space-setup-profile-form";
-const filledUser02BodyPath =
-    "M18.5 20V16.5C18.5 15.2577 17.9407 14.0395 16.8103 13.5242C15.4315 12.8957 13.7779 12.5296 12 12.5296C10.2221 12.5296 8.5685 12.8957 7.18968 13.5242C6.05927 14.0395 5.5 15.2577 5.5 16.5V20";
-const filledUserIcon = User02Icon.map(([tag, attrs]) => [
-    tag,
-    {
-        ...attrs,
-        d: attrs.key == "0" ? filledUser02BodyPath : attrs.d,
-        fill: "currentColor",
-        stroke: "none",
-    },
-]) as IconSvgElement;
 
 export interface SetupProfile {
     avatarUrl: string | null;
@@ -94,27 +82,11 @@ const BackIcon: React.FC = () => (
 );
 
 const AvatarPlaceholder: React.FC = () => (
-    <Box
+    <SpaceAvatarImage
         aria-hidden
-        sx={{
-            alignItems: "center",
-            bgcolor: "#C8D2DB",
-            border: "4px solid white",
-            borderRadius: "50%",
-            color: "white",
-            display: "flex",
-            height: "100%",
-            justifyContent: "center",
-            overflow: "hidden",
-            width: "100%",
-        }}
-    >
-        <HugeiconsIcon
-            icon={filledUserIcon}
-            size={120}
-            style={{ transform: "translateY(18px)" }}
-        />
-    </Box>
+        border="4px solid white"
+        borderRadius="50%"
+    />
 );
 
 const CheckIcon: React.FC = () => (

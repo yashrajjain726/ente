@@ -13,6 +13,7 @@ import {
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
+import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
 import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
 import {
@@ -171,10 +172,11 @@ type FeedTimestampStatus = "failed" | "posted" | "posting";
 
 interface FeedItemProps {
     aspectRatio: number;
-    avatarUrl?: string | null;
+    avatarUrl: string | null;
     caption?: string;
     friendID: string;
     imageUrl?: string;
+    isAvatarPending: boolean;
     isOwnPost: boolean;
     likeCount?: number;
     name: string;
@@ -637,6 +639,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     caption,
     friendID,
     imageUrl,
+    isAvatarPending,
     isOwnPost,
     likeCount = 0,
     name,
@@ -655,7 +658,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const [isLiked, setIsLiked] = useState(viewerLiked);
     const [likePopID, setLikePopID] = useState(0);
     const [shouldLoadMedia, setShouldLoadMedia] = useState(
-        Boolean(imageUrl) && avatarUrl !== undefined,
+        Boolean(imageUrl) && !isAvatarPending,
     );
     const rootRef = React.useRef<HTMLElement | null>(null);
     const firstName = firstNameFrom(name);
@@ -686,7 +689,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
         (decodedPhoto.ready ? decodedPhoto.src : imageUrl) ?? undefined;
     const displayAvatarUrl =
         (decodedAvatar.ready ? decodedAvatar.src : avatarUrl) ?? undefined;
-    const isAvatarReady = avatarUrl !== undefined && decodedAvatar.ready;
+    const isAvatarReady = !isAvatarPending && decodedAvatar.ready;
     const photoDimensions =
         loadedPhotoDimensions && loadedPhotoDimensions.src == displayImageUrl
             ? loadedPhotoDimensions
@@ -789,10 +792,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
         if (!imageUrl) {
             void onLoadImage?.();
         }
-        if (avatarUrl === undefined) {
+        if (isAvatarPending) {
             void onLoadAvatar?.();
         }
-    }, [avatarUrl, imageUrl, onLoadAvatar, onLoadImage, shouldLoadMedia]);
+    }, [imageUrl, isAvatarPending, onLoadAvatar, onLoadImage, shouldLoadMedia]);
 
     React.useEffect(() => {
         if (!decodedPhotoHeight || !decodedPhotoWidth) return;
@@ -967,31 +970,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             },
                         }}
                     >
-                        {displayAvatarUrl ? (
-                            <Box
-                                component="img"
-                                alt=""
-                                src={displayAvatarUrl}
-                                sx={{
-                                    borderRadius: "50%",
-                                    display: "block",
-                                    height: "100%",
-                                    objectFit: "cover",
-                                    objectPosition: "center",
-                                    width: "100%",
-                                }}
-                            />
-                        ) : (
-                            <Skeleton
-                                variant="circular"
-                                sx={{
-                                    bgcolor: feedSkeletonElementBackground,
-                                    height: "100%",
-                                    transform: "none",
-                                    width: "100%",
-                                }}
-                            />
-                        )}
+                        <SpaceAvatarImage
+                            src={displayAvatarUrl}
+                            borderRadius="50%"
+                        />
                         <Box
                             aria-hidden
                             sx={{
@@ -1654,23 +1636,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     ) => {
         const imageUrl = loadedFeedImageURLFor(item);
         const avatarUrl = loadedFeedAvatarURLFor(item);
+        const isAvatarPending = avatarUrl === undefined;
         return (
             <FeedItem
                 key={key}
                 aspectRatio={
                     item.width && item.height ? item.width / item.height : 1
                 }
-                avatarUrl={avatarUrl}
+                avatarUrl={avatarUrl ?? null}
                 caption={item.caption}
                 friendID={item.friendID}
                 imageUrl={imageUrl}
+                isAvatarPending={isAvatarPending}
                 isOwnPost={
                     Boolean(profileSpaceId) && item.spaceId == profileSpaceId
                 }
                 likeCount={item.likeCount}
                 name={item.name}
                 onLoadAvatar={
-                    avatarUrl === undefined
+                    isAvatarPending
                         ? () => loadFeedPostAvatar(item)
                         : undefined
                 }
@@ -1708,6 +1692,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 caption={item.caption}
                 friendID={item.friendID}
                 imageUrl={item.imageUrl}
+                isAvatarPending={false}
                 isOwnPost
                 name={item.name}
                 onOpenProfile={onOpenProfile}
@@ -2029,19 +2014,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 width: headerAvatarSize,
                             }}
                         >
-                            {profile?.avatarUrl ? (
-                                <Box
-                                    component="img"
-                                    alt=""
+                            {profile &&
+                            (profile.avatarUrl || !profile.avatarObjectKey) ? (
+                                <SpaceAvatarImage
                                     src={profile.avatarUrl}
-                                    sx={{
-                                        borderRadius: "50%",
-                                        display: "block",
-                                        height: "100%",
-                                        objectFit: "cover",
-                                        objectPosition: "center",
-                                        width: "100%",
-                                    }}
+                                    borderRadius="50%"
                                 />
                             ) : (
                                 <Skeleton

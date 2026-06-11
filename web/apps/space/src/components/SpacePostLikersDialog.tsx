@@ -1,4 +1,5 @@
 import { Box, CircularProgress, Dialog, useMediaQuery } from "@mui/material";
+import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import { SpaceBottomSheetTransition } from "components/SpaceBottomSheetTransition";
 import React from "react";
 import type { SpacePostLiker } from "services/space";
@@ -210,20 +211,7 @@ const SpacePostLikerRow: React.FC<{
                     width: 28,
                 }}
             >
-                {profile.avatarUrl ? (
-                    <Box
-                        component="img"
-                        alt=""
-                        src={profile.avatarUrl}
-                        sx={{
-                            display: "block",
-                            height: "100%",
-                            objectFit: "cover",
-                            objectPosition: "center",
-                            width: "100%",
-                        }}
-                    />
-                ) : null}
+                <SpaceAvatarImage src={profile.avatarUrl} />
             </Box>
             <Box
                 sx={{

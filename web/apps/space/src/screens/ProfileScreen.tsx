@@ -5,6 +5,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
+import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import {
     SpaceFileViewer,
     SpaceViewerFeedBackdrop,
@@ -1198,19 +1199,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 },
                             }}
                         >
-                            {profile.avatarUrl ? (
-                                <Box
-                                    component="img"
-                                    alt=""
-                                    src={profile.avatarUrl}
-                                    sx={{
-                                        display: "block",
-                                        height: "100%",
-                                        objectFit: "cover",
-                                        objectPosition: "center",
-                                        width: "100%",
-                                    }}
-                                />
+                            {profile.avatarUrl || !profile.avatarObjectKey ? (
+                                <SpaceAvatarImage src={profile.avatarUrl} />
                             ) : (
                                 <Skeleton
                                     variant="circular"
