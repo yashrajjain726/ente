@@ -528,7 +528,9 @@ async fn message_response_quote_to_js(
                 quote.key_version,
                 &quote.caption_cipher,
             )
-            .await?,
+            .await
+            .ok()
+            .flatten(),
             "caption",
         )?
     } else {
