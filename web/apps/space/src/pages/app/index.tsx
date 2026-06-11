@@ -7,7 +7,6 @@ import {
     createCurrentProfileLink,
     deleteCurrentPost,
     loadCurrentFeedPage,
-    loadCurrentPostLikers,
     loadCurrentSpaceFriends,
     loadCurrentSpacePostAssetURL,
     loadCurrentSpacePostAvatarURL,
@@ -288,7 +287,6 @@ const Page: React.FC = () => {
                 onLoadMoreFeedItems={loadMoreFeedItems}
                 onLoadPostAvatar={loadCurrentSpacePostAvatarURL}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
-                onLoadPostLikers={loadCurrentPostLikers}
                 onOpenMessages={() => void router.push(spaceRoutes.messages)}
                 onOpenProfile={
                     profile

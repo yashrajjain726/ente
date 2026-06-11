@@ -29,7 +29,6 @@ export const profilePostGroupsFromPosts = (
             id: String(post.postId),
             imageAsset: post.imageAsset,
             imageUrl: post.imageUrl,
-            likeCount: post.likeCount,
             name: post.name,
             postId: post.postId,
             timestampMs: post.timestampMs,

@@ -12,7 +12,6 @@ import {
 import { normalizeSpaceMessageText } from "utils/spaceMessageLimits";
 
 const currentFeedPageSize = 10;
-const postLikersPageSize = 100;
 
 interface SpaceAvatar {
     objectKey: string;
@@ -64,7 +63,6 @@ interface SpacePostResponse {
     createdAt: string;
     encryptedPostKey: string;
     keyVersion: number;
-    likes?: number;
     objects?: SpacePostObject[];
     postId: number;
     viewerLiked: boolean;
@@ -74,16 +72,6 @@ interface SpacePostResponse {
 
 interface SpacePostPageResponse {
     items?: SpacePostResponse[];
-    nextCursor?: string;
-}
-
-interface SpacePostLikerResponse {
-    actor: SpaceActor;
-    createdAt: string;
-}
-
-interface SpacePostLikersPageResponse {
-    likers?: SpacePostLikerResponse[];
     nextCursor?: string;
 }
 
@@ -175,7 +163,6 @@ interface SpacePostBase {
     caption?: string;
     friendID: string;
     height?: number;
-    likeCount: number;
     name: string;
     postId: number;
     timestampMs: number;
@@ -212,15 +199,6 @@ export interface SpaceProfilePostPage {
     items: SpaceProfilePost[];
     nextCursor?: string;
 }
-
-export interface SpacePostLiker {
-    createdAtMs: number;
-    profile: FriendProfile;
-}
-
-export type SpacePostLikersLoader = (
-    postId: number,
-) => Promise<SpacePostLiker[]>;
 
 export type SpacePostAssetURLLoader = (
     asset: SpacePostAsset,
@@ -682,7 +660,6 @@ const postFromAccountPost = async (
         height: object.height,
         imageAsset: postAssetFrom(post, object),
         imageUrl,
-        likeCount: post.likes ?? 0,
         name: author.fullName || author.username,
         postId: post.postId,
         timestampMs: timestampMsFromSpaceDate(post.createdAt),
@@ -708,7 +685,6 @@ const profilePostFromPost = (
         friendID: author.id,
         height: object.height,
         imageAsset: postAssetFrom(post, object),
-        likeCount: post.likes ?? 0,
         name: author.fullName || author.username,
         postId: post.postId,
         timestampMs: timestampMsFromSpaceDate(post.createdAt),
@@ -741,19 +717,6 @@ const profilePostPageFromPage = (
         .filter((post): post is SpaceProfilePost => Boolean(post)),
     nextCursor: page.nextCursor || undefined,
 });
-
-const postLikerFromResponse = async (
-    ctx: SpaceAccountCtxHandle,
-    liker: SpacePostLikerResponse,
-): Promise<SpacePostLiker> => {
-    const profile = actorProfile(liker.actor);
-    profile.avatarUrl = await accountAvatarURL(
-        ctx,
-        liker.actor.spaceId,
-        liker.actor.avatar,
-    );
-    return { createdAtMs: timestampMsFromSpaceDate(liker.createdAt), profile };
-};
 
 const messageQuoteFromSpaceQuote = async (
     ctx: SpaceAccountCtxHandle,
@@ -1006,9 +969,7 @@ export const loadCurrentUnreadStatus = async (): Promise<SpaceUnreadStatus> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
         const status = (await ctx.unread_status()) as SpaceUnreadStatusResponse;
-        return {
-            messagesUnread: status.notificationsUnread,
-        };
+        return { messagesUnread: status.notificationsUnread };
     } finally {
         releaseCurrentSpaceContext(ctx);
     }
@@ -1155,34 +1116,6 @@ export const setCurrentPostLiked = async (postId: number, liked: boolean) => {
     const ctx = await ensureCurrentSpaceContext();
     try {
         await ctx.like_post(BigInt(postId), liked);
-    } finally {
-        releaseCurrentSpaceContext(ctx);
-    }
-};
-
-export const loadCurrentPostLikers = async (
-    postId: number,
-): Promise<SpacePostLiker[]> => {
-    const ctx = await ensureCurrentSpaceContext();
-    try {
-        const likers: SpacePostLiker[] = [];
-        let cursor: string | undefined;
-        do {
-            const page = (await ctx.list_post_likers(
-                BigInt(postId),
-                cursor ?? null,
-                postLikersPageSize,
-            )) as SpacePostLikersPageResponse;
-            likers.push(
-                ...(await Promise.all(
-                    (page.likers ?? []).map((liker) =>
-                        postLikerFromResponse(ctx, liker),
-                    ),
-                )),
-            );
-            cursor = page.nextCursor || undefined;
-        } while (cursor);
-        return likers;
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

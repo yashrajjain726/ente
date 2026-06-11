@@ -3,7 +3,6 @@ import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import React from "react";
 import {
-    loadCurrentPostLikers,
     loadCurrentSpacePost,
     replyToCurrentPost,
     setCurrentPostLiked,
@@ -51,7 +50,6 @@ const viewerPhotoFromPost = (post: SpacePost) => ({
     friendID: post.friendID,
     height: post.height,
     imageUrl: post.imageUrl ?? "",
-    likeCount: post.likeCount,
     name: post.name,
     postId: post.postId,
     timestampMs: post.timestampMs,
@@ -150,9 +148,8 @@ const Page: React.FC = () => {
             />
             <SpaceFileViewer
                 photo={viewerPhotoFromPost(post)}
-                postActionMode={isOwnPost ? "own-post-likes" : "like-only"}
+                postActionMode={isOwnPost ? "hidden" : "like-only"}
                 onClose={closePost}
-                onLoadPostLikers={loadCurrentPostLikers}
                 onOpenProfile={() => void router.push(ownerProfileRoute())}
                 onReplyToPost={isOwnPost ? undefined : replyToCurrentPost}
                 onSetPostLiked={setCurrentPostLiked}

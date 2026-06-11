@@ -17,7 +17,7 @@ import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActio
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import type { SpacePostAsset, SpacePostLikersLoader } from "services/space";
+import type { SpacePostAsset } from "services/space";
 import { spaceTouchTargetSize } from "styles/touchTargets";
 import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
 import { firstNameFrom } from "utils/spaceDisplay";
@@ -66,7 +66,6 @@ export interface ProfilePostItem {
     id: string;
     imageAsset?: SpacePostAsset;
     imageUrl?: string;
-    likeCount?: number;
     name?: string;
     postId?: number;
     timestampMs: number;
@@ -403,7 +402,6 @@ interface ProfileScreenProps {
     onOpenProfilePhoto?: () => void;
     onOpenSettings?: () => void;
     onLoadPostImage?: (asset: SpacePostAsset) => Promise<string>;
-    onLoadPostLikers?: SpacePostLikersLoader;
     onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     postGroups?: ProfilePostGroup[];
@@ -427,7 +425,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onOpenProfilePhoto,
     onOpenSettings,
     onLoadPostImage,
-    onLoadPostLikers,
     onReplyToPost,
     onSetPostLiked,
     postGroups = [],
@@ -493,7 +490,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const selectedPostActionMode: SpaceViewerPostActionMode = isPublicProfile
         ? "like-only"
         : isOwnerProfile
-          ? "own-post-likes"
+          ? "hidden"
           : "like-only";
 
     const revokeLocalPostObjectUrls = React.useCallback(() => {
@@ -608,7 +605,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     caption: item.caption,
                     height: dimensions.height,
                     imageUrl,
-                    likeCount: item.likeCount ?? 0,
                     name: displayName,
                     postId: item.postId,
                     timestampMs: item.timestampMs,
@@ -638,7 +634,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     name: displayName,
                     postId: item.postId,
                     timestampMs: item.timestampMs,
-                    likeCount: item.likeCount ?? 0,
                     viewerLiked: item.viewerLiked,
                     width: dimensions.width,
                 };
@@ -1617,7 +1612,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         onAddFriendForPostAction={
                             isPublicProfile ? onAddFriend : undefined
                         }
-                        onLoadPostLikers={onLoadPostLikers}
                         onOpenProfile={closeSelectedPost}
                         onReplyToPost={
                             isFriendProfile ? onReplyToPost : undefined
