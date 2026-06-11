@@ -1300,9 +1300,15 @@ const MessageBubble: React.FC<{
                             WebkitTouchCallout: "none",
                             WebkitUserSelect: "none",
                         },
-                        "&:hover": {
-                            bgcolor: isOwn ? outgoingBubble : lightSurfaceHover,
-                        },
+                        ...(isSyntheticPostLike
+                            ? {}
+                            : {
+                                  "&:hover": {
+                                      bgcolor: isOwn
+                                          ? outgoingBubble
+                                          : lightSurfaceHover,
+                                  },
+                              }),
                     }}
                 >
                     {isSyntheticPostLike ? (
