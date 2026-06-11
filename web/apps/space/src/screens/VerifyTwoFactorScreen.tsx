@@ -2,14 +2,14 @@ import { Shield01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
+import { SpaceOtpInput } from "components/SpaceOtpInput";
 import React, { useEffect, useRef, useState } from "react";
 import { spaceTouchTargetSize } from "styles/touchTargets";
+import { sanitizeSpaceOTP, spaceOTPCodeLength } from "utils/spaceOtp";
 
 export const verifyTwoFactorBackground = "#FAFAFA";
 
 const green = "#08C225";
-const activeFill = "rgba(8, 194, 37, 0.08)";
-const emptyStroke = "#EDF0FF";
 const textBase = "#000";
 const textMuted = "#666";
 const textLight = "#969696";
@@ -42,82 +42,6 @@ const BackIcon: React.FC = () => (
     </Box>
 );
 
-interface OtpInputProps {
-    active: boolean;
-    index: number;
-    inputRef: (node: HTMLInputElement | null) => void;
-    onChange: (index: number, value: string) => void;
-    onKeyDown: (
-        index: number,
-        event: React.KeyboardEvent<HTMLInputElement>,
-    ) => void;
-    onPaste: (
-        index: number,
-        event: React.ClipboardEvent<HTMLInputElement>,
-    ) => void;
-    value: string;
-}
-
-const OtpInput: React.FC<OtpInputProps> = ({
-    active,
-    index,
-    inputRef,
-    onChange,
-    onKeyDown,
-    onPaste,
-    value,
-}) => {
-    const typed = value.length > 0;
-
-    return (
-        <Box
-            sx={{
-                alignItems: "center",
-                bgcolor: typed ? "white" : active ? activeFill : "white",
-                border:
-                    typed || active
-                        ? `2px solid ${green}`
-                        : `1px solid ${emptyStroke}`,
-                borderRadius: "20px",
-                display: "flex",
-                flex: "1 1 0",
-                height: 52,
-                justifyContent: "center",
-                minWidth: 0,
-            }}
-        >
-            <Box
-                component="input"
-                ref={inputRef}
-                aria-label={`2FA code digit ${index + 1}`}
-                autoComplete={index == 0 ? "one-time-code" : "off"}
-                inputMode="numeric"
-                maxLength={1}
-                onChange={(event) => onChange(index, event.target.value)}
-                onKeyDown={(event) => onKeyDown(index, event)}
-                onPaste={(event) => onPaste(index, event)}
-                pattern="[0-9]*"
-                type="text"
-                value={value}
-                sx={{
-                    bgcolor: "transparent",
-                    border: 0,
-                    color: green,
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 20,
-                    fontWeight: 700,
-                    height: "100%",
-                    lineHeight: "17px",
-                    outline: 0,
-                    p: 0,
-                    textAlign: "center",
-                    width: "100%",
-                }}
-            />
-        </Box>
-    );
-};
-
 export const VerifyTwoFactorScreen: React.FC<VerifyTwoFactorScreenProps> = ({
     errorMessage,
     initialCode = "",
@@ -125,95 +49,25 @@ export const VerifyTwoFactorScreen: React.FC<VerifyTwoFactorScreenProps> = ({
     onBack,
     onVerify,
 }) => {
-    const [otp, setOtp] = useState<string[]>(
-        initialCode
-            .replace(/\D/g, "")
-            .slice(0, 6)
-            .padEnd(6, " ")
-            .split("")
-            .map((digit) => (digit == " " ? "" : digit)),
-    );
-    const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const initialOTP = sanitizeSpaceOTP(initialCode);
+    const [otp, setOtp] = useState(initialOTP);
+    const inputRef = useRef<HTMLInputElement | null>(null);
 
-    const activeIndex = Math.max(
-        0,
-        otp.findIndex((digit) => digit.length == 0),
-    );
-    const otpComplete = otp.every((digit) => digit.length == 1);
+    const otpComplete = otp.length == spaceOTPCodeLength;
     const canVerify = otpComplete && !isSubmitting;
     const isVerifyButtonActive = canVerify || isSubmitting;
 
-    const focusInput = (index: number) => {
-        inputRefs.current[index]?.focus();
-        inputRefs.current[index]?.select();
-    };
-
     useEffect(() => {
-        const initialCodeLength = initialCode
-            .replace(/\D/g, "")
-            .slice(0, 6).length;
-        const initialFocusIndex =
-            initialCodeLength >= 6 ? 5 : Math.max(0, initialCodeLength);
-        const animationFrame = window.requestAnimationFrame(() =>
-            focusInput(initialFocusIndex),
-        );
-
-        return () => window.cancelAnimationFrame(animationFrame);
-    }, [initialCode]);
-
-    const setDigitsFrom = (startIndex: number, rawValue: string) => {
-        const digits = rawValue.replace(/\D/g, "").slice(0, 6 - startIndex);
-        if (!digits) {
-            setOtp((current) =>
-                current.map((digit, index) =>
-                    index == startIndex ? "" : digit,
-                ),
-            );
-            return;
-        }
-
-        setOtp((current) => {
-            const next = [...current];
-            digits.split("").forEach((digit, offset) => {
-                next[startIndex + offset] = digit;
-            });
-            return next;
+        setOtp(initialOTP);
+        const animationFrame = window.requestAnimationFrame(() => {
+            inputRef.current?.focus();
         });
 
-        focusInput(Math.min(startIndex + digits.length, 5));
-    };
-
-    const handleKeyDown = (
-        index: number,
-        event: React.KeyboardEvent<HTMLInputElement>,
-    ) => {
-        if (event.key == "Backspace" && !otp[index] && index > 0) {
-            event.preventDefault();
-            setOtp((current) =>
-                current.map((digit, digitIndex) =>
-                    digitIndex == index - 1 ? "" : digit,
-                ),
-            );
-            focusInput(index - 1);
-        } else if (event.key == "ArrowLeft" && index > 0) {
-            event.preventDefault();
-            focusInput(index - 1);
-        } else if (event.key == "ArrowRight" && index < 5) {
-            event.preventDefault();
-            focusInput(index + 1);
-        }
-    };
-
-    const handlePaste = (
-        index: number,
-        event: React.ClipboardEvent<HTMLInputElement>,
-    ) => {
-        event.preventDefault();
-        setDigitsFrom(index, event.clipboardData.getData("text"));
-    };
+        return () => window.cancelAnimationFrame(animationFrame);
+    }, [initialOTP]);
 
     const submitVerification = () => {
-        if (canVerify) onVerify?.(otp.join(""));
+        if (canVerify) onVerify?.(otp);
     };
 
     const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
@@ -357,31 +211,12 @@ export const VerifyTwoFactorScreen: React.FC<VerifyTwoFactorScreenProps> = ({
                         </Box>
 
                         <Box sx={{ width: "100%" }}>
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    gap: "6px",
-                                    justifyContent: "stretch",
-                                    width: "100%",
-                                }}
-                            >
-                                {otp.map((digit, index) => (
-                                    <OtpInput
-                                        key={index}
-                                        active={
-                                            !otpComplete && activeIndex == index
-                                        }
-                                        index={index}
-                                        inputRef={(node) => {
-                                            inputRefs.current[index] = node;
-                                        }}
-                                        onChange={setDigitsFrom}
-                                        onKeyDown={handleKeyDown}
-                                        onPaste={handlePaste}
-                                        value={digit}
-                                    />
-                                ))}
-                            </Box>
+                            <SpaceOtpInput
+                                ref={inputRef}
+                                ariaLabel="2FA code"
+                                onChange={setOtp}
+                                value={otp}
+                            />
                             {errorMessage && (
                                 <Box
                                     role="alert"
