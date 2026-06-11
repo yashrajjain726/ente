@@ -26,6 +26,7 @@ import {
     spaceInviteFromLocation,
     type PendingSpaceInvite,
 } from "services/spaceInvite";
+import { savedSpaceSessionToken } from "services/spacePersistentSession";
 import {
     useSpaceAppState,
     type OnboardingEntrySource,
@@ -109,10 +110,15 @@ const Page: React.FC = () => {
     const [publicPostAssetURLLoader, setPublicPostAssetURLLoader] =
         useState<SpacePostAssetURLLoader>();
     const [publicError, setPublicError] = useState<string>();
+    const [hasSavedSpaceSession, setHasSavedSpaceSession] = useState(false);
     const publicPostGroups = useMemo(
         () => profilePostGroupsFromPosts(publicPosts),
         [publicPosts],
     );
+
+    useEffect(() => {
+        setHasSavedSpaceSession(Boolean(savedSpaceSessionToken()));
+    }, []);
 
     useEffect(() => {
         const publicInvite = spaceInviteFromLocation();
@@ -220,6 +226,11 @@ const Page: React.FC = () => {
                     onLoadPostImage={publicPostAssetURLLoader}
                     postGroups={publicPostGroups}
                     profile={publicProfile}
+                    spaceLogoHref={
+                        profile || hasSavedSpaceSession
+                            ? spaceRoutes.home
+                            : undefined
+                    }
                     onAddFriend={() => {
                         const inviteFriend = {
                             fullName: publicProfile.fullName,

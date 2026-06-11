@@ -10,6 +10,7 @@ interface PublicProfileScreenProps {
     onLoadPostImage?: SpacePostAssetURLLoader;
     postGroups?: ProfilePostGroup[];
     profile: SetupProfile;
+    spaceLogoHref?: string;
 }
 
 export const PublicProfileScreen: React.FC<PublicProfileScreenProps> = ({
@@ -19,6 +20,7 @@ export const PublicProfileScreen: React.FC<PublicProfileScreenProps> = ({
     onLoadPostImage,
     postGroups,
     profile,
+    spaceLogoHref,
 }) => (
     <ProfileScreen
         friendsCount={friendsCount}
@@ -28,5 +30,6 @@ export const PublicProfileScreen: React.FC<PublicProfileScreenProps> = ({
         onLoadPostImage={onLoadPostImage}
         postGroups={postGroups}
         profile={profile}
+        spaceLogoHref={spaceLogoHref}
     />
 );

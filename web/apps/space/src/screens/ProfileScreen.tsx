@@ -407,6 +407,7 @@ interface ProfileScreenProps {
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     postGroups?: ProfilePostGroup[];
     profile: SetupProfile;
+    spaceLogoHref?: string;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -431,6 +432,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     postGroups = [],
     profile,
     showPostLoadingSkeleton,
+    spaceLogoHref = "https://ente.com/space",
 }) => {
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
@@ -970,8 +972,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     {isPublicProfile ? (
                         <Box
                             component="a"
-                            href="https://ente.com/space"
-                            aria-label="Go to ente.com/space"
+                            href={spaceLogoHref}
+                            aria-label="Go to Space"
                             sx={{
                                 alignSelf: "center",
                                 color: "inherit",
