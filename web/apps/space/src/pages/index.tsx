@@ -207,7 +207,7 @@ const Page: React.FC = () => {
 
         const timeoutID = window.setTimeout(
             () => setShowSharedInviteDialog(true),
-            2500,
+            1800,
         );
         return () => window.clearTimeout(timeoutID);
     }, [publicProfile, routeMode.kind]);
