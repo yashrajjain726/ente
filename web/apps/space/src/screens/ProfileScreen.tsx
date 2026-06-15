@@ -17,6 +17,7 @@ import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActio
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
+import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type { SpacePostAsset } from "services/space";
 import { spaceTouchTargetSize } from "styles/touchTargets";
 import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
@@ -404,6 +405,7 @@ interface ProfileScreenProps {
     onLoadPostImage?: (asset: SpacePostAsset) => Promise<string>;
     onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
+    onShareProfileLink?: () => Promise<string>;
     postGroups?: ProfilePostGroup[];
     profile: SetupProfile;
     spaceLogoHref?: string;
@@ -427,6 +429,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onLoadPostImage,
     onReplyToPost,
     onSetPostLiked,
+    onShareProfileLink,
     postGroups = [],
     profile,
     showPostLoadingSkeleton,
@@ -799,6 +802,23 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             .finally(() => {
                 setIsPostPhotoOpening(false);
             });
+    };
+
+    const shareProfile = async () => {
+        if (!onShareProfileLink) return;
+        const profileLink = await onShareProfileLink();
+
+        if (typeof navigator.share == "function") {
+            try {
+                await navigator.share({ url: profileLink });
+                return;
+            } catch (error) {
+                if (error instanceof DOMException && error.name == "AbortError")
+                    return;
+            }
+        }
+
+        await navigator.clipboard.writeText(profileLink);
     };
 
     const deleteSelectedPost = async () => {
@@ -1221,8 +1241,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         <Box
                             sx={{
                                 alignItems: "center",
-                                display: "flex",
-                                justifyContent: "center",
+                                display: "grid",
+                                gridTemplateColumns:
+                                    "minmax(0, 1fr) minmax(0, max-content) minmax(0, 1fr)",
                                 minWidth: 0,
                                 width: "100%",
                             }}
@@ -1234,6 +1255,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         '"Nunito", "Inter Variable", sans-serif',
                                     fontSize: 26,
                                     fontWeight: 800,
+                                    gridColumn: 2,
                                     lineHeight: "32px",
                                     maxWidth: isPublicProfile
                                         ? "100%"
@@ -1250,6 +1272,38 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             >
                                 {displayName}
                             </Box>
+                            {isOwnerProfile && (
+                                <Box
+                                    component="button"
+                                    type="button"
+                                    aria-label="Share profile"
+                                    onClick={() => void shareProfile()}
+                                    sx={{
+                                        alignItems: "center",
+                                        bgcolor: "transparent",
+                                        border: 0,
+                                        color: textStrong,
+                                        cursor: onShareProfileLink
+                                            ? "pointer"
+                                            : "default",
+                                        display: "flex",
+                                        gridColumn: 3,
+                                        height: spaceTouchTargetSize,
+                                        justifyContent: "flex-start",
+                                        justifySelf: "start",
+                                        ml: "8px",
+                                        p: 0,
+                                        width: spaceTouchTargetSize,
+                                        "&:focus-visible": {
+                                            borderRadius: "50%",
+                                            outline: `2px solid ${green}`,
+                                            outlineOffset: 2,
+                                        },
+                                    }}
+                                >
+                                    <ShareIcon strokeWidth={2.2} />
+                                </Box>
+                            )}
                         </Box>
                         {isStatsLoading ? (
                             <ProfileStatsSkeleton />
