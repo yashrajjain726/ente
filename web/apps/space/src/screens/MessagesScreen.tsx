@@ -12,7 +12,6 @@ import {
     MenuItem,
     MenuList,
     Popper,
-    Tooltip,
 } from "@mui/material";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
@@ -54,7 +53,7 @@ const composerHeight = 48;
 const composerMaxHeight = 112;
 const composerPadding = 14;
 const composerPaddingLeft = 18;
-const postQuoteThumbnailSize = 132;
+const postQuoteThumbnailSize = 164;
 const threadBottomThresholdPx = 96;
 const messageGroupTimeThresholdMs = 10 * 60 * 1000;
 const messageTimeSeparatorThresholdMs = 60 * 60 * 1000;
@@ -181,30 +180,6 @@ const isCurrentProfileActor = (
         return actor.spaceSlug == profile.spaceSlug;
     }
     return actor.username == profile.username;
-};
-
-const actorName = (actor: SpaceMessage["sender"]) =>
-    firstNameFrom(actor.fullName.trim() || actor.username);
-
-const messageLikeTooltipLabel = (
-    message: SpaceMessage,
-    profile: SetupProfile,
-) => {
-    const otherParticipant = isCurrentProfileActor(message.sender, profile)
-        ? message.recipient
-        : message.sender;
-    const likerNames: string[] = [];
-    if (message.viewerLiked) likerNames.push("You");
-    if (message.likeCount > likerNames.length) {
-        likerNames.push(actorName(otherParticipant));
-    }
-    if (message.likeCount > likerNames.length) {
-        const otherCount = message.likeCount - likerNames.length;
-        likerNames.push(
-            `${otherCount} ${otherCount == 1 ? "other" : "others"}`,
-        );
-    }
-    return likerNames.filter(Boolean).join(" and ") || "Liked";
 };
 
 const conversationPreview = (
@@ -721,6 +696,33 @@ const HeartIcon: React.FC<{ filled?: boolean; small?: boolean }> = ({
     </svg>
 );
 
+const MessageLikeHeartIcon: React.FC = () => (
+    <svg
+        width="17"
+        height="15"
+        viewBox="-2 -2 20 18"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            d="M6.63749 12.3742C4.66259 10.885 0.75 7.4804 0.75 4.41664C0.75 2.39161 2.22368 0.75 4.25 0.75C5.3 0.75 6.35 1.10294 7.75 2.51469C9.15 1.10294 10.2 0.75 11.25 0.75C13.2763 0.75 14.75 2.39161 14.75 4.41664C14.75 7.4804 10.8374 10.885 8.86251 12.3742C8.19793 12.8753 7.30207 12.8753 6.63749 12.3742Z"
+            fill={green}
+            stroke={messagesBackground}
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+        <path
+            d="M6.63749 12.3742C4.66259 10.885 0.75 7.4804 0.75 4.41664C0.75 2.39161 2.22368 0.75 4.25 0.75C5.3 0.75 6.35 1.10294 7.75 2.51469C9.15 1.10294 10.2 0.75 11.25 0.75C13.2763 0.75 14.75 2.39161 14.75 4.41664C14.75 7.4804 10.8374 10.885 8.86251 12.3742C8.19793 12.8753 7.30207 12.8753 6.63749 12.3742Z"
+            fill={green}
+            stroke={green}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+    </svg>
+);
+
 const DeleteIcon: React.FC = () => (
     <svg
         width="13"
@@ -1065,20 +1067,11 @@ const MessageBubble: React.FC<{
                 : "Replied to you"
             : undefined;
     const hasBodyBubble = !isSyntheticPostLike;
-    const [isLikeTooltipOpen, setIsLikeTooltipOpen] = React.useState(false);
-    const likeTooltipTimerRef = React.useRef<number | undefined>(undefined);
     const longPressTimerRef = React.useRef<number | undefined>(undefined);
     const longPressStartRef = React.useRef<
         { x: number; y: number } | undefined
     >(undefined);
     const didOpenLongPressRef = React.useRef(false);
-    const likeTooltipLabel = messageLikeTooltipLabel(message, profile);
-
-    const clearLikeTooltipTimer = React.useCallback(() => {
-        if (likeTooltipTimerRef.current == undefined) return;
-        window.clearTimeout(likeTooltipTimerRef.current);
-        likeTooltipTimerRef.current = undefined;
-    }, []);
 
     const clearLongPressTimer = React.useCallback(() => {
         if (longPressTimerRef.current == undefined) return;
@@ -1091,17 +1084,6 @@ const MessageBubble: React.FC<{
         longPressStartRef.current = undefined;
         didOpenLongPressRef.current = false;
     }, [clearLongPressTimer]);
-
-    const showLikeTooltip = (event: React.MouseEvent) => {
-        event.preventDefault();
-        event.stopPropagation();
-        clearLikeTooltipTimer();
-        setIsLikeTooltipOpen(true);
-        likeTooltipTimerRef.current = window.setTimeout(() => {
-            setIsLikeTooltipOpen(false);
-            likeTooltipTimerRef.current = undefined;
-        }, 1800);
-    };
 
     const openActions = React.useCallback(
         (bubbleElement: HTMLElement, source: MessageActionsOpenSource) => {
@@ -1169,18 +1151,7 @@ const MessageBubble: React.FC<{
         didOpenLongPressRef.current = false;
     };
 
-    React.useEffect(() => clearLikeTooltipTimer, [clearLikeTooltipTimer]);
     React.useEffect(() => cancelLongPress, [cancelLongPress]);
-
-    React.useEffect(() => {
-        clearLikeTooltipTimer();
-        setIsLikeTooltipOpen(false);
-    }, [
-        clearLikeTooltipTimer,
-        message.id,
-        message.likeCount,
-        message.viewerLiked,
-    ]);
 
     return (
         <Box
@@ -1288,101 +1259,25 @@ const MessageBubble: React.FC<{
                             {message.text}
                         </Box>
                         {message.likeCount > 0 && (
-                            <Tooltip
-                                arrow
-                                disableFocusListener
-                                disableHoverListener
-                                disableTouchListener
-                                open={isLikeTooltipOpen}
-                                placement={isOwn ? "left" : "right"}
-                                title={likeTooltipLabel}
-                                slotProps={{
-                                    tooltip: {
-                                        sx: {
-                                            bgcolor: messagesBackground,
-                                            borderRadius: "6px",
-                                            boxShadow:
-                                                "0 8px 24px rgba(0, 0, 0, 0.14)",
-                                            color: textBase,
-                                            fontFamily:
-                                                '"Inter Variable", Inter, sans-serif',
-                                            fontSize: 12,
-                                            fontWeight: 700,
-                                            lineHeight: "16px",
-                                            px: "8px",
-                                            py: "5px",
-                                        },
-                                    },
-                                    arrow: {
-                                        sx: { color: messagesBackground },
-                                    },
+                            <Box
+                                component="span"
+                                role="img"
+                                aria-label="Liked"
+                                sx={{
+                                    alignItems: "center",
+                                    bottom: -5,
+                                    color: green,
+                                    display: "inline-flex",
+                                    justifyContent: "center",
+                                    lineHeight: 0,
+                                    pointerEvents: "none",
+                                    position: "absolute",
+                                    zIndex: 2,
+                                    ...(isOwn ? { left: -2 } : { right: -2 }),
                                 }}
                             >
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    aria-label={`Liked by ${likeTooltipLabel}`}
-                                    onClick={showLikeTooltip}
-                                    onContextMenu={(event) => {
-                                        event.preventDefault();
-                                        event.stopPropagation();
-                                    }}
-                                    sx={{
-                                        alignItems: "center",
-                                        appearance: "none",
-                                        bgcolor: "transparent",
-                                        border: 0,
-                                        borderRadius: "999px",
-                                        bottom: -22,
-                                        boxSizing: "border-box",
-                                        color: green,
-                                        cursor: "pointer",
-                                        display: "inline-flex",
-                                        fontFamily:
-                                            '"Inter Variable", Inter, sans-serif',
-                                        fontSize: 10,
-                                        fontWeight: 800,
-                                        gap: "4px",
-                                        height: spaceTouchTargetSize,
-                                        justifyContent: "center",
-                                        lineHeight: 1,
-                                        minWidth: spaceTouchTargetSize,
-                                        p: 0,
-                                        position: "absolute",
-                                        zIndex: 2,
-                                        ...(isOwn
-                                            ? { left: -3 }
-                                            : { right: -3 }),
-                                        "&:focus-visible": {
-                                            outline: `2px solid ${green}`,
-                                            outlineOffset: 2,
-                                        },
-                                    }}
-                                >
-                                    <Box
-                                        component="span"
-                                        sx={{
-                                            alignItems: "center",
-                                            bgcolor: messagesBackground,
-                                            border: `2px solid ${messagesBackground}`,
-                                            borderRadius: "999px",
-                                            boxShadow:
-                                                "0 1px 3px rgba(0, 0, 0, 0.08)",
-                                            boxSizing: "border-box",
-                                            display: "inline-flex",
-                                            gap: "4px",
-                                            height: 22,
-                                            justifyContent: "center",
-                                            minWidth: 34,
-                                            pb: "1px",
-                                            px: "7px",
-                                        }}
-                                    >
-                                        <HeartIcon filled small />
-                                        {message.likeCount}
-                                    </Box>
-                                </Box>
-                            </Tooltip>
+                                <MessageLikeHeartIcon />
+                            </Box>
                         )}
                     </Box>
                 )}
@@ -1462,6 +1357,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     );
     const isContextMessageLiked = Boolean(
         messageContextMenu?.message.viewerLiked,
+    );
+    const isContextMessageOwn = Boolean(
+        messageContextMenu?.message &&
+            isCurrentProfileMessage(messageContextMenu.message, profile),
     );
 
     const sendMessage = () => {
@@ -1598,6 +1497,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 break;
             case "like":
                 closeMessageActions();
+                if (isCurrentProfileMessage(targetMessage, profile)) return;
                 void onSetMessageLiked(
                     targetMessage.id,
                     !targetMessage.viewerLiked,
@@ -2136,23 +2036,25 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 >
                                                     {!isThreadReadOnly && (
                                                         <>
-                                                            <MessageActionMenuItem
-                                                                icon={
-                                                                    <HeartIcon
-                                                                        small
-                                                                    />
-                                                                }
-                                                                label={
-                                                                    isContextMessageLiked
-                                                                        ? "Unlike"
-                                                                        : "Like"
-                                                                }
-                                                                onClick={() =>
-                                                                    handleMessageAction(
-                                                                        "like",
-                                                                    )
-                                                                }
-                                                            />
+                                                            {!isContextMessageOwn && (
+                                                                <MessageActionMenuItem
+                                                                    icon={
+                                                                        <HeartIcon
+                                                                            small
+                                                                        />
+                                                                    }
+                                                                    label={
+                                                                        isContextMessageLiked
+                                                                            ? "Unlike"
+                                                                            : "Like"
+                                                                    }
+                                                                    onClick={() =>
+                                                                        handleMessageAction(
+                                                                            "like",
+                                                                        )
+                                                                    }
+                                                                />
+                                                            )}
                                                             <MessageActionMenuItem
                                                                 icon={
                                                                     <ReplyIcon />
@@ -2177,10 +2079,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                     />
                                                     {!isThreadReadOnly &&
                                                         messageContextMenu?.message &&
-                                                        isCurrentProfileMessage(
-                                                            messageContextMenu.message,
-                                                            profile,
-                                                        ) && (
+                                                        isContextMessageOwn && (
                                                             <MessageActionMenuItem
                                                                 icon={
                                                                     <DeleteIcon />
