@@ -586,6 +586,19 @@ const sameMessageSender = (
     second: SpaceMessage | undefined,
 ) => Boolean(first && second && first.sender.spaceId == second.sender.spaceId);
 
+const bodyBubblesCanGroup = (
+    first: SpaceMessage | undefined,
+    second: SpaceMessage | undefined,
+) => {
+    if (!first || !second) return false;
+    if (!sameMessageSender(first, second)) return false;
+    if (first.kind == "post_like") return false;
+    if (second.kind != "regular" || second.replyMessageId) return false;
+    return (
+        second.createdAtMs - first.createdAtMs <= messageGroupTimeThresholdMs
+    );
+};
+
 const ReplyIcon: React.FC = () => (
     <svg
         width="12"
@@ -900,8 +913,9 @@ const isMessageLongPressIgnoredTarget = (target: EventTarget | null) =>
     target instanceof Element && Boolean(target.closest("button"));
 
 const MessageBubble: React.FC<{
+    groupsWithNext: boolean;
+    groupsWithPrevious: boolean;
     isHighlighted: boolean;
-    isLastInSequence: boolean;
     message: SpaceMessage;
     onOpenActions: (
         message: SpaceMessage,
@@ -914,8 +928,9 @@ const MessageBubble: React.FC<{
     profile: SetupProfile;
     showTimestamp: boolean;
 }> = ({
+    groupsWithNext,
+    groupsWithPrevious,
     isHighlighted,
-    isLastInSequence,
     message,
     onOpenActions,
     onOpenQuotePost,
@@ -932,12 +947,8 @@ const MessageBubble: React.FC<{
         Math.floor(microsForTimestamp(message.createdAtMs) / 1000),
     ).toISOString();
     const bubbleBorderRadius = isOwn
-        ? isLastInSequence
-            ? "20px 6px 20px 20px"
-            : "20px 6px 6px 20px"
-        : isLastInSequence
-          ? "6px 20px 20px 20px"
-          : "6px 20px 20px 6px";
+        ? `20px ${groupsWithPrevious ? "6px" : "20px"} ${groupsWithNext ? "6px" : "20px"} 20px`
+        : `${groupsWithPrevious ? "6px" : "20px"} 20px 20px ${groupsWithNext ? "6px" : "20px"}`;
     const isSyntheticPostLike = message.kind == "post_like";
     const isPostReply = message.kind == "post_reply";
     const hasMessageReply = Boolean(message.replyMessageId);
@@ -1080,7 +1091,7 @@ const MessageBubble: React.FC<{
                 display: "flex",
                 flexDirection: "column",
                 listStyle: "none",
-                mb: isLastInSequence ? "24px" : "6px",
+                mb: groupsWithNext ? "6px" : "24px",
                 maxWidth: "100%",
                 minWidth: 0,
                 position: "relative",
@@ -1282,7 +1293,7 @@ const MessageBubble: React.FC<{
                         color: textSecondary,
                         fontFamily: '"Inter Variable", Inter, sans-serif',
                         fontSize: 12,
-                        fontWeight: 600,
+                        fontWeight: 500,
                         lineHeight: "16px",
                         ml: isOwn ? 0 : "2px",
                         mt:
@@ -1893,29 +1904,34 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         }}
                                     >
                                         {messages.map((message, index) => {
+                                            const previousMessage =
+                                                messages[index - 1];
                                             const nextMessage =
                                                 messages[index + 1];
-                                            const isSameSequenceAsNext =
-                                                sameMessageSender(
+                                            const groupsWithPrevious =
+                                                bodyBubblesCanGroup(
+                                                    previousMessage,
+                                                    message,
+                                                );
+                                            const groupsWithNext =
+                                                bodyBubblesCanGroup(
                                                     message,
                                                     nextMessage,
-                                                ) &&
-                                                nextMessage!.createdAtMs -
-                                                    message.createdAtMs <=
-                                                    messageGroupTimeThresholdMs;
-                                            const isLastInSequence =
-                                                !isSameSequenceAsNext;
+                                                );
 
                                             return (
                                                 <MessageBubble
                                                     key={message.id}
+                                                    groupsWithNext={
+                                                        groupsWithNext
+                                                    }
+                                                    groupsWithPrevious={
+                                                        groupsWithPrevious
+                                                    }
                                                     isHighlighted={
                                                         messageContextMenu
                                                             ?.message.id ==
                                                         message.id
-                                                    }
-                                                    isLastInSequence={
-                                                        isLastInSequence
                                                     }
                                                     message={message}
                                                     onOpenActions={
@@ -1934,7 +1950,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                     }
                                                     profile={profile}
                                                     showTimestamp={
-                                                        isLastInSequence
+                                                        !groupsWithNext
                                                     }
                                                 />
                                             );
