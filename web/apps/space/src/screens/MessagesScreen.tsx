@@ -39,11 +39,11 @@ const lightSurface = "#F2F2F2";
 const lightSurfaceHover = "#E8E8E8";
 const composerSurface = "#FFFFFF";
 const composerBorder = "#DEDEDE";
-const outgoingBubble = "#3FA43D";
+const outgoingBubble = "#0DAF35";
 const incomingBubble = lightSurface;
 const outgoingMessageText = "#FFFFFF";
 const incomingMessageText = "#111111";
-const outgoingQuoteBubble = "#9CE7A8";
+const outgoingQuoteBubble = "#9EDFAE";
 const incomingQuoteBubble = "#FAFAFA";
 const incomingQuoteText = "#BDBDBD";
 const outgoingQuoteText = "#FFFFFF";
@@ -53,8 +53,7 @@ const composerHeight = 48;
 const composerMaxHeight = 112;
 const composerPadding = 14;
 const composerPaddingLeft = 18;
-const postQuoteThumbnailMaxWidth = 108;
-const postQuoteThumbnailMaxHeight = 76;
+const postQuoteThumbnailSize = 132;
 const threadBottomThresholdPx = 96;
 const messageGroupTimeThresholdMs = 10 * 60 * 1000;
 const messageTimeSeparatorThresholdMs = 60 * 60 * 1000;
@@ -806,21 +805,6 @@ const MessageActionMenuItem: React.FC<{
     </MenuItem>
 );
 
-const postQuoteThumbnailSize = (quote: SpaceMessageQuote | undefined) => {
-    if (!quote?.width || !quote.height) {
-        return { height: 64, width: 64 };
-    }
-
-    const scale = Math.min(
-        postQuoteThumbnailMaxWidth / quote.width,
-        postQuoteThumbnailMaxHeight / quote.height,
-    );
-    return {
-        height: Math.round(quote.height * scale),
-        width: Math.round(quote.width * scale),
-    };
-};
-
 const MessageActionLabel: React.FC<{ isOwn: boolean; label: string }> = ({
     isOwn,
     label,
@@ -922,7 +906,6 @@ const PostQuotePreview: React.FC<{
     const quote = message.quote;
     const isUnavailable = !quote || quote.isUnavailable || !quote.imageUrl;
     const canOpen = Boolean(quote && !isUnavailable);
-    const thumbnailSize = postQuoteThumbnailSize(quote);
 
     return (
         <QuoteFrame isOwn={isOwn} mb={mb}>
@@ -962,10 +945,11 @@ const PostQuotePreview: React.FC<{
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 12,
                             fontWeight: 700,
-                            height: 56,
+                            height: postQuoteThumbnailSize,
                             justifyContent: "center",
                             lineHeight: "16px",
-                            minWidth: 86,
+                            textAlign: "center",
+                            width: postQuoteThumbnailSize,
                             px: "12px",
                         }}
                     >
@@ -979,10 +963,10 @@ const PostQuotePreview: React.FC<{
                         sx={{
                             borderRadius: "8px",
                             display: "block",
-                            height: thumbnailSize.height,
+                            height: postQuoteThumbnailSize,
                             objectFit: "cover",
                             objectPosition: "center",
-                            width: thumbnailSize.width,
+                            width: postQuoteThumbnailSize,
                         }}
                     />
                 )}
@@ -1204,7 +1188,6 @@ const MessageBubble: React.FC<{
                 {hasBodyBubble && (
                     <Box
                         data-message-bubble
-                        className={isOwn ? "green-bg" : undefined}
                         onContextMenu={handleContextMenu}
                         onTouchCancel={cancelLongPress}
                         onTouchEnd={handleTouchEnd}
