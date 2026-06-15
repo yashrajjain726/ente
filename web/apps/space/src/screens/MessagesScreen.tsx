@@ -57,6 +57,7 @@ const postQuoteThumbnailMaxWidth = 108;
 const postQuoteThumbnailMaxHeight = 76;
 const threadBottomThresholdPx = 96;
 const messageGroupTimeThresholdMs = 10 * 60 * 1000;
+const messageTimeSeparatorThresholdMs = 60 * 60 * 1000;
 const messageLongPressMs = 520;
 const messageLongPressMoveTolerancePx = 10;
 const messageActionsTouchOpenMouseSuppressMs = 900;
@@ -374,6 +375,80 @@ const conversationTimeSections = (
 const conversationUnreadLabel = (count: number) =>
     count > 99 ? "99+" : String(count);
 
+const isSameLocalDate = (first: Date, second: Date) =>
+    first.getFullYear() == second.getFullYear() &&
+    first.getMonth() == second.getMonth() &&
+    first.getDate() == second.getDate();
+
+const monthLabels = [
+    "JAN",
+    "FEB",
+    "MAR",
+    "APR",
+    "MAY",
+    "JUN",
+    "JUL",
+    "AUG",
+    "SEP",
+    "OCT",
+    "NOV",
+    "DEC",
+] as const;
+
+const messageTimeLabel = (timestampMs: number) =>
+    new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        hour12: true,
+        minute: "2-digit",
+    }).format(new Date(timestampMs));
+
+const messageDateTimeLabel = (timestampMs: number) => {
+    const date = new Date(timestampMs);
+    const now = new Date();
+    if (isSameLocalDate(date, now)) return messageTimeLabel(timestampMs);
+
+    return `${date.getDate()} ${monthLabels[date.getMonth()]}, ${messageTimeLabel(timestampMs)}`;
+};
+
+const shouldShowMessageTimeSeparator = (
+    lastSeparatorMessage: SpaceMessage | undefined,
+    previousMessage: SpaceMessage | undefined,
+    message: SpaceMessage,
+) => {
+    if (!lastSeparatorMessage || !previousMessage) return true;
+
+    const separatorDate = new Date(lastSeparatorMessage.createdAtMs);
+    const messageDate = new Date(message.createdAtMs);
+    if (!isSameLocalDate(separatorDate, messageDate)) return true;
+
+    return (
+        message.createdAtMs - lastSeparatorMessage.createdAtMs >=
+        messageTimeSeparatorThresholdMs
+    );
+};
+
+const MessageTimeSeparator: React.FC<{ timestampMs: number }> = ({
+    timestampMs,
+}) => (
+    <Box
+        component="li"
+        sx={{
+            color: textSecondary,
+            fontFamily: '"Inter Variable", Inter, sans-serif',
+            fontSize: 12,
+            fontWeight: 500,
+            lineHeight: "16px",
+            listStyle: "none",
+            py: "14px",
+            textAlign: "center",
+        }}
+    >
+        <Box component="time" dateTime={new Date(timestampMs).toISOString()}>
+            {messageDateTimeLabel(timestampMs)}
+        </Box>
+    </Box>
+);
+
 const ConversationListItem: React.FC<{
     conversation: SpaceMessageConversation;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
@@ -594,6 +669,13 @@ const bodyBubblesCanGroup = (
     if (!sameMessageSender(first, second)) return false;
     if (first.kind == "post_like") return false;
     if (second.kind != "regular" || second.replyMessageId) return false;
+    if (
+        !isSameLocalDate(
+            new Date(first.createdAtMs),
+            new Date(second.createdAtMs),
+        )
+    )
+        return false;
     return (
         second.createdAtMs - first.createdAtMs <= messageGroupTimeThresholdMs
     );
@@ -926,7 +1008,6 @@ const MessageBubble: React.FC<{
     ownSpaceID?: string;
     parentMessage?: SpaceMessage;
     profile: SetupProfile;
-    showTimestamp: boolean;
 }> = ({
     groupsWithNext,
     groupsWithPrevious,
@@ -937,15 +1018,8 @@ const MessageBubble: React.FC<{
     ownSpaceID,
     parentMessage,
     profile,
-    showTimestamp,
 }) => {
     const isOwn = message.sender.spaceId == ownSpaceID;
-    const timestampLabel = formatTimeAgo(
-        microsForTimestamp(message.createdAtMs),
-    );
-    const timestampDateTime = new Date(
-        Math.floor(microsForTimestamp(message.createdAtMs) / 1000),
-    ).toISOString();
     const bubbleBorderRadius = isOwn
         ? `20px ${groupsWithPrevious ? "6px" : "20px"} ${groupsWithNext ? "6px" : "20px"} 20px`
         : `${groupsWithPrevious ? "6px" : "20px"} 20px 20px ${groupsWithNext ? "6px" : "20px"}`;
@@ -1285,27 +1359,6 @@ const MessageBubble: React.FC<{
                     </Box>
                 )}
             </Box>
-            {showTimestamp && (
-                <Box
-                    component="time"
-                    dateTime={timestampDateTime}
-                    sx={{
-                        color: textSecondary,
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 12,
-                        fontWeight: 500,
-                        lineHeight: "16px",
-                        ml: isOwn ? 0 : "2px",
-                        mt:
-                            hasBodyBubble && message.likeCount > 0
-                                ? "14px"
-                                : "6px",
-                        mr: isOwn ? "2px" : 0,
-                    }}
-                >
-                    {timestampLabel}
-                </Box>
-            )}
         </Box>
     );
 };
@@ -1903,58 +1956,90 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             p: 0,
                                         }}
                                     >
-                                        {messages.map((message, index) => {
-                                            const previousMessage =
-                                                messages[index - 1];
-                                            const nextMessage =
-                                                messages[index + 1];
-                                            const groupsWithPrevious =
-                                                bodyBubblesCanGroup(
-                                                    previousMessage,
-                                                    message,
-                                                );
-                                            const groupsWithNext =
-                                                bodyBubblesCanGroup(
-                                                    message,
-                                                    nextMessage,
-                                                );
+                                        {(() => {
+                                            let lastTimeSeparatorMessage:
+                                                | SpaceMessage
+                                                | undefined;
 
-                                            return (
-                                                <MessageBubble
-                                                    key={message.id}
-                                                    groupsWithNext={
-                                                        groupsWithNext
+                                            return messages.map(
+                                                (message, index) => {
+                                                    const previousMessage =
+                                                        messages[index - 1];
+                                                    const nextMessage =
+                                                        messages[index + 1];
+                                                    const groupsWithPrevious =
+                                                        bodyBubblesCanGroup(
+                                                            previousMessage,
+                                                            message,
+                                                        );
+                                                    const groupsWithNext =
+                                                        bodyBubblesCanGroup(
+                                                            message,
+                                                            nextMessage,
+                                                        );
+                                                    const showTimeSeparator =
+                                                        shouldShowMessageTimeSeparator(
+                                                            lastTimeSeparatorMessage,
+                                                            previousMessage,
+                                                            message,
+                                                        );
+                                                    if (showTimeSeparator) {
+                                                        lastTimeSeparatorMessage =
+                                                            message;
                                                     }
-                                                    groupsWithPrevious={
-                                                        groupsWithPrevious
-                                                    }
-                                                    isHighlighted={
-                                                        messageContextMenu
-                                                            ?.message.id ==
-                                                        message.id
-                                                    }
-                                                    message={message}
-                                                    onOpenActions={
-                                                        openMessageActions
-                                                    }
-                                                    onOpenQuotePost={
-                                                        onOpenQuotePost
-                                                    }
-                                                    ownSpaceID={profile.spaceId}
-                                                    parentMessage={
-                                                        message.replyMessageId
-                                                            ? messageByID.get(
-                                                                  message.replyMessageId,
-                                                              )
-                                                            : undefined
-                                                    }
-                                                    profile={profile}
-                                                    showTimestamp={
-                                                        !groupsWithNext
-                                                    }
-                                                />
+
+                                                    return (
+                                                        <React.Fragment
+                                                            key={message.id}
+                                                        >
+                                                            {showTimeSeparator && (
+                                                                <MessageTimeSeparator
+                                                                    timestampMs={
+                                                                        message.createdAtMs
+                                                                    }
+                                                                />
+                                                            )}
+                                                            <MessageBubble
+                                                                groupsWithNext={
+                                                                    groupsWithNext
+                                                                }
+                                                                groupsWithPrevious={
+                                                                    groupsWithPrevious
+                                                                }
+                                                                isHighlighted={
+                                                                    messageContextMenu
+                                                                        ?.message
+                                                                        .id ==
+                                                                    message.id
+                                                                }
+                                                                message={
+                                                                    message
+                                                                }
+                                                                onOpenActions={
+                                                                    openMessageActions
+                                                                }
+                                                                onOpenQuotePost={
+                                                                    onOpenQuotePost
+                                                                }
+                                                                ownSpaceID={
+                                                                    profile.spaceId
+                                                                }
+                                                                parentMessage={
+                                                                    message.replyMessageId
+                                                                        ? messageByID.get(
+                                                                              message.replyMessageId,
+                                                                          )
+                                                                        : undefined
+                                                                }
+                                                                profile={
+                                                                    profile
+                                                                }
+                                                            />
+                                                        </React.Fragment>
+                                                    );
+                                                },
                                             );
-                                        })}
+                                        })()}
                                     </Box>
                                 )}
                             </Box>
