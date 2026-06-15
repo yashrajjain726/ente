@@ -421,9 +421,9 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             width: "100%",
                         }}
                     >
-                        Invite your friends and family to follow your life by
-                        sharing your private profile link. Only you and the
-                        people you share it with can access it.
+                        Invite your friends and family to follow your life.
+                        Only you and the people you share this link with can
+                        see your posts.
                     </Box>
                 </Box>
 

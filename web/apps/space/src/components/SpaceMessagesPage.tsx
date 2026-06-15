@@ -449,10 +449,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 
     return (
         <>
-            <SpacePageMeta
-                themeColor={messagesBackground}
-                title="Messages | Ente Space"
-            />
+            <SpacePageMeta themeColor={messagesBackground} />
             <MessagesScreen
                 conversations={conversations}
                 friendsCount={friends.length}

@@ -142,10 +142,7 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta
-                themeColor={postBackground}
-                title={`${post.name} Post | Ente Space`}
-            />
+            <SpacePageMeta themeColor={postBackground} />
             <SpaceFileViewer
                 photo={viewerPhotoFromPost(post)}
                 postActionMode={isOwnPost ? "hidden" : "like-only"}
