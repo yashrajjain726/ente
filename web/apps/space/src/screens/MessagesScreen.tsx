@@ -1,6 +1,7 @@
 import {
     ArrowLeft02Icon,
     Cancel01Icon,
+    FavouriteIcon,
     Navigation03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -805,24 +806,64 @@ const MessageActionMenuItem: React.FC<{
     </MenuItem>
 );
 
-const MessageActionLabel: React.FC<{ isOwn: boolean; label: string }> = ({
-    isOwn,
-    label,
-}) => (
+type MessageActionLabelIcon = "like" | "reply";
+
+const MessageActionLabelIconView: React.FC<{
+    icon: MessageActionLabelIcon;
+    isOwn: boolean;
+}> = ({ icon, isOwn }) => (
+    <Box
+        component="span"
+        sx={{
+            alignItems: "center",
+            display: "inline-flex",
+            flexShrink: 0,
+            height: 14,
+            justifyContent: "center",
+            lineHeight: 0,
+            ml: isOwn ? 0 : "-5px",
+            mr: isOwn ? "-5px" : 0,
+            transform: "scale(0.88)",
+            width: 14,
+        }}
+    >
+        {icon == "reply" ? (
+            <ReplyIcon />
+        ) : (
+            <HugeiconsIcon
+                fill="none"
+                icon={FavouriteIcon}
+                primaryColor="currentColor"
+                size={14}
+                strokeWidth={2}
+            />
+        )}
+    </Box>
+);
+
+const MessageActionLabel: React.FC<{
+    icon: MessageActionLabelIcon;
+    isOwn: boolean;
+    label: string;
+}> = ({ icon, isOwn, label }) => (
     <Box
         sx={{
             alignSelf: isOwn ? "flex-end" : "flex-start",
+            alignItems: "center",
             color: textSecondary,
+            display: "inline-flex",
+            gap: "4px",
             fontFamily: '"Inter Variable", Inter, sans-serif',
             fontSize: 12,
             fontWeight: 500,
+            justifyContent: isOwn ? "flex-end" : "flex-start",
             lineHeight: "16px",
             mb: "5px",
-            ml: isOwn ? "2px" : "12px",
-            mr: isOwn ? "12px" : "2px",
         }}
     >
-        {label}
+        {!isOwn && <MessageActionLabelIconView icon={icon} isOwn={isOwn} />}
+        <Box component="span">{label}</Box>
+        {isOwn && <MessageActionLabelIconView icon={icon} isOwn={isOwn} />}
     </Box>
 );
 
@@ -1168,7 +1209,11 @@ const MessageBubble: React.FC<{
                 }}
             >
                 {actionLabel && (
-                    <MessageActionLabel isOwn={isOwn} label={actionLabel} />
+                    <MessageActionLabel
+                        icon={isSyntheticPostLike ? "like" : "reply"}
+                        isOwn={isOwn}
+                        label={actionLabel}
+                    />
                 )}
                 {hasMessageReply && (
                     <MessageReplyPreview
