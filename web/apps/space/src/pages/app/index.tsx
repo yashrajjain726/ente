@@ -22,7 +22,6 @@ import {
     createLocalFeedPostID,
     failLocalFeedPost,
 } from "utils/localFeedPost";
-import { firstNameFrom } from "utils/spaceDisplay";
 import { prepareSpacePostImageFromEdit } from "utils/spacePostImage";
 import { spaceRoutes } from "utils/spaceRoutes";
 import { useSpaceRouter } from "utils/spaceRouteTransitions";
@@ -75,11 +74,7 @@ const Page: React.FC = () => {
         const sentFriend = consumeSentSpaceInviteFriend();
         if (!sentFriend) return;
 
-        const displayName =
-            sentFriend.fullName.trim() || sentFriend.username.trim();
-        setFriendRequestSentToastName(
-            firstNameFrom(displayName) || displayName,
-        );
+        setFriendRequestSentToastName(sentFriend.username.trim());
     }, [router.isReady]);
 
     useEffect(() => {

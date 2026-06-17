@@ -1,3 +1,5 @@
+import { UserAdd02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
@@ -66,20 +68,6 @@ const PublicProfileUnavailable: React.FC = () => (
             >
                 Profile unavailable
             </Box>
-            <Box
-                component="p"
-                sx={{
-                    color: "#AAFFB8",
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 14,
-                    fontWeight: 500,
-                    lineHeight: "20px",
-                    m: 0,
-                    mt: "6px",
-                }}
-            >
-                This profile is unavailable.
-            </Box>
         </Box>
     </Box>
 );
@@ -97,120 +85,155 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
     onAddFriend,
 }) => (
     <Box
-        className="green-bg"
         component="main"
         sx={{
-            alignItems: "center",
-            bgcolor: onboardingGreen,
+            bgcolor: "white",
             boxSizing: "border-box",
-            color: "white",
-            display: "flex",
-            flexDirection: "column",
+            display: "grid",
             minHeight: "100svh",
-            px: 3,
-            textAlign: "center",
+            p: { xs: 1, sm: 0 },
+            placeItems: "stretch",
         }}
     >
         <Box
-            component="header"
+            className="green-bg"
             sx={{
                 alignItems: "center",
-                display: "grid",
-                flexShrink: 0,
-                gridTemplateColumns: "40px 1fr 40px",
-                height: 40,
-                mt: "clamp(24px, 5.5svh, 44px)",
-                width: "100%",
-                "@media (min-width: 600px)": { maxWidth: 390 },
-            }}
-        >
-            <Box />
-            <Box
-                component="img"
-                alt="Ente Space"
-                src="/images/space.svg"
-                sx={{
-                    display: "block",
-                    height: 30,
-                    justifySelf: "center",
-                    width: 101,
-                }}
-            />
-            <Box />
-        </Box>
-        <Box
-            sx={{
-                alignItems: "center",
+                bgcolor: onboardingGreen,
+                borderRadius: { xs: "24px", sm: 0 },
+                boxSizing: "border-box",
+                color: "white",
                 display: "flex",
-                flex: "1 1 auto",
                 flexDirection: "column",
-                justifyContent: "center",
-                maxWidth: 390,
-                pb: "calc(env(safe-area-inset-bottom) + 48px)",
+                minHeight: { xs: "calc(100svh - 16px)", sm: "100svh" },
+                overflow: "hidden",
+                textAlign: "center",
                 width: "100%",
             }}
         >
             <Box
-                component="h1"
-                sx={{
-                    fontFamily: "Nunito, sans-serif",
-                    fontSize: 32,
-                    fontWeight: 800,
-                    letterSpacing: 0,
-                    lineHeight: "38px",
-                    m: 0,
-                    maxWidth: "100%",
-                    overflowWrap: "anywhere",
-                }}
-            >
-                @{identity.username}
-            </Box>
-            <Box
-                component="p"
-                sx={{
-                    color: "#AAFFB8",
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 15,
-                    fontWeight: 600,
-                    lineHeight: "22px",
-                    m: 0,
-                    mt: "10px",
-                    maxWidth: 300,
-                }}
-            >
-                Send a request to add @{identity.username} as a friend on Ente
-                Space.
-            </Box>
-            <Box
-                component="button"
-                type="button"
-                onClick={onAddFriend}
+                component="header"
                 sx={{
                     alignItems: "center",
-                    appearance: "none",
-                    bgcolor: "black",
-                    border: 0,
-                    borderRadius: "20px",
-                    color: "white",
-                    cursor: "pointer",
-                    display: "flex",
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 16,
-                    fontWeight: 650,
-                    height: 52,
-                    justifyContent: "center",
-                    lineHeight: "20px",
-                    mt: "28px",
-                    px: 4,
+                    display: "grid",
+                    flexShrink: 0,
+                    gridTemplateColumns: "40px 1fr 40px",
+                    height: 40,
+                    maxWidth: 390,
+                    mt: "clamp(24px, 5.5svh, 44px)",
+                    mx: "auto",
+                    px: 3,
                     width: "100%",
-                    "&:hover": { bgcolor: "#121212" },
-                    "&:focus-visible": {
-                        outline: "2px solid rgba(255 255 255 / 0.88)",
-                        outlineOffset: 3,
-                    },
                 }}
             >
-                Add friend
+                <Box />
+                <Box
+                    component="img"
+                    alt="Ente Space"
+                    src="/images/space.svg"
+                    sx={{
+                        display: "block",
+                        height: 30,
+                        justifySelf: "center",
+                        width: 101,
+                    }}
+                />
+                <Box />
+            </Box>
+            <Box
+                sx={{
+                    alignItems: "center",
+                    display: "flex",
+                    flex: "1 1 auto",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    maxWidth: 390,
+                    minHeight: 0,
+                    px: 3,
+                    width: "100%",
+                }}
+            >
+                <Box
+                    component="h1"
+                    sx={{
+                        fontFamily: "Nunito, sans-serif",
+                        fontSize: 28,
+                        fontWeight: 800,
+                        letterSpacing: 0,
+                        lineHeight: "34px",
+                        m: 0,
+                        maxWidth: "100%",
+                        overflowWrap: "anywhere",
+                    }}
+                >
+                    @{identity.username} invited you!
+                </Box>
+                <Box
+                    component="p"
+                    sx={{
+                        color: "#AAFFB8",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 15,
+                        fontWeight: 600,
+                        lineHeight: "22px",
+                        m: 0,
+                        mt: "10px",
+                        maxWidth: 300,
+                    }}
+                >
+                    See what @{identity.username} is up to
+                    <br />
+                    on Ente Space.
+                </Box>
+            </Box>
+            <Box
+                sx={{
+                    boxSizing: "border-box",
+                    flexShrink: 0,
+                    maxWidth: 390,
+                    mx: "auto",
+                    pb: "calc(env(safe-area-inset-bottom) + 24px)",
+                    px: 3,
+                    pt: 3,
+                    width: "100%",
+                }}
+            >
+                <Box
+                    component="button"
+                    type="button"
+                    onClick={onAddFriend}
+                    sx={{
+                        alignItems: "center",
+                        appearance: "none",
+                        bgcolor: "black",
+                        border: 0,
+                        borderRadius: "20px",
+                        color: "white",
+                        cursor: "pointer",
+                        display: "flex",
+                        gap: "8px",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 14,
+                        fontWeight: 500,
+                        height: 48,
+                        justifyContent: "center",
+                        lineHeight: "20px",
+                        p: "14px 24px",
+                        width: "100%",
+                        "&:hover": { bgcolor: "#121212" },
+                        "&:focus-visible": {
+                            outline: "2px solid rgba(255 255 255 / 0.88)",
+                            outlineOffset: 3,
+                        },
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={UserAdd02Icon}
+                        size={18}
+                        strokeWidth={1.8}
+                    />
+                    Add friend
+                </Box>
             </Box>
         </Box>
     </Box>
@@ -252,8 +275,7 @@ const Page: React.FC = () => {
             .then((identity) => {
                 if (!cancelled) setPublicIdentity(identity);
             })
-            .catch((error: unknown) => {
-                console.error("Failed to load public space identity", error);
+            .catch(() => {
                 if (!cancelled) setPublicError("This profile is unavailable.");
             });
 

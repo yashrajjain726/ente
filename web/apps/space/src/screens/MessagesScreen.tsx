@@ -14,7 +14,6 @@ import {
     Popper,
 } from "@mui/material";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
-import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
@@ -194,7 +193,7 @@ const conversationPreview = (
 ) => {
     const activity = conversation.latestActivity;
     if (activity.type == "friend_request") {
-        return "Wants to add you as a friend";
+        return "Friend request";
     }
     if (activity.type == "friend_add") {
         return "You're now friends. Say hello!";
@@ -519,7 +518,7 @@ const ConversationListItem: React.FC<{
                         avatarUrl={conversation.friend.avatarUrl}
                         size={44}
                     />
-                    {unreadCount > 0 && (
+                    {unreadCount > 0 && !isFriendRequest && (
                         <Box
                             aria-label={`${unreadCount} unread message${unreadCount == 1 ? "" : "s"}`}
                             component="span"
@@ -1420,11 +1419,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const [sendPhase, setSendPhase] = React.useState<"idle" | "sending">(
         "idle",
     );
-    const [isInviteDialogOpen, setIsInviteDialogOpen] = React.useState(false);
     const [isInviteSharing, setIsInviteSharing] = React.useState(false);
-    const [inviteShareError, setInviteShareError] = React.useState<
-        string | null
-    >(null);
     const composerRef = React.useRef<HTMLTextAreaElement | null>(null);
     const threadScrollRef = React.useRef<HTMLDivElement | null>(null);
     const stickToThreadBottomRef = React.useRef(true);
@@ -1448,8 +1443,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         friendsCount == 0 && Boolean(onShareProfileLink);
     const emptyConversationsCopy =
         friendsCount == 0
-            ? "No messages yet. Once you add friends, you'll see their messages and replies to your posts here."
-            : "No messages yet. You'll see your friends' messages and replies to your posts here.";
+            ? "No messages yet. Once you add friends, you'll see their likes, replies and messages here."
+            : "No messages yet. You'll see your friends' likes, replies and messages here.";
     const conversationSections = React.useMemo(
         () => conversationTimeSections(conversations, newConversationIds),
         [conversations, newConversationIds],
@@ -1539,27 +1534,15 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         closeMessageActions();
     };
 
-    const openInviteDialog = () => {
-        setInviteShareError(null);
-        setIsInviteDialogOpen(true);
-    };
-
-    const closeInviteDialog = () => {
-        if (isInviteSharing) return;
-        setIsInviteDialogOpen(false);
-    };
-
     const shareInviteLink = async () => {
         if (!onShareProfileLink || isInviteSharing) return;
         setIsInviteSharing(true);
-        setInviteShareError(null);
 
         try {
             const profileLink = await onShareProfileLink();
             if (typeof navigator.share == "function") {
                 try {
                     await navigator.share({ url: profileLink });
-                    setIsInviteDialogOpen(false);
                     return;
                 } catch (error) {
                     if (
@@ -1571,10 +1554,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             }
 
             await copyTextToClipboard(profileLink);
-            setIsInviteDialogOpen(false);
         } catch (error) {
             console.error("Failed to share space invite", error);
-            setInviteShareError("Couldn't share invite. Please try again.");
         } finally {
             setIsInviteSharing(false);
         }
@@ -2505,14 +2486,24 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         <Box
                                             component="button"
                                             type="button"
-                                            onClick={openInviteDialog}
+                                            disabled={
+                                                !onShareProfileLink ||
+                                                isInviteSharing
+                                            }
+                                            onClick={() =>
+                                                void shareInviteLink()
+                                            }
                                             sx={{
                                                 alignItems: "center",
                                                 bgcolor: "#F2F2F2",
                                                 border: 0,
                                                 borderRadius: "18px",
                                                 color: textBase,
-                                                cursor: "pointer",
+                                                cursor:
+                                                    onShareProfileLink &&
+                                                    !isInviteSharing
+                                                        ? "pointer"
+                                                        : "default",
                                                 display: "inline-flex",
                                                 fontFamily:
                                                     '"Inter Variable", Inter, sans-serif',
@@ -2525,17 +2516,25 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 pointerEvents: "auto",
                                                 px: "14px",
                                                 whiteSpace: "nowrap",
+                                                "&:disabled": {
+                                                    opacity: 0.45,
+                                                },
                                                 "&:focus-visible": {
                                                     outline: `2px solid ${green}`,
                                                     outlineOffset: 2,
                                                 },
-                                                "&:hover": {
-                                                    bgcolor: "#E8E8E8",
-                                                },
+                                                "&:hover":
+                                                    onShareProfileLink &&
+                                                    !isInviteSharing
+                                                        ? {
+                                                              bgcolor:
+                                                                  "#E8E8E8",
+                                                          }
+                                                        : undefined,
                                             }}
                                         >
                                             <ShareIcon />
-                                            Invite friends
+                                            Share invite
                                         </Box>
                                     )}
                                 </Box>
@@ -2567,15 +2566,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     )}
                 </Box>
             </Box>
-            {showInviteEmptyState && (
-                <SpaceInviteFriendsDialog
-                    errorMessage={inviteShareError}
-                    open={isInviteDialogOpen}
-                    sharing={isInviteSharing}
-                    onClose={closeInviteDialog}
-                    onShare={() => void shareInviteLink()}
-                />
-            )}
         </>
     );
 };
