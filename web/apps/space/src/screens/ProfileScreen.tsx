@@ -1211,7 +1211,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 display: "grid",
                                 gridTemplateColumns:
                                     "minmax(0, 1fr) minmax(0, max-content) minmax(0, 1fr)",
+                                height: "32px",
                                 minWidth: 0,
+                                position: "relative",
                                 width: "100%",
                             }}
                         >
@@ -1260,6 +1262,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         justifySelf: "start",
                                         ml: "8px",
                                         p: 0,
+                                        position: "absolute",
+                                        top: "50%",
+                                        transform: "translateY(-50%)",
                                         width: spaceTouchTargetSize,
                                         "&:focus-visible": {
                                             borderRadius: "50%",
