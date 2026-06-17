@@ -1,5 +1,4 @@
 export interface PendingSpaceInvite {
-    accessKey: string;
     spaceUsername: string;
 }
 
@@ -10,16 +9,13 @@ export interface SpaceInviteFriendSummary {
 
 const pendingSpaceInviteFriendKey = "spacePendingInviteFriend";
 const pendingSpaceInviteKey = "spacePendingInvite";
-const spaceInviteAccessKeyPattern = /^[0-9A-Za-z]{12}$/;
-let acceptedSpaceInviteFriend: SpaceInviteFriendSummary | undefined;
+let sentSpaceInviteFriend: SpaceInviteFriendSummary | undefined;
 
 const isPendingSpaceInvite = (value: unknown): value is PendingSpaceInvite => {
     if (!value || typeof value != "object") return false;
     const candidate = value as Record<string, unknown>;
     return (
-        typeof candidate.accessKey == "string" &&
         typeof candidate.spaceUsername == "string" &&
-        candidate.accessKey.trim().length > 0 &&
         candidate.spaceUsername.trim().length > 0
     );
 };
@@ -87,36 +83,27 @@ export const clearPendingSpaceInviteFriend = () => {
     sessionStorage.removeItem(pendingSpaceInviteFriendKey);
 };
 
-export const saveAcceptedSpaceInviteFriend = (
-    friend: SpaceInviteFriendSummary,
-) => {
-    acceptedSpaceInviteFriend = friend;
+export const saveSentSpaceInviteFriend = (friend: SpaceInviteFriendSummary) => {
+    sentSpaceInviteFriend = friend;
 };
 
-export const consumeAcceptedSpaceInviteFriend = () => {
-    const friend = acceptedSpaceInviteFriend;
-    acceptedSpaceInviteFriend = undefined;
+export const consumeSentSpaceInviteFriend = () => {
+    const friend = sentSpaceInviteFriend;
+    sentSpaceInviteFriend = undefined;
     return friend;
 };
 
 export const spaceInviteFromLocation = (): PendingSpaceInvite | null => {
     const match = /^\/([^/]+)\/?$/.exec(window.location.pathname);
-    const encodedAccessKey = window.location.hash.slice(1).trim();
-    if (!match || !encodedAccessKey) return null;
+    if (!match || window.location.hash.trim()) return null;
 
     try {
-        const accessKey = decodeURIComponent(encodedAccessKey).trim();
         const spaceUsername = decodeURIComponent(match[1] ?? "").trim();
-        return spaceInviteAccessKeyPattern.test(accessKey) && spaceUsername
-            ? { accessKey, spaceUsername }
-            : null;
+        return spaceUsername ? { spaceUsername } : null;
     } catch {
         return null;
     }
 };
 
-export const spaceInviteURL = ({
-    accessKey,
-    spaceUsername,
-}: PendingSpaceInvite) =>
-    `${window.location.origin}/${encodeURIComponent(spaceUsername)}#${encodeURIComponent(accessKey)}`;
+export const spaceInviteURL = ({ spaceUsername }: PendingSpaceInvite) =>
+    `${window.location.origin}/${encodeURIComponent(spaceUsername)}`;

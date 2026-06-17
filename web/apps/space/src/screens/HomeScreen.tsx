@@ -103,15 +103,14 @@ const FeedReplyIcon: React.FC = () => (
 );
 
 interface HomeScreenProps {
-    addedFriendToastName?: string;
     feedItems: SpacePost[];
+    friendRequestSentToastName?: string;
     friendsCount: number;
     hasMoreFeedItems?: boolean;
     hasUnreadMessages?: boolean;
     isFeedLoading?: boolean;
     isFeedLoadingMore?: boolean;
     localFeedPosts?: LocalSpaceFeedPost[];
-    onAddedFriendToastClose?: () => void;
     onCreatePost?: (
         image: DraftSpacePostImage,
         caption: string,
@@ -120,6 +119,7 @@ interface HomeScreenProps {
     onLoadMoreFeedItems?: () => Promise<void> | void;
     onLoadPostAvatar?: SpacePostAvatarURLLoader;
     onLoadPostImage?: SpacePostAssetURLLoader;
+    onFriendRequestSentToastClose?: () => void;
     onOpenFriend?: (friendID: string) => void;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
@@ -196,7 +196,7 @@ interface FeedSkeletonItemProps {
 }
 
 interface AddedFriendToastProps {
-    name: string;
+    message: string;
     onClose?: () => void;
 }
 
@@ -1165,7 +1165,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
 };
 
 const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
-    name,
+    message,
     onClose,
 }) => (
     <Box
@@ -1223,7 +1223,7 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                     whiteSpace: "nowrap",
                 }}
             >
-                You&apos;re now friends with {name}!
+                {message}
             </Box>
             <Box
                 component="button"
@@ -1261,20 +1261,20 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
 );
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
-    addedFriendToastName,
     feedItems,
+    friendRequestSentToastName,
     friendsCount,
     hasMoreFeedItems = false,
     hasUnreadMessages,
     isFeedLoading = false,
     isFeedLoadingMore = false,
     localFeedPosts = [],
-    onAddedFriendToastClose,
     onCreatePost,
     onDeletePost,
     onLoadMoreFeedItems,
     onLoadPostAvatar,
     onLoadPostImage,
+    onFriendRequestSentToastClose,
     onOpenFriend,
     onOpenMessages,
     onOpenProfile,
@@ -2183,10 +2183,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         onSetPostLiked={onSetPostLiked}
                     />
                 )}
-                {addedFriendToastName && (
+                {friendRequestSentToastName && (
                     <AddedFriendToast
-                        name={addedFriendToastName}
-                        onClose={onAddedFriendToastClose}
+                        message={`Friend request sent to ${friendRequestSentToastName}`}
+                        onClose={onFriendRequestSentToastClose}
                     />
                 )}
                 <SpaceInviteFriendsDialog

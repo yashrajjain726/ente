@@ -843,8 +843,18 @@ func (r *MessagesRepository) HasUnreadNotifications(ctx context.Context, viewerI
 			 AND nrm.friend_space_id = c.friend_space_id
 			WHERE c.notification_created_at > COALESCE(nrm.read_at, 0)
 			LIMIT 1
+		) OR EXISTS (
+			SELECT 1
+			FROM space_friend_requests fr
+			JOIN spaces requester_space ON requester_space.space_id = fr.requester_space_id
+			JOIN users requester_owner ON requester_owner.user_id = requester_space.owner_id AND requester_owner.encrypted_email IS NOT NULL
+			WHERE fr.target_space_id = $1
+			  AND fr.target_id = $2
+			  AND fr.is_deleted = FALSE
+			  AND fr.resolved_at IS NULL
+			LIMIT 1
 		)
-	`, strings.TrimSpace(viewerSpaceID)).Scan(&exists); err != nil {
+	`, strings.TrimSpace(viewerSpaceID), viewerID).Scan(&exists); err != nil {
 		return false, stacktrace.Propagate(err, "")
 	}
 	return exists, nil

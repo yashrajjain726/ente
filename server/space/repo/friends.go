@@ -110,6 +110,308 @@ func (r *FriendsRepository) AddFriendWithCreated(ctx context.Context, requesterI
 	return !alreadyFriends, nil
 }
 
+func (r *FriendsRepository) CreateFriendRequest(ctx context.Context, requesterID int64, requesterSpaceID string, targetSpaceID string, requesterEncryptedSpaceKey string, requesterKeyVersion int) (*SpaceFriendRequestRecord, bool, error) {
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, false, stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
+
+	var requesterOwnerID int64
+	var requesterCurrentVersion int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT owner_id, current_version
+		FROM spaces
+		WHERE space_id = $1
+		FOR UPDATE
+	`, requesterSpaceID).Scan(&requesterOwnerID, &requesterCurrentVersion); err != nil {
+		return nil, false, stacktrace.Propagate(err, "")
+	}
+	if requesterOwnerID != requesterID || requesterCurrentVersion != requesterKeyVersion {
+		return nil, false, sql.ErrNoRows
+	}
+
+	var targetOwnerID int64
+	if err := tx.QueryRowContext(ctx, `
+		SELECT target_space.owner_id
+		FROM spaces target_space
+		JOIN users target_owner ON target_owner.user_id = target_space.owner_id AND target_owner.encrypted_email IS NOT NULL
+		WHERE target_space.space_id = $1
+		FOR UPDATE OF target_space
+	`, targetSpaceID).Scan(&targetOwnerID); err != nil {
+		return nil, false, stacktrace.Propagate(err, "")
+	}
+	if targetOwnerID == requesterID {
+		return nil, false, ErrSelfFriendship
+	}
+
+	var alreadyFriends bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM space_friend_shares target_share
+			JOIN space_friend_shares requester_share
+			  ON requester_share.space_id = $1
+			 AND requester_share.friend_id = $2
+			 AND requester_share.friend_space_id = $3
+			WHERE target_share.space_id = $3
+			  AND target_share.friend_id = $4
+			  AND target_share.friend_space_id = $1
+		)
+	`, requesterSpaceID, targetOwnerID, targetSpaceID, requesterID).Scan(&alreadyFriends); err != nil {
+		return nil, false, stacktrace.Propagate(err, "")
+	}
+	if alreadyFriends {
+		return nil, false, ErrAlreadyFriends
+	}
+
+	var rec SpaceFriendRequestRecord
+	err = tx.QueryRowContext(ctx, `
+		SELECT request_id, created_at
+		FROM space_friend_requests
+		WHERE requester_space_id = $1
+		  AND target_space_id = $2
+		  AND is_deleted = FALSE
+		  AND resolved_at IS NULL
+		FOR UPDATE
+	`, requesterSpaceID, targetSpaceID).Scan(&rec.RequestID, &rec.CreatedAt)
+	switch {
+	case err == nil:
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE space_friend_requests
+			SET requester_encrypted_space_key = $2,
+			    requester_key_version = $3
+			WHERE request_id = $1
+		`, rec.RequestID, requesterEncryptedSpaceKey, requesterKeyVersion); err != nil {
+			return nil, false, stacktrace.Propagate(err, "")
+		}
+		rec.RequesterID = requesterID
+		rec.RequesterSpaceID = requesterSpaceID
+		rec.TargetID = targetOwnerID
+		rec.TargetSpaceID = targetSpaceID
+		rec.RequesterEncryptedSpaceKey = requesterEncryptedSpaceKey
+		rec.RequesterKeyVersion = requesterKeyVersion
+		return &rec, false, stacktrace.Propagate(tx.Commit(), "")
+	case !errors.Is(err, sql.ErrNoRows):
+		return nil, false, stacktrace.Propagate(err, "")
+	}
+
+	if err := tx.QueryRowContext(ctx, `
+		INSERT INTO space_friend_requests (
+			requester_id,
+			requester_space_id,
+			target_id,
+			target_space_id,
+			requester_encrypted_space_key,
+			requester_key_version
+		)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING request_id, created_at
+	`, requesterID, requesterSpaceID, targetOwnerID, targetSpaceID, requesterEncryptedSpaceKey, requesterKeyVersion).Scan(&rec.RequestID, &rec.CreatedAt); err != nil {
+		return nil, false, stacktrace.Propagate(err, "")
+	}
+	rec.RequesterID = requesterID
+	rec.RequesterSpaceID = requesterSpaceID
+	rec.TargetID = targetOwnerID
+	rec.TargetSpaceID = targetSpaceID
+	rec.RequesterEncryptedSpaceKey = requesterEncryptedSpaceKey
+	rec.RequesterKeyVersion = requesterKeyVersion
+	return &rec, true, stacktrace.Propagate(tx.Commit(), "")
+}
+
+func (r *FriendsRepository) ListFriendRequestsForSpace(ctx context.Context, targetID int64, targetSpaceID string) ([]SpaceFriendRequestRecord, error) {
+	rows, err := r.DB.QueryContext(ctx, `
+		SELECT fr.request_id,
+		       fr.requester_id,
+		       fr.requester_space_id,
+		       fr.target_id,
+		       fr.target_space_id,
+		       fr.requester_encrypted_space_key,
+		       fr.requester_key_version,
+		       fr.created_at,
+		       requester_space.owner_id,
+		       requester_space.space_id,
+		       requester_space.space_slug,
+		       requester_space.public_key,
+		       requester_space.current_version,
+		       '' AS encrypted_profile,
+		       NULL::TEXT AS avatar_object_key,
+		       NULL::BIGINT AS avatar_size,
+		       requester_space.updated_at,
+		       NULL::BIGINT AS friends,
+		       NULL::BIGINT AS posts
+		FROM space_friend_requests fr
+		JOIN spaces requester_space ON requester_space.space_id = fr.requester_space_id
+		JOIN users requester_owner ON requester_owner.user_id = requester_space.owner_id AND requester_owner.encrypted_email IS NOT NULL
+		WHERE fr.target_id = $1
+		  AND fr.target_space_id = $2
+		  AND fr.is_deleted = FALSE
+		  AND fr.resolved_at IS NULL
+		ORDER BY fr.created_at DESC, fr.request_id DESC
+	`, targetID, targetSpaceID)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	defer rows.Close()
+
+	var out []SpaceFriendRequestRecord
+	for rows.Next() {
+		var rec SpaceFriendRequestRecord
+		dest := []any{
+			&rec.RequestID,
+			&rec.RequesterID,
+			&rec.RequesterSpaceID,
+			&rec.TargetID,
+			&rec.TargetSpaceID,
+			&rec.RequesterEncryptedSpaceKey,
+			&rec.RequesterKeyVersion,
+			&rec.CreatedAt,
+		}
+		dest = append(dest, spaceActorScanDest(&rec.Requester)...)
+		if err := rows.Scan(dest...); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		out = append(out, rec)
+	}
+	return out, stacktrace.Propagate(rows.Err(), "")
+}
+
+func (r *FriendsRepository) ConfirmFriendRequest(ctx context.Context, targetID int64, targetSpaceID string, requestID int64, targetEncryptedSpaceKey string, targetKeyVersion int) (int64, bool, error) {
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, false, stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
+
+	var requesterID int64
+	var requesterSpaceID string
+	var requesterEncryptedSpaceKey string
+	var requesterKeyVersion int
+	var requesterCurrentVersion int
+	var targetOwnerID int64
+	var targetCurrentVersion int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT fr.requester_id,
+		       fr.requester_space_id,
+		       fr.requester_encrypted_space_key,
+		       fr.requester_key_version,
+		       requester_space.current_version,
+		       target_space.owner_id,
+		       target_space.current_version
+		FROM space_friend_requests fr
+		JOIN spaces requester_space ON requester_space.space_id = fr.requester_space_id
+		JOIN users requester_owner ON requester_owner.user_id = requester_space.owner_id AND requester_owner.encrypted_email IS NOT NULL
+		JOIN spaces target_space ON target_space.space_id = fr.target_space_id
+		WHERE fr.request_id = $1
+		  AND fr.target_id = $2
+		  AND fr.target_space_id = $3
+		  AND fr.is_deleted = FALSE
+		  AND fr.resolved_at IS NULL
+		FOR UPDATE OF fr, requester_space, target_space
+	`, requestID, targetID, targetSpaceID).Scan(
+		&requesterID,
+		&requesterSpaceID,
+		&requesterEncryptedSpaceKey,
+		&requesterKeyVersion,
+		&requesterCurrentVersion,
+		&targetOwnerID,
+		&targetCurrentVersion,
+	); err != nil {
+		return 0, false, stacktrace.Propagate(err, "")
+	}
+	if targetOwnerID != targetID || targetCurrentVersion != targetKeyVersion || requesterCurrentVersion != requesterKeyVersion {
+		return 0, false, sql.ErrNoRows
+	}
+
+	var alreadyFriends bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM space_friend_shares target_share
+			JOIN space_friend_shares requester_share
+			  ON requester_share.space_id = $1
+			 AND requester_share.friend_id = $2
+			 AND requester_share.friend_space_id = $3
+			WHERE target_share.space_id = $3
+			  AND target_share.friend_id = $4
+			  AND target_share.friend_space_id = $1
+		)
+	`, requesterSpaceID, targetID, targetSpaceID, requesterID).Scan(&alreadyFriends); err != nil {
+		return 0, false, stacktrace.Propagate(err, "")
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO space_friend_shares (space_id, friend_id, friend_space_id, encrypted_space_key, key_version)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (space_id, friend_space_id) DO UPDATE
+		SET encrypted_space_key = EXCLUDED.encrypted_space_key,
+		    key_version = EXCLUDED.key_version
+	`, targetSpaceID, requesterID, requesterSpaceID, targetEncryptedSpaceKey, targetKeyVersion); err != nil {
+		return 0, false, stacktrace.Propagate(err, "")
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO space_friend_shares (space_id, friend_id, friend_space_id, encrypted_space_key, key_version)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (space_id, friend_space_id) DO UPDATE
+		SET encrypted_space_key = EXCLUDED.encrypted_space_key,
+		    key_version = EXCLUDED.key_version
+	`, requesterSpaceID, targetID, targetSpaceID, requesterEncryptedSpaceKey, requesterKeyVersion); err != nil {
+		return 0, false, stacktrace.Propagate(err, "")
+	}
+
+	if !alreadyFriends {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO space_friend_events (event_type, actor_id, actor_space_id, target_id, target_space_id)
+			VALUES ('friend_add', $1, $2, $3, $4)
+		`, targetID, targetSpaceID, requesterID, requesterSpaceID); err != nil {
+			return 0, false, stacktrace.Propagate(err, "")
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE space_friend_requests
+		SET is_deleted = TRUE,
+		    resolved_at = now_utc_micro_seconds()
+		WHERE request_id = $1
+		   OR (
+			   requester_space_id = $2
+			   AND target_space_id = $3
+			   AND is_deleted = FALSE
+			   AND resolved_at IS NULL
+		   )
+	`, requestID, targetSpaceID, requesterSpaceID); err != nil {
+		return 0, false, stacktrace.Propagate(err, "")
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, false, stacktrace.Propagate(err, "")
+	}
+	return requesterID, !alreadyFriends, nil
+}
+
+func (r *FriendsRepository) DeleteFriendRequest(ctx context.Context, targetID int64, requestID int64) error {
+	res, err := r.DB.ExecContext(ctx, `
+		UPDATE space_friend_requests
+		SET is_deleted = TRUE
+		WHERE request_id = $1
+		  AND target_id = $2
+		  AND is_deleted = FALSE
+		  AND resolved_at IS NULL
+	`, requestID, targetID)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (r *FriendsRepository) UpsertShare(ctx context.Context, spaceID string, friendID int64, friendSpaceID string, encryptedSpaceKey string, keyVersion int) error {
 	_, err := r.DB.ExecContext(ctx, `
 		INSERT INTO space_friend_shares (space_id, friend_id, friend_space_id, encrypted_space_key, key_version)

@@ -245,6 +245,18 @@ type SpaceFriendRecord struct {
 	CreatedAt       int64
 }
 
+type SpaceFriendRequestRecord struct {
+	RequestID                  int64
+	RequesterID                int64
+	RequesterSpaceID           string
+	TargetID                   int64
+	TargetSpaceID              string
+	RequesterEncryptedSpaceKey string
+	RequesterKeyVersion        int
+	CreatedAt                  int64
+	Requester                  SpaceActorRecord
+}
+
 type SpaceLinkRecord struct {
 	SpaceID            string
 	SpaceSlug          string

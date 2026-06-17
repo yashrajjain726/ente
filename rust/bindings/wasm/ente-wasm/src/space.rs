@@ -290,6 +290,14 @@ struct FriendJs {
     created_at: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FriendRequestJs {
+    request_id: i64,
+    requester: ActorJs,
+    created_at: String,
+}
+
 fn decode_b64_field(value: &str) -> Result<Vec<u8>, WasmSpaceError> {
     decode_b64(value).map_err(Into::into)
 }
@@ -371,6 +379,10 @@ async fn link_actor_to_js(
 ) -> Result<ActorJs, WasmSpaceError> {
     let profile = ctx.decrypt_actor_profile(&actor).await?;
     actor_to_js(actor, profile)
+}
+
+fn public_actor_to_js(actor: SpaceActorResponse) -> Result<ActorJs, WasmSpaceError> {
+    actor_to_js(actor, None)
 }
 
 fn post_object_to_js(
@@ -852,6 +864,20 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&self.inner.add_friend_from_link(&link).await?).map_err(Into::into)
     }
 
+    /// Request to add a public username as a friend.
+    pub async fn request_friend_by_username(
+        &self,
+        space_username: String,
+    ) -> Result<JsValue, WasmSpaceError> {
+        swb::to_value(
+            &self
+                .inner
+                .request_friend_by_username(&space_username)
+                .await?,
+        )
+        .map_err(Into::into)
+    }
+
     /// List the current account feed with captions decrypted.
     pub async fn list_feed(
         &self,
@@ -1213,6 +1239,33 @@ impl SpaceAccountCtxHandle {
             });
         }
         swb::to_value(&items).map_err(Into::into)
+    }
+
+    /// List incoming friend requests for the current account.
+    pub async fn list_friend_requests(&self) -> Result<JsValue, WasmSpaceError> {
+        let requests = self.inner.list_friend_requests().await?;
+        let mut items = Vec::with_capacity(requests.len());
+        for request in requests {
+            items.push(FriendRequestJs {
+                request_id: request.request_id,
+                requester: public_actor_to_js(request.requester)?,
+                created_at: request.created_at,
+            });
+        }
+        swb::to_value(&items).map_err(Into::into)
+    }
+
+    /// Confirm an incoming friend request.
+    pub async fn confirm_friend_request(&self, request_id: i64) -> Result<JsValue, WasmSpaceError> {
+        swb::to_value(&self.inner.confirm_friend_request(request_id).await?).map_err(Into::into)
+    }
+
+    /// Delete an incoming friend request.
+    pub async fn delete_friend_request(&self, request_id: i64) -> Result<(), WasmSpaceError> {
+        self.inner
+            .delete_friend_request(request_id)
+            .await
+            .map_err(Into::into)
     }
 
     /// Remove a friend by their space ID.

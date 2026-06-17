@@ -71,7 +71,13 @@ interface MessagesScreenProps {
     messages: SpaceMessage[];
     onBack?: () => void;
     onCloseThread: () => void;
+    onConfirmFriendRequest: (
+        conversation: SpaceMessageConversation,
+    ) => Promise<void>;
     onDeleteMessage: (messageId: string) => Promise<void>;
+    onDeleteFriendRequest: (
+        conversation: SpaceMessageConversation,
+    ) => Promise<void>;
     onOpenSelectedFriendProfile: (
         friend: SpaceMessageConversation["friend"],
     ) => void;
@@ -187,6 +193,9 @@ const conversationPreview = (
     profile: SetupProfile,
 ) => {
     const activity = conversation.latestActivity;
+    if (activity.type == "friend_request") {
+        return "Wants to add you as a friend";
+    }
     if (activity.type == "friend_add") {
         return "You're now friends. Say hello!";
     }
@@ -288,7 +297,9 @@ const ConversationPreviewLine: React.FC<{
 };
 
 const conversationId = (conversation: SpaceMessageConversation) =>
-    conversation.friend.spaceId ?? conversation.friend.id;
+    conversation.latestActivity.type == "friend_request"
+        ? conversation.latestActivity.id
+        : (conversation.friend.spaceId ?? conversation.friend.id);
 
 const conversationTimeSections = (
     conversations: SpaceMessageConversation[],
@@ -426,23 +437,51 @@ const MessageTimeSeparator: React.FC<{ timestampMs: number }> = ({
 
 const ConversationListItem: React.FC<{
     conversation: SpaceMessageConversation;
+    onConfirmFriendRequest: (
+        conversation: SpaceMessageConversation,
+    ) => Promise<void>;
+    onDeleteFriendRequest: (
+        conversation: SpaceMessageConversation,
+    ) => Promise<void>;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
     profile: SetupProfile;
-}> = ({ conversation, onOpenThread, profile }) => {
+}> = ({
+    conversation,
+    onConfirmFriendRequest,
+    onDeleteFriendRequest,
+    onOpenThread,
+    profile,
+}) => {
     const name =
         conversation.friend.fullName.trim() || conversation.friend.username;
     const timestampLabel = formatTimeAgo(
         microsForTimestamp(conversation.latestActivity.createdAtMs),
     );
+    const isFriendRequest =
+        conversation.latestActivity.type == "friend_request";
     const postThumbnailUrl = conversation.latestActivity.post?.imageUrl;
     const unreadCount = conversation.unreadCount;
+    const confirmFriendRequest = () => {
+        void onConfirmFriendRequest(conversation).catch((error: unknown) =>
+            console.error("Failed to confirm friend request", error),
+        );
+    };
+    const deleteFriendRequest = () => {
+        void onDeleteFriendRequest(conversation).catch((error: unknown) =>
+            console.error("Failed to delete friend request", error),
+        );
+    };
 
     return (
         <Box component="li" sx={{ listStyle: "none" }}>
             <Box
-                component="button"
-                type="button"
-                onClick={() => onOpenThread(conversation)}
+                component={isFriendRequest ? "div" : "button"}
+                type={isFriendRequest ? undefined : "button"}
+                onClick={
+                    isFriendRequest
+                        ? undefined
+                        : () => onOpenThread(conversation)
+                }
                 sx={{
                     alignItems: "center",
                     appearance: "none",
@@ -450,12 +489,14 @@ const ConversationListItem: React.FC<{
                     border: 0,
                     borderRadius: "8px",
                     color: textBase,
-                    cursor: "pointer",
+                    cursor: isFriendRequest ? "default" : "pointer",
                     display: "grid",
                     gap: "10px",
-                    gridTemplateColumns: postThumbnailUrl
-                        ? "44px minmax(0, 1fr) 44px"
-                        : "44px minmax(0, 1fr)",
+                    gridTemplateColumns: isFriendRequest
+                        ? "44px minmax(0, 1fr) auto"
+                        : postThumbnailUrl
+                          ? "44px minmax(0, 1fr) 44px"
+                          : "44px minmax(0, 1fr)",
                     minHeight: 64,
                     p: "8px 0",
                     textAlign: "left",
@@ -588,16 +629,74 @@ const ConversationListItem: React.FC<{
                         }}
                     />
                 )}
+                {isFriendRequest && (
+                    <Box sx={{ display: "flex", flexShrink: 0, gap: "6px" }}>
+                        <Box
+                            component="button"
+                            type="button"
+                            onClick={confirmFriendRequest}
+                            sx={{
+                                bgcolor: green,
+                                border: 0,
+                                borderRadius: "12px",
+                                color: "white",
+                                cursor: "pointer",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                height: 34,
+                                px: "12px",
+                                "&:hover": { bgcolor: "#07A820" },
+                            }}
+                        >
+                            Confirm
+                        </Box>
+                        <Box
+                            component="button"
+                            type="button"
+                            onClick={deleteFriendRequest}
+                            sx={{
+                                bgcolor: "#F1F1F1",
+                                border: 0,
+                                borderRadius: "12px",
+                                color: textBase,
+                                cursor: "pointer",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                height: 34,
+                                px: "12px",
+                                "&:hover": { bgcolor: "#E7E7E7" },
+                            }}
+                        >
+                            Delete
+                        </Box>
+                    </Box>
+                )}
             </Box>
         </Box>
     );
 };
 
 const ConversationSection: React.FC<{
+    onConfirmFriendRequest: (
+        conversation: SpaceMessageConversation,
+    ) => Promise<void>;
+    onDeleteFriendRequest: (
+        conversation: SpaceMessageConversation,
+    ) => Promise<void>;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
     profile: SetupProfile;
     section: ConversationSection;
-}> = ({ onOpenThread, profile, section }) => {
+}> = ({
+    onConfirmFriendRequest,
+    onDeleteFriendRequest,
+    onOpenThread,
+    profile,
+    section,
+}) => {
     if (section.items.length == 0) return null;
 
     return (
@@ -622,6 +721,8 @@ const ConversationSection: React.FC<{
                     <ConversationListItem
                         key={conversationId(conversation)}
                         conversation={conversation}
+                        onConfirmFriendRequest={onConfirmFriendRequest}
+                        onDeleteFriendRequest={onDeleteFriendRequest}
                         onOpenThread={onOpenThread}
                         profile={profile}
                     />
@@ -1296,7 +1397,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     newConversationIds = [],
     onBack,
     onCloseThread,
+    onConfirmFriendRequest,
     onDeleteMessage,
+    onDeleteFriendRequest,
     onOpenSelectedFriendProfile,
     onOpenQuotePost,
     onOpenThread,
@@ -2447,6 +2550,12 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     {conversationSections.map((section) => (
                                         <ConversationSection
                                             key={section.title}
+                                            onConfirmFriendRequest={
+                                                onConfirmFriendRequest
+                                            }
+                                            onDeleteFriendRequest={
+                                                onDeleteFriendRequest
+                                            }
                                             onOpenThread={onOpenThread}
                                             profile={profile}
                                             section={section}
