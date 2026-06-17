@@ -4,7 +4,7 @@ import {
     Menu01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Skeleton } from "@mui/material";
+import { Box, CircularProgress, Skeleton } from "@mui/material";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import {
     SpaceFileViewer,
@@ -50,7 +50,6 @@ const photoMasonryGap = "3px";
 const photoMasonryPlaceholderBackground = "#F2F2F2";
 const photoMasonryRadius = "12px";
 const photoMasonryLoadRootMargin = "800px 0px";
-const profilePostSkeletonAspectRatios = [1.18, 0.82, 1.45];
 interface ProfilePhotoDimensions {
     height: number;
     width: number;
@@ -204,53 +203,20 @@ const ProfileStatsSkeleton: React.FC = () => (
     </Box>
 );
 
-const ProfilePostLoadingSkeletons: React.FC = () => (
+const ProfilePostLoadingIndicator: React.FC = () => (
     <Box
         role="status"
         aria-label="Loading posts"
         sx={{
+            alignItems: "center",
             display: "flex",
-            flexDirection: "column",
-            gap: "10px",
+            justifyContent: "center",
+            minHeight: 144,
             mx: "16px",
             width: "calc(100% - 32px)",
         }}
     >
-        <Skeleton
-            variant="rectangular"
-            sx={{
-                bgcolor: photoMasonryPlaceholderBackground,
-                borderRadius: "999px",
-                height: 12,
-                mx: "2px",
-                width: 72,
-            }}
-        />
-        <Box
-            sx={{
-                borderRadius: photoMasonryRadius,
-                display: "flex",
-                flexDirection: "column",
-                gap: photoMasonryGap,
-                overflow: "hidden",
-                width: "100%",
-            }}
-        >
-            {profilePostSkeletonAspectRatios.map((aspectRatio, index) => (
-                <Skeleton
-                    key={index}
-                    variant="rectangular"
-                    sx={{
-                        aspectRatio,
-                        bgcolor: photoMasonryPlaceholderBackground,
-                        display: "block",
-                        height: "auto",
-                        transform: "none",
-                        width: "100%",
-                    }}
-                />
-            ))}
-        </Box>
+        <CircularProgress size={26} thickness={4} sx={{ color: green }} />
     </Box>
 );
 
@@ -389,7 +355,7 @@ interface ProfileScreenProps {
     isCoverLoading?: boolean;
     isPostsLoading?: boolean;
     isStatsLoading?: boolean;
-    showPostLoadingSkeleton?: boolean;
+    showPostLoadingIndicator?: boolean;
     onAddFriend?: () => void;
     onBack?: () => void;
     onCreatePost?: (
@@ -432,7 +398,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onShareProfileLink,
     postGroups = [],
     profile,
-    showPostLoadingSkeleton,
+    showPostLoadingIndicator,
     spaceLogoHref = "https://ente.com/space",
 }) => {
     const [selectedPost, setSelectedPost] =
@@ -484,9 +450,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const canOpenProfileCover = isOwnerProfile && Boolean(onOpenProfileCover);
     const canOpenProfilePhoto = isOwnerProfile && Boolean(onOpenProfilePhoto);
     const hasProfilePosts = postsSharedCount > 0;
-    const shouldShowPostLoadingSkeleton =
-        isPostsLoading && (showPostLoadingSkeleton ?? true);
-    const shouldShowPostGrid = hasProfilePosts || shouldShowPostLoadingSkeleton;
+    const shouldShowPostLoadingIndicator =
+        isPostsLoading && (showPostLoadingIndicator ?? true);
+    const shouldShowPostGrid =
+        hasProfilePosts || shouldShowPostLoadingIndicator;
     const isCoverImageLoading = Boolean(coverUrl && loadedCoverUrl != coverUrl);
     const shouldShowCoverSkeleton =
         isCoverLoading || isCoverURLPending || isCoverImageLoading;
@@ -1534,8 +1501,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 </Box>
                             );
                         })
-                    ) : shouldShowPostLoadingSkeleton ? (
-                        <ProfilePostLoadingSkeletons />
+                    ) : shouldShowPostLoadingIndicator ? (
+                        <ProfilePostLoadingIndicator />
                     ) : isPostsLoading ? null : (
                         <Box
                             sx={{
