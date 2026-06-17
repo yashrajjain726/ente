@@ -3,7 +3,6 @@ import {
     Camera01Icon,
     ArrowRight01Icon as ChevronRightIcon,
     CustomerSupportIcon,
-    HelpCircleIcon,
     Image01Icon,
     Logout05Icon,
     UserEdit01Icon,
@@ -24,7 +23,6 @@ const rowBackground = "#FFFFFF";
 const dangerColor = "#F63A3A";
 const iconMuted = "#8C8C8C";
 const textLight = "#969696";
-const helpURL = "https://ente.com/help/photos/features/profile";
 const supportMailURL = "mailto:support@ente.com";
 const spaceLinks = [
     {
@@ -325,11 +323,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                         icon={UserIcon}
                         label="Profile"
                         onClick={onOpenProfile}
-                    />
-                    <SettingsRow
-                        href={helpURL}
-                        icon={HelpCircleIcon}
-                        label="Help"
                     />
                     <SettingsRow
                         href={supportMailURL}
