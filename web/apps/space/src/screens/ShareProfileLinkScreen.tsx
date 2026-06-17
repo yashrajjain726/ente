@@ -233,7 +233,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             width: "100%",
                         }}
                     >
-                        Invite your friends and family to follow your life
+                        Next, invite friends and family to follow your life
                     </Box>
                 </Box>
 
@@ -296,7 +296,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             onClick={onDone}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: "#F5F5F5",
+                                bgcolor: "#F2F2F2",
                                 border: 0,
                                 borderRadius: "20px",
                                 color: textMuted,
@@ -315,7 +315,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 2,
                                 },
-                                "&:hover": { bgcolor: "#EFEFEF" },
+                                "&:hover": { bgcolor: "#ECECEC" },
                             }}
                         >
                             Done
