@@ -627,6 +627,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			asset.metadata_cipher AS post_object_metadata_cipher
 		FROM ranked c
 		JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
+		JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
 		LEFT JOIN space_messages m ON m.message_id = c.message_id
 		LEFT JOIN spaces sender_space ON sender_space.space_id = m.sender_space_id
 		LEFT JOIN spaces recipient_space ON recipient_space.space_id = m.recipient_space_id
@@ -760,6 +761,8 @@ func (r *MessagesRepository) GetLatestConversationActivityAt(ctx context.Context
 		)
 		SELECT c.activity_created_at
 		FROM candidates c
+		JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
+		JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
 		WHERE c.friend_space_id = $2
 		ORDER BY c.activity_created_at DESC, c.activity_id DESC
 		LIMIT 1
@@ -833,6 +836,8 @@ func (r *MessagesRepository) HasUnreadNotifications(ctx context.Context, viewerI
 		SELECT EXISTS (
 			SELECT 1
 			FROM notification_candidates c
+			JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
+			JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
 			LEFT JOIN space_notification_read_markers nrm
 			  ON nrm.viewer_space_id = $1
 			 AND nrm.friend_space_id = c.friend_space_id

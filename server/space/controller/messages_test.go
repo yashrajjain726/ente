@@ -100,6 +100,25 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	require.True(t, errors.Is(err, ente.ErrPermissionDenied))
 }
 
+func TestListThreadHidesDeletedTargetOwner(t *testing.T) {
+	controller, repos, ctx := setupMessagesControllerTest(t)
+	aliceID, aliceSpace := createMessageControllerUserAndSpace(t, repos, "alice-thread-deleted-owner", "alice-thread-public")
+	bobID, bobSpace := createMessageControllerUserAndSpace(t, repos, "bob-thread-deleted-owner", "bob-thread-public")
+	require.NoError(t, repos.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
+	createRepoMessage(t, repos, bobID, bobSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
+
+	page, err := controller.ListThread(newSpaceControllerContext(aliceID), bobSpace.SpaceID, models.ListMessageThreadRequest{})
+	require.NoError(t, err)
+	require.Len(t, page.Items, 1)
+
+	_, err = repos.Spaces.DB.Exec(`UPDATE users SET encrypted_email = NULL WHERE user_id = $1`, bobID)
+	require.NoError(t, err)
+
+	page, err = controller.ListThread(newSpaceControllerContext(aliceID), bobSpace.SpaceID, models.ListMessageThreadRequest{})
+	require.Nil(t, page)
+	require.True(t, errors.Is(err, ente.ErrNotFound))
+}
+
 func TestValidateCreateMessageRequestLimits(t *testing.T) {
 	valid := models.CreateMessageRequest{
 		MessageCipher:                spaceTestB64("cipher"),

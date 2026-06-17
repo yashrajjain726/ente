@@ -13,7 +13,7 @@
   "validEmailAddress": "Valid email address",
   "enterValidEmail": "Please enter a valid email address.",
   "deleteAccount": "Delete account",
-  "deleteAccountWarning": "This will delete your Ente Auth, Ente Photos and Ente Locker account.",
+  "deleteAccountWarning": "This will delete your Ente Auth, Ente Photos, Ente Locker and Ente Space account.",
   "askDeleteReason": "What is the main reason you are deleting your account?",
   "deleteAccountFeedbackPrompt": "We are sorry to see you go. Please share your feedback to help us improve.",
   "feedback": "Feedback",

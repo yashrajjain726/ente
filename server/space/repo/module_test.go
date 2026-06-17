@@ -39,6 +39,14 @@ func insertSpaceUser(t *testing.T, module *Module, email string, publicKey strin
 	return userID
 }
 
+func countSpaceRows(t *testing.T, module *Module, query string, args ...any) int64 {
+	t.Helper()
+	var count int64
+	err := module.Spaces.DB.QueryRow(query, args...).Scan(&count)
+	require.NoError(t, err)
+	return count
+}
+
 func TestGetBrowserSession(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
@@ -82,6 +90,134 @@ func TestUpdateSlugRejectsReservedSlug(t *testing.T) {
 	unchanged, err := module.Spaces.GetSpaceByID(ctx, space.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, "rename-user", unchanged.SpaceSlug)
+}
+
+func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+
+	aliceID := insertSpaceUser(t, module, "alice-reset-space@example.com", "alice-reset-public")
+	bobID := insertSpaceUser(t, module, "bob-reset-space@example.com", "bob-reset-public")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-reset-space", "alice-space-key", "alice-reset-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	require.NoError(t, err)
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-reset-space", "bob-space-key", "bob-reset-public", "bob-secret", "bob-secret-nonce", "bob-profile")
+	require.NoError(t, err)
+
+	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
+	_, err = module.Links.UpsertLink(ctx, aliceSpace.SpaceID, []byte("alice-auth-hash"), aliceSpace.CurrentVersion, "alice-link-space-key", "alice-link-access-key")
+	require.NoError(t, err)
+	require.NoError(t, module.Links.CreateSession(ctx, []byte("alice-link-token"), aliceSpace.SpaceID, []byte("alice-auth-hash"), aliceSpace.CurrentVersion, timeutil.NDaysFromNow(1)))
+	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, []byte("alice-browser-token"), aliceID, "client-key", timeutil.NDaysFromNow(1)))
+
+	postID, err := module.Posts.CreatePost(ctx, aliceID, aliceSpace.SpaceID, "alice-post-key", nil, aliceSpace.CurrentVersion, nil)
+	require.NoError(t, err)
+	require.NoError(t, module.Posts.SetLike(ctx, postID, bobID, bobSpace.SpaceID, true))
+	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     bobID,
+		SenderSpaceID:                bobSpace.SpaceID,
+		RecipientID:                  aliceID,
+		RecipientSpaceID:             aliceSpace.SpaceID,
+		MessageCipher:                "cipher",
+		SenderEncryptedMessageKey:    "sender-key",
+		RecipientEncryptedMessageKey: "recipient-key",
+	})
+	require.NoError(t, err)
+	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceID, aliceSpace.SpaceID, true))
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, timeutil.Microseconds()))
+
+	require.NoError(t, module.ResetUserAccess(ctx, aliceID))
+
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM spaces WHERE owner_id = $1`, aliceID))
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_posts WHERE owner_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_browser_sessions WHERE user_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_link_sessions WHERE space_id = $1`, aliceSpace.SpaceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1 OR friend_id = $2`, aliceSpace.SpaceID, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_events WHERE actor_space_id = $1 OR target_space_id = $1 OR actor_id = $2 OR target_id = $2`, aliceSpace.SpaceID, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1 OR user_id = $2`, aliceSpace.SpaceID, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_post_likes WHERE post_id = $1`, postID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_message_likes WHERE message_id = $1`, message.MessageID))
+
+	var active bool
+	require.NoError(t, module.Links.DB.QueryRow(`SELECT active FROM space_links WHERE space_id = $1`, aliceSpace.SpaceID).Scan(&active))
+	require.False(t, active)
+}
+
+func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+
+	aliceID := insertSpaceUser(t, module, "alice-delete-space@example.com", "alice-delete-public")
+	bobID := insertSpaceUser(t, module, "bob-delete-space@example.com", "bob-delete-public")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-delete-space", "alice-space-key", "alice-delete-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	require.NoError(t, err)
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-delete-space", "bob-space-key", "bob-delete-public", "bob-secret", "bob-secret-nonce", "bob-profile")
+	require.NoError(t, err)
+
+	_, err = module.Spaces.DB.Exec(`
+		UPDATE spaces
+		SET avatar_object_key = $2,
+		    avatar_bucket_id = $3,
+		    avatar_size = 11,
+		    cover_object_key = $4,
+		    cover_bucket_id = $5,
+		    cover_size = 22
+		WHERE space_id = $1
+	`, aliceSpace.SpaceID, "space/alice/avatar", "hot", "space/alice/cover", "cold")
+	require.NoError(t, err)
+	postID, err := module.Posts.CreatePost(ctx, aliceID, aliceSpace.SpaceID, "alice-post-key", nil, aliceSpace.CurrentVersion, nil)
+	require.NoError(t, err)
+	_, err = module.Posts.DB.Exec(`
+		INSERT INTO space_post_assets (post_id, object_key, bucket_id, size, position, metadata_cipher)
+		VALUES ($1, $2, $3, 33, 0, $4)
+	`, postID, "space/alice/post-asset", "hot", "metadata")
+	require.NoError(t, err)
+	require.NoError(t, module.Assets.AddTempObject(ctx, SpaceTempObjectRecord{
+		ObjectKey:    "space/alice/staged-upload",
+		OwnerID:      aliceID,
+		SpaceID:      sql.NullString{String: aliceSpace.SpaceID, Valid: true},
+		Purpose:      TempObjectPurposePost,
+		BucketID:     "hot",
+		ExpectedSize: 44,
+		ExpiresAt:    timeutil.NDaysFromNow(1),
+	}))
+	require.NoError(t, module.EntityKeys.CreateKey(ctx, aliceID, "primary", "encrypted-key", "header"))
+	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, []byte("alice-delete-browser-token"), aliceID, "client-key", timeutil.NDaysFromNow(1)))
+	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
+	_, err = module.Links.UpsertLink(ctx, aliceSpace.SpaceID, []byte("alice-delete-auth-hash"), aliceSpace.CurrentVersion, "alice-link-space-key", "alice-link-access-key")
+	require.NoError(t, err)
+	require.NoError(t, module.Links.CreateSession(ctx, []byte("alice-delete-link-token"), aliceSpace.SpaceID, []byte("alice-delete-auth-hash"), aliceSpace.CurrentVersion, timeutil.NDaysFromNow(1)))
+	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     bobID,
+		SenderSpaceID:                bobSpace.SpaceID,
+		RecipientID:                  aliceID,
+		RecipientSpaceID:             aliceSpace.SpaceID,
+		MessageCipher:                "cipher",
+		SenderEncryptedMessageKey:    "sender-key",
+		RecipientEncryptedMessageKey: "recipient-key",
+	})
+	require.NoError(t, err)
+	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceID, aliceSpace.SpaceID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, postID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, timeutil.Microseconds()))
+
+	require.NoError(t, module.DeleteUserData(ctx, aliceID))
+
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM spaces WHERE owner_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_posts WHERE owner_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_post_assets WHERE object_key = $1`, "space/alice/post-asset"))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE sender_id = $1 OR recipient_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_entity_keys WHERE user_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_browser_sessions WHERE user_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_link_sessions WHERE owner_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_links WHERE space_id = $1`, aliceSpace.SpaceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1 OR friend_id = $2`, aliceSpace.SpaceID, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1 OR user_id = $2`, aliceSpace.SpaceID, aliceID))
+
+	for _, objectKey := range []string{"space/alice/avatar", "space/alice/cover", "space/alice/post-asset", "space/alice/staged-upload"} {
+		require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_temp_objects WHERE object_key = $1 AND owner_id = $2 AND space_id IS NULL AND cleanup_after <= now_utc_micro_seconds()`, objectKey, aliceID))
+	}
 }
 
 func TestSpaceMessagesThreadAndConversations(t *testing.T) {

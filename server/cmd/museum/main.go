@@ -975,6 +975,7 @@ func main() {
 	userEntityController := &userEntityCtrl.Controller{Repo: userEntityRepo}
 	userEntityHandler := &api.UserEntityHandler{Controller: userEntityController}
 	spaceRepos := spacerepo.NewModule(db, s3Config)
+	userController.SpaceAccessResetter = spaceRepos
 	spaceModule := spacecontroller.NewModule(spaceRepos, userAuthRepo, &spacecontroller.SpaceEmailSender{UserRepo: userRepo})
 	spaceModule.UserTokens = userController
 	spaceHandlers := spaceapi.NewHandlers(spaceModule)
@@ -1026,6 +1027,7 @@ func main() {
 		TaskLockRepo:   taskLockingRepo,
 		TrashRepo:      trashRepo,
 		UsageRepo:      usageRepo,
+		SpaceDataRepo:  spaceRepos,
 		HostName:       hostName,
 	}
 	remoteStoreHandler := &api.RemoteStoreHandler{Controller: remoteStoreController}

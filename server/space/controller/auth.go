@@ -138,6 +138,9 @@ func (a authDeps) requireLinkSession(ctx context.Context, token string) (*spacer
 }
 
 func (a authDeps) canViewSpace(ctx context.Context, viewer *viewerAuth, space *spacerepo.SpaceRecord) error {
+	if err := a.requireActiveSpaceOwner(ctx, space); err != nil {
+		return err
+	}
 	switch {
 	case viewer == nil:
 		return ente.ErrAuthenticationRequired
@@ -164,4 +167,15 @@ func (a authDeps) canViewSpace(ctx context.Context, viewer *viewerAuth, space *s
 	default:
 		return ente.ErrAuthenticationRequired
 	}
+}
+
+func (a authDeps) requireActiveSpaceOwner(ctx context.Context, space *spacerepo.SpaceRecord) error {
+	active, err := a.SpacesRepo.IsOwnerActive(ctx, space.OwnerID)
+	if err != nil {
+		return err
+	}
+	if !active {
+		return ente.ErrNotFound
+	}
+	return nil
 }

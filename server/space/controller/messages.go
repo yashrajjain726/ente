@@ -159,7 +159,11 @@ func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, 
 	if strings.TrimSpace(targetSpaceID) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceId is required")
 	}
-	if _, err := c.SpacesRepo.GetSpaceByID(ctx.Request.Context(), strings.TrimSpace(targetSpaceID)); err != nil {
+	targetSpace, err := c.SpacesRepo.GetSpaceByID(ctx.Request.Context(), strings.TrimSpace(targetSpaceID))
+	if err != nil {
+		return nil, err
+	}
+	if err := c.auth.requireActiveSpaceOwner(ctx.Request.Context(), targetSpace); err != nil {
 		return nil, err
 	}
 	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)

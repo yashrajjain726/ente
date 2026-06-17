@@ -143,6 +143,7 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 			       CASE WHEN p.space_id = $2 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) END AS viewer_liked
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
+			JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
 			WHERE p.is_deleted = FALSE
 			  AND (
 			    p.space_id = $2 OR EXISTS (

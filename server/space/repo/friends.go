@@ -229,6 +229,7 @@ func (r *FriendsRepository) GetShareForFriendAndSpace(ctx context.Context, frien
 		SELECT s.space_id, s.friend_id, w.owner_id, w.space_slug, s.encrypted_space_key, s.key_version, s.created_at, w.public_key
 		FROM space_friend_shares s
 		JOIN spaces w ON w.space_id = s.space_id
+		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
 		WHERE s.friend_id = $1 AND s.friend_space_id = $2 AND s.space_id = $3
 	`, friendID, friendSpaceID, spaceID))
 }
@@ -238,6 +239,7 @@ func (r *FriendsRepository) ListSharesForFriend(ctx context.Context, friendID in
 		SELECT s.space_id, s.friend_id, w.owner_id, w.space_slug, s.encrypted_space_key, s.key_version, s.created_at, w.public_key
 		FROM space_friend_shares s
 		JOIN spaces w ON w.space_id = s.space_id
+		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
 		WHERE s.friend_id = $1
 		ORDER BY s.created_at ASC
 	`, friendID)
@@ -273,6 +275,7 @@ func (r *FriendsRepository) ListFriendsForSpace(ctx context.Context, spaceID str
 		       s.created_at
 		FROM space_friend_shares s
 		JOIN spaces friend_space ON friend_space.space_id = s.friend_space_id
+		JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
 		WHERE s.space_id = $1
 		ORDER BY lower(friend_space.space_slug) ASC
 	`, spaceID)
@@ -316,8 +319,10 @@ func (r *FriendsRepository) ListAccessibleSpaceIDs(ctx context.Context, viewerID
 		WHERE owner_id = $1 AND space_id = ANY($2)
 		UNION
 		SELECT space_id
-		FROM space_friend_shares
-		WHERE friend_id = $1 AND friend_space_id = $3 AND space_id = ANY($2)
+		FROM space_friend_shares s
+		JOIN spaces w ON w.space_id = s.space_id
+		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
+		WHERE s.friend_id = $1 AND s.friend_space_id = $3 AND s.space_id = ANY($2)
 	`, viewerID, pq.Array(spaceIDs), viewerSpaceID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")

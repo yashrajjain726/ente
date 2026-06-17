@@ -120,6 +120,7 @@ func (r *LinksRepository) GetLink(ctx context.Context, spaceID string) (*SpaceLi
 		SELECT l.space_id, w.space_slug, w.owner_id, w.space_slug, l.auth_key_hash, l.key_version, l.encrypted_space_key, l.encrypted_access_key, l.active, l.created_at, l.updated_at
 		FROM space_links l
 		JOIN spaces w ON w.space_id = l.space_id
+		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
 		WHERE l.space_id = $1 AND l.active = TRUE
 	`, spaceID))
 }
@@ -151,6 +152,7 @@ func (r *LinksRepository) GetLinkByAuthHash(ctx context.Context, spaceID string,
 		SELECT l.space_id, w.space_slug, w.owner_id, w.space_slug, l.auth_key_hash, l.key_version, l.encrypted_space_key, l.encrypted_access_key, l.active, l.created_at, l.updated_at
 		FROM space_links l
 		JOIN spaces w ON w.space_id = l.space_id
+		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
 		WHERE l.space_id = $1 AND l.auth_key_hash = $2 AND l.active = TRUE
 	`, spaceID, authHash))
 }
@@ -161,6 +163,7 @@ func (r *LinksRepository) CreateSession(ctx context.Context, tokenHash []byte, s
 		SELECT $1, l.space_id, w.owner_id, l.auth_key_hash, l.key_version, $5
 		FROM space_links l
 		JOIN spaces w ON w.space_id = l.space_id
+		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
 		WHERE l.space_id = $2
 		  AND l.auth_key_hash = $3
 		  AND l.key_version = $4
@@ -185,6 +188,7 @@ func (r *LinksRepository) GetSession(ctx context.Context, tokenHash []byte) (*Sp
 		       w.space_slug, w.space_slug, l.encrypted_space_key
 		FROM space_link_sessions s
 		JOIN spaces w ON w.space_id = s.space_id
+		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
 		JOIN space_links l ON l.space_id = s.space_id
 		                 AND l.auth_key_hash = s.auth_key_hash
 		                 AND l.key_version = s.key_version
