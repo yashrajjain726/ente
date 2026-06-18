@@ -98,12 +98,18 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 
 	aliceID := insertSpaceUser(t, module, "alice-reset-space@example.com", "alice-reset-public")
 	bobID := insertSpaceUser(t, module, "bob-reset-space@example.com", "bob-reset-public")
+	charlieID := insertSpaceUser(t, module, "charlie-reset-space@example.com", "charlie-reset-public")
 	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-reset-space", "alice-space-key", "alice-reset-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-reset-space", "bob-space-key", "bob-reset-public", "bob-secret", "bob-secret-nonce", "bob-profile")
 	require.NoError(t, err)
+	charlieSpace, err := module.Spaces.CreateSpace(ctx, charlieID, "charlie-reset-space", "charlie-space-key", "charlie-reset-public", "charlie-secret", "charlie-secret-nonce", "charlie-profile")
+	require.NoError(t, err)
 
 	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
+	pendingRequest, created, err := module.Friends.CreateFriendRequest(ctx, aliceID, aliceSpace.SpaceID, charlieSpace.SpaceID, "alice-charlie-share-key", aliceSpace.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, created)
 	_, err = module.Links.UpsertLink(ctx, aliceSpace.SpaceID, []byte("alice-auth-hash"), aliceSpace.CurrentVersion, "alice-link-space-key", "alice-link-access-key")
 	require.NoError(t, err)
 	require.NoError(t, module.Links.CreateSession(ctx, []byte("alice-link-token"), aliceSpace.SpaceID, []byte("alice-auth-hash"), aliceSpace.CurrentVersion, timeutil.NDaysFromNow(1)))
@@ -133,10 +139,14 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_browser_sessions WHERE user_id = $1`, aliceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_link_sessions WHERE space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1 OR friend_id = $2`, aliceSpace.SpaceID, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE requester_id = $1 OR target_id = $1 OR requester_space_id = $2 OR target_space_id = $2`, aliceID, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_events WHERE actor_space_id = $1 OR target_space_id = $1 OR actor_id = $2 OR target_id = $2`, aliceSpace.SpaceID, aliceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1 OR user_id = $2`, aliceSpace.SpaceID, aliceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_post_likes WHERE post_id = $1`, postID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_message_likes WHERE message_id = $1`, message.MessageID))
+	_, _, err = module.Friends.ConfirmFriendRequest(ctx, charlieID, charlieSpace.SpaceID, pendingRequest.RequestID, "charlie-share-key", charlieSpace.CurrentVersion)
+	require.Error(t, err)
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE (space_id = $1 AND friend_space_id = $2) OR (space_id = $2 AND friend_space_id = $1)`, aliceSpace.SpaceID, charlieSpace.SpaceID))
 
 	var active bool
 	require.NoError(t, module.Links.DB.QueryRow(`SELECT active FROM space_links WHERE space_id = $1`, aliceSpace.SpaceID).Scan(&active))
