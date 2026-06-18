@@ -325,7 +325,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
         return (
             <SpaceRouteFallback
                 background={profileBackground}
-                invitePreview={invitePreview}
+                preview={invitePreview ? "invite" : "home"}
             />
         );
     }
@@ -338,7 +338,10 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
         if (!publicIdentity) {
             return (
                 <>
-                    <SpacePageMeta themeColor={profileBackground} />
+                    <SpacePageMeta
+                        themeColor={profileBackground}
+                        preview="invite"
+                    />
                     <PublicProfileUnavailable />
                 </>
             );
@@ -373,7 +376,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
 
         return (
             <>
-                <SpacePageMeta themeColor={onboardingGreen} invitePreview />
+                <SpacePageMeta themeColor={onboardingGreen} preview="invite" />
                 <PublicFriendRequestScreen
                     identity={publicIdentity}
                     onAddFriend={addFriend}
@@ -387,7 +390,7 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
 
     return (
         <>
-            <SpacePageMeta themeColor={onboardingGreen} />
+            <SpacePageMeta themeColor={onboardingGreen} preview="home" />
             <OnboardingScreen
                 onCreateAccount={() => void router.push(spaceRoutes.signup)}
                 onLogin={() => void router.push(spaceRoutes.login)}
