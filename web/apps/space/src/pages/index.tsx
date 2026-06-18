@@ -181,9 +181,8 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                         maxWidth: 300,
                     }}
                 >
-                    See what @{identity.username} is up to
-                    <br />
-                    on Ente Space.
+                    Add @{identity.username} as a friend to see what they're up
+                    to on Ente Space.
                 </Box>
             </Box>
             <Box

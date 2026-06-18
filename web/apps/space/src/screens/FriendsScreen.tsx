@@ -12,6 +12,7 @@ import {
     type SpaceActionPhase,
 } from "components/SpaceActionFeedback";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
+import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
 import type { FriendProfile } from "data/friends";
 import React, { useState } from "react";
 import { ShareIcon } from "screens/ShareProfileLinkScreen";
@@ -334,7 +335,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     const [loadedAvatarURLsByKey, setLoadedAvatarURLsByKey] = React.useState<
         Record<string, string>
     >({});
+    const [isInviteDialogOpen, setIsInviteDialogOpen] = React.useState(false);
     const [isInviteSharing, setIsInviteSharing] = React.useState(false);
+    const [inviteShareError, setInviteShareError] = React.useState<
+        string | null
+    >(null);
     const avatarLoadsInFlightRef = React.useRef<
         Map<string, Promise<string | null | undefined>>
     >(new Map());
@@ -420,9 +425,20 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         setUnfriendErrorMessage(null);
     };
 
+    const openInviteDialog = () => {
+        setInviteShareError(null);
+        setIsInviteDialogOpen(true);
+    };
+
+    const closeInviteDialog = () => {
+        if (isInviteSharing) return;
+        setIsInviteDialogOpen(false);
+    };
+
     const shareInviteLink = async () => {
         if (!onShareProfileLink || isInviteSharing) return;
         setIsInviteSharing(true);
+        setInviteShareError(null);
 
         try {
             const profileLink = await onShareProfileLink();
@@ -430,6 +446,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
             if (typeof navigator.share == "function") {
                 try {
                     await navigator.share({ url: profileLink });
+                    setIsInviteDialogOpen(false);
                     return;
                 } catch (error) {
                     if (
@@ -441,8 +458,10 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
             }
 
             await navigator.clipboard.writeText(profileLink);
+            setIsInviteDialogOpen(false);
         } catch (error) {
             console.error("Failed to share space invite", error);
+            setInviteShareError("Couldn't share invite. Please try again.");
         } finally {
             setIsInviteSharing(false);
         }
@@ -530,18 +549,15 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     <Box
                         component="button"
                         type="button"
-                        aria-label="Share invite"
-                        disabled={!onShareProfileLink || isInviteSharing}
-                        onClick={() => void shareInviteLink()}
+                        aria-label="Invite friends"
+                        disabled={!onShareProfileLink}
+                        onClick={openInviteDialog}
                         sx={{
                             alignItems: "center",
                             bgcolor: "transparent",
                             border: 0,
                             color: textBase,
-                            cursor:
-                                onShareProfileLink && !isInviteSharing
-                                    ? "pointer"
-                                    : "default",
+                            cursor: onShareProfileLink ? "pointer" : "default",
                             display: "flex",
                             height: spaceTouchTargetSize,
                             justifyContent: "flex-end",
@@ -645,8 +661,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                 },
                                 "&:hover":
                                     onShareProfileLink && !isInviteSharing
-                                    ? { bgcolor: "#DEDEDE" }
-                                    : undefined,
+                                        ? { bgcolor: "#DEDEDE" }
+                                        : undefined,
                             }}
                         >
                             <ShareIcon />
@@ -666,6 +682,13 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 onCancel={cancelUnfriend}
                 onConfirm={confirmUnfriend}
                 onExited={handleUnfriendSheetExited}
+            />
+            <SpaceInviteFriendsDialog
+                errorMessage={inviteShareError}
+                open={isInviteDialogOpen}
+                sharing={isInviteSharing}
+                onClose={closeInviteDialog}
+                onShare={() => void shareInviteLink()}
             />
         </Box>
     );
