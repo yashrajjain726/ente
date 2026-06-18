@@ -128,16 +128,24 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
             >
                 <Box />
                 <Box
-                    component="img"
-                    alt="Ente Space"
-                    src="/images/space.svg"
+                    component="a"
+                    href="/"
+                    aria-label="Go to Space"
                     sx={{
                         display: "block",
-                        height: 30,
                         justifySelf: "center",
+                        lineHeight: 0,
+                        textDecoration: "none",
                         width: 101,
                     }}
-                />
+                >
+                    <Box
+                        component="img"
+                        alt=""
+                        src="/images/space.svg"
+                        sx={{ display: "block", height: 30, width: 101 }}
+                    />
+                </Box>
                 <Box />
             </Box>
             <Box
@@ -181,8 +189,8 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                         maxWidth: 300,
                     }}
                 >
-                    Add @{identity.username} as a friend to see what they're up
-                    to on Ente Space.
+                    Add @{identity.username} as a friend to see what
+                    they&apos;re up to on Ente Space.
                 </Box>
             </Box>
             <Box

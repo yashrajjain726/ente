@@ -351,12 +351,11 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
 
 interface ProfileScreenProps {
     friendsCount?: number;
-    headerVariant?: "friend" | "owner" | "public";
+    headerVariant?: "friend" | "owner";
     isCoverLoading?: boolean;
     isPostsLoading?: boolean;
     isStatsLoading?: boolean;
     showPostLoadingIndicator?: boolean;
-    onAddFriend?: () => void;
     onBack?: () => void;
     onCreatePost?: (
         image: DraftSpacePostImage,
@@ -374,7 +373,6 @@ interface ProfileScreenProps {
     onShareProfileLink?: () => Promise<string>;
     postGroups?: ProfilePostGroup[];
     profile: SetupProfile;
-    spaceLogoHref?: string;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -383,7 +381,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     isCoverLoading = false,
     isPostsLoading = false,
     isStatsLoading = false,
-    onAddFriend,
     onBack,
     onCreatePost,
     onDeletePost,
@@ -399,7 +396,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     postGroups = [],
     profile,
     showPostLoadingIndicator,
-    spaceLogoHref = "https://ente.com/space",
 }) => {
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
@@ -420,7 +416,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     >(new Map());
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
-    const isPublicProfile = headerVariant == "public";
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
     const displayName = profile.fullName.trim() || profile.username.trim();
@@ -457,11 +452,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const isCoverImageLoading = Boolean(coverUrl && loadedCoverUrl != coverUrl);
     const shouldShowCoverSkeleton =
         isCoverLoading || isCoverURLPending || isCoverImageLoading;
-    const selectedPostActionMode: SpaceViewerPostActionMode = isPublicProfile
-        ? "like-only"
-        : isOwnerProfile
-          ? "hidden"
-          : "like-only";
+    const selectedPostActionMode: SpaceViewerPostActionMode = isOwnerProfile
+        ? "hidden"
+        : "like-only";
 
     const revokeLocalPostObjectUrls = React.useCallback(() => {
         localPostObjectUrlsRef.current.forEach((objectUrl) =>
@@ -941,9 +934,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         alignItems: "center",
                         color: coverForeground,
                         display: "grid",
-                        gridTemplateColumns: isPublicProfile
-                            ? "1fr auto"
-                            : `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
+                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
                         height: profileHeaderHeight,
                         position: "relative",
                         px: 2,
@@ -952,147 +943,57 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         zIndex: 3,
                     }}
                 >
-                    {isPublicProfile ? (
-                        <Box
-                            component="a"
-                            href={spaceLogoHref}
-                            aria-label="Go to Space"
-                            sx={{
-                                alignSelf: "center",
-                                color: "inherit",
-                                cursor: "pointer",
-                                justifySelf: "flex-start",
-                                lineHeight: 0,
-                                overflow: "visible",
-                                textDecoration: "none",
-                                width: 61,
-                                "&:focus-visible": {
-                                    borderRadius: "4px",
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 3,
-                                },
-                            }}
-                        >
-                            <Box
-                                component="img"
-                                alt=""
-                                src="/images/space.svg"
-                                sx={{
-                                    display: "block",
-                                    height: 18,
-                                    width: "auto",
-                                }}
-                            />
-                        </Box>
-                    ) : (
-                        <Box
-                            component="button"
-                            type="button"
-                            aria-label={
-                                isFriendProfile
-                                    ? "Back to friends"
-                                    : "Back to home"
-                            }
-                            onClick={onBack}
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: "transparent",
-                                border: 0,
-                                color: "inherit",
-                                cursor: "pointer",
-                                display: "flex",
-                                height: spaceTouchTargetSize,
-                                justifyContent: "flex-start",
-                                ml: "-2px",
-                                p: 0,
-                                width: spaceTouchTargetSize,
-                                "&:focus-visible": {
-                                    borderRadius: "50%",
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                            }}
-                        >
-                            <HugeiconsIcon
-                                icon={ArrowLeft02Icon}
-                                size={24}
-                                strokeWidth={1.8}
-                            />
-                        </Box>
-                    )}
-                    {isPublicProfile && (
-                        <Box
-                            component="button"
-                            type="button"
-                            onClick={onAddFriend}
-                            sx={{
-                                alignItems: "center",
-                                backgroundColor: "transparent",
-                                border: 0,
-                                color: green,
-                                cursor: onAddFriend ? "pointer" : "default",
-                                display: "inline-flex",
-                                height: spaceTouchTargetSize,
-                                justifyContent: "center",
-                                justifySelf: "flex-end",
-                                minWidth: 0,
-                                p: 0,
-                                "&:focus-visible": {
-                                    borderRadius: "999px",
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                                "&:hover .space-add-friend-pill": {
-                                    backgroundColor: "#F3FFF5",
-                                },
-                            }}
-                        >
-                            <Box
-                                className="space-add-friend-pill"
-                                component="span"
-                                sx={{
-                                    alignItems: "center",
-                                    backgroundColor: "#FFFFFF",
-                                    borderRadius: "999px",
-                                    display: "inline-flex",
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 13,
-                                    fontWeight: 700,
-                                    height: 32,
-                                    justifyContent: "center",
-                                    lineHeight: "18px",
-                                    px: "14px",
-                                    transition: "background-color 120ms ease",
-                                    whiteSpace: "nowrap",
-                                }}
-                            >
-                                Add friend
-                            </Box>
-                        </Box>
-                    )}
-                    {!isPublicProfile && (
-                        <Box
-                            component="h1"
-                            sx={{
-                                color: "inherit",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 18,
-                                fontWeight: 700,
-                                justifySelf: "center",
-                                lineHeight: "24px",
-                                m: 0,
-                                maxWidth: "100%",
-                                overflow: "hidden",
-                                px: "4px",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                            }}
-                        >
-                            {profile.username}
-                        </Box>
-                    )}
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={
+                            isFriendProfile ? "Back to friends" : "Back to home"
+                        }
+                        onClick={onBack}
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: "transparent",
+                            border: 0,
+                            color: "inherit",
+                            cursor: "pointer",
+                            display: "flex",
+                            height: spaceTouchTargetSize,
+                            justifyContent: "flex-start",
+                            ml: "-2px",
+                            p: 0,
+                            width: spaceTouchTargetSize,
+                            "&:focus-visible": {
+                                borderRadius: "50%",
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={ArrowLeft02Icon}
+                            size={24}
+                            strokeWidth={1.8}
+                        />
+                    </Box>
+                    <Box
+                        component="h1"
+                        sx={{
+                            color: "inherit",
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 18,
+                            fontWeight: 700,
+                            justifySelf: "center",
+                            lineHeight: "24px",
+                            m: 0,
+                            maxWidth: "100%",
+                            overflow: "hidden",
+                            px: "4px",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        {profile.username}
+                    </Box>
                     {isOwnerProfile ? (
                         <Box
                             component="button"
@@ -1124,12 +1025,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             />
                         </Box>
                     ) : (
-                        !isPublicProfile && (
-                            <Box
-                                aria-hidden
-                                sx={{ width: spaceTouchTargetSize }}
-                            />
-                        )
+                        <Box aria-hidden sx={{ width: spaceTouchTargetSize }} />
                     )}
                 </Box>
                 <Box
@@ -1226,13 +1122,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     fontWeight: 800,
                                     gridColumn: 2,
                                     lineHeight: "32px",
-                                    maxWidth: isPublicProfile
-                                        ? "100%"
-                                        : "calc(100vw - 72px)",
+                                    maxWidth: "calc(100vw - 72px)",
                                     "@media (min-width: 600px)": {
-                                        maxWidth: isPublicProfile
-                                            ? "100%"
-                                            : 303,
+                                        maxWidth: 303,
                                     },
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
@@ -1543,9 +1435,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             >
                                 {isOwnerProfile
                                     ? "What are you up to?"
-                                    : isPublicProfile
-                                      ? `${firstName} hasn't posted anything yet. Add them as a friend to get their latest posts.`
-                                      : `${firstName} hasn't posted anything yet.`}
+                                    : `${firstName} hasn't posted anything yet.`}
                             </Box>
                             {isOwnerProfile && (
                                 <Box
@@ -1634,9 +1524,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         onClose={closeSelectedPost}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
-                        }
-                        onAddFriendForPostAction={
-                            isPublicProfile ? onAddFriend : undefined
                         }
                         onOpenProfile={closeSelectedPost}
                         onReplyToPost={
