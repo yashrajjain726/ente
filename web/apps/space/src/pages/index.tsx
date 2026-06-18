@@ -37,6 +37,10 @@ type RouteMode =
     | { kind: "app" }
     | ({ kind: "public-profile" } & PendingSpaceInvite);
 
+interface PageProps {
+    invitePreview?: boolean;
+}
+
 const PublicProfileUnavailable: React.FC = () => (
     <Box
         className="green-bg"
@@ -246,7 +250,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
     </Box>
 );
 
-const Page: React.FC = () => {
+export const Page: React.FC<PageProps> = ({ invitePreview }) => {
     const router = useSpaceRouter();
     const {
         onboardingEntrySource,
@@ -318,7 +322,12 @@ const Page: React.FC = () => {
         (routeMode.kind == "app" &&
             (profileLoadStatus == "loading" || Boolean(profile)))
     ) {
-        return <SpaceRouteFallback background={profileBackground} />;
+        return (
+            <SpaceRouteFallback
+                background={profileBackground}
+                invitePreview={invitePreview}
+            />
+        );
     }
 
     if (routeMode.kind == "public-profile") {
@@ -364,7 +373,7 @@ const Page: React.FC = () => {
 
         return (
             <>
-                <SpacePageMeta themeColor={onboardingGreen} />
+                <SpacePageMeta themeColor={onboardingGreen} invitePreview />
                 <PublicFriendRequestScreen
                     identity={publicIdentity}
                     onAddFriend={addFriend}

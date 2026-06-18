@@ -4,6 +4,7 @@ import React from "react";
 
 interface SpaceRouteFallbackProps {
     background: string;
+    invitePreview?: boolean;
     message?: string;
 }
 
@@ -40,10 +41,11 @@ export const SpaceLoadingSpinner: React.FC<SpaceLoadingSpinnerProps> = ({
 
 export const SpaceRouteFallback: React.FC<SpaceRouteFallbackProps> = ({
     background,
+    invitePreview,
     message,
 }) => (
     <>
-        <SpacePageMeta themeColor={background} />
+        <SpacePageMeta themeColor={background} invitePreview={invitePreview} />
         <Box
             sx={{
                 alignItems: "center",
