@@ -2,7 +2,7 @@ import {
     BubbleChatIcon,
     FavouriteIcon,
     MultiplicationSignIcon,
-    UserCheck01Icon,
+    UserAdd02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
@@ -1207,7 +1207,7 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
         >
             <Box component="span" sx={{ display: "flex", flexShrink: 0 }}>
                 <HugeiconsIcon
-                    icon={UserCheck01Icon}
+                    icon={UserAdd02Icon}
                     size={20}
                     strokeWidth={1.8}
                 />
