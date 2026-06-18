@@ -21,6 +21,7 @@ import {
     spacePostLikePopDurationMs,
     spacePostLikePopTiming,
 } from "components/SpacePostLikeAnimation";
+import { SpacePWAInstallPrompt } from "components/SpacePWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
@@ -110,6 +111,7 @@ interface HomeScreenProps {
     isFeedLoading?: boolean;
     isFeedLoadingMore?: boolean;
     localFeedPosts?: LocalSpaceFeedPost[];
+    showInstallPrompt?: boolean;
     onCreatePost?: (
         image: DraftSpacePostImage,
         caption: string,
@@ -1268,6 +1270,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     isFeedLoading = false,
     isFeedLoadingMore = false,
     localFeedPosts = [],
+    showInstallPrompt = false,
     onCreatePost,
     onDeletePost,
     onLoadMoreFeedItems,
@@ -1324,6 +1327,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         localFeedPosts.length > 0 || remoteFeedItems.length > 0;
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
     const showFeedCards = hasFeedItems;
+    const isInstallPromptEnabled =
+        showInstallPrompt && !friendRequestSentToastName && !selectedViewer;
     const showUnreadIndicator = hasUnreadMessages === true;
     const emptyFeedMessage =
         friendsCount == 0
@@ -2176,11 +2181,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         onSetPostLiked={onSetPostLiked}
                     />
                 )}
-                {friendRequestSentToastName && (
+                {friendRequestSentToastName ? (
                     <AddedFriendToast
                         message={`Friend request sent to @${friendRequestSentToastName}`}
                         onClose={onFriendRequestSentToastClose}
                     />
+                ) : (
+                    <SpacePWAInstallPrompt enabled={isInstallPromptEnabled} />
                 )}
             </Box>
         </Box>

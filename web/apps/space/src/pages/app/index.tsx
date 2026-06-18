@@ -211,6 +211,11 @@ const Page: React.FC = () => {
                 isFeedLoadingMore={isFeedLoadingMore}
                 localFeedPosts={localFeedPosts}
                 profile={profile}
+                showInstallPrompt={
+                    profileLoadStatus == "ready" &&
+                    Boolean(profile) &&
+                    !isHomeFeedLoading
+                }
                 onFriendRequestSentToastClose={closeFriendRequestSentToast}
                 onCreatePost={
                     profile
