@@ -8,7 +8,6 @@ import {
     createCurrentProfileLink,
     deleteCurrentFriendRequest,
     deleteCurrentMessage,
-    loadCurrentFriendRequests,
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
     loadCurrentSpaceFriends,
@@ -17,7 +16,6 @@ import {
     replyToCurrentMessage,
     sendCurrentMessage,
     setCurrentMessageLiked,
-    type SpaceFriendRequest,
     type SpaceMessage,
     type SpaceMessageConversation,
 } from "services/space";
@@ -37,32 +35,12 @@ const conversationId = (conversation: SpaceMessageConversation) =>
         ? conversation.latestActivity.id
         : friendSpaceId(conversation.friend);
 
-const friendRequestActivityId = (requestId: number) =>
-    `friend_request:${requestId}`;
-
 const friendRequestIdFromConversation = (
     conversation: SpaceMessageConversation,
 ) => Number(conversation.latestActivity.id.split(":")[1]);
 
 const isFriendRequestConversation = (conversation: SpaceMessageConversation) =>
     conversation.latestActivity.type == "friend_request";
-
-const conversationFromFriendRequest = ({
-    createdAtMs,
-    requester,
-    requestId,
-}: SpaceFriendRequest): SpaceMessageConversation => ({
-    friend: requester,
-    latestActivity: {
-        createdAtMs,
-        id: friendRequestActivityId(requestId),
-        outgoing: false,
-        type: "friend_request",
-    },
-    notificationUnread: true,
-    unread: true,
-    unreadCount: 1,
-});
 
 let nextLocalMessageID = 0;
 
@@ -233,22 +211,12 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     const refreshConversations = React.useCallback(async () => {
         setIsConversationsLoading(true);
         try {
-            const [page, requests] = await Promise.all([
-                loadCurrentMessageConversations(),
-                loadCurrentFriendRequests(),
-            ]);
-            const items = [
-                ...requests.map(conversationFromFriendRequest),
-                ...page.items,
-            ].sort(
-                (left, right) =>
-                    right.latestActivity.createdAtMs -
-                    left.latestActivity.createdAtMs,
-            );
+            const page = await loadCurrentMessageConversations();
+            const items = page.items;
             const unreadConversationIds = items
                 .filter((conversation) => conversation.notificationUnread)
                 .map(conversationId);
-            const passiveUnreadConversationIds = page.items
+            const passiveUnreadConversationIds = items
                 .filter(
                     (conversation) =>
                         conversation.notificationUnread && !conversation.unread,

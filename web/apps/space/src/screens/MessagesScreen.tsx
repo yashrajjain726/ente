@@ -2516,9 +2516,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 pointerEvents: "auto",
                                                 px: "14px",
                                                 whiteSpace: "nowrap",
-                                                "&:disabled": {
-                                                    opacity: 0.45,
-                                                },
+                                                "&:disabled": { opacity: 0.45 },
                                                 "&:focus-visible": {
                                                     outline: `2px solid ${green}`,
                                                     outlineOffset: 2,
@@ -2526,10 +2524,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 "&:hover":
                                                     onShareProfileLink &&
                                                     !isInviteSharing
-                                                        ? {
-                                                              bgcolor:
-                                                                  "#E8E8E8",
-                                                          }
+                                                        ? { bgcolor: "#E8E8E8" }
                                                         : undefined,
                                             }}
                                         >

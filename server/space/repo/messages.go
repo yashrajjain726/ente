@@ -431,6 +431,29 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				FALSE AS is_outgoing
 			FROM post_reply_events r
 		),
+		active_friend_requests AS (
+			SELECT
+				fr.request_id,
+				fr.created_at,
+				fr.requester_space_id AS friend_space_id
+			FROM space_friend_requests fr
+			WHERE fr.target_id = $1
+			  AND fr.target_space_id = $2
+			  AND fr.is_deleted = FALSE
+			  AND fr.resolved_at IS NULL
+		),
+		friend_request_candidates AS (
+			SELECT
+				'friend_request' AS activity_type,
+				'friend_request:' || fr.request_id::text AS activity_id,
+				fr.created_at AS activity_created_at,
+				fr.friend_space_id,
+				NULL::text AS message_id,
+				NULL::bigint AS post_id,
+				fr.created_at AS notification_created_at,
+				FALSE AS is_outgoing
+			FROM active_friend_requests fr
+		),
 		friend_candidates AS (
 			SELECT
 				CASE fe.event_type
@@ -454,6 +477,8 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			SELECT * FROM post_like_candidates
 			UNION ALL
 			SELECT * FROM post_reply_candidates
+			UNION ALL
+			SELECT * FROM friend_request_candidates
 			UNION ALL
 			SELECT * FROM friend_candidates
 		),
@@ -508,6 +533,13 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			  AND pl.created_at > COALESCE(nrm.read_at, 0)
 			GROUP BY actor_space.space_id
 		),
+		friend_request_unread_counts AS (
+			SELECT
+				friend_space_id,
+				COUNT(*) AS unread_count
+			FROM active_friend_requests
+			GROUP BY friend_space_id
+		),
 		latest_activities AS (
 			SELECT DISTINCT ON (friend_space_id)
 				friend_space_id,
@@ -522,6 +554,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				COALESCE(nrm.read_at, 0) AS read_at,
 				COALESCE(ruc.unread_count, 0) AS unread_count,
 				COALESCE(pluc.unread_count, 0) AS post_like_unread_count,
+				COALESCE(fruc.unread_count, 0) AS friend_request_unread_count,
 				la.sort_created_at,
 				la.sort_id,
 				(
@@ -537,6 +570,8 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			  ON ruc.friend_space_id = c.friend_space_id
 			LEFT JOIN post_like_unread_counts pluc
 			  ON pluc.friend_space_id = c.friend_space_id
+			LEFT JOIN friend_request_unread_counts fruc
+			  ON fruc.friend_space_id = c.friend_space_id
 		),
 		ranked AS (
 			SELECT
@@ -544,8 +579,9 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				CASE
 					WHEN c.unread_count = 0
 					 AND c.post_like_unread_count = 1
+					 AND c.friend_request_unread_count = 0
 					 AND c.activity_type = 'post_like' THEN 0
-					ELSE c.unread_count + c.post_like_unread_count
+					ELSE c.unread_count + c.post_like_unread_count + c.friend_request_unread_count
 				END AS conversation_unread_count,
 				BOOL_OR(c.notification_unread) OVER (PARTITION BY c.friend_space_id) AS conversation_notification_unread,
 				ROW_NUMBER() OVER (
@@ -569,12 +605,12 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			friend_space.space_slug,
 			friend_space.public_key,
 			friend_space.current_version,
-			friend_space.encrypted_profile,
-			friend_space.avatar_object_key,
-			friend_space.avatar_size,
+			CASE WHEN c.activity_type = 'friend_request' THEN '' ELSE friend_space.encrypted_profile END AS friend_profile,
+			CASE WHEN c.activity_type = 'friend_request' THEN NULL::text ELSE friend_space.avatar_object_key END AS friend_avatar_object_key,
+			CASE WHEN c.activity_type = 'friend_request' THEN NULL::bigint ELSE friend_space.avatar_size END AS friend_avatar_size,
 			friend_space.updated_at,
-			(SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = friend_space.space_id) AS friend_friends,
-			(SELECT COUNT(*) FROM space_posts fp WHERE fp.space_id = friend_space.space_id AND fp.is_deleted = FALSE) AS friend_posts,
+			CASE WHEN c.activity_type = 'friend_request' THEN NULL::bigint ELSE (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = friend_space.space_id) END AS friend_friends,
+			CASE WHEN c.activity_type = 'friend_request' THEN NULL::bigint ELSE (SELECT COUNT(*) FROM space_posts fp WHERE fp.space_id = friend_space.space_id AND fp.is_deleted = FALSE) END AS friend_posts,
 			COALESCE(m.message_id, '') AS message_id,
 			COALESCE(m.kind, '') AS kind,
 			COALESCE(m.sender_id, 0) AS sender_id,
@@ -757,6 +793,17 @@ func (r *MessagesRepository) GetLatestConversationActivityAt(ctx context.Context
 			FROM space_friend_events fe
 			WHERE (fe.target_space_id = $1 OR fe.actor_space_id = $1)
 			  AND fe.actor_space_id <> fe.target_space_id
+
+			UNION ALL
+
+			SELECT
+				fr.created_at AS activity_created_at,
+				'friend_request:' || fr.request_id::text AS activity_id,
+				fr.requester_space_id AS friend_space_id
+			FROM space_friend_requests fr
+			WHERE fr.target_space_id = $1
+			  AND fr.is_deleted = FALSE
+			  AND fr.resolved_at IS NULL
 
 		)
 		SELECT c.activity_created_at

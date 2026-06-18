@@ -626,6 +626,61 @@ func TestDeleteFriendRequestClearsUnread(t *testing.T) {
 	require.Empty(t, requests)
 }
 
+func TestFriendRequestConversationSupersedesPreviousFriendEvent(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+
+	aliceID := insertSpaceUser(t, module, "alice-request-conversation@example.com", "alice-request-conversation-public")
+	bobID := insertSpaceUser(t, module, "bob-request-conversation@example.com", "bob-request-conversation-public")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-request-conversation", "alice-space-key", "alice-request-conversation-public", "alice-request-secret", "alice-request-secret-nonce", "alice-profile")
+	require.NoError(t, err)
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-request-conversation", "bob-space-key", "bob-request-conversation-public", "bob-request-secret", "bob-request-secret-nonce", "bob-profile")
+	require.NoError(t, err)
+
+	require.NoError(t, module.Friends.AddFriend(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion))
+	setFriendEventCreatedAt(t, module, 500, "friend_add", aliceID, bobID)
+	require.NoError(t, module.Friends.DeleteFriendship(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID))
+	setFriendEventCreatedAt(t, module, 1000, "friend_remove", aliceID, bobID)
+	request, created, err := module.Friends.CreateFriendRequest(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "bob-share-key-v2", bobSpace.CurrentVersion)
+	require.NoError(t, err)
+	require.True(t, created)
+	setFriendRequestCreatedAt(t, module, 2000, request.RequestID)
+
+	conversations, _, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, conversations, 1)
+	require.Equal(t, bobSpace.SpaceID, conversations[0].Friend.SpaceID)
+	require.Empty(t, conversations[0].Friend.EncryptedProfile)
+	require.False(t, conversations[0].Friend.AvatarObjectKey.Valid)
+	require.False(t, conversations[0].Friend.Friends.Valid)
+	require.False(t, conversations[0].Friend.Posts.Valid)
+	require.Equal(t, "friend_request", conversations[0].LatestActivity.Type)
+	require.Equal(t, "friend_request:"+strconv.FormatInt(request.RequestID, 10), conversations[0].LatestActivity.ID)
+	require.False(t, conversations[0].LatestActivity.Outgoing)
+	require.Nil(t, conversations[0].LatestActivity.Message)
+	require.Nil(t, conversations[0].LatestActivity.Post)
+	require.True(t, conversations[0].Unread)
+	require.Equal(t, int64(1), conversations[0].UnreadCount)
+	require.True(t, conversations[0].NotificationUnread)
+
+	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	require.NoError(t, err)
+	require.Equal(t, int64(2000), latestActivityAt)
+	notificationsUnread, err := module.Messages.HasUnreadNotifications(ctx, aliceID, aliceSpace.SpaceID)
+	require.NoError(t, err)
+	require.True(t, notificationsUnread)
+
+	require.NoError(t, module.Friends.DeleteFriendRequest(ctx, aliceID, request.RequestID))
+	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, conversations, 1)
+	require.Equal(t, "friend_remove", conversations[0].LatestActivity.Type)
+	require.Equal(t, int64(1000), conversations[0].LatestActivity.CreatedAt)
+	notificationsUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceID, aliceSpace.SpaceID)
+	require.NoError(t, err)
+	require.False(t, notificationsUnread)
+}
+
 func TestSpaceMessageConversationPreviewUsesLatestActivityWithSeparateUnreadState(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
@@ -2166,6 +2221,12 @@ func setPostLikeCreatedAt(t *testing.T, module *Module, createdAt, postID int64,
 func setFriendEventCreatedAt(t *testing.T, module *Module, createdAt int64, eventType string, actorID, targetID int64) {
 	t.Helper()
 	_, err := module.Friends.DB.Exec(`UPDATE space_friend_events SET created_at = $1 WHERE event_type = $2 AND actor_id = $3 AND target_id = $4`, createdAt, eventType, actorID, targetID)
+	require.NoError(t, err)
+}
+
+func setFriendRequestCreatedAt(t *testing.T, module *Module, createdAt int64, requestID int64) {
+	t.Helper()
+	_, err := module.Friends.DB.Exec(`UPDATE space_friend_requests SET created_at = $1 WHERE request_id = $2`, createdAt, requestID)
 	require.NoError(t, err)
 }
 
