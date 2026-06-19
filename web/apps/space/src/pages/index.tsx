@@ -388,7 +388,10 @@ export const Page: React.FC<PageProps> = ({ invitePreview }) => {
 
         return (
             <>
-                <SpacePageMeta themeColor={onboardingGreen} preview="invite" />
+                <SpacePageMeta
+                    themeColor={profileBackground}
+                    preview="invite"
+                />
                 <PublicFriendRequestScreen
                     identity={publicIdentity}
                     onAddFriend={addFriend}
