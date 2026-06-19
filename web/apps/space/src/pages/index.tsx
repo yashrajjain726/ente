@@ -203,24 +203,6 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                 }}
             >
                 <Box
-                    component="p"
-                    sx={{
-                        color: "rgba(255, 255, 255, 0.6)",
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 18,
-                        fontWeight: 600,
-                        lineHeight: "26px",
-                        m: "0 auto 36px",
-                        maxWidth: 300,
-                    }}
-                >
-                    Add{" "}
-                    <Box component="span" sx={{ color: "white" }}>
-                        @{identity.username}
-                    </Box>{" "}
-                    as a friend to see their everyday moments.
-                </Box>
-                <Box
                     component="button"
                     type="button"
                     onClick={onAddFriend}
@@ -252,6 +234,24 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     }}
                 >
                     Add friend
+                </Box>
+                <Box
+                    component="p"
+                    sx={{
+                        color: "rgba(255, 255, 255, 0.6)",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 18,
+                        fontWeight: 600,
+                        lineHeight: "26px",
+                        m: "28px auto 0",
+                        maxWidth: 300,
+                    }}
+                >
+                    Add{" "}
+                    <Box component="span" sx={{ color: "white" }}>
+                        @{identity.username}
+                    </Box>{" "}
+                    as a friend to see their everyday moments
                 </Box>
             </Box>
         </Box>
