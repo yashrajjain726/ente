@@ -35,6 +35,9 @@ const verificationErrorMessage = (error: unknown) => {
         : "Couldn't verify this code. Please try again.";
 };
 
+const isExpectedVerificationError = (error: unknown) =>
+    isHTTPErrorWithStatus(error, 401) || isHTTPErrorWithStatus(error, 410);
+
 const Page: React.FC = () => {
     const router = useSpaceRouter();
     const {
@@ -138,7 +141,9 @@ const Page: React.FC = () => {
             setIsLiveSignupVerification(false);
             void router.push(spaceRoutes.setupProfile());
         } catch (error) {
-            console.error("Space signup verification failed", error);
+            if (!isExpectedVerificationError(error)) {
+                console.error("Space signup verification failed", error);
+            }
             setVerificationError(verificationErrorMessage(error));
             setIsSubmitting(false);
         }
@@ -158,7 +163,9 @@ const Page: React.FC = () => {
                 }),
             );
         } catch (error) {
-            console.error("Space login email verification failed", error);
+            if (!isExpectedVerificationError(error)) {
+                console.error("Space login email verification failed", error);
+            }
             setVerificationError(verificationErrorMessage(error));
             setIsSubmitting(false);
         }

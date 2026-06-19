@@ -25,6 +25,9 @@ const twoFactorErrorMessage = (error: unknown) => {
         : "Couldn't verify this code. Please try again.";
 };
 
+const isExpectedTwoFactorError = (error: unknown) =>
+    isHTTPErrorWithStatus(error, 401) || isHTTPErrorWithStatus(error, 404);
+
 const Page: React.FC = () => {
     const router = useSpaceRouter();
     const { refreshProfile } = useSpaceAppState();
@@ -51,7 +54,9 @@ const Page: React.FC = () => {
             await completeSpaceLoginSecondFactor(code, twoFactorSessionID);
             await routeAfterCompletedLogin(router, refreshProfile);
         } catch (error) {
-            console.error("Space 2FA verification failed", error);
+            if (!isExpectedTwoFactorError(error)) {
+                console.error("Space 2FA verification failed", error);
+            }
             setErrorMessage(twoFactorErrorMessage(error));
             setIsSubmitting(false);
         }

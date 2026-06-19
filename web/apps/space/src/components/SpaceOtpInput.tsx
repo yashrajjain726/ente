@@ -16,17 +16,85 @@ export const SpaceOtpInput = React.forwardRef<
     HTMLInputElement,
     SpaceOtpInputProps
 >(({ ariaLabel, onChange, value }, ref) => {
+    const [activeIndex, setActiveIndex] = React.useState<number | undefined>(
+        value.length < spaceOTPCodeLength ? value.length : undefined,
+    );
     const digits = value
         .padEnd(spaceOTPCodeLength, " ")
         .slice(0, spaceOTPCodeLength)
         .split("")
         .map((digit) => (digit == " " ? "" : digit));
-    const activeIndex =
-        value.length < spaceOTPCodeLength ? value.length : undefined;
-    const moveCaretToEnd = (input: HTMLInputElement) => {
-        const caretPosition = input.value.length;
-        input.setSelectionRange(caretPosition, caretPosition);
+
+    React.useEffect(() => {
+        if (value.length < spaceOTPCodeLength && activeIndex == undefined) {
+            setActiveIndex(value.length);
+            return;
+        }
+
+        if (activeIndex != undefined && activeIndex > value.length) {
+            setActiveIndex(
+                value.length < spaceOTPCodeLength ? value.length : undefined,
+            );
+        }
+    }, [activeIndex, value.length]);
+
+    const nextActiveIndex = (index: number) =>
+        index < spaceOTPCodeLength ? index : undefined;
+
+    const replaceFromActiveIndex = (inputDigits: string) => {
+        const replacementDigits = sanitizeSpaceOTP(inputDigits);
+        if (!replacementDigits) return;
+
+        if (replacementDigits.length == spaceOTPCodeLength) {
+            onChange(replacementDigits);
+            setActiveIndex(undefined);
+            return;
+        }
+
+        const startIndex =
+            activeIndex ??
+            (value.length < spaceOTPCodeLength ? value.length : undefined);
+        if (startIndex == undefined) return;
+
+        const nextDigits = value.split("");
+        const clampedStartIndex = Math.min(startIndex, value.length);
+
+        for (let index = 0; index < replacementDigits.length; index++) {
+            const targetIndex = clampedStartIndex + index;
+            if (targetIndex >= spaceOTPCodeLength) break;
+            nextDigits[targetIndex] = replacementDigits[index]!;
+        }
+
+        const nextValue = nextDigits.join("").slice(0, spaceOTPCodeLength);
+        onChange(nextValue);
+        setActiveIndex(
+            nextActiveIndex(
+                Math.min(
+                    clampedStartIndex + replacementDigits.length,
+                    nextValue.length,
+                ),
+            ),
+        );
     };
+
+    const removeAtIndex = (index: number) => {
+        if (index < 0 || index >= value.length) return;
+
+        const nextValue = value.slice(0, index) + value.slice(index + 1);
+        onChange(nextValue);
+        setActiveIndex(Math.min(index, nextValue.length));
+    };
+
+    const handleBackspace = () => {
+        if (activeIndex == undefined) {
+            removeAtIndex(value.length - 1);
+        } else if (activeIndex < value.length) {
+            removeAtIndex(activeIndex);
+        } else {
+            removeAtIndex(activeIndex - 1);
+        }
+    };
+
     const selectCell = (input: HTMLInputElement, clientX: number) => {
         const { left, width } = input.getBoundingClientRect();
         const cellIndex = Math.max(
@@ -36,10 +104,68 @@ export const SpaceOtpInput = React.forwardRef<
                 Math.floor(((clientX - left) / width) * spaceOTPCodeLength),
             ),
         );
-        const selectionStart = Math.min(cellIndex, input.value.length);
-        const selectionEnd = Math.min(selectionStart + 1, input.value.length);
 
-        input.setSelectionRange(selectionStart, selectionEnd);
+        setActiveIndex(Math.min(cellIndex, value.length));
+    };
+
+    const handleBeforeInput = (event: React.FormEvent<HTMLInputElement>) => {
+        const inputEvent = event.nativeEvent as InputEvent;
+        if (!inputEvent.data) return;
+
+        event.preventDefault();
+        replaceFromActiveIndex(inputEvent.data);
+    };
+
+    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const nextValue = sanitizeSpaceOTP(event.target.value);
+        if (nextValue == value) return;
+
+        onChange(nextValue);
+        setActiveIndex(
+            nextValue.length < spaceOTPCodeLength
+                ? nextValue.length
+                : undefined,
+        );
+    };
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+        if (/^\d$/.test(event.key)) {
+            event.preventDefault();
+            replaceFromActiveIndex(event.key);
+            return;
+        }
+
+        switch (event.key) {
+            case "Backspace":
+                event.preventDefault();
+                handleBackspace();
+                break;
+            case "Delete":
+                event.preventDefault();
+                if (activeIndex != undefined) removeAtIndex(activeIndex);
+                break;
+            case "ArrowLeft":
+                event.preventDefault();
+                setActiveIndex(
+                    Math.max(
+                        0,
+                        activeIndex == undefined
+                            ? value.length - 1
+                            : activeIndex - 1,
+                    ),
+                );
+                break;
+            case "ArrowRight":
+                event.preventDefault();
+                setActiveIndex(
+                    activeIndex == undefined
+                        ? undefined
+                        : nextActiveIndex(activeIndex + 1),
+                );
+                break;
+        }
     };
 
     return (
@@ -50,18 +176,31 @@ export const SpaceOtpInput = React.forwardRef<
                 aria-label={ariaLabel}
                 autoComplete="one-time-code"
                 inputMode="numeric"
-                onChange={(event) =>
-                    onChange(sanitizeSpaceOTP(event.target.value))
-                }
+                maxLength={spaceOTPCodeLength}
+                onBeforeInput={handleBeforeInput}
+                onChange={handleChange}
                 onClick={(event) =>
                     selectCell(event.currentTarget, event.clientX)
                 }
-                onFocus={(event) => moveCaretToEnd(event.currentTarget)}
+                onFocus={() =>
+                    setActiveIndex(
+                        value.length < spaceOTPCodeLength
+                            ? value.length
+                            : undefined,
+                    )
+                }
+                onKeyDown={handleKeyDown}
                 onPaste={(event) => {
                     event.preventDefault();
-                    onChange(
-                        sanitizeSpaceOTP(event.clipboardData.getData("text")),
+                    const nextValue = sanitizeSpaceOTP(
+                        event.clipboardData.getData("text"),
                     );
+                    if (nextValue.length == spaceOTPCodeLength) {
+                        onChange(nextValue);
+                        setActiveIndex(undefined);
+                    } else {
+                        replaceFromActiveIndex(nextValue);
+                    }
                 }}
                 pattern="[0-9]*"
                 type="text"
@@ -75,6 +214,7 @@ export const SpaceOtpInput = React.forwardRef<
                     fontSize: 16,
                     height: "100%",
                     inset: 0,
+                    opacity: 0,
                     outline: 0,
                     p: 0,
                     position: "absolute",
@@ -101,11 +241,7 @@ export const SpaceOtpInput = React.forwardRef<
                             key={index}
                             sx={{
                                 alignItems: "center",
-                                bgcolor: typed
-                                    ? "white"
-                                    : active
-                                      ? activeFill
-                                      : "white",
+                                bgcolor: active ? activeFill : "white",
                                 border:
                                     typed || active
                                         ? `2px solid ${green}`
