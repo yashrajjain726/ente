@@ -58,7 +58,7 @@ func (n *SpaceEmailSender) OnSpaceFriendAdded(actorSlug string, recipientUserID 
 }
 
 func (n *SpaceEmailSender) OnSpaceFriendRequested(actorSlug string, recipientUserID int64) {
-	n.send(actorSlug, "wants to add you as a friend", spaceNotificationFriendRequested, []int64{recipientUserID})
+	n.send(actorSlug, "sent you a friend request", spaceNotificationFriendRequested, []int64{recipientUserID})
 }
 
 func (n *SpaceEmailSender) send(actorSlug, action, event string, recipientUserIDs []int64) {
@@ -133,7 +133,7 @@ func spaceEmailNotificationText(event, action string) string {
 	case spaceNotificationFriendAdded:
 		return "is now your friend"
 	case spaceNotificationFriendRequested:
-		return "wants to add you as a friend"
+		return "sent you a friend request"
 	default:
 		return action
 	}
