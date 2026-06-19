@@ -191,6 +191,21 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                 >
                     @{identity.username} invited you!
                 </Box>
+                <Box
+                    component="p"
+                    sx={{
+                        color: "rgba(255, 255, 255, 0.7)",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 14,
+                        fontWeight: 500,
+                        lineHeight: "20px",
+                        m: "12px auto 0",
+                        maxWidth: 260,
+                    }}
+                >
+                    Add <Box component="span">@{identity.username}</Box> as a
+                    friend to see what they're up to on Ente Space
+                </Box>
             </Box>
             <Box
                 sx={{
@@ -198,7 +213,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     flexShrink: 0,
                     maxWidth: 390,
                     mx: "auto",
-                    pb: "calc(env(safe-area-inset-bottom) + 40px)",
+                    pb: "calc(env(safe-area-inset-bottom) + clamp(36px, calc(5.5svh + 12px), 56px))",
                     px: 3,
                     pt: 3,
                     width: "100%",
@@ -236,24 +251,6 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     }}
                 >
                     Add friend
-                </Box>
-                <Box
-                    component="p"
-                    sx={{
-                        color: "rgba(255, 255, 255, 0.6)",
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 18,
-                        fontWeight: 600,
-                        lineHeight: "26px",
-                        m: "28px auto 0",
-                        maxWidth: 300,
-                    }}
-                >
-                    Add{" "}
-                    <Box component="span" sx={{ color: "white" }}>
-                        @{identity.username}
-                    </Box>{" "}
-                    as a friend to see their everyday moments
                 </Box>
             </Box>
         </Box>
