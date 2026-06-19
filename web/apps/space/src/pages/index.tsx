@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import { SpaceMobileBestToast } from "components/SpaceMobileBestToast";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import React, { useEffect, useState } from "react";
@@ -71,6 +72,7 @@ const PublicProfileUnavailable: React.FC = () => (
                 Profile unavailable
             </Box>
         </Box>
+        <SpaceMobileBestToast />
     </Box>
 );
 
@@ -107,6 +109,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                 color: "white",
                 display: "flex",
                 flexDirection: "column",
+                justifyContent: "space-between",
                 minHeight: { xs: "calc(100svh - 16px)", sm: "100svh" },
                 overflow: "hidden",
                 position: "relative",
@@ -167,13 +170,9 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "center",
-                    left: "50%",
                     maxWidth: 390,
                     minHeight: 0,
-                    position: "absolute",
                     px: 3,
-                    top: "50%",
-                    transform: "translate(-50%, -50%)",
                     width: "100%",
                 }}
             >
@@ -198,7 +197,6 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     boxSizing: "border-box",
                     flexShrink: 0,
                     maxWidth: 390,
-                    mt: "auto",
                     mx: "auto",
                     pb: "calc(env(safe-area-inset-bottom) + 40px)",
                     px: 3,
@@ -206,24 +204,6 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     width: "100%",
                 }}
             >
-                <Box
-                    component="p"
-                    sx={{
-                        color: "rgba(255, 255, 255, 0.6)",
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 18,
-                        fontWeight: 600,
-                        lineHeight: "26px",
-                        m: "0 auto 36px",
-                        maxWidth: 300,
-                    }}
-                >
-                    Add{" "}
-                    <Box component="span" sx={{ color: "white" }}>
-                        @{identity.username}
-                    </Box>{" "}
-                    as a friend to see their everyday moments.
-                </Box>
                 <Box
                     component="button"
                     type="button"
@@ -257,8 +237,27 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                 >
                     Add friend
                 </Box>
+                <Box
+                    component="p"
+                    sx={{
+                        color: "rgba(255, 255, 255, 0.6)",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 18,
+                        fontWeight: 600,
+                        lineHeight: "26px",
+                        m: "28px auto 0",
+                        maxWidth: 300,
+                    }}
+                >
+                    Add{" "}
+                    <Box component="span" sx={{ color: "white" }}>
+                        @{identity.username}
+                    </Box>{" "}
+                    as a friend to see their everyday moments
+                </Box>
             </Box>
         </Box>
+        <SpaceMobileBestToast />
     </Box>
 );
 

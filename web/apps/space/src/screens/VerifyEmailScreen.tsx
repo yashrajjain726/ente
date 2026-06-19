@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import { SpaceBackIcon } from "components/SpaceBackIcon";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import { SpaceOtpInput } from "components/SpaceOtpInput";
 import React, { useEffect, useRef, useState } from "react";
@@ -25,24 +26,6 @@ interface VerifyEmailScreenProps {
     onResendCode?: () => void;
     onVerify?: (code: string) => void;
 }
-
-const BackIcon: React.FC = () => (
-    <Box
-        component="svg"
-        viewBox="0 0 24 24"
-        aria-hidden
-        sx={{ display: "block", height: 24, width: 24 }}
-    >
-        <path
-            d="M15 6L9 12L15 18"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-        />
-    </Box>
-);
 
 export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
     email,
@@ -148,7 +131,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
                             },
                         }}
                     >
-                        <BackIcon />
+                        <SpaceBackIcon />
                     </Box>
                     <Box
                         component="h1"

@@ -2,6 +2,7 @@ import { Box } from "@mui/material";
 import { SpaceAvatarCropPage } from "components/SpaceAvatarCropPage";
 import { SpaceAvatarEditButton } from "components/SpaceAvatarEditButton";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
+import { SpaceBackIcon } from "components/SpaceBackIcon";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React, { useEffect, useRef, useState } from "react";
 import type { Area, Point } from "react-easy-crop";
@@ -62,24 +63,6 @@ interface TextInputProps {
     required?: boolean;
     value?: string;
 }
-
-const BackIcon: React.FC = () => (
-    <Box
-        component="svg"
-        viewBox="0 0 24 24"
-        aria-hidden
-        sx={{ display: "block", height: 24, width: 24 }}
-    >
-        <path
-            d="M15 6L9 12L15 18"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-        />
-    </Box>
-);
 
 const AvatarPlaceholder: React.FC = () => (
     <SpaceAvatarImage aria-hidden border="4px solid white" borderRadius="50%" />
@@ -462,7 +445,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                             },
                         }}
                     >
-                        <BackIcon />
+                        <SpaceBackIcon />
                     </Box>
                     <Box
                         component="h1"

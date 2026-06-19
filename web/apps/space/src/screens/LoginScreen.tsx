@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import { SpaceBackIcon } from "components/SpaceBackIcon";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React, { useEffect, useRef, useState } from "react";
 import { spaceTouchTargetSize } from "styles/touchTargets";
@@ -40,24 +41,6 @@ interface TextInputProps {
     type?: "email" | "password" | "text";
     value?: string;
 }
-
-const BackIcon: React.FC = () => (
-    <Box
-        component="svg"
-        viewBox="0 0 24 24"
-        aria-hidden
-        sx={{ display: "block", height: 24, width: 24 }}
-    >
-        <path
-            d="M15 6L9 12L15 18"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-        />
-    </Box>
-);
 
 const EyeIcon: React.FC = () => (
     <Box
@@ -377,7 +360,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                                 },
                             }}
                         >
-                            <BackIcon />
+                            <SpaceBackIcon />
                         </Box>
                     ) : (
                         <Box />

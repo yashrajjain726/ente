@@ -1,6 +1,5 @@
-import { ArrowLeft02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
+import { SpaceBackIcon } from "components/SpaceBackIcon";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React from "react";
 import Cropper, { type Area, type Point } from "react-easy-crop";
@@ -30,24 +29,6 @@ interface SpaceAvatarCropPageProps {
     title?: string;
     zoom: number;
 }
-
-const SetupBackIcon: React.FC = () => (
-    <Box
-        component="svg"
-        viewBox="0 0 24 24"
-        aria-hidden
-        sx={{ display: "block", height: 24, width: 24 }}
-    >
-        <path
-            d="M15 6L9 12L15 18"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-        />
-    </Box>
-);
 
 const SpaceAvatarCropPageButton: React.FC<{
     children: React.ReactNode;
@@ -264,15 +245,7 @@ export const SpaceAvatarCropPage: React.FC<SpaceAvatarCropPageProps> = ({
                                   }
                         }
                     >
-                        {isAppHeader ? (
-                            <HugeiconsIcon
-                                icon={ArrowLeft02Icon}
-                                size={24}
-                                strokeWidth={1.8}
-                            />
-                        ) : (
-                            <SetupBackIcon />
-                        )}
+                        <SpaceBackIcon />
                     </Box>
                     <Box
                         component="h1"

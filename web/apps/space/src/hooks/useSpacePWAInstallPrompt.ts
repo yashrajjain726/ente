@@ -1,6 +1,10 @@
 import React from "react";
 
-type SpacePWAInstallMode = "android-fallback" | "ios-fallback" | "ios-safari";
+type SpacePWAInstallMode =
+    | "android-fallback"
+    | "ios-chrome"
+    | "ios-fallback"
+    | "ios-safari";
 
 interface SpacePWAInstallPromptState {
     dismiss: () => void;
@@ -34,6 +38,8 @@ const isIOSSafari = () => {
         !/CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo/i.test(userAgent)
     );
 };
+
+const isIOSChrome = () => isIOS() && /CriOS/i.test(navigator.userAgent);
 
 const isAndroidNativePromptBrowser = () => {
     if (!isAndroid()) return false;
@@ -98,7 +104,9 @@ export const useSpacePWAInstallPrompt = (): SpacePWAInstallPromptState => {
         setDismissed(isDismissed());
         setInstalled(isStandalone());
 
-        if (isIOSSafari()) {
+        if (isIOSChrome()) {
+            setMode("ios-chrome");
+        } else if (isIOSSafari()) {
             setMode("ios-safari");
         } else if (isIOS()) {
             setMode("ios-fallback");

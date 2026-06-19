@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import { SpaceBackIcon } from "components/SpaceBackIcon";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React from "react";
 import { spaceTouchTargetSize } from "styles/touchTargets";
@@ -22,24 +23,6 @@ interface PasskeyVerificationScreenProps {
     onUseTwoFactor?: () => void;
     status?: PasskeyVerificationStatus;
 }
-
-const BackIcon: React.FC = () => (
-    <Box
-        component="svg"
-        viewBox="0 0 24 24"
-        aria-hidden
-        sx={{ display: "block", height: 24, width: 24 }}
-    >
-        <path
-            d="M15 6L9 12L15 18"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-        />
-    </Box>
-);
 
 const statusText = (status: PasskeyVerificationStatus) => {
     switch (status) {
@@ -124,7 +107,7 @@ export const PasskeyVerificationScreen: React.FC<
                             },
                         }}
                     >
-                        <BackIcon />
+                        <SpaceBackIcon />
                     </Box>
                     <Box
                         component="h1"

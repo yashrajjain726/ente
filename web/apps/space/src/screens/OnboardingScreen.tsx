@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import { SpaceMobileBestToast } from "components/SpaceMobileBestToast";
 import React from "react";
 
 export const onboardingGreen = "#08C225";
@@ -230,6 +231,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
                     </ActionButton>
                 </Box>
             </Box>
+            <SpaceMobileBestToast />
         </Box>
     );
 };

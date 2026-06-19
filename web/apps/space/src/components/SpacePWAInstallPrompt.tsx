@@ -4,7 +4,6 @@ import {
     MoreHorizontalIcon,
     MoreVerticalIcon,
     MultiplicationSignIcon,
-    SafariIcon,
     ScreenAddToHomeIcon,
     Upload01Icon,
 } from "@hugeicons/core-free-icons";
@@ -116,7 +115,7 @@ export const SpacePWAInstallPrompt: React.FC<SpacePWAInstallPromptProps> = ({
                             whiteSpace: "nowrap",
                         }}
                     >
-                        Add to Home Screen
+                        Add to home screen
                     </Box>
                     <Box
                         sx={{
@@ -215,6 +214,20 @@ const SpacePWAInstallInstructions: React.FC<
 > = ({ mode, open, onClose, onDismiss }) => {
     const titleID = React.useId();
     const isBottomSheet = useMediaQuery("(max-width: 599px)");
+    const shareStep: InstallStep = {
+        icon: <HugeiconsIcon icon={Upload01Icon} size={18} strokeWidth={2} />,
+        text: 'Tap "Share"',
+    };
+    const viewMoreStep: InstallStep = {
+        icon: (
+            <HugeiconsIcon icon={ArrowDown01Icon} size={18} strokeWidth={2} />
+        ),
+        text: 'Tap "View More"',
+    };
+    const addHomeScreenStep: InstallStep = {
+        icon: <HugeiconsIcon icon={AddSquareIcon} size={18} strokeWidth={2} />,
+        text: 'Tap "Add to Home Screen"',
+    };
     const iosSafariSteps: InstallStep[] = [
         {
             icon: (
@@ -226,78 +239,68 @@ const SpacePWAInstallInstructions: React.FC<
             ),
             text: "Open your browser menu",
         },
-        {
-            icon: (
-                <HugeiconsIcon icon={Upload01Icon} size={18} strokeWidth={2} />
-            ),
-            text: 'Tap "Share"',
-        },
+        shareStep,
+        viewMoreStep,
+        addHomeScreenStep,
+    ];
+    const iosChromeSteps: InstallStep[] = [
+        shareStep,
+        viewMoreStep,
+        addHomeScreenStep,
+    ];
+    const iosFallbackSteps: InstallStep[] = [
         {
             icon: (
                 <HugeiconsIcon
-                    icon={ArrowDown01Icon}
+                    icon={MoreHorizontalIcon}
                     size={18}
-                    strokeWidth={2}
+                    strokeWidth={3.2}
                 />
             ),
-            text: 'Tap "View More"',
+            text: "Open your browser menu",
         },
-        {
-            icon: (
-                <HugeiconsIcon icon={AddSquareIcon} size={18} strokeWidth={2} />
-            ),
-            text: 'Tap "Add to Home Screen"',
-        },
+        shareStep,
+        addHomeScreenStep,
     ];
     const steps: InstallStep[] =
-        mode == "ios-fallback"
-            ? [
-                  {
-                      icon: (
-                          <HugeiconsIcon
-                              icon={SafariIcon}
-                              size={18}
-                              strokeWidth={2}
-                          />
-                      ),
-                      text: "Open this page in Safari",
-                  },
-                  ...iosSafariSteps,
-              ]
-            : mode == "ios-safari"
-              ? iosSafariSteps
-              : [
-                    {
-                        icon: (
-                            <HugeiconsIcon
-                                icon={MoreVerticalIcon}
-                                size={18}
-                                strokeWidth={3.2}
-                            />
-                        ),
-                        text: "Open your browser menu",
-                    },
-                    {
-                        icon: (
-                            <HugeiconsIcon
-                                icon={MoreHorizontalIcon}
-                                size={18}
-                                strokeWidth={3.2}
-                            />
-                        ),
-                        text: 'Tap "More"',
-                    },
-                    {
-                        icon: (
-                            <HugeiconsIcon
-                                icon={ScreenAddToHomeIcon}
-                                size={18}
-                                strokeWidth={2}
-                            />
-                        ),
-                        text: 'Tap "Add to Home screen"',
-                    },
-                ];
+        mode == "ios-chrome"
+            ? iosChromeSteps
+            : mode == "ios-fallback"
+              ? iosFallbackSteps
+              : mode == "ios-safari"
+                ? iosSafariSteps
+                : [
+                      {
+                          icon: (
+                              <HugeiconsIcon
+                                  icon={MoreVerticalIcon}
+                                  size={18}
+                                  strokeWidth={3.2}
+                              />
+                          ),
+                          text: "Open your browser menu",
+                      },
+                      {
+                          icon: (
+                              <HugeiconsIcon
+                                  icon={MoreHorizontalIcon}
+                                  size={18}
+                                  strokeWidth={3.2}
+                              />
+                          ),
+                          text: 'Tap "More"',
+                      },
+                      {
+                          icon: (
+                              <HugeiconsIcon
+                                  icon={ScreenAddToHomeIcon}
+                                  size={18}
+                                  strokeWidth={2}
+                              />
+                          ),
+                          text: 'Tap "Add to Home screen"',
+                      },
+                  ];
 
     return (
         <Dialog
@@ -362,7 +365,7 @@ const SpacePWAInstallInstructions: React.FC<
                         textAlign: "center",
                     }}
                 >
-                    Add to Home Screen
+                    Add Space to your home screen
                 </Box>
                 <Box sx={{ display: "grid", gap: "12px", mt: "22px" }}>
                     {steps.map((step, index) => (
