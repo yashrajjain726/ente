@@ -1,5 +1,3 @@
-import { UserAdd02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
@@ -104,15 +102,20 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
             sx={{
                 alignItems: "center",
                 bgcolor: onboardingGreen,
-                borderRadius: { xs: "24px", sm: 0 },
+                borderRadius: { xs: "32px", sm: 0 },
                 boxSizing: "border-box",
                 color: "white",
                 display: "flex",
                 flexDirection: "column",
                 minHeight: { xs: "calc(100svh - 16px)", sm: "100svh" },
                 overflow: "hidden",
+                position: "relative",
                 textAlign: "center",
                 width: "100%",
+                "@media (max-width: 599.95px)": {
+                    background:
+                        'url("/images/invite-bg.jpg") center / cover no-repeat',
+                },
             }}
         >
             <Box
@@ -144,10 +147,16 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     }}
                 >
                     <Box
-                        component="img"
-                        alt=""
-                        src="/images/space.svg"
-                        sx={{ display: "block", height: 30, width: 101 }}
+                        component="span"
+                        sx={{
+                            bgcolor: { xs: "#CBE78F", sm: "white" },
+                            display: "block",
+                            height: 30,
+                            mask: 'url("/images/space.svg") center / contain no-repeat',
+                            WebkitMask:
+                                'url("/images/space.svg") center / contain no-repeat',
+                            width: 101,
+                        }}
                     />
                 </Box>
                 <Box />
@@ -156,12 +165,15 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                 sx={{
                     alignItems: "center",
                     display: "flex",
-                    flex: "1 1 auto",
                     flexDirection: "column",
                     justifyContent: "center",
+                    left: "50%",
                     maxWidth: 390,
                     minHeight: 0,
+                    position: "absolute",
                     px: 3,
+                    top: "50%",
+                    transform: "translate(-50%, -50%)",
                     width: "100%",
                 }}
             >
@@ -180,35 +192,38 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                 >
                     @{identity.username} invited you!
                 </Box>
-                <Box
-                    component="p"
-                    sx={{
-                        color: "#AAFFB8",
-                        fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 15,
-                        fontWeight: 600,
-                        lineHeight: "22px",
-                        m: 0,
-                        mt: "10px",
-                        maxWidth: 300,
-                    }}
-                >
-                    Add @{identity.username} as a friend to see what
-                    they&apos;re up to on Ente Space.
-                </Box>
             </Box>
             <Box
                 sx={{
                     boxSizing: "border-box",
                     flexShrink: 0,
                     maxWidth: 390,
+                    mt: "auto",
                     mx: "auto",
-                    pb: "calc(env(safe-area-inset-bottom) + 24px)",
+                    pb: "calc(env(safe-area-inset-bottom) + 40px)",
                     px: 3,
                     pt: 3,
                     width: "100%",
                 }}
             >
+                <Box
+                    component="p"
+                    sx={{
+                        color: "rgba(255, 255, 255, 0.6)",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 18,
+                        fontWeight: 600,
+                        lineHeight: "26px",
+                        m: "0 auto 36px",
+                        maxWidth: 300,
+                    }}
+                >
+                    Add{" "}
+                    <Box component="span" sx={{ color: "white" }}>
+                        @{identity.username}
+                    </Box>{" "}
+                    as a friend to see their everyday moments.
+                </Box>
                 <Box
                     component="button"
                     type="button"
@@ -216,33 +231,30 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     sx={{
                         alignItems: "center",
                         appearance: "none",
-                        bgcolor: "black",
+                        bgcolor: { xs: "white", sm: "black" },
                         border: 0,
-                        borderRadius: "20px",
-                        color: "white",
+                        borderRadius: "24px",
+                        color: { xs: "black", sm: "white" },
                         cursor: "pointer",
                         display: "flex",
-                        gap: "8px",
                         fontFamily: '"Inter Variable", Inter, sans-serif',
-                        fontSize: 14,
-                        fontWeight: 500,
-                        height: 48,
+                        fontSize: 16,
+                        fontWeight: 700,
                         justifyContent: "center",
-                        lineHeight: "20px",
-                        p: "14px 24px",
-                        width: "100%",
-                        "&:hover": { bgcolor: "#121212" },
+                        lineHeight: "24px",
+                        minHeight: 60,
+                        p: "18px 24px",
+                        mx: "auto",
+                        width: "min(100%, 300px)",
+                        "&:hover": {
+                            bgcolor: { xs: "#F4F4F4", sm: "#121212" },
+                        },
                         "&:focus-visible": {
                             outline: "2px solid rgba(255 255 255 / 0.88)",
                             outlineOffset: 3,
                         },
                     }}
                 >
-                    <HugeiconsIcon
-                        icon={UserAdd02Icon}
-                        size={18}
-                        strokeWidth={1.8}
-                    />
                     Add friend
                 </Box>
             </Box>
