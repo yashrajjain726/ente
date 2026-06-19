@@ -1,82 +1,19 @@
 <!DOCTYPE html>
 <html>
-<meta content="text/html; charset=utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1,
-  minimum-scale=1" />
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<title>Ente Space notification</title>
 <style>
-  body {
-    background-color: #f0f1f3;
-    font-family: "Helvetica Neue", "Segoe UI", Helvetica, sans-serif;
-    font-size: 16px;
-    line-height: 24px;
-    margin: 0;
-    color: #232323;
-  }
-
-  .wrap {
-    background-color: #ffffff;
-    padding: 34px 22px 22px;
-    max-width: 320px;
-    margin: 0 auto;
-    border-radius: 32px;
-  }
-
-  .button {
-    background: #08C225;
-    border-radius: 16px;
-    text-decoration: none !important;
-    color: #fff !important;
-    font-size: 14px;
-    font-weight: 500;
-    padding: 16px 28px;
-    display: block;
-    box-sizing: border-box;
-    width: 100%;
-  }
-
-  .button:hover {
-    background: #08B020;
-  }
-
-  .footer {
-    text-align: center;
-    font-size: 12px;
-    color: #888;
-  }
-
-  .footer a {
-    color: #888;
-    margin-right: 5px;
-  }
-
-  .gutter {
-    padding: 30px;
-  }
-
-  .card-gutter {
-    padding: 0 20px;
-  }
-
-  img {
-    max-width: 100%;
-    height: auto;
-  }
-
-  a {
-    color: #08C225;
-  }
-
-  a:hover {
-    color: #111;
-  }
-
-  @media screen and (max-width: 600px) {
-    .wrap {
-      max-width: auto;
+  @media screen and (max-width: 480px) {
+    .space-shell {
+      padding-left: 12px !important;
+      padding-right: 12px !important;
     }
 
-    .gutter {
-      padding: 10px;
+    .space-card {
+      padding-left: 18px !important;
+      padding-right: 18px !important;
     }
   }
 
@@ -85,29 +22,50 @@
     width: 24px !important;
   }
 </style>
-
-<body>
-<div class="gutter" style="padding: 18px">&nbsp;</div>
-<div class="card-gutter" style="padding: 0 20px;">
-<div class="wrap" style=" background-color: rgb(255, 255, 255); padding: 34px
-    22px 22px; max-width: 320px; margin: 0 auto; border-radius: 32px;
-    font-size: 16px; color: #232323; " >
-  <main>
-    <div style="text-align: center;">
-      {{if .IllustrationURL}}
-      <p style="margin: 0 0 24px;">
-        <img src="{{ .IllustrationURL }}" alt="" style="display: block; margin: 0 auto; width: {{ .IllustrationWidth }}px; height: auto;" />
-      </p>
-      {{end}}
-      <p style="font-size: 26px; font-weight: 800; line-height: 30px; margin: 0 0 4px; color: #232323;">{{ .ActorLabel }}</p>
-      <p style="font-size: 15px; line-height: 21px; margin: 0 0 28px; color: #6b6b6b;">{{ .Notification }}</p>
-      <p style="margin: 0;">
-        <a class="button" href="{{ .AppURL }}" target="_blank">Open Ente Space</a>
-      </p>
-    </div>
-  </main>
-</div>
-</div>
+</head>
+<body style="background-color: #f0f1f3; color: #232323; font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif; margin: 0; padding: 0; -ms-text-size-adjust: 100%; -webkit-text-size-adjust: 100%;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f0f1f3" style="background-color: #f0f1f3; border-collapse: collapse; margin: 0; width: 100%;">
+  <tr>
+    <td align="center" class="space-shell" style="padding: 48px 20px 0;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: separate; border-spacing: 0; max-width: 364px; width: 100%;">
+        <tr>
+          <td align="center" class="space-card" bgcolor="#ffffff" style="background-color: #ffffff; border-radius: 32px; color: #232323; font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif; padding: 34px 22px 22px; text-align: center;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; width: 100%;">
+              {{if .IllustrationURL}}
+              <tr>
+                <td align="center" style="padding: 0 0 24px;">
+                  <img src="{{ .IllustrationURL }}" width="{{ .IllustrationWidth }}" alt="" style="border: 0; display: block; height: auto; margin: 0 auto; max-width: 100%; outline: none; text-decoration: none; width: {{ .IllustrationWidth }}px;" />
+                </td>
+              </tr>
+              {{end}}
+              <tr>
+                <td align="center" style="color: #232323; font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif; font-size: 26px; font-weight: 800; line-height: 30px; padding: 0 0 4px; text-align: center;">
+                  {{ .ActorLabel }}
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="color: #6b6b6b; font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif; font-size: 15px; line-height: 21px; padding: 0 0 28px; text-align: center;">
+                  {{ .Notification }}
+                </td>
+              </tr>
+              <tr>
+                <td align="center">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: separate; border-spacing: 0; width: 100%;">
+                    <tr>
+                      <td align="center" bgcolor="#08C225" style="background-color: #08C225; border-radius: 16px;">
+                        <a href="{{ .AppURL }}" target="_blank" style="background-color: #08C225; border-radius: 16px; color: #ffffff !important; display: block; font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif; font-size: 14px; font-weight: 700; line-height: 20px; padding: 16px 28px; text-align: center; text-decoration: none !important;">Open Ente Space</a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
 <br />
 <div class="footer" style="text-align: center; font-size: 12px; color:
     rgb(136, 136, 136)" >
