@@ -24,7 +24,7 @@ pub use transport::{
     MessageConversationPage, MessageConversationPost, MessageConversationResponse, MessagePage,
     MessageResponse, PostLikerResponse, PostObjectPayload, PostPage, PostResponse,
     PresignUploadResponse, ProfileAvatarPayload, ProfileAvatarResponse, ProfileCoverPayload,
-    ProfileCoverResponse, SpaceActorResponse, SpaceFriendResponse, SpaceKeyResponse,
-    SpaceKeyVersionResponse, SpaceLinkLoginResponse, SpaceLinkStatusResponse, SpaceLookupResponse,
-    SpaceProfileResponse, SpaceUnreadStatusResponse,
+    ProfileCoverResponse, SpaceActorResponse, SpaceFriendRequestResponse, SpaceFriendResponse,
+    SpaceKeyResponse, SpaceKeyVersionResponse, SpaceLinkLoginResponse, SpaceLinkStatusResponse,
+    SpaceLookupResponse, SpaceProfileResponse, SpaceUnreadStatusResponse,
 };

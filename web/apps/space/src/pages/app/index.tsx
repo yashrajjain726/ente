@@ -15,14 +15,13 @@ import {
     setCurrentPostLiked,
     type SpacePost,
 } from "services/space";
-import { consumeAcceptedSpaceInviteFriend } from "services/spaceInvite";
+import { consumeSentSpaceInviteFriend } from "services/spaceInvite";
 import { useSpaceAppState } from "state/spaceAppState";
 import {
     confirmLocalFeedPost,
     createLocalFeedPostID,
     failLocalFeedPost,
 } from "utils/localFeedPost";
-import { firstNameFrom } from "utils/spaceDisplay";
 import { prepareSpacePostImageFromEdit } from "utils/spacePostImage";
 import { spaceRoutes } from "utils/spaceRoutes";
 import { useSpaceRouter } from "utils/spaceRouteTransitions";
@@ -40,7 +39,8 @@ const Page: React.FC = () => {
         setSkipNextHomeFeedSkeleton,
         skipNextHomeFeedSkeleton,
     } = useSpaceAppState();
-    const [addedFriendToastName, setAddedFriendToastName] = useState<string>();
+    const [friendRequestSentToastName, setFriendRequestSentToastName] =
+        useState<string>();
     const [feedItems, setFeedItems] = useState<SpacePost[]>([]);
     const [feedNextCursor, setFeedNextCursor] = useState<string>();
     const [hasUnreadMessages, setHasUnreadMessages] = useState<boolean>();
@@ -56,10 +56,9 @@ const Page: React.FC = () => {
     const isSkippingInitialFeedSkeleton =
         isInitialFeedLoading && skipNextHomeFeedSkeleton;
     const isHomeFeedLoading =
-        isFriendsLoading ||
-        (isFeedLoading && !isSkippingInitialFeedSkeleton);
-    const closeAddedFriendToast = React.useCallback(
-        () => setAddedFriendToastName(undefined),
+        isFriendsLoading || (isFeedLoading && !isSkippingInitialFeedSkeleton);
+    const closeFriendRequestSentToast = React.useCallback(
+        () => setFriendRequestSentToastName(undefined),
         [],
     );
 
@@ -72,12 +71,10 @@ const Page: React.FC = () => {
     useEffect(() => {
         if (!router.isReady) return;
 
-        const acceptedFriend = consumeAcceptedSpaceInviteFriend();
-        if (!acceptedFriend) return;
+        const sentFriend = consumeSentSpaceInviteFriend();
+        if (!sentFriend) return;
 
-        const displayName =
-            acceptedFriend.fullName.trim() || acceptedFriend.username.trim();
-        setAddedFriendToastName(firstNameFrom(displayName) || displayName);
+        setFriendRequestSentToastName(sentFriend.username.trim());
     }, [router.isReady]);
 
     useEffect(() => {
@@ -207,14 +204,19 @@ const Page: React.FC = () => {
             <HomeScreen
                 feedItems={feedItems}
                 friendsCount={friends.length}
-                addedFriendToastName={addedFriendToastName}
+                friendRequestSentToastName={friendRequestSentToastName}
                 hasUnreadMessages={hasUnreadMessages}
                 hasMoreFeedItems={Boolean(feedNextCursor)}
                 isFeedLoading={isHomeFeedLoading}
                 isFeedLoadingMore={isFeedLoadingMore}
                 localFeedPosts={localFeedPosts}
                 profile={profile}
-                onAddedFriendToastClose={closeAddedFriendToast}
+                showInstallPrompt={
+                    profileLoadStatus == "ready" &&
+                    Boolean(profile) &&
+                    !isHomeFeedLoading
+                }
+                onFriendRequestSentToastClose={closeFriendRequestSentToast}
                 onCreatePost={
                     profile
                         ? async (image, caption) => {

@@ -629,17 +629,18 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                         <Box
                             component="button"
                             type="button"
-                            disabled={!onShareProfileLink}
-                            onClick={openInviteDialog}
+                            disabled={!onShareProfileLink || isInviteSharing}
+                            onClick={() => void shareInviteLink()}
                             sx={{
                                 alignItems: "center",
                                 bgcolor: "#E8E8E8",
                                 border: 0,
                                 borderRadius: "18px",
                                 color: textBase,
-                                cursor: onShareProfileLink
-                                    ? "pointer"
-                                    : "default",
+                                cursor:
+                                    onShareProfileLink && !isInviteSharing
+                                        ? "pointer"
+                                        : "default",
                                 display: "inline-flex",
                                 fontFamily:
                                     '"Inter Variable", Inter, sans-serif',
@@ -658,13 +659,14 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                                     outline: `2px solid ${green}`,
                                     outlineOffset: 2,
                                 },
-                                "&:hover": onShareProfileLink
-                                    ? { bgcolor: "#DEDEDE" }
-                                    : undefined,
+                                "&:hover":
+                                    onShareProfileLink && !isInviteSharing
+                                        ? { bgcolor: "#DEDEDE" }
+                                        : undefined,
                             }}
                         >
                             <ShareIcon />
-                            Invite friends
+                            Share invite
                         </Box>
                     </Box>
                 )}

@@ -23,7 +23,7 @@ import { prepareSpacePostImageFromEdit } from "utils/spacePostImage";
 import { spaceRoutes } from "utils/spaceRoutes";
 import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
-const initialPostSkeletonDelayMs = 350;
+const initialPostLoadingIndicatorDelayMs = 350;
 
 const Page: React.FC = () => {
     const router = useSpaceRouter();
@@ -32,8 +32,10 @@ const Page: React.FC = () => {
     const [friendsCount, setFriendsCount] = useState(0);
     const [posts, setPosts] = useState<SpaceProfilePost[]>([]);
     const [isPostsLoading, setIsPostsLoading] = useState(true);
-    const [showInitialPostSkeleton, setShowInitialPostSkeleton] =
-        useState(false);
+    const [
+        showInitialPostLoadingIndicator,
+        setShowInitialPostLoadingIndicator,
+    ] = useState(false);
     const postGroups = useMemo(
         () => profilePostGroupsFromPosts(posts),
         [posts],
@@ -85,13 +87,13 @@ const Page: React.FC = () => {
 
     useEffect(() => {
         if (!isInitialPostsLoading) {
-            setShowInitialPostSkeleton(false);
+            setShowInitialPostLoadingIndicator(false);
             return;
         }
 
         const timeoutID = window.setTimeout(
-            () => setShowInitialPostSkeleton(true),
-            initialPostSkeletonDelayMs,
+            () => setShowInitialPostLoadingIndicator(true),
+            initialPostLoadingIndicatorDelayMs,
         );
         return () => window.clearTimeout(timeoutID);
     }, [isInitialPostsLoading]);
@@ -114,7 +116,7 @@ const Page: React.FC = () => {
                 isStatsLoading={isPostsLoading}
                 postGroups={postGroups}
                 profile={profile}
-                showPostLoadingSkeleton={showInitialPostSkeleton}
+                showPostLoadingIndicator={showInitialPostLoadingIndicator}
                 onBack={() => void router.push(spaceRoutes.home)}
                 onCreatePost={async (image, caption) => {
                     const spaceId = profile.spaceId;

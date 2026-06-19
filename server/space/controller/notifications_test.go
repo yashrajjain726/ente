@@ -1,13 +1,11 @@
 package controller
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
 	"strconv"
 	"testing"
 	"time"
 
-	timeutil "github.com/ente-io/museum/pkg/utils/time"
 	"github.com/ente-io/museum/space/models"
 	"github.com/stretchr/testify/require"
 )
@@ -40,6 +38,10 @@ func (n *recordingSpaceEmailNotifier) OnSpacePostReplied(actorSlug string, recip
 
 func (n *recordingSpaceEmailNotifier) OnSpaceFriendAdded(actorSlug string, recipientUserID int64) {
 	n.events <- recordedSpaceEmail{event: "friend_added", actorSlug: actorSlug, recipients: []int64{recipientUserID}}
+}
+
+func (n *recordingSpaceEmailNotifier) OnSpaceFriendRequested(actorSlug string, recipientUserID int64) {
+	n.events <- recordedSpaceEmail{event: "friend_requested", actorSlug: actorSlug, recipients: []int64{recipientUserID}}
 }
 
 func requireSpaceEmail(t *testing.T, notifier *recordingSpaceEmailNotifier) recordedSpaceEmail {
@@ -75,14 +77,17 @@ func TestSpaceEmailTemplateData(t *testing.T) {
 	require.Equal(t, "just liked your post", spaceEmailNotificationText(spaceNotificationPostLiked, "liked your post"))
 	require.Equal(t, "just replied to your post", spaceEmailNotificationText(spaceNotificationPostReplied, "replied to your post"))
 	require.Equal(t, "is now your friend", spaceEmailNotificationText(spaceNotificationFriendAdded, "is now your friend"))
+	require.Equal(t, "wants to add you as a friend", spaceEmailNotificationText(spaceNotificationFriendRequested, "wants to add you as a friend"))
 	require.Equal(t, spaceNewPostIllustrationURL, spaceEmailIllustrationURL(spaceNotificationPostCreated))
 	require.Equal(t, spaceNewPostLikeIllustrationURL, spaceEmailIllustrationURL(spaceNotificationPostLiked))
 	require.Equal(t, spaceNewPostReplyIllustrationURL, spaceEmailIllustrationURL(spaceNotificationPostReplied))
 	require.Equal(t, spaceNewFriendIllustrationURL, spaceEmailIllustrationURL(spaceNotificationFriendAdded))
+	require.Equal(t, spaceNewFriendIllustrationURL, spaceEmailIllustrationURL(spaceNotificationFriendRequested))
 	require.Equal(t, spaceNewPostIllustrationWidth, spaceEmailIllustrationWidth(spaceNotificationPostCreated))
 	require.Equal(t, spaceNewPostLikeIllustrationWidth, spaceEmailIllustrationWidth(spaceNotificationPostLiked))
 	require.Equal(t, spaceNewPostReplyIllustrationWidth, spaceEmailIllustrationWidth(spaceNotificationPostReplied))
 	require.Equal(t, spaceNewFriendIllustrationWidth, spaceEmailIllustrationWidth(spaceNotificationFriendAdded))
+	require.Equal(t, spaceNewFriendIllustrationWidth, spaceEmailIllustrationWidth(spaceNotificationFriendRequested))
 }
 
 func TestPostLikeSendsEmailOnce(t *testing.T) {
@@ -140,30 +145,36 @@ func TestAddFriendSendsEmailOnce(t *testing.T) {
 	require.NoError(t, err)
 	bobSpace, err := repos.Spaces.CreateSpace(ctx, bobID, "bob-friend-email", "bob-space-key", "bob-friend-email-public", "bob-friend-email-secret", "bob-friend-email-secret-nonce", "bob-profile")
 	require.NoError(t, err)
-	authHash := sha256.Sum256([]byte("alice-friend-email-auth-key"))
-	link, err := repos.Links.UpsertLink(ctx, aliceSpace.SpaceID, authHash[:], aliceSpace.CurrentVersion, "alice-link-key", "alice-link-secret")
-	require.NoError(t, err)
-	sessionHash := sha256.Sum256([]byte("alice-friend-email-session-token"))
-	require.NoError(t, repos.Links.CreateSession(ctx, sessionHash[:], link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.MicrosecondsAfterMinutes(5)))
 	req := models.AddFriendPayload{
 		TargetSpaceID:              aliceSpace.SpaceID,
-		LinkSessionToken:           "alice-friend-email-session-token",
 		RequesterSpaceID:           bobSpace.SpaceID,
-		TargetEncryptedSpaceKey:    base64.StdEncoding.EncodeToString([]byte("alice-target-key")),
-		TargetKeyVersion:           aliceSpace.CurrentVersion,
 		RequesterEncryptedSpaceKey: base64.StdEncoding.EncodeToString([]byte("bob-requester-key")),
 		RequesterKeyVersion:        bobSpace.CurrentVersion,
 	}
 
 	resp, err := friends.Add(newSpaceControllerContext(bobID), req)
 	require.NoError(t, err)
-	require.Equal(t, "friend", resp.Status)
+	require.Equal(t, "requested", resp.Status)
 	email := requireSpaceEmail(t, notifier)
-	require.Equal(t, recordedSpaceEmail{event: "friend_added", actorSlug: bobSpace.SpaceSlug, recipients: []int64{aliceID}}, email)
+	require.Equal(t, recordedSpaceEmail{event: "friend_requested", actorSlug: bobSpace.SpaceSlug, recipients: []int64{aliceID}}, email)
 
 	_, err = friends.Add(newSpaceControllerContext(bobID), req)
 	require.NoError(t, err)
 	requireNoSpaceEmail(t, notifier)
+
+	requests, err := friends.ListRequests(newSpaceControllerContext(aliceID))
+	require.NoError(t, err)
+	require.Len(t, requests, 1)
+	require.Equal(t, bobSpace.SpaceSlug, requests[0].Requester.SpaceSlug)
+
+	resp, err = friends.ConfirmRequest(newSpaceControllerContext(aliceID), base10(requests[0].RequestID), models.ConfirmFriendRequestPayload{
+		TargetEncryptedSpaceKey: base64.StdEncoding.EncodeToString([]byte("alice-target-key")),
+		TargetKeyVersion:        aliceSpace.CurrentVersion,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "friend", resp.Status)
+	email = requireSpaceEmail(t, notifier)
+	require.Equal(t, recordedSpaceEmail{event: "friend_added", actorSlug: aliceSpace.SpaceSlug, recipients: []int64{bobID}}, email)
 }
 
 func base10(id int64) string {

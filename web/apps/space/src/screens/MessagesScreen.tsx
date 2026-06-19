@@ -14,7 +14,6 @@ import {
     Popper,
 } from "@mui/material";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
-import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
@@ -71,7 +70,13 @@ interface MessagesScreenProps {
     messages: SpaceMessage[];
     onBack?: () => void;
     onCloseThread: () => void;
+    onConfirmFriendRequest: (
+        conversation: SpaceMessageConversation,
+    ) => Promise<void>;
     onDeleteMessage: (messageId: string) => Promise<void>;
+    onDeleteFriendRequest: (
+        conversation: SpaceMessageConversation,
+    ) => Promise<void>;
     onOpenSelectedFriendProfile: (
         friend: SpaceMessageConversation["friend"],
     ) => void;
@@ -187,6 +192,9 @@ const conversationPreview = (
     profile: SetupProfile,
 ) => {
     const activity = conversation.latestActivity;
+    if (activity.type == "friend_request") {
+        return "Friend request";
+    }
     if (activity.type == "friend_add") {
         return "You're now friends. Say hello!";
     }
@@ -288,7 +296,9 @@ const ConversationPreviewLine: React.FC<{
 };
 
 const conversationId = (conversation: SpaceMessageConversation) =>
-    conversation.friend.spaceId ?? conversation.friend.id;
+    conversation.latestActivity.type == "friend_request"
+        ? conversation.latestActivity.id
+        : (conversation.friend.spaceId ?? conversation.friend.id);
 
 const conversationTimeSections = (
     conversations: SpaceMessageConversation[],
@@ -426,23 +436,51 @@ const MessageTimeSeparator: React.FC<{ timestampMs: number }> = ({
 
 const ConversationListItem: React.FC<{
     conversation: SpaceMessageConversation;
+    onConfirmFriendRequest: (
+        conversation: SpaceMessageConversation,
+    ) => Promise<void>;
+    onDeleteFriendRequest: (
+        conversation: SpaceMessageConversation,
+    ) => Promise<void>;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
     profile: SetupProfile;
-}> = ({ conversation, onOpenThread, profile }) => {
+}> = ({
+    conversation,
+    onConfirmFriendRequest,
+    onDeleteFriendRequest,
+    onOpenThread,
+    profile,
+}) => {
     const name =
         conversation.friend.fullName.trim() || conversation.friend.username;
     const timestampLabel = formatTimeAgo(
         microsForTimestamp(conversation.latestActivity.createdAtMs),
     );
+    const isFriendRequest =
+        conversation.latestActivity.type == "friend_request";
     const postThumbnailUrl = conversation.latestActivity.post?.imageUrl;
     const unreadCount = conversation.unreadCount;
+    const confirmFriendRequest = () => {
+        void onConfirmFriendRequest(conversation).catch((error: unknown) =>
+            console.error("Failed to confirm friend request", error),
+        );
+    };
+    const deleteFriendRequest = () => {
+        void onDeleteFriendRequest(conversation).catch((error: unknown) =>
+            console.error("Failed to delete friend request", error),
+        );
+    };
 
     return (
         <Box component="li" sx={{ listStyle: "none" }}>
             <Box
-                component="button"
-                type="button"
-                onClick={() => onOpenThread(conversation)}
+                component={isFriendRequest ? "div" : "button"}
+                type={isFriendRequest ? undefined : "button"}
+                onClick={
+                    isFriendRequest
+                        ? undefined
+                        : () => onOpenThread(conversation)
+                }
                 sx={{
                     alignItems: "center",
                     appearance: "none",
@@ -450,12 +488,14 @@ const ConversationListItem: React.FC<{
                     border: 0,
                     borderRadius: "8px",
                     color: textBase,
-                    cursor: "pointer",
+                    cursor: isFriendRequest ? "default" : "pointer",
                     display: "grid",
                     gap: "10px",
-                    gridTemplateColumns: postThumbnailUrl
-                        ? "44px minmax(0, 1fr) 44px"
-                        : "44px minmax(0, 1fr)",
+                    gridTemplateColumns: isFriendRequest
+                        ? "44px minmax(0, 1fr) auto"
+                        : postThumbnailUrl
+                          ? "44px minmax(0, 1fr) 44px"
+                          : "44px minmax(0, 1fr)",
                     minHeight: 64,
                     p: "8px 0",
                     textAlign: "left",
@@ -478,7 +518,7 @@ const ConversationListItem: React.FC<{
                         avatarUrl={conversation.friend.avatarUrl}
                         size={44}
                     />
-                    {unreadCount > 0 && (
+                    {unreadCount > 0 && !isFriendRequest && (
                         <Box
                             aria-label={`${unreadCount} unread message${unreadCount == 1 ? "" : "s"}`}
                             component="span"
@@ -588,16 +628,74 @@ const ConversationListItem: React.FC<{
                         }}
                     />
                 )}
+                {isFriendRequest && (
+                    <Box sx={{ display: "flex", flexShrink: 0, gap: "6px" }}>
+                        <Box
+                            component="button"
+                            type="button"
+                            onClick={confirmFriendRequest}
+                            sx={{
+                                bgcolor: green,
+                                border: 0,
+                                borderRadius: "12px",
+                                color: "white",
+                                cursor: "pointer",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                height: 34,
+                                px: "12px",
+                                "&:hover": { bgcolor: "#07A820" },
+                            }}
+                        >
+                            Confirm
+                        </Box>
+                        <Box
+                            component="button"
+                            type="button"
+                            onClick={deleteFriendRequest}
+                            sx={{
+                                bgcolor: "#F1F1F1",
+                                border: 0,
+                                borderRadius: "12px",
+                                color: textBase,
+                                cursor: "pointer",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                height: 34,
+                                px: "12px",
+                                "&:hover": { bgcolor: "#E7E7E7" },
+                            }}
+                        >
+                            Delete
+                        </Box>
+                    </Box>
+                )}
             </Box>
         </Box>
     );
 };
 
 const ConversationSection: React.FC<{
+    onConfirmFriendRequest: (
+        conversation: SpaceMessageConversation,
+    ) => Promise<void>;
+    onDeleteFriendRequest: (
+        conversation: SpaceMessageConversation,
+    ) => Promise<void>;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
     profile: SetupProfile;
     section: ConversationSection;
-}> = ({ onOpenThread, profile, section }) => {
+}> = ({
+    onConfirmFriendRequest,
+    onDeleteFriendRequest,
+    onOpenThread,
+    profile,
+    section,
+}) => {
     if (section.items.length == 0) return null;
 
     return (
@@ -622,6 +720,8 @@ const ConversationSection: React.FC<{
                     <ConversationListItem
                         key={conversationId(conversation)}
                         conversation={conversation}
+                        onConfirmFriendRequest={onConfirmFriendRequest}
+                        onDeleteFriendRequest={onDeleteFriendRequest}
                         onOpenThread={onOpenThread}
                         profile={profile}
                     />
@@ -1296,7 +1396,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     newConversationIds = [],
     onBack,
     onCloseThread,
+    onConfirmFriendRequest,
     onDeleteMessage,
+    onDeleteFriendRequest,
     onOpenSelectedFriendProfile,
     onOpenQuotePost,
     onOpenThread,
@@ -1317,11 +1419,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const [sendPhase, setSendPhase] = React.useState<"idle" | "sending">(
         "idle",
     );
-    const [isInviteDialogOpen, setIsInviteDialogOpen] = React.useState(false);
     const [isInviteSharing, setIsInviteSharing] = React.useState(false);
-    const [inviteShareError, setInviteShareError] = React.useState<
-        string | null
-    >(null);
     const composerRef = React.useRef<HTMLTextAreaElement | null>(null);
     const threadScrollRef = React.useRef<HTMLDivElement | null>(null);
     const stickToThreadBottomRef = React.useRef(true);
@@ -1345,8 +1443,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         friendsCount == 0 && Boolean(onShareProfileLink);
     const emptyConversationsCopy =
         friendsCount == 0
-            ? "No messages yet. Once you add friends, you'll see their messages and replies to your posts here."
-            : "No messages yet. You'll see your friends' messages and replies to your posts here.";
+            ? "No messages yet. Once you add friends, you'll see their likes, replies and messages here."
+            : "No messages yet. You'll see your friends' likes, replies and messages here.";
     const conversationSections = React.useMemo(
         () => conversationTimeSections(conversations, newConversationIds),
         [conversations, newConversationIds],
@@ -1436,27 +1534,15 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         closeMessageActions();
     };
 
-    const openInviteDialog = () => {
-        setInviteShareError(null);
-        setIsInviteDialogOpen(true);
-    };
-
-    const closeInviteDialog = () => {
-        if (isInviteSharing) return;
-        setIsInviteDialogOpen(false);
-    };
-
     const shareInviteLink = async () => {
         if (!onShareProfileLink || isInviteSharing) return;
         setIsInviteSharing(true);
-        setInviteShareError(null);
 
         try {
             const profileLink = await onShareProfileLink();
             if (typeof navigator.share == "function") {
                 try {
                     await navigator.share({ url: profileLink });
-                    setIsInviteDialogOpen(false);
                     return;
                 } catch (error) {
                     if (
@@ -1468,10 +1554,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             }
 
             await copyTextToClipboard(profileLink);
-            setIsInviteDialogOpen(false);
         } catch (error) {
             console.error("Failed to share space invite", error);
-            setInviteShareError("Couldn't share invite. Please try again.");
         } finally {
             setIsInviteSharing(false);
         }
@@ -2402,14 +2486,24 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         <Box
                                             component="button"
                                             type="button"
-                                            onClick={openInviteDialog}
+                                            disabled={
+                                                !onShareProfileLink ||
+                                                isInviteSharing
+                                            }
+                                            onClick={() =>
+                                                void shareInviteLink()
+                                            }
                                             sx={{
                                                 alignItems: "center",
                                                 bgcolor: "#F2F2F2",
                                                 border: 0,
                                                 borderRadius: "18px",
                                                 color: textBase,
-                                                cursor: "pointer",
+                                                cursor:
+                                                    onShareProfileLink &&
+                                                    !isInviteSharing
+                                                        ? "pointer"
+                                                        : "default",
                                                 display: "inline-flex",
                                                 fontFamily:
                                                     '"Inter Variable", Inter, sans-serif',
@@ -2422,17 +2516,20 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 pointerEvents: "auto",
                                                 px: "14px",
                                                 whiteSpace: "nowrap",
+                                                "&:disabled": { opacity: 0.45 },
                                                 "&:focus-visible": {
                                                     outline: `2px solid ${green}`,
                                                     outlineOffset: 2,
                                                 },
-                                                "&:hover": {
-                                                    bgcolor: "#E8E8E8",
-                                                },
+                                                "&:hover":
+                                                    onShareProfileLink &&
+                                                    !isInviteSharing
+                                                        ? { bgcolor: "#E8E8E8" }
+                                                        : undefined,
                                             }}
                                         >
                                             <ShareIcon />
-                                            Invite friends
+                                            Share invite
                                         </Box>
                                     )}
                                 </Box>
@@ -2447,6 +2544,12 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     {conversationSections.map((section) => (
                                         <ConversationSection
                                             key={section.title}
+                                            onConfirmFriendRequest={
+                                                onConfirmFriendRequest
+                                            }
+                                            onDeleteFriendRequest={
+                                                onDeleteFriendRequest
+                                            }
                                             onOpenThread={onOpenThread}
                                             profile={profile}
                                             section={section}
@@ -2458,15 +2561,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                     )}
                 </Box>
             </Box>
-            {showInviteEmptyState && (
-                <SpaceInviteFriendsDialog
-                    errorMessage={inviteShareError}
-                    open={isInviteDialogOpen}
-                    sharing={isInviteSharing}
-                    onClose={closeInviteDialog}
-                    onShare={() => void shareInviteLink()}
-                />
-            )}
         </>
     );
 };

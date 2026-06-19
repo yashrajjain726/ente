@@ -4,7 +4,7 @@ import React from "react";
 export const onboardingGreen = "#08C225";
 export const onboardingTitle = "Share your life";
 export const onboardingDescription =
-    "A private space for sharing everyday moments with friends and family. No ads. No brain rot.";
+    "A private space for sharing everyday moments with friends and family only. No ads. No brain rot.";
 export const addFriendOnboardingTitle = "Follow their life";
 
 const softGreen = "#E7F6E9";

@@ -1,3 +1,4 @@
 /app/friends/*    /app/friends/[spaceId]    200
 /app/messages/*    /app/messages/[spaceId]    200
+/:spaceUsername    /profile-link.html    200
 /*    /index.html    200

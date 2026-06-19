@@ -15,7 +15,6 @@ const Page: React.FC = () => {
     const { profile, profileLoadError, profileLoadStatus } = useSpaceAppState();
     const [profileLink, setProfileLink] = useState<string>();
     const [linkError, setLinkError] = useState<string>();
-    const [isLinkLoading, setIsLinkLoading] = useState(false);
 
     useEffect(() => {
         if (profileLoadStatus == "ready" && !profile) {
@@ -26,7 +25,6 @@ const Page: React.FC = () => {
     const loadInviteLink = useCallback(async () => {
         if (!profile?.spaceId) return;
 
-        setIsLinkLoading(true);
         setLinkError(undefined);
         try {
             setProfileLink(
@@ -35,8 +33,6 @@ const Page: React.FC = () => {
         } catch (error) {
             console.error("Failed to create space invite link", error);
             setLinkError("Couldn't create invite link. Tap to retry.");
-        } finally {
-            setIsLinkLoading(false);
         }
     }, [profile?.spaceId]);
 
@@ -58,9 +54,7 @@ const Page: React.FC = () => {
             <SpacePageMeta themeColor={shareProfileLinkBackground} />
             <ShareProfileLinkScreen
                 errorMessage={linkError}
-                isLinkLoading={isLinkLoading}
                 profile={profile}
-                onBack={() => void router.push(spaceRoutes.setupProfile())}
                 onDone={() => void router.push(spaceRoutes.home)}
                 onRetry={() => void loadInviteLink()}
                 profileLink={profileLink}

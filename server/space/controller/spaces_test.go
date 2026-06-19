@@ -141,3 +141,26 @@ func TestSlugAvailabilityReturnsFalseForExistingAndReservedSlugs(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, free.Available)
 }
+
+func TestLookupBySlugHidesDeletedOwnerButReservesSlug(t *testing.T) {
+	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
+	aliceID := insertSpaceControllerUser(t, repos, "alice-deleted-lookup@example.com", "alice-public")
+	_, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-deleted-lookup", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	require.NoError(t, err)
+	ginCtx := newPublicSpaceContext()
+
+	lookup, err := module.Spaces.LookupBySlug(ginCtx, "alice-deleted-lookup")
+	require.NoError(t, err)
+	require.Equal(t, "alice-deleted-lookup", lookup.SpaceSlug)
+
+	_, err = repos.Spaces.DB.Exec(`UPDATE users SET encrypted_email = NULL WHERE user_id = $1`, aliceID)
+	require.NoError(t, err)
+
+	lookup, err = module.Spaces.LookupBySlug(ginCtx, "alice-deleted-lookup")
+	require.Nil(t, lookup)
+	require.Error(t, err)
+
+	availability, err := module.Spaces.SlugAvailability(ginCtx, "alice-deleted-lookup")
+	require.NoError(t, err)
+	require.False(t, availability.Available)
+}

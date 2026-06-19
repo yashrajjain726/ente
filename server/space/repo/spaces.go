@@ -104,6 +104,29 @@ func (r *SpacesRepository) GetSpaceBySlug(ctx context.Context, spaceSlug string)
 	`, normalizeSlug(spaceSlug)))
 }
 
+func (r *SpacesRepository) GetActiveSpaceBySlug(ctx context.Context, spaceSlug string) (*SpaceRecord, error) {
+	return scanSpaceRecord(r.DB.QueryRowContext(ctx, `
+		SELECT w.space_id, w.owner_id, w.space_slug, w.encrypted_space_key, w.encrypted_profile, w.current_version,
+		       w.public_key, w.encrypted_secret_key, w.secret_key_decryption_nonce,
+		       w.avatar_object_key, w.avatar_bucket_id, w.avatar_size, w.cover_object_key, w.cover_bucket_id, w.cover_size, w.created_at, w.updated_at
+		FROM spaces w
+		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
+		WHERE w.space_slug = $1
+	`, normalizeSlug(spaceSlug)))
+}
+
+func (r *SpacesRepository) IsOwnerActive(ctx context.Context, ownerID int64) (bool, error) {
+	var active bool
+	err := r.DB.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM users
+			WHERE user_id = $1 AND encrypted_email IS NOT NULL
+		)
+	`, ownerID).Scan(&active)
+	return active, stacktrace.Propagate(err, "")
+}
+
 func (r *SpacesRepository) GetOwnerPublicKey(ctx context.Context, ownerID int64) (string, error) {
 	var publicKey string
 	err := r.DB.QueryRowContext(ctx, `

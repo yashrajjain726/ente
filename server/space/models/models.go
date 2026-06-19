@@ -162,13 +162,16 @@ type SpaceLinkLoginResponse struct {
 }
 
 type AddFriendPayload struct {
-	TargetSpaceID              string `json:"targetSpaceId"`
-	LinkSessionToken           string `json:"linkSessionToken"`
+	TargetSpaceID              string `json:"targetSpaceId,omitempty"`
+	TargetUsername             string `json:"targetUsername,omitempty"`
 	RequesterSpaceID           string `json:"requesterSpaceId"`
-	TargetEncryptedSpaceKey    string `json:"targetEncryptedSpaceKey"`
-	TargetKeyVersion           int    `json:"targetKeyVersion"`
 	RequesterEncryptedSpaceKey string `json:"requesterEncryptedSpaceKey"`
 	RequesterKeyVersion        int    `json:"requesterKeyVersion"`
+}
+
+type ConfirmFriendRequestPayload struct {
+	TargetEncryptedSpaceKey string `json:"targetEncryptedSpaceKey"`
+	TargetKeyVersion        int    `json:"targetKeyVersion"`
 }
 
 type FriendTargetPayload struct {
@@ -186,6 +189,12 @@ type FriendShareResponse struct {
 
 type FriendStatusResponse struct {
 	Status string `json:"status"`
+}
+
+type SpaceFriendRequestResponse struct {
+	RequestID int64              `json:"requestId"`
+	Requester SpaceActorResponse `json:"requester"`
+	CreatedAt string             `json:"createdAt"`
 }
 
 type FriendRelationshipResponse struct {

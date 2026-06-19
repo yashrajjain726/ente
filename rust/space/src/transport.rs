@@ -435,13 +435,20 @@ mod tests {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AddFriendPayload {
-    pub target_space_id: String,
-    pub link_session_token: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_space_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_username: Option<String>,
     pub requester_space_id: String,
-    pub target_encrypted_space_key: String,
-    pub target_key_version: i32,
     pub requester_encrypted_space_key: String,
     pub requester_key_version: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfirmFriendRequestPayload {
+    pub target_encrypted_space_key: String,
+    pub target_key_version: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -471,6 +478,14 @@ pub struct SpaceFriendResponse {
     pub friend: SpaceActorResponse,
     #[serde(default)]
     pub share_key_version: i32,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpaceFriendRequestResponse {
+    pub request_id: i64,
+    pub requester: SpaceActorResponse,
     pub created_at: String,
 }
 

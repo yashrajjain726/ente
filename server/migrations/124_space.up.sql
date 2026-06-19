@@ -197,6 +197,37 @@ CREATE TRIGGER update_space_friend_shares_updated_at
     FOR EACH ROW
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
+CREATE TABLE IF NOT EXISTS space_friend_requests (
+    request_id                   BIGSERIAL PRIMARY KEY,
+    requester_id                 BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    requester_space_id           TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
+    target_id                    BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    target_space_id              TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
+    requester_encrypted_space_key TEXT  NOT NULL,
+    requester_key_version        INTEGER NOT NULL DEFAULT 1,
+    is_deleted                   BOOLEAN NOT NULL DEFAULT FALSE,
+    resolved_at                  BIGINT,
+    created_at                   BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    updated_at                   BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    CONSTRAINT chk_space_friend_requests_distinct_users CHECK (requester_id <> target_id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_space_friend_requests_active_pair
+    ON space_friend_requests (requester_space_id, target_space_id)
+    WHERE is_deleted = FALSE AND resolved_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_space_friend_requests_target_created
+    ON space_friend_requests (target_space_id, created_at DESC)
+    WHERE is_deleted = FALSE AND resolved_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_space_friend_requests_requester_created
+    ON space_friend_requests (requester_space_id, created_at DESC);
+
+CREATE TRIGGER update_space_friend_requests_updated_at
+    BEFORE UPDATE ON space_friend_requests
+    FOR EACH ROW
+EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
+
 CREATE TABLE IF NOT EXISTS space_friend_events (
     event_id        BIGSERIAL PRIMARY KEY,
     event_type      TEXT   NOT NULL DEFAULT 'friend_add',

@@ -25,6 +25,25 @@ func (h *Handlers) Unfriend(c *gin.Context) {
 	respondStatus(c, h.Module.Friends.Unfriend(c, req))
 }
 
+func (h *Handlers) ListFriendRequests(c *gin.Context) {
+	resp, err := h.Module.Friends.ListRequests(c)
+	respondJSON(c, resp, err)
+}
+
+func (h *Handlers) ConfirmFriendRequest(c *gin.Context) {
+	var req models.ConfirmFriendRequestPayload
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondJSON(c, nil, ente.ErrBadRequest)
+		return
+	}
+	resp, err := h.Module.Friends.ConfirmRequest(c, c.Param("requestID"), req)
+	respondJSON(c, resp, err)
+}
+
+func (h *Handlers) DeleteFriendRequest(c *gin.Context) {
+	respondStatus(c, h.Module.Friends.DeleteRequest(c, c.Param("requestID")))
+}
+
 func (h *Handlers) ListSpaceFriends(c *gin.Context) {
 	var req models.ListSpaceFriendsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {

@@ -2,7 +2,7 @@ import {
     BubbleChatIcon,
     FavouriteIcon,
     MultiplicationSignIcon,
-    UserCheck01Icon,
+    UserAdd02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
@@ -14,7 +14,6 @@ import {
     type SpaceViewerPhoto,
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
-import { SpaceInviteFriendsDialog } from "components/SpaceInviteFriendsDialog";
 import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
 import {
     spacePostLikeButtonPop,
@@ -22,6 +21,7 @@ import {
     spacePostLikePopDurationMs,
     spacePostLikePopTiming,
 } from "components/SpacePostLikeAnimation";
+import { SpacePWAInstallPrompt } from "components/SpacePWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
@@ -103,15 +103,15 @@ const FeedReplyIcon: React.FC = () => (
 );
 
 interface HomeScreenProps {
-    addedFriendToastName?: string;
     feedItems: SpacePost[];
+    friendRequestSentToastName?: string;
     friendsCount: number;
     hasMoreFeedItems?: boolean;
     hasUnreadMessages?: boolean;
     isFeedLoading?: boolean;
     isFeedLoadingMore?: boolean;
     localFeedPosts?: LocalSpaceFeedPost[];
-    onAddedFriendToastClose?: () => void;
+    showInstallPrompt?: boolean;
     onCreatePost?: (
         image: DraftSpacePostImage,
         caption: string,
@@ -120,6 +120,7 @@ interface HomeScreenProps {
     onLoadMoreFeedItems?: () => Promise<void> | void;
     onLoadPostAvatar?: SpacePostAvatarURLLoader;
     onLoadPostImage?: SpacePostAssetURLLoader;
+    onFriendRequestSentToastClose?: () => void;
     onOpenFriend?: (friendID: string) => void;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
@@ -196,7 +197,7 @@ interface FeedSkeletonItemProps {
 }
 
 interface AddedFriendToastProps {
-    name: string;
+    message: string;
     onClose?: () => void;
 }
 
@@ -1165,7 +1166,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
 };
 
 const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
-    name,
+    message,
     onClose,
 }) => (
     <Box
@@ -1208,7 +1209,7 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
         >
             <Box component="span" sx={{ display: "flex", flexShrink: 0 }}>
                 <HugeiconsIcon
-                    icon={UserCheck01Icon}
+                    icon={UserAdd02Icon}
                     size={20}
                     strokeWidth={1.8}
                 />
@@ -1223,7 +1224,7 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
                     whiteSpace: "nowrap",
                 }}
             >
-                You&apos;re now friends with {name}!
+                {message}
             </Box>
             <Box
                 component="button"
@@ -1261,20 +1262,21 @@ const AddedFriendToast: React.FC<AddedFriendToastProps> = ({
 );
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
-    addedFriendToastName,
     feedItems,
+    friendRequestSentToastName,
     friendsCount,
     hasMoreFeedItems = false,
     hasUnreadMessages,
     isFeedLoading = false,
     isFeedLoadingMore = false,
     localFeedPosts = [],
-    onAddedFriendToastClose,
+    showInstallPrompt = false,
     onCreatePost,
     onDeletePost,
     onLoadMoreFeedItems,
     onLoadPostAvatar,
     onLoadPostImage,
+    onFriendRequestSentToastClose,
     onOpenFriend,
     onOpenMessages,
     onOpenProfile,
@@ -1285,11 +1287,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
-    const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
     const [isInviteSharing, setIsInviteSharing] = useState(false);
-    const [inviteShareError, setInviteShareError] = useState<string | null>(
-        null,
-    );
     const [isPostPhotoOpening, setIsPostPhotoOpening] = useState(false);
     const [loadedFeedAvatarURLsByKey, setLoadedFeedAvatarURLsByKey] = useState<
         Record<string, string | null>
@@ -1329,6 +1327,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         localFeedPosts.length > 0 || remoteFeedItems.length > 0;
     const isEmptyFeedLoading = !hasFeedItems && isFeedLoading;
     const showFeedCards = hasFeedItems;
+    const isInstallPromptEnabled =
+        showInstallPrompt && !friendRequestSentToastName && !selectedViewer;
     const showUnreadIndicator = hasUnreadMessages === true;
     const emptyFeedMessage =
         friendsCount == 0
@@ -1582,27 +1582,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         return () => observer.disconnect();
     }, [hasMoreFeedItems, isFeedLoadingMore, onLoadMoreFeedItems]);
 
-    const openInviteDialog = () => {
-        setInviteShareError(null);
-        setIsInviteDialogOpen(true);
-    };
-
-    const closeInviteDialog = () => {
-        if (isInviteSharing) return;
-        setIsInviteDialogOpen(false);
-    };
-
     const shareInviteLink = async () => {
         if (!onShareProfileLink || isInviteSharing) return;
         setIsInviteSharing(true);
-        setInviteShareError(null);
 
         try {
             const profileLink = await onShareProfileLink();
             if (typeof navigator.share == "function") {
                 try {
                     await navigator.share({ url: profileLink });
-                    setIsInviteDialogOpen(false);
                     return;
                 } catch (error) {
                     if (
@@ -1614,10 +1602,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }
 
             await navigator.clipboard.writeText(profileLink);
-            setIsInviteDialogOpen(false);
         } catch (error) {
             console.error("Failed to share space invite", error);
-            setInviteShareError("Couldn't share invite. Please try again.");
         } finally {
             setIsInviteSharing(false);
         }
@@ -2070,14 +2056,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 <Box
                                     component="button"
                                     type="button"
-                                    onClick={openInviteDialog}
+                                    disabled={
+                                        !onShareProfileLink || isInviteSharing
+                                    }
+                                    onClick={() => void shareInviteLink()}
                                     sx={{
                                         alignItems: "center",
                                         bgcolor: "#E8E8E8",
                                         border: 0,
                                         borderRadius: "18px",
                                         color: textBase,
-                                        cursor: "pointer",
+                                        cursor:
+                                            onShareProfileLink &&
+                                            !isInviteSharing
+                                                ? "pointer"
+                                                : "default",
                                         display: "inline-flex",
                                         fontFamily:
                                             '"Inter Variable", Inter, sans-serif',
@@ -2090,15 +2083,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                         mt: emptyFeedItemGap,
                                         px: "14px",
                                         whiteSpace: "nowrap",
+                                        "&:disabled": { opacity: 0.45 },
                                         "&:focus-visible": {
                                             outline: `2px solid ${green}`,
                                             outlineOffset: 2,
                                         },
-                                        "&:hover": { bgcolor: "#DEDEDE" },
+                                        "&:hover":
+                                            onShareProfileLink &&
+                                            !isInviteSharing
+                                                ? { bgcolor: "#DEDEDE" }
+                                                : undefined,
                                     }}
                                 >
                                     <ShareIcon />
-                                    Invite friends
+                                    Share invite
                                 </Box>
                             )}
                         </Box>
@@ -2183,19 +2181,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         onSetPostLiked={onSetPostLiked}
                     />
                 )}
-                {addedFriendToastName && (
+                {friendRequestSentToastName ? (
                     <AddedFriendToast
-                        name={addedFriendToastName}
-                        onClose={onAddedFriendToastClose}
+                        message={`Friend request sent to @${friendRequestSentToastName}`}
+                        onClose={onFriendRequestSentToastClose}
                     />
+                ) : (
+                    <SpacePWAInstallPrompt enabled={isInstallPromptEnabled} />
                 )}
-                <SpaceInviteFriendsDialog
-                    errorMessage={inviteShareError}
-                    open={isInviteDialogOpen}
-                    sharing={isInviteSharing}
-                    onClose={closeInviteDialog}
-                    onShare={() => void shareInviteLink()}
-                />
             </Box>
         </Box>
     );

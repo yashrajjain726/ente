@@ -198,7 +198,7 @@ func (c *SpacesController) UpdateSlug(ctx *gin.Context, spaceID string, req mode
 }
 
 func (c *SpacesController) LookupBySlug(ctx *gin.Context, spaceSlug string) (*models.SpaceLookupResponse, error) {
-	space, err := c.SpacesRepo.GetSpaceBySlug(ctx.Request.Context(), spaceSlug)
+	space, err := c.SpacesRepo.GetActiveSpaceBySlug(ctx.Request.Context(), spaceSlug)
 	if err != nil {
 		return nil, err
 	}

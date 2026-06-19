@@ -2,11 +2,9 @@ package controller
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/base64"
 	"testing"
 
-	timeutil "github.com/ente-io/museum/pkg/utils/time"
 	"github.com/ente-io/museum/space/models"
 	spacerepo "github.com/ente-io/museum/space/repo"
 	"github.com/stretchr/testify/require"
@@ -44,30 +42,22 @@ func TestFriendRelationshipReportsSelfFriendAndEmpty(t *testing.T) {
 	require.Empty(t, resp.Relationship)
 }
 
-func TestAddFriendRejectsOwnLink(t *testing.T) {
+func TestAddFriendRejectsOwnSpace(t *testing.T) {
 	friends, repos, ctx := setupFriendsControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-own-link@example.com", "alice-public")
 	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-own-link", "alice-space-key", "alice-own-link-public", "alice-own-link-secret", "alice-own-link-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	authHash := sha256.Sum256([]byte("self-link-auth-key"))
-	link, err := repos.Links.UpsertLink(ctx, aliceSpace.SpaceID, authHash[:], aliceSpace.CurrentVersion, "alice-link-key", "alice-link-secret")
-	require.NoError(t, err)
-	sessionHash := sha256.Sum256([]byte("self-link-session-token"))
-	require.NoError(t, repos.Links.CreateSession(ctx, sessionHash[:], link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.MicrosecondsAfterMinutes(5)))
 
 	resp, err := friends.Add(newSpaceControllerContext(aliceID), models.AddFriendPayload{
 		TargetSpaceID:              aliceSpace.SpaceID,
-		LinkSessionToken:           "self-link-session-token",
 		RequesterSpaceID:           aliceSpace.SpaceID,
-		TargetEncryptedSpaceKey:    base64.StdEncoding.EncodeToString([]byte("alice-target-key")),
-		TargetKeyVersion:           aliceSpace.CurrentVersion,
 		RequesterEncryptedSpaceKey: base64.StdEncoding.EncodeToString([]byte("alice-requester-key")),
 		RequesterKeyVersion:        aliceSpace.CurrentVersion,
 	})
 
 	require.Nil(t, resp)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "cannot join your own space link")
+	require.Contains(t, err.Error(), "cannot add yourself as a friend")
 }
 
 func TestUnfriendBySpaceIDRemovesReciprocalShares(t *testing.T) {

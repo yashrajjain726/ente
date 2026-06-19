@@ -4,7 +4,7 @@ import {
     Menu01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Skeleton } from "@mui/material";
+import { Box, CircularProgress, Skeleton } from "@mui/material";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import {
     SpaceFileViewer,
@@ -50,7 +50,6 @@ const photoMasonryGap = "3px";
 const photoMasonryPlaceholderBackground = "#F2F2F2";
 const photoMasonryRadius = "12px";
 const photoMasonryLoadRootMargin = "800px 0px";
-const profilePostSkeletonAspectRatios = [1.18, 0.82, 1.45];
 interface ProfilePhotoDimensions {
     height: number;
     width: number;
@@ -204,53 +203,20 @@ const ProfileStatsSkeleton: React.FC = () => (
     </Box>
 );
 
-const ProfilePostLoadingSkeletons: React.FC = () => (
+const ProfilePostLoadingIndicator: React.FC = () => (
     <Box
         role="status"
         aria-label="Loading posts"
         sx={{
+            alignItems: "center",
             display: "flex",
-            flexDirection: "column",
-            gap: "10px",
+            justifyContent: "center",
+            minHeight: 144,
             mx: "16px",
             width: "calc(100% - 32px)",
         }}
     >
-        <Skeleton
-            variant="rectangular"
-            sx={{
-                bgcolor: photoMasonryPlaceholderBackground,
-                borderRadius: "999px",
-                height: 12,
-                mx: "2px",
-                width: 72,
-            }}
-        />
-        <Box
-            sx={{
-                borderRadius: photoMasonryRadius,
-                display: "flex",
-                flexDirection: "column",
-                gap: photoMasonryGap,
-                overflow: "hidden",
-                width: "100%",
-            }}
-        >
-            {profilePostSkeletonAspectRatios.map((aspectRatio, index) => (
-                <Skeleton
-                    key={index}
-                    variant="rectangular"
-                    sx={{
-                        aspectRatio,
-                        bgcolor: photoMasonryPlaceholderBackground,
-                        display: "block",
-                        height: "auto",
-                        transform: "none",
-                        width: "100%",
-                    }}
-                />
-            ))}
-        </Box>
+        <CircularProgress size={26} thickness={4} sx={{ color: green }} />
     </Box>
 );
 
@@ -385,12 +351,11 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
 
 interface ProfileScreenProps {
     friendsCount?: number;
-    headerVariant?: "friend" | "owner" | "public";
+    headerVariant?: "friend" | "owner";
     isCoverLoading?: boolean;
     isPostsLoading?: boolean;
     isStatsLoading?: boolean;
-    showPostLoadingSkeleton?: boolean;
-    onAddFriend?: () => void;
+    showPostLoadingIndicator?: boolean;
     onBack?: () => void;
     onCreatePost?: (
         image: DraftSpacePostImage,
@@ -408,7 +373,6 @@ interface ProfileScreenProps {
     onShareProfileLink?: () => Promise<string>;
     postGroups?: ProfilePostGroup[];
     profile: SetupProfile;
-    spaceLogoHref?: string;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -417,7 +381,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     isCoverLoading = false,
     isPostsLoading = false,
     isStatsLoading = false,
-    onAddFriend,
     onBack,
     onCreatePost,
     onDeletePost,
@@ -432,8 +395,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onShareProfileLink,
     postGroups = [],
     profile,
-    showPostLoadingSkeleton,
-    spaceLogoHref = "https://ente.com/space",
+    showPostLoadingIndicator,
 }) => {
     const [selectedPost, setSelectedPost] =
         useState<SelectedProfilePost | null>(null);
@@ -454,7 +416,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     >(new Map());
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
-    const isPublicProfile = headerVariant == "public";
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
     const displayName = profile.fullName.trim() || profile.username.trim();
@@ -484,17 +445,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const canOpenProfileCover = isOwnerProfile && Boolean(onOpenProfileCover);
     const canOpenProfilePhoto = isOwnerProfile && Boolean(onOpenProfilePhoto);
     const hasProfilePosts = postsSharedCount > 0;
-    const shouldShowPostLoadingSkeleton =
-        isPostsLoading && (showPostLoadingSkeleton ?? true);
-    const shouldShowPostGrid = hasProfilePosts || shouldShowPostLoadingSkeleton;
+    const shouldShowPostLoadingIndicator =
+        isPostsLoading && (showPostLoadingIndicator ?? true);
+    const shouldShowPostGrid =
+        hasProfilePosts || shouldShowPostLoadingIndicator;
     const isCoverImageLoading = Boolean(coverUrl && loadedCoverUrl != coverUrl);
     const shouldShowCoverSkeleton =
         isCoverLoading || isCoverURLPending || isCoverImageLoading;
-    const selectedPostActionMode: SpaceViewerPostActionMode = isPublicProfile
-        ? "like-only"
-        : isOwnerProfile
-          ? "hidden"
-          : "like-only";
+    const selectedPostActionMode: SpaceViewerPostActionMode = isOwnerProfile
+        ? "hidden"
+        : "like-only";
 
     const revokeLocalPostObjectUrls = React.useCallback(() => {
         localPostObjectUrlsRef.current.forEach((objectUrl) =>
@@ -974,9 +934,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         alignItems: "center",
                         color: coverForeground,
                         display: "grid",
-                        gridTemplateColumns: isPublicProfile
-                            ? "1fr auto"
-                            : `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
+                        gridTemplateColumns: `${spaceTouchTargetSize}px 1fr ${spaceTouchTargetSize}px`,
                         height: profileHeaderHeight,
                         position: "relative",
                         px: 2,
@@ -985,147 +943,57 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         zIndex: 3,
                     }}
                 >
-                    {isPublicProfile ? (
-                        <Box
-                            component="a"
-                            href={spaceLogoHref}
-                            aria-label="Go to Space"
-                            sx={{
-                                alignSelf: "center",
-                                color: "inherit",
-                                cursor: "pointer",
-                                justifySelf: "flex-start",
-                                lineHeight: 0,
-                                overflow: "visible",
-                                textDecoration: "none",
-                                width: 61,
-                                "&:focus-visible": {
-                                    borderRadius: "4px",
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 3,
-                                },
-                            }}
-                        >
-                            <Box
-                                component="img"
-                                alt=""
-                                src="/images/space.svg"
-                                sx={{
-                                    display: "block",
-                                    height: 18,
-                                    width: "auto",
-                                }}
-                            />
-                        </Box>
-                    ) : (
-                        <Box
-                            component="button"
-                            type="button"
-                            aria-label={
-                                isFriendProfile
-                                    ? "Back to friends"
-                                    : "Back to home"
-                            }
-                            onClick={onBack}
-                            sx={{
-                                alignItems: "center",
-                                bgcolor: "transparent",
-                                border: 0,
-                                color: "inherit",
-                                cursor: "pointer",
-                                display: "flex",
-                                height: spaceTouchTargetSize,
-                                justifyContent: "flex-start",
-                                ml: "-2px",
-                                p: 0,
-                                width: spaceTouchTargetSize,
-                                "&:focus-visible": {
-                                    borderRadius: "50%",
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                            }}
-                        >
-                            <HugeiconsIcon
-                                icon={ArrowLeft02Icon}
-                                size={24}
-                                strokeWidth={1.8}
-                            />
-                        </Box>
-                    )}
-                    {isPublicProfile && (
-                        <Box
-                            component="button"
-                            type="button"
-                            onClick={onAddFriend}
-                            sx={{
-                                alignItems: "center",
-                                backgroundColor: "transparent",
-                                border: 0,
-                                color: green,
-                                cursor: onAddFriend ? "pointer" : "default",
-                                display: "inline-flex",
-                                height: spaceTouchTargetSize,
-                                justifyContent: "center",
-                                justifySelf: "flex-end",
-                                minWidth: 0,
-                                p: 0,
-                                "&:focus-visible": {
-                                    borderRadius: "999px",
-                                    outline: `2px solid ${green}`,
-                                    outlineOffset: 2,
-                                },
-                                "&:hover .space-add-friend-pill": {
-                                    backgroundColor: "#F3FFF5",
-                                },
-                            }}
-                        >
-                            <Box
-                                className="space-add-friend-pill"
-                                component="span"
-                                sx={{
-                                    alignItems: "center",
-                                    backgroundColor: "#FFFFFF",
-                                    borderRadius: "999px",
-                                    display: "inline-flex",
-                                    fontFamily:
-                                        '"Inter Variable", Inter, sans-serif',
-                                    fontSize: 13,
-                                    fontWeight: 700,
-                                    height: 32,
-                                    justifyContent: "center",
-                                    lineHeight: "18px",
-                                    px: "14px",
-                                    transition: "background-color 120ms ease",
-                                    whiteSpace: "nowrap",
-                                }}
-                            >
-                                Add friend
-                            </Box>
-                        </Box>
-                    )}
-                    {!isPublicProfile && (
-                        <Box
-                            component="h1"
-                            sx={{
-                                color: "inherit",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 18,
-                                fontWeight: 700,
-                                justifySelf: "center",
-                                lineHeight: "24px",
-                                m: 0,
-                                maxWidth: "100%",
-                                overflow: "hidden",
-                                px: "4px",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                            }}
-                        >
-                            {profile.username}
-                        </Box>
-                    )}
+                    <Box
+                        component="button"
+                        type="button"
+                        aria-label={
+                            isFriendProfile ? "Back to friends" : "Back to home"
+                        }
+                        onClick={onBack}
+                        sx={{
+                            alignItems: "center",
+                            bgcolor: "transparent",
+                            border: 0,
+                            color: "inherit",
+                            cursor: "pointer",
+                            display: "flex",
+                            height: spaceTouchTargetSize,
+                            justifyContent: "flex-start",
+                            ml: "-2px",
+                            p: 0,
+                            width: spaceTouchTargetSize,
+                            "&:focus-visible": {
+                                borderRadius: "50%",
+                                outline: `2px solid ${green}`,
+                                outlineOffset: 2,
+                            },
+                        }}
+                    >
+                        <HugeiconsIcon
+                            icon={ArrowLeft02Icon}
+                            size={24}
+                            strokeWidth={1.8}
+                        />
+                    </Box>
+                    <Box
+                        component="h1"
+                        sx={{
+                            color: "inherit",
+                            fontFamily: '"Inter Variable", Inter, sans-serif',
+                            fontSize: 18,
+                            fontWeight: 700,
+                            justifySelf: "center",
+                            lineHeight: "24px",
+                            m: 0,
+                            maxWidth: "100%",
+                            overflow: "hidden",
+                            px: "4px",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        {profile.username}
+                    </Box>
                     {isOwnerProfile ? (
                         <Box
                             component="button"
@@ -1157,12 +1025,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             />
                         </Box>
                     ) : (
-                        !isPublicProfile && (
-                            <Box
-                                aria-hidden
-                                sx={{ width: spaceTouchTargetSize }}
-                            />
-                        )
+                        <Box aria-hidden sx={{ width: spaceTouchTargetSize }} />
                     )}
                 </Box>
                 <Box
@@ -1244,7 +1107,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 display: "grid",
                                 gridTemplateColumns:
                                     "minmax(0, 1fr) minmax(0, max-content) minmax(0, 1fr)",
+                                height: "32px",
                                 minWidth: 0,
+                                position: "relative",
                                 width: "100%",
                             }}
                         >
@@ -1257,13 +1122,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                     fontWeight: 800,
                                     gridColumn: 2,
                                     lineHeight: "32px",
-                                    maxWidth: isPublicProfile
-                                        ? "100%"
-                                        : "calc(100vw - 72px)",
+                                    maxWidth: "calc(100vw - 72px)",
                                     "@media (min-width: 600px)": {
-                                        maxWidth: isPublicProfile
-                                            ? "100%"
-                                            : 303,
+                                        maxWidth: 303,
                                     },
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
@@ -1293,6 +1154,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         justifySelf: "start",
                                         ml: "8px",
                                         p: 0,
+                                        position: "absolute",
+                                        top: "50%",
+                                        transform: "translateY(-50%)",
                                         width: spaceTouchTargetSize,
                                         "&:focus-visible": {
                                             borderRadius: "50%",
@@ -1534,8 +1398,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 </Box>
                             );
                         })
-                    ) : shouldShowPostLoadingSkeleton ? (
-                        <ProfilePostLoadingSkeletons />
+                    ) : shouldShowPostLoadingIndicator ? (
+                        <ProfilePostLoadingIndicator />
                     ) : isPostsLoading ? null : (
                         <Box
                             sx={{
@@ -1571,9 +1435,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             >
                                 {isOwnerProfile
                                     ? "What are you up to?"
-                                    : isPublicProfile
-                                      ? `${firstName} hasn't posted anything yet. Add them as a friend to get their latest posts.`
-                                      : `${firstName} hasn't posted anything yet.`}
+                                    : `${firstName} hasn't posted anything yet.`}
                             </Box>
                             {isOwnerProfile && (
                                 <Box
@@ -1662,9 +1524,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         onClose={closeSelectedPost}
                         onDeletePost={
                             isOwnerProfile ? deleteSelectedPost : undefined
-                        }
-                        onAddFriendForPostAction={
-                            isPublicProfile ? onAddFriend : undefined
                         }
                         onOpenProfile={closeSelectedPost}
                         onReplyToPost={

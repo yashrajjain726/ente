@@ -1,38 +1,34 @@
+import { UserAdd02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Box } from "@mui/material";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
-import { SpaceSharedInviteDialog } from "components/SpaceSharedInviteDialog";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     OnboardingScreen,
     addFriendOnboardingTitle,
     onboardingGreen,
 } from "screens/OnboardingScreen";
 import { profileBackground } from "screens/ProfileScreen";
-import { PublicProfileScreen } from "screens/PublicProfileScreen";
-import type { SetupProfile } from "screens/SetupProfileScreen";
 import {
     joinSpaceInvite,
-    loadPublicSpaceInvite,
-    type SpacePostAssetURLLoader,
-    type SpaceProfilePost,
+    loadPublicSpaceIdentity,
+    type PublicSpaceIdentity,
 } from "services/space";
 import {
     clearPendingSpaceInvite,
     clearPendingSpaceInviteFriend,
-    saveAcceptedSpaceInviteFriend,
     savePendingSpaceInvite,
     savePendingSpaceInviteFriend,
+    saveSentSpaceInviteFriend,
     savedPendingSpaceInvite,
     spaceInviteFromLocation,
     type PendingSpaceInvite,
 } from "services/spaceInvite";
-import { savedSpaceSessionToken } from "services/spacePersistentSession";
 import {
     useSpaceAppState,
     type OnboardingEntrySource,
 } from "state/spaceAppState";
-import { profilePostGroupsFromPosts } from "utils/spacePostDisplay";
 import { spaceRoutes } from "utils/spaceRoutes";
 import { useSpaceRouter } from "utils/spaceRouteTransitions";
 
@@ -40,6 +36,10 @@ type RouteMode =
     | { kind: "checking" }
     | { kind: "app" }
     | ({ kind: "public-profile" } & PendingSpaceInvite);
+
+interface PageProps {
+    invitePreview?: boolean;
+}
 
 const PublicProfileUnavailable: React.FC = () => (
     <Box
@@ -72,20 +72,6 @@ const PublicProfileUnavailable: React.FC = () => (
             >
                 Profile unavailable
             </Box>
-            <Box
-                component="p"
-                sx={{
-                    color: "#AAFFB8",
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 14,
-                    fontWeight: 500,
-                    lineHeight: "20px",
-                    m: 0,
-                    mt: "6px",
-                }}
-            >
-                This profile link is invalid or expired.
-            </Box>
         </Box>
     </Box>
 );
@@ -93,16 +79,178 @@ const PublicProfileUnavailable: React.FC = () => (
 const onboardingEntrySourceFromPendingInvite = (): OnboardingEntrySource =>
     savedPendingSpaceInvite() ? "add-friend-link" : "direct";
 
-const sharedInviteDialogStorageKey = "spaceSharedInviteDialogShown";
+interface PublicFriendRequestScreenProps {
+    identity: PublicSpaceIdentity;
+    onAddFriend: () => void;
+}
 
-const hasShownSharedInviteDialog = () =>
-    window.localStorage.getItem(sharedInviteDialogStorageKey) == "1";
+const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
+    identity,
+    onAddFriend,
+}) => (
+    <Box
+        component="main"
+        sx={{
+            bgcolor: "white",
+            boxSizing: "border-box",
+            display: "grid",
+            minHeight: "100svh",
+            p: { xs: 1, sm: 0 },
+            placeItems: "stretch",
+        }}
+    >
+        <Box
+            className="green-bg"
+            sx={{
+                alignItems: "center",
+                bgcolor: onboardingGreen,
+                borderRadius: { xs: "24px", sm: 0 },
+                boxSizing: "border-box",
+                color: "white",
+                display: "flex",
+                flexDirection: "column",
+                minHeight: { xs: "calc(100svh - 16px)", sm: "100svh" },
+                overflow: "hidden",
+                textAlign: "center",
+                width: "100%",
+            }}
+        >
+            <Box
+                component="header"
+                sx={{
+                    alignItems: "center",
+                    display: "grid",
+                    flexShrink: 0,
+                    gridTemplateColumns: "40px 1fr 40px",
+                    height: 40,
+                    maxWidth: 390,
+                    mt: "clamp(24px, 5.5svh, 44px)",
+                    mx: "auto",
+                    px: 3,
+                    width: "100%",
+                }}
+            >
+                <Box />
+                <Box
+                    component="a"
+                    href="/"
+                    aria-label="Go to Space"
+                    sx={{
+                        display: "block",
+                        justifySelf: "center",
+                        lineHeight: 0,
+                        textDecoration: "none",
+                        width: 101,
+                    }}
+                >
+                    <Box
+                        component="img"
+                        alt=""
+                        src="/images/space.svg"
+                        sx={{ display: "block", height: 30, width: 101 }}
+                    />
+                </Box>
+                <Box />
+            </Box>
+            <Box
+                sx={{
+                    alignItems: "center",
+                    display: "flex",
+                    flex: "1 1 auto",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    maxWidth: 390,
+                    minHeight: 0,
+                    px: 3,
+                    width: "100%",
+                }}
+            >
+                <Box
+                    component="h1"
+                    sx={{
+                        fontFamily: "Nunito, sans-serif",
+                        fontSize: 28,
+                        fontWeight: 800,
+                        letterSpacing: 0,
+                        lineHeight: "34px",
+                        m: 0,
+                        maxWidth: "100%",
+                        overflowWrap: "anywhere",
+                    }}
+                >
+                    @{identity.username} invited you!
+                </Box>
+                <Box
+                    component="p"
+                    sx={{
+                        color: "#AAFFB8",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 15,
+                        fontWeight: 600,
+                        lineHeight: "22px",
+                        m: 0,
+                        mt: "10px",
+                        maxWidth: 300,
+                    }}
+                >
+                    Add @{identity.username} as a friend to see what
+                    they&apos;re up to on Ente Space.
+                </Box>
+            </Box>
+            <Box
+                sx={{
+                    boxSizing: "border-box",
+                    flexShrink: 0,
+                    maxWidth: 390,
+                    mx: "auto",
+                    pb: "calc(env(safe-area-inset-bottom) + 24px)",
+                    px: 3,
+                    pt: 3,
+                    width: "100%",
+                }}
+            >
+                <Box
+                    component="button"
+                    type="button"
+                    onClick={onAddFriend}
+                    sx={{
+                        alignItems: "center",
+                        appearance: "none",
+                        bgcolor: "black",
+                        border: 0,
+                        borderRadius: "20px",
+                        color: "white",
+                        cursor: "pointer",
+                        display: "flex",
+                        gap: "8px",
+                        fontFamily: '"Inter Variable", Inter, sans-serif',
+                        fontSize: 14,
+                        fontWeight: 500,
+                        height: 48,
+                        justifyContent: "center",
+                        lineHeight: "20px",
+                        p: "14px 24px",
+                        width: "100%",
+                        "&:hover": { bgcolor: "#121212" },
+                        "&:focus-visible": {
+                            outline: "2px solid rgba(255 255 255 / 0.88)",
+                            outlineOffset: 3,
+                        },
+                    }}
+                >
+                    <HugeiconsIcon
+                        icon={UserAdd02Icon}
+                        size={18}
+                        strokeWidth={1.8}
+                    />
+                    Add friend
+                </Box>
+            </Box>
+        </Box>
+    </Box>
+);
 
-const markSharedInviteDialogShown = () => {
-    window.localStorage.setItem(sharedInviteDialogStorageKey, "1");
-};
-
-const Page: React.FC = () => {
+export const Page: React.FC<PageProps> = ({ invitePreview }) => {
     const router = useSpaceRouter();
     const {
         onboardingEntrySource,
@@ -112,24 +260,9 @@ const Page: React.FC = () => {
         setOnboardingEntrySource,
     } = useSpaceAppState();
     const [routeMode, setRouteMode] = useState<RouteMode>({ kind: "checking" });
-    const [publicProfile, setPublicProfile] = useState<SetupProfile | null>(
-        null,
-    );
-    const [publicFriendsCount, setPublicFriendsCount] = useState(0);
-    const [publicPosts, setPublicPosts] = useState<SpaceProfilePost[]>([]);
-    const [publicPostAssetURLLoader, setPublicPostAssetURLLoader] =
-        useState<SpacePostAssetURLLoader>();
+    const [publicIdentity, setPublicIdentity] =
+        useState<PublicSpaceIdentity | null>(null);
     const [publicError, setPublicError] = useState<string>();
-    const [hasSavedSpaceSession, setHasSavedSpaceSession] = useState(false);
-    const [showSharedInviteDialog, setShowSharedInviteDialog] = useState(false);
-    const publicPostGroups = useMemo(
-        () => profilePostGroupsFromPosts(publicPosts),
-        [publicPosts],
-    );
-
-    useEffect(() => {
-        setHasSavedSpaceSession(Boolean(savedSpaceSessionToken()));
-    }, []);
 
     useEffect(() => {
         const publicInvite = spaceInviteFromLocation();
@@ -147,41 +280,18 @@ const Page: React.FC = () => {
         if (routeMode.kind != "public-profile") return;
 
         let cancelled = false;
-        let closePublicInvite: (() => void) | undefined;
         setPublicError(undefined);
-        setPublicPostAssetURLLoader(undefined);
-        void loadPublicSpaceInvite(routeMode)
-            .then(
-                ({ close, loadPostAssetURL, posts, profile: nextProfile }) => {
-                    if (cancelled) {
-                        close();
-                        return;
-                    }
-                    closePublicInvite = close;
-                    setPublicProfile({
-                        avatarUrl: nextProfile.avatarUrl ?? null,
-                        coverUrl: nextProfile.coverUrl ?? null,
-                        coverObjectKey: nextProfile.coverObjectKey,
-                        coverUpdatedAt: nextProfile.coverUpdatedAt,
-                        fullName: nextProfile.fullName,
-                        username: nextProfile.username,
-                        spaceId: nextProfile.spaceId,
-                        spaceSlug: nextProfile.spaceSlug,
-                    });
-                    setPublicFriendsCount(nextProfile.friendsCount);
-                    setPublicPostAssetURLLoader(() => loadPostAssetURL);
-                    setPublicPosts(posts);
-                },
-            )
-            .catch((error: unknown) => {
-                console.error("Failed to load public space invite", error);
-                if (!cancelled)
-                    setPublicError("This profile link is invalid or expired.");
+        setPublicIdentity(null);
+        void loadPublicSpaceIdentity(routeMode.spaceUsername)
+            .then((identity) => {
+                if (!cancelled) setPublicIdentity(identity);
+            })
+            .catch(() => {
+                if (!cancelled) setPublicError("This profile is unavailable.");
             });
 
         return () => {
             cancelled = true;
-            closePublicInvite?.();
         };
     }, [routeMode]);
 
@@ -194,23 +304,6 @@ const Page: React.FC = () => {
             void router.replace(spaceRoutes.home);
         }
     }, [profile, profileLoadStatus, routeMode.kind, router]);
-
-    useEffect(() => {
-        if (
-            routeMode.kind != "public-profile" ||
-            !publicProfile ||
-            hasShownSharedInviteDialog()
-        ) {
-            setShowSharedInviteDialog(false);
-            return;
-        }
-
-        const timeoutID = window.setTimeout(
-            () => setShowSharedInviteDialog(true),
-            1800,
-        );
-        return () => window.clearTimeout(timeoutID);
-    }, [publicProfile, routeMode.kind]);
 
     const hasProfileLoadError =
         routeMode.kind == "app" && profileLoadStatus == "error";
@@ -229,81 +322,64 @@ const Page: React.FC = () => {
         (routeMode.kind == "app" &&
             (profileLoadStatus == "loading" || Boolean(profile)))
     ) {
-        return <SpaceRouteFallback background={profileBackground} />;
+        return (
+            <SpaceRouteFallback
+                background={profileBackground}
+                preview={invitePreview ? "invite" : "home"}
+            />
+        );
     }
 
     if (routeMode.kind == "public-profile") {
-        if (!publicProfile && !publicError) {
+        if (!publicIdentity && !publicError) {
             return <SpaceRouteFallback background={profileBackground} />;
         }
 
-        if (!publicProfile) {
+        if (!publicIdentity) {
             return (
                 <>
-                    <SpacePageMeta themeColor={profileBackground} />
+                    <SpacePageMeta
+                        themeColor={profileBackground}
+                        preview="invite"
+                    />
                     <PublicProfileUnavailable />
                 </>
             );
         }
 
         const inviteFriend = {
-            fullName: publicProfile.fullName,
-            username: publicProfile.username,
+            fullName: "",
+            username: publicIdentity.username,
         };
-        const inviteFriendName =
-            inviteFriend.fullName.trim() ||
-            inviteFriend.username.trim() ||
-            "Someone";
         const addFriend = () => {
-            savePendingSpaceInvite(routeMode);
+            const invite = { spaceUsername: publicIdentity.username };
+            savePendingSpaceInvite(invite);
             savePendingSpaceInviteFriend(inviteFriend);
             setOnboardingEntrySource("add-friend-link");
             if (profile) {
-                void joinSpaceInvite(routeMode)
-                    .then(() => {
+                void joinSpaceInvite(invite)
+                    .then((status) => {
                         clearPendingSpaceInvite();
                         clearPendingSpaceInviteFriend();
-                        saveAcceptedSpaceInviteFriend(inviteFriend);
+                        if (status == "requested") {
+                            saveSentSpaceInviteFriend(inviteFriend);
+                        }
                         void router.push(spaceRoutes.home);
                     })
                     .catch((error: unknown) =>
-                        console.error("Failed to join space invite", error),
+                        console.error("Failed to send friend request", error),
                     );
                 return;
             }
             window.location.assign("/");
         };
-        const closeSharedInviteDialog = () => {
-            markSharedInviteDialogShown();
-            setShowSharedInviteDialog(false);
-        };
-        const addFriendFromSharedInviteDialog = () => {
-            markSharedInviteDialogShown();
-            setShowSharedInviteDialog(false);
-            addFriend();
-        };
 
         return (
             <>
-                <SpacePageMeta themeColor={profileBackground} />
-                <PublicProfileScreen
-                    friendsCount={publicFriendsCount}
-                    onLoadPostImage={publicPostAssetURLLoader}
-                    postGroups={publicPostGroups}
-                    profile={publicProfile}
-                    spaceLogoHref={
-                        profile || hasSavedSpaceSession
-                            ? spaceRoutes.home
-                            : undefined
-                    }
+                <SpacePageMeta themeColor={onboardingGreen} preview="invite" />
+                <PublicFriendRequestScreen
+                    identity={publicIdentity}
                     onAddFriend={addFriend}
-                />
-                <SpaceSharedInviteDialog
-                    avatarUrl={publicProfile.avatarUrl}
-                    name={inviteFriendName}
-                    open={showSharedInviteDialog}
-                    onAddFriend={addFriendFromSharedInviteDialog}
-                    onClose={closeSharedInviteDialog}
                 />
             </>
         );
@@ -314,7 +390,7 @@ const Page: React.FC = () => {
 
     return (
         <>
-            <SpacePageMeta themeColor={onboardingGreen} />
+            <SpacePageMeta themeColor={onboardingGreen} preview="home" />
             <OnboardingScreen
                 onCreateAccount={() => void router.push(spaceRoutes.signup)}
                 onLogin={() => void router.push(spaceRoutes.login)}

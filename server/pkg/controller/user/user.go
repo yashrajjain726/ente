@@ -34,6 +34,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type SpaceAccessResetter interface {
+	ResetUserAccess(ctx context.Context, userID int64) error
+}
+
 // UserController exposes request handlers for all user related requests
 type UserController struct {
 	UserRepo                *repo.UserRepository
@@ -54,6 +58,7 @@ type UserController struct {
 	DiscordController       *discord.DiscordController
 	MailingListsController  *controller.MailingListsController
 	PushController          *controller.PushController
+	SpaceAccessResetter     SpaceAccessResetter
 	ContactRepo             *contactrepo.Repository
 	HashingKey              []byte
 	SecretEncryptionKey     []byte
@@ -262,6 +267,13 @@ func (c *UserController) ResetUserAccess(ctx context.Context, userID int64, logg
 
 	if err := c.FamilyController.ResetUserFamilyAccess(ctx, userID, logger); err != nil {
 		return stacktrace.Propagate(err, "")
+	}
+
+	if c.SpaceAccessResetter != nil {
+		logger.Info("reset space access for user")
+		if err := c.SpaceAccessResetter.ResetUserAccess(ctx, userID); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
 	}
 	return nil
 }

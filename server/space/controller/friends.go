@@ -3,6 +3,7 @@ package controller
 import (
 	"database/sql"
 	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/ente-io/museum/ente"
@@ -24,51 +25,40 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.TargetSpaceID) == "" ||
-		strings.TrimSpace(req.LinkSessionToken) == "" ||
+	if (strings.TrimSpace(req.TargetSpaceID) == "" && strings.TrimSpace(req.TargetUsername) == "") ||
 		strings.TrimSpace(req.RequesterSpaceID) == "" ||
-		strings.TrimSpace(req.TargetEncryptedSpaceKey) == "" ||
 		strings.TrimSpace(req.RequesterEncryptedSpaceKey) == "" ||
-		req.TargetKeyVersion <= 0 ||
 		req.RequesterKeyVersion <= 0 {
-		return nil, ente.NewBadRequestWithMessage("targetSpaceId, linkSessionToken, requesterSpaceId, encrypted space keys and key versions are required")
-	}
-	if len(strings.TrimSpace(req.LinkSessionToken)) > maxSpaceLinkSessionTokenBytes {
-		return nil, ente.NewBadRequestWithMessage("linkSessionToken is too large")
-	}
-	if err := validateEncodedSpaceField("targetEncryptedSpaceKey", req.TargetEncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
-		return nil, err
+		return nil, ente.NewBadRequestWithMessage("targetSpaceId or targetUsername, requesterSpaceId, requesterEncryptedSpaceKey and requesterKeyVersion are required")
 	}
 	if err := validateEncodedSpaceField("requesterEncryptedSpaceKey", req.RequesterEncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
 		return nil, err
-	}
-	session, err := c.auth.requireLinkSession(ctx.Request.Context(), req.LinkSessionToken)
-	if err != nil {
-		return nil, err
-	}
-	if session.SpaceID != strings.TrimSpace(req.TargetSpaceID) {
-		return nil, ente.ErrPermissionDenied
-	}
-	if session.KeyVersion != req.TargetKeyVersion {
-		return nil, ente.NewBadRequestWithMessage("targetKeyVersion does not match link session")
 	}
 	requesterSpace, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, strings.TrimSpace(req.RequesterSpaceID))
 	if err != nil {
 		return nil, err
 	}
-	created, err := c.FriendsRepo.AddFriendWithCreated(
+	var targetSpace *repo.SpaceRecord
+	switch {
+	case strings.TrimSpace(req.TargetSpaceID) != "":
+		targetSpace, err = c.SpacesRepo.GetSpaceByID(ctx.Request.Context(), strings.TrimSpace(req.TargetSpaceID))
+	case strings.TrimSpace(req.TargetUsername) != "":
+		targetSpace, err = c.SpacesRepo.GetSpaceBySlug(ctx.Request.Context(), strings.TrimSpace(req.TargetUsername))
+	}
+	if err != nil {
+		return nil, err
+	}
+	request, created, err := c.FriendsRepo.CreateFriendRequest(
 		ctx.Request.Context(),
 		userID,
-		strings.TrimSpace(req.RequesterSpaceID),
-		strings.TrimSpace(req.TargetSpaceID),
-		strings.TrimSpace(req.TargetEncryptedSpaceKey),
-		req.TargetKeyVersion,
+		requesterSpace.SpaceID,
+		targetSpace.SpaceID,
 		strings.TrimSpace(req.RequesterEncryptedSpaceKey),
 		req.RequesterKeyVersion,
 	)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), repo.ErrSelfFriendship) {
-			return nil, ente.NewBadRequestWithMessage("cannot join your own space link")
+			return nil, ente.NewBadRequestWithMessage("cannot add yourself as a friend")
 		}
 		if errors.Is(stacktrace.RootCause(err), repo.ErrAlreadyFriends) {
 			return &models.FriendStatusResponse{Status: "friend"}, nil
@@ -79,9 +69,90 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 		return nil, err
 	}
 	if created && c.EmailNotifier != nil {
-		go c.EmailNotifier.OnSpaceFriendAdded(requesterSpace.SpaceSlug, session.OwnerID)
+		go c.EmailNotifier.OnSpaceFriendRequested(requesterSpace.SpaceSlug, request.TargetID)
+	}
+	return &models.FriendStatusResponse{Status: "requested"}, nil
+}
+
+func (c *FriendsController) ListRequests(ctx *gin.Context) ([]models.SpaceFriendRequestResponse, error) {
+	userID, err := c.auth.requireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	space, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	requests, err := c.FriendsRepo.ListFriendRequestsForSpace(ctx.Request.Context(), userID, space.SpaceID)
+	if err != nil {
+		return nil, err
+	}
+	resp := make([]models.SpaceFriendRequestResponse, 0, len(requests))
+	for _, request := range requests {
+		resp = append(resp, models.SpaceFriendRequestResponse{
+			RequestID: request.RequestID,
+			Requester: toActorResponse(request.Requester, true),
+			CreatedAt: formatMicros(request.CreatedAt),
+		})
+	}
+	return resp, nil
+}
+
+func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestIDValue string, req models.ConfirmFriendRequestPayload) (*models.FriendStatusResponse, error) {
+	userID, err := c.auth.requireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	requestID, err := strconv.ParseInt(strings.TrimSpace(requestIDValue), 10, 64)
+	if err != nil || requestID <= 0 {
+		return nil, ente.ErrBadRequest
+	}
+	if strings.TrimSpace(req.TargetEncryptedSpaceKey) == "" || req.TargetKeyVersion <= 0 {
+		return nil, ente.NewBadRequestWithMessage("targetEncryptedSpaceKey and targetKeyVersion are required")
+	}
+	if err := validateEncodedSpaceField("targetEncryptedSpaceKey", req.TargetEncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		return nil, err
+	}
+	targetSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	requesterID, created, err := c.FriendsRepo.ConfirmFriendRequest(
+		ctx.Request.Context(),
+		userID,
+		targetSpace.SpaceID,
+		requestID,
+		strings.TrimSpace(req.TargetEncryptedSpaceKey),
+		req.TargetKeyVersion,
+	)
+	if err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return nil, ente.NewBadRequestWithMessage("friend request is stale or no longer available")
+		}
+		return nil, err
+	}
+	if created && c.EmailNotifier != nil {
+		go c.EmailNotifier.OnSpaceFriendAdded(targetSpace.SpaceSlug, requesterID)
 	}
 	return &models.FriendStatusResponse{Status: "friend"}, nil
+}
+
+func (c *FriendsController) DeleteRequest(ctx *gin.Context, requestIDValue string) error {
+	userID, err := c.auth.requireUser(ctx)
+	if err != nil {
+		return err
+	}
+	requestID, err := strconv.ParseInt(strings.TrimSpace(requestIDValue), 10, 64)
+	if err != nil || requestID <= 0 {
+		return ente.ErrBadRequest
+	}
+	if err := c.FriendsRepo.DeleteFriendRequest(ctx.Request.Context(), userID, requestID); err != nil {
+		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			return ente.ErrNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 func (c *FriendsController) Unfriend(ctx *gin.Context, req models.FriendTargetPayload) error {

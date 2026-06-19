@@ -1,7 +1,7 @@
 import { Box } from "@mui/material";
-import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import { SpaceAvatarCropPage } from "components/SpaceAvatarCropPage";
 import { SpaceAvatarEditButton } from "components/SpaceAvatarEditButton";
+import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import { SpaceButtonSpinner } from "components/SpaceButtonSpinner";
 import React, { useEffect, useRef, useState } from "react";
 import type { Area, Point } from "react-easy-crop";
@@ -82,11 +82,7 @@ const BackIcon: React.FC = () => (
 );
 
 const AvatarPlaceholder: React.FC = () => (
-    <SpaceAvatarImage
-        aria-hidden
-        border="4px solid white"
-        borderRadius="50%"
-    />
+    <SpaceAvatarImage aria-hidden border="4px solid white" borderRadius="50%" />
 );
 
 const CheckIcon: React.FC = () => (

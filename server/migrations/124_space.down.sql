@@ -5,6 +5,9 @@ DROP TABLE IF EXISTS space_links;
 
 DROP TABLE IF EXISTS space_friend_events;
 
+DROP TRIGGER IF EXISTS update_space_friend_requests_updated_at ON space_friend_requests;
+DROP TABLE IF EXISTS space_friend_requests;
+
 DROP TRIGGER IF EXISTS update_space_friend_shares_updated_at ON space_friend_shares;
 DROP TABLE IF EXISTS space_friend_shares;
 

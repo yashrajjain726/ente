@@ -215,7 +215,7 @@ const Page: React.FC = () => {
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
                 onReplyToPost={replyToCurrentPost}
                 onSetPostLiked={setCurrentPostLiked}
-                showPostLoadingSkeleton={false}
+                showPostLoadingIndicator={false}
             />
         </>
     );

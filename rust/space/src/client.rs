@@ -17,18 +17,19 @@ use crate::models::{
     OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostObjectMetadata,
 };
 use crate::transport::{
-    AddFriendPayload, AssetDownloadResponse, CreateEntityKeyRequest, CreateMessageRequest,
-    CreatePostRequest, CreatePostResponse, CreateSpaceRequest, EntityKeyPayload, EntityKeyResponse,
-    FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse, FriendTargetPayload,
-    LikeMessageRequest, LikeMessageResponse, LikePostRequest, LikePostResponse,
-    ListPostLikersResponse, MarkNotificationsReadRequest, MessageConversationPage, MessagePage,
-    MessageResponse, PostObjectPayload, PostPage, PostResponse, PresignUploadRequest,
-    PresignUploadResponse, ProfileAvatarPayload, ProfileCoverPayload, RefreshFriendSharesRequest,
-    RotateSpaceKeyRequest, ShareUpdatePayload, SpaceActorResponse, SpaceFriendResponse,
-    SpaceKeyResponse, SpaceKeyVersionResponse, SpaceLinkCreateRequest, SpaceLinkLoginRequest,
-    SpaceLinkLoginResponse, SpaceLinkStatusResponse, SpaceLookupResponse, SpaceProfileResponse,
-    SpaceUnreadStatusResponse, UpdatePostCaptionRequest, UpdateSpaceProfileRequest,
-    UpdateSpaceProfileResponse, UpdateSpaceSlugRequest,
+    AddFriendPayload, AssetDownloadResponse, ConfirmFriendRequestPayload, CreateEntityKeyRequest,
+    CreateMessageRequest, CreatePostRequest, CreatePostResponse, CreateSpaceRequest,
+    EntityKeyPayload, EntityKeyResponse, FriendRelationshipResponse, FriendShareResponse,
+    FriendStatusResponse, FriendTargetPayload, LikeMessageRequest, LikeMessageResponse,
+    LikePostRequest, LikePostResponse, ListPostLikersResponse, MarkNotificationsReadRequest,
+    MessageConversationPage, MessagePage, MessageResponse, PostObjectPayload, PostPage,
+    PostResponse, PresignUploadRequest, PresignUploadResponse, ProfileAvatarPayload,
+    ProfileCoverPayload, RefreshFriendSharesRequest, RotateSpaceKeyRequest, ShareUpdatePayload,
+    SpaceActorResponse, SpaceFriendRequestResponse, SpaceFriendResponse, SpaceKeyResponse,
+    SpaceKeyVersionResponse, SpaceLinkCreateRequest, SpaceLinkLoginRequest, SpaceLinkLoginResponse,
+    SpaceLinkStatusResponse, SpaceLookupResponse, SpaceProfileResponse, SpaceUnreadStatusResponse,
+    UpdatePostCaptionRequest, UpdateSpaceProfileRequest, UpdateSpaceProfileResponse,
+    UpdateSpaceSlugRequest,
 };
 use ente_core::crypto::{keys, sealed};
 use ente_core::http::Error as HttpError;
@@ -1272,31 +1273,98 @@ impl AccountSpaceCtx {
         })
     }
 
-    pub async fn add_friend_from_link(&self, link: &SpaceLinkCtx) -> Result<FriendStatusResponse> {
-        if link.owner_public_key().is_empty() {
+    async fn request_friend_with_target(
+        &self,
+        target_space_id: &str,
+        target_public_key: &[u8],
+    ) -> Result<FriendStatusResponse> {
+        if target_space_id.trim().is_empty() {
+            return Err(SpaceError::InvalidInput(
+                "target space id is required".into(),
+            ));
+        }
+        if target_public_key.is_empty() {
             return Err(SpaceError::InvalidInput(
                 "target public key is required".into(),
             ));
         }
-        let identity = self.default_space_identity().await?;
         let (requester_space, requester_space_key) = self.default_profile_space_access().await?;
-        let target_share = sealed::seal(link.space_key(), &identity.public_key)?;
-        let requester_share = sealed::seal(&requester_space_key, link.owner_public_key())?;
+        let requester_share = sealed::seal(&requester_space_key, target_public_key)?;
         let payload = AddFriendPayload {
-            target_space_id: link.space_id().to_owned(),
-            link_session_token: link.session_token().to_owned(),
+            target_space_id: Some(target_space_id.to_owned()),
+            target_username: None,
             requester_space_id: requester_space.space_id,
-            target_encrypted_space_key: encode_b64(&pack_payload(&target_share, &[])),
-            target_key_version: link.key_version(),
             requester_encrypted_space_key: encode_b64(&pack_payload(&requester_share, &[])),
             requester_key_version: requester_space.key_version,
         };
-        let response = self
-            .client
+        self.client
             .post_json("/space/friends/add", &payload)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn request_friend_by_username(&self, username: &str) -> Result<FriendStatusResponse> {
+        let target = self.lookup_space_by_slug(username).await?;
+        let target_public_key = decode_b64(&target.public_key)?;
+        self.request_friend_with_target(&target.space_id, &target_public_key)
+            .await
+    }
+
+    pub async fn add_friend_from_link(&self, link: &SpaceLinkCtx) -> Result<FriendStatusResponse> {
+        let response = self
+            .request_friend_with_target(link.space_id(), link.owner_public_key())
             .await?;
+        Ok(response)
+    }
+
+    pub async fn list_friend_requests(&self) -> Result<Vec<SpaceFriendRequestResponse>> {
+        self.client
+            .get_json("/space/friends/requests", &[])
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn confirm_friend_request(&self, request_id: i64) -> Result<FriendStatusResponse> {
+        if request_id <= 0 {
+            return Err(SpaceError::InvalidInput(
+                "friend request id is required".into(),
+            ));
+        }
+        let request = self
+            .list_friend_requests()
+            .await?
+            .into_iter()
+            .find(|value| value.request_id == request_id)
+            .ok_or_else(|| SpaceError::InvalidInput("friend request is not available".into()))?;
+        if request.requester.public_key.trim().is_empty() {
+            return Err(SpaceError::InvalidInput(
+                "requester public key is required".into(),
+            ));
+        }
+        let requester_public_key = decode_b64(&request.requester.public_key)?;
+        let (target_space, target_space_key) = self.default_profile_space_access().await?;
+        let target_share = sealed::seal(&target_space_key, &requester_public_key)?;
+        let payload = ConfirmFriendRequestPayload {
+            target_encrypted_space_key: encode_b64(&pack_payload(&target_share, &[])),
+            target_key_version: target_space.key_version,
+        };
+        let path = format!("/space/friends/requests/{request_id}/confirm");
+        let response = self.client.post_json(&path, &payload).await?;
         self.clear_friend_share_cache()?;
         Ok(response)
+    }
+
+    pub async fn delete_friend_request(&self, request_id: i64) -> Result<()> {
+        if request_id <= 0 {
+            return Err(SpaceError::InvalidInput(
+                "friend request id is required".into(),
+            ));
+        }
+        let path = format!("/space/friends/requests/{request_id}");
+        self.client
+            .delete_empty(&path, &[])
+            .await
+            .map_err(Into::into)
     }
 
     pub async fn unfriend_by_space(&self, space_id: &str) -> Result<()> {
@@ -3261,7 +3329,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn add_friend_from_link_sends_reciprocal_space_shares() {
+    async fn add_friend_from_link_creates_friend_request() {
         let mut server = Server::new_async().await;
         let root_space_key = generate_key();
         let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
@@ -3290,15 +3358,12 @@ mod tests {
             .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"targetSpaceId\":\"space_owner_main\"".into()),
-                Matcher::Regex("\"linkSessionToken\":\"link-session-token\"".into()),
                 Matcher::Regex("\"requesterSpaceId\":\"space_viewer_main\"".into()),
-                Matcher::Regex("\"targetKeyVersion\":5".into()),
                 Matcher::Regex("\"requesterKeyVersion\":4".into()),
-                Matcher::Regex("\"targetEncryptedSpaceKey\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"requesterEncryptedSpaceKey\":\"[^\"]+\"".into()),
             ]))
             .with_status(200)
-            .with_body(json!({"status": "friend"}).to_string())
+            .with_body(json!({"status": "requested"}).to_string())
             .create_async()
             .await;
         let link = SpaceLinkCtx {
@@ -3323,9 +3388,9 @@ mod tests {
         let response = ctx
             .add_friend_from_link(&link)
             .await
-            .expect("direct friendship should send reciprocal shares");
+            .expect("friend request should be sent");
 
-        assert_eq!(response.status, "friend");
+        assert_eq!(response.status, "requested");
         spaces.assert_async().await;
         add.assert_async().await;
     }

@@ -100,9 +100,7 @@ export const SpaceInviteFriendsDialog: React.FC<
                         textAlign: "center",
                     }}
                 >
-                    Invite friends and family by sharing your private profile
-                    link. Only you and the people you share it with can see your
-                    posts.
+                    Invite friends and family to add you as a friend.
                 </Box>
                 <Box
                     sx={{
@@ -129,9 +127,9 @@ export const SpaceInviteFriendsDialog: React.FC<
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 14,
                             fontWeight: 600,
+                            height: 48,
                             justifyContent: "center",
                             lineHeight: "20px",
-                            height: 48,
                             px: "24px",
                             py: "14px",
                             transition: "filter 120ms ease, opacity 120ms ease",

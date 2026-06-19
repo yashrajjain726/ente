@@ -4,7 +4,9 @@ import React from "react";
 import { MessagesScreen, messagesBackground } from "screens/MessagesScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import {
+    confirmCurrentFriendRequest,
     createCurrentProfileLink,
+    deleteCurrentFriendRequest,
     deleteCurrentMessage,
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
@@ -29,7 +31,16 @@ const friendSpaceId = (friend: SpaceMessageConversation["friend"]) =>
     friend.spaceId ?? friend.id;
 
 const conversationId = (conversation: SpaceMessageConversation) =>
-    friendSpaceId(conversation.friend);
+    conversation.latestActivity.type == "friend_request"
+        ? conversation.latestActivity.id
+        : friendSpaceId(conversation.friend);
+
+const friendRequestIdFromConversation = (
+    conversation: SpaceMessageConversation,
+) => Number(conversation.latestActivity.id.split(":")[1]);
+
+const isFriendRequestConversation = (conversation: SpaceMessageConversation) =>
+    conversation.latestActivity.type == "friend_request";
 
 let nextLocalMessageID = 0;
 
@@ -201,17 +212,18 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         setIsConversationsLoading(true);
         try {
             const page = await loadCurrentMessageConversations();
-            const unreadConversationIds = page.items
+            const items = page.items;
+            const unreadConversationIds = items
                 .filter((conversation) => conversation.notificationUnread)
                 .map(conversationId);
-            const passiveUnreadConversationIds = page.items
+            const passiveUnreadConversationIds = items
                 .filter(
                     (conversation) =>
                         conversation.notificationUnread && !conversation.unread,
                 )
                 .map(conversationId);
             setNewConversationIds(unreadConversationIds);
-            setConversations(page.items);
+            setConversations(items);
             if (passiveUnreadConversationIds.length > 0) {
                 void Promise.all(
                     passiveUnreadConversationIds.map((spaceId) =>
@@ -235,9 +247,30 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 
     const openConversation = React.useCallback(
         (conversation: SpaceMessageConversation) => {
+            if (isFriendRequestConversation(conversation)) return;
             void router.push(spaceRoutes.message(conversationId(conversation)));
         },
         [router],
+    );
+
+    const confirmFriendRequest = React.useCallback(
+        async (conversation: SpaceMessageConversation) => {
+            await confirmCurrentFriendRequest(
+                friendRequestIdFromConversation(conversation),
+            );
+            window.location.reload();
+        },
+        [],
+    );
+
+    const deleteFriendRequest = React.useCallback(
+        async (conversation: SpaceMessageConversation) => {
+            await deleteCurrentFriendRequest(
+                friendRequestIdFromConversation(conversation),
+            );
+            void refreshConversations();
+        },
+        [refreshConversations],
     );
 
     const closeConversation = React.useCallback(() => {
@@ -460,6 +493,8 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 newConversationIds={newConversationIds}
                 onBack={() => void router.push(spaceRoutes.home)}
                 onCloseThread={closeConversation}
+                onConfirmFriendRequest={confirmFriendRequest}
+                onDeleteFriendRequest={deleteFriendRequest}
                 onOpenSelectedFriendProfile={(friend) =>
                     void router.push(spaceRoutes.friend(friendSpaceId(friend)))
                 }

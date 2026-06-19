@@ -4,177 +4,30 @@ import { Box, Skeleton } from "@mui/material";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import { spaceTouchTargetSize } from "styles/touchTargets";
 
 export const shareProfileLinkBackground = "#FAFAFA";
 
 const green = "#08C225";
 const textBase = "#000";
 const textMuted = "#666";
-const textLight = "#969696";
 const avatarSkeletonBackground = "#E6E6E6";
-const iconFill = "#F0F0F0";
-const actionRowHover = "#F5F5F5";
+const headerHeight = 64;
+const headerSideWidth = 32;
 
 interface ShareProfileLinkScreenProps {
     errorMessage?: string;
-    isLinkLoading?: boolean;
-    onBack: () => void;
     onDone?: () => void;
     onRetry?: () => void;
     profile: SetupProfile;
     profileLink?: string;
 }
 
-interface ActionRowProps {
-    label: string;
-    onClick: () => void;
-    startIcon: React.ReactNode;
-    status?: string;
-}
-
-const BackIcon: React.FC = () => (
-    <Box
-        component="svg"
-        viewBox="0 0 24 24"
-        aria-hidden
-        sx={{ display: "block", height: 24, width: 24 }}
-    >
-        <path
-            d="M15 6L9 12L15 18"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-        />
-    </Box>
-);
-
 export const ShareIcon: React.FC<{ strokeWidth?: number }> = ({
     strokeWidth = 1.8,
 }) => <HugeiconsIcon icon={Share08Icon} size={18} strokeWidth={strokeWidth} />;
 
-export const LinkIcon: React.FC = () => (
-    <Box
-        component="svg"
-        viewBox="0 0 24 24"
-        aria-hidden
-        sx={{ display: "block", height: 20, width: 20 }}
-    >
-        <path
-            d="M9.75 14.25L14.25 9.75M10.75 7.5L11.8 6.45C13.25 5 15.65 5 17.1 6.45C18.55 7.9 18.55 10.3 17.1 11.75L15.75 13.1M13.25 16.5L12.2 17.55C10.75 19 8.35 19 6.9 17.55C5.45 16.1 5.45 13.7 6.9 12.25L8.25 10.9"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-        />
-    </Box>
-);
-
-const ChevronIcon: React.FC = () => (
-    <Box
-        component="svg"
-        viewBox="0 0 24 24"
-        aria-hidden
-        sx={{ display: "block", height: 22, width: 22 }}
-    >
-        <path
-            d="M9 6L15 12L9 18"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-        />
-    </Box>
-);
-
-const ActionRow: React.FC<ActionRowProps> = ({
-    label,
-    onClick,
-    startIcon,
-    status,
-}) => (
-    <Box
-        component="button"
-        type="button"
-        onClick={onClick}
-        sx={{
-            alignItems: "center",
-            bgcolor: "white",
-            border: 0,
-            borderRadius: "16px",
-            boxSizing: "border-box",
-            color: textBase,
-            cursor: "pointer",
-            display: "flex",
-            gap: "14px",
-            height: 56,
-            maxWidth: "100%",
-            minWidth: 0,
-            p: "8px 12px",
-            textAlign: "left",
-            width: "100%",
-            "&:focus-visible": {
-                outline: `2px solid ${green}`,
-                outlineOffset: 2,
-            },
-            "&:hover": { bgcolor: actionRowHover },
-        }}
-    >
-        <Box
-            sx={{
-                alignItems: "center",
-                bgcolor: iconFill,
-                borderRadius: "50%",
-                color: textBase,
-                display: "flex",
-                flexShrink: 0,
-                height: 38,
-                justifyContent: "center",
-                width: 38,
-            }}
-        >
-            {startIcon}
-        </Box>
-        <Box
-            sx={{
-                flex: "1 1 0",
-                fontFamily: '"Inter Variable", Inter, sans-serif',
-                fontSize: 14,
-                fontWeight: 500,
-                lineHeight: "20px",
-                minWidth: 0,
-            }}
-        >
-            {label}
-        </Box>
-        {status && (
-            <Box
-                sx={{
-                    color: green,
-                    flexShrink: 0,
-                    fontFamily: '"Inter Variable", Inter, sans-serif',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    lineHeight: "16px",
-                }}
-            >
-                {status}
-            </Box>
-        )}
-        <Box sx={{ color: textBase, display: "flex", flexShrink: 0 }}>
-            <ChevronIcon />
-        </Box>
-    </Box>
-);
-
 export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
     errorMessage,
-    isLinkLoading = false,
-    onBack,
     onDone,
     onRetry,
     profile,
@@ -229,7 +82,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                     minWidth: 0,
                     mx: "auto",
                     overflowX: "hidden",
-                    pb: "120px",
+                    pb: "156px",
                     px: 3,
                     width: "100%",
                     "@media (min-width: 600px)": { maxWidth: 390 },
@@ -238,66 +91,64 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                 <Box
                     component="header"
                     sx={{
+                        alignItems: "center",
+                        bgcolor: shareProfileLinkBackground,
+                        boxSizing: "border-box",
                         display: "grid",
-                        gridTemplateColumns: `${spaceTouchTargetSize}px minmax(0, 1fr) ${spaceTouchTargetSize}px`,
-                        height: spaceTouchTargetSize,
-                        minWidth: 0,
-                        mt: "32px",
+                        gap: "12px",
+                        gridTemplateColumns: `${headerSideWidth}px minmax(0, 1fr) ${headerSideWidth}px`,
+                        height: headerHeight + 4,
+                        left: "50%",
+                        maxWidth: "100%",
+                        pb: 2,
+                        position: "fixed",
+                        pt: 2,
+                        px: 2,
+                        top: 0,
+                        transform: "translateX(-50%)",
                         width: "100%",
+                        zIndex: 4,
+                        "@media (min-width: 600px)": { maxWidth: 390 },
                     }}
                 >
+                    <Box />
                     <Box
-                        component="button"
-                        type="button"
-                        aria-label="Back"
-                        onClick={onBack}
-                        sx={{
-                            alignItems: "center",
-                            bgcolor: "transparent",
-                            border: 0,
-                            color: textBase,
-                            cursor: "pointer",
-                            display: "flex",
-                            height: spaceTouchTargetSize,
-                            justifyContent: "flex-start",
-                            p: 0,
-                            width: spaceTouchTargetSize,
-                            "&:focus-visible": {
-                                borderRadius: "50%",
-                                outline: `2px solid ${green}`,
-                                outlineOffset: 2,
-                            },
-                        }}
-                    >
-                        <BackIcon />
-                    </Box>
-                    <Box
-                        component="h1"
                         sx={{
                             alignSelf: "center",
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 20,
-                            fontWeight: 600,
+                            color: textBase,
                             justifySelf: "center",
-                            lineHeight: "28px",
-                            m: 0,
+                            lineHeight: 0,
                             minWidth: 0,
-                            whiteSpace: "nowrap",
+                            overflow: "visible",
+                            placeSelf: "center",
+                            width: 61,
                         }}
                     >
-                        Invite people
+                        <Box
+                            component="img"
+                            alt="Space"
+                            src="/images/space.svg"
+                            sx={{
+                                display: "block",
+                                filter: "invert(1)",
+                                height: 18,
+                                width: "auto",
+                            }}
+                        />
                     </Box>
                     <Box />
                 </Box>
-
+                <Box aria-hidden sx={{ height: headerHeight + 4 }} />
                 <Box
                     sx={{
                         alignItems: "center",
                         display: "flex",
+                        flex: "1 1 auto",
                         flexDirection: "column",
+                        justifyContent: "center",
                         maxWidth: "100%",
+                        minHeight: 0,
                         minWidth: 0,
-                        mt: "32px",
                         width: "100%",
                     }}
                 >
@@ -308,10 +159,10 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             bgcolor: avatarSkeletonBackground,
                             borderRadius: "50%",
                             display: "flex",
-                            height: 112,
+                            height: 176,
                             justifyContent: "center",
                             overflow: "hidden",
-                            width: 112,
+                            width: 176,
                         }}
                     >
                         {profile.avatarUrl || !profile.avatarObjectKey ? (
@@ -333,54 +184,15 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                         component="h2"
                         sx={{
                             fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 18,
+                            fontSize: 24,
                             fontWeight: 600,
-                            lineHeight: "24px",
+                            lineHeight: "32px",
                             m: 0,
-                            mt: "18px",
+                            mt: "24px",
                             textAlign: "center",
                         }}
                     >
-                        {displayName}
-                    </Box>
-                    <Box
-                        sx={{
-                            color: textMuted,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 500,
-                            lineHeight: "20px",
-                            mt: "4px",
-                            textAlign: "center",
-                        }}
-                    >
-                        @{profile.username}
-                    </Box>
-                    <Box
-                        sx={{
-                            bgcolor: "white",
-                            borderRadius: "16px",
-                            boxSizing: "border-box",
-                            color: textLight,
-                            fontFamily: '"Inter Variable", Inter, sans-serif',
-                            fontSize: 13,
-                            fontWeight: 500,
-                            lineHeight: "18px",
-                            maxWidth: "100%",
-                            minWidth: 0,
-                            mt: "20px",
-                            overflow: "hidden",
-                            px: 2,
-                            py: "13px",
-                            textAlign: "center",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            width: "100%",
-                        }}
-                    >
-                        {isLinkLoading
-                            ? "Creating invite link..."
-                            : profileLink || "Invite link unavailable"}
+                        Welcome, {displayName}
                     </Box>
                     {errorMessage && (
                         <Box
@@ -421,34 +233,8 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             width: "100%",
                         }}
                     >
-                        Invite your friends and family to follow your life.
-                        Only you and the people you share this link with can
-                        see your posts.
+                        Next, invite friends and family to follow your life
                     </Box>
-                </Box>
-
-                <Box
-                    sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "10px",
-                        maxWidth: "100%",
-                        minWidth: 0,
-                        mt: "34px",
-                        width: "100%",
-                    }}
-                >
-                    <ActionRow
-                        label="Share"
-                        onClick={shareProfileLink}
-                        startIcon={<ShareIcon />}
-                    />
-                    <ActionRow
-                        label="Copy link"
-                        onClick={copyProfileLink}
-                        startIcon={<LinkIcon />}
-                        status={copied ? "Copied" : undefined}
-                    />
                 </Box>
 
                 <Box
@@ -456,9 +242,12 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                         bgcolor: shareProfileLinkBackground,
                         bottom: 0,
                         boxSizing: "border-box",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "10px",
                         left: "50%",
                         maxWidth: 390,
-                        p: 3,
+                        p: "16px 24px calc(20px + env(safe-area-inset-bottom))",
                         position: "fixed",
                         transform: "translateX(-50%)",
                         width: "100%",
@@ -468,34 +257,70 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                         className="green-bg"
                         component="button"
                         type="button"
-                        onClick={onDone}
+                        disabled={!profileLink}
+                        onClick={shareProfileLink}
                         sx={{
                             alignItems: "center",
                             bgcolor: green,
                             border: 0,
                             borderRadius: "20px",
                             color: "white",
-                            cursor: onDone ? "pointer" : "default",
+                            cursor: profileLink ? "pointer" : "default",
                             display: "flex",
+                            gap: "10px",
                             fontFamily: '"Inter Variable", Inter, sans-serif',
                             fontSize: 14,
-                            fontWeight: 500,
+                            fontWeight: 600,
                             height: 48,
                             justifyContent: "center",
                             lineHeight: "20px",
                             p: "14px 24px",
                             width: "100%",
+                            "&:disabled": { opacity: 0.56 },
                             "&:focus-visible": {
                                 outline: `2px solid ${green}`,
                                 outlineOffset: 3,
                             },
-                            "&:hover": onDone
+                            "&:hover": profileLink
                                 ? { bgcolor: "#07AE22" }
                                 : undefined,
                         }}
                     >
-                        Done
+                        <ShareIcon strokeWidth={2} />
+                        {copied ? "Copied" : "Share invite"}
                     </Box>
+                    {onDone && (
+                        <Box
+                            component="button"
+                            type="button"
+                            onClick={onDone}
+                            sx={{
+                                alignItems: "center",
+                                bgcolor: "#F2F2F2",
+                                border: 0,
+                                borderRadius: "20px",
+                                color: textMuted,
+                                cursor: "pointer",
+                                display: "flex",
+                                fontFamily:
+                                    '"Inter Variable", Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 600,
+                                height: 48,
+                                justifyContent: "center",
+                                lineHeight: "20px",
+                                p: "14px 24px",
+                                width: "100%",
+                                "&:focus-visible": {
+                                    outline: `2px solid ${green}`,
+                                    outlineOffset: 2,
+                                },
+                                "&:hover": { bgcolor: "#ECECEC" },
+                            }}
+                        >
+                            Done
+                        </Box>
+                    )}
                 </Box>
             </Box>
         </Box>

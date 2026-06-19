@@ -20,6 +20,7 @@ const (
 	spaceNotificationPostLiked         = "post_liked"
 	spaceNotificationPostReplied       = "post_replied"
 	spaceNotificationFriendAdded       = "friend_added"
+	spaceNotificationFriendRequested   = "friend_requested"
 	spaceNewPostIllustrationWidth      = 112
 	spaceNewPostLikeIllustrationWidth  = 132
 	spaceNewPostReplyIllustrationWidth = 132
@@ -33,6 +34,7 @@ type SpaceEmailNotifier interface {
 	OnSpacePostLiked(actorSlug string, recipientUserID int64)
 	OnSpacePostReplied(actorSlug string, recipientUserID int64)
 	OnSpaceFriendAdded(actorSlug string, recipientUserID int64)
+	OnSpaceFriendRequested(actorSlug string, recipientUserID int64)
 }
 
 type SpaceEmailSender struct {
@@ -53,6 +55,10 @@ func (n *SpaceEmailSender) OnSpacePostReplied(actorSlug string, recipientUserID 
 
 func (n *SpaceEmailSender) OnSpaceFriendAdded(actorSlug string, recipientUserID int64) {
 	n.send(actorSlug, "is now your friend", spaceNotificationFriendAdded, []int64{recipientUserID})
+}
+
+func (n *SpaceEmailSender) OnSpaceFriendRequested(actorSlug string, recipientUserID int64) {
+	n.send(actorSlug, "wants to add you as a friend", spaceNotificationFriendRequested, []int64{recipientUserID})
 }
 
 func (n *SpaceEmailSender) send(actorSlug, action, event string, recipientUserIDs []int64) {
@@ -126,6 +132,8 @@ func spaceEmailNotificationText(event, action string) string {
 		return "just replied to your post"
 	case spaceNotificationFriendAdded:
 		return "is now your friend"
+	case spaceNotificationFriendRequested:
+		return "wants to add you as a friend"
 	default:
 		return action
 	}
@@ -141,6 +149,8 @@ func spaceEmailIllustrationURL(event string) string {
 		return spaceNewPostReplyIllustrationURL
 	case spaceNotificationFriendAdded:
 		return spaceNewFriendIllustrationURL
+	case spaceNotificationFriendRequested:
+		return spaceNewFriendIllustrationURL
 	default:
 		return ""
 	}
@@ -155,6 +165,8 @@ func spaceEmailIllustrationWidth(event string) int {
 	case spaceNotificationPostReplied:
 		return spaceNewPostReplyIllustrationWidth
 	case spaceNotificationFriendAdded:
+		return spaceNewFriendIllustrationWidth
+	case spaceNotificationFriendRequested:
 		return spaceNewFriendIllustrationWidth
 	default:
 		return 0
