@@ -77,7 +77,7 @@ func TestSpaceEmailTemplateData(t *testing.T) {
 	require.Equal(t, "just liked your post", spaceEmailNotificationText(spaceNotificationPostLiked, "liked your post"))
 	require.Equal(t, "just replied to your post", spaceEmailNotificationText(spaceNotificationPostReplied, "replied to your post"))
 	require.Equal(t, "is now your friend", spaceEmailNotificationText(spaceNotificationFriendAdded, "is now your friend"))
-	require.Equal(t, "wants to add you as a friend", spaceEmailNotificationText(spaceNotificationFriendRequested, "wants to add you as a friend"))
+	require.Equal(t, "sent you a friend request", spaceEmailNotificationText(spaceNotificationFriendRequested, "sent you a friend request"))
 	require.Equal(t, spaceNewPostIllustrationURL, spaceEmailIllustrationURL(spaceNotificationPostCreated))
 	require.Equal(t, spaceNewPostLikeIllustrationURL, spaceEmailIllustrationURL(spaceNotificationPostLiked))
 	require.Equal(t, spaceNewPostReplyIllustrationURL, spaceEmailIllustrationURL(spaceNotificationPostReplied))
