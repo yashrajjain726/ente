@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import { SpaceMobileBestToast } from "components/SpaceMobileBestToast";
 import { SpacePageMeta } from "components/SpacePageMeta";
 import { SpaceRouteFallback } from "components/SpaceRouteFallback";
 import React, { useEffect, useState } from "react";
@@ -71,6 +72,7 @@ const PublicProfileUnavailable: React.FC = () => (
                 Profile unavailable
             </Box>
         </Box>
+        <SpaceMobileBestToast />
     </Box>
 );
 
@@ -255,6 +257,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                 </Box>
             </Box>
         </Box>
+        <SpaceMobileBestToast />
     </Box>
 );
 
