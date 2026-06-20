@@ -204,7 +204,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                     }}
                 >
                     Add <Box component="span">@{identity.username}</Box> as a
-                    friend to see what they're up to on Ente Space
+                    friend to see what they&apos;re up to on Ente Space
                 </Box>
             </Box>
             <Box

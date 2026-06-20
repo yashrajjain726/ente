@@ -1,8 +1,7 @@
-import { Share08Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Skeleton } from "@mui/material";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
-import React, { useState } from "react";
+import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
+import React from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 
 export const shareProfileLinkBackground = "#FAFAFA";
@@ -15,50 +14,17 @@ const headerHeight = 64;
 const headerSideWidth = 32;
 
 interface ShareProfileLinkScreenProps {
-    errorMessage?: string;
     onDone?: () => void;
-    onRetry?: () => void;
     profile: SetupProfile;
     profileLink?: string;
 }
 
-export const ShareIcon: React.FC<{ strokeWidth?: number }> = ({
-    strokeWidth = 1.8,
-}) => <HugeiconsIcon icon={Share08Icon} size={18} strokeWidth={strokeWidth} />;
-
 export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
-    errorMessage,
     onDone,
-    onRetry,
     profile,
     profileLink,
 }) => {
-    const [copied, setCopied] = useState(false);
     const displayName = profile.fullName.trim() || profile.username.trim();
-
-    const copyProfileLink = async () => {
-        if (!profileLink) return;
-        await navigator.clipboard.writeText(profileLink);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1200);
-    };
-
-    const shareProfileLink = async () => {
-        if (!profileLink) return;
-        const shareData = { url: profileLink };
-
-        if (typeof navigator.share == "function") {
-            try {
-                await navigator.share(shareData);
-                return;
-            } catch (error) {
-                if (error instanceof DOMException && error.name == "AbortError")
-                    return;
-            }
-        }
-
-        await copyProfileLink();
-    };
 
     return (
         <Box
@@ -194,28 +160,6 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                     >
                         Welcome, {displayName}
                     </Box>
-                    {errorMessage && (
-                        <Box
-                            component="button"
-                            type="button"
-                            onClick={onRetry}
-                            sx={{
-                                bgcolor: "transparent",
-                                border: 0,
-                                color: green,
-                                cursor: onRetry ? "pointer" : "default",
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 13,
-                                fontWeight: 600,
-                                lineHeight: "18px",
-                                mt: "10px",
-                                p: 0,
-                            }}
-                        >
-                            {errorMessage}
-                        </Box>
-                    )}
                     <Box
                         component="p"
                         sx={{
@@ -253,12 +197,10 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                         width: "100%",
                     }}
                 >
-                    <Box
+                    <SpaceShareInviteButton
                         className="green-bg"
-                        component="button"
-                        type="button"
-                        disabled={!profileLink}
-                        onClick={shareProfileLink}
+                        iconStrokeWidth={2}
+                        profileLink={profileLink}
                         sx={{
                             alignItems: "center",
                             bgcolor: green,
@@ -285,10 +227,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                                 ? { bgcolor: "#07AE22" }
                                 : undefined,
                         }}
-                    >
-                        <ShareIcon strokeWidth={2} />
-                        {copied ? "Copied" : "Share invite"}
-                    </Box>
+                    />
                     {onDone && (
                         <Box
                             component="button"

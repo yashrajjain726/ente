@@ -2,6 +2,7 @@ import {
     AddSquareIcon,
     ArrowLeft02Icon,
     Menu01Icon,
+    MultiplicationSignIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, CircularProgress, Skeleton } from "@mui/material";
@@ -14,10 +15,10 @@ import {
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
 import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
+import { SpaceShareIcon } from "components/SpaceShareInviteButton";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type { SpacePostAsset } from "services/space";
 import { spaceTouchTargetSize } from "styles/touchTargets";
 import { createLoadedLocalPostPhoto } from "utils/localPostPhoto";
@@ -47,9 +48,11 @@ const profileAvatarSize = 120;
 const profileCoverHeight =
     profileHeaderHeight + profileAvatarTopOffset + profileAvatarSize / 2;
 const photoMasonryGap = "3px";
+const profileHorizontalPadding = "16px";
 const photoMasonryPlaceholderBackground = "#F2F2F2";
 const photoMasonryRadius = "12px";
 const photoMasonryLoadRootMargin = "800px 0px";
+const profileToastTransition = "opacity 160ms ease, transform 160ms ease";
 interface ProfilePhotoDimensions {
     height: number;
     width: number;
@@ -108,6 +111,18 @@ interface PostMasonryTile {
 interface PostMasonryRow {
     aspectRatio: number;
     tiles: PostMasonryTile[];
+}
+
+interface ProfileToastProps {
+    message: string;
+    open: boolean;
+    onClose?: () => void;
+    onExited?: () => void;
+}
+
+interface ProfileToastState {
+    message: string;
+    open: boolean;
 }
 
 const buildPostMasonryRows = (
@@ -349,6 +364,125 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
     );
 };
 
+const CopyIcon: React.FC = () => (
+    <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            d="M4.5 4.5V2.5C4.5 1.39543 5.39543 0.5 6.5 0.5H11.5C12.6046 0.5 13.5 1.39543 13.5 2.5V7.5C13.5 8.60457 12.6046 9.5 11.5 9.5H9.5M2.5 4.5H7.5C8.60457 4.5 9.5 5.39543 9.5 6.5V11.5C9.5 12.6046 8.60457 13.5 7.5 13.5H2.5C1.39543 13.5 0.5 12.6046 0.5 11.5V6.5C0.5 5.39543 1.39543 4.5 2.5 4.5Z"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+    </svg>
+);
+
+const ProfileToast: React.FC<ProfileToastProps> = ({
+    message,
+    open,
+    onClose,
+    onExited,
+}) => (
+    <Box
+        onTransitionEnd={(event) => {
+            if (event.currentTarget != event.target || open) return;
+            onExited?.();
+        }}
+        sx={{
+            boxSizing: "border-box",
+            left: "50%",
+            opacity: open ? 1 : 0,
+            px: profileHorizontalPadding,
+            pointerEvents: "none",
+            position: "fixed",
+            top: "calc(env(safe-area-inset-top) + 10px)",
+            transform: open
+                ? "translateX(-50%) translateY(0)"
+                : "translateX(-50%) translateY(-8px)",
+            transition: profileToastTransition,
+            width: "100%",
+            zIndex: 20,
+            "@media (min-width: 600px)": { maxWidth: 390 },
+        }}
+    >
+        <Box
+            role="status"
+            aria-live="polite"
+            sx={{
+                alignItems: "center",
+                bgcolor: "#FFFFFF",
+                borderRadius: "18px",
+                boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
+                boxSizing: "border-box",
+                color: textBase,
+                display: "flex",
+                fontFamily: '"Inter Variable", Inter, sans-serif',
+                fontSize: 14,
+                fontWeight: 650,
+                gap: "10px",
+                lineHeight: "20px",
+                minHeight: 50,
+                pointerEvents: "auto",
+                pl: "16px",
+                pr: "6px",
+                py: "3px",
+                width: "100%",
+            }}
+        >
+            <Box component="span" sx={{ display: "flex", flexShrink: 0 }}>
+                <CopyIcon />
+            </Box>
+            <Box
+                component="span"
+                sx={{
+                    flex: "1 1 auto",
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                }}
+            >
+                {message}
+            </Box>
+            <Box
+                component="button"
+                type="button"
+                aria-label="Close"
+                onClick={onClose}
+                sx={{
+                    alignItems: "center",
+                    appearance: "none",
+                    bgcolor: "transparent",
+                    border: 0,
+                    color: textBase,
+                    cursor: onClose ? "pointer" : "default",
+                    display: "flex",
+                    flexShrink: 0,
+                    height: spaceTouchTargetSize,
+                    justifyContent: "center",
+                    opacity: 0.9,
+                    p: 0,
+                    width: spaceTouchTargetSize,
+                    "&:focus-visible": {
+                        outline: "2px solid rgba(0 0 0 / 0.72)",
+                        outlineOffset: 2,
+                    },
+                }}
+            >
+                <HugeiconsIcon
+                    icon={MultiplicationSignIcon}
+                    size={16}
+                    strokeWidth={2}
+                />
+            </Box>
+        </Box>
+    </Box>
+);
+
 interface ProfileScreenProps {
     friendsCount?: number;
     headerVariant?: "friend" | "owner";
@@ -370,9 +504,9 @@ interface ProfileScreenProps {
     onLoadPostImage?: (asset: SpacePostAsset) => Promise<string>;
     onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
-    onShareProfileLink?: () => Promise<string>;
     postGroups?: ProfilePostGroup[];
     profile: SetupProfile;
+    profileLink?: string;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -392,9 +526,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onLoadPostImage,
     onReplyToPost,
     onSetPostLiked,
-    onShareProfileLink,
     postGroups = [],
     profile,
+    profileLink,
     showPostLoadingIndicator,
 }) => {
     const [selectedPost, setSelectedPost] =
@@ -403,6 +537,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const [deletedPostIDs, setDeletedPostIDs] = useState<Set<string>>(
         () => new Set(),
     );
+    const [profileShareToast, setProfileShareToast] =
+        useState<ProfileToastState | null>(null);
     const [loadedPhotoDimensionsByID, setLoadedPhotoDimensionsByID] = useState<
         Record<string, ProfilePhotoDimensions>
     >({});
@@ -416,6 +552,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     >(new Map());
     const localPostObjectUrlsRef = React.useRef<Set<string>>(new Set());
     const activeLocalPostObjectUrlRef = React.useRef<string | null>(null);
+    const profileShareToastTimeoutRef = React.useRef<number | undefined>(
+        undefined,
+    );
+    const profileShareToastFrameRef = React.useRef<number | undefined>(
+        undefined,
+    );
     const isOwnerProfile = headerVariant == "owner";
     const isFriendProfile = headerVariant == "friend";
     const displayName = profile.fullName.trim() || profile.username.trim();
@@ -455,6 +597,52 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const selectedPostActionMode: SpaceViewerPostActionMode = isOwnerProfile
         ? "hidden"
         : "like-only";
+
+    const clearProfileShareToastTimers = React.useCallback(() => {
+        if (profileShareToastTimeoutRef.current !== undefined) {
+            window.clearTimeout(profileShareToastTimeoutRef.current);
+            profileShareToastTimeoutRef.current = undefined;
+        }
+        if (profileShareToastFrameRef.current !== undefined) {
+            window.cancelAnimationFrame(profileShareToastFrameRef.current);
+            profileShareToastFrameRef.current = undefined;
+        }
+    }, []);
+
+    const hideProfileShareToast = React.useCallback(() => {
+        clearProfileShareToastTimers();
+        setProfileShareToast((currentToast) =>
+            currentToast ? { ...currentToast, open: false } : currentToast,
+        );
+    }, [clearProfileShareToastTimers]);
+
+    const showProfileShareToast = React.useCallback(
+        (message: string) => {
+            clearProfileShareToastTimers();
+            setProfileShareToast({ message, open: false });
+            profileShareToastFrameRef.current = window.requestAnimationFrame(
+                () => {
+                    setProfileShareToast((currentToast) =>
+                        currentToast
+                            ? { ...currentToast, open: true }
+                            : currentToast,
+                    );
+                    profileShareToastFrameRef.current = undefined;
+                },
+            );
+            profileShareToastTimeoutRef.current = window.setTimeout(() => {
+                profileShareToastTimeoutRef.current = undefined;
+                hideProfileShareToast();
+            }, 1800);
+        },
+        [clearProfileShareToastTimers, hideProfileShareToast],
+    );
+
+    const clearClosedProfileShareToast = React.useCallback(() => {
+        setProfileShareToast((currentToast) =>
+            currentToast?.open ? currentToast : null,
+        );
+    }, []);
 
     const revokeLocalPostObjectUrls = React.useCallback(() => {
         localPostObjectUrlsRef.current.forEach((objectUrl) =>
@@ -765,8 +953,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     };
 
     const shareProfile = async () => {
-        if (!onShareProfileLink) return;
-        const profileLink = await onShareProfileLink();
+        if (!profileLink) return;
 
         if (typeof navigator.share == "function") {
             try {
@@ -778,7 +965,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             }
         }
 
-        await navigator.clipboard.writeText(profileLink);
+        try {
+            await navigator.clipboard.writeText(profileLink);
+            showProfileShareToast("Invite link copied");
+        } catch (error) {
+            console.error("Failed to copy profile link", error);
+            showProfileShareToast("Couldn't copy link. Please try again.");
+        }
     };
 
     const deleteSelectedPost = async () => {
@@ -800,6 +993,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             revokeLocalPostObjectUrls();
         },
         [revokeLocalPostObjectUrls],
+    );
+
+    React.useEffect(
+        () => () => {
+            clearProfileShareToastTimers();
+        },
+        [clearProfileShareToastTimers],
     );
 
     return (
@@ -1144,7 +1344,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         bgcolor: "transparent",
                                         border: 0,
                                         color: textStrong,
-                                        cursor: onShareProfileLink
+                                        cursor: profileLink
                                             ? "pointer"
                                             : "default",
                                         display: "flex",
@@ -1165,7 +1365,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                         },
                                     }}
                                 >
-                                    <ShareIcon strokeWidth={2.2} />
+                                    <SpaceShareIcon strokeWidth={2.2} />
                                 </Box>
                             )}
                         </Box>
@@ -1497,6 +1697,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     <SpacePostFloatingActionButton
                         disabled={isPostPhotoOpening}
                         onClick={openPostPhotoPicker}
+                    />
+                )}
+                {profileShareToast && (
+                    <ProfileToast
+                        message={profileShareToast.message}
+                        open={profileShareToast.open}
+                        onClose={hideProfileShareToast}
+                        onExited={clearClosedProfileShareToast}
                     />
                 )}
                 {selectedPost && (

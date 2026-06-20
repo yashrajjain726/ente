@@ -23,10 +23,10 @@ import {
 } from "components/SpacePostLikeAnimation";
 import { SpacePWAInstallPrompt } from "components/SpacePWAInstallPrompt";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
+import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type {
     SpacePost,
     SpacePostAssetURLLoader,
@@ -126,7 +126,7 @@ interface HomeScreenProps {
     onOpenProfile?: () => void;
     onReplyToPost?: (postId: number, text: string) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
-    onShareProfileLink?: () => Promise<string>;
+    profileLink?: string;
     profile: SetupProfile | null;
 }
 
@@ -1282,8 +1282,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onOpenProfile,
     onReplyToPost,
     onSetPostLiked,
-    onShareProfileLink,
     profile,
+    profileLink,
 }) => {
     const [selectedViewer, setSelectedViewer] =
         useState<SelectedHomeViewer | null>(null);
@@ -1581,33 +1581,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         observer.observe(element);
         return () => observer.disconnect();
     }, [hasMoreFeedItems, isFeedLoadingMore, onLoadMoreFeedItems]);
-
-    const shareInviteLink = async () => {
-        if (!onShareProfileLink || isInviteSharing) return;
-        setIsInviteSharing(true);
-
-        try {
-            const profileLink = await onShareProfileLink();
-            if (typeof navigator.share == "function") {
-                try {
-                    await navigator.share({ url: profileLink });
-                    return;
-                } catch (error) {
-                    if (
-                        error instanceof DOMException &&
-                        error.name == "AbortError"
-                    )
-                        return;
-                }
-            }
-
-            await navigator.clipboard.writeText(profileLink);
-        } catch (error) {
-            console.error("Failed to share space invite", error);
-        } finally {
-            setIsInviteSharing(false);
-        }
-    };
 
     const prepareSelectedPostPhoto = async (file: File) => {
         if (!profile) return;
@@ -2053,13 +2026,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 {emptyFeedMessage}
                             </Box>
                             {friendsCount == 0 && (
-                                <Box
-                                    component="button"
-                                    type="button"
-                                    disabled={
-                                        !onShareProfileLink || isInviteSharing
+                                <SpaceShareInviteButton
+                                    profileLink={profileLink}
+                                    sharing={isInviteSharing}
+                                    onShareError={(error) =>
+                                        console.error(
+                                            "Failed to share space invite",
+                                            error,
+                                        )
                                     }
-                                    onClick={() => void shareInviteLink()}
+                                    onSharingChange={setIsInviteSharing}
                                     sx={{
                                         alignItems: "center",
                                         bgcolor: "#E8E8E8",
@@ -2067,8 +2043,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                         borderRadius: "18px",
                                         color: textBase,
                                         cursor:
-                                            onShareProfileLink &&
-                                            !isInviteSharing
+                                            profileLink && !isInviteSharing
                                                 ? "pointer"
                                                 : "default",
                                         display: "inline-flex",
@@ -2089,15 +2064,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                             outlineOffset: 2,
                                         },
                                         "&:hover":
-                                            onShareProfileLink &&
-                                            !isInviteSharing
+                                            profileLink && !isInviteSharing
                                                 ? { bgcolor: "#DEDEDE" }
                                                 : undefined,
                                     }}
-                                >
-                                    <ShareIcon />
-                                    Share invite
-                                </Box>
+                                />
                             )}
                         </Box>
                     )}

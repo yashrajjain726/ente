@@ -15,11 +15,11 @@ import {
 } from "@mui/material";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
+import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
 import { formatTimeAgo } from "ente-base/date";
 import React from "react";
 import { flushSync } from "react-dom";
 import type { SetupProfile } from "screens/SetupProfileScreen";
-import { ShareIcon } from "screens/ShareProfileLinkScreen";
 import type {
     SpaceMessage,
     SpaceMessageConversation,
@@ -89,7 +89,7 @@ interface MessagesScreenProps {
     ) => Promise<void>;
     onSendMessage: (spaceId: string, text: string) => Promise<void>;
     onSetMessageLiked: (messageId: string, liked: boolean) => Promise<void>;
-    onShareProfileLink?: () => Promise<string>;
+    profileLink?: string;
     newConversationIds?: string[];
     profile: SetupProfile;
     selectedFriend?: SpaceMessageConversation["friend"];
@@ -1405,8 +1405,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     onReplyToMessage,
     onSendMessage,
     onSetMessageLiked,
-    onShareProfileLink,
     profile,
+    profileLink,
     selectedFriend,
     threadBackLabel = "Back to messages",
 }) => {
@@ -1439,8 +1439,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const selectedName = selectedFriend
         ? selectedFriend.fullName.trim() || selectedFriend.username
         : "";
-    const showInviteEmptyState =
-        friendsCount == 0 && Boolean(onShareProfileLink);
+    const showInviteEmptyState = friendsCount == 0 && Boolean(profileLink);
     const emptyConversationsCopy =
         friendsCount == 0
             ? "No messages yet. Once you add friends, you'll see their likes, replies and messages here."
@@ -1532,33 +1531,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         event.preventDefault();
         event.stopPropagation();
         closeMessageActions();
-    };
-
-    const shareInviteLink = async () => {
-        if (!onShareProfileLink || isInviteSharing) return;
-        setIsInviteSharing(true);
-
-        try {
-            const profileLink = await onShareProfileLink();
-            if (typeof navigator.share == "function") {
-                try {
-                    await navigator.share({ url: profileLink });
-                    return;
-                } catch (error) {
-                    if (
-                        error instanceof DOMException &&
-                        error.name == "AbortError"
-                    )
-                        return;
-                }
-            }
-
-            await copyTextToClipboard(profileLink);
-        } catch (error) {
-            console.error("Failed to share space invite", error);
-        } finally {
-            setIsInviteSharing(false);
-        }
     };
 
     const handleMessageAction = (
@@ -2483,16 +2455,16 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         {emptyConversationsCopy}
                                     </Box>
                                     {showInviteEmptyState && (
-                                        <Box
-                                            component="button"
-                                            type="button"
-                                            disabled={
-                                                !onShareProfileLink ||
-                                                isInviteSharing
+                                        <SpaceShareInviteButton
+                                            profileLink={profileLink}
+                                            sharing={isInviteSharing}
+                                            onShareError={(error) =>
+                                                console.error(
+                                                    "Failed to share space invite",
+                                                    error,
+                                                )
                                             }
-                                            onClick={() =>
-                                                void shareInviteLink()
-                                            }
+                                            onSharingChange={setIsInviteSharing}
                                             sx={{
                                                 alignItems: "center",
                                                 bgcolor: "#F2F2F2",
@@ -2500,7 +2472,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 borderRadius: "18px",
                                                 color: textBase,
                                                 cursor:
-                                                    onShareProfileLink &&
+                                                    profileLink &&
                                                     !isInviteSharing
                                                         ? "pointer"
                                                         : "default",
@@ -2522,15 +2494,12 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                     outlineOffset: 2,
                                                 },
                                                 "&:hover":
-                                                    onShareProfileLink &&
+                                                    profileLink &&
                                                     !isInviteSharing
                                                         ? { bgcolor: "#E8E8E8" }
                                                         : undefined,
                                             }}
-                                        >
-                                            <ShareIcon />
-                                            Share invite
-                                        </Box>
+                                        />
                                     )}
                                 </Box>
                             ) : (
