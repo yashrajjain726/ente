@@ -91,7 +91,7 @@ export const SpaceInviteFriendsDialog: React.FC<
                         textAlign: "center",
                     }}
                 >
-                    Invite friends
+                    Add friends on Space
                 </Box>
                 <Box
                     component="p"
@@ -106,7 +106,7 @@ export const SpaceInviteFriendsDialog: React.FC<
                         textAlign: "center",
                     }}
                 >
-                    Invite friends and family to add you as a friend.
+                    Share your invite link with friends and family.
                 </Box>
                 <Box
                     sx={{
