@@ -177,7 +177,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             width: "100%",
                         }}
                     >
-                        Next, invite friends and family to follow your life
+                        Next, invite the people you want to share with
                     </Box>
                 </Box>
 

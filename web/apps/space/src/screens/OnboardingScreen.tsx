@@ -3,10 +3,10 @@ import { SpaceMobileBestToast } from "components/SpaceMobileBestToast";
 import React from "react";
 
 export const onboardingGreen = "#08C225";
-export const onboardingTitle = "Share your life";
+export const onboardingTitle = "Share everyday moments";
 export const onboardingDescription =
     "A private space for sharing everyday moments with friends and family only. No ads. No brain rot.";
-export const addFriendOnboardingTitle = "Follow their life";
+export const addFriendOnboardingTitle = "Share everyday moments";
 
 const softGreen = "#E7F6E9";
 const copyGreen = "#AAFFB8";
