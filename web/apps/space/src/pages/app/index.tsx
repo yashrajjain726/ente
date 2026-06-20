@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { HomeScreen, homeBackground } from "screens/HomeScreen";
 import {
     createCurrentPhotoPost,
-    createCurrentProfileLink,
     deleteCurrentPost,
     loadCurrentFeedPage,
     loadCurrentSpaceFriends,
@@ -15,7 +14,10 @@ import {
     setCurrentPostLiked,
     type SpacePost,
 } from "services/space";
-import { consumeSentSpaceInviteFriend } from "services/spaceInvite";
+import {
+    consumeSentSpaceInviteFriend,
+    spaceInviteURL,
+} from "services/spaceInvite";
 import { useSpaceAppState } from "state/spaceAppState";
 import {
     confirmLocalFeedPost,
@@ -304,17 +306,9 @@ const Page: React.FC = () => {
                 }
                 onReplyToPost={replyToCurrentPost}
                 onSetPostLiked={setFeedPostLiked}
-                onShareProfileLink={
+                profileLink={
                     profile
-                        ? async () => {
-                              if (!profile.spaceId)
-                                  throw new Error("Missing space.");
-                              return (
-                                  await createCurrentProfileLink(
-                                      profile.spaceId,
-                                  )
-                              ).url;
-                          }
+                        ? spaceInviteURL({ spaceUsername: profile.username })
                         : undefined
                 }
             />

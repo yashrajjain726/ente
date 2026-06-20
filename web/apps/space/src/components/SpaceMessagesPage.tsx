@@ -5,7 +5,6 @@ import { MessagesScreen, messagesBackground } from "screens/MessagesScreen";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import {
     confirmCurrentFriendRequest,
-    createCurrentProfileLink,
     deleteCurrentFriendRequest,
     deleteCurrentMessage,
     loadCurrentMessageConversations,
@@ -19,6 +18,7 @@ import {
     type SpaceMessage,
     type SpaceMessageConversation,
 } from "services/space";
+import { spaceInviteURL } from "services/spaceInvite";
 import { useSpaceAppState } from "state/spaceAppState";
 import { spaceRoutes } from "utils/spaceRoutes";
 import { useSpaceRouter } from "utils/spaceRouteTransitions";
@@ -573,11 +573,9 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     );
                     void refreshConversations();
                 }}
-                onShareProfileLink={async () => {
-                    if (!profile.spaceId) throw new Error("Missing space.");
-                    return (await createCurrentProfileLink(profile.spaceId))
-                        .url;
-                }}
+                profileLink={spaceInviteURL({
+                    spaceUsername: profile.username,
+                })}
                 onDeleteMessage={async (messageId) => {
                     await deleteCurrentMessage(messageId);
                     setMessages((currentMessages) =>

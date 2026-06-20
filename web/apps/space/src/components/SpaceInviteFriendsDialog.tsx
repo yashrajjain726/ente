@@ -1,7 +1,6 @@
-import { Share08Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, Dialog, useMediaQuery } from "@mui/material";
 import { SpaceBottomSheetTransition } from "components/SpaceBottomSheetTransition";
+import { SpaceShareInviteButton } from "components/SpaceShareInviteButton";
 import React from "react";
 
 const textBase = "#000";
@@ -9,18 +8,25 @@ const textSoft = "#777777";
 const dangerColor = "#F63A3A";
 
 interface SpaceInviteFriendsDialogProps {
-    errorMessage?: string | null;
     open: boolean;
+    profileLink?: string;
     sharing: boolean;
     onClose: () => void;
-    onShare: () => void;
+    onSharingChange: (sharing: boolean) => void;
 }
 
 export const SpaceInviteFriendsDialog: React.FC<
     SpaceInviteFriendsDialogProps
-> = ({ errorMessage, open, sharing, onClose, onShare }) => {
+> = ({ open, profileLink, sharing, onClose, onSharingChange }) => {
     const titleID = React.useId();
     const isBottomSheet = useMediaQuery("(max-width: 599px)");
+    const [shareErrorMessage, setShareErrorMessage] = React.useState<
+        string | null
+    >(null);
+
+    React.useEffect(() => {
+        if (open) setShareErrorMessage(null);
+    }, [open]);
 
     return (
         <Dialog
@@ -85,7 +91,7 @@ export const SpaceInviteFriendsDialog: React.FC<
                         textAlign: "center",
                     }}
                 >
-                    Invite friends
+                    Add friends on Space
                 </Box>
                 <Box
                     component="p"
@@ -100,7 +106,7 @@ export const SpaceInviteFriendsDialog: React.FC<
                         textAlign: "center",
                     }}
                 >
-                    Invite friends and family to add you as a friend.
+                    Share your invite link with friends and family.
                 </Box>
                 <Box
                     sx={{
@@ -110,12 +116,22 @@ export const SpaceInviteFriendsDialog: React.FC<
                         mt: "22px",
                     }}
                 >
-                    <Box
+                    <SpaceShareInviteButton
                         className="green-bg"
-                        component="button"
-                        type="button"
-                        disabled={sharing}
-                        onClick={onShare}
+                        profileLink={profileLink}
+                        sharing={sharing}
+                        onShareComplete={onClose}
+                        onShareError={(error) => {
+                            console.error(
+                                "Failed to share space invite",
+                                error,
+                            );
+                            setShareErrorMessage(
+                                "Couldn't share invite. Please try again.",
+                            );
+                        }}
+                        onShareStart={() => setShareErrorMessage(null)}
+                        onSharingChange={onSharingChange}
                         sx={{
                             alignItems: "center",
                             border: 0,
@@ -146,15 +162,8 @@ export const SpaceInviteFriendsDialog: React.FC<
                                 ? undefined
                                 : { filter: "brightness(0.98)" },
                         }}
-                    >
-                        <HugeiconsIcon
-                            icon={Share08Icon}
-                            size={18}
-                            strokeWidth={1.8}
-                        />
-                        {sharing ? "Sharing..." : "Share invite"}
-                    </Box>
-                    {errorMessage && (
+                    />
+                    {shareErrorMessage && (
                         <Box
                             role="alert"
                             sx={{
@@ -167,7 +176,7 @@ export const SpaceInviteFriendsDialog: React.FC<
                                 textAlign: "center",
                             }}
                         >
-                            {errorMessage}
+                            {shareErrorMessage}
                         </Box>
                     )}
                 </Box>

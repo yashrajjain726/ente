@@ -2,7 +2,6 @@ import type { FriendProfile } from "data/friends";
 import { apiOrigin } from "ente-base/origins";
 import type { SpaceAccountCtxHandle } from "ente-wasm";
 import type { PendingSpaceInvite } from "services/spaceInvite";
-import { spaceInviteURL } from "services/spaceInvite";
 import {
     ensureCurrentSpaceContext,
     releaseCurrentSpaceContext,
@@ -212,13 +211,6 @@ export type SpacePostAssetURLLoader = (
 export type SpacePostAvatarURLLoader = (
     post: SpacePost,
 ) => Promise<string | null>;
-
-export interface SpaceLink {
-    url: string;
-    spaceId: string;
-    spaceSlug: string;
-    spaceUsername: string;
-}
 
 export interface PublicSpaceIdentity {
     spaceId: string;
@@ -799,28 +791,6 @@ const messageActivityFromSpaceActivity = async (
         post,
         type: activity.type,
     };
-};
-
-export const createCurrentProfileLink = async (
-    spaceId: string,
-): Promise<SpaceLink> => {
-    const ctx = await ensureCurrentSpaceContext();
-    try {
-        const spaceProfile = (await ctx.get_space_profile(
-            spaceId,
-        )) as SpaceProfileResponse;
-        const invite: PendingSpaceInvite = {
-            spaceUsername: spaceProfile.spaceSlug,
-        };
-        return {
-            url: spaceInviteURL(invite),
-            spaceId: spaceProfile.spaceId,
-            spaceSlug: spaceProfile.spaceSlug,
-            spaceUsername: invite.spaceUsername,
-        };
-    } finally {
-        releaseCurrentSpaceContext(ctx);
-    }
 };
 
 export const joinSpaceInvite = async ({
