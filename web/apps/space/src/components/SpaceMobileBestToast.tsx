@@ -21,7 +21,6 @@ export const SpaceMobileBestToast: React.FC = () => {
                 alignItems: "center",
                 bgcolor: "#FFFFFF",
                 borderRadius: "18px",
-                bottom: "calc(env(safe-area-inset-bottom) + 24px)",
                 boxShadow: "0 12px 32px rgba(0, 0, 0, 0.18)",
                 boxSizing: "border-box",
                 color: "#000000",
@@ -37,6 +36,7 @@ export const SpaceMobileBestToast: React.FC = () => {
                 pr: "6px",
                 py: "4px",
                 right: "calc(env(safe-area-inset-right) + 24px)",
+                top: "calc(env(safe-area-inset-top) + 24px)",
                 width: 336,
                 zIndex: 20,
             }}
