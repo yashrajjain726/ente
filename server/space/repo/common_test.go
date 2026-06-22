@@ -15,7 +15,7 @@ func TestValidateSpaceSlugMatchesClientRules(t *testing.T) {
 	}{
 		{name: "letters", input: "alice", normalized: "alice"},
 		{name: "numbers", input: "user123", normalized: "user123"},
-		{name: "allowed separators", input: "my.space-name_1", normalized: "my.space-name_1"},
+		{name: "allowed separators", input: "my.space_name1", normalized: "my.space_name1"},
 		{name: "normalizes case and spaces", input: " Alice_123 ", normalized: "alice_123"},
 		{name: "thirty chars", input: strings.Repeat("a", 30), normalized: strings.Repeat("a", 30)},
 	} {
@@ -39,6 +39,7 @@ func TestValidateSpaceSlugRejectsInvalidClientSlugs(t *testing.T) {
 		{name: "leading dot", input: ".alice", message: "spaceSlug can only contain"},
 		{name: "leading dash", input: "-alice", message: "spaceSlug can only contain"},
 		{name: "leading underscore", input: "_alice", message: "spaceSlug can only contain"},
+		{name: "inner dash", input: "ali-ce", message: "spaceSlug can only contain"},
 		{name: "space", input: "ali ce", message: "spaceSlug can only contain"},
 		{name: "slash", input: "ali/ce", message: "spaceSlug can only contain"},
 		{name: "control character", input: "ali\nce", message: "spaceSlug can only contain"},
@@ -56,7 +57,6 @@ func TestReservedSpaceSlugListBuildsLookup(t *testing.T) {
 	seen := make(map[string]struct{}, len(reservedSpaceSlugList))
 	for _, slug := range reservedSpaceSlugList {
 		require.Equal(t, slug, normalizeSlug(slug))
-		require.True(t, spaceSlugPattern.MatchString(slug))
 
 		_, ok := seen[slug]
 		require.False(t, ok, "duplicate reserved space slug: %s", slug)

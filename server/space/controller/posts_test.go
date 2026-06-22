@@ -11,7 +11,7 @@ import (
 func TestPostLikeRejectsOwnPost(t *testing.T) {
 	controller, repos, ctx := setupPostsControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-own-post-like@example.com", "alice-public")
-	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-own-post-like", "alice-space-key", "alice-own-post-like-public", "alice-own-post-like-secret", "alice-own-post-like-secret-nonce", "alice-profile")
+	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice_own_post_like", "alice-space-key", "alice-own-post-like-public", "alice-own-post-like-secret", "alice-own-post-like-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	postID, err := repos.Posts.CreatePost(ctx, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
@@ -24,7 +24,7 @@ func TestPostLikeRejectsOwnPost(t *testing.T) {
 func TestCreatePostRequiresAssetMetadataCipher(t *testing.T) {
 	controller, repos, ctx := setupPostsControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-metadata-post@example.com", "alice-public")
-	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-metadata-post", "alice-space-key", "alice-metadata-post-public", "alice-metadata-post-secret", "alice-metadata-post-secret-nonce", "alice-profile")
+	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice_metadata_post", "alice-space-key", "alice-metadata-post-public", "alice-metadata-post-secret", "alice-metadata-post-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 
 	_, err = controller.Create(newSpaceControllerContext(aliceID), models.CreatePostRequest{

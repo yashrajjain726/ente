@@ -14,7 +14,7 @@ const (
 	maxSpaceSlugLength = 30
 )
 
-var spaceSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
+var spaceSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._]*$`)
 
 func normalizeSlug(input string) string {
 	return strings.ToLower(strings.TrimSpace(input))
@@ -38,11 +38,11 @@ func validateSpaceSlug(input string) (string, error) {
 	if len(slug) < minSpaceSlugLength || len(slug) > maxSpaceSlugLength {
 		return "", ente.NewBadRequestWithMessage("spaceSlug must be 3-30 characters")
 	}
-	if !spaceSlugPattern.MatchString(slug) {
-		return "", ente.NewBadRequestWithMessage("spaceSlug can only contain lowercase letters, numbers, dots, dashes, or underscores, and must start with a letter or number")
-	}
 	if isReservedSpaceSlug(slug) {
 		return "", ente.NewBadRequestWithMessage("spaceSlug is reserved")
+	}
+	if !spaceSlugPattern.MatchString(slug) {
+		return "", ente.NewBadRequestWithMessage("spaceSlug can only contain lowercase letters, numbers, dots, or underscores, and must start with a letter or number")
 	}
 	return slug, nil
 }
