@@ -1,13 +1,12 @@
-use base64::{Engine, engine::general_purpose::STANDARD};
-use ente_core::crypto::{Key, Nonce, PublicKey, SecretKey, blob, hash, kdf, sealed, secretbox};
+use ente_core::crypto::{
+    Key, Nonce, PublicKey, SecretKey, blob, encode_b64, hash, kdf, sealed, secretbox,
+};
 use md5::{Digest, Md5};
 
 use crate::error::{Result, SpaceError};
 
-pub const SECRETBOX_NONCE_BYTES: usize = Nonce::BYTES;
-pub const SECRETBOX_MAC_BYTES: usize = secretbox::MAC_BYTES;
-pub const SECRETBOX_PAYLOAD_OVERHEAD_BYTES: usize = SECRETBOX_NONCE_BYTES + SECRETBOX_MAC_BYTES;
-pub const ASSET_PAYLOAD_OVERHEAD_BYTES: usize = blob::HEADER_BYTES + blob::ABYTES;
+pub(crate) const SECRETBOX_PAYLOAD_OVERHEAD_BYTES: usize = Nonce::BYTES + secretbox::MAC_BYTES;
+pub(crate) const ASSET_PAYLOAD_OVERHEAD_BYTES: usize = blob::HEADER_BYTES + blob::ABYTES;
 const SPACE_LINK_ACCESS_KEY_LEN: usize = 12;
 const SPACE_LINK_ACCESS_KEY_ALPHABET: &[u8] =
     b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -92,17 +91,9 @@ pub fn space_link_access_key_material(access_key: &str) -> Result<Vec<u8>> {
     hash::hash_default(trimmed.as_bytes()).map_err(Into::into)
 }
 
-pub fn encode_b64(bytes: &[u8]) -> String {
-    STANDARD.encode(bytes)
-}
-
 pub fn content_md5_base64(bytes: &[u8]) -> String {
     let digest = Md5::digest(bytes);
     encode_b64(&digest)
-}
-
-pub fn decode_b64(value: &str) -> Result<Vec<u8>> {
-    Ok(STANDARD.decode(value.trim())?)
 }
 
 pub fn derive_space_link_auth_key(access_key: &[u8]) -> Result<Vec<u8>> {

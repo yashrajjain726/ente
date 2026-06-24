@@ -2634,7 +2634,6 @@ dependencies = [
 name = "ente-space"
 version = "0.0.1"
 dependencies = [
- "base64 0.22.1",
  "ente-core",
  "md-5 0.11.0",
  "mockito",

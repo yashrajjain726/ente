@@ -1,4 +1,3 @@
-use base64::DecodeError;
 use ente_core::{auth::AuthError, crypto::CryptoError, http::Error as HttpError};
 use thiserror::Error;
 
@@ -12,9 +11,6 @@ pub enum SpaceError {
 
     #[error(transparent)]
     Auth(#[from] AuthError),
-
-    #[error(transparent)]
-    Base64(#[from] DecodeError),
 
     #[error("invalid input: {0}")]
     InvalidInput(String),

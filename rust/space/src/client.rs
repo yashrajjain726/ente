@@ -4,8 +4,8 @@ use std::{
 };
 
 use crate::crypto::{
-    ASSET_PAYLOAD_OVERHEAD_BYTES, SECRETBOX_PAYLOAD_OVERHEAD_BYTES, content_md5_base64, decode_b64,
-    decrypt_secretbox_payload, derive_space_link_auth_key, derive_space_link_wrap_key, encode_b64,
+    ASSET_PAYLOAD_OVERHEAD_BYTES, SECRETBOX_PAYLOAD_OVERHEAD_BYTES, content_md5_base64,
+    decrypt_secretbox_payload, derive_space_link_auth_key, derive_space_link_wrap_key,
     encrypt_asset_payload, encrypt_secretbox_payload, generate_key, generate_keypair,
     generate_space_link_access_key, open_with_keypair, seal_with_public_key,
     space_link_access_key_material,
@@ -32,7 +32,10 @@ use crate::transport::{
     UpdatePostCaptionRequest, UpdateSpaceProfileRequest, UpdateSpaceProfileResponse,
     UpdateSpaceSlugRequest,
 };
-use ente_core::http::Error as HttpError;
+use ente_core::{
+    crypto::{decode_b64, encode_b64},
+    http::Error as HttpError,
+};
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
 const UPLOAD_PURPOSE_COVER: &str = "cover";
 const MESSAGE_KIND_REGULAR: &str = "regular";

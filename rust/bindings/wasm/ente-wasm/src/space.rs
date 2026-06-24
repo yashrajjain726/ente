@@ -1,12 +1,14 @@
 //! WASM bindings for space flows.
 
-use ente_core::http::Error as HttpError;
+use ente_core::{
+    crypto::{decode_b64, encode_b64},
+    http::Error as HttpError,
+};
 use ente_space::{
     AccountSpaceCtx, CreatedSpace, CreatedSpaceLink, DecryptedMessage, DecryptedPost,
     DecryptedSpaceProfile, MessageConversationActivity, MessageConversationPost, MessageResponse,
     OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostResponse, ProfileAvatarResponse,
     ProfileCoverResponse, SpaceActorResponse, SpaceError as CoreSpaceError, SpaceLinkCtx,
-    crypto::{decode_b64, encode_b64},
 };
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen as swb;
@@ -50,7 +52,6 @@ impl From<CoreSpaceError> for WasmSpaceError {
             CoreSpaceError::Http(HttpError::Parse(_)) => ("parse", None),
             CoreSpaceError::Crypto(_) => ("crypto", None),
             CoreSpaceError::Auth(_) => ("auth", None),
-            CoreSpaceError::Base64(_) => ("base64", None),
             CoreSpaceError::InvalidInput(_) => ("invalid_input", None),
             CoreSpaceError::MissingPrivateKey => ("missing_private_key", None),
             CoreSpaceError::MissingEncryptedSpaceKey => ("missing_encrypted_space_key", None),
@@ -299,7 +300,9 @@ struct FriendRequestJs {
 }
 
 fn decode_b64_field(value: &str) -> Result<Vec<u8>, WasmSpaceError> {
-    decode_b64(value).map_err(Into::into)
+    decode_b64(value)
+        .map_err(CoreSpaceError::from)
+        .map_err(Into::into)
 }
 
 fn utf8_field(bytes: Vec<u8>, field: &str) -> Result<String, WasmSpaceError> {
