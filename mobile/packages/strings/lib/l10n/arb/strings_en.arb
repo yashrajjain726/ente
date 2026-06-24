@@ -242,7 +242,7 @@
   "@noDeleteAccountAction": {
     "description": "Button to proceed with account deletion"
   },
-  "deleteAccountWarning": "This will delete your Ente Auth, Ente Photos, Ente Locker and Ente Space account.",
+  "deleteAccountWarning": "This will delete your Ente Auth, Ente Photos and Ente Locker account.",
   "@deleteAccountWarning": {
     "description": "Warning message shown before account deletion"
   },
