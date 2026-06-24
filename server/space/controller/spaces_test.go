@@ -3,6 +3,7 @@ package controller
 import (
 	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
 	"strconv"
 	"testing"
 
@@ -36,7 +37,7 @@ func TestGetProfileReturnsHistoricalVersion(t *testing.T) {
 	require.Equal(t, space.SpaceID, resp.SpaceID)
 	require.Equal(t, "alice", resp.SpaceSlug)
 	require.Equal(t, 1, resp.Version)
-	require.Equal(t, "alice-profile-v1", resp.EncryptedProfile)
+	require.Equal(t, base64.StdEncoding.EncodeToString([]byte("alice-profile-v1")), resp.EncryptedProfile)
 	require.NotEmpty(t, resp.UpdatedAt)
 	require.Nil(t, resp.Avatar)
 }
@@ -145,11 +146,11 @@ func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
 	ginCtx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(aliceID, 10))
 
 	resp, err := module.Spaces.RotateKey(ginCtx, models.RotateSpaceKeyRequest{
-		SpaceID:           space.SpaceID,
-		KeyVersion:        space.CurrentVersion + 1,
-		EncryptedSpaceKey: "YWxpY2Utc3BhY2Uta2V5LXYy",
-		WrappedPrevKey:    "d3JhcHBlZC1wcmV2LWtleQ==",
-		EncryptedProfile:  "YWxpY2UtcHJvZmlsZS12Mg==",
+		SpaceID:             space.SpaceID,
+		KeyVersion:          space.CurrentVersion + 1,
+		RootWrappedSpaceKey: "YWxpY2Utc3BhY2Uta2V5LXYy",
+		WrappedPrevKey:      "d3JhcHBlZC1wcmV2LWtleQ==",
+		EncryptedProfile:    "YWxpY2UtcHJvZmlsZS12Mg==",
 	})
 
 	require.Nil(t, resp)

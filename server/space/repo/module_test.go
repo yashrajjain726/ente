@@ -27,44 +27,44 @@ func testSpaceBytes(value string) []byte {
 	return []byte(value)
 }
 
-func testCreateSpace(ctx context.Context, module *Module, ownerID int64, spaceSlug string, encryptedSpaceKey string, publicKey string, encryptedSecretKey string, _ string, encryptedProfile string) (*SpaceRecord, error) {
-	return module.Spaces.CreateSpace(ctx, ownerID, spaceSlug, testSpaceBytes(encryptedSpaceKey), testSpaceBytes(publicKey), testSpaceBytes(encryptedSecretKey), testSpaceBytes(encryptedProfile))
+func testCreateSpace(ctx context.Context, module *Module, ownerID int64, spaceSlug string, rootWrappedSpaceKey string, publicKey string, encryptedSecretKey string, _ string, encryptedProfile string) (*SpaceRecord, error) {
+	return module.Spaces.CreateSpace(ctx, ownerID, spaceSlug, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(publicKey), testSpaceBytes(encryptedSecretKey), testSpaceBytes(encryptedProfile))
 }
 
 func testUpdateProfile(ctx context.Context, module *Module, ownerID int64, spaceID string, keyVersion int, encryptedProfile string, avatar *ProfileAssetUpdate, cover *ProfileAssetUpdate, removeAvatar bool, removeCover bool) (*SpaceRecord, error) {
 	return module.Spaces.UpdateProfile(ctx, ownerID, spaceID, keyVersion, testSpaceBytes(encryptedProfile), avatar, cover, removeAvatar, removeCover)
 }
 
-func testRotateKey(ctx context.Context, module *Module, ownerID int64, spaceID string, keyVersion int, encryptedSpaceKey string, wrappedPrevKey string, encryptedProfile string) (*SpaceRecord, error) {
-	return module.Spaces.RotateKey(ctx, ownerID, spaceID, keyVersion, testSpaceBytes(encryptedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile))
+func testRotateKey(ctx context.Context, module *Module, ownerID int64, spaceID string, keyVersion int, rootWrappedSpaceKey string, wrappedPrevKey string, encryptedProfile string) (*SpaceRecord, error) {
+	return module.Spaces.RotateKey(ctx, ownerID, spaceID, keyVersion, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile))
 }
 
-func testAddFriend(ctx context.Context, module *Module, requesterID int64, requesterSpaceID string, targetSpaceID string, targetEncryptedSpaceKey string, targetKeyVersion int, requesterEncryptedSpaceKey string, requesterKeyVersion int) error {
-	return module.Friends.AddFriend(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(targetEncryptedSpaceKey), targetKeyVersion, testSpaceBytes(requesterEncryptedSpaceKey), requesterKeyVersion)
+func testAddFriend(ctx context.Context, module *Module, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey string, targetKeyVersion int, requesterFriendSealedSpaceKey string, requesterKeyVersion int) error {
+	return module.Friends.AddFriend(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion, testSpaceBytes(requesterFriendSealedSpaceKey), requesterKeyVersion)
 }
 
-func testCreateFriendRequest(ctx context.Context, module *Module, requesterID int64, requesterSpaceID string, targetSpaceID string, requesterEncryptedSpaceKey string, requesterKeyVersion int) (*SpaceFriendRequestRecord, bool, error) {
-	return module.Friends.CreateFriendRequest(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(requesterEncryptedSpaceKey), requesterKeyVersion)
+func testCreateFriendRequest(ctx context.Context, module *Module, requesterID int64, requesterSpaceID string, targetSpaceID string, requesterFriendSealedSpaceKey string, requesterKeyVersion int) (*SpaceFriendRequestRecord, bool, error) {
+	return module.Friends.CreateFriendRequest(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(requesterFriendSealedSpaceKey), requesterKeyVersion)
 }
 
-func testConfirmFriendRequest(ctx context.Context, module *Module, targetID int64, targetSpaceID string, requestID int64, targetEncryptedSpaceKey string, targetKeyVersion int) (int64, bool, error) {
-	return module.Friends.ConfirmFriendRequest(ctx, targetID, targetSpaceID, requestID, testSpaceBytes(targetEncryptedSpaceKey), targetKeyVersion)
+func testConfirmFriendRequest(ctx context.Context, module *Module, targetID int64, targetSpaceID string, requestID int64, targetFriendSealedSpaceKey string, targetKeyVersion int) (int64, bool, error) {
+	return module.Friends.ConfirmFriendRequest(ctx, targetID, targetSpaceID, requestID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion)
 }
 
-func testUpsertShare(ctx context.Context, module *Module, spaceID string, friendID int64, friendSpaceID string, encryptedSpaceKey string, keyVersion int) error {
-	return module.Friends.UpsertShare(ctx, spaceID, friendID, friendSpaceID, testSpaceBytes(encryptedSpaceKey), keyVersion)
+func testUpsertShare(ctx context.Context, module *Module, spaceID string, friendID int64, friendSpaceID string, friendSealedSpaceKey string, keyVersion int) error {
+	return module.Friends.UpsertShare(ctx, spaceID, friendID, friendSpaceID, testSpaceBytes(friendSealedSpaceKey), keyVersion)
 }
 
-func testUpdateShare(ctx context.Context, module *Module, spaceID string, friendID int64, friendSpaceID string, encryptedSpaceKey string, keyVersion int) error {
-	return module.Friends.UpdateShare(ctx, spaceID, friendID, friendSpaceID, testSpaceBytes(encryptedSpaceKey), keyVersion)
+func testUpdateShare(ctx context.Context, module *Module, spaceID string, friendID int64, friendSpaceID string, friendSealedSpaceKey string, keyVersion int) error {
+	return module.Friends.UpdateShare(ctx, spaceID, friendID, friendSpaceID, testSpaceBytes(friendSealedSpaceKey), keyVersion)
 }
 
-func testUpsertLink(ctx context.Context, module *Module, spaceID string, authKeyHash []byte, keyVersion int, encryptedSpaceKey string, encryptedAccessKey string) (*SpaceLinkRecord, error) {
-	return module.Links.UpsertLink(ctx, spaceID, authKeyHash, keyVersion, testSpaceBytes(encryptedSpaceKey), testSpaceBytes(encryptedAccessKey))
+func testUpsertLink(ctx context.Context, module *Module, spaceID string, authKeyHash []byte, keyVersion int, linkWrappedSpaceKey string, encryptedAccessKey string) (*SpaceLinkRecord, error) {
+	return module.Links.UpsertLink(ctx, spaceID, authKeyHash, keyVersion, testSpaceBytes(linkWrappedSpaceKey), testSpaceBytes(encryptedAccessKey))
 }
 
-func testRotateLink(ctx context.Context, module *Module, spaceID string, authKeyHash []byte, keyVersion int, encryptedSpaceKey string, encryptedAccessKey string) (*SpaceLinkRecord, error) {
-	return module.Links.RotateLink(ctx, spaceID, authKeyHash, keyVersion, testSpaceBytes(encryptedSpaceKey), testSpaceBytes(encryptedAccessKey))
+func testRotateLink(ctx context.Context, module *Module, spaceID string, authKeyHash []byte, keyVersion int, linkWrappedSpaceKey string, encryptedAccessKey string) (*SpaceLinkRecord, error) {
+	return module.Links.RotateLink(ctx, spaceID, authKeyHash, keyVersion, testSpaceBytes(linkWrappedSpaceKey), testSpaceBytes(encryptedAccessKey))
 }
 
 func testCreatePost(ctx context.Context, module *Module, ownerID int64, spaceID string, encryptedPostKey string, captionCipher *string, keyVersion int, objects []SpacePostAssetRecord) (int64, error) {
@@ -696,10 +696,10 @@ func TestConfirmFriendRequestCreatesFriendshipAndNotifiesRequester(t *testing.T)
 
 	aliceShare, err := module.Friends.GetShareForFriendAndSpace(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, "bob-share-key", aliceShare.EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("bob-share-key"), aliceShare.FriendSealedSpaceKey)
 	bobShare, err := module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, "alice-share-key", bobShare.EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("alice-share-key"), bobShare.FriendSealedSpaceKey)
 	requests, err := module.Friends.ListFriendRequestsForSpace(ctx, aliceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Empty(t, requests)
@@ -992,7 +992,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 		Size:     111,
 	}, nil, false, false)
 	require.NoError(t, err)
-	require.Equal(t, "alice-profile-v2", updatedSpace.EncryptedProfile)
+	require.Equal(t, testSpaceBytes("alice-profile-v2"), updatedSpace.EncryptedProfile)
 	require.Equal(t, "avatar.jpg", updatedSpace.AvatarObjectID.String)
 	require.Equal(t, "b2-eu-cen", updatedSpace.AvatarBucketID.String)
 
@@ -1010,12 +1010,12 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	shares, err := module.Friends.ListSharesForFriend(ctx, bobID)
 	require.NoError(t, err)
 	require.Len(t, shares, 1)
-	require.Equal(t, "alice-share-key", shares[0].EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("alice-share-key"), shares[0].FriendSealedSpaceKey)
 
 	aliceShares, err := module.Friends.ListSharesForFriend(ctx, aliceID)
 	require.NoError(t, err)
 	require.Len(t, aliceShares, 1)
-	require.Equal(t, "bob-share-key", aliceShares[0].EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("bob-share-key"), aliceShares[0].FriendSealedSpaceKey)
 
 	friends, err := module.Friends.ListFriendsForSpace(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
@@ -1139,7 +1139,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 
 	link, err := testUpsertLink(ctx, module, aliceSpace.SpaceID, []byte("hash"), rotatedSpace.CurrentVersion, "space-link-key", "owner-link-secret")
 	require.NoError(t, err)
-	require.Equal(t, "space-link-key", link.EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("space-link-key"), link.LinkWrappedSpaceKey)
 
 	err = module.Links.CreateSession(ctx, []byte("token-hash"), link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.NMinFromNow(30))
 	require.NoError(t, err)
@@ -1306,12 +1306,12 @@ func TestAddFriendCreatesReciprocalSharesAndEvent(t *testing.T) {
 
 	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, "alice-share-key", share.EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("alice-share-key"), share.FriendSealedSpaceKey)
 	require.Equal(t, aliceSpace.CurrentVersion, share.KeyVersion)
 
 	reciprocalShare, err := module.Friends.GetShareForFriendAndSpace(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, "bob-share-key", reciprocalShare.EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("bob-share-key"), reciprocalShare.FriendSealedSpaceKey)
 	require.Equal(t, bobSpace.CurrentVersion, reciprocalShare.KeyVersion)
 
 	var eventCount int
@@ -1351,7 +1351,7 @@ func TestAddFriendIsIdempotentForExistingFriends(t *testing.T) {
 	require.NoError(t, err)
 	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, "alice-share-key-v2", share.EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("alice-share-key-v2"), share.FriendSealedSpaceKey)
 	var eventCount int
 	err = module.Friends.DB.QueryRow(`SELECT COUNT(*) FROM space_friend_events WHERE event_type = 'friend_add' AND actor_id = $1 AND target_id = $2`, bobID, aliceID).Scan(&eventCount)
 	require.NoError(t, err)
@@ -1445,7 +1445,7 @@ func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
 	require.NoError(t, err)
 	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, "share-key-v2", share.EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("share-key-v2"), share.FriendSealedSpaceKey)
 	require.Equal(t, rotatedSpace.CurrentVersion, share.KeyVersion)
 
 	err = module.Friends.DeleteShareBySpaceAndFriend(ctx, aliceSpace.SpaceID, bobID, bobSpace.SpaceID)
@@ -1495,7 +1495,7 @@ func TestUpdateProfileRejectsStaleKeyVersion(t *testing.T) {
 	current, err := module.Spaces.GetSpaceByID(ctx, space.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, rotated.CurrentVersion, current.CurrentVersion)
-	require.Equal(t, "alice-profile-v2", current.EncryptedProfile)
+	require.Equal(t, testSpaceBytes("alice-profile-v2"), current.EncryptedProfile)
 }
 
 func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
@@ -1516,7 +1516,7 @@ func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
 	current, err := module.Spaces.GetSpaceByID(ctx, space.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, 2, current.CurrentVersion)
-	require.Equal(t, "alice-space-key-v2", current.EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("alice-space-key-v2"), current.RootWrappedSpaceKey)
 
 	versions, err := module.Spaces.ListVersions(ctx, space.SpaceID)
 	require.NoError(t, err)
@@ -1565,7 +1565,7 @@ func TestUpdateShareRejectsStaleKeyVersion(t *testing.T) {
 
 	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, "share-key-v1", share.EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("share-key-v1"), share.FriendSealedSpaceKey)
 	require.Equal(t, aliceSpace.CurrentVersion, share.KeyVersion)
 }
 
@@ -1579,7 +1579,7 @@ func TestRotateKeyRevokesSpaceLinks(t *testing.T) {
 
 	link, err := testUpsertLink(ctx, module, space.SpaceID, []byte("hash"), space.CurrentVersion, "space-link-key", "owner-link-secret")
 	require.NoError(t, err)
-	require.Equal(t, "space-link-key", link.EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("space-link-key"), link.LinkWrappedSpaceKey)
 
 	err = module.Links.CreateSession(ctx, []byte("token-hash"), link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.NMinFromNow(30))
 	require.NoError(t, err)
@@ -1614,12 +1614,12 @@ func TestGetVersionReturnsHistoricalProfile(t *testing.T) {
 	v1, err := module.Spaces.GetVersion(ctx, space.SpaceID, 1)
 	require.NoError(t, err)
 	require.Equal(t, 1, v1.Version)
-	require.Equal(t, "alice-profile-v1", v1.EncryptedProfile)
+	require.Equal(t, testSpaceBytes("alice-profile-v1"), v1.EncryptedProfile)
 
 	v2, err := module.Spaces.GetVersion(ctx, space.SpaceID, 2)
 	require.NoError(t, err)
 	require.Equal(t, 2, v2.Version)
-	require.Equal(t, "alice-profile-v2", v2.EncryptedProfile)
+	require.Equal(t, testSpaceBytes("alice-profile-v2"), v2.EncryptedProfile)
 }
 
 func TestUpsertLinkReusesExistingLinkWithoutRevokingSessions(t *testing.T) {
@@ -1638,7 +1638,7 @@ func TestUpsertLinkReusesExistingLinkWithoutRevokingSessions(t *testing.T) {
 	reused, err := testUpsertLink(ctx, module, space.SpaceID, []byte("same-hash"), space.CurrentVersion, "new-random-envelope", "new-owner-link-secret")
 	require.NoError(t, err)
 	require.Equal(t, link.AuthKeyHash, reused.AuthKeyHash)
-	require.Equal(t, link.EncryptedSpaceKey, reused.EncryptedSpaceKey)
+	require.Equal(t, link.LinkWrappedSpaceKey, reused.LinkWrappedSpaceKey)
 	require.Equal(t, link.EncryptedAccessKey, reused.EncryptedAccessKey)
 
 	session, err := module.Links.GetSession(ctx, []byte("token-hash"))
@@ -1683,7 +1683,7 @@ func TestDeleteLinkTombstonesAuthHash(t *testing.T) {
 
 	freshLink, err := testUpsertLink(ctx, module, space.SpaceID, []byte("fresh-hash"), space.CurrentVersion, "fresh-space-link-key", "fresh-owner-link-secret")
 	require.NoError(t, err)
-	require.Equal(t, "fresh-space-link-key", freshLink.EncryptedSpaceKey)
+	require.Equal(t, testSpaceBytes("fresh-space-link-key"), freshLink.LinkWrappedSpaceKey)
 }
 
 func TestCreateSessionRejectsStaleLinkAuthHash(t *testing.T) {

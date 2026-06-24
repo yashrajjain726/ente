@@ -247,9 +247,9 @@ impl AccountSpaceCtx {
         share: &FriendShareResponse,
     ) -> Result<DecryptedFriendShare> {
         let identity = self.default_space_identity().await?;
-        let ciphertext = decode_b64(&share.encrypted_space_key)?;
+        let ciphertext = decode_b64(&share.friend_sealed_space_key)?;
         if ciphertext.is_empty() {
-            return Err(SpaceError::MissingEncryptedSpaceKey);
+            return Err(SpaceError::MissingFriendSealedSpaceKey);
         }
         let space_key = open_with_keypair(&ciphertext, &identity.public_key, &identity.secret_key)?;
         Ok(DecryptedFriendShare {
@@ -272,7 +272,7 @@ impl AccountSpaceCtx {
             .into_iter()
             .next()
             .ok_or_else(|| SpaceError::InvalidInput("no owned space is available".into()))?;
-        let packed = decode_b64(&space.encrypted_space_key)?;
+        let packed = decode_b64(&space.root_wrapped_space_key)?;
         let space_key = decrypt_secretbox_payload(&space_root_key, &packed)?;
         Ok((space, space_key))
     }
@@ -304,14 +304,14 @@ impl AccountSpaceCtx {
         profile: &[u8],
     ) -> Result<CreatedSpace> {
         let space_root_key = self.get_or_create_space_root_key().await?;
-        let encrypted_space_key =
+        let root_wrapped_space_key =
             encode_b64(&encrypt_secretbox_payload(&space_root_key, space_key)?);
         let (public_key, secret_key) = generate_keypair()?;
         let encrypted_secret_key = encrypt_secretbox_payload(&space_root_key, &secret_key)?;
         let encrypted_profile = encode_b64(&encrypt_secretbox_payload(space_key, profile)?);
         let request = CreateSpaceRequest {
             space_slug: space_slug.to_owned(),
-            encrypted_space_key: encrypted_space_key.clone(),
+            root_wrapped_space_key: root_wrapped_space_key.clone(),
             public_key: encode_b64(&public_key),
             encrypted_secret_key: encode_b64(&encrypted_secret_key),
             encrypted_profile: encrypted_profile.clone(),
@@ -323,7 +323,7 @@ impl AccountSpaceCtx {
         self.cache_created_owned_space(SpaceKeyResponse {
             space_id: response.space_id.clone(),
             space_slug: response.space_slug.clone(),
-            encrypted_space_key: encrypted_space_key.clone(),
+            root_wrapped_space_key: root_wrapped_space_key.clone(),
             public_key: request.public_key.clone(),
             encrypted_secret_key: request.encrypted_secret_key.clone(),
             encrypted_profile: encrypted_profile.clone(),
@@ -338,7 +338,7 @@ impl AccountSpaceCtx {
             space_slug: response.space_slug,
             key_version: response.key_version,
             space_key: space_key.to_vec(),
-            encrypted_space_key,
+            root_wrapped_space_key,
             encrypted_profile,
         })
     }
@@ -502,7 +502,7 @@ impl AccountSpaceCtx {
         let request = RotateSpaceKeyRequest {
             space_id: space_id.to_owned(),
             key_version: current.key_version,
-            encrypted_space_key: encode_b64(&encrypt_secretbox_payload(
+            root_wrapped_space_key: encode_b64(&encrypt_secretbox_payload(
                 &space_root_key,
                 &next_space_key,
             )?),
@@ -525,7 +525,7 @@ impl AccountSpaceCtx {
             space_slug: response.space_slug,
             key_version: response.key_version,
             space_key: next_space_key,
-            encrypted_space_key: request.encrypted_space_key,
+            root_wrapped_space_key: request.root_wrapped_space_key,
             encrypted_profile: request.encrypted_profile,
         })
     }
@@ -909,7 +909,7 @@ impl AccountSpaceCtx {
         let mut owned = Vec::with_capacity(owned_records.len());
         if let Some(space_root_key) = space_root_key {
             for record in owned_records {
-                let packed = decode_b64(&record.encrypted_space_key)?;
+                let packed = decode_b64(&record.root_wrapped_space_key)?;
                 let space_key = decrypt_secretbox_payload(&space_root_key, &packed)?;
                 owned.push((record.space_id, space_key));
             }
@@ -1325,7 +1325,7 @@ impl AccountSpaceCtx {
             target_space_id: Some(target_space_id.to_owned()),
             target_username: None,
             requester_space_id: requester_space.space_id,
-            requester_encrypted_space_key: encode_b64(&requester_share),
+            requester_friend_sealed_space_key: encode_b64(&requester_share),
             requester_key_version: requester_space.key_version,
         };
         self.client
@@ -1376,7 +1376,7 @@ impl AccountSpaceCtx {
         let (target_space, target_space_key) = self.default_profile_space_access().await?;
         let target_share = seal_with_public_key(&target_space_key, &requester_public_key)?;
         let payload = ConfirmFriendRequestPayload {
-            target_encrypted_space_key: encode_b64(&target_share),
+            target_friend_sealed_space_key: encode_b64(&target_share),
             target_key_version: target_space.key_version,
         };
         let path = format!("/space/friends/requests/{request_id}/confirm");
@@ -1458,7 +1458,7 @@ impl AccountSpaceCtx {
             let sealed_share = seal_with_public_key(&access.space_key, &public_key)?;
             updates.push(ShareUpdatePayload {
                 friend_space_id: friend.friend.space_id,
-                encrypted_space_key: encode_b64(&sealed_share),
+                friend_sealed_space_key: encode_b64(&sealed_share),
             });
         }
         if updates.is_empty() {
@@ -1520,7 +1520,7 @@ impl AccountSpaceCtx {
             space_id: space_id.to_owned(),
             auth_key: encode_b64(&auth_key),
             key_version: access.key_version,
-            encrypted_space_key: encode_b64(&encrypt_secretbox_payload(
+            link_wrapped_space_key: encode_b64(&encrypt_secretbox_payload(
                 &wrap_key,
                 &access.space_key,
             )?),
@@ -1589,7 +1589,7 @@ impl AccountSpaceCtx {
         let Some(record) = spaces.into_iter().find(|value| value.space_id == space_id) else {
             return Ok(None);
         };
-        let packed = decode_b64(&record.encrypted_space_key)?;
+        let packed = decode_b64(&record.root_wrapped_space_key)?;
         let space_key = decrypt_secretbox_payload(&space_root_key, &packed)?;
         Ok(Some(ResolvedOwnedSpaceAccess {
             space_root_key,
@@ -1875,7 +1875,7 @@ impl SpaceLinkCtx {
             .await?;
         client.set_auth_token(Some(response.session_token.clone()));
         let space_key =
-            decrypt_secretbox_payload(&wrap_key, &decode_b64(&response.encrypted_space_key)?)?;
+            decrypt_secretbox_payload(&wrap_key, &decode_b64(&response.link_wrapped_space_key)?)?;
         Ok(Self {
             client,
             session_token: response.session_token,
@@ -2308,7 +2308,7 @@ mod tests {
         json!([{
             "spaceId": space_id,
             "spaceSlug": space_slug,
-            "encryptedSpaceKey": encode_b64(
+            "rootWrappedSpaceKey": encode_b64(
                 &encrypt_secretbox_payload(space_root_key, space_key).expect("space key wrap")
             ),
             "encryptedProfile": "",
@@ -2355,8 +2355,8 @@ mod tests {
             space_link_access_key_material(access_key).expect("access key material");
         let auth_key = derive_space_link_auth_key(&access_key_material).expect("auth key");
         let wrap_key = derive_space_link_wrap_key(&access_key_material).expect("wrap key");
-        let encrypted_space_key = encode_b64(
-            &encrypt_secretbox_payload(&wrap_key, &space_key).expect("encrypted space key"),
+        let link_wrapped_space_key = encode_b64(
+            &encrypt_secretbox_payload(&wrap_key, &space_key).expect("link wrapped space key"),
         );
 
         let lookup = server
@@ -2390,7 +2390,7 @@ mod tests {
                     "spaceSlug": "owner-gallery",
                     "owner": "owner-handle",
                     "keyVersion": 3,
-                    "encryptedSpaceKey": encrypted_space_key,
+                    "linkWrappedSpaceKey": link_wrapped_space_key,
                     "encryptedProfile": "",
                 })
                 .to_string(),
@@ -2431,8 +2431,9 @@ mod tests {
             derive_space_link_auth_key(&wrong_access_key_material).expect("auth key");
         let correct_wrap_key =
             derive_space_link_wrap_key(&correct_access_key_material).expect("wrap key");
-        let encrypted_space_key = encode_b64(
-            &encrypt_secretbox_payload(&correct_wrap_key, &space_key).expect("encrypted space key"),
+        let link_wrapped_space_key = encode_b64(
+            &encrypt_secretbox_payload(&correct_wrap_key, &space_key)
+                .expect("link wrapped space key"),
         );
 
         let lookup = server
@@ -2466,7 +2467,7 @@ mod tests {
                     "spaceSlug": "owner-gallery",
                     "owner": "owner-handle",
                     "keyVersion": 3,
-                    "encryptedSpaceKey": encrypted_space_key,
+                    "linkWrappedSpaceKey": link_wrapped_space_key,
                 })
                 .to_string(),
             )
@@ -2643,7 +2644,7 @@ mod tests {
         );
         let sealed_share = seal_with_public_key(&friend_space_key, &test_public_key(&ctx))
             .expect("friend share seal");
-        let encrypted_space_key = encode_b64(&sealed_share);
+        let friend_sealed_space_key = encode_b64(&sealed_share);
 
         let spaces = server
             .mock("GET", "/space")
@@ -2668,7 +2669,7 @@ mod tests {
                     "friend": "friend",
                     "spaceId": "space_friend",
                     "spaceSlug": "friend",
-                    "encryptedSpaceKey": encrypted_space_key,
+                    "friendSealedSpaceKey": friend_sealed_space_key,
                     "keyVersion": 1
                 }])
                 .to_string(),
@@ -3121,7 +3122,7 @@ mod tests {
             .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
                 Matcher::Regex("\"spaceSlug\":\"owner-main\"".into()),
-                Matcher::Regex("\"encryptedSpaceKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"rootWrappedSpaceKey\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"publicKey\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"encryptedSecretKey\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"encryptedProfile\":\"[^\"]+\"".into()),
@@ -3131,7 +3132,7 @@ mod tests {
                 json!({
                     "spaceId": "space_owner_main",
                     "spaceSlug": "owner-main",
-                    "encryptedSpaceKey": "",
+                    "rootWrappedSpaceKey": "",
                     "encryptedProfile": "",
                     "keyVersion": 1
                 })
@@ -3177,7 +3178,7 @@ mod tests {
                 json!({
                     "spaceId": "space_owner_main",
                     "spaceSlug": "owner-main",
-                    "encryptedSpaceKey": "",
+                    "rootWrappedSpaceKey": "",
                     "encryptedProfile": "",
                     "keyVersion": 1
                 })
@@ -3260,7 +3261,10 @@ mod tests {
         assert_eq!(second.len(), 1);
         assert_eq!(second[0].space_id, first[0].space_id);
         assert_eq!(second[0].space_slug, first[0].space_slug);
-        assert_eq!(second[0].encrypted_space_key, first[0].encrypted_space_key);
+        assert_eq!(
+            second[0].root_wrapped_space_key,
+            first[0].root_wrapped_space_key
+        );
         assert_eq!(second[0].key_version, first[0].key_version);
         list_spaces.assert_async().await;
     }
@@ -3279,7 +3283,7 @@ mod tests {
                 json!([{
                     "spaceId": "space_owner_main",
                     "spaceSlug": "owner-main",
-                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &space_key).expect("space key wrap")),
+                    "rootWrappedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &space_key).expect("space key wrap")),
                     "encryptedProfile": "",
                     "keyVersion": 3
                 }])
@@ -3504,7 +3508,7 @@ mod tests {
                 json!([{
                     "spaceId": "space_viewer_main",
                     "spaceSlug": "viewer-main",
-                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &requester_space_key).expect("space key wrap")),
+                    "rootWrappedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &requester_space_key).expect("space key wrap")),
                     "encryptedProfile": "",
                     "keyVersion": 4
                 }])
@@ -3519,7 +3523,7 @@ mod tests {
                 Matcher::Regex("\"targetSpaceId\":\"space_owner_main\"".into()),
                 Matcher::Regex("\"requesterSpaceId\":\"space_viewer_main\"".into()),
                 Matcher::Regex("\"requesterKeyVersion\":4".into()),
-                Matcher::Regex("\"requesterEncryptedSpaceKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"requesterFriendSealedSpaceKey\":\"[^\"]+\"".into()),
             ]))
             .with_status(200)
             .with_body(json!({"status": "requested"}).to_string())
@@ -3996,7 +4000,7 @@ mod tests {
                 json!([{
                     "spaceId": "space_owner_main",
                     "spaceSlug": "owner-main",
-                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &space_key).expect("space key wrap")),
+                    "rootWrappedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &space_key).expect("space key wrap")),
                     "encryptedProfile": "",
                     "keyVersion": 3
                 }])
@@ -4106,7 +4110,7 @@ mod tests {
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
                 Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"keyVersion\":3".into()),
-                Matcher::Regex("\"encryptedSpaceKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"linkWrappedSpaceKey\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"encryptedAccessKey\":\"[^\"]+\"".into()),
             ]))
             .with_status(200)
@@ -4131,7 +4135,7 @@ mod tests {
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
                 Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"keyVersion\":3".into()),
-                Matcher::Regex("\"encryptedSpaceKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"linkWrappedSpaceKey\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"encryptedAccessKey\":\"[^\"]+\"".into()),
             ]))
             .with_status(200)
@@ -4220,7 +4224,7 @@ mod tests {
                 Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
                 Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"keyVersion\":3".into()),
-                Matcher::Regex("\"encryptedSpaceKey\":\"[^\"]+\"".into()),
+                Matcher::Regex("\"linkWrappedSpaceKey\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"encryptedAccessKey\":\"[^\"]+\"".into()),
             ]))
             .with_status(200)
@@ -4366,7 +4370,7 @@ mod tests {
                 json!([{
                     "spaceId": "space_owner_gallery",
                     "spaceSlug": "owner-gallery",
-                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &space_key).expect("space key wrap")),
+                    "rootWrappedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &space_key).expect("space key wrap")),
                     "encryptedProfile": "",
                     "keyVersion": 3
                 }])
@@ -4432,7 +4436,7 @@ mod tests {
                 json!([{
                     "spaceId": "space_owner_gallery",
                     "spaceSlug": "owner-gallery",
-                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &owned_space_key).expect("owned wrap")),
+                    "rootWrappedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &owned_space_key).expect("owned wrap")),
                     "encryptedProfile": "",
                     "keyVersion": 1
                 }])
@@ -4449,7 +4453,7 @@ mod tests {
                     "friend": "owner",
                     "spaceId": "space_shared_gallery",
                     "spaceSlug": "shared-gallery",
-                    "encryptedSpaceKey": encode_b64(&sealed_share),
+                    "friendSealedSpaceKey": encode_b64(&sealed_share),
                     "encryptedProfile": "",
                     "keyVersion": 4
                 }])

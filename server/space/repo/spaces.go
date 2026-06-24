@@ -9,7 +9,7 @@ import (
 	"github.com/ente-io/stacktrace"
 )
 
-func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, spaceSlug string, encryptedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile []byte) (*SpaceRecord, error) {
+func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, spaceSlug string, rootWrappedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile []byte) (*SpaceRecord, error) {
 	normalizedSpaceSlug, err := validateSpaceSlug(spaceSlug)
 	if err != nil {
 		return nil, err
@@ -22,15 +22,15 @@ func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, space
 	defer tx.Rollback()
 
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO spaces (space_id, owner_id, space_slug, encrypted_space_key, public_key, encrypted_secret_key, encrypted_profile, current_version)
+		INSERT INTO spaces (space_id, owner_id, space_slug, root_wrapped_space_key, public_key, encrypted_secret_key, encrypted_profile, current_version)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
-	`, spaceID, ownerID, normalizedSpaceSlug, encryptedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile); err != nil {
+	`, spaceID, ownerID, normalizedSpaceSlug, rootWrappedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile); err != nil {
 		return nil, wrapUnique(err, "space already exists")
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO space_key_versions (space_id, version, encrypted_space_key, encrypted_profile)
+		INSERT INTO space_key_versions (space_id, version, root_wrapped_space_key, encrypted_profile)
 		VALUES ($1, 1, $2, $3)
-	`, spaceID, encryptedSpaceKey, encryptedProfile); err != nil {
+	`, spaceID, rootWrappedSpaceKey, encryptedProfile); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	rec, err := scanSpaceRecord(tx.QueryRowContext(ctx, `
@@ -217,7 +217,7 @@ func (r *SpacesRepository) UpdateSlug(ctx context.Context, ownerID int64, spaceI
 	return rec, nil
 }
 
-func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID string, keyVersion int, encryptedSpaceKey, wrappedPrevKey, encryptedProfile []byte) (*SpaceRecord, error) {
+func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID string, keyVersion int, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile []byte) (*SpaceRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -241,16 +241,16 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID
 	}
 	newVersion := current.CurrentVersion + 1
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO space_key_versions (space_id, version, encrypted_space_key, encrypted_profile, wrapped_prev_key)
+		INSERT INTO space_key_versions (space_id, version, root_wrapped_space_key, encrypted_profile, wrapped_prev_key)
 		VALUES ($1, $2, $3, $4, $5)
-	`, spaceID, newVersion, encryptedSpaceKey, encryptedProfile, wrappedPrevKey); err != nil {
+	`, spaceID, newVersion, rootWrappedSpaceKey, encryptedProfile, wrappedPrevKey); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE spaces
-		SET encrypted_space_key = $1, encrypted_profile = $2, current_version = $3
+		SET root_wrapped_space_key = $1, encrypted_profile = $2, current_version = $3
 		WHERE owner_id = $4 AND space_id = $5
-	`, encryptedSpaceKey, encryptedProfile, newVersion, ownerID, spaceID); err != nil {
+	`, rootWrappedSpaceKey, encryptedProfile, newVersion, ownerID, spaceID); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	if err := deleteLinkTx(ctx, tx, spaceID); err != nil {
@@ -273,7 +273,7 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID
 
 func (r *SpacesRepository) ListVersions(ctx context.Context, spaceID string) ([]SpaceVersionRecord, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT space_id, version, encrypted_space_key, encrypted_profile, wrapped_prev_key, created_at
+		SELECT space_id, version, root_wrapped_space_key, encrypted_profile, wrapped_prev_key, created_at
 		FROM space_key_versions
 		WHERE space_id = $1
 		ORDER BY version DESC
@@ -285,7 +285,7 @@ func (r *SpacesRepository) ListVersions(ctx context.Context, spaceID string) ([]
 	var versions []SpaceVersionRecord
 	for rows.Next() {
 		var rec SpaceVersionRecord
-		if err := rows.Scan(&rec.SpaceID, &rec.Version, &rec.EncryptedSpaceKey, &rec.EncryptedProfile, &rec.WrappedPrevKey, &rec.CreatedAt); err != nil {
+		if err := rows.Scan(&rec.SpaceID, &rec.Version, &rec.RootWrappedSpaceKey, &rec.EncryptedProfile, &rec.WrappedPrevKey, &rec.CreatedAt); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		versions = append(versions, rec)
@@ -295,12 +295,12 @@ func (r *SpacesRepository) ListVersions(ctx context.Context, spaceID string) ([]
 
 func (r *SpacesRepository) GetVersion(ctx context.Context, spaceID string, version int) (*SpaceVersionRecord, error) {
 	row := r.DB.QueryRowContext(ctx, `
-		SELECT space_id, version, encrypted_space_key, encrypted_profile, wrapped_prev_key, created_at
+		SELECT space_id, version, root_wrapped_space_key, encrypted_profile, wrapped_prev_key, created_at
 		FROM space_key_versions
 		WHERE space_id = $1 AND version = $2
 	`, spaceID, version)
 	var rec SpaceVersionRecord
-	if err := row.Scan(&rec.SpaceID, &rec.Version, &rec.EncryptedSpaceKey, &rec.EncryptedProfile, &rec.WrappedPrevKey, &rec.CreatedAt); err != nil {
+	if err := row.Scan(&rec.SpaceID, &rec.Version, &rec.RootWrappedSpaceKey, &rec.EncryptedProfile, &rec.WrappedPrevKey, &rec.CreatedAt); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil
@@ -312,7 +312,7 @@ func scanSpaceRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceRecord
 		&rec.SpaceID,
 		&rec.OwnerID,
 		&rec.SpaceSlug,
-		&rec.EncryptedSpaceKey,
+		&rec.RootWrappedSpaceKey,
 		&rec.EncryptedProfile,
 		&rec.CurrentVersion,
 		&rec.PublicKey,

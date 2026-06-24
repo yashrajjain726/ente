@@ -21,11 +21,11 @@ func TestCreateSpaceLinkReturnsExistingActiveLink(t *testing.T) {
 	}
 
 	resp, err := module.Links.Create(newSpaceControllerContext(aliceID), models.SpaceLinkCreateRequest{
-		SpaceID:            space.SpaceID,
-		AuthKey:            base64.StdEncoding.EncodeToString(authKey),
-		KeyVersion:         space.CurrentVersion,
-		EncryptedSpaceKey:  base64.StdEncoding.EncodeToString([]byte("new-space-link-key")),
-		EncryptedAccessKey: base64.StdEncoding.EncodeToString([]byte("new-owner-link-secret")),
+		SpaceID:             space.SpaceID,
+		AuthKey:             base64.StdEncoding.EncodeToString(authKey),
+		KeyVersion:          space.CurrentVersion,
+		LinkWrappedSpaceKey: base64.StdEncoding.EncodeToString([]byte("new-space-link-key")),
+		EncryptedAccessKey:  base64.StdEncoding.EncodeToString([]byte("new-owner-link-secret")),
 	})
 
 	require.NoError(t, err)
@@ -34,5 +34,5 @@ func TestCreateSpaceLinkReturnsExistingActiveLink(t *testing.T) {
 	require.Equal(t, existing.SpaceID, resp.SpaceID)
 	require.Equal(t, existing.SpaceSlug, resp.SpaceSlug)
 	require.Equal(t, existing.KeyVersion, resp.KeyVersion)
-	require.Equal(t, existing.EncryptedAccessKey, resp.EncryptedAccessKey)
+	require.Equal(t, base64.StdEncoding.EncodeToString(existing.EncryptedAccessKey), resp.EncryptedAccessKey)
 }

@@ -30,24 +30,24 @@ func testSpaceBytes(value string) []byte {
 	return []byte(value)
 }
 
-func testCreateSpace(ctx context.Context, module *spacerepo.Module, ownerID int64, spaceSlug string, encryptedSpaceKey string, publicKey string, encryptedSecretKey string, _ string, encryptedProfile string) (*spacerepo.SpaceRecord, error) {
-	return module.Spaces.CreateSpace(ctx, ownerID, spaceSlug, testSpaceBytes(encryptedSpaceKey), testSpaceBytes(publicKey), testSpaceBytes(encryptedSecretKey), testSpaceBytes(encryptedProfile))
+func testCreateSpace(ctx context.Context, module *spacerepo.Module, ownerID int64, spaceSlug string, rootWrappedSpaceKey string, publicKey string, encryptedSecretKey string, _ string, encryptedProfile string) (*spacerepo.SpaceRecord, error) {
+	return module.Spaces.CreateSpace(ctx, ownerID, spaceSlug, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(publicKey), testSpaceBytes(encryptedSecretKey), testSpaceBytes(encryptedProfile))
 }
 
 func testUpdateProfile(ctx context.Context, module *spacerepo.Module, ownerID int64, spaceID string, keyVersion int, encryptedProfile string, avatar *spacerepo.ProfileAssetUpdate, cover *spacerepo.ProfileAssetUpdate, removeAvatar bool, removeCover bool) (*spacerepo.SpaceRecord, error) {
 	return module.Spaces.UpdateProfile(ctx, ownerID, spaceID, keyVersion, testSpaceBytes(encryptedProfile), avatar, cover, removeAvatar, removeCover)
 }
 
-func testRotateKey(ctx context.Context, module *spacerepo.Module, ownerID int64, spaceID string, keyVersion int, encryptedSpaceKey string, wrappedPrevKey string, encryptedProfile string) (*spacerepo.SpaceRecord, error) {
-	return module.Spaces.RotateKey(ctx, ownerID, spaceID, keyVersion, testSpaceBytes(encryptedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile))
+func testRotateKey(ctx context.Context, module *spacerepo.Module, ownerID int64, spaceID string, keyVersion int, rootWrappedSpaceKey string, wrappedPrevKey string, encryptedProfile string) (*spacerepo.SpaceRecord, error) {
+	return module.Spaces.RotateKey(ctx, ownerID, spaceID, keyVersion, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile))
 }
 
-func testAddFriend(ctx context.Context, module *spacerepo.Module, requesterID int64, requesterSpaceID string, targetSpaceID string, targetEncryptedSpaceKey string, targetKeyVersion int, requesterEncryptedSpaceKey string, requesterKeyVersion int) error {
-	return module.Friends.AddFriend(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(targetEncryptedSpaceKey), targetKeyVersion, testSpaceBytes(requesterEncryptedSpaceKey), requesterKeyVersion)
+func testAddFriend(ctx context.Context, module *spacerepo.Module, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey string, targetKeyVersion int, requesterFriendSealedSpaceKey string, requesterKeyVersion int) error {
+	return module.Friends.AddFriend(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion, testSpaceBytes(requesterFriendSealedSpaceKey), requesterKeyVersion)
 }
 
-func testUpsertLink(ctx context.Context, module *spacerepo.Module, spaceID string, authKeyHash []byte, keyVersion int, encryptedSpaceKey string, encryptedAccessKey string) (*spacerepo.SpaceLinkRecord, error) {
-	return module.Links.UpsertLink(ctx, spaceID, authKeyHash, keyVersion, testSpaceBytes(encryptedSpaceKey), testSpaceBytes(encryptedAccessKey))
+func testUpsertLink(ctx context.Context, module *spacerepo.Module, spaceID string, authKeyHash []byte, keyVersion int, linkWrappedSpaceKey string, encryptedAccessKey string) (*spacerepo.SpaceLinkRecord, error) {
+	return module.Links.UpsertLink(ctx, spaceID, authKeyHash, keyVersion, testSpaceBytes(linkWrappedSpaceKey), testSpaceBytes(encryptedAccessKey))
 }
 
 func testCreatePost(ctx context.Context, module *spacerepo.Module, ownerID int64, spaceID string, encryptedPostKey string, captionCipher *string, keyVersion int, objects []spacerepo.SpacePostAssetRecord) (int64, error) {

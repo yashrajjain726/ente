@@ -54,7 +54,9 @@ impl From<CoreSpaceError> for WasmSpaceError {
             CoreSpaceError::Auth(_) => ("auth", None),
             CoreSpaceError::InvalidInput(_) => ("invalid_input", None),
             CoreSpaceError::MissingSecretKey => ("missing_secret_key", None),
-            CoreSpaceError::MissingEncryptedSpaceKey => ("missing_encrypted_space_key", None),
+            CoreSpaceError::MissingFriendSealedSpaceKey => {
+                ("missing_friend_sealed_space_key", None)
+            }
             CoreSpaceError::EntityKeyConflict => ("entity_key_conflict", None),
         };
         Self {
@@ -105,7 +107,7 @@ struct CreatedSpaceJs {
     space_slug: String,
     key_version: i32,
     space_key_b64: String,
-    encrypted_space_key: String,
+    root_wrapped_space_key: String,
     encrypted_profile: String,
 }
 
@@ -320,7 +322,7 @@ fn created_space_to_js(value: CreatedSpace) -> CreatedSpaceJs {
         space_slug: value.space_slug,
         key_version: value.key_version,
         space_key_b64: encode_b64(&value.space_key),
-        encrypted_space_key: value.encrypted_space_key,
+        root_wrapped_space_key: value.root_wrapped_space_key,
         encrypted_profile: value.encrypted_profile,
     }
 }

@@ -80,7 +80,7 @@ const spaceRecordSelectColumns = `
 	s.space_id,
 	s.owner_id,
 	s.space_slug,
-	s.encrypted_space_key,
+	s.root_wrapped_space_key,
 	s.encrypted_profile,
 	s.current_version,
 	s.public_key,

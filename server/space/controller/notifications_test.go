@@ -146,10 +146,10 @@ func TestAddFriendSendsEmailOnce(t *testing.T) {
 	bobSpace, err := testCreateSpace(ctx, repos, bobID, "bob_friend_email", "bob-space-key", "bob-friend-email-public", "bob-friend-email-secret", "bob-friend-email-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	req := models.AddFriendPayload{
-		TargetSpaceID:              aliceSpace.SpaceID,
-		RequesterSpaceID:           bobSpace.SpaceID,
-		RequesterEncryptedSpaceKey: base64.StdEncoding.EncodeToString([]byte("bob-requester-key")),
-		RequesterKeyVersion:        bobSpace.CurrentVersion,
+		TargetSpaceID:                 aliceSpace.SpaceID,
+		RequesterSpaceID:              bobSpace.SpaceID,
+		RequesterFriendSealedSpaceKey: base64.StdEncoding.EncodeToString([]byte("bob-requester-key")),
+		RequesterKeyVersion:           bobSpace.CurrentVersion,
 	}
 
 	resp, err := friends.Add(newSpaceControllerContext(bobID), req)
@@ -168,8 +168,8 @@ func TestAddFriendSendsEmailOnce(t *testing.T) {
 	require.Equal(t, bobSpace.SpaceSlug, requests[0].Requester.SpaceSlug)
 
 	resp, err = friends.ConfirmRequest(newSpaceControllerContext(aliceID), base10(requests[0].RequestID), models.ConfirmFriendRequestPayload{
-		TargetEncryptedSpaceKey: base64.StdEncoding.EncodeToString([]byte("alice-target-key")),
-		TargetKeyVersion:        aliceSpace.CurrentVersion,
+		TargetFriendSealedSpaceKey: base64.StdEncoding.EncodeToString([]byte("alice-target-key")),
+		TargetKeyVersion:           aliceSpace.CurrentVersion,
 	})
 	require.NoError(t, err)
 	require.Equal(t, "friend", resp.Status)

@@ -75,13 +75,13 @@ type FriendRelationshipRequest struct {
 }
 
 type SpaceKeyResponse struct {
-	SpaceID            string `json:"spaceId"`
-	SpaceSlug          string `json:"spaceSlug"`
-	EncryptedSpaceKey  string `json:"encryptedSpaceKey"`
-	PublicKey          string `json:"publicKey,omitempty"`
-	EncryptedSecretKey string `json:"encryptedSecretKey,omitempty"`
-	EncryptedProfile   string `json:"encryptedProfile,omitempty"`
-	KeyVersion         int    `json:"keyVersion"`
+	SpaceID             string `json:"spaceId"`
+	SpaceSlug           string `json:"spaceSlug"`
+	RootWrappedSpaceKey string `json:"rootWrappedSpaceKey"`
+	PublicKey           string `json:"publicKey,omitempty"`
+	EncryptedSecretKey  string `json:"encryptedSecretKey,omitempty"`
+	EncryptedProfile    string `json:"encryptedProfile,omitempty"`
+	KeyVersion          int    `json:"keyVersion"`
 }
 
 type PresignUploadRequest struct {
@@ -130,11 +130,11 @@ type SpaceActorResponse struct {
 }
 
 type SpaceLinkCreateRequest struct {
-	SpaceID            string `json:"spaceId"`
-	AuthKey            string `json:"authKey"`
-	KeyVersion         int    `json:"keyVersion"`
-	EncryptedSpaceKey  string `json:"encryptedSpaceKey"`
-	EncryptedAccessKey string `json:"encryptedAccessKey"`
+	SpaceID             string `json:"spaceId"`
+	AuthKey             string `json:"authKey"`
+	KeyVersion          int    `json:"keyVersion"`
+	LinkWrappedSpaceKey string `json:"linkWrappedSpaceKey"`
+	EncryptedAccessKey  string `json:"encryptedAccessKey"`
 }
 
 type SpaceLinkStatusResponse struct {
@@ -153,26 +153,26 @@ type SpaceLinkLoginRequest struct {
 }
 
 type SpaceLinkLoginResponse struct {
-	SessionToken      string `json:"sessionToken"`
-	SpaceID           string `json:"spaceId"`
-	SpaceSlug         string `json:"spaceSlug"`
-	Owner             string `json:"owner"`
-	PublicKey         string `json:"publicKey,omitempty"`
-	KeyVersion        int    `json:"keyVersion"`
-	EncryptedSpaceKey string `json:"encryptedSpaceKey"`
+	SessionToken        string `json:"sessionToken"`
+	SpaceID             string `json:"spaceId"`
+	SpaceSlug           string `json:"spaceSlug"`
+	Owner               string `json:"owner"`
+	PublicKey           string `json:"publicKey,omitempty"`
+	KeyVersion          int    `json:"keyVersion"`
+	LinkWrappedSpaceKey string `json:"linkWrappedSpaceKey"`
 }
 
 type AddFriendPayload struct {
-	TargetSpaceID              string `json:"targetSpaceId,omitempty"`
-	TargetUsername             string `json:"targetUsername,omitempty"`
-	RequesterSpaceID           string `json:"requesterSpaceId"`
-	RequesterEncryptedSpaceKey string `json:"requesterEncryptedSpaceKey"`
-	RequesterKeyVersion        int    `json:"requesterKeyVersion"`
+	TargetSpaceID                 string `json:"targetSpaceId,omitempty"`
+	TargetUsername                string `json:"targetUsername,omitempty"`
+	RequesterSpaceID              string `json:"requesterSpaceId"`
+	RequesterFriendSealedSpaceKey string `json:"requesterFriendSealedSpaceKey"`
+	RequesterKeyVersion           int    `json:"requesterKeyVersion"`
 }
 
 type ConfirmFriendRequestPayload struct {
-	TargetEncryptedSpaceKey string `json:"targetEncryptedSpaceKey"`
-	TargetKeyVersion        int    `json:"targetKeyVersion"`
+	TargetFriendSealedSpaceKey string `json:"targetFriendSealedSpaceKey"`
+	TargetKeyVersion           int    `json:"targetKeyVersion"`
 }
 
 type FriendTargetPayload struct {
@@ -181,11 +181,11 @@ type FriendTargetPayload struct {
 }
 
 type FriendShareResponse struct {
-	Friend            string `json:"friend"`
-	SpaceID           string `json:"spaceId"`
-	SpaceSlug         string `json:"spaceSlug"`
-	EncryptedSpaceKey string `json:"encryptedSpaceKey"`
-	KeyVersion        int    `json:"keyVersion"`
+	Friend               string `json:"friend"`
+	SpaceID              string `json:"spaceId"`
+	SpaceSlug            string `json:"spaceSlug"`
+	FriendSealedSpaceKey string `json:"friendSealedSpaceKey"`
+	KeyVersion           int    `json:"keyVersion"`
 }
 
 type FriendStatusResponse struct {
@@ -219,11 +219,11 @@ type UpdateSpaceProfileResponse struct {
 }
 
 type CreateSpaceRequest struct {
-	SpaceSlug          string `json:"spaceSlug"`
-	EncryptedSpaceKey  string `json:"encryptedSpaceKey"`
-	PublicKey          string `json:"publicKey"`
-	EncryptedSecretKey string `json:"encryptedSecretKey"`
-	EncryptedProfile   string `json:"encryptedProfile"`
+	SpaceSlug           string `json:"spaceSlug"`
+	RootWrappedSpaceKey string `json:"rootWrappedSpaceKey"`
+	PublicKey           string `json:"publicKey"`
+	EncryptedSecretKey  string `json:"encryptedSecretKey"`
+	EncryptedProfile    string `json:"encryptedProfile"`
 }
 
 type SpaceProfileResponse struct {
@@ -253,11 +253,11 @@ type SpaceSlugAvailabilityResponse struct {
 }
 
 type RotateSpaceKeyRequest struct {
-	SpaceID           string `json:"spaceId"`
-	KeyVersion        int    `json:"keyVersion"`
-	EncryptedSpaceKey string `json:"encryptedSpaceKey"`
-	WrappedPrevKey    string `json:"wrappedPrevKey"`
-	EncryptedProfile  string `json:"encryptedProfile"`
+	SpaceID             string `json:"spaceId"`
+	KeyVersion          int    `json:"keyVersion"`
+	RootWrappedSpaceKey string `json:"rootWrappedSpaceKey"`
+	WrappedPrevKey      string `json:"wrappedPrevKey"`
+	EncryptedProfile    string `json:"encryptedProfile"`
 }
 
 type SpaceKeyVersionResponse struct {
@@ -279,8 +279,8 @@ type RefreshFriendSharesRequest struct {
 }
 
 type ShareUpdatePayload struct {
-	FriendSpaceID     string `json:"friendSpaceId"`
-	EncryptedSpaceKey string `json:"encryptedSpaceKey"`
+	FriendSpaceID        string `json:"friendSpaceId"`
+	FriendSealedSpaceKey string `json:"friendSealedSpaceKey"`
 }
 
 type CreatePostRequest struct {

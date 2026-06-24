@@ -35,7 +35,7 @@ pub struct StatusResponse {
 #[serde(rename_all = "camelCase")]
 pub struct CreateSpaceRequest {
     pub space_slug: String,
-    pub encrypted_space_key: String,
+    pub root_wrapped_space_key: String,
     pub public_key: String,
     pub encrypted_secret_key: String,
     pub encrypted_profile: String,
@@ -46,7 +46,7 @@ pub struct CreateSpaceRequest {
 pub struct SpaceKeyResponse {
     pub space_id: String,
     pub space_slug: String,
-    pub encrypted_space_key: String,
+    pub root_wrapped_space_key: String,
     #[serde(default)]
     pub public_key: String,
     #[serde(default)]
@@ -384,7 +384,7 @@ pub struct SpaceProfileResponse {
 #[serde(rename_all = "camelCase")]
 pub struct RotateSpaceKeyRequest {
     pub space_id: String,
-    pub encrypted_space_key: String,
+    pub root_wrapped_space_key: String,
     pub key_version: i32,
     pub wrapped_prev_key: String,
     pub encrypted_profile: String,
@@ -526,14 +526,14 @@ pub struct AddFriendPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_username: Option<String>,
     pub requester_space_id: String,
-    pub requester_encrypted_space_key: String,
+    pub requester_friend_sealed_space_key: String,
     pub requester_key_version: i32,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfirmFriendRequestPayload {
-    pub target_encrypted_space_key: String,
+    pub target_friend_sealed_space_key: String,
     pub target_key_version: i32,
 }
 
@@ -579,7 +579,7 @@ pub struct SpaceFriendRequestResponse {
 #[serde(rename_all = "camelCase")]
 pub struct ShareUpdatePayload {
     pub friend_space_id: String,
-    pub encrypted_space_key: String,
+    pub friend_sealed_space_key: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -596,7 +596,7 @@ pub struct FriendShareResponse {
     pub friend: String,
     pub space_id: String,
     pub space_slug: String,
-    pub encrypted_space_key: String,
+    pub friend_sealed_space_key: String,
     pub key_version: i32,
 }
 
@@ -633,7 +633,7 @@ pub struct SpaceLinkCreateRequest {
     pub space_id: String,
     pub auth_key: String,
     pub key_version: i32,
-    pub encrypted_space_key: String,
+    pub link_wrapped_space_key: String,
     pub encrypted_access_key: String,
 }
 
@@ -654,7 +654,7 @@ pub struct SpaceLinkLoginResponse {
     #[serde(default)]
     pub public_key: String,
     pub key_version: i32,
-    pub encrypted_space_key: String,
+    pub link_wrapped_space_key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -61,13 +61,13 @@ func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreate
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.AuthKey) == "" || strings.TrimSpace(req.EncryptedSpaceKey) == "" || strings.TrimSpace(req.EncryptedAccessKey) == "" || req.KeyVersion <= 0 {
-		return nil, ente.NewBadRequestWithMessage("spaceId, authKey, encryptedSpaceKey, encryptedAccessKey and keyVersion are required")
+	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.AuthKey) == "" || strings.TrimSpace(req.LinkWrappedSpaceKey) == "" || strings.TrimSpace(req.EncryptedAccessKey) == "" || req.KeyVersion <= 0 {
+		return nil, ente.NewBadRequestWithMessage("spaceId, authKey, linkWrappedSpaceKey, encryptedAccessKey and keyVersion are required")
 	}
 	if len(strings.TrimSpace(req.AuthKey)) > maxSpaceEncryptedKeyEncodedBytes {
 		return nil, ente.NewBadRequestWithMessage("authKey is too large")
 	}
-	encryptedSpaceKey, err := decodeEncodedSpaceField("encryptedSpaceKey", req.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	linkWrappedSpaceKey, err := decodeEncodedSpaceField("linkWrappedSpaceKey", req.LinkWrappedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -89,9 +89,9 @@ func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreate
 	sum := sha256.Sum256(authKeyBytes)
 	var link *repo.SpaceLinkRecord
 	if rotate {
-		link, err = c.LinksRepo.RotateLink(ctx.Request.Context(), space.SpaceID, sum[:], req.KeyVersion, encryptedSpaceKey, encryptedAccessKey)
+		link, err = c.LinksRepo.RotateLink(ctx.Request.Context(), space.SpaceID, sum[:], req.KeyVersion, linkWrappedSpaceKey, encryptedAccessKey)
 	} else {
-		link, err = c.LinksRepo.UpsertLink(ctx.Request.Context(), space.SpaceID, sum[:], req.KeyVersion, encryptedSpaceKey, encryptedAccessKey)
+		link, err = c.LinksRepo.UpsertLink(ctx.Request.Context(), space.SpaceID, sum[:], req.KeyVersion, linkWrappedSpaceKey, encryptedAccessKey)
 	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -165,12 +165,12 @@ func (c *LinksController) Login(ctx *gin.Context, req models.SpaceLinkLoginReque
 		return nil, err
 	}
 	return &models.SpaceLinkLoginResponse{
-		SessionToken:      sessionToken,
-		SpaceID:           link.SpaceID,
-		SpaceSlug:         link.SpaceSlug,
-		Owner:             link.OwnerSlug,
-		PublicKey:         encodeSpaceField(publicKey),
-		KeyVersion:        link.KeyVersion,
-		EncryptedSpaceKey: encodeSpaceField(link.EncryptedSpaceKey),
+		SessionToken:        sessionToken,
+		SpaceID:             link.SpaceID,
+		SpaceSlug:           link.SpaceSlug,
+		Owner:               link.OwnerSlug,
+		PublicKey:           encodeSpaceField(publicKey),
+		KeyVersion:          link.KeyVersion,
+		LinkWrappedSpaceKey: encodeSpaceField(link.LinkWrappedSpaceKey),
 	}, nil
 }

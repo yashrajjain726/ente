@@ -49,10 +49,10 @@ func TestAddFriendRejectsOwnSpace(t *testing.T) {
 	require.NoError(t, err)
 
 	resp, err := friends.Add(newSpaceControllerContext(aliceID), models.AddFriendPayload{
-		TargetSpaceID:              aliceSpace.SpaceID,
-		RequesterSpaceID:           aliceSpace.SpaceID,
-		RequesterEncryptedSpaceKey: base64.StdEncoding.EncodeToString([]byte("alice-requester-key")),
-		RequesterKeyVersion:        aliceSpace.CurrentVersion,
+		TargetSpaceID:                 aliceSpace.SpaceID,
+		RequesterSpaceID:              aliceSpace.SpaceID,
+		RequesterFriendSealedSpaceKey: base64.StdEncoding.EncodeToString([]byte("alice-requester-key")),
+		RequesterKeyVersion:           aliceSpace.CurrentVersion,
 	})
 
 	require.Nil(t, resp)

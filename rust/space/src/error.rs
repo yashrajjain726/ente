@@ -18,8 +18,8 @@ pub enum SpaceError {
     #[error("missing secret key material")]
     MissingSecretKey,
 
-    #[error("missing encrypted space key")]
-    MissingEncryptedSpaceKey,
+    #[error("missing friend sealed space key")]
+    MissingFriendSealedSpaceKey,
 
     #[error("entity key conflict")]
     EntityKeyConflict,

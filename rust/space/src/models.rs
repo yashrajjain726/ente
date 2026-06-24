@@ -31,7 +31,7 @@ pub struct CreatedSpace {
     pub space_slug: String,
     pub key_version: i32,
     pub space_key: Vec<u8>,
-    pub encrypted_space_key: String,
+    pub root_wrapped_space_key: String,
     pub encrypted_profile: String,
 }
 
