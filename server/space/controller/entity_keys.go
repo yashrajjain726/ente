@@ -28,10 +28,11 @@ func (c *EntityKeysController) CreateKey(ctx *gin.Context, req models.SpaceEntit
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(req.EncryptedKey) == "" || strings.TrimSpace(req.Header) == "" {
-		return ente.NewBadRequestWithMessage("encryptedKey and header are required")
+	encryptedKey, err := decodeEncodedSpaceField("encryptedKey", req.EncryptedKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	if err != nil {
+		return err
 	}
-	return c.EntityKeysRepo.CreateKey(ctx.Request.Context(), userID, keyType, strings.TrimSpace(req.EncryptedKey), strings.TrimSpace(req.Header))
+	return c.EntityKeysRepo.CreateKey(ctx.Request.Context(), userID, keyType, encryptedKey)
 }
 
 func (c *EntityKeysController) EnsureKey(ctx *gin.Context, req models.SpaceEntityKeyRequest) (*models.SpaceEntityKeyResponse, error) {
@@ -43,10 +44,11 @@ func (c *EntityKeysController) EnsureKey(ctx *gin.Context, req models.SpaceEntit
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.EncryptedKey) == "" || strings.TrimSpace(req.Header) == "" {
-		return nil, ente.NewBadRequestWithMessage("encryptedKey and header are required")
+	encryptedKey, err := decodeEncodedSpaceField("encryptedKey", req.EncryptedKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	if err != nil {
+		return nil, err
 	}
-	rec, err := c.EntityKeysRepo.EnsureKey(ctx.Request.Context(), userID, keyType, strings.TrimSpace(req.EncryptedKey), strings.TrimSpace(req.Header))
+	rec, err := c.EntityKeysRepo.EnsureKey(ctx.Request.Context(), userID, keyType, encryptedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +85,6 @@ func validateSpaceEntityKeyType(value string) (string, error) {
 func toSpaceEntityKeyResponse(rec *repo.SpaceEntityKeyRecord) *models.SpaceEntityKeyResponse {
 	return &models.SpaceEntityKeyResponse{
 		Type:         rec.KeyType,
-		EncryptedKey: rec.EncryptedKey,
-		Header:       rec.Header,
+		EncryptedKey: encodeSpaceField(rec.EncryptedKey),
 	}
 }

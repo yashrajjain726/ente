@@ -28,7 +28,7 @@ func TestSpaceSlugAvailabilityRouteReturnsOK(t *testing.T) {
 		Email:        "alice-availability-route@example.com",
 		CreationTime: timeutil.Microseconds(),
 	})
-	_, err := repos.Spaces.CreateSpace(context.Background(), userID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	_, err := testCreateSpace(context.Background(), repos, userID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	router := gin.New()
 	Register(router.Group(""), router.Group(""), NewHandlers(controller.NewModule(

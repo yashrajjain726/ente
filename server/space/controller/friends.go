@@ -31,7 +31,8 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 		req.RequesterKeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("targetSpaceId or targetUsername, requesterSpaceId, requesterEncryptedSpaceKey and requesterKeyVersion are required")
 	}
-	if err := validateEncodedSpaceField("requesterEncryptedSpaceKey", req.RequesterEncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+	requesterEncryptedSpaceKey, err := decodeEncodedSpaceField("requesterEncryptedSpaceKey", req.RequesterEncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
 	requesterSpace, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, strings.TrimSpace(req.RequesterSpaceID))
@@ -53,7 +54,7 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 		userID,
 		requesterSpace.SpaceID,
 		targetSpace.SpaceID,
-		strings.TrimSpace(req.RequesterEncryptedSpaceKey),
+		requesterEncryptedSpaceKey,
 		req.RequesterKeyVersion,
 	)
 	if err != nil {
@@ -110,7 +111,8 @@ func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestIDValue stri
 	if strings.TrimSpace(req.TargetEncryptedSpaceKey) == "" || req.TargetKeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("targetEncryptedSpaceKey and targetKeyVersion are required")
 	}
-	if err := validateEncodedSpaceField("targetEncryptedSpaceKey", req.TargetEncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+	targetEncryptedSpaceKey, err := decodeEncodedSpaceField("targetEncryptedSpaceKey", req.TargetEncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
 	targetSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
@@ -122,7 +124,7 @@ func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestIDValue stri
 		userID,
 		targetSpace.SpaceID,
 		requestID,
-		strings.TrimSpace(req.TargetEncryptedSpaceKey),
+		targetEncryptedSpaceKey,
 		req.TargetKeyVersion,
 	)
 	if err != nil {
@@ -247,13 +249,14 @@ func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFr
 		if share.FriendID == 0 || strings.TrimSpace(share.FriendSpaceID) == "" || strings.TrimSpace(share.EncryptedSpaceKey) == "" {
 			return ente.NewBadRequestWithMessage("friendId, friendSpaceId and encryptedSpaceKey are required for each share")
 		}
-		if err := validateEncodedSpaceField("encryptedSpaceKey", share.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+		encryptedSpaceKey, err := decodeEncodedSpaceField("encryptedSpaceKey", share.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+		if err != nil {
 			return err
 		}
 		updates = append(updates, repo.SpaceShareUpdateRecord{
 			FriendID:          share.FriendID,
 			FriendSpaceID:     strings.TrimSpace(share.FriendSpaceID),
-			EncryptedSpaceKey: share.EncryptedSpaceKey,
+			EncryptedSpaceKey: encryptedSpaceKey,
 		})
 	}
 	if err := c.FriendsRepo.UpdateShares(ctx.Request.Context(), space.SpaceID, updates, req.KeyVersion); err != nil {
@@ -280,7 +283,7 @@ func (c *FriendsController) ListShares(ctx *gin.Context) ([]models.FriendShareRe
 			Friend:            share.SpaceSlug,
 			SpaceID:           share.SpaceID,
 			SpaceSlug:         share.SpaceSlug,
-			EncryptedSpaceKey: share.EncryptedSpaceKey,
+			EncryptedSpaceKey: encodeSpaceField(share.EncryptedSpaceKey),
 			KeyVersion:        share.KeyVersion,
 		})
 	}

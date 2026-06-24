@@ -18,10 +18,10 @@ const spaceMessageSelectColumns = `
 	m.sender_space_id,
 	m.recipient_id,
 	m.recipient_space_id,
-	COALESCE(m.message_cipher, ''),
+	COALESCE(m.message_cipher, '\x'::bytea),
 	CASE
-		WHEN m.sender_space_id = %s THEN COALESCE(m.sender_encrypted_message_key, '')
-		ELSE COALESCE(m.recipient_encrypted_message_key, '')
+		WHEN m.sender_space_id = %s THEN COALESCE(m.sender_encrypted_message_key, '\x'::bytea)
+		ELSE COALESCE(m.recipient_encrypted_message_key, '\x'::bytea)
 	END AS encrypted_message_key,
 	m.reply_post_id,
 	m.reply_message_id,
@@ -33,8 +33,8 @@ const spaceMessageSelectColumns = `
 	'' AS text,
 	NULL::bigint AS quote_post_id,
 	'' AS quote_space_id,
-	'' AS quote_encrypted_post_key,
-	'' AS quote_caption_cipher,
+	'\x'::bytea AS quote_encrypted_post_key,
+	'\x'::bytea AS quote_caption_cipher,
 	0 AS quote_key_version,
 	NULL::text AS quote_object_key,
 	sender_space.owner_id,
@@ -182,8 +182,8 @@ func (r *MessagesRepository) listThreadPostLikes(ctx context.Context, viewerID i
 			pl.actor_space_id AS sender_space_id,
 			p.owner_id AS recipient_id,
 			p.space_id AS recipient_space_id,
-			'' AS message_cipher,
-			'' AS encrypted_message_key,
+			'\x'::bytea AS message_cipher,
+			'\x'::bytea AS encrypted_message_key,
 			NULL::bigint AS reply_post_id,
 			NULL::text AS reply_message_id,
 			0 AS likes,
@@ -609,7 +609,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			friend_space.space_slug,
 			friend_space.public_key,
 			friend_space.current_version,
-			CASE WHEN c.activity_type = 'friend_request' THEN '' ELSE friend_space.encrypted_profile END AS friend_profile,
+			CASE WHEN c.activity_type = 'friend_request' THEN '\x'::bytea ELSE friend_space.encrypted_profile END AS friend_profile,
 			CASE WHEN c.activity_type = 'friend_request' THEN NULL::text ELSE friend_avatar.object_id END AS friend_avatar_object_id,
 			CASE WHEN c.activity_type = 'friend_request' THEN NULL::bigint ELSE friend_avatar.size END AS friend_avatar_size,
 			friend_space.updated_at,
@@ -621,11 +621,11 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			COALESCE(m.sender_space_id, '') AS sender_space_id,
 			COALESCE(m.recipient_id, 0) AS recipient_id,
 			COALESCE(m.recipient_space_id, '') AS recipient_space_id,
-			COALESCE(m.message_cipher, '') AS message_cipher,
+			COALESCE(m.message_cipher, '\x'::bytea) AS message_cipher,
 			CASE
-				WHEN m.message_id IS NULL THEN ''
-				WHEN m.sender_space_id = $2 THEN COALESCE(m.sender_encrypted_message_key, '')
-				ELSE COALESCE(m.recipient_encrypted_message_key, '')
+				WHEN m.message_id IS NULL THEN '\x'::bytea
+				WHEN m.sender_space_id = $2 THEN COALESCE(m.sender_encrypted_message_key, '\x'::bytea)
+				ELSE COALESCE(m.recipient_encrypted_message_key, '\x'::bytea)
 			END AS encrypted_message_key,
 			m.reply_post_id,
 			m.reply_message_id,
@@ -637,9 +637,9 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			COALESCE(sender_space.owner_id, 0) AS sender_owner_id,
 			COALESCE(sender_space.space_id, '') AS sender_space_id,
 			COALESCE(sender_space.space_slug, '') AS sender_space_slug,
-			COALESCE(sender_space.public_key, '') AS sender_public_key,
+			COALESCE(sender_space.public_key, '\x'::bytea) AS sender_public_key,
 			COALESCE(sender_space.current_version, 0) AS sender_current_version,
-			COALESCE(sender_space.encrypted_profile, '') AS sender_profile,
+			COALESCE(sender_space.encrypted_profile, '\x'::bytea) AS sender_profile,
 			sender_avatar.object_id,
 			sender_avatar.size,
 			COALESCE(sender_space.updated_at, 0) AS sender_updated_at,
@@ -648,9 +648,9 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			COALESCE(recipient_space.owner_id, 0) AS recipient_owner_id,
 			COALESCE(recipient_space.space_id, '') AS recipient_space_id,
 			COALESCE(recipient_space.space_slug, '') AS recipient_space_slug,
-			COALESCE(recipient_space.public_key, '') AS recipient_public_key,
+			COALESCE(recipient_space.public_key, '\x'::bytea) AS recipient_public_key,
 			COALESCE(recipient_space.current_version, 0) AS recipient_current_version,
-			COALESCE(recipient_space.encrypted_profile, '') AS recipient_profile,
+			COALESCE(recipient_space.encrypted_profile, '\x'::bytea) AS recipient_profile,
 			recipient_avatar.object_id,
 			recipient_avatar.size,
 			COALESCE(recipient_space.updated_at, 0) AS recipient_updated_at,

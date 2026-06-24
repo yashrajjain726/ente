@@ -26,6 +26,38 @@ func setupPostsControllerTest(t *testing.T) (*PostsController, *spacerepo.Module
 	return NewModule(repos, nil).Posts, repos, context.Background()
 }
 
+func testSpaceBytes(value string) []byte {
+	return []byte(value)
+}
+
+func testCreateSpace(ctx context.Context, module *spacerepo.Module, ownerID int64, spaceSlug string, encryptedSpaceKey string, publicKey string, encryptedSecretKey string, _ string, encryptedProfile string) (*spacerepo.SpaceRecord, error) {
+	return module.Spaces.CreateSpace(ctx, ownerID, spaceSlug, testSpaceBytes(encryptedSpaceKey), testSpaceBytes(publicKey), testSpaceBytes(encryptedSecretKey), testSpaceBytes(encryptedProfile))
+}
+
+func testUpdateProfile(ctx context.Context, module *spacerepo.Module, ownerID int64, spaceID string, keyVersion int, encryptedProfile string, avatar *spacerepo.ProfileAssetUpdate, cover *spacerepo.ProfileAssetUpdate, removeAvatar bool, removeCover bool) (*spacerepo.SpaceRecord, error) {
+	return module.Spaces.UpdateProfile(ctx, ownerID, spaceID, keyVersion, testSpaceBytes(encryptedProfile), avatar, cover, removeAvatar, removeCover)
+}
+
+func testRotateKey(ctx context.Context, module *spacerepo.Module, ownerID int64, spaceID string, keyVersion int, encryptedSpaceKey string, wrappedPrevKey string, encryptedProfile string) (*spacerepo.SpaceRecord, error) {
+	return module.Spaces.RotateKey(ctx, ownerID, spaceID, keyVersion, testSpaceBytes(encryptedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile))
+}
+
+func testAddFriend(ctx context.Context, module *spacerepo.Module, requesterID int64, requesterSpaceID string, targetSpaceID string, targetEncryptedSpaceKey string, targetKeyVersion int, requesterEncryptedSpaceKey string, requesterKeyVersion int) error {
+	return module.Friends.AddFriend(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(targetEncryptedSpaceKey), targetKeyVersion, testSpaceBytes(requesterEncryptedSpaceKey), requesterKeyVersion)
+}
+
+func testUpsertLink(ctx context.Context, module *spacerepo.Module, spaceID string, authKeyHash []byte, keyVersion int, encryptedSpaceKey string, encryptedAccessKey string) (*spacerepo.SpaceLinkRecord, error) {
+	return module.Links.UpsertLink(ctx, spaceID, authKeyHash, keyVersion, testSpaceBytes(encryptedSpaceKey), testSpaceBytes(encryptedAccessKey))
+}
+
+func testCreatePost(ctx context.Context, module *spacerepo.Module, ownerID int64, spaceID string, encryptedPostKey string, captionCipher *string, keyVersion int, objects []spacerepo.SpacePostAssetRecord) (int64, error) {
+	var caption []byte
+	if captionCipher != nil {
+		caption = testSpaceBytes(*captionCipher)
+	}
+	return module.Posts.CreatePost(ctx, ownerID, spaceID, testSpaceBytes(encryptedPostKey), caption, keyVersion, objects)
+}
+
 func insertSpaceControllerUser(t *testing.T, module *spacerepo.Module, email string, publicKey string) int64 {
 	t.Helper()
 	userID := testutil.InsertUser(t, module.Spaces.DB, testutil.UserFixture{

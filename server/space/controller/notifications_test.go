@@ -96,12 +96,12 @@ func TestPostLikeSendsEmailOnce(t *testing.T) {
 	posts := NewModule(repos, nil, notifier).Posts
 	aliceID := insertSpaceControllerUser(t, repos, "alice-post-like-email@example.com", "alice-public")
 	bobID := insertSpaceControllerUser(t, repos, "bob-post-like-email@example.com", "bob-public")
-	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice_post_like_email", "alice-space-key", "alice-post-like-email-public", "alice-post-like-email-secret", "alice-post-like-email-secret-nonce", "alice-profile")
+	aliceSpace, err := testCreateSpace(ctx, repos, aliceID, "alice_post_like_email", "alice-space-key", "alice-post-like-email-public", "alice-post-like-email-secret", "alice-post-like-email-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := repos.Spaces.CreateSpace(ctx, bobID, "bob_post_like_email", "bob-space-key", "bob-post-like-email-public", "bob-post-like-email-secret", "bob-post-like-email-secret-nonce", "bob-profile")
+	bobSpace, err := testCreateSpace(ctx, repos, bobID, "bob_post_like_email", "bob-space-key", "bob-post-like-email-public", "bob-post-like-email-secret", "bob-post-like-email-secret-nonce", "bob-profile")
 	require.NoError(t, err)
-	require.NoError(t, repos.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
-	postID, err := repos.Posts.CreatePost(ctx, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
+	require.NoError(t, testAddFriend(ctx, repos, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
+	postID, err := testCreatePost(ctx, repos, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
 
 	resp, err := posts.ToggleLike(newSpaceControllerContext(bobID), base10(postID), models.LikePostRequest{Like: true})
@@ -121,8 +121,8 @@ func TestPostReplySendsEmail(t *testing.T) {
 	messages := NewModule(repos, nil, notifier).Messages
 	aliceID, aliceSpace := createMessageControllerUserAndSpace(t, repos, "alice-post-reply-email", "alice-public")
 	bobID, bobSpace := createMessageControllerUserAndSpace(t, repos, "bob-post-reply-email", "bob-public")
-	require.NoError(t, repos.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
-	postID, err := repos.Posts.CreatePost(ctx, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
+	require.NoError(t, testAddFriend(ctx, repos, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
+	postID, err := testCreatePost(ctx, repos, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
 
 	_, err = messages.ReplyToPost(newSpaceControllerContext(bobID), base10(postID), models.CreateMessageRequest{
@@ -141,9 +141,9 @@ func TestAddFriendSendsEmailOnce(t *testing.T) {
 	friends := NewModule(repos, nil, notifier).Friends
 	aliceID := insertSpaceControllerUser(t, repos, "alice-friend-email@example.com", "alice-public")
 	bobID := insertSpaceControllerUser(t, repos, "bob-friend-email@example.com", "bob-public")
-	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice_friend_email", "alice-space-key", "alice-friend-email-public", "alice-friend-email-secret", "alice-friend-email-secret-nonce", "alice-profile")
+	aliceSpace, err := testCreateSpace(ctx, repos, aliceID, "alice_friend_email", "alice-space-key", "alice-friend-email-public", "alice-friend-email-secret", "alice-friend-email-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := repos.Spaces.CreateSpace(ctx, bobID, "bob_friend_email", "bob-space-key", "bob-friend-email-public", "bob-friend-email-secret", "bob-friend-email-secret-nonce", "bob-profile")
+	bobSpace, err := testCreateSpace(ctx, repos, bobID, "bob_friend_email", "bob-space-key", "bob-friend-email-public", "bob-friend-email-secret", "bob-friend-email-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	req := models.AddFriendPayload{
 		TargetSpaceID:              aliceSpace.SpaceID,

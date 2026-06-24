@@ -56,23 +56,22 @@ type EntityKeysRepository struct {
 }
 
 type SpaceRecord struct {
-	SpaceID                  string
-	OwnerID                  int64
-	SpaceSlug                string
-	EncryptedSpaceKey        string
-	PublicKey                string
-	EncryptedSecretKey       string
-	SecretKeyDecryptionNonce string
-	EncryptedProfile         string
-	CurrentVersion           int
-	AvatarObjectID           sql.NullString
-	AvatarBucketID           sql.NullString
-	AvatarSize               sql.NullInt64
-	CoverObjectID            sql.NullString
-	CoverBucketID            sql.NullString
-	CoverSize                sql.NullInt64
-	CreatedAt                int64
-	UpdatedAt                int64
+	SpaceID            string
+	OwnerID            int64
+	SpaceSlug          string
+	EncryptedSpaceKey  []byte
+	PublicKey          []byte
+	EncryptedSecretKey []byte
+	EncryptedProfile   []byte
+	CurrentVersion     int
+	AvatarObjectID     sql.NullString
+	AvatarBucketID     sql.NullString
+	AvatarSize         sql.NullInt64
+	CoverObjectID      sql.NullString
+	CoverBucketID      sql.NullString
+	CoverSize          sql.NullInt64
+	CreatedAt          int64
+	UpdatedAt          int64
 }
 
 type ProfileAssetUpdate struct {
@@ -84,9 +83,9 @@ type ProfileAssetUpdate struct {
 type SpaceVersionRecord struct {
 	SpaceID           string
 	Version           int
-	EncryptedSpaceKey string
-	EncryptedProfile  string
-	WrappedPrevKey    sql.NullString
+	EncryptedSpaceKey []byte
+	EncryptedProfile  []byte
+	WrappedPrevKey    []byte
 	CreatedAt         int64
 }
 
@@ -96,8 +95,8 @@ type SpacePostRecord struct {
 	SpaceSlug        string
 	OwnerID          int64
 	Author           SpaceActorRecord
-	EncryptedPostKey string
-	CaptionCipher    string
+	EncryptedPostKey []byte
+	CaptionCipher    []byte
 	KeyVersion       int
 	CreatedAt        int64
 	Likes            int64
@@ -111,7 +110,7 @@ type SpacePostAssetRecord struct {
 	BucketID       string
 	Size           sql.NullInt64
 	Position       int
-	MetadataCipher string
+	MetadataCipher []byte
 	CreatedAt      int64
 }
 
@@ -139,8 +138,8 @@ type SpaceMessageRecord struct {
 	SenderSpaceID       string
 	RecipientID         int64
 	RecipientSpaceID    string
-	MessageCipher       string
-	EncryptedMessageKey string
+	MessageCipher       []byte
+	EncryptedMessageKey []byte
 	ReplyPostID         sql.NullInt64
 	ReplyMessageID      sql.NullString
 	Likes               int64
@@ -157,8 +156,8 @@ type SpaceMessageRecord struct {
 type SpaceMessageQuoteRecord struct {
 	PostID           int64
 	SpaceID          string
-	EncryptedPostKey string
-	CaptionCipher    string
+	EncryptedPostKey []byte
+	CaptionCipher    []byte
 	KeyVersion       int
 	ObjectKey        sql.NullString
 }
@@ -191,7 +190,7 @@ type SpaceMessageConversationPostRecord struct {
 	ObjectKey            sql.NullString
 	ObjectSize           sql.NullInt64
 	ObjectPosition       sql.NullInt64
-	ObjectMetadataCipher sql.NullString
+	ObjectMetadataCipher []byte
 }
 
 type CreateSpaceMessageRecord struct {
@@ -201,9 +200,9 @@ type CreateSpaceMessageRecord struct {
 	SenderSpaceID                string
 	RecipientID                  int64
 	RecipientSpaceID             string
-	MessageCipher                string
-	SenderEncryptedMessageKey    string
-	RecipientEncryptedMessageKey string
+	MessageCipher                []byte
+	SenderEncryptedMessageKey    []byte
+	RecipientEncryptedMessageKey []byte
 	ReplyPostID                  sql.NullInt64
 	ReplyMessageID               sql.NullString
 }
@@ -212,9 +211,9 @@ type SpaceActorRecord struct {
 	UserID           int64
 	SpaceID          string
 	SpaceSlug        string
-	PublicKey        string
+	PublicKey        []byte
 	KeyVersion       int
-	EncryptedProfile string
+	EncryptedProfile []byte
 	AvatarObjectID   sql.NullString
 	AvatarSize       sql.NullInt64
 	UpdatedAt        int64
@@ -227,16 +226,16 @@ type SpaceShareRecord struct {
 	FriendID          int64
 	OwnerID           int64
 	SpaceSlug         string
-	EncryptedSpaceKey string
+	EncryptedSpaceKey []byte
 	KeyVersion        int
 	CreatedAt         int64
-	PublicKey         string
+	PublicKey         []byte
 }
 
 type SpaceShareUpdateRecord struct {
 	FriendID          int64
 	FriendSpaceID     string
-	EncryptedSpaceKey string
+	EncryptedSpaceKey []byte
 }
 
 type SpaceFriendRecord struct {
@@ -251,7 +250,7 @@ type SpaceFriendRequestRecord struct {
 	RequesterSpaceID           string
 	TargetID                   int64
 	TargetSpaceID              string
-	RequesterEncryptedSpaceKey string
+	RequesterEncryptedSpaceKey []byte
 	RequesterKeyVersion        int
 	CreatedAt                  int64
 	Requester                  SpaceActorRecord
@@ -264,8 +263,8 @@ type SpaceLinkRecord struct {
 	OwnerSlug          string
 	AuthKeyHash        []byte
 	KeyVersion         int
-	EncryptedSpaceKey  string
-	EncryptedAccessKey string
+	EncryptedSpaceKey  []byte
+	EncryptedAccessKey []byte
 	Active             bool
 	CreatedAt          int64
 	UpdatedAt          int64
@@ -281,7 +280,7 @@ type SpaceLinkSessionRecord struct {
 	CreatedAt         int64
 	SpaceSlug         string
 	OwnerSlug         string
-	EncryptedSpaceKey string
+	EncryptedSpaceKey []byte
 }
 
 type SpaceBrowserSessionRecord struct {
@@ -297,8 +296,7 @@ type SpaceBrowserSessionRecord struct {
 type SpaceEntityKeyRecord struct {
 	UserID       int64
 	KeyType      string
-	EncryptedKey string
-	Header       string
+	EncryptedKey []byte
 	CreatedAt    int64
 }
 

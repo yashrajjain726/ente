@@ -93,7 +93,7 @@ func TestNormalizeContentMD5RejectsInvalidValues(t *testing.T) {
 func TestRedirectRejectsInvalidProfileAssetObjectID(t *testing.T) {
 	module, repos, userAuthRepo, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-asset-redirect@example.com", "alice-public")
-	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-asset-redirect", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	space, err := testCreateSpace(ctx, repos, aliceID, "alice-asset-redirect", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	require.NoError(t, userAuthRepo.AddToken(aliceID, ente.Photos, "alice-asset-token", "127.0.0.1", "space-test"))
 	ginCtx := newPublicSpaceContext()

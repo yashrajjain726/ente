@@ -77,7 +77,7 @@ func TestRegisteredTokenSessionRoutesAllowEntityKeyEnsureBeforeBrowserSession(t 
 	ensureReq := httptest.NewRequest(
 		http.MethodPost,
 		"/space/entity-key/ensure",
-		bytes.NewBufferString(`{"type":"space","encryptedKey":"encrypted-key","header":"nonce"}`),
+		bytes.NewBufferString(`{"type":"space","encryptedKey":"ZW5jcnlwdGVkLWtleQ=="}`),
 	)
 	ensureReq.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
 	ensureRecorder := httptest.NewRecorder()
@@ -85,7 +85,7 @@ func TestRegisteredTokenSessionRoutesAllowEntityKeyEnsureBeforeBrowserSession(t 
 	router.ServeHTTP(ensureRecorder, ensureReq)
 
 	require.Equal(t, http.StatusOK, ensureRecorder.Code)
-	require.JSONEq(t, `{"type":"space","encryptedKey":"encrypted-key","header":"nonce"}`, ensureRecorder.Body.String())
+	require.JSONEq(t, `{"type":"space","encryptedKey":"ZW5jcnlwdGVkLWtleQ=="}`, ensureRecorder.Body.String())
 
 	getReq := httptest.NewRequest(http.MethodGet, "/space/entity-key?type=space", nil)
 	getReq.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))

@@ -38,10 +38,12 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 	if req.KeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("keyVersion is required")
 	}
-	if err := validateEncodedSpaceField("encryptedPostKey", req.EncryptedPostKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+	encryptedPostKey, err := decodeEncodedSpaceField("encryptedPostKey", req.EncryptedPostKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
-	if err := validateOptionalEncodedSpacePointerField("captionCipher", req.CaptionCipher, maxSpaceCaptionCipherEncodedBytes, maxSpaceCaptionCipherDecodedBytes); err != nil {
+	captionCipher, err := decodeOptionalEncodedSpacePointerField("captionCipher", req.CaptionCipher, maxSpaceCaptionCipherEncodedBytes, maxSpaceCaptionCipherDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
 	space, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, req.SpaceID)
@@ -59,7 +61,8 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 		if object.Position < 0 || object.Position >= maxSpacePostObjects {
 			return nil, ente.NewBadRequestWithMessage("invalid object position")
 		}
-		if err := validateEncodedSpaceField("metadataCipher", object.MetadataCipher, maxSpaceAssetMetadataEncodedBytes, maxSpaceAssetMetadataDecodedBytes); err != nil {
+		metadataCipher, err := decodeEncodedSpaceField("metadataCipher", object.MetadataCipher, maxSpaceAssetMetadataEncodedBytes, maxSpaceAssetMetadataDecodedBytes)
+		if err != nil {
 			return nil, err
 		}
 		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, object.ObjectKey, repo.TempObjectPurposePost, &space.SpaceID)
@@ -71,10 +74,10 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 			BucketID:       staged.BucketID,
 			Size:           sql.NullInt64{Int64: staged.ExpectedSize, Valid: staged.ExpectedSize > 0},
 			Position:       object.Position,
-			MetadataCipher: strings.TrimSpace(object.MetadataCipher),
+			MetadataCipher: metadataCipher,
 		})
 	}
-	postID, err := c.PostsRepo.CreatePost(ctx.Request.Context(), userID, space.SpaceID, req.EncryptedPostKey, req.CaptionCipher, req.KeyVersion, assets)
+	postID, err := c.PostsRepo.CreatePost(ctx.Request.Context(), userID, space.SpaceID, encryptedPostKey, captionCipher, req.KeyVersion, assets)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
@@ -221,10 +224,11 @@ func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req mod
 	if err != nil || id <= 0 {
 		return nil, ente.NewBadRequestWithMessage("invalid postID")
 	}
-	if err := validateOptionalEncodedSpacePointerField("captionCipher", req.CaptionCipher, maxSpaceCaptionCipherEncodedBytes, maxSpaceCaptionCipherDecodedBytes); err != nil {
+	captionCipher, err := decodeOptionalEncodedSpacePointerField("captionCipher", req.CaptionCipher, maxSpaceCaptionCipherEncodedBytes, maxSpaceCaptionCipherDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
-	if err := c.PostsRepo.UpdateCaption(ctx.Request.Context(), id, userID, req.CaptionCipher); err != nil {
+	if err := c.PostsRepo.UpdateCaption(ctx.Request.Context(), id, userID, captionCipher); err != nil {
 		return nil, err
 	}
 	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)

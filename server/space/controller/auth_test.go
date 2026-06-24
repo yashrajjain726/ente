@@ -41,7 +41,7 @@ func newPublicSpaceContext() *gin.Context {
 func TestResolveViewerRejectsForgedUserHeaderWithoutToken(t *testing.T) {
 	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
-	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	space, err := testCreateSpace(ctx, repos, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	ginCtx := newPublicSpaceContext()
 	ginCtx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(aliceID, 10))
@@ -55,7 +55,7 @@ func TestResolveViewerRejectsForgedUserHeaderWithoutToken(t *testing.T) {
 func TestResolveViewerAcceptsValidatedUserToken(t *testing.T) {
 	module, repos, userAuthRepo, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
-	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	space, err := testCreateSpace(ctx, repos, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	require.NoError(t, userAuthRepo.AddToken(aliceID, ente.Photos, "alice-token", "127.0.0.1", "space-test"))
 	ginCtx := newPublicSpaceContext()
@@ -72,7 +72,7 @@ func TestResolveViewerAcceptsValidatedUserToken(t *testing.T) {
 func TestResolveViewerAcceptsSpaceBrowserSessionHeader(t *testing.T) {
 	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
-	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	space, err := testCreateSpace(ctx, repos, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	sessionHash := sha256.Sum256([]byte("space-session-token"))
 	require.NoError(t, repos.Sessions.CreateBrowserSession(ctx, sessionHash[:], aliceID, "client-key", timeutil.MicrosecondsAfterMinutes(5)))
@@ -90,10 +90,10 @@ func TestResolveViewerAcceptsSpaceBrowserSessionHeader(t *testing.T) {
 func TestResolveViewerAcceptsSpaceLinkSessionToken(t *testing.T) {
 	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
-	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	space, err := testCreateSpace(ctx, repos, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	authHash := sha256.Sum256([]byte("link-auth-key"))
-	link, err := repos.Links.UpsertLink(ctx, space.SpaceID, authHash[:], space.CurrentVersion, "encrypted-link-space-key", "encrypted-owner-link-secret")
+	link, err := testUpsertLink(ctx, repos, space.SpaceID, authHash[:], space.CurrentVersion, "encrypted-link-space-key", "encrypted-owner-link-secret")
 	require.NoError(t, err)
 	sessionHash := sha256.Sum256([]byte("link-session-token"))
 	require.NoError(t, repos.Links.CreateSession(ctx, sessionHash[:], link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.MicrosecondsAfterMinutes(5)))

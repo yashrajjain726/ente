@@ -8,7 +8,6 @@ fn is_false(value: &bool) -> bool {
 #[serde(rename_all = "camelCase")]
 pub struct EntityKeyPayload {
     pub encrypted_key: String,
-    pub header: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -17,7 +16,6 @@ pub struct EntityKeyResponse {
     #[serde(rename = "type")]
     pub key_type: String,
     pub encrypted_key: String,
-    pub header: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -26,7 +24,6 @@ pub struct CreateEntityKeyRequest {
     #[serde(rename = "type")]
     pub key_type: String,
     pub encrypted_key: String,
-    pub header: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +38,6 @@ pub struct CreateSpaceRequest {
     pub encrypted_space_key: String,
     pub public_key: String,
     pub encrypted_secret_key: String,
-    pub secret_key_decryption_nonce: String,
     pub encrypted_profile: String,
 }
 
@@ -55,8 +51,6 @@ pub struct SpaceKeyResponse {
     pub public_key: String,
     #[serde(default)]
     pub encrypted_secret_key: String,
-    #[serde(default)]
-    pub secret_key_decryption_nonce: String,
     #[serde(default)]
     pub encrypted_profile: String,
     pub key_version: i32,

@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/ente-io/museum/space/models"
@@ -67,9 +66,9 @@ func toActorResponse(actor spacerepo.SpaceActorRecord, includePrivate bool) mode
 	}
 	resp.UserID = actor.UserID
 	resp.SpaceID = actor.SpaceID
-	resp.PublicKey = actor.PublicKey
+	resp.PublicKey = encodeSpaceField(actor.PublicKey)
 	resp.KeyVersion = actor.KeyVersion
-	resp.EncryptedProfile = actor.EncryptedProfile
+	resp.EncryptedProfile = encodeSpaceField(actor.EncryptedProfile)
 	resp.Avatar = toActorAvatarResponse(actor)
 	if actor.Friends.Valid {
 		friends := actor.Friends.Int64
@@ -116,14 +115,13 @@ func visibleActor(visible map[string]bool, actor spacerepo.SpaceActorRecord) boo
 
 func toSpaceKeyResponse(space *spacerepo.SpaceRecord) *models.SpaceKeyResponse {
 	return &models.SpaceKeyResponse{
-		SpaceID:                  space.SpaceID,
-		SpaceSlug:                space.SpaceSlug,
-		EncryptedSpaceKey:        space.EncryptedSpaceKey,
-		PublicKey:                space.PublicKey,
-		EncryptedSecretKey:       space.EncryptedSecretKey,
-		SecretKeyDecryptionNonce: space.SecretKeyDecryptionNonce,
-		EncryptedProfile:         space.EncryptedProfile,
-		KeyVersion:               space.CurrentVersion,
+		SpaceID:            space.SpaceID,
+		SpaceSlug:          space.SpaceSlug,
+		EncryptedSpaceKey:  encodeSpaceField(space.EncryptedSpaceKey),
+		PublicKey:          encodeSpaceField(space.PublicKey),
+		EncryptedSecretKey: encodeSpaceField(space.EncryptedSecretKey),
+		EncryptedProfile:   encodeSpaceField(space.EncryptedProfile),
+		KeyVersion:         space.CurrentVersion,
 	}
 }
 
@@ -135,8 +133,8 @@ func toPostObjectPayload(asset spacerepo.SpacePostAssetRecord) models.PostObject
 	if asset.Size.Valid {
 		resp.Size = asset.Size.Int64
 	}
-	if strings.TrimSpace(asset.MetadataCipher) != "" {
-		resp.MetadataCipher = asset.MetadataCipher
+	if len(asset.MetadataCipher) > 0 {
+		resp.MetadataCipher = encodeSpaceField(asset.MetadataCipher)
 	}
 	return resp
 }
@@ -148,8 +146,8 @@ func toPostResponse(post *spacerepo.SpacePostRecord, assets []spacerepo.SpacePos
 		SpaceSlug:        post.SpaceSlug,
 		OwnerUserID:      post.OwnerID,
 		Author:           toActorResponse(post.Author, includeAuthorPrivate),
-		EncryptedPostKey: post.EncryptedPostKey,
-		CaptionCipher:    post.CaptionCipher,
+		EncryptedPostKey: encodeSpaceField(post.EncryptedPostKey),
+		CaptionCipher:    encodeSpaceField(post.CaptionCipher),
 		KeyVersion:       post.KeyVersion,
 		CreatedAt:        formatMicros(post.CreatedAt),
 		Likes:            post.Likes,

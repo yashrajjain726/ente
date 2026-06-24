@@ -38,7 +38,8 @@ func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req 
 	if err != nil {
 		return nil, err
 	}
-	if err := validateCreateMessageRequest(req); err != nil {
+	messageCipher, senderEncryptedMessageKey, recipientEncryptedMessageKey, err := decodeCreateMessageRequest(req)
+	if err != nil {
 		return nil, err
 	}
 	senderSpace, recipientSpace, err := c.requireFriendMessageTarget(ctx, userID, targetSpaceID)
@@ -56,9 +57,9 @@ func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req 
 		SenderSpaceID:                senderSpace.SpaceID,
 		RecipientID:                  recipientSpace.OwnerID,
 		RecipientSpaceID:             recipientSpace.SpaceID,
-		MessageCipher:                req.MessageCipher,
-		SenderEncryptedMessageKey:    req.SenderEncryptedMessageKey,
-		RecipientEncryptedMessageKey: req.RecipientEncryptedMessageKey,
+		MessageCipher:                messageCipher,
+		SenderEncryptedMessageKey:    senderEncryptedMessageKey,
+		RecipientEncryptedMessageKey: recipientEncryptedMessageKey,
 		ReplyMessageID:               replyMessageID,
 	})
 	if err != nil {
@@ -72,7 +73,8 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 	if err != nil {
 		return nil, err
 	}
-	if err := validateCreateMessageRequest(req); err != nil {
+	messageCipher, senderEncryptedMessageKey, recipientEncryptedMessageKey, err := decodeCreateMessageRequest(req)
+	if err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(req.ReplyMessageID) != "" {
@@ -111,9 +113,9 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 		SenderSpaceID:                senderSpace.SpaceID,
 		RecipientID:                  recipientSpace.OwnerID,
 		RecipientSpaceID:             recipientSpace.SpaceID,
-		MessageCipher:                req.MessageCipher,
-		SenderEncryptedMessageKey:    req.SenderEncryptedMessageKey,
-		RecipientEncryptedMessageKey: req.RecipientEncryptedMessageKey,
+		MessageCipher:                messageCipher,
+		SenderEncryptedMessageKey:    senderEncryptedMessageKey,
+		RecipientEncryptedMessageKey: recipientEncryptedMessageKey,
 		ReplyPostID:                  sql.NullInt64{Int64: id, Valid: true},
 	})
 	if err != nil {
@@ -300,22 +302,30 @@ func sameMessageThread(message *repo.SpaceMessageRecord, firstSpaceID, secondSpa
 		(message.SenderSpaceID == secondSpaceID && message.RecipientSpaceID == firstSpaceID)
 }
 
-func validateCreateMessageRequest(req models.CreateMessageRequest) error {
+func decodeCreateMessageRequest(req models.CreateMessageRequest) ([]byte, []byte, []byte, error) {
 	if strings.TrimSpace(req.MessageCipher) == "" ||
 		strings.TrimSpace(req.SenderEncryptedMessageKey) == "" ||
 		strings.TrimSpace(req.RecipientEncryptedMessageKey) == "" {
-		return ente.NewBadRequestWithMessage("messageCipher and encrypted message keys are required")
+		return nil, nil, nil, ente.NewBadRequestWithMessage("messageCipher and encrypted message keys are required")
 	}
-	if err := validateEncodedSpaceField("messageCipher", req.MessageCipher, maxSpaceMessageCipherEncodedBytes, maxSpaceMessageCipherDecodedBytes); err != nil {
-		return err
+	messageCipher, err := decodeEncodedSpaceField("messageCipher", req.MessageCipher, maxSpaceMessageCipherEncodedBytes, maxSpaceMessageCipherDecodedBytes)
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	if err := validateEncodedSpaceField("senderEncryptedMessageKey", req.SenderEncryptedMessageKey, maxSpaceMessageKeyEncodedBytes, maxSpaceMessageKeyDecodedBytes); err != nil {
-		return err
+	senderEncryptedMessageKey, err := decodeEncodedSpaceField("senderEncryptedMessageKey", req.SenderEncryptedMessageKey, maxSpaceMessageKeyEncodedBytes, maxSpaceMessageKeyDecodedBytes)
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	if err := validateEncodedSpaceField("recipientEncryptedMessageKey", req.RecipientEncryptedMessageKey, maxSpaceMessageKeyEncodedBytes, maxSpaceMessageKeyDecodedBytes); err != nil {
-		return err
+	recipientEncryptedMessageKey, err := decodeEncodedSpaceField("recipientEncryptedMessageKey", req.RecipientEncryptedMessageKey, maxSpaceMessageKeyEncodedBytes, maxSpaceMessageKeyDecodedBytes)
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	return nil
+	return messageCipher, senderEncryptedMessageKey, recipientEncryptedMessageKey, nil
+}
+
+func validateCreateMessageRequest(req models.CreateMessageRequest) error {
+	_, _, _, err := decodeCreateMessageRequest(req)
+	return err
 }
 
 func toMessageResponse(message repo.SpaceMessageRecord) *models.MessageResponse {
@@ -324,8 +334,8 @@ func toMessageResponse(message repo.SpaceMessageRecord) *models.MessageResponse 
 		Kind:                message.Kind,
 		Sender:              toActorResponse(message.Sender, true),
 		Recipient:           toActorResponse(message.Recipient, true),
-		MessageCipher:       message.MessageCipher,
-		EncryptedMessageKey: message.EncryptedMessageKey,
+		MessageCipher:       encodeSpaceField(message.MessageCipher),
+		EncryptedMessageKey: encodeSpaceField(message.EncryptedMessageKey),
 		Text:                message.Text,
 		Likes:               message.Likes,
 		ViewerLiked:         message.ViewerLiked,
@@ -337,8 +347,8 @@ func toMessageResponse(message repo.SpaceMessageRecord) *models.MessageResponse 
 		resp.Quote = &models.MessageQuoteResponse{
 			PostID:           message.Quote.PostID,
 			SpaceID:          message.Quote.SpaceID,
-			EncryptedPostKey: message.Quote.EncryptedPostKey,
-			CaptionCipher:    message.Quote.CaptionCipher,
+			EncryptedPostKey: encodeSpaceField(message.Quote.EncryptedPostKey),
+			CaptionCipher:    encodeSpaceField(message.Quote.CaptionCipher),
 			KeyVersion:       message.Quote.KeyVersion,
 		}
 		if message.Quote.ObjectKey.Valid {
@@ -381,7 +391,7 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 					ObjectKey:      activity.Post.ObjectKey.String,
 					Size:           activity.Post.ObjectSize,
 					Position:       int(activity.Post.ObjectPosition.Int64),
-					MetadataCipher: activity.Post.ObjectMetadataCipher.String,
+					MetadataCipher: activity.Post.ObjectMetadataCipher,
 				}),
 			}
 		}

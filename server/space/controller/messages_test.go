@@ -33,8 +33,8 @@ func TestMessageReplyValidation(t *testing.T) {
 	aliceID, aliceSpace := createMessageControllerUserAndSpace(t, repos, "alice-reply-validation", "alice-public")
 	bobID, bobSpace := createMessageControllerUserAndSpace(t, repos, "bob-reply-validation", "bob-public")
 	charlieID, charlieSpace := createMessageControllerUserAndSpace(t, repos, "charlie-reply-validation", "charlie-public")
-	require.NoError(t, repos.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
-	require.NoError(t, repos.Friends.AddFriend(ctx, charlieID, charlieSpace.SpaceID, aliceSpace.SpaceID, "alice-charlie-share-key", aliceSpace.CurrentVersion, "charlie-share-key", charlieSpace.CurrentVersion))
+	require.NoError(t, testAddFriend(ctx, repos, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
+	require.NoError(t, testAddFriend(ctx, repos, charlieID, charlieSpace.SpaceID, aliceSpace.SpaceID, "alice-charlie-share-key", aliceSpace.CurrentVersion, "charlie-share-key", charlieSpace.CurrentVersion))
 
 	bobMessage := createRepoMessage(t, repos, bobID, bobSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
 	charlieMessage := createRepoMessage(t, repos, charlieID, charlieSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
@@ -72,7 +72,7 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	controller, repos, ctx := setupMessagesControllerTest(t)
 	aliceID, aliceSpace := createMessageControllerUserAndSpace(t, repos, "alice-message-actions", "alice-actions-public")
 	bobID, bobSpace := createMessageControllerUserAndSpace(t, repos, "bob-message-actions", "bob-actions-public")
-	require.NoError(t, repos.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
+	require.NoError(t, testAddFriend(ctx, repos, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	message := createRepoMessage(t, repos, bobID, bobSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
 	messageToDelete := createRepoMessage(t, repos, bobID, bobSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
 
@@ -105,7 +105,7 @@ func TestListThreadHidesDeletedTargetOwner(t *testing.T) {
 	controller, repos, ctx := setupMessagesControllerTest(t)
 	aliceID, aliceSpace := createMessageControllerUserAndSpace(t, repos, "alice-thread-deleted-owner", "alice-thread-public")
 	bobID, bobSpace := createMessageControllerUserAndSpace(t, repos, "bob-thread-deleted-owner", "bob-thread-public")
-	require.NoError(t, repos.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
+	require.NoError(t, testAddFriend(ctx, repos, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	createRepoMessage(t, repos, bobID, bobSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
 
 	page, err := controller.ListThread(newSpaceControllerContext(aliceID), bobSpace.SpaceID, models.ListMessageThreadRequest{})
@@ -149,7 +149,7 @@ func createMessageControllerUserAndSpace(t *testing.T, repos *spacerepo.Module, 
 	t.Helper()
 	userID := insertSpaceControllerUser(t, repos, slug+"@example.com", publicKey)
 	spaceSlug := strings.ReplaceAll(slug, "-", "_")
-	space, err := repos.Spaces.CreateSpace(context.Background(), userID, spaceSlug, slug+"-space-key", slug+"-public", slug+"-secret", slug+"-secret-nonce", slug+"-profile")
+	space, err := testCreateSpace(context.Background(), repos, userID, spaceSlug, slug+"-space-key", slug+"-public", slug+"-secret", slug+"-secret-nonce", slug+"-profile")
 	require.NoError(t, err)
 	return userID, space
 }
@@ -162,9 +162,9 @@ func createRepoMessage(t *testing.T, repos *spacerepo.Module, senderID int64, se
 		SenderSpaceID:                senderSpaceID,
 		RecipientID:                  recipientID,
 		RecipientSpaceID:             recipientSpaceID,
-		MessageCipher:                "cipher",
-		SenderEncryptedMessageKey:    "sender-key",
-		RecipientEncryptedMessageKey: "recipient-key",
+		MessageCipher:                testSpaceBytes("cipher"),
+		SenderEncryptedMessageKey:    testSpaceBytes("sender-key"),
+		RecipientEncryptedMessageKey: testSpaceBytes("recipient-key"),
 	}
 	if replyMessageID != "" {
 		input.ReplyMessageID.Valid = true

@@ -9,7 +9,7 @@ import (
 	"github.com/ente-io/stacktrace"
 )
 
-func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID, encryptedPostKey string, captionCipher *string, keyVersion int, objects []SpacePostAssetRecord) (int64, error) {
+func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID string, encryptedPostKey []byte, captionCipher []byte, keyVersion int, objects []SpacePostAssetRecord) (int64, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, stacktrace.Propagate(err, "")
@@ -27,9 +27,9 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID
 	if currentVersion != keyVersion {
 		return 0, sql.ErrNoRows
 	}
-	caption := ""
+	caption := []byte{}
 	if captionCipher != nil {
-		caption = *captionCipher
+		caption = captionCipher
 	}
 	var postID int64
 	if err := tx.QueryRowContext(ctx, `
@@ -360,10 +360,10 @@ func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, curs
 	return out, nextCursor, nil
 }
 
-func (r *PostsRepository) UpdateCaption(ctx context.Context, postID, ownerID int64, captionCipher *string) error {
-	caption := ""
+func (r *PostsRepository) UpdateCaption(ctx context.Context, postID, ownerID int64, captionCipher []byte) error {
+	caption := []byte{}
 	if captionCipher != nil {
-		caption = *captionCipher
+		caption = captionCipher
 	}
 	res, err := r.DB.ExecContext(ctx, `UPDATE space_posts SET caption_cipher = $1 WHERE post_id = $2 AND owner_id = $3 AND is_deleted = FALSE`, caption, postID, ownerID)
 	if err != nil {

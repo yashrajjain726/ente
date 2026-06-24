@@ -39,25 +39,26 @@ func (c *SpacesController) Create(ctx *gin.Context, req models.CreateSpaceReques
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.SpaceSlug) == "" || strings.TrimSpace(req.EncryptedSpaceKey) == "" || strings.TrimSpace(req.PublicKey) == "" || strings.TrimSpace(req.EncryptedSecretKey) == "" || strings.TrimSpace(req.SecretKeyDecryptionNonce) == "" {
+	if strings.TrimSpace(req.SpaceSlug) == "" || strings.TrimSpace(req.EncryptedSpaceKey) == "" || strings.TrimSpace(req.PublicKey) == "" || strings.TrimSpace(req.EncryptedSecretKey) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceSlug, encryptedSpaceKey and space identity keys are required")
 	}
-	if err := validateEncodedSpaceField("encryptedSpaceKey", req.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+	encryptedSpaceKey, err := decodeEncodedSpaceField("encryptedSpaceKey", req.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
-	if err := validateEncodedSpaceField("publicKey", req.PublicKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+	publicKey, err := decodeEncodedSpaceField("publicKey", req.PublicKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
-	if err := validateEncodedSpaceField("encryptedSecretKey", req.EncryptedSecretKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+	encryptedSecretKey, err := decodeEncodedSpaceField("encryptedSecretKey", req.EncryptedSecretKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
-	if err := validateEncodedSpaceField("secretKeyDecryptionNonce", req.SecretKeyDecryptionNonce, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+	encryptedProfile, err := decodeOptionalEncodedSpaceField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
-	if err := validateOptionalEncodedSpaceField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes); err != nil {
-		return nil, err
-	}
-	space, err := c.SpacesRepo.CreateSpace(ctx.Request.Context(), userID, req.SpaceSlug, req.EncryptedSpaceKey, req.PublicKey, req.EncryptedSecretKey, req.SecretKeyDecryptionNonce, req.EncryptedProfile)
+	space, err := c.SpacesRepo.CreateSpace(ctx.Request.Context(), userID, req.SpaceSlug, encryptedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +98,7 @@ func (c *SpacesController) GetProfile(ctx *gin.Context, req models.GetSpaceProfi
 				SpaceID:          space.SpaceID,
 				SpaceSlug:        space.SpaceSlug,
 				Version:          version.Version,
-				EncryptedProfile: version.EncryptedProfile,
+				EncryptedProfile: encodeSpaceField(version.EncryptedProfile),
 				UpdatedAt:        formatMicros(version.CreatedAt),
 				Friends:          friendsCount,
 			}, nil
@@ -107,7 +108,7 @@ func (c *SpacesController) GetProfile(ctx *gin.Context, req models.GetSpaceProfi
 		SpaceID:          space.SpaceID,
 		SpaceSlug:        space.SpaceSlug,
 		Version:          space.CurrentVersion,
-		EncryptedProfile: space.EncryptedProfile,
+		EncryptedProfile: encodeSpaceField(space.EncryptedProfile),
 		UpdatedAt:        formatMicros(space.UpdatedAt),
 		Avatar:           toAvatarResponse(space),
 		Cover:            toCoverResponse(space),
@@ -123,7 +124,8 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.EncryptedProfile) == "" || req.KeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("spaceId, keyVersion and encryptedProfile are required")
 	}
-	if err := validateEncodedSpaceField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes); err != nil {
+	encryptedProfile, err := decodeEncodedSpaceField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
 	if req.RemoveAvatar && req.Avatar != nil {
@@ -172,7 +174,7 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 			Size:     staged.ExpectedSize,
 		}
 	}
-	space, err := c.SpacesRepo.UpdateProfile(ctx.Request.Context(), userID, spaceID, req.KeyVersion, req.EncryptedProfile, avatar, cover, req.RemoveAvatar, req.RemoveCover)
+	space, err := c.SpacesRepo.UpdateProfile(ctx.Request.Context(), userID, spaceID, req.KeyVersion, encryptedProfile, avatar, cover, req.RemoveAvatar, req.RemoveCover)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
@@ -202,7 +204,7 @@ func (c *SpacesController) UpdateSlug(ctx *gin.Context, spaceID string, req mode
 	if err != nil {
 		return nil, err
 	}
-	return &models.SpaceLookupResponse{SpaceID: space.SpaceID, SpaceSlug: space.SpaceSlug, Owner: space.SpaceSlug, PublicKey: publicKey}, nil
+	return &models.SpaceLookupResponse{SpaceID: space.SpaceID, SpaceSlug: space.SpaceSlug, Owner: space.SpaceSlug, PublicKey: encodeSpaceField(publicKey)}, nil
 }
 
 func (c *SpacesController) LookupBySlug(ctx *gin.Context, spaceSlug string) (*models.SpaceLookupResponse, error) {
@@ -218,7 +220,7 @@ func (c *SpacesController) LookupBySlug(ctx *gin.Context, spaceSlug string) (*mo
 		SpaceID:   space.SpaceID,
 		SpaceSlug: space.SpaceSlug,
 		Owner:     space.SpaceSlug,
-		PublicKey: publicKey,
+		PublicKey: encodeSpaceField(publicKey),
 	}, nil
 }
 
@@ -244,13 +246,16 @@ func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKey
 	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.EncryptedSpaceKey) == "" || strings.TrimSpace(req.WrappedPrevKey) == "" || strings.TrimSpace(req.EncryptedProfile) == "" || req.KeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("spaceId, keyVersion, encryptedSpaceKey, wrappedPrevKey and encryptedProfile are required")
 	}
-	if err := validateEncodedSpaceField("encryptedSpaceKey", req.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+	encryptedSpaceKey, err := decodeEncodedSpaceField("encryptedSpaceKey", req.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
-	if err := validateEncodedSpaceField("wrappedPrevKey", req.WrappedPrevKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes); err != nil {
+	wrappedPrevKey, err := decodeEncodedSpaceField("wrappedPrevKey", req.WrappedPrevKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
-	if err := validateEncodedSpaceField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes); err != nil {
+	encryptedProfile, err := decodeEncodedSpaceField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes)
+	if err != nil {
 		return nil, err
 	}
 	current, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, req.SpaceID)
@@ -260,7 +265,7 @@ func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKey
 	if req.KeyVersion != current.CurrentVersion {
 		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
 	}
-	space, err := c.SpacesRepo.RotateKey(ctx.Request.Context(), userID, req.SpaceID, req.KeyVersion, req.EncryptedSpaceKey, req.WrappedPrevKey, req.EncryptedProfile)
+	space, err := c.SpacesRepo.RotateKey(ctx.Request.Context(), userID, req.SpaceID, req.KeyVersion, encryptedSpaceKey, wrappedPrevKey, encryptedProfile)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
@@ -292,8 +297,8 @@ func (c *SpacesController) ListVersions(ctx *gin.Context, req models.GetSpacePro
 			Version:   version.Version,
 			CreatedAt: formatMicros(version.CreatedAt),
 		}
-		if version.WrappedPrevKey.Valid {
-			item.WrappedPrevKey = version.WrappedPrevKey.String
+		if len(version.WrappedPrevKey) > 0 {
+			item.WrappedPrevKey = encodeSpaceField(version.WrappedPrevKey)
 		}
 		resp = append(resp, item)
 	}

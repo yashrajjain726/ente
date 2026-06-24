@@ -25,7 +25,6 @@ type SpaceBrowserSessionBootstrapResponse struct {
 type SpaceEntityKeyRequest struct {
 	Type         string `json:"type" binding:"required"`
 	EncryptedKey string `json:"encryptedKey" binding:"required"`
-	Header       string `json:"header" binding:"required"`
 }
 
 type GetSpaceEntityKeyRequest struct {
@@ -35,7 +34,6 @@ type GetSpaceEntityKeyRequest struct {
 type SpaceEntityKeyResponse struct {
 	Type         string `json:"type"`
 	EncryptedKey string `json:"encryptedKey"`
-	Header       string `json:"header"`
 }
 
 type GetSpaceProfileRequest struct {
@@ -74,14 +72,13 @@ type FriendRelationshipRequest struct {
 }
 
 type SpaceKeyResponse struct {
-	SpaceID                  string `json:"spaceId"`
-	SpaceSlug                string `json:"spaceSlug"`
-	EncryptedSpaceKey        string `json:"encryptedSpaceKey"`
-	PublicKey                string `json:"publicKey,omitempty"`
-	EncryptedSecretKey       string `json:"encryptedSecretKey,omitempty"`
-	SecretKeyDecryptionNonce string `json:"secretKeyDecryptionNonce,omitempty"`
-	EncryptedProfile         string `json:"encryptedProfile,omitempty"`
-	KeyVersion               int    `json:"keyVersion"`
+	SpaceID            string `json:"spaceId"`
+	SpaceSlug          string `json:"spaceSlug"`
+	EncryptedSpaceKey  string `json:"encryptedSpaceKey"`
+	PublicKey          string `json:"publicKey,omitempty"`
+	EncryptedSecretKey string `json:"encryptedSecretKey,omitempty"`
+	EncryptedProfile   string `json:"encryptedProfile,omitempty"`
+	KeyVersion         int    `json:"keyVersion"`
 }
 
 type PresignUploadRequest struct {
@@ -220,12 +217,11 @@ type UpdateSpaceProfileResponse struct {
 }
 
 type CreateSpaceRequest struct {
-	SpaceSlug                string `json:"spaceSlug"`
-	EncryptedSpaceKey        string `json:"encryptedSpaceKey"`
-	PublicKey                string `json:"publicKey"`
-	EncryptedSecretKey       string `json:"encryptedSecretKey"`
-	SecretKeyDecryptionNonce string `json:"secretKeyDecryptionNonce"`
-	EncryptedProfile         string `json:"encryptedProfile"`
+	SpaceSlug          string `json:"spaceSlug"`
+	EncryptedSpaceKey  string `json:"encryptedSpaceKey"`
+	PublicKey          string `json:"publicKey"`
+	EncryptedSecretKey string `json:"encryptedSecretKey"`
+	EncryptedProfile   string `json:"encryptedProfile"`
 }
 
 type SpaceProfileResponse struct {

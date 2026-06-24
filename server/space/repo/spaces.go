@@ -9,7 +9,7 @@ import (
 	"github.com/ente-io/stacktrace"
 )
 
-func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, spaceSlug, encryptedSpaceKey, publicKey, encryptedSecretKey, secretKeyDecryptionNonce, encryptedProfile string) (*SpaceRecord, error) {
+func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, spaceSlug string, encryptedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile []byte) (*SpaceRecord, error) {
 	normalizedSpaceSlug, err := validateSpaceSlug(spaceSlug)
 	if err != nil {
 		return nil, err
@@ -22,9 +22,9 @@ func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, space
 	defer tx.Rollback()
 
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO spaces (space_id, owner_id, space_slug, encrypted_space_key, public_key, encrypted_secret_key, secret_key_decryption_nonce, encrypted_profile, current_version)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1)
-	`, spaceID, ownerID, normalizedSpaceSlug, encryptedSpaceKey, publicKey, encryptedSecretKey, secretKeyDecryptionNonce, encryptedProfile); err != nil {
+		INSERT INTO spaces (space_id, owner_id, space_slug, encrypted_space_key, public_key, encrypted_secret_key, encrypted_profile, current_version)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
+	`, spaceID, ownerID, normalizedSpaceSlug, encryptedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile); err != nil {
 		return nil, wrapUnique(err, "space already exists")
 	}
 	if _, err := tx.ExecContext(ctx, `
@@ -122,8 +122,8 @@ func (r *SpacesRepository) IsOwnerActive(ctx context.Context, ownerID int64) (bo
 	return active, stacktrace.Propagate(err, "")
 }
 
-func (r *SpacesRepository) GetOwnerPublicKey(ctx context.Context, ownerID int64) (string, error) {
-	var publicKey string
+func (r *SpacesRepository) GetOwnerPublicKey(ctx context.Context, ownerID int64) ([]byte, error) {
+	var publicKey []byte
 	err := r.DB.QueryRowContext(ctx, `
 		SELECT public_key
 		FROM spaces
@@ -134,7 +134,7 @@ func (r *SpacesRepository) GetOwnerPublicKey(ctx context.Context, ownerID int64)
 	return publicKey, stacktrace.Propagate(err, "")
 }
 
-func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spaceID string, keyVersion int, encryptedProfile string, avatar *ProfileAssetUpdate, cover *ProfileAssetUpdate, removeAvatar bool, removeCover bool) (*SpaceRecord, error) {
+func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spaceID string, keyVersion int, encryptedProfile []byte, avatar *ProfileAssetUpdate, cover *ProfileAssetUpdate, removeAvatar bool, removeCover bool) (*SpaceRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -217,7 +217,7 @@ func (r *SpacesRepository) UpdateSlug(ctx context.Context, ownerID int64, spaceI
 	return rec, nil
 }
 
-func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID string, keyVersion int, encryptedSpaceKey, wrappedPrevKey, encryptedProfile string) (*SpaceRecord, error) {
+func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID string, keyVersion int, encryptedSpaceKey, wrappedPrevKey, encryptedProfile []byte) (*SpaceRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -243,7 +243,7 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO space_key_versions (space_id, version, encrypted_space_key, encrypted_profile, wrapped_prev_key)
 		VALUES ($1, $2, $3, $4, $5)
-	`, spaceID, newVersion, encryptedSpaceKey, encryptedProfile, strings.TrimSpace(wrappedPrevKey)); err != nil {
+	`, spaceID, newVersion, encryptedSpaceKey, encryptedProfile, wrappedPrevKey); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	if _, err := tx.ExecContext(ctx, `
@@ -317,7 +317,6 @@ func scanSpaceRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceRecord
 		&rec.CurrentVersion,
 		&rec.PublicKey,
 		&rec.EncryptedSecretKey,
-		&rec.SecretKeyDecryptionNonce,
 		&rec.AvatarObjectID,
 		&rec.AvatarBucketID,
 		&rec.AvatarSize,

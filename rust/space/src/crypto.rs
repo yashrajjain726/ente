@@ -1,5 +1,5 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
-use ente_core::crypto::{Key, Nonce, PublicKey, SecretKey, hash, kdf, sealed, secretbox};
+use ente_core::crypto::{Key, Nonce, PublicKey, SecretKey, blob, hash, kdf, sealed, secretbox};
 use md5::{Digest, Md5};
 
 use crate::error::{Result, SpaceError};
@@ -7,7 +7,8 @@ use crate::transport::EntityKeyPayload;
 
 pub const SECRETBOX_NONCE_BYTES: usize = Nonce::BYTES;
 pub const SECRETBOX_MAC_BYTES: usize = secretbox::MAC_BYTES;
-pub const PACKED_SECRETBOX_OVERHEAD_BYTES: usize = 2 + SECRETBOX_NONCE_BYTES + SECRETBOX_MAC_BYTES;
+pub const SECRETBOX_PAYLOAD_OVERHEAD_BYTES: usize = SECRETBOX_NONCE_BYTES + SECRETBOX_MAC_BYTES;
+pub const ASSET_PAYLOAD_OVERHEAD_BYTES: usize = blob::HEADER_BYTES + blob::ABYTES;
 const SPACE_LINK_ACCESS_KEY_LEN: usize = 12;
 const SPACE_LINK_ACCESS_KEY_ALPHABET: &[u8] =
     b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -115,84 +116,34 @@ pub fn derive_space_link_wrap_key(access_key: &[u8]) -> Result<Vec<u8>> {
     Ok(kdf::derive_subkey(&access_key, kdf::KEY_BYTES, 2, SPACE_LINK_WRAP_KDF_CONTEXT)?.to_vec())
 }
 
-pub fn encrypt_secretbox_split(key: &[u8], plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
+pub fn encrypt_secretbox_payload(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
     let key = Key::try_from_slice(key)?;
-    let encrypted = secretbox::encrypt(plaintext, &key);
-    Ok((
-        encrypted.encrypted_data,
-        encrypted.nonce.as_bytes().to_vec(),
-    ))
+    Ok(secretbox::encrypt_combined(plaintext, &key))
 }
 
-pub fn decrypt_secretbox_split(key: &[u8], ciphertext: &[u8], nonce: &[u8]) -> Result<Vec<u8>> {
-    if nonce.len() != SECRETBOX_NONCE_BYTES {
-        return Err(SpaceError::InvalidInput(
-            "invalid secretbox nonce length".into(),
-        ));
-    }
+pub fn decrypt_secretbox_payload(key: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let key = Key::try_from_slice(key)?;
-    let nonce = Nonce::try_from_slice(nonce)?;
-    secretbox::decrypt(ciphertext, &nonce, &key).map_err(Into::into)
-}
-
-pub fn encrypt_secretbox_packed(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
-    let (ciphertext, nonce) = encrypt_secretbox_split(key, plaintext)?;
-    Ok(pack_payload(&ciphertext, &nonce))
-}
-
-pub fn decrypt_secretbox_packed(key: &[u8], packed: &[u8]) -> Result<Vec<u8>> {
-    let (ciphertext, nonce) = unpack_payload(packed)?;
-    decrypt_secretbox_split(key, &ciphertext, &nonce)
+    secretbox::decrypt_combined(payload, &key).map_err(Into::into)
 }
 
 pub fn encrypt_entity_key(master_key: &[u8], plaintext: &[u8]) -> Result<EntityKeyPayload> {
-    let (ciphertext, nonce) = encrypt_secretbox_split(master_key, plaintext)?;
     Ok(EntityKeyPayload {
-        encrypted_key: encode_b64(&ciphertext),
-        header: encode_b64(&nonce),
+        encrypted_key: encode_b64(&encrypt_secretbox_payload(master_key, plaintext)?),
     })
 }
 
 pub fn decrypt_entity_key(master_key: &[u8], payload: &EntityKeyPayload) -> Result<Vec<u8>> {
-    let ciphertext = decode_b64(&payload.encrypted_key)?;
-    let nonce = decode_b64(&payload.header)?;
-    decrypt_secretbox_split(master_key, &ciphertext, &nonce)
-}
-
-pub fn pack_payload(ciphertext: &[u8], nonce: &[u8]) -> Vec<u8> {
-    if ciphertext.is_empty() && nonce.is_empty() {
-        return Vec::new();
-    }
-    let mut out = Vec::with_capacity(2 + nonce.len() + ciphertext.len());
-    out.extend_from_slice(&(nonce.len() as u16).to_be_bytes());
-    out.extend_from_slice(nonce);
-    out.extend_from_slice(ciphertext);
-    out
-}
-
-pub fn unpack_payload(packed: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
-    if packed.is_empty() {
-        return Ok((Vec::new(), Vec::new()));
-    }
-    if packed.len() < 2 {
-        return Err(SpaceError::InvalidInput("packed payload too short".into()));
-    }
-    let nonce_len = u16::from_be_bytes([packed[0], packed[1]]) as usize;
-    if packed.len() < 2 + nonce_len {
-        return Err(SpaceError::InvalidInput("packed payload truncated".into()));
-    }
-    Ok((
-        packed[2 + nonce_len..].to_vec(),
-        packed[2..2 + nonce_len].to_vec(),
-    ))
+    decrypt_secretbox_payload(master_key, &decode_b64(&payload.encrypted_key)?)
 }
 
 pub fn encrypt_asset_payload(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
-    encrypt_secretbox_packed(key, plaintext)
+    let key = Key::try_from_slice(key)?;
+    blob::encrypt_combined(plaintext, &key).map_err(Into::into)
 }
 
 pub fn decrypt_asset_payload(key: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
-    decrypt_secretbox_packed(key, payload)
+    let key = Key::try_from_slice(key)?;
+    blob::decrypt_combined(payload, &key).map_err(Into::into)
 }
 
 #[cfg(test)]
@@ -200,11 +151,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn packed_secretbox_round_trip() {
+    fn secretbox_payload_round_trip() {
         let key = generate_key();
         let plaintext = b"hello space";
-        let packed = encrypt_secretbox_packed(&key, plaintext).unwrap();
-        let decrypted = decrypt_secretbox_packed(&key, &packed).unwrap();
+        let payload = encrypt_secretbox_payload(&key, plaintext).unwrap();
+        let decrypted = decrypt_secretbox_payload(&key, &payload).unwrap();
         assert_eq!(decrypted, plaintext);
     }
 

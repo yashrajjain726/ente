@@ -15,15 +15,15 @@ var (
 	ErrLinkAuthKeyReused       = errors.New("space link auth key has already been used")
 )
 
-func (r *LinksRepository) UpsertLink(ctx context.Context, spaceID string, authKeyHash []byte, keyVersion int, encryptedSpaceKey string, encryptedAccessKey string) (*SpaceLinkRecord, error) {
+func (r *LinksRepository) UpsertLink(ctx context.Context, spaceID string, authKeyHash []byte, keyVersion int, encryptedSpaceKey []byte, encryptedAccessKey []byte) (*SpaceLinkRecord, error) {
 	return r.writeLink(ctx, spaceID, authKeyHash, keyVersion, encryptedSpaceKey, encryptedAccessKey, false)
 }
 
-func (r *LinksRepository) RotateLink(ctx context.Context, spaceID string, authKeyHash []byte, keyVersion int, encryptedSpaceKey string, encryptedAccessKey string) (*SpaceLinkRecord, error) {
+func (r *LinksRepository) RotateLink(ctx context.Context, spaceID string, authKeyHash []byte, keyVersion int, encryptedSpaceKey []byte, encryptedAccessKey []byte) (*SpaceLinkRecord, error) {
 	return r.writeLink(ctx, spaceID, authKeyHash, keyVersion, encryptedSpaceKey, encryptedAccessKey, true)
 }
 
-func (r *LinksRepository) writeLink(ctx context.Context, spaceID string, authKeyHash []byte, keyVersion int, encryptedSpaceKey string, encryptedAccessKey string, rotate bool) (*SpaceLinkRecord, error) {
+func (r *LinksRepository) writeLink(ctx context.Context, spaceID string, authKeyHash []byte, keyVersion int, encryptedSpaceKey []byte, encryptedAccessKey []byte, rotate bool) (*SpaceLinkRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
