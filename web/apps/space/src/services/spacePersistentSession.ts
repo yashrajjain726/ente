@@ -5,11 +5,18 @@ import {
 import {
     decryptBox,
     encryptBox,
+    fromB64,
     generateKey,
+    toB64,
 } from "ente-accounts-rs/services/crypto";
 import { ensureOk, publicRequestHeaders } from "ente-base/http";
 import { apiURL } from "ente-base/origins";
 import { removeAuthToken } from "ente-base/token";
+import {
+    Key,
+    secretboxDecryptCombined,
+    secretboxEncryptCombined,
+} from "ente-wasm-core";
 import { spaceBootstrapAuthHeaders } from "services/spaceBootstrapAuth";
 import {
     clearSpaceSecureSessionStorage,
@@ -35,10 +42,32 @@ const SpaceBrowserSessionBootstrapResponse = z.object({
     sessionWrapKey: z.string(),
 });
 
-const SpaceEntityKeyResponse = z.object({
-    encryptedKey: z.string(),
-    header: z.string(),
-});
+const SpaceEntityKeyResponse = z.object({ encryptedKey: z.string() });
+
+const masterKeyToSecretboxKey = async (masterKey: string) =>
+    Key.fromBytes(await fromB64(masterKey));
+
+const encryptSpaceRootEntityKey = async (
+    spaceRootKey: string,
+    masterKey: string,
+) =>
+    toB64(
+        await secretboxEncryptCombined(
+            await fromB64(spaceRootKey),
+            await masterKeyToSecretboxKey(masterKey),
+        ),
+    );
+
+const decryptSpaceRootEntityKey = async (
+    encryptedKey: string,
+    masterKey: string,
+) =>
+    toB64(
+        await secretboxDecryptCombined(
+            await fromB64(encryptedKey),
+            await masterKeyToSecretboxKey(masterKey),
+        ),
+    );
 
 const savedPersistedSession = () => {
     const value = localStorage.getItem(spaceBrowserSessionStorageKey);
@@ -162,25 +191,18 @@ export const getOrCreateSpaceRootKey = async (
     authToken: string,
 ) => {
     const candidate = await generateKey();
-    const box = await encryptBox(candidate, masterKey);
+    const encryptedKey = await encryptSpaceRootEntityKey(candidate, masterKey);
     const res = await fetch(await apiURL("/space/entity-key/ensure"), {
         method: "POST",
         headers: {
             ...spaceBootstrapAuthHeaders(authToken),
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-            type: "space",
-            encryptedKey: box.encryptedData,
-            header: box.nonce,
-        }),
+        body: JSON.stringify({ type: "space", encryptedKey }),
     });
     ensureOk(res);
     const ensured = SpaceEntityKeyResponse.parse(await res.json());
-    return decryptBox(
-        { encryptedData: ensured.encryptedKey, nonce: ensured.header },
-        masterKey,
-    );
+    return decryptSpaceRootEntityKey(ensured.encryptedKey, masterKey);
 };
 
 export const revokeSpaceBrowserSession = async () => {
