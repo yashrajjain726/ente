@@ -126,6 +126,7 @@ impl From<AccountsClientConfig> for HttpConfig {
             client_package: Some(value.client_package),
             client_version: value.client_version,
             timeout_secs: value.timeout_secs,
+            ..HttpConfig::default()
         }
     }
 }

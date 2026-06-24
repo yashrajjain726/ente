@@ -87,6 +87,7 @@ impl ContactsCtx {
             client_package: input.client_package,
             client_version: input.client_version,
             timeout_secs: Some(30),
+            ..HttpConfig::default()
         })?;
 
         let (root_contact_key, wrapped_root_contact_key, root_key_source) =

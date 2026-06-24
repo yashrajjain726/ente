@@ -11,7 +11,6 @@ use crate::crypto::{
     space_link_access_key_material,
 };
 use crate::error::{Result, SpaceError};
-use crate::http::{HttpClient, HttpConfig};
 use crate::models::{
     CreatedSpace, CreatedSpaceLink, DecryptedFriendShare, DecryptedMessage, DecryptedPost,
     DecryptedSpaceProfile, FeedItem, FeedPage, HydratedKeys, MessagePayload, MessageQuote,
@@ -34,8 +33,9 @@ use crate::transport::{
 };
 use ente_core::{
     crypto::{decode_b64, encode_b64},
-    http::Error as HttpError,
+    http::{Error as HttpError, HttpClient, HttpConfig},
 };
+const SPACE_SESSION_TOKEN_HEADER: &str = "X-Space-Session-Token";
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
 const UPLOAD_PURPOSE_COVER: &str = "cover";
 const MESSAGE_KIND_REGULAR: &str = "regular";
@@ -2157,10 +2157,13 @@ fn build_http_client(
     client_package: Option<String>,
     client_version: Option<String>,
 ) -> Result<HttpClient> {
+    let extra_auth_headers = space_session_token
+        .map(|token| vec![(SPACE_SESSION_TOKEN_HEADER.to_owned(), token)])
+        .unwrap_or_default();
     HttpClient::new_with_config(HttpConfig {
         base_url: base_url.to_owned(),
         auth_token,
-        space_session_token,
+        extra_auth_headers,
         user_agent,
         client_package,
         client_version,

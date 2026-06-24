@@ -232,6 +232,8 @@ pub struct HttpConfig {
     pub base_url: String,
     /// Optional auth token sent via `X-Auth-Token`.
     pub auth_token: Option<String>,
+    /// Additional sensitive headers sent only on authenticated API requests.
+    pub extra_auth_headers: Vec<(String, String)>,
     /// Optional user agent.
     pub user_agent: Option<String>,
     /// Optional client package header.
@@ -250,6 +252,14 @@ impl std::fmt::Debug for HttpConfig {
                 "auth_token",
                 &self.auth_token.as_ref().map(|_| "<redacted>"),
             )
+            .field(
+                "extra_auth_headers",
+                &self
+                    .extra_auth_headers
+                    .iter()
+                    .map(|(name, _)| (name, "<redacted>"))
+                    .collect::<Vec<_>>(),
+            )
             .field("user_agent", &self.user_agent)
             .field("client_package", &self.client_package)
             .field("client_version", &self.client_version)
@@ -265,6 +275,7 @@ pub struct HttpClient {
     base_url: String,
     base_origin: Option<Url>,
     auth_token: RwLock<Option<Zeroizing<String>>>,
+    extra_auth_headers: Vec<(HeaderName, Zeroizing<String>)>,
     #[cfg(not(target_arch = "wasm32"))]
     user_agent: Option<String>,
     client_package: Option<String>,
@@ -289,6 +300,7 @@ impl HttpClient {
     /// Create a client with auth/header configuration.
     pub fn new_with_config(config: HttpConfig) -> Result<Self, Error> {
         let base_url = config.base_url.trim_end_matches('/').to_string();
+        let extra_auth_headers = validate_extra_auth_headers(config.extra_auth_headers)?;
         let base_origin = Url::parse(&base_url).ok().and_then(|base| {
             if base.query().is_none() && base.fragment().is_none() {
                 Some(base)
@@ -322,6 +334,7 @@ impl HttpClient {
             base_url,
             base_origin,
             auth_token: RwLock::new(config.auth_token.map(Zeroizing::new)),
+            extra_auth_headers,
             #[cfg(not(target_arch = "wasm32"))]
             user_agent: config.user_agent,
             client_package: config.client_package,
@@ -614,6 +627,11 @@ impl HttpClient {
                 HeaderValue::from_str(auth_token).map_err(|e| Error::Parse(e.to_string()))?;
             headers.insert(TOKEN_HEADER, token);
         }
+        for (name, value) in &self.extra_auth_headers {
+            let header_value =
+                HeaderValue::from_str(value).map_err(|e| Error::Parse(e.to_string()))?;
+            headers.insert(name.clone(), header_value);
+        }
         Ok(headers)
     }
 
@@ -720,6 +738,20 @@ fn build_header_map(headers: &[(&str, String)]) -> Result<HeaderMap, Error> {
         header_map.insert(header_name, header_value);
     }
     Ok(header_map)
+}
+
+fn validate_extra_auth_headers(
+    headers: Vec<(String, String)>,
+) -> Result<Vec<(HeaderName, Zeroizing<String>)>, Error> {
+    headers
+        .into_iter()
+        .map(|(name, value)| {
+            let header_name =
+                HeaderName::from_bytes(name.as_bytes()).map_err(|e| Error::Parse(e.to_string()))?;
+            HeaderValue::from_str(&value).map_err(|e| Error::Parse(e.to_string()))?;
+            Ok((header_name, Zeroizing::new(value)))
+        })
+        .collect()
 }
 
 fn parse_url(url: &str) -> Result<Url, Error> {
@@ -927,7 +959,7 @@ mod tests {
             user_agent: Some("ente-core-test".to_string()),
             client_package: Some("io.ente.photos".to_string()),
             client_version: Some("1.0.0".to_string()),
-            timeout_secs: None,
+            ..HttpConfig::default()
         })
         .unwrap();
 
@@ -970,7 +1002,7 @@ mod tests {
             user_agent: Some("ente-core-test".to_string()),
             client_package: Some("io.ente.photos".to_string()),
             client_version: Some("1.0.0".to_string()),
-            timeout_secs: None,
+            ..HttpConfig::default()
         })
         .unwrap();
         let object_store = client.object_store();
@@ -1022,10 +1054,7 @@ mod tests {
         let client = HttpClient::new_with_config(HttpConfig {
             base_url: server.url(),
             auth_token: Some("auth-token".to_string()),
-            user_agent: None,
-            client_package: None,
-            client_version: None,
-            timeout_secs: None,
+            ..HttpConfig::default()
         })
         .unwrap();
 
@@ -1070,7 +1099,7 @@ mod tests {
             user_agent: Some("ente-core-test".to_string()),
             client_package: Some("io.ente.photos".to_string()),
             client_version: Some("1.0.0".to_string()),
-            timeout_secs: None,
+            ..HttpConfig::default()
         })
         .unwrap();
 

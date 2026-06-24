@@ -158,6 +158,7 @@ impl LegacyKitRecoveryClient {
             client_package,
             client_version,
             timeout_secs: Some(30),
+            ..HttpConfig::default()
         })?;
         Ok(Self {
             http: Arc::new(http),

@@ -2637,14 +2637,11 @@ dependencies = [
  "ente-core",
  "md-5 0.11.0",
  "mockito",
- "reqwest 0.12.28",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
- "url",
  "urlencoding",
- "zeroize",
 ]
 
 [[package]]
