@@ -323,11 +323,6 @@ func decodeCreateMessageRequest(req models.CreateMessageRequest) ([]byte, []byte
 	return messageCipher, senderEncryptedMessageKey, recipientEncryptedMessageKey, nil
 }
 
-func validateCreateMessageRequest(req models.CreateMessageRequest) error {
-	_, _, _, err := decodeCreateMessageRequest(req)
-	return err
-}
-
 func toMessageResponse(message repo.SpaceMessageRecord) *models.MessageResponse {
 	resp := &models.MessageResponse{
 		MessageID:           message.MessageID,

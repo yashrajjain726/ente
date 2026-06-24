@@ -3,7 +3,6 @@ use ente_core::crypto::{Key, Nonce, PublicKey, SecretKey, blob, hash, kdf, seale
 use md5::{Digest, Md5};
 
 use crate::error::{Result, SpaceError};
-use crate::transport::EntityKeyPayload;
 
 pub const SECRETBOX_NONCE_BYTES: usize = Nonce::BYTES;
 pub const SECRETBOX_MAC_BYTES: usize = secretbox::MAC_BYTES;
@@ -124,16 +123,6 @@ pub fn encrypt_secretbox_payload(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>
 pub fn decrypt_secretbox_payload(key: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let key = Key::try_from_slice(key)?;
     secretbox::decrypt_combined(payload, &key).map_err(Into::into)
-}
-
-pub fn encrypt_entity_key(master_key: &[u8], plaintext: &[u8]) -> Result<EntityKeyPayload> {
-    Ok(EntityKeyPayload {
-        encrypted_key: encode_b64(&encrypt_secretbox_payload(master_key, plaintext)?),
-    })
-}
-
-pub fn decrypt_entity_key(master_key: &[u8], payload: &EntityKeyPayload) -> Result<Vec<u8>> {
-    decrypt_secretbox_payload(master_key, &decode_b64(&payload.encrypted_key)?)
 }
 
 pub fn encrypt_asset_payload(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {

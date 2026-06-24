@@ -22,22 +22,12 @@ const (
 	maxSpaceLinkSessionTokenBytes        = 256
 )
 
-func validateEncodedSpaceField(field string, value string, maxEncodedBytes int, maxDecodedBytes int) error {
-	_, err := decodeEncodedSpaceField(field, value, maxEncodedBytes, maxDecodedBytes)
-	return err
-}
-
 func decodeEncodedSpaceField(field string, value string, maxEncodedBytes int, maxDecodedBytes int) ([]byte, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return nil, ente.NewBadRequestWithMessage(field + " is required")
 	}
 	return decodeOptionalEncodedSpaceField(field, trimmed, maxEncodedBytes, maxDecodedBytes)
-}
-
-func validateOptionalEncodedSpaceField(field string, value string, maxEncodedBytes int, maxDecodedBytes int) error {
-	_, err := decodeOptionalEncodedSpaceField(field, value, maxEncodedBytes, maxDecodedBytes)
-	return err
 }
 
 func decodeOptionalEncodedSpaceField(field string, value string, maxEncodedBytes int, maxDecodedBytes int) ([]byte, error) {
@@ -56,13 +46,6 @@ func decodeOptionalEncodedSpaceField(field string, value string, maxEncodedBytes
 		return nil, ente.NewBadRequestWithMessage(field + " is too large")
 	}
 	return decoded, nil
-}
-
-func validateOptionalEncodedSpacePointerField(field string, value *string, maxEncodedBytes int, maxDecodedBytes int) error {
-	if value == nil {
-		return nil
-	}
-	return validateOptionalEncodedSpaceField(field, *value, maxEncodedBytes, maxDecodedBytes)
 }
 
 func decodeOptionalEncodedSpacePointerField(field string, value *string, maxEncodedBytes int, maxDecodedBytes int) ([]byte, error) {

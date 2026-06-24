@@ -126,21 +126,23 @@ func TestValidateCreateMessageRequestLimits(t *testing.T) {
 		SenderEncryptedMessageKey:    spaceTestB64("sender-key"),
 		RecipientEncryptedMessageKey: spaceTestB64("recipient-key"),
 	}
-	require.NoError(t, validateCreateMessageRequest(valid))
+	_, _, _, err := decodeCreateMessageRequest(valid)
+	require.NoError(t, err)
 
 	invalidBase64 := valid
 	invalidBase64.MessageCipher = "not-base64"
-	require.Error(t, validateCreateMessageRequest(invalidBase64))
+	_, _, _, err = decodeCreateMessageRequest(invalidBase64)
+	require.Error(t, err)
 
 	tooLargeCipher := valid
 	tooLargeCipher.MessageCipher = base64.StdEncoding.EncodeToString(make([]byte, maxSpaceMessageCipherDecodedBytes+1))
-	err := validateCreateMessageRequest(tooLargeCipher)
+	_, _, _, err = decodeCreateMessageRequest(tooLargeCipher)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "messageCipher is too large")
 
 	tooLargeKey := valid
 	tooLargeKey.SenderEncryptedMessageKey = base64.StdEncoding.EncodeToString(make([]byte, maxSpaceMessageKeyDecodedBytes+1))
-	err = validateCreateMessageRequest(tooLargeKey)
+	_, _, _, err = decodeCreateMessageRequest(tooLargeKey)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "senderEncryptedMessageKey is too large")
 }
