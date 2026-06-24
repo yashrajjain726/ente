@@ -53,6 +53,15 @@ pub const MAX_SPACE_MESSAGE_CIPHER_DECODED_BYTES: usize = 6 * 1024;
 pub const MAX_SPACE_MESSAGE_PAYLOAD_BYTES: usize =
     MAX_SPACE_MESSAGE_CIPHER_DECODED_BYTES - PACKED_SECRETBOX_OVERHEAD_BYTES;
 
+fn profile_object_id_from_key(object_key: &str) -> Result<String> {
+    object_key
+        .rsplit('/')
+        .next()
+        .filter(|value| !value.trim().is_empty() && !value.contains('/'))
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| SpaceError::InvalidInput("invalid profile asset object key".into()))
+}
+
 #[derive(Debug, Clone)]
 struct ResolvedSpaceAccess {
     space_key: Vec<u8>,
@@ -699,9 +708,40 @@ impl AccountSpaceCtx {
         };
         self.upload_bytes(&presign, &encrypted).await?;
         Ok(ProfileAvatarPayload {
-            object_key: presign.object_key,
+            object_id: profile_object_id_from_key(&presign.object_key)?,
             size: Some(encrypted.len() as i64),
         })
+    }
+
+    pub async fn get_profile_asset_url(
+        &self,
+        space_id: &str,
+        asset_type: &str,
+        object_id: &str,
+    ) -> Result<AssetDownloadResponse> {
+        let query = vec![
+            ("spaceId", space_id.to_owned()),
+            ("assetType", asset_type.to_owned()),
+            ("objectID", object_id.to_owned()),
+        ];
+        self.client
+            .get_json("/space/assets/redirect", &query)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn download_profile_asset(
+        &self,
+        space_id: &str,
+        asset_type: &str,
+        object_id: &str,
+        key: &[u8],
+    ) -> Result<Vec<u8>> {
+        let download = self
+            .get_profile_asset_url(space_id, asset_type, object_id)
+            .await?;
+        let encrypted = self.client.object_store().get_bytes(&download.url).await?;
+        crate::crypto::decrypt_asset_payload(key, &encrypted)
     }
 
     pub async fn get_asset_url(
@@ -2068,6 +2108,32 @@ impl SpaceLinkCtx {
             .map_err(Into::into)
     }
 
+    pub async fn get_profile_asset_url(
+        &self,
+        asset_type: &str,
+        object_id: &str,
+    ) -> Result<AssetDownloadResponse> {
+        let query = vec![
+            ("spaceId", self.space_id.clone()),
+            ("assetType", asset_type.to_owned()),
+            ("objectID", object_id.to_owned()),
+        ];
+        self.client
+            .get_json("/space/assets/redirect", &query)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn download_profile_asset(
+        &self,
+        asset_type: &str,
+        object_id: &str,
+    ) -> Result<Vec<u8>> {
+        let download = self.get_profile_asset_url(asset_type, object_id).await?;
+        let encrypted = self.client.object_store().get_bytes(&download.url).await?;
+        crate::crypto::decrypt_asset_payload(self.space_key(), &encrypted)
+    }
+
     pub async fn download_encrypted_asset(&self, object_key: &str) -> Result<Vec<u8>> {
         let download = self.get_asset_url(object_key).await?;
         self.client
@@ -2883,7 +2949,7 @@ mod tests {
             .await
             .expect("avatar upload should succeed");
 
-        assert_eq!(payload.object_key, "avatar-object");
+        assert_eq!(payload.object_id, "avatar-object");
         assert!(payload.size.unwrap_or_default() > 0);
         presign.assert_async().await;
         upload.assert_async().await;
@@ -2944,10 +3010,111 @@ mod tests {
             .await
             .expect("cover upload should succeed");
 
-        assert_eq!(payload.object_key, "cover-object");
+        assert_eq!(payload.object_id, "cover-object");
         assert!(payload.size.unwrap_or_default() > 0);
         presign.assert_async().await;
         upload.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn account_download_profile_avatar_uses_object_id_redirect() {
+        let mut server = Server::new_async().await;
+        let ctx = test_account_ctx(&server.url());
+        let space_key = generate_key();
+        let encrypted_asset =
+            encrypt_asset_payload(&space_key, b"avatar-image").expect("asset encryption");
+        let redirect = server
+            .mock("GET", "/space/assets/redirect")
+            .match_header("x-space-session-token", "space-session-token")
+            .match_query(Matcher::AllOf(vec![
+                Matcher::UrlEncoded("spaceId".into(), "space_owner_main".into()),
+                Matcher::UrlEncoded("assetType".into(), "avatar".into()),
+                Matcher::UrlEncoded("objectID".into(), "avatar-object".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "url": format!("{}/objects/avatar-object", server.url()),
+                    "expiresIn": 900
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let object = server
+            .mock("GET", "/objects/avatar-object")
+            .with_status(200)
+            .with_body(encrypted_asset)
+            .create_async()
+            .await;
+
+        let bytes = ctx
+            .download_profile_asset("space_owner_main", "avatar", "avatar-object", &space_key)
+            .await
+            .expect("avatar asset should download and decrypt");
+
+        assert_eq!(bytes, b"avatar-image");
+        redirect.assert_async().await;
+        object.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn space_link_download_profile_cover_uses_object_id_redirect() {
+        let mut server = Server::new_async().await;
+        let space_key = generate_key();
+        let encrypted_asset =
+            encrypt_asset_payload(&space_key, b"cover-image").expect("asset encryption");
+        let redirect = server
+            .mock("GET", "/space/assets/redirect")
+            .match_header("x-auth-token", "link-token")
+            .match_query(Matcher::AllOf(vec![
+                Matcher::UrlEncoded("spaceId".into(), "space_owner_gallery".into()),
+                Matcher::UrlEncoded("assetType".into(), "cover".into()),
+                Matcher::UrlEncoded("objectID".into(), "cover-object".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                json!({
+                    "url": format!("{}/objects/cover-object", server.url()),
+                    "expiresIn": 900
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+        let object = server
+            .mock("GET", "/objects/cover-object")
+            .with_status(200)
+            .with_body(encrypted_asset)
+            .create_async()
+            .await;
+        let ctx = SpaceLinkCtx {
+            client: build_http_client(
+                &server.url(),
+                Some("link-token".to_owned()),
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("http client"),
+            session_token: "link-token".to_owned(),
+            owner_handle: "owner".to_owned(),
+            space_id: "space_owner_gallery".to_owned(),
+            space_slug: "owner-gallery".to_owned(),
+            owner_public_key: Vec::new(),
+            space_key,
+            key_version: 1,
+        };
+
+        let bytes = ctx
+            .download_profile_asset("cover", "cover-object")
+            .await
+            .expect("cover asset should download and decrypt");
+
+        assert_eq!(bytes, b"cover-image");
+        redirect.assert_async().await;
+        object.assert_async().await;
     }
 
     #[tokio::test]
@@ -3207,10 +3374,10 @@ mod tests {
                 Matcher::Regex("\"keyVersion\":3".into()),
                 Matcher::Regex("\"encryptedProfile\":\"[^\"]+\"".into()),
                 Matcher::Regex("\"avatar\"".into()),
-                Matcher::Regex("\"objectKey\":\"avatar-object\"".into()),
+                Matcher::Regex("\"objectID\":\"avatar-object\"".into()),
                 Matcher::Regex("\"size\":123".into()),
                 Matcher::Regex("\"cover\"".into()),
-                Matcher::Regex("\"objectKey\":\"cover-object\"".into()),
+                Matcher::Regex("\"objectID\":\"cover-object\"".into()),
                 Matcher::Regex("\"size\":456".into()),
             ]))
             .with_status(200)
@@ -3218,12 +3385,12 @@ mod tests {
                 json!({
                     "status": "ok",
                     "avatar": {
-                        "objectKey": "avatar-object",
+                        "objectID": "avatar-object",
                         "size": 123,
                         "updatedAt": "2026-04-16T00:00:00Z"
                     },
                     "cover": {
-                        "objectKey": "cover-object",
+                        "objectID": "cover-object",
                         "size": 456,
                         "updatedAt": "2026-04-16T00:00:00Z"
                     }
@@ -3238,11 +3405,11 @@ mod tests {
                 "space_owner_main",
                 b"profile-v2",
                 Some(ProfileAvatarPayload {
-                    object_key: "avatar-object".to_owned(),
+                    object_id: "avatar-object".to_owned(),
                     size: Some(123),
                 }),
                 Some(ProfileCoverPayload {
-                    object_key: "cover-object".to_owned(),
+                    object_id: "cover-object".to_owned(),
                     size: Some(456),
                 }),
                 false,
@@ -3256,14 +3423,14 @@ mod tests {
             response
                 .avatar
                 .as_ref()
-                .map(|avatar| avatar.object_key.as_str()),
+                .map(|avatar| avatar.object_id.as_str()),
             Some("avatar-object")
         );
         assert_eq!(
             response
                 .cover
                 .as_ref()
-                .map(|cover| cover.object_key.as_str()),
+                .map(|cover| cover.object_id.as_str()),
             Some("cover-object")
         );
         spaces.assert_async().await;

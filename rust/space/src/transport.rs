@@ -328,7 +328,8 @@ pub struct SpaceActorResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ProfileAvatarPayload {
-    pub object_key: String,
+    #[serde(rename = "objectID")]
+    pub object_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<i64>,
 }
@@ -336,7 +337,8 @@ pub struct ProfileAvatarPayload {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ProfileAvatarResponse {
-    pub object_key: String,
+    #[serde(rename = "objectID")]
+    pub object_id: String,
     #[serde(default)]
     pub size: i64,
     #[serde(default)]
@@ -411,7 +413,10 @@ pub struct SpaceKeyVersionResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::{AssetDownloadResponse, MessageConversationActivity};
+    use super::{
+        AssetDownloadResponse, MessageConversationActivity, MessageConversationPage,
+        ProfileAvatarPayload, ProfileCoverPayload, SpaceProfileResponse, UpdateSpaceProfileRequest,
+    };
 
     #[test]
     fn asset_download_response_deserializes_camel_case() {
@@ -429,6 +434,101 @@ mod tests {
         )
         .expect("activity should deserialize");
         assert!(activity.outgoing);
+    }
+
+    #[test]
+    fn profile_asset_payloads_serialize_object_id_for_avatar_and_cover() {
+        let request = UpdateSpaceProfileRequest {
+            space_id: "space_owner_main".to_owned(),
+            key_version: 3,
+            encrypted_profile: "encrypted-profile".to_owned(),
+            avatar: Some(ProfileAvatarPayload {
+                object_id: "avatar-object".to_owned(),
+                size: Some(123),
+            }),
+            cover: Some(ProfileCoverPayload {
+                object_id: "cover-object".to_owned(),
+                size: Some(456),
+            }),
+            remove_avatar: false,
+            remove_cover: false,
+        };
+
+        let value = serde_json::to_value(&request).expect("profile request should serialize");
+
+        assert_eq!(value["avatar"]["objectID"], "avatar-object");
+        assert_eq!(value["cover"]["objectID"], "cover-object");
+        assert!(value["avatar"].get("objectId").is_none());
+        assert!(value["cover"].get("objectId").is_none());
+    }
+
+    #[test]
+    fn profile_asset_responses_deserialize_object_id_for_avatar_and_cover() {
+        let response: SpaceProfileResponse = serde_json::from_str(
+            r#"{
+                "spaceId":"space_owner_main",
+                "spaceSlug":"owner-main",
+                "version":3,
+                "avatar":{"objectID":"avatar-object","size":123,"updatedAt":"2026-04-16T00:00:00Z"},
+                "cover":{"objectID":"cover-object","size":456,"updatedAt":"2026-04-17T00:00:00Z"}
+            }"#,
+        )
+        .expect("profile response should deserialize");
+
+        assert_eq!(
+            response
+                .avatar
+                .as_ref()
+                .map(|avatar| avatar.object_id.as_str()),
+            Some("avatar-object")
+        );
+        assert_eq!(
+            response
+                .cover
+                .as_ref()
+                .map(|cover| cover.object_id.as_str()),
+            Some("cover-object")
+        );
+    }
+
+    #[test]
+    fn message_conversation_response_deserializes_minimal_embedded_actors() {
+        let page: MessageConversationPage = serde_json::from_str(
+            r#"{
+                "items":[{
+                    "friend":{"spaceSlug":"friend-main"},
+                    "latestActivity":{
+                        "id":"message:msg_1",
+                        "type":"message",
+                        "createdAt":"2026-05-25T00:00:00Z",
+                        "message":{
+                            "messageId":"msg_1",
+                            "kind":"regular",
+                            "sender":{"spaceSlug":"owner-main"},
+                            "recipient":{"spaceSlug":"friend-main"},
+                            "text":"hello",
+                            "createdAt":"2026-05-25T00:00:00Z",
+                            "updatedAt":"2026-05-25T00:00:00Z"
+                        }
+                    }
+                }]
+            }"#,
+        )
+        .expect("conversation page should deserialize");
+
+        let conversation = &page.items[0];
+        assert_eq!(conversation.friend.space_slug, "friend-main");
+        assert_eq!(conversation.friend.user_id, 0);
+        let message = conversation
+            .latest_activity
+            .message
+            .as_ref()
+            .expect("latest activity message should be preserved");
+        assert_eq!(message.sender.space_slug, "owner-main");
+        assert_eq!(message.sender.user_id, 0);
+        assert_eq!(message.sender.public_key, "");
+        assert_eq!(message.recipient.space_slug, "friend-main");
+        assert_eq!(message.recipient.space_id, "");
     }
 }
 

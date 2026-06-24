@@ -1032,7 +1032,7 @@ impl SpaceAccountCtxHandle {
     pub async fn download_space_avatar(
         &self,
         space_id: String,
-        object_key: String,
+        object_id: String,
     ) -> Result<Vec<u8>, WasmSpaceError> {
         let space_key = self
             .inner
@@ -1042,7 +1042,7 @@ impl SpaceAccountCtxHandle {
                 CoreSpaceError::InvalidInput(format!("no space key available for {space_id}"))
             })?;
         self.inner
-            .download_decrypted_asset(&space_id, &object_key, &space_key)
+            .download_profile_asset(&space_id, "avatar", &object_id, &space_key)
             .await
             .map_err(Into::into)
     }
@@ -1051,7 +1051,7 @@ impl SpaceAccountCtxHandle {
     pub async fn download_space_cover(
         &self,
         space_id: String,
-        object_key: String,
+        object_id: String,
     ) -> Result<Vec<u8>, WasmSpaceError> {
         let space_key = self
             .inner
@@ -1061,7 +1061,7 @@ impl SpaceAccountCtxHandle {
                 CoreSpaceError::InvalidInput(format!("no space key available for {space_id}"))
             })?;
         self.inner
-            .download_decrypted_asset(&space_id, &object_key, &space_key)
+            .download_profile_asset(&space_id, "cover", &object_id, &space_key)
             .await
             .map_err(Into::into)
     }
@@ -1347,21 +1347,18 @@ impl SpaceLinkCtxHandle {
     /// Download and decrypt the public space avatar.
     pub async fn download_space_avatar(
         &self,
-        object_key: String,
+        object_id: String,
     ) -> Result<Vec<u8>, WasmSpaceError> {
         self.inner
-            .download_decrypted_asset(&object_key, self.inner.space_key())
+            .download_profile_asset("avatar", &object_id)
             .await
             .map_err(Into::into)
     }
 
     /// Download and decrypt the public space cover.
-    pub async fn download_space_cover(
-        &self,
-        object_key: String,
-    ) -> Result<Vec<u8>, WasmSpaceError> {
+    pub async fn download_space_cover(&self, object_id: String) -> Result<Vec<u8>, WasmSpaceError> {
         self.inner
-            .download_decrypted_asset(&object_key, self.inner.space_key())
+            .download_profile_asset("cover", &object_id)
             .await
             .map_err(Into::into)
     }
