@@ -14,140 +14,20 @@ const (
 	maxSpaceSlugLength = 30
 )
 
-var spaceSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
+var spaceSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._]*$`)
 
 func normalizeSlug(input string) string {
 	return strings.ToLower(strings.TrimSpace(input))
 }
 
-var reservedSpaceSlugs = map[string]struct{}{
-	"about":          {},
-	"abuse":          {},
-	"account":        {},
-	"accounts":       {},
-	"add":            {},
-	"admin":          {},
-	"administrator":  {},
-	"admins":         {},
-	"all":            {},
-	"anonymous":      {},
-	"api":            {},
-	"app":            {},
-	"apps":           {},
-	"asset":          {},
-	"assets":         {},
-	"auth":           {},
-	"authentication": {},
-	"avatar":         {},
-	"blog":           {},
-	"cdn":            {},
-	"contact":        {},
-	"create":         {},
-	"css":            {},
-	"dashboard":      {},
-	"delete":         {},
-	"deleted":        {},
-	"dev":            {},
-	"developer":      {},
-	"developers":     {},
-	"docs":           {},
-	"edit":           {},
-	"email":          {},
-	"faq":            {},
-	"favicon":        {},
-	"feed":           {},
-	"feedback":       {},
-	"friend":         {},
-	"friends":        {},
-	"ftp":            {},
-	"guest":          {},
-	"help":           {},
-	"home":           {},
-	"hostmaster":     {},
-	"html":           {},
-	"image":          {},
-	"images":         {},
-	"imap":           {},
-	"img":            {},
-	"invite":         {},
-	"join":           {},
-	"js":             {},
-	"json":           {},
-	"legal":          {},
-	"like":           {},
-	"likes":          {},
-	"link":           {},
-	"links":          {},
-	"login":          {},
-	"logout":         {},
-	"mail":           {},
-	"mailer":         {},
-	"me":             {},
-	"mod":            {},
-	"moderator":      {},
-	"museum":         {},
-	"new":            {},
-	"no-reply":       {},
-	"no_reply":       {},
-	"noreply":        {},
-	"notifications":  {},
-	"null":           {},
-	"official":       {},
-	"owner":          {},
-	"passkeys":       {},
-	"pop":            {},
-	"post":           {},
-	"postmaster":     {},
-	"posts":          {},
-	"privacy":        {},
-	"private":        {},
-	"profile":        {},
-	"public":         {},
-	"recover":        {},
-	"register":       {},
-	"registration":   {},
-	"remove":         {},
-	"robots":         {},
-	"root":           {},
-	"search":         {},
-	"security":       {},
-	"self":           {},
-	"settings":       {},
-	"setup-profile":  {},
-	"setup_profile":  {},
-	"share":          {},
-	"shares":         {},
-	"signin":         {},
-	"signout":        {},
-	"signup":         {},
-	"sitemap":        {},
-	"smtp":           {},
-	"ssh":            {},
-	"staff":          {},
-	"static":         {},
-	"status":         {},
-	"support":        {},
-	"system":         {},
-	"team":           {},
-	"terms":          {},
-	"tos":            {},
-	"two-factor":     {},
-	"two_factor":     {},
-	"undefined":      {},
-	"unknown":        {},
-	"update":         {},
-	"upload":         {},
-	"uploads":        {},
-	"user":           {},
-	"username":       {},
-	"users":          {},
-	"verify":         {},
-	"view":           {},
-	"space":          {},
-	"web":            {},
-	"webmaster":      {},
-	"www":            {},
-	"xml":            {},
+var reservedSpaceSlugs = newReservedSpaceSlugSet()
+
+func newReservedSpaceSlugSet() map[string]struct{} {
+	slugs := make(map[string]struct{}, len(reservedSpaceSlugList))
+	for _, slug := range reservedSpaceSlugList {
+		slugs[slug] = struct{}{}
+	}
+	return slugs
 }
 
 func validateSpaceSlug(input string) (string, error) {
@@ -158,11 +38,11 @@ func validateSpaceSlug(input string) (string, error) {
 	if len(slug) < minSpaceSlugLength || len(slug) > maxSpaceSlugLength {
 		return "", ente.NewBadRequestWithMessage("spaceSlug must be 3-30 characters")
 	}
-	if !spaceSlugPattern.MatchString(slug) {
-		return "", ente.NewBadRequestWithMessage("spaceSlug can only contain lowercase letters, numbers, dots, dashes, or underscores, and must start with a letter or number")
-	}
 	if isReservedSpaceSlug(slug) {
 		return "", ente.NewBadRequestWithMessage("spaceSlug is reserved")
+	}
+	if !spaceSlugPattern.MatchString(slug) {
+		return "", ente.NewBadRequestWithMessage("spaceSlug can only contain lowercase letters, numbers, dots, or underscores, and must start with a letter or number")
 	}
 	return slug, nil
 }
@@ -175,7 +55,10 @@ func isReservedSpaceSlug(slug string) bool {
 	if _, ok := reservedSpaceSlugs[slug]; ok {
 		return true
 	}
-	return strings.HasPrefix(slug, "ente")
+	if strings.HasPrefix(slug, "ente") {
+		return true
+	}
+	return strings.HasSuffix(slug, ".ente") || strings.HasSuffix(slug, "-ente") || strings.HasSuffix(slug, "_ente")
 }
 
 func nullString(value string) sql.NullString {

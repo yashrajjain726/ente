@@ -13,7 +13,7 @@ import {
 } from "services/spacePersistentSession";
 import { spaceRootKeyFromSpaceSession } from "services/spaceSecureSessionStorage";
 
-const usernamePattern = /^[a-z0-9][a-z0-9._-]*$/;
+const usernamePattern = /^[a-z0-9][a-z0-9._]*$/;
 const minUsernameLength = 3;
 const maxUsernameLength = 30;
 
@@ -74,7 +74,7 @@ export const spaceUsernameValidationError = (username: string) => {
         return "Username must be 30 characters or less.";
     }
     if (!usernamePattern.test(normalized)) {
-        return "Use lowercase letters, numbers, dots, dashes, or underscores.";
+        return "Use lowercase letters, numbers, dots, or underscores.";
     }
     if (normalized.startsWith("ente")) {
         return "This username is reserved.";
@@ -329,8 +329,6 @@ export const saveSpaceProfile = async (
     profile: SetupProfileInput,
 ): Promise<SetupProfile> => {
     const username = normalizeSpaceUsername(profile.username);
-    const usernameError = spaceUsernameValidationError(username);
-    if (usernameError) throw new Error(usernameError);
 
     const ctx = await ensureCurrentSpaceContext();
     try {
@@ -339,6 +337,12 @@ export const saveSpaceProfile = async (
             (profile.spaceId &&
                 spaces.find((space) => space.spaceId == profile.spaceId)) ||
             defaultOwnedSpace(spaces);
+        if (
+            normalizeSpaceUsername(existingSpace?.spaceSlug ?? "") != username
+        ) {
+            const usernameError = spaceUsernameValidationError(username);
+            if (usernameError) throw new Error(usernameError);
+        }
         const profilePayload = spaceProfilePayloadFor({ ...profile, username });
 
         let spaceId: string;
