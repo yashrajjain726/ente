@@ -11,6 +11,11 @@ import {
     restoreSpaceBrowserSessionIfNeeded,
     savedSpaceSessionToken,
 } from "services/spacePersistentSession";
+import {
+    blobPartForBytes,
+    parseSpaceProfilePayload,
+    spaceProfileTextField,
+} from "services/spaceProfilePayload";
 import { spaceRootKeyFromSpaceSession } from "services/spaceSecureSessionStorage";
 
 const usernamePattern = /^[a-z0-9][a-z0-9._]*$/;
@@ -54,12 +59,6 @@ interface UpdateSpaceProfileResponse {
     cover?: SpaceCover;
 }
 
-interface SpaceProfilePayload {
-    displayName?: unknown;
-    fullName?: unknown;
-    username?: unknown;
-}
-
 export type UsernameAvailability = "available" | "taken";
 
 export const normalizeSpaceUsername = (username: string) =>
@@ -89,19 +88,6 @@ const spaceProfilePayloadFor = (profile: SetupProfileInput) =>
         username: normalizeSpaceUsername(profile.username),
     });
 
-const parseSpaceProfilePayload = (profile: string): SpaceProfilePayload => {
-    const trimmed = profile.trim();
-    if (!trimmed) return {};
-    const parsed: unknown = JSON.parse(trimmed);
-    if (!parsed || typeof parsed != "object" || Array.isArray(parsed)) {
-        throw new Error("Space profile payload must be a JSON object.");
-    }
-    return parsed;
-};
-
-const textField = (value: unknown) =>
-    typeof value == "string" ? value.trim() : "";
-
 const spaceHTTPStatus = (error: unknown) => {
     if (!error || typeof error != "object" || !("status" in error)) {
         return undefined;
@@ -111,12 +97,6 @@ const spaceHTTPStatus = (error: unknown) => {
 };
 
 const defaultOwnedSpace = (spaces: OwnedSpace[]) => spaces[0];
-
-const blobPartForBytes = (bytes: Uint8Array): ArrayBuffer => {
-    const copy = new Uint8Array(bytes.byteLength);
-    copy.set(bytes);
-    return copy.buffer;
-};
 
 const currentSpaceContextConfig = async () => {
     await restoreSpaceBrowserSessionIfNeeded();
@@ -238,8 +218,8 @@ const profileFromDecryptedSpaceProfile = (
 ): SetupProfile => {
     const payload = parseSpaceProfilePayload(spaceProfile.profile);
     const fullName =
-        textField(payload.fullName) ||
-        textField(payload.displayName) ||
+        spaceProfileTextField(payload.fullName) ||
+        spaceProfileTextField(payload.displayName) ||
         spaceProfile.spaceSlug;
 
     return {

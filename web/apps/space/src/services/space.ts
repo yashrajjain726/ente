@@ -6,6 +6,11 @@ import {
     ensureCurrentSpaceContext,
     releaseCurrentSpaceContext,
 } from "services/spaceProfile";
+import {
+    blobPartForBytes,
+    parseSpaceProfilePayload,
+    spaceProfileTextField,
+} from "services/spaceProfilePayload";
 import { normalizeSpaceMessageText } from "utils/spaceMessageLimits";
 
 const currentFeedPageSize = 10;
@@ -17,12 +22,6 @@ interface SpaceAvatar {
 }
 
 type SpaceCover = SpaceAvatar;
-
-interface SpaceProfilePayload {
-    displayName?: unknown;
-    fullName?: unknown;
-    username?: unknown;
-}
 
 interface SpaceProfileResponse {
     avatar?: SpaceAvatar;
@@ -102,12 +101,6 @@ interface SpaceFriend {
     createdAt: string;
     friend: SpaceActor;
     shareKeyVersion: number;
-}
-
-interface SpaceFriendRequestResponse {
-    createdAt: string;
-    requestId: bigint | number;
-    requester: SpaceActor;
 }
 
 type SpaceMessageKindResponse = "post_like" | "post_reply" | "regular";
@@ -288,12 +281,6 @@ export interface SpaceMessageConversation {
     unreadCount: number;
 }
 
-export interface SpaceFriendRequest {
-    createdAtMs: number;
-    requestId: number;
-    requester: FriendProfile;
-}
-
 export interface SpaceMessageConversationPage {
     items: SpaceMessageConversation[];
     nextCursor?: string;
@@ -310,22 +297,8 @@ interface SpaceUnreadStatusResponse {
 type SpaceFriendRequestContext = SpaceAccountCtxHandle & {
     confirm_friend_request: (requestId: bigint) => Promise<unknown>;
     delete_friend_request: (requestId: bigint) => Promise<void>;
-    list_friend_requests: () => Promise<SpaceFriendRequestResponse[]>;
     request_friend_by_username: (username: string) => Promise<unknown>;
 };
-
-const parseSpaceProfilePayload = (profile: string): SpaceProfilePayload => {
-    const trimmed = profile.trim();
-    if (!trimmed) return {};
-    const parsed: unknown = JSON.parse(trimmed);
-    if (!parsed || typeof parsed != "object" || Array.isArray(parsed)) {
-        throw new Error("Space profile payload must be a JSON object.");
-    }
-    return parsed;
-};
-
-const textField = (value: unknown) =>
-    typeof value == "string" ? value.trim() : "";
 
 const timestampMsFromSpaceDate = (value: string) => {
     const parsed = Date.parse(value);
@@ -333,12 +306,6 @@ const timestampMsFromSpaceDate = (value: string) => {
         throw new Error(`Invalid space date: ${value}`);
     }
     return parsed;
-};
-
-const blobPartForBytes = (bytes: Uint8Array): ArrayBuffer => {
-    const copy = new Uint8Array(bytes.byteLength);
-    copy.set(bytes);
-    return copy.buffer;
 };
 
 const blobURLForBytes = (bytes: Uint8Array, mediaType?: string) =>
@@ -411,8 +378,8 @@ const cloneFriendProfiles = (friends: FriendProfile[]) =>
 const actorProfile = (actor: SpaceActor): FriendProfile => {
     const payload = parseSpaceProfilePayload(actor.profile ?? "");
     const fullName =
-        textField(payload.fullName) ||
-        textField(payload.displayName) ||
+        spaceProfileTextField(payload.fullName) ||
+        spaceProfileTextField(payload.displayName) ||
         actor.spaceSlug;
     const username = actor.spaceSlug;
 
@@ -435,8 +402,8 @@ const profileFromSpaceProfile = (
 ): FriendProfile => {
     const payload = parseSpaceProfilePayload(spaceProfile.profile);
     const fullName =
-        textField(payload.fullName) ||
-        textField(payload.displayName) ||
+        spaceProfileTextField(payload.fullName) ||
+        spaceProfileTextField(payload.displayName) ||
         spaceProfile.spaceSlug;
 
     return {
@@ -926,25 +893,6 @@ export const loadCurrentUnreadStatus = async (): Promise<SpaceUnreadStatus> => {
     }
 };
 
-export const loadCurrentSpacePostsPage = async (
-    spaceId: string,
-    cursor?: string,
-): Promise<SpacePostPage> => {
-    const ctx = await ensureCurrentSpaceContext();
-    try {
-        return await postPageFromAccountPage(
-            ctx,
-            (await ctx.list_posts(
-                spaceId,
-                cursor ?? null,
-                60,
-            )) as SpacePostPageResponse,
-        );
-    } finally {
-        releaseCurrentSpaceContext(ctx);
-    }
-};
-
 export const loadCurrentSpaceProfilePostsPage = async (
     spaceId: string,
     cursor?: string,
@@ -1177,28 +1125,6 @@ export const loadCurrentMessageConversations =
             releaseCurrentSpaceContext(ctx);
         }
     };
-
-export const loadCurrentFriendRequests = async (): Promise<
-    SpaceFriendRequest[]
-> => {
-    const ctx = await ensureCurrentSpaceContext();
-    try {
-        const requests = (await (
-            ctx as SpaceFriendRequestContext
-        ).list_friend_requests()) as SpaceFriendRequestResponse[];
-        return requests.map((request) => {
-            const requester = actorProfile(request.requester);
-            requester.avatarUrl = null;
-            return {
-                createdAtMs: timestampMsFromSpaceDate(request.createdAt),
-                requestId: Number(request.requestId),
-                requester,
-            };
-        });
-    } finally {
-        releaseCurrentSpaceContext(ctx);
-    }
-};
 
 export const confirmCurrentFriendRequest = async (requestId: number) => {
     const ctx = await ensureCurrentSpaceContext();
