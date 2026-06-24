@@ -9,6 +9,35 @@ import (
 	"github.com/ente-io/stacktrace"
 )
 
+func postRecordSelectSQL(viewerLikedExpr string) string {
+	return `
+		SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
+		       w.owner_id, w.space_id, w.space_slug, w.public_key,
+		       w.current_version, w.encrypted_profile, w_avatar.object_id,
+		       w_avatar.size, w.updated_at,
+		       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = w.space_id) AS author_friends,
+		       (SELECT COUNT(*) FROM space_posts ap WHERE ap.space_id = w.space_id AND ap.is_deleted = FALSE) AS author_posts,
+		       p.encrypted_post_key, p.caption_cipher,
+		       p.key_version, p.created_at,
+		       (SELECT COUNT(*) FROM space_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
+		       ` + viewerLikedExpr + ` AS viewer_liked`
+}
+
+func scanPostRecords(rows *sql.Rows) ([]SpacePostRecord, error) {
+	var out []SpacePostRecord
+	for rows.Next() {
+		rec, err := scanPostRecord(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return out, nil
+}
+
 func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID string, encryptedPostKey []byte, captionCipher []byte, keyVersion int, objects []SpacePostAssetRecord) (int64, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -57,22 +86,14 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID
 }
 
 func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID int64, viewerSpaceID string) (*SpacePostRecord, error) {
-	return scanPostRecord(r.DB.QueryRowContext(ctx, `
-		SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
-		       w.owner_id, w.space_id, w.space_slug, w.public_key,
-		       w.current_version, w.encrypted_profile, w_avatar.object_id,
-		       w_avatar.size, w.updated_at,
-		       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = w.space_id) AS author_friends,
-		       (SELECT COUNT(*) FROM space_posts ap WHERE ap.space_id = w.space_id AND ap.is_deleted = FALSE) AS author_posts,
-		       p.encrypted_post_key, p.caption_cipher,
-		       p.key_version, p.created_at,
-		       (SELECT COUNT(*) FROM space_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-		       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked
+	query := postRecordSelectSQL(`
+		       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2)`) + `
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
 			LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
 			WHERE p.post_id = $1 AND p.is_deleted = FALSE
-		`, postID, viewerSpaceID))
+		`
+	return scanPostRecord(r.DB.QueryRowContext(ctx, query, postID, viewerSpaceID))
 }
 
 func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, viewerID int64, viewerSpaceID string, cursor string, limit int) ([]SpacePostRecord, string, error) {
@@ -81,17 +102,8 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 		limit = 100
 	}
 	args := []any{spaceID, viewerSpaceID}
-	query := `
-			SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
-			       w.owner_id, w.space_id, w.space_slug, w.public_key,
-			       w.current_version, w.encrypted_profile, w_avatar.object_id,
-			       w_avatar.size, w.updated_at,
-			       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = w.space_id) AS author_friends,
-			       (SELECT COUNT(*) FROM space_posts ap WHERE ap.space_id = w.space_id AND ap.is_deleted = FALSE) AS author_posts,
-			       p.encrypted_post_key, p.caption_cipher,
-			       p.key_version, p.created_at,
-			       (SELECT COUNT(*) FROM space_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-			       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked
+	query := postRecordSelectSQL(`
+			       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2)`) + `
 				FROM space_posts p
 				JOIN spaces w ON w.space_id = p.space_id
 				LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
@@ -107,16 +119,9 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 		return nil, "", stacktrace.Propagate(err, "")
 	}
 	defer rows.Close()
-	var out []SpacePostRecord
-	for rows.Next() {
-		rec, err := scanPostRecord(rows)
-		if err != nil {
-			return nil, "", err
-		}
-		out = append(out, *rec)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, "", stacktrace.Propagate(err, "")
+	out, err := scanPostRecords(rows)
+	if err != nil {
+		return nil, "", err
 	}
 	nextCursor := ""
 	if len(out) > limit {
@@ -132,17 +137,8 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 		limit = 100
 	}
 	args := []any{viewerID, viewerSpaceID}
-	query := `
-			SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
-			       w.owner_id, w.space_id, w.space_slug, w.public_key,
-			       w.current_version, w.encrypted_profile, w_avatar.object_id,
-			       w_avatar.size, w.updated_at,
-			       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = w.space_id) AS author_friends,
-			       (SELECT COUNT(*) FROM space_posts ap WHERE ap.space_id = w.space_id AND ap.is_deleted = FALSE) AS author_posts,
-			       p.encrypted_post_key, p.caption_cipher,
-			       p.key_version, p.created_at,
-			       (SELECT COUNT(*) FROM space_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
-			       CASE WHEN p.space_id = $2 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) END AS viewer_liked
+	query := postRecordSelectSQL(`
+			       CASE WHEN p.space_id = $2 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) END`) + `
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
 			LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
@@ -165,16 +161,9 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 		return nil, "", stacktrace.Propagate(err, "")
 	}
 	defer rows.Close()
-	var out []SpacePostRecord
-	for rows.Next() {
-		rec, err := scanPostRecord(rows)
-		if err != nil {
-			return nil, "", err
-		}
-		out = append(out, *rec)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, "", stacktrace.Propagate(err, "")
+	out, err := scanPostRecords(rows)
+	if err != nil {
+		return nil, "", err
 	}
 	nextCursor := ""
 	if len(out) > limit {

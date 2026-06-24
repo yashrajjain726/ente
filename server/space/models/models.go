@@ -45,10 +45,14 @@ type ListPostsRequest struct {
 	SpaceID string `form:"spaceId" binding:"required"`
 	Cursor  string `form:"cursor"`
 	Limit   int    `form:"limit"`
-	Include string `form:"include"`
 }
 
 type ListFeedRequest struct {
+	Cursor string `form:"cursor"`
+	Limit  int    `form:"limit"`
+}
+
+type ListPostLikersRequest struct {
 	Cursor string `form:"cursor"`
 	Limit  int    `form:"limit"`
 }

@@ -111,6 +111,30 @@ func (c *PostsController) notifyFriendsOfNewPost(spaceID, spaceSlug string) {
 	}()
 }
 
+func (c *PostsController) postResponses(ctx context.Context, posts []repo.SpacePostRecord, includeAuthor bool) ([]models.PostResponse, error) {
+	postIDs := make([]int64, 0, len(posts))
+	for _, post := range posts {
+		postIDs = append(postIDs, post.PostID)
+	}
+	assetsByPost, err := c.PostsRepo.ListAssetsByPostIDs(ctx, postIDs)
+	if err != nil {
+		return nil, err
+	}
+	resp := make([]models.PostResponse, 0, len(posts))
+	for _, post := range posts {
+		resp = append(resp, *toPostResponse(&post, assetsByPost[post.PostID], includeAuthor))
+	}
+	return resp, nil
+}
+
+func (c *PostsController) postResponse(ctx context.Context, post *repo.SpacePostRecord, includeAuthor bool) (*models.PostResponse, error) {
+	assetsByPost, err := c.PostsRepo.ListAssetsByPostIDs(ctx, []int64{post.PostID})
+	if err != nil {
+		return nil, err
+	}
+	return toPostResponse(post, assetsByPost[post.PostID], includeAuthor), nil
+}
+
 func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*models.PostPage, error) {
 	viewer, err := c.auth.resolveViewer(ctx)
 	if err != nil {
@@ -133,17 +157,9 @@ func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	postIDs := make([]int64, 0, len(posts))
-	for _, post := range posts {
-		postIDs = append(postIDs, post.PostID)
-	}
-	assetsByPost, err := c.PostsRepo.ListAssetsByPostIDs(ctx.Request.Context(), postIDs)
+	resp, err := c.postResponses(ctx.Request.Context(), posts, true)
 	if err != nil {
 		return nil, err
-	}
-	resp := make([]models.PostResponse, 0, len(posts))
-	for _, post := range posts {
-		resp = append(resp, *toPostResponse(&post, assetsByPost[post.PostID], true))
 	}
 	return &models.PostPage{
 		Items:      resp,
@@ -164,17 +180,9 @@ func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest)
 	if err != nil {
 		return nil, err
 	}
-	postIDs := make([]int64, 0, len(posts))
-	for _, post := range posts {
-		postIDs = append(postIDs, post.PostID)
-	}
-	assetsByPost, err := c.PostsRepo.ListAssetsByPostIDs(ctx.Request.Context(), postIDs)
+	items, err := c.postResponses(ctx.Request.Context(), posts, true)
 	if err != nil {
 		return nil, err
-	}
-	items := make([]models.PostResponse, 0, len(posts))
-	for _, post := range posts {
-		items = append(items, *toPostResponse(&post, assetsByPost[post.PostID], true))
 	}
 	return &models.FeedPage{
 		Items:      items,
@@ -208,11 +216,7 @@ func (c *PostsController) Get(ctx *gin.Context, postID string) (*models.PostResp
 	if err := c.auth.canViewSpace(ctx.Request.Context(), viewer, space); err != nil {
 		return nil, err
 	}
-	assetsByPost, err := c.PostsRepo.ListAssetsByPostIDs(ctx.Request.Context(), []int64{id})
-	if err != nil {
-		return nil, err
-	}
-	return toPostResponse(post, assetsByPost[id], true), nil
+	return c.postResponse(ctx.Request.Context(), post, true)
 }
 
 func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req models.UpdatePostCaptionRequest) (*models.PostResponse, error) {
@@ -239,11 +243,7 @@ func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req mod
 	if err != nil {
 		return nil, err
 	}
-	assetsByPost, err := c.PostsRepo.ListAssetsByPostIDs(ctx.Request.Context(), []int64{id})
-	if err != nil {
-		return nil, err
-	}
-	return toPostResponse(post, assetsByPost[id], true), nil
+	return c.postResponse(ctx.Request.Context(), post, true)
 }
 
 func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models.LikePostRequest) (*models.LikePostResponse, error) {
@@ -283,7 +283,7 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models
 	return &models.LikePostResponse{Liked: req.Like}, nil
 }
 
-func (c *PostsController) ListLikers(ctx *gin.Context, postID string) (*models.ListPostLikersResponse, error) {
+func (c *PostsController) ListLikers(ctx *gin.Context, postID string, req models.ListPostLikersRequest) (*models.ListPostLikersResponse, error) {
 	id, err := strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
 	if err != nil || id <= 0 {
 		return nil, ente.NewBadRequestWithMessage("invalid postID")
@@ -309,8 +309,7 @@ func (c *PostsController) ListLikers(ctx *gin.Context, postID string) (*models.L
 	if err := c.auth.canViewSpace(ctx.Request.Context(), viewer, space); err != nil {
 		return nil, err
 	}
-	limit, _ := strconv.Atoi(strings.TrimSpace(ctx.Query("limit")))
-	likers, nextCursor, err := c.PostsRepo.ListPostLikers(ctx.Request.Context(), id, ctx.Query("cursor"), limit)
+	likers, nextCursor, err := c.PostsRepo.ListPostLikers(ctx.Request.Context(), id, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}

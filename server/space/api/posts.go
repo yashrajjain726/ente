@@ -62,7 +62,12 @@ func (h *Handlers) TogglePostLike(c *gin.Context) {
 }
 
 func (h *Handlers) ListPostLikers(c *gin.Context) {
-	resp, err := h.Module.Posts.ListLikers(c, c.Param("postID"))
+	var req models.ListPostLikersRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		respondJSON(c, nil, ente.ErrBadRequest)
+		return
+	}
+	resp, err := h.Module.Posts.ListLikers(c, c.Param("postID"), req)
 	respondJSON(c, resp, err)
 }
 

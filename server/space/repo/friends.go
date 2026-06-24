@@ -621,7 +621,7 @@ func (r *FriendsRepository) ListAccessibleSpaceIDs(ctx context.Context, viewerID
 		FROM spaces
 		WHERE owner_id = $1 AND space_id = ANY($2)
 		UNION
-		SELECT space_id
+		SELECT w.space_id
 		FROM space_friend_shares s
 		JOIN spaces w ON w.space_id = s.space_id
 		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
