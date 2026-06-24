@@ -235,7 +235,7 @@ func (r *FriendsRepository) ListFriendRequestsForSpace(ctx context.Context, targ
 		       requester_space.public_key,
 		       requester_space.current_version,
 		       '' AS encrypted_profile,
-		       NULL::TEXT AS avatar_object_key,
+		       NULL::TEXT AS avatar_object_id,
 		       NULL::BIGINT AS avatar_size,
 		       requester_space.updated_at,
 		       NULL::BIGINT AS friends,
@@ -568,8 +568,8 @@ func (r *FriendsRepository) ListFriendsForSpace(ctx context.Context, spaceID str
 		       friend_space.public_key,
 		       friend_space.current_version,
 		       friend_space.encrypted_profile,
-		       friend_space.avatar_object_key,
-		       friend_space.avatar_size,
+		       friend_avatar.object_id,
+		       friend_avatar.size,
 		       friend_space.updated_at,
 		       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = friend_space.space_id) AS friends,
 		       (SELECT COUNT(*) FROM space_posts p WHERE p.space_id = friend_space.space_id AND p.is_deleted = FALSE) AS posts,
@@ -577,6 +577,7 @@ func (r *FriendsRepository) ListFriendsForSpace(ctx context.Context, spaceID str
 		       s.created_at
 		FROM space_friend_shares s
 		JOIN spaces friend_space ON friend_space.space_id = s.friend_space_id
+		LEFT JOIN space_profile_assets friend_avatar ON friend_avatar.space_id = friend_space.space_id AND friend_avatar.asset_type = 'avatar'
 		JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
 		WHERE s.space_id = $1
 		ORDER BY lower(friend_space.space_slug) ASC

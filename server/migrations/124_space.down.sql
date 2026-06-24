@@ -36,5 +36,8 @@ DROP TABLE IF EXISTS space_browser_sessions;
 DROP TRIGGER IF EXISTS update_space_notification_read_markers_updated_at ON space_notification_read_markers;
 DROP TABLE IF EXISTS space_notification_read_markers;
 
+DROP TRIGGER IF EXISTS update_space_profile_assets_updated_at ON space_profile_assets;
+DROP TABLE IF EXISTS space_profile_assets;
+
 DROP TRIGGER IF EXISTS update_spaces_updated_at ON spaces;
 DROP TABLE IF EXISTS spaces;

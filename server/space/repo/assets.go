@@ -20,41 +20,53 @@ func (r *AssetsRepository) AssetBelongsToSpace(ctx context.Context, spaceID, obj
 }
 
 func (r *AssetsRepository) GetAssetBucketID(ctx context.Context, spaceID, objectKey string) (string, error) {
+	if keySpaceID, assetType, objectID, ok := ParseProfileAssetObjectKey(objectKey); ok {
+		if keySpaceID != spaceID {
+			return "", sql.ErrNoRows
+		}
+		return r.GetProfileAssetBucketID(ctx, spaceID, assetType, objectID)
+	}
 	var bucketID string
 	err := r.DB.QueryRowContext(ctx, `
-		SELECT bucket_id
-		FROM (
-		    SELECT avatar_bucket_id AS bucket_id
-		    FROM spaces
-		    WHERE space_id = $1 AND avatar_object_key = $2 AND avatar_bucket_id IS NOT NULL
-		    UNION ALL
-		    SELECT cover_bucket_id AS bucket_id
-		    FROM spaces
-		    WHERE space_id = $1 AND cover_object_key = $2 AND cover_bucket_id IS NOT NULL
-		    UNION ALL
-		    SELECT a.bucket_id
-		    FROM space_post_assets a
-		    JOIN space_posts p ON p.post_id = a.post_id
-		    WHERE p.space_id = $1 AND a.object_key = $2 AND p.is_deleted = FALSE
-		) assets
+		SELECT a.bucket_id
+		FROM space_post_assets a
+		JOIN space_posts p ON p.post_id = a.post_id
+		WHERE p.space_id = $1 AND a.object_key = $2 AND p.is_deleted = FALSE
 		LIMIT 1
 	`, spaceID, objectKey).Scan(&bucketID)
 	return bucketID, stacktrace.Propagate(err, "")
 }
 
+func (r *AssetsRepository) GetProfileAssetBucketID(ctx context.Context, spaceID, assetType, objectID string) (string, error) {
+	var bucketID string
+	err := r.DB.QueryRowContext(ctx, `
+		SELECT bucket_id
+		FROM space_profile_assets
+		WHERE space_id = $1 AND asset_type = $2 AND object_id = $3
+	`, spaceID, assetType, objectID).Scan(&bucketID)
+	return bucketID, stacktrace.Propagate(err, "")
+}
+
 func (r *AssetsRepository) GetSpaceForObjectKey(ctx context.Context, objectKey string) (*SpaceRecord, error) {
+	if spaceID, assetType, objectID, ok := ParseProfileAssetObjectKey(objectKey); ok {
+		return scanSpaceRecord(r.DB.QueryRowContext(ctx, `
+			SELECT `+spaceRecordSelectColumns+`
+			FROM spaces s
+			JOIN space_profile_assets a ON a.space_id = s.space_id
+			`+spaceRecordProfileAssetJoins+`
+			WHERE a.space_id = $1 AND a.asset_type = $2 AND a.object_id = $3
+			LIMIT 1
+		`, spaceID, assetType, objectID))
+	}
 	return scanSpaceRecord(r.DB.QueryRowContext(ctx, `
-		SELECT w.space_id, w.owner_id, w.space_slug, w.encrypted_space_key, w.encrypted_profile, w.current_version,
-		       w.public_key, w.encrypted_secret_key, w.secret_key_decryption_nonce,
-		       w.avatar_object_key, w.avatar_bucket_id, w.avatar_size, w.cover_object_key, w.cover_bucket_id, w.cover_size, w.created_at, w.updated_at
-		FROM spaces w
-		WHERE w.avatar_object_key = $1
-		   OR w.cover_object_key = $1
-		   OR EXISTS (
+		SELECT `+spaceRecordSelectColumns+`
+		FROM spaces s
+		`+spaceRecordProfileAssetJoins+`
+		WHERE EXISTS (
 		       SELECT 1
 		       FROM space_post_assets a
 		       JOIN space_posts p ON p.post_id = a.post_id
-		       WHERE a.object_key = $1 AND p.space_id = w.space_id AND p.is_deleted = FALSE
+		       WHERE a.object_key = $1 AND p.space_id = s.space_id AND p.is_deleted = FALSE
 		   )
 		LIMIT 1
 	`, objectKey))

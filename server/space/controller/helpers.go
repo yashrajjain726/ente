@@ -17,11 +17,11 @@ func formatMicros(value int64) string {
 }
 
 func toAvatarResponse(space *spacerepo.SpaceRecord) *models.ProfileAvatarResponse {
-	if !space.AvatarObjectKey.Valid {
+	if !space.AvatarObjectID.Valid {
 		return nil
 	}
 	resp := &models.ProfileAvatarResponse{
-		ObjectKey: space.AvatarObjectKey.String,
+		ObjectID:  space.AvatarObjectID.String,
 		UpdatedAt: formatMicros(space.UpdatedAt),
 	}
 	if space.AvatarSize.Valid {
@@ -31,11 +31,11 @@ func toAvatarResponse(space *spacerepo.SpaceRecord) *models.ProfileAvatarRespons
 }
 
 func toCoverResponse(space *spacerepo.SpaceRecord) *models.ProfileCoverResponse {
-	if !space.CoverObjectKey.Valid {
+	if !space.CoverObjectID.Valid {
 		return nil
 	}
 	resp := &models.ProfileCoverResponse{
-		ObjectKey: space.CoverObjectKey.String,
+		ObjectID:  space.CoverObjectID.String,
 		UpdatedAt: formatMicros(space.UpdatedAt),
 	}
 	if space.CoverSize.Valid {
@@ -45,11 +45,11 @@ func toCoverResponse(space *spacerepo.SpaceRecord) *models.ProfileCoverResponse 
 }
 
 func toActorAvatarResponse(actor spacerepo.SpaceActorRecord) *models.ProfileAvatarResponse {
-	if !actor.AvatarObjectKey.Valid {
+	if !actor.AvatarObjectID.Valid {
 		return nil
 	}
 	resp := &models.ProfileAvatarResponse{
-		ObjectKey: actor.AvatarObjectKey.String,
+		ObjectID:  actor.AvatarObjectID.String,
 		UpdatedAt: formatMicros(actor.UpdatedAt),
 	}
 	if actor.AvatarSize.Valid {

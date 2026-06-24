@@ -193,6 +193,35 @@ func optionalInt(limit int, fallback int) int {
 	return limit
 }
 
+const spaceRecordSelectColumns = `
+	s.space_id,
+	s.owner_id,
+	s.space_slug,
+	s.encrypted_space_key,
+	s.encrypted_profile,
+	s.current_version,
+	s.public_key,
+	s.encrypted_secret_key,
+	s.secret_key_decryption_nonce,
+	avatar.object_id AS avatar_object_id,
+	avatar.bucket_id AS avatar_bucket_id,
+	avatar.size AS avatar_size,
+	cover.object_id AS cover_object_id,
+	cover.bucket_id AS cover_bucket_id,
+	cover.size AS cover_size,
+	s.created_at,
+	s.updated_at
+`
+
+const spaceRecordProfileAssetJoins = `
+	LEFT JOIN space_profile_assets avatar
+	  ON avatar.space_id = s.space_id
+	 AND avatar.asset_type = 'avatar'
+	LEFT JOIN space_profile_assets cover
+	  ON cover.space_id = s.space_id
+	 AND cover.asset_type = 'cover'
+`
+
 func spaceActorScanDest(actor *SpaceActorRecord) []any {
 	return []any{
 		&actor.UserID,
@@ -201,7 +230,7 @@ func spaceActorScanDest(actor *SpaceActorRecord) []any {
 		&actor.PublicKey,
 		&actor.KeyVersion,
 		&actor.EncryptedProfile,
-		&actor.AvatarObjectKey,
+		&actor.AvatarObjectID,
 		&actor.AvatarSize,
 		&actor.UpdatedAt,
 		&actor.Friends,

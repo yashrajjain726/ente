@@ -201,7 +201,19 @@ func (c *AssetsController) Redirect(ctx *gin.Context, req models.AssetRedirectRe
 	if err := c.auth.canViewSpace(ctx.Request.Context(), viewer, space); err != nil {
 		return nil, err
 	}
-	bucketID, err := c.AssetsRepo.GetAssetBucketID(ctx.Request.Context(), space.SpaceID, req.ObjectKey)
+	objectKey := strings.TrimSpace(req.ObjectKey)
+	var bucketID string
+	if objectKey == "" {
+		assetType := strings.TrimSpace(req.AssetType)
+		objectID := strings.TrimSpace(req.ObjectID)
+		if !spacerepo.IsProfileAssetType(assetType) || !spacerepo.IsProfileAssetObjectID(objectID) {
+			return nil, ente.NewBadRequestWithMessage("objectKey or assetType and objectID are required")
+		}
+		objectKey = spacerepo.ProfileAssetObjectKey(space.SpaceID, assetType, objectID)
+		bucketID, err = c.AssetsRepo.GetProfileAssetBucketID(ctx.Request.Context(), space.SpaceID, assetType, objectID)
+	} else {
+		bucketID, err = c.AssetsRepo.GetAssetBucketID(ctx.Request.Context(), space.SpaceID, objectKey)
+	}
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
@@ -210,7 +222,7 @@ func (c *AssetsController) Redirect(ctx *gin.Context, req models.AssetRedirectRe
 	}
 	bucket := c.AssetsRepo.S3Config.GetBucket(bucketID)
 	s3Client := c.AssetsRepo.S3Config.GetS3Client(bucketID)
-	getReq, _ := s3Client.GetObjectRequest(&s3.GetObjectInput{Bucket: bucket, Key: aws.String(req.ObjectKey)})
+	getReq, _ := s3Client.GetObjectRequest(&s3.GetObjectInput{Bucket: bucket, Key: aws.String(objectKey)})
 	url, err := getReq.Presign(uploadURLExpiry)
 	if err != nil {
 		return nil, err

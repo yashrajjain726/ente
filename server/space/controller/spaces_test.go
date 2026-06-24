@@ -1,11 +1,15 @@
 package controller
 
 import (
+	"crypto/sha256"
+	"database/sql"
 	"strconv"
 	"testing"
 
 	"github.com/ente-io/museum/ente"
+	timeutil "github.com/ente-io/museum/pkg/utils/time"
 	"github.com/ente-io/museum/space/models"
+	spacerepo "github.com/ente-io/museum/space/repo"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,6 +61,60 @@ func TestGetProfileIncludesFriendsCount(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.EqualValues(t, 1, resp.Friends)
+}
+
+func TestGetProfileReturnsProfileAssetObjectIDs(t *testing.T) {
+	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
+	aliceID := insertSpaceControllerUser(t, repos, "alice-assets-profile@example.com", "alice-assets-public")
+	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-assets-profile", "alice-space-key", "alice-assets-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	require.NoError(t, err)
+	for _, rec := range []spacerepo.SpaceTempObjectRecord{
+		{
+			ObjectKey:    spacerepo.ProfileAssetObjectKey(space.SpaceID, spacerepo.ProfileAssetTypeAvatar, "avatar-object-id"),
+			OwnerID:      aliceID,
+			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
+			Purpose:      spacerepo.TempObjectPurposeAvatar,
+			BucketID:     "b2-eu-cen",
+			ExpectedSize: 111,
+			ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
+		},
+		{
+			ObjectKey:    spacerepo.ProfileAssetObjectKey(space.SpaceID, spacerepo.ProfileAssetTypeCover, "cover-object-id"),
+			OwnerID:      aliceID,
+			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
+			Purpose:      spacerepo.TempObjectPurposeCover,
+			BucketID:     "b2-us-west",
+			ExpectedSize: 222,
+			ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
+		},
+	} {
+		require.NoError(t, repos.Assets.AddTempObject(ctx, rec))
+	}
+	_, err = repos.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-v2",
+		&spacerepo.ProfileAssetUpdate{ObjectID: "avatar-object-id", BucketID: "b2-eu-cen", Size: 111},
+		&spacerepo.ProfileAssetUpdate{ObjectID: "cover-object-id", BucketID: "b2-us-west", Size: 222},
+		false,
+		false,
+	)
+	require.NoError(t, err)
+	sessionHash := sha256.Sum256([]byte("alice-assets-session-token"))
+	require.NoError(t, repos.Sessions.CreateBrowserSession(ctx, sessionHash[:], aliceID, "client-key", timeutil.MicrosecondsAfterMinutes(5)))
+	ginCtx := newPublicSpaceContext()
+	ginCtx.Request.Header.Set(SpaceBrowserSessionTokenHeader, "alice-assets-session-token")
+
+	resp, err := module.Spaces.GetProfile(ginCtx, models.GetSpaceProfileRequest{
+		SpaceID: space.SpaceID,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp.Avatar)
+	require.Equal(t, "avatar-object-id", resp.Avatar.ObjectID)
+	require.EqualValues(t, 111, resp.Avatar.Size)
+	require.NotEmpty(t, resp.Avatar.UpdatedAt)
+	require.NotNil(t, resp.Cover)
+	require.Equal(t, "cover-object-id", resp.Cover.ObjectID)
+	require.EqualValues(t, 222, resp.Cover.Size)
+	require.NotEmpty(t, resp.Cover.UpdatedAt)
 }
 
 func TestGetProfileRejectsInvalidVersion(t *testing.T) {
@@ -112,7 +170,7 @@ func TestUpdateProfileRejectsStaleKeyVersion(t *testing.T) {
 	resp, err := module.Spaces.UpdateProfile(ginCtx, models.UpdateSpaceProfileRequest{
 		SpaceID:          space.SpaceID,
 		KeyVersion:       space.CurrentVersion + 1,
-		EncryptedProfile: "alice-profile-v2",
+		EncryptedProfile: "YWxpY2UtcHJvZmlsZS12Mg==",
 	})
 
 	require.Nil(t, resp)

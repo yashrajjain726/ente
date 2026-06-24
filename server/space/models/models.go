@@ -2,7 +2,9 @@ package models
 
 type AssetRedirectRequest struct {
 	SpaceID   string `form:"spaceId" binding:"required"`
-	ObjectKey string `form:"objectKey" binding:"required"`
+	ObjectKey string `form:"objectKey"`
+	AssetType string `form:"assetType"`
+	ObjectID  string `form:"objectID"`
 }
 
 type ListSpacesRequest struct{}
@@ -103,12 +105,12 @@ type AssetDownloadResponse struct {
 }
 
 type ProfileAvatarPayload struct {
-	ObjectKey string `json:"objectKey"`
-	Size      int64  `json:"size,omitempty"`
+	ObjectID string `json:"objectID"`
+	Size     int64  `json:"size,omitempty"`
 }
 
 type ProfileAvatarResponse struct {
-	ObjectKey string `json:"objectKey"`
+	ObjectID  string `json:"objectID"`
 	Size      int64  `json:"size,omitempty"`
 	UpdatedAt string `json:"updatedAt,omitempty"`
 }

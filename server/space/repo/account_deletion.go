@@ -141,30 +141,39 @@ func queueOwnedSpaceObjectsTx(ctx context.Context, tx *sql.Tx, userID int64, spa
 
 func queueProfileObjectsTx(ctx context.Context, tx *sql.Tx, userID int64) error {
 	rows, err := tx.QueryContext(ctx, `
-		SELECT avatar_object_key, avatar_bucket_id, COALESCE(NULLIF(avatar_size, 0), 1), $2
-		FROM spaces
-		WHERE owner_id = $1 AND avatar_object_key IS NOT NULL AND avatar_bucket_id IS NOT NULL
-		UNION ALL
-		SELECT cover_object_key, cover_bucket_id, COALESCE(NULLIF(cover_size, 0), 1), $3
-		FROM spaces
-		WHERE owner_id = $1 AND cover_object_key IS NOT NULL AND cover_bucket_id IS NOT NULL
-	`, userID, TempObjectPurposeAvatar, TempObjectPurposeCover)
+		SELECT a.space_id, a.asset_type, a.object_id, a.bucket_id, COALESCE(NULLIF(a.size, 0), 1)
+		FROM space_profile_assets a
+		JOIN spaces s ON s.space_id = a.space_id
+		WHERE s.owner_id = $1
+	`, userID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	defer rows.Close()
 
+	var cleanupObjects []SpaceTempObjectRecord
 	for rows.Next() {
 		var rec SpaceTempObjectRecord
-		if err := rows.Scan(&rec.ObjectKey, &rec.BucketID, &rec.ExpectedSize, &rec.Purpose); err != nil {
+		var spaceID, objectID string
+		if err := rows.Scan(&spaceID, &rec.Purpose, &objectID, &rec.BucketID, &rec.ExpectedSize); err != nil {
+			rows.Close()
 			return stacktrace.Propagate(err, "")
 		}
+		rec.ObjectKey = ProfileAssetObjectKey(spaceID, rec.Purpose, objectID)
 		rec.OwnerID = userID
+		cleanupObjects = append(cleanupObjects, rec)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return stacktrace.Propagate(err, "")
+	}
+	rows.Close()
+
+	for _, rec := range cleanupObjects {
 		if err := QueueObjectCleanupTx(ctx, tx, rec); err != nil {
 			return err
 		}
 	}
-	return stacktrace.Propagate(rows.Err(), "")
+	return nil
 }
 
 func queuePostObjectsTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs []string) error {
@@ -177,21 +186,31 @@ func queuePostObjectsTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs 
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	defer rows.Close()
 
+	var cleanupObjects []SpaceTempObjectRecord
 	for rows.Next() {
 		rec := SpaceTempObjectRecord{
 			OwnerID: userID,
 			Purpose: TempObjectPurposePost,
 		}
 		if err := rows.Scan(&rec.ObjectKey, &rec.BucketID, &rec.ExpectedSize); err != nil {
+			rows.Close()
 			return stacktrace.Propagate(err, "")
 		}
+		cleanupObjects = append(cleanupObjects, rec)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return stacktrace.Propagate(err, "")
+	}
+	rows.Close()
+
+	for _, rec := range cleanupObjects {
 		if err := QueueObjectCleanupTx(ctx, tx, rec); err != nil {
 			return err
 		}
 	}
-	return stacktrace.Propagate(rows.Err(), "")
+	return nil
 }
 
 func deleteSpaceRowsTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs []string) error {

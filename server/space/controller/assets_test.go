@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/space/models"
 	"github.com/stretchr/testify/require"
 )
@@ -87,4 +88,26 @@ func TestNormalizeContentMD5RejectsInvalidValues(t *testing.T) {
 	_, err = normalizeContentMD5("aGVsbG8=")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "contentMD5 must be exactly 16 bytes")
+}
+
+func TestRedirectRejectsInvalidProfileAssetObjectID(t *testing.T) {
+	module, repos, userAuthRepo, ctx := setupSpaceAuthControllerTest(t)
+	aliceID := insertSpaceControllerUser(t, repos, "alice-asset-redirect@example.com", "alice-public")
+	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-asset-redirect", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	require.NoError(t, err)
+	require.NoError(t, userAuthRepo.AddToken(aliceID, ente.Photos, "alice-asset-token", "127.0.0.1", "space-test"))
+	ginCtx := newPublicSpaceContext()
+	ginCtx.Request.Header.Set("X-Auth-Token", "alice-asset-token")
+
+	resp, err := module.Assets.Redirect(ginCtx, models.AssetRedirectRequest{
+		SpaceID:   space.SpaceID,
+		AssetType: "avatar",
+		ObjectID:  "nested/object",
+	})
+
+	require.Nil(t, resp)
+	var apiErr *ente.ApiError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, ente.BadRequest, apiErr.Code)
+	require.Equal(t, "objectKey or assetType and objectID are required", apiErr.Message)
 }

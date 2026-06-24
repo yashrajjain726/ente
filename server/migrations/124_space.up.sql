@@ -8,12 +8,6 @@ CREATE TABLE IF NOT EXISTS spaces (
     secret_key_decryption_nonce TEXT NOT NULL,
     encrypted_profile    TEXT   NOT NULL DEFAULT '',
     current_version      INTEGER NOT NULL DEFAULT 1,
-    avatar_object_key    TEXT,
-    avatar_bucket_id     TEXT,
-    avatar_size          BIGINT,
-    cover_object_key     TEXT,
-    cover_bucket_id      TEXT,
-    cover_size           BIGINT,
     created_at           BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     updated_at           BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     CONSTRAINT uq_spaces_owner UNIQUE (owner_id),
@@ -25,6 +19,25 @@ CREATE INDEX IF NOT EXISTS idx_spaces_space_slug ON spaces (space_slug);
 
 CREATE TRIGGER update_spaces_updated_at
     BEFORE UPDATE ON spaces
+    FOR EACH ROW
+EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
+
+CREATE TABLE IF NOT EXISTS space_profile_assets (
+    space_id      TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
+    asset_type    TEXT   NOT NULL,
+    object_id     TEXT   NOT NULL,
+    bucket_id     TEXT   NOT NULL,
+    size          BIGINT,
+    created_at    BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    updated_at    BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
+    PRIMARY KEY (space_id, asset_type),
+    CONSTRAINT chk_space_profile_assets_type CHECK (asset_type IN ('avatar', 'cover')),
+    CONSTRAINT chk_space_profile_assets_object_id CHECK (object_id <> '' AND object_id NOT LIKE '%/%'),
+    CONSTRAINT chk_space_profile_assets_size CHECK (size IS NULL OR size > 0)
+);
+
+CREATE TRIGGER update_space_profile_assets_updated_at
+    BEFORE UPDATE ON space_profile_assets
     FOR EACH ROW
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
@@ -175,6 +188,9 @@ CREATE INDEX IF NOT EXISTS idx_space_post_likes_post_created_user
 CREATE INDEX IF NOT EXISTS idx_space_post_likes_user_created
     ON space_post_likes (user_id, created_at DESC, post_id DESC);
 
+CREATE INDEX IF NOT EXISTS idx_space_post_likes_actor_created_post
+    ON space_post_likes (actor_space_id, created_at DESC, post_id DESC);
+
 CREATE TABLE IF NOT EXISTS space_friend_shares (
     space_id              TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     friend_id            BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
@@ -251,6 +267,9 @@ CREATE INDEX IF NOT EXISTS idx_space_friend_events_target_space_created
 
 CREATE INDEX IF NOT EXISTS idx_space_friend_events_target_space_type_created
     ON space_friend_events (target_space_id, event_type, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_space_friend_events_actor_space_created
+    ON space_friend_events (actor_space_id, created_at DESC);
 
 CREATE OR REPLACE FUNCTION tg_space_messages_null_cipher_on_delete() RETURNS trigger AS $$
 BEGIN

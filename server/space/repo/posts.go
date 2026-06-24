@@ -60,8 +60,8 @@ func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID in
 	return scanPostRecord(r.DB.QueryRowContext(ctx, `
 		SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
 		       w.owner_id, w.space_id, w.space_slug, w.public_key,
-		       w.current_version, w.encrypted_profile, w.avatar_object_key,
-		       w.avatar_size, w.updated_at,
+		       w.current_version, w.encrypted_profile, w_avatar.object_id,
+		       w_avatar.size, w.updated_at,
 		       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = w.space_id) AS author_friends,
 		       (SELECT COUNT(*) FROM space_posts ap WHERE ap.space_id = w.space_id AND ap.is_deleted = FALSE) AS author_posts,
 		       p.encrypted_post_key, p.caption_cipher,
@@ -70,6 +70,7 @@ func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID in
 		       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
+			LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
 			WHERE p.post_id = $1 AND p.is_deleted = FALSE
 		`, postID, viewerSpaceID))
 }
@@ -83,8 +84,8 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 	query := `
 			SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
 			       w.owner_id, w.space_id, w.space_slug, w.public_key,
-			       w.current_version, w.encrypted_profile, w.avatar_object_key,
-			       w.avatar_size, w.updated_at,
+			       w.current_version, w.encrypted_profile, w_avatar.object_id,
+			       w_avatar.size, w.updated_at,
 			       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = w.space_id) AS author_friends,
 			       (SELECT COUNT(*) FROM space_posts ap WHERE ap.space_id = w.space_id AND ap.is_deleted = FALSE) AS author_posts,
 			       p.encrypted_post_key, p.caption_cipher,
@@ -93,6 +94,7 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 			       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) AS viewer_liked
 				FROM space_posts p
 				JOIN spaces w ON w.space_id = p.space_id
+				LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
 				WHERE p.space_id = $1 AND p.is_deleted = FALSE`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorPostID)
@@ -133,8 +135,8 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 	query := `
 			SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
 			       w.owner_id, w.space_id, w.space_slug, w.public_key,
-			       w.current_version, w.encrypted_profile, w.avatar_object_key,
-			       w.avatar_size, w.updated_at,
+			       w.current_version, w.encrypted_profile, w_avatar.object_id,
+			       w_avatar.size, w.updated_at,
 			       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = w.space_id) AS author_friends,
 			       (SELECT COUNT(*) FROM space_posts ap WHERE ap.space_id = w.space_id AND ap.is_deleted = FALSE) AS author_posts,
 			       p.encrypted_post_key, p.caption_cipher,
@@ -143,6 +145,7 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 			       CASE WHEN p.space_id = $2 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) END AS viewer_liked
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
+			LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
 			JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
 			WHERE p.is_deleted = FALSE
 			  AND (
@@ -316,13 +319,14 @@ func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, curs
 	args := []any{postID}
 	query := `
 		SELECT liker_space.owner_id, liker_space.space_id, liker_space.space_slug, liker_space.public_key,
-		       liker_space.current_version, liker_space.encrypted_profile, liker_space.avatar_object_key,
-		       liker_space.avatar_size, liker_space.updated_at,
+		       liker_space.current_version, liker_space.encrypted_profile, liker_avatar.object_id,
+		       liker_avatar.size, liker_space.updated_at,
 		       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = liker_space.space_id) AS liker_friends,
 		       (SELECT COUNT(*) FROM space_posts lp WHERE lp.space_id = liker_space.space_id AND lp.is_deleted = FALSE) AS liker_posts,
 		       pl.created_at
 		FROM space_post_likes pl
 		JOIN spaces liker_space ON liker_space.space_id = pl.actor_space_id
+		LEFT JOIN space_profile_assets liker_avatar ON liker_avatar.space_id = liker_space.space_id AND liker_avatar.asset_type = 'avatar'
 		WHERE pl.post_id = $1`
 	if cursorCreatedAt, cursorActorSpaceID, ok := parsePostLikerCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorActorSpaceID)

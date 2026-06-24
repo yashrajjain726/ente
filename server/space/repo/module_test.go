@@ -165,15 +165,10 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = module.Spaces.DB.Exec(`
-		UPDATE spaces
-		SET avatar_object_key = $2,
-		    avatar_bucket_id = $3,
-		    avatar_size = 11,
-		    cover_object_key = $4,
-		    cover_bucket_id = $5,
-		    cover_size = 22
-		WHERE space_id = $1
-	`, aliceSpace.SpaceID, "space/alice/avatar", "hot", "space/alice/cover", "cold")
+		INSERT INTO space_profile_assets (space_id, asset_type, object_id, bucket_id, size)
+		VALUES ($1, $2, $3, $4, 11),
+		       ($1, $5, $6, $7, 22)
+	`, aliceSpace.SpaceID, ProfileAssetTypeAvatar, "avatar", "hot", ProfileAssetTypeCover, "cover", "cold")
 	require.NoError(t, err)
 	postID, err := module.Posts.CreatePost(ctx, aliceID, aliceSpace.SpaceID, "alice-post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
@@ -225,7 +220,7 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1 OR friend_id = $2`, aliceSpace.SpaceID, aliceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1 OR user_id = $2`, aliceSpace.SpaceID, aliceID))
 
-	for _, objectKey := range []string{"space/alice/avatar", "space/alice/cover", "space/alice/post-asset", "space/alice/staged-upload"} {
+	for _, objectKey := range []string{ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeAvatar, "avatar"), ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeCover, "cover"), "space/alice/post-asset", "space/alice/staged-upload"} {
 		require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_temp_objects WHERE object_key = $1 AND owner_id = $2 AND space_id IS NULL AND cleanup_after <= now_utc_micro_seconds()`, objectKey, aliceID))
 	}
 }
@@ -244,6 +239,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 
 	err = module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion)
 	require.NoError(t, err)
+	setFriendEventCreatedAt(t, module, 500, "friend_add", bobID, aliceID)
 
 	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
@@ -262,6 +258,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	require.False(t, message.ViewerLiked)
 
 	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceID, aliceSpace.SpaceID, true))
+	setMessageLikeCreatedAt(t, module, 1500, message.MessageID, aliceSpace.SpaceID)
 	likedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, aliceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), likedMessage.Likes)
@@ -330,6 +327,59 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 		ReplyPostID:                  sql.NullInt64{Int64: 1, Valid: true},
 	})
 	require.Error(t, err)
+}
+
+func TestSpaceMessagesUseProfileAssetAvatars(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+
+	aliceID := insertSpaceUser(t, module, "alice-message-avatars@example.com", "alice-message-avatars-public")
+	bobID := insertSpaceUser(t, module, "bob-message-avatars@example.com", "bob-message-avatars-public")
+
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-message-avatars", "alice-space-key", "alice-message-avatars-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	require.NoError(t, err)
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-message-avatars", "bob-space-key", "bob-message-avatars-public", "bob-secret", "bob-secret-nonce", "bob-profile")
+	require.NoError(t, err)
+	_, err = module.Spaces.DB.Exec(`
+		INSERT INTO space_profile_assets (space_id, asset_type, object_id, bucket_id, size)
+		VALUES ($1, $2, $3, $4, 101),
+		       ($5, $2, $6, $4, 202)
+	`, aliceSpace.SpaceID, ProfileAssetTypeAvatar, "alice-avatar-object-id", "b2-eu-cen", bobSpace.SpaceID, "bob-avatar-object-id")
+	require.NoError(t, err)
+	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
+	setFriendEventCreatedAt(t, module, 500, "friend_add", bobID, aliceID)
+
+	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
+		Kind:                         "regular",
+		SenderID:                     bobID,
+		SenderSpaceID:                bobSpace.SpaceID,
+		RecipientID:                  aliceID,
+		RecipientSpaceID:             aliceSpace.SpaceID,
+		MessageCipher:                "cipher",
+		SenderEncryptedMessageKey:    "sender-key",
+		RecipientEncryptedMessageKey: "recipient-key",
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 1000, message.MessageID)
+
+	thread, nextCursor, err := module.Messages.ListThread(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
+	require.NoError(t, err)
+	require.Empty(t, nextCursor)
+	require.Len(t, thread, 1)
+	require.Equal(t, "bob-avatar-object-id", thread[0].Sender.AvatarObjectID.String)
+	require.EqualValues(t, 202, thread[0].Sender.AvatarSize.Int64)
+	require.Equal(t, "alice-avatar-object-id", thread[0].Recipient.AvatarObjectID.String)
+	require.EqualValues(t, 101, thread[0].Recipient.AvatarSize.Int64)
+
+	conversations, nextCursor, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
+	require.NoError(t, err)
+	require.Empty(t, nextCursor)
+	require.Len(t, conversations, 1)
+	require.Equal(t, "bob-avatar-object-id", conversations[0].Friend.AvatarObjectID.String)
+	require.EqualValues(t, 202, conversations[0].Friend.AvatarSize.Int64)
+	require.NotNil(t, conversations[0].LatestActivity.Message)
+	require.Equal(t, "bob-avatar-object-id", conversations[0].LatestActivity.Message.Sender.AvatarObjectID.String)
+	require.Equal(t, "alice-avatar-object-id", conversations[0].LatestActivity.Message.Recipient.AvatarObjectID.String)
 }
 
 func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
@@ -651,7 +701,7 @@ func TestFriendRequestConversationSupersedesPreviousFriendEvent(t *testing.T) {
 	require.Len(t, conversations, 1)
 	require.Equal(t, bobSpace.SpaceID, conversations[0].Friend.SpaceID)
 	require.Empty(t, conversations[0].Friend.EncryptedProfile)
-	require.False(t, conversations[0].Friend.AvatarObjectKey.Valid)
+	require.False(t, conversations[0].Friend.AvatarObjectID.Valid)
 	require.False(t, conversations[0].Friend.Friends.Valid)
 	require.False(t, conversations[0].Friend.Posts.Valid)
 	require.Equal(t, "friend_request", conversations[0].LatestActivity.Type)
@@ -862,7 +912,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.Len(t, listedSpaces, 1)
 
 	err = module.Assets.AddTempObject(ctx, SpaceTempObjectRecord{
-		ObjectKey:    "space/alice/avatar.jpg",
+		ObjectKey:    ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeAvatar, "avatar.jpg"),
 		OwnerID:      aliceID,
 		SpaceID:      sql.NullString{String: aliceSpace.SpaceID, Valid: true},
 		Purpose:      TempObjectPurposeAvatar,
@@ -872,13 +922,13 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	})
 	require.NoError(t, err)
 	updatedSpace, err := module.Spaces.UpdateProfile(ctx, aliceID, aliceSpace.SpaceID, aliceSpace.CurrentVersion, "alice-profile-v2", &ProfileAssetUpdate{
-		ObjectKey: "space/alice/avatar.jpg",
-		BucketID:  "b2-eu-cen",
-		Size:      111,
+		ObjectID: "avatar.jpg",
+		BucketID: "b2-eu-cen",
+		Size:     111,
 	}, nil, false, false)
 	require.NoError(t, err)
 	require.Equal(t, "alice-profile-v2", updatedSpace.EncryptedProfile)
-	require.Equal(t, "space/alice/avatar.jpg", updatedSpace.AvatarObjectKey.String)
+	require.Equal(t, "avatar.jpg", updatedSpace.AvatarObjectID.String)
 	require.Equal(t, "b2-eu-cen", updatedSpace.AvatarBucketID.String)
 
 	rotatedSpace, err := module.Spaces.RotateKey(ctx, aliceID, aliceSpace.SpaceID, updatedSpace.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v3")
@@ -973,7 +1023,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "b2-eu-cen", bucketID)
 
-	bucketID, err = module.Assets.GetAssetBucketID(ctx, aliceSpace.SpaceID, "space/alice/avatar.jpg")
+	bucketID, err = module.Assets.GetAssetBucketID(ctx, aliceSpace.SpaceID, ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeAvatar, "avatar.jpg"))
 	require.NoError(t, err)
 	require.Equal(t, "b2-eu-cen", bucketID)
 
@@ -1083,7 +1133,7 @@ func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
 
 	for _, rec := range []SpaceTempObjectRecord{
 		{
-			ObjectKey:    "space/alice/avatar-old",
+			ObjectKey:    ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeAvatar, "avatar-old"),
 			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposeAvatar,
@@ -1092,7 +1142,7 @@ func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
 			ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
 		},
 		{
-			ObjectKey:    "space/alice/avatar-new",
+			ObjectKey:    ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeAvatar, "avatar-new"),
 			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposeAvatar,
@@ -1104,20 +1154,24 @@ func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
 		require.NoError(t, module.Assets.AddTempObject(ctx, rec))
 	}
 
-	oldAvatar := &ProfileAssetUpdate{ObjectKey: "space/alice/avatar-old", BucketID: "b2-eu-cen", Size: 111}
+	oldAvatar := &ProfileAssetUpdate{ObjectID: "avatar-old", BucketID: "b2-eu-cen", Size: 111}
 	_, err = module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-old-avatar", oldAvatar, nil, false, false)
 	require.NoError(t, err)
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_profile_assets WHERE space_id = $1 AND asset_type = $2 AND object_id = $3`, space.SpaceID, ProfileAssetTypeAvatar, "avatar-old"))
 
-	newAvatar := &ProfileAssetUpdate{ObjectKey: "space/alice/avatar-new", BucketID: "b2-us-west", Size: 222}
+	newAvatar := &ProfileAssetUpdate{ObjectID: "avatar-new", BucketID: "b2-us-west", Size: 222}
 	updated, err := module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-new-avatar", newAvatar, nil, false, false)
 	require.NoError(t, err)
-	require.Equal(t, "space/alice/avatar-new", updated.AvatarObjectKey.String)
-	requireQueuedTempObject(t, module, "space/alice/avatar-old", TempObjectPurposeAvatar, "b2-eu-cen")
+	require.Equal(t, "avatar-new", updated.AvatarObjectID.String)
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_profile_assets WHERE space_id = $1 AND asset_type = $2 AND object_id = $3`, space.SpaceID, ProfileAssetTypeAvatar, "avatar-old"))
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_profile_assets WHERE space_id = $1 AND asset_type = $2 AND object_id = $3`, space.SpaceID, ProfileAssetTypeAvatar, "avatar-new"))
+	requireQueuedTempObject(t, module, ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeAvatar, "avatar-old"), TempObjectPurposeAvatar, "b2-eu-cen")
 
 	updated, err = module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-no-avatar", nil, nil, true, false)
 	require.NoError(t, err)
-	require.False(t, updated.AvatarObjectKey.Valid)
-	requireQueuedTempObject(t, module, "space/alice/avatar-new", TempObjectPurposeAvatar, "b2-us-west")
+	require.False(t, updated.AvatarObjectID.Valid)
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_profile_assets WHERE space_id = $1 AND asset_type = $2`, space.SpaceID, ProfileAssetTypeAvatar))
+	requireQueuedTempObject(t, module, ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeAvatar, "avatar-new"), TempObjectPurposeAvatar, "b2-us-west")
 }
 
 func TestUpdateProfileQueuesOldCoverForCleanup(t *testing.T) {
@@ -1130,7 +1184,7 @@ func TestUpdateProfileQueuesOldCoverForCleanup(t *testing.T) {
 
 	for _, rec := range []SpaceTempObjectRecord{
 		{
-			ObjectKey:    "space/alice-cover/cover-old",
+			ObjectKey:    ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeCover, "cover-old"),
 			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposeCover,
@@ -1139,7 +1193,7 @@ func TestUpdateProfileQueuesOldCoverForCleanup(t *testing.T) {
 			ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
 		},
 		{
-			ObjectKey:    "space/alice-cover/cover-new",
+			ObjectKey:    ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeCover, "cover-new"),
 			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposeCover,
@@ -1151,20 +1205,24 @@ func TestUpdateProfileQueuesOldCoverForCleanup(t *testing.T) {
 		require.NoError(t, module.Assets.AddTempObject(ctx, rec))
 	}
 
-	oldCover := &ProfileAssetUpdate{ObjectKey: "space/alice-cover/cover-old", BucketID: "b2-eu-cen", Size: 333}
+	oldCover := &ProfileAssetUpdate{ObjectID: "cover-old", BucketID: "b2-eu-cen", Size: 333}
 	_, err = module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-old-cover", nil, oldCover, false, false)
 	require.NoError(t, err)
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_profile_assets WHERE space_id = $1 AND asset_type = $2 AND object_id = $3`, space.SpaceID, ProfileAssetTypeCover, "cover-old"))
 
-	newCover := &ProfileAssetUpdate{ObjectKey: "space/alice-cover/cover-new", BucketID: "b2-us-west", Size: 444}
+	newCover := &ProfileAssetUpdate{ObjectID: "cover-new", BucketID: "b2-us-west", Size: 444}
 	updated, err := module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-new-cover", nil, newCover, false, false)
 	require.NoError(t, err)
-	require.Equal(t, "space/alice-cover/cover-new", updated.CoverObjectKey.String)
-	requireQueuedTempObject(t, module, "space/alice-cover/cover-old", TempObjectPurposeCover, "b2-eu-cen")
+	require.Equal(t, "cover-new", updated.CoverObjectID.String)
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_profile_assets WHERE space_id = $1 AND asset_type = $2 AND object_id = $3`, space.SpaceID, ProfileAssetTypeCover, "cover-old"))
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_profile_assets WHERE space_id = $1 AND asset_type = $2 AND object_id = $3`, space.SpaceID, ProfileAssetTypeCover, "cover-new"))
+	requireQueuedTempObject(t, module, ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeCover, "cover-old"), TempObjectPurposeCover, "b2-eu-cen")
 
 	updated, err = module.Spaces.UpdateProfile(ctx, aliceID, space.SpaceID, space.CurrentVersion, "alice-profile-no-cover", nil, nil, false, true)
 	require.NoError(t, err)
-	require.False(t, updated.CoverObjectKey.Valid)
-	requireQueuedTempObject(t, module, "space/alice-cover/cover-new", TempObjectPurposeCover, "b2-us-west")
+	require.False(t, updated.CoverObjectID.Valid)
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_profile_assets WHERE space_id = $1 AND asset_type = $2`, space.SpaceID, ProfileAssetTypeCover))
+	requireQueuedTempObject(t, module, ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeCover, "cover-new"), TempObjectPurposeCover, "b2-us-west")
 }
 
 func TestAddFriendCreatesReciprocalSharesAndEvent(t *testing.T) {
@@ -1908,7 +1966,7 @@ func TestSpaceNotificationReadMarkersArePerFriend(t *testing.T) {
 	require.Equal(t, int64(1002), bobLatestActivityAt)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, bobLatestActivityAt))
 	bobConversation = conversationBySpaceID(bobSpace.SpaceID)
-	require.True(t, bobConversation.Unread)
+	require.False(t, bobConversation.Unread)
 	require.Equal(t, int64(0), bobConversation.UnreadCount)
 	charlieConversation = conversationBySpaceID(charlieSpace.SpaceID)
 	require.True(t, charlieConversation.Unread)

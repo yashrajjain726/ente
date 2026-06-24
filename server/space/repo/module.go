@@ -65,10 +65,10 @@ type SpaceRecord struct {
 	SecretKeyDecryptionNonce string
 	EncryptedProfile         string
 	CurrentVersion           int
-	AvatarObjectKey          sql.NullString
+	AvatarObjectID           sql.NullString
 	AvatarBucketID           sql.NullString
 	AvatarSize               sql.NullInt64
-	CoverObjectKey           sql.NullString
+	CoverObjectID            sql.NullString
 	CoverBucketID            sql.NullString
 	CoverSize                sql.NullInt64
 	CreatedAt                int64
@@ -76,9 +76,9 @@ type SpaceRecord struct {
 }
 
 type ProfileAssetUpdate struct {
-	ObjectKey string
-	BucketID  string
-	Size      int64
+	ObjectID string
+	BucketID string
+	Size     int64
 }
 
 type SpaceVersionRecord struct {
@@ -215,7 +215,7 @@ type SpaceActorRecord struct {
 	PublicKey        string
 	KeyVersion       int
 	EncryptedProfile string
-	AvatarObjectKey  sql.NullString
+	AvatarObjectID   sql.NullString
 	AvatarSize       sql.NullInt64
 	UpdatedAt        int64
 	Friends          sql.NullInt64

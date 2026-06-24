@@ -132,10 +132,20 @@ func SetTempObjectCleanupAfterTx(ctx context.Context, tx *sql.Tx, objectKey stri
 
 func IsObjectReferencedTx(ctx context.Context, tx *sql.Tx, objectKey string) (bool, error) {
 	var exists bool
+	if spaceID, assetType, objectID, ok := ParseProfileAssetObjectKey(objectKey); ok {
+		err := tx.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM space_profile_assets
+				WHERE space_id = $1 AND asset_type = $2 AND object_id = $3
+			)
+		`, spaceID, assetType, objectID).Scan(&exists)
+		if err != nil || exists {
+			return exists, stacktrace.Propagate(err, "")
+		}
+	}
 	err := tx.QueryRowContext(ctx, `
 		SELECT (
-			EXISTS (SELECT 1 FROM spaces WHERE avatar_object_key = $1) OR
-			EXISTS (SELECT 1 FROM spaces WHERE cover_object_key = $1) OR
 			EXISTS (
 				SELECT 1
 				FROM space_post_assets a

@@ -43,8 +43,8 @@ const spaceMessageSelectColumns = `
 	sender_space.public_key,
 	sender_space.current_version,
 	sender_space.encrypted_profile,
-	sender_space.avatar_object_key,
-	sender_space.avatar_size,
+	sender_avatar.object_id,
+	sender_avatar.size,
 	sender_space.updated_at,
 	(SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = sender_space.space_id) AS sender_friends,
 	(SELECT COUNT(*) FROM space_posts sp WHERE sp.space_id = sender_space.space_id AND sp.is_deleted = FALSE) AS sender_posts,
@@ -54,8 +54,8 @@ const spaceMessageSelectColumns = `
 	recipient_space.public_key,
 	recipient_space.current_version,
 	recipient_space.encrypted_profile,
-	recipient_space.avatar_object_key,
-	recipient_space.avatar_size,
+	recipient_avatar.object_id,
+	recipient_avatar.size,
 	recipient_space.updated_at,
 	(SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = recipient_space.space_id) AS recipient_friends,
 	(SELECT COUNT(*) FROM space_posts rp WHERE rp.space_id = recipient_space.space_id AND rp.is_deleted = FALSE) AS recipient_posts
@@ -63,7 +63,9 @@ const spaceMessageSelectColumns = `
 
 const spaceMessageJoins = `
 	JOIN spaces sender_space ON sender_space.space_id = m.sender_space_id
+	LEFT JOIN space_profile_assets sender_avatar ON sender_avatar.space_id = sender_space.space_id AND sender_avatar.asset_type = 'avatar'
 	JOIN spaces recipient_space ON recipient_space.space_id = m.recipient_space_id
+	LEFT JOIN space_profile_assets recipient_avatar ON recipient_avatar.space_id = recipient_space.space_id AND recipient_avatar.asset_type = 'avatar'
 `
 
 func (r *MessagesRepository) CreateMessage(ctx context.Context, input CreateSpaceMessageRecord) (*SpaceMessageRecord, error) {
@@ -202,8 +204,8 @@ func (r *MessagesRepository) listThreadPostLikes(ctx context.Context, viewerID i
 			sender_space.public_key,
 			sender_space.current_version,
 			sender_space.encrypted_profile,
-			sender_space.avatar_object_key,
-			sender_space.avatar_size,
+			sender_avatar.object_id,
+			sender_avatar.size,
 			sender_space.updated_at,
 			(SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = sender_space.space_id) AS sender_friends,
 			(SELECT COUNT(*) FROM space_posts sp WHERE sp.space_id = sender_space.space_id AND sp.is_deleted = FALSE) AS sender_posts,
@@ -213,15 +215,17 @@ func (r *MessagesRepository) listThreadPostLikes(ctx context.Context, viewerID i
 			recipient_space.public_key,
 			recipient_space.current_version,
 			recipient_space.encrypted_profile,
-			recipient_space.avatar_object_key,
-			recipient_space.avatar_size,
+			recipient_avatar.object_id,
+			recipient_avatar.size,
 			recipient_space.updated_at,
 			(SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = recipient_space.space_id) AS recipient_friends,
 			(SELECT COUNT(*) FROM space_posts rp WHERE rp.space_id = recipient_space.space_id AND rp.is_deleted = FALSE) AS recipient_posts
 		FROM space_post_likes pl
 		JOIN space_posts p ON p.post_id = pl.post_id
 		JOIN spaces sender_space ON sender_space.space_id = pl.actor_space_id
+		LEFT JOIN space_profile_assets sender_avatar ON sender_avatar.space_id = sender_space.space_id AND sender_avatar.asset_type = 'avatar'
 		JOIN spaces recipient_space ON recipient_space.space_id = p.space_id
+		LEFT JOIN space_profile_assets recipient_avatar ON recipient_avatar.space_id = recipient_space.space_id AND recipient_avatar.asset_type = 'avatar'
 		LEFT JOIN LATERAL (
 			SELECT object_key
 			FROM space_post_assets
@@ -580,7 +584,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 					WHEN c.unread_count = 0
 					 AND c.post_like_unread_count = 1
 					 AND c.friend_request_unread_count = 0
-					 AND c.activity_type = 'post_like' THEN 0
+					 AND (c.activity_type = 'post_like' OR c.notification_created_at IS NULL) THEN 0
 					ELSE c.unread_count + c.post_like_unread_count + c.friend_request_unread_count
 				END AS conversation_unread_count,
 				BOOL_OR(c.notification_unread) OVER (PARTITION BY c.friend_space_id) AS conversation_notification_unread,
@@ -606,8 +610,8 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			friend_space.public_key,
 			friend_space.current_version,
 			CASE WHEN c.activity_type = 'friend_request' THEN '' ELSE friend_space.encrypted_profile END AS friend_profile,
-			CASE WHEN c.activity_type = 'friend_request' THEN NULL::text ELSE friend_space.avatar_object_key END AS friend_avatar_object_key,
-			CASE WHEN c.activity_type = 'friend_request' THEN NULL::bigint ELSE friend_space.avatar_size END AS friend_avatar_size,
+			CASE WHEN c.activity_type = 'friend_request' THEN NULL::text ELSE friend_avatar.object_id END AS friend_avatar_object_id,
+			CASE WHEN c.activity_type = 'friend_request' THEN NULL::bigint ELSE friend_avatar.size END AS friend_avatar_size,
 			friend_space.updated_at,
 			CASE WHEN c.activity_type = 'friend_request' THEN NULL::bigint ELSE (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = friend_space.space_id) END AS friend_friends,
 			CASE WHEN c.activity_type = 'friend_request' THEN NULL::bigint ELSE (SELECT COUNT(*) FROM space_posts fp WHERE fp.space_id = friend_space.space_id AND fp.is_deleted = FALSE) END AS friend_posts,
@@ -636,8 +640,8 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			COALESCE(sender_space.public_key, '') AS sender_public_key,
 			COALESCE(sender_space.current_version, 0) AS sender_current_version,
 			COALESCE(sender_space.encrypted_profile, '') AS sender_profile,
-			sender_space.avatar_object_key,
-			sender_space.avatar_size,
+			sender_avatar.object_id,
+			sender_avatar.size,
 			COALESCE(sender_space.updated_at, 0) AS sender_updated_at,
 			CASE WHEN sender_space.space_id IS NULL THEN NULL::bigint ELSE (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = sender_space.space_id) END AS sender_friends,
 			CASE WHEN sender_space.space_id IS NULL THEN NULL::bigint ELSE (SELECT COUNT(*) FROM space_posts sp WHERE sp.space_id = sender_space.space_id AND sp.is_deleted = FALSE) END AS sender_posts,
@@ -647,8 +651,8 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			COALESCE(recipient_space.public_key, '') AS recipient_public_key,
 			COALESCE(recipient_space.current_version, 0) AS recipient_current_version,
 			COALESCE(recipient_space.encrypted_profile, '') AS recipient_profile,
-			recipient_space.avatar_object_key,
-			recipient_space.avatar_size,
+			recipient_avatar.object_id,
+			recipient_avatar.size,
 			COALESCE(recipient_space.updated_at, 0) AS recipient_updated_at,
 			CASE WHEN recipient_space.space_id IS NULL THEN NULL::bigint ELSE (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = recipient_space.space_id) END AS recipient_friends,
 			CASE WHEN recipient_space.space_id IS NULL THEN NULL::bigint ELSE (SELECT COUNT(*) FROM space_posts rp WHERE rp.space_id = recipient_space.space_id AND rp.is_deleted = FALSE) END AS recipient_posts,
@@ -663,10 +667,13 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			asset.metadata_cipher AS post_object_metadata_cipher
 		FROM ranked c
 		JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
+		LEFT JOIN space_profile_assets friend_avatar ON friend_avatar.space_id = friend_space.space_id AND friend_avatar.asset_type = 'avatar'
 		JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
 		LEFT JOIN space_messages m ON m.message_id = c.message_id
 		LEFT JOIN spaces sender_space ON sender_space.space_id = m.sender_space_id
+		LEFT JOIN space_profile_assets sender_avatar ON sender_avatar.space_id = sender_space.space_id AND sender_avatar.asset_type = 'avatar'
 		LEFT JOIN spaces recipient_space ON recipient_space.space_id = m.recipient_space_id
+		LEFT JOIN space_profile_assets recipient_avatar ON recipient_avatar.space_id = recipient_space.space_id AND recipient_avatar.asset_type = 'avatar'
 		LEFT JOIN space_posts p ON p.post_id = c.post_id
 		LEFT JOIN spaces post_space ON post_space.space_id = p.space_id
 		LEFT JOIN LATERAL (
