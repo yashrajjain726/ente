@@ -18,11 +18,11 @@ pub(crate) fn generate_key() -> Vec<u8> {
 }
 
 pub(crate) fn generate_keypair() -> Result<(Vec<u8>, Vec<u8>)> {
-    let private_key = SecretKey::generate();
-    let public_key = private_key.public_key();
+    let secret_key = SecretKey::generate();
+    let public_key = secret_key.public_key();
     Ok((
         public_key.as_bytes().to_vec(),
-        private_key.as_bytes().to_vec(),
+        secret_key.as_bytes().to_vec(),
     ))
 }
 
@@ -34,11 +34,11 @@ pub(crate) fn seal_with_public_key(plaintext: &[u8], public_key: &[u8]) -> Resul
 pub(crate) fn open_with_keypair(
     ciphertext: &[u8],
     public_key: &[u8],
-    private_key: &[u8],
+    secret_key: &[u8],
 ) -> Result<Vec<u8>> {
     let public_key = PublicKey::try_from_slice(public_key)?;
-    let private_key = SecretKey::try_from_slice(private_key)?;
-    sealed::open(ciphertext, &public_key, &private_key).map_err(Into::into)
+    let secret_key = SecretKey::try_from_slice(secret_key)?;
+    sealed::open(ciphertext, &public_key, &secret_key).map_err(Into::into)
 }
 
 pub(crate) fn generate_space_link_access_key() -> Result<String> {

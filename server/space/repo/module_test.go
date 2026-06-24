@@ -118,13 +118,13 @@ func TestGetBrowserSession(t *testing.T) {
 	tokenHash := sha256.Sum256([]byte("browser-session-token"))
 	expiresAt := timeutil.NDaysFromNow(1)
 
-	err := module.Sessions.CreateBrowserSession(ctx, tokenHash[:], userID, "client-key", expiresAt)
+	err := module.Sessions.CreateBrowserSession(ctx, tokenHash[:], userID, "session-wrap-key", expiresAt)
 	require.NoError(t, err)
 
 	session, err := module.Sessions.GetBrowserSession(ctx, tokenHash[:])
 	require.NoError(t, err)
 	require.Equal(t, userID, session.UserID)
-	require.Equal(t, "client-key", session.ClientKey)
+	require.Equal(t, "session-wrap-key", session.SessionWrapKey)
 	require.Equal(t, expiresAt, session.ExpiresAt)
 }
 
@@ -177,7 +177,7 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 	_, err = testUpsertLink(ctx, module, aliceSpace.SpaceID, []byte("alice-auth-hash"), aliceSpace.CurrentVersion, "alice-link-space-key", "alice-link-access-key")
 	require.NoError(t, err)
 	require.NoError(t, module.Links.CreateSession(ctx, []byte("alice-link-token"), aliceSpace.SpaceID, []byte("alice-auth-hash"), aliceSpace.CurrentVersion, timeutil.NDaysFromNow(1)))
-	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, []byte("alice-browser-token"), aliceID, "client-key", timeutil.NDaysFromNow(1)))
+	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, []byte("alice-browser-token"), aliceID, "session-wrap-key", timeutil.NDaysFromNow(1)))
 
 	postID, err := testCreatePost(ctx, module, aliceID, aliceSpace.SpaceID, "alice-post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
@@ -252,7 +252,7 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 		ExpiresAt:    timeutil.NDaysFromNow(1),
 	}))
 	require.NoError(t, testCreateEntityKey(ctx, module, aliceID, "primary", "encrypted-key"))
-	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, []byte("alice-delete-browser-token"), aliceID, "client-key", timeutil.NDaysFromNow(1)))
+	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, []byte("alice-delete-browser-token"), aliceID, "session-wrap-key", timeutil.NDaysFromNow(1)))
 	require.NoError(t, testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	_, err = testUpsertLink(ctx, module, aliceSpace.SpaceID, []byte("alice-delete-auth-hash"), aliceSpace.CurrentVersion, "alice-link-space-key", "alice-link-access-key")
 	require.NoError(t, err)

@@ -15,8 +15,8 @@ pub enum SpaceError {
     #[error("invalid input: {0}")]
     InvalidInput(String),
 
-    #[error("missing private key material")]
-    MissingPrivateKey,
+    #[error("missing secret key material")]
+    MissingSecretKey,
 
     #[error("missing encrypted space key")]
     MissingEncryptedSpaceKey,

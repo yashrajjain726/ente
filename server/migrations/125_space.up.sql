@@ -61,7 +61,7 @@ EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 CREATE TABLE IF NOT EXISTS space_browser_sessions (
     token_hash BYTEA PRIMARY KEY,
     user_id    BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    client_key TEXT   NOT NULL,
+    session_wrap_key TEXT   NOT NULL,
     expires_at BIGINT NOT NULL,
     created_at BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     updated_at BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),

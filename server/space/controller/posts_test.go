@@ -71,7 +71,7 @@ func TestListPostsHydratesPostAssets(t *testing.T) {
 	})
 	require.NoError(t, err)
 	sessionHash := sha256.Sum256([]byte("alice-list-assets-session"))
-	require.NoError(t, repos.Sessions.CreateBrowserSession(ctx, sessionHash[:], aliceID, "client-key", timeutil.MicrosecondsAfterMinutes(5)))
+	require.NoError(t, repos.Sessions.CreateBrowserSession(ctx, sessionHash[:], aliceID, "session-wrap-key", timeutil.MicrosecondsAfterMinutes(5)))
 	ginCtx := newPublicSpaceContext()
 	ginCtx.Request.Header.Set(SpaceBrowserSessionTokenHeader, "alice-list-assets-session")
 
@@ -104,7 +104,7 @@ func TestListPostLikersUsesRequestPagination(t *testing.T) {
 	require.NoError(t, repos.Posts.SetLike(ctx, postID, bobID, bobSpace.SpaceID, true))
 	require.NoError(t, repos.Posts.SetLike(ctx, postID, charlieID, charlieSpace.SpaceID, true))
 	sessionHash := sha256.Sum256([]byte("alice-list-likers-session"))
-	require.NoError(t, repos.Sessions.CreateBrowserSession(ctx, sessionHash[:], aliceID, "client-key", timeutil.MicrosecondsAfterMinutes(5)))
+	require.NoError(t, repos.Sessions.CreateBrowserSession(ctx, sessionHash[:], aliceID, "session-wrap-key", timeutil.MicrosecondsAfterMinutes(5)))
 	ginCtx := newPublicSpaceContext()
 	ginCtx.Request.Header.Set(SpaceBrowserSessionTokenHeader, "alice-list-likers-session")
 

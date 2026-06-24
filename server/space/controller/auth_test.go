@@ -75,7 +75,7 @@ func TestResolveViewerAcceptsSpaceBrowserSessionHeader(t *testing.T) {
 	space, err := testCreateSpace(ctx, repos, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	sessionHash := sha256.Sum256([]byte("space-session-token"))
-	require.NoError(t, repos.Sessions.CreateBrowserSession(ctx, sessionHash[:], aliceID, "client-key", timeutil.MicrosecondsAfterMinutes(5)))
+	require.NoError(t, repos.Sessions.CreateBrowserSession(ctx, sessionHash[:], aliceID, "session-wrap-key", timeutil.MicrosecondsAfterMinutes(5)))
 	ginCtx := newPublicSpaceContext()
 	ginCtx.Request.Header.Set(SpaceBrowserSessionTokenHeader, "space-session-token")
 	ginCtx.Request.Header.Set("X-Auth-User-ID", "999999")

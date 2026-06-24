@@ -53,7 +53,7 @@ impl From<CoreSpaceError> for WasmSpaceError {
             CoreSpaceError::Crypto(_) => ("crypto", None),
             CoreSpaceError::Auth(_) => ("auth", None),
             CoreSpaceError::InvalidInput(_) => ("invalid_input", None),
-            CoreSpaceError::MissingPrivateKey => ("missing_private_key", None),
+            CoreSpaceError::MissingSecretKey => ("missing_secret_key", None),
             CoreSpaceError::MissingEncryptedSpaceKey => ("missing_encrypted_space_key", None),
             CoreSpaceError::EntityKeyConflict => ("entity_key_conflict", None),
         };

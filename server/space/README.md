@@ -12,7 +12,7 @@ This module is the top-level home for space functionality in `ente3/server`.
 The Rust space client lives alongside the rest of the Ente Rust crates at
 `../rust/space`, not inside `server/space`.
 
-The root space key bootstrap remains on the existing `/user-entity/key` endpoint via `userentity.Space`.
+The space root key bootstrap remains on the existing `/user-entity/key` endpoint via `userentity.Space`.
 
 ## Routes
 

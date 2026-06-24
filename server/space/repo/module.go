@@ -284,13 +284,13 @@ type SpaceLinkSessionRecord struct {
 }
 
 type SpaceBrowserSessionRecord struct {
-	TokenHash  []byte
-	UserID     int64
-	ClientKey  string
-	ExpiresAt  int64
-	CreatedAt  int64
-	UpdatedAt  int64
-	LastUsedAt int64
+	TokenHash      []byte
+	UserID         int64
+	SessionWrapKey string
+	ExpiresAt      int64
+	CreatedAt      int64
+	UpdatedAt      int64
+	LastUsedAt     int64
 }
 
 type SpaceEntityKeyRecord struct {

@@ -26,15 +26,15 @@ type CreatedBrowserSession struct {
 	Response models.SpaceBrowserSessionResponse
 }
 
-func (c *SessionsController) CreateBrowserSession(ctx *gin.Context, userID int64, clientKey string) (*CreatedBrowserSession, error) {
+func (c *SessionsController) CreateBrowserSession(ctx *gin.Context, userID int64, sessionWrapKey string) (*CreatedBrowserSession, error) {
 	sessionToken := auth.GenerateURLSafeRandomString(32)
-	clientKey = strings.TrimSpace(clientKey)
-	if clientKey == "" {
-		return nil, ente.NewBadRequestWithMessage("clientKey is required")
+	sessionWrapKey = strings.TrimSpace(sessionWrapKey)
+	if sessionWrapKey == "" {
+		return nil, ente.NewBadRequestWithMessage("sessionWrapKey is required")
 	}
 	sessionHash := sha256.Sum256([]byte(sessionToken))
 	expiresAt := timeutil.NDaysFromNow(spaceBrowserSessionDurationDays)
-	if err := c.SessionsRepo.CreateBrowserSession(ctx.Request.Context(), sessionHash[:], userID, clientKey, expiresAt); err != nil {
+	if err := c.SessionsRepo.CreateBrowserSession(ctx.Request.Context(), sessionHash[:], userID, sessionWrapKey, expiresAt); err != nil {
 		return nil, err
 	}
 	return &CreatedBrowserSession{
@@ -48,8 +48,8 @@ func (c *SessionsController) BootstrapBrowserSession(ctx *gin.Context, sessionTo
 		return nil, err
 	}
 	return &models.SpaceBrowserSessionBootstrapResponse{
-		ID:        session.UserID,
-		ClientKey: session.ClientKey,
+		ID:             session.UserID,
+		SessionWrapKey: session.SessionWrapKey,
 	}, nil
 }
 

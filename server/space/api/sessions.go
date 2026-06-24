@@ -40,7 +40,7 @@ func (h *Handlers) CreateBrowserSession(c *gin.Context) {
 		respondJSON(c, nil, ente.ErrAuthenticationRequired)
 		return
 	}
-	created, err := h.Module.Sessions.CreateBrowserSession(c, userID, req.ClientKey)
+	created, err := h.Module.Sessions.CreateBrowserSession(c, userID, req.SessionWrapKey)
 	if err != nil {
 		respondJSON(c, nil, err)
 		return

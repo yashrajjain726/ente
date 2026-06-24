@@ -73,7 +73,7 @@ struct ResolvedSpaceAccess {
 
 #[derive(Debug, Clone)]
 struct ResolvedOwnedSpaceAccess {
-    root_space_key: Vec<u8>,
+    space_root_key: Vec<u8>,
     space_key: Vec<u8>,
     key_version: i32,
 }
@@ -81,14 +81,14 @@ struct ResolvedOwnedSpaceAccess {
 #[derive(Debug, Clone)]
 struct SpaceIdentity {
     public_key: Vec<u8>,
-    private_key: Vec<u8>,
+    secret_key: Vec<u8>,
 }
 
 pub struct AccountSpaceCtx {
     client: HttpClient,
-    root_space_key: Vec<u8>,
+    space_root_key: Vec<u8>,
     user_id: Option<i64>,
-    root_space_key_cache: Mutex<Option<Option<Vec<u8>>>>,
+    space_root_key_cache: Mutex<Option<Option<Vec<u8>>>>,
     space_identity_cache: Mutex<Option<SpaceIdentity>>,
     owned_spaces_cache: Mutex<Option<Vec<SpaceKeyResponse>>>,
     friend_shares_cache: Mutex<Option<Vec<DecryptedFriendShare>>>,
@@ -117,9 +117,9 @@ impl AccountSpaceCtx {
         )?;
         Ok(Self {
             client,
-            root_space_key: input.space_root_key,
+            space_root_key: input.space_root_key,
             user_id: input.user_id,
-            root_space_key_cache: Mutex::new(None),
+            space_root_key_cache: Mutex::new(None),
             space_identity_cache: Mutex::new(None),
             owned_spaces_cache: Mutex::new(None),
             friend_shares_cache: Mutex::new(None),
@@ -134,8 +134,8 @@ impl AccountSpaceCtx {
         self.user_id
     }
 
-    pub fn root_space_key(&self) -> &[u8] {
-        &self.root_space_key
+    pub fn space_root_key(&self) -> &[u8] {
+        &self.space_root_key
     }
 
     pub async fn get_entity_key(&self, key_type: &str) -> Result<Option<EntityKeyPayload>> {
@@ -183,15 +183,15 @@ impl AccountSpaceCtx {
         })
     }
 
-    pub async fn get_root_space_key(&self) -> Result<Option<Vec<u8>>> {
-        Ok(Some(self.root_space_key.clone()))
+    pub async fn get_space_root_key(&self) -> Result<Option<Vec<u8>>> {
+        Ok(Some(self.space_root_key.clone()))
     }
 
-    pub async fn get_or_create_root_space_key(&self) -> Result<Vec<u8>> {
-        let root_space_key = self.root_space_key.clone();
-        *cache_lock(&self.root_space_key_cache, "root space key")? =
-            Some(Some(root_space_key.clone()));
-        Ok(root_space_key)
+    pub async fn get_or_create_space_root_key(&self) -> Result<Vec<u8>> {
+        let space_root_key = self.space_root_key.clone();
+        *cache_lock(&self.space_root_key_cache, "space root key")? =
+            Some(Some(space_root_key.clone()));
+        Ok(space_root_key)
     }
 
     pub async fn list_owned_spaces(&self) -> Result<Vec<SpaceKeyResponse>> {
@@ -216,14 +216,14 @@ impl AccountSpaceCtx {
 
     fn decrypt_space_identity(&self, space: &SpaceKeyResponse) -> Result<SpaceIdentity> {
         if space.public_key.trim().is_empty() || space.encrypted_secret_key.trim().is_empty() {
-            return Err(SpaceError::MissingPrivateKey);
+            return Err(SpaceError::MissingSecretKey);
         }
         let public_key = decode_b64(&space.public_key)?;
         let encrypted_secret_key = decode_b64(&space.encrypted_secret_key)?;
-        let private_key = decrypt_secretbox_payload(&self.root_space_key, &encrypted_secret_key)?;
+        let secret_key = decrypt_secretbox_payload(&self.space_root_key, &encrypted_secret_key)?;
         Ok(SpaceIdentity {
             public_key,
-            private_key,
+            secret_key,
         })
     }
 
@@ -251,8 +251,7 @@ impl AccountSpaceCtx {
         if ciphertext.is_empty() {
             return Err(SpaceError::MissingEncryptedSpaceKey);
         }
-        let space_key =
-            open_with_keypair(&ciphertext, &identity.public_key, &identity.private_key)?;
+        let space_key = open_with_keypair(&ciphertext, &identity.public_key, &identity.secret_key)?;
         Ok(DecryptedFriendShare {
             friend: share.friend.clone(),
             space_id: share.space_id.clone(),
@@ -263,10 +262,10 @@ impl AccountSpaceCtx {
     }
 
     async fn default_profile_space_access(&self) -> Result<(SpaceKeyResponse, Vec<u8>)> {
-        let root_space_key = self
-            .get_root_space_key()
+        let space_root_key = self
+            .get_space_root_key()
             .await?
-            .ok_or_else(|| SpaceError::InvalidInput("root space key is missing".into()))?;
+            .ok_or_else(|| SpaceError::InvalidInput("space root key is missing".into()))?;
         let space = self
             .list_owned_spaces()
             .await?
@@ -274,7 +273,7 @@ impl AccountSpaceCtx {
             .next()
             .ok_or_else(|| SpaceError::InvalidInput("no owned space is available".into()))?;
         let packed = decode_b64(&space.encrypted_space_key)?;
-        let space_key = decrypt_secretbox_payload(&root_space_key, &packed)?;
+        let space_key = decrypt_secretbox_payload(&space_root_key, &packed)?;
         Ok((space, space_key))
     }
 
@@ -304,11 +303,11 @@ impl AccountSpaceCtx {
         space_key: &[u8],
         profile: &[u8],
     ) -> Result<CreatedSpace> {
-        let root_space_key = self.get_or_create_root_space_key().await?;
+        let space_root_key = self.get_or_create_space_root_key().await?;
         let encrypted_space_key =
-            encode_b64(&encrypt_secretbox_payload(&root_space_key, space_key)?);
-        let (public_key, private_key) = generate_keypair()?;
-        let encrypted_secret_key = encrypt_secretbox_payload(&root_space_key, &private_key)?;
+            encode_b64(&encrypt_secretbox_payload(&space_root_key, space_key)?);
+        let (public_key, secret_key) = generate_keypair()?;
+        let encrypted_secret_key = encrypt_secretbox_payload(&space_root_key, &secret_key)?;
         let encrypted_profile = encode_b64(&encrypt_secretbox_payload(space_key, profile)?);
         let request = CreateSpaceRequest {
             space_slug: space_slug.to_owned(),
@@ -332,7 +331,7 @@ impl AccountSpaceCtx {
         })?;
         *cache_lock(&self.space_identity_cache, "space identity")? = Some(SpaceIdentity {
             public_key,
-            private_key,
+            secret_key,
         });
         Ok(CreatedSpace {
             space_id: response.space_id,
@@ -499,12 +498,12 @@ impl AccountSpaceCtx {
                 .ok_or_else(|| SpaceError::InvalidInput("missing current profile".into()))?,
         };
         let next_space_key = generate_key();
-        let root_space_key = self.get_or_create_root_space_key().await?;
+        let space_root_key = self.get_or_create_space_root_key().await?;
         let request = RotateSpaceKeyRequest {
             space_id: space_id.to_owned(),
             key_version: current.key_version,
             encrypted_space_key: encode_b64(&encrypt_secretbox_payload(
-                &root_space_key,
+                &space_root_key,
                 &next_space_key,
             )?),
             wrapped_prev_key: encode_b64(&encrypt_secretbox_payload(
@@ -905,13 +904,13 @@ impl AccountSpaceCtx {
     }
 
     pub async fn hydrate_space_keys(&self) -> Result<HydratedKeys> {
-        let root_space_key = self.get_root_space_key().await?;
+        let space_root_key = self.get_space_root_key().await?;
         let owned_records = self.list_owned_spaces().await?;
         let mut owned = Vec::with_capacity(owned_records.len());
-        if let Some(root_space_key) = root_space_key {
+        if let Some(space_root_key) = space_root_key {
             for record in owned_records {
                 let packed = decode_b64(&record.encrypted_space_key)?;
-                let space_key = decrypt_secretbox_payload(&root_space_key, &packed)?;
+                let space_key = decrypt_secretbox_payload(&space_root_key, &packed)?;
                 owned.push((record.space_id, space_key));
             }
         }
@@ -1232,7 +1231,7 @@ impl AccountSpaceCtx {
         let identity = self.default_space_identity().await?;
         let sealed_key = decode_b64(&message.encrypted_message_key)?;
         let message_key =
-            open_with_keypair(&sealed_key, &identity.public_key, &identity.private_key)?;
+            open_with_keypair(&sealed_key, &identity.public_key, &identity.secret_key)?;
         let packed_message = decode_b64(&message.message_cipher)?;
         let plaintext = decrypt_secretbox_payload(&message_key, &packed_message)?;
         let payload: MessagePayload = serde_json::from_slice(&plaintext)
@@ -1523,17 +1522,17 @@ impl AccountSpaceCtx {
                 &access.space_key,
             )?),
             encrypted_access_key: encode_b64(&encrypt_secretbox_payload(
-                &access.root_space_key,
+                &access.space_root_key,
                 access_key.as_bytes(),
             )?),
         };
         let status: SpaceLinkStatusResponse = self.client.post_json(path, &request).await?;
-        self.created_space_link_from_status(&access.root_space_key, status)
+        self.created_space_link_from_status(&access.space_root_key, status)
     }
 
     fn created_space_link_from_status(
         &self,
-        root_space_key: &[u8],
+        space_root_key: &[u8],
         status: SpaceLinkStatusResponse,
     ) -> Result<CreatedSpaceLink> {
         if status.encrypted_access_key.trim().is_empty() {
@@ -1542,7 +1541,7 @@ impl AccountSpaceCtx {
             ));
         }
         let access_key_bytes =
-            decrypt_secretbox_payload(root_space_key, &decode_b64(&status.encrypted_access_key)?)?;
+            decrypt_secretbox_payload(space_root_key, &decode_b64(&status.encrypted_access_key)?)?;
         let access_key = String::from_utf8(access_key_bytes).map_err(|err| {
             SpaceError::InvalidInput(format!("invalid space link access key utf8: {err}"))
         })?;
@@ -1579,7 +1578,7 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
     ) -> Result<Option<ResolvedOwnedSpaceAccess>> {
-        let root_space_key = match self.get_root_space_key_cached().await? {
+        let space_root_key = match self.get_space_root_key_cached().await? {
             Some(value) => value,
             None => return Ok(None),
         };
@@ -1588,9 +1587,9 @@ impl AccountSpaceCtx {
             return Ok(None);
         };
         let packed = decode_b64(&record.encrypted_space_key)?;
-        let space_key = decrypt_secretbox_payload(&root_space_key, &packed)?;
+        let space_key = decrypt_secretbox_payload(&space_root_key, &packed)?;
         Ok(Some(ResolvedOwnedSpaceAccess {
-            root_space_key,
+            space_root_key,
             space_key,
             key_version: record.key_version,
         }))
@@ -1634,12 +1633,12 @@ impl AccountSpaceCtx {
         Ok(history.get(&target_version).cloned())
     }
 
-    async fn get_root_space_key_cached(&self) -> Result<Option<Vec<u8>>> {
-        if let Some(value) = cache_lock(&self.root_space_key_cache, "root space key")?.clone() {
+    async fn get_space_root_key_cached(&self) -> Result<Option<Vec<u8>>> {
+        if let Some(value) = cache_lock(&self.space_root_key_cache, "space root key")?.clone() {
             return Ok(value);
         }
-        let value = self.get_root_space_key().await?;
-        *cache_lock(&self.root_space_key_cache, "root space key")? = Some(value.clone());
+        let value = self.get_space_root_key().await?;
+        *cache_lock(&self.space_root_key_cache, "space root key")? = Some(value.clone());
         Ok(value)
     }
 
@@ -2237,11 +2236,14 @@ mod tests {
     const TEST_MP4_BYTES: &[u8] = b"\0\0\0\x18ftypmp42";
 
     fn test_account_ctx(base_url: &str) -> AccountSpaceCtx {
-        test_account_ctx_with_root_key(base_url, generate_key())
+        test_account_ctx_with_space_root_key(base_url, generate_key())
     }
 
-    fn test_account_ctx_with_root_key(base_url: &str, space_root_key: Vec<u8>) -> AccountSpaceCtx {
-        let (public_key, private_key) = generate_keypair().expect("valid keypair");
+    fn test_account_ctx_with_space_root_key(
+        base_url: &str,
+        space_root_key: Vec<u8>,
+    ) -> AccountSpaceCtx {
+        let (public_key, secret_key) = generate_keypair().expect("valid keypair");
         let ctx = AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
             base_url: base_url.to_owned(),
             space_session_token: Some("space-session-token".to_owned()),
@@ -2255,7 +2257,7 @@ mod tests {
         *cache_lock(&ctx.space_identity_cache, "space identity").expect("space identity cache") =
             Some(SpaceIdentity {
                 public_key,
-                private_key,
+                secret_key,
             });
         ctx
     }
@@ -2295,7 +2297,7 @@ mod tests {
     }
 
     fn owned_space_response(
-        root_space_key: &[u8],
+        space_root_key: &[u8],
         space_key: &[u8],
         space_id: &str,
         space_slug: &str,
@@ -2305,7 +2307,7 @@ mod tests {
             "spaceId": space_id,
             "spaceSlug": space_slug,
             "encryptedSpaceKey": encode_b64(
-                &encrypt_secretbox_payload(root_space_key, space_key).expect("space key wrap")
+                &encrypt_secretbox_payload(space_root_key, space_key).expect("space key wrap")
             ),
             "encryptedProfile": "",
             "keyVersion": key_version
@@ -2314,32 +2316,32 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_root_space_key_returns_context_root_key() {
+    async fn get_space_root_key_returns_context_space_root_key() {
         let server = Server::new_async().await;
-        let expected_root = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), expected_root.clone());
+        let expected_space_root = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), expected_space_root.clone());
 
-        let root = ctx
-            .get_root_space_key()
+        let space_root = ctx
+            .get_space_root_key()
             .await
-            .expect("root space key should load")
-            .expect("root space key should exist");
+            .expect("space root key should load")
+            .expect("space root key should exist");
 
-        assert_eq!(root, expected_root);
+        assert_eq!(space_root, expected_space_root);
     }
 
     #[tokio::test]
-    async fn get_or_create_root_space_key_returns_context_root_key() {
+    async fn get_or_create_space_root_key_returns_context_space_root_key() {
         let server = Server::new_async().await;
-        let expected_root = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), expected_root.clone());
+        let expected_space_root = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), expected_space_root.clone());
 
-        let root = ctx
-            .get_or_create_root_space_key()
+        let space_root = ctx
+            .get_or_create_space_root_key()
             .await
-            .expect("root space key should load");
+            .expect("space root key should load");
 
-        assert_eq!(root, expected_root);
+        assert_eq!(space_root, expected_space_root);
     }
 
     #[tokio::test]
@@ -2633,8 +2635,8 @@ mod tests {
     #[tokio::test]
     async fn account_space_key_resolution_is_cached_within_context() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
         let friend_space_key = generate_key();
         let encrypted_profile = encode_b64(
             &encrypt_secretbox_payload(&friend_space_key, b"friend-profile").expect("profile wrap"),
@@ -2648,7 +2650,7 @@ mod tests {
             .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
-                &root_space_key,
+                &space_root_key,
                 &generate_key(),
                 "space_owner_main",
                 "owner",
@@ -3112,8 +3114,8 @@ mod tests {
     #[tokio::test]
     async fn create_space_with_key_sends_encrypted_space_and_profile_payloads() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key);
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key);
         let space_key = generate_key();
         let create_space = server
             .mock("POST", "/space")
@@ -3157,8 +3159,8 @@ mod tests {
     #[tokio::test]
     async fn create_space_updates_loaded_owned_space_cache() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key);
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key);
         let space_key = generate_key();
         let list_spaces = server
             .mock("GET", "/space")
@@ -3229,14 +3231,14 @@ mod tests {
     async fn list_owned_spaces_reuses_loaded_cache() {
         let mut server = Server::new_async().await;
         let ctx = test_account_ctx(&server.url());
-        let root_space_key = generate_key();
+        let space_root_key = generate_key();
         let space_key = generate_key();
         let list_spaces = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
-                &root_space_key,
+                &space_root_key,
                 &space_key,
                 "space_owner_main",
                 "owner-main",
@@ -3267,8 +3269,8 @@ mod tests {
     #[tokio::test]
     async fn create_post_includes_space_key_version() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
         let space_key = generate_key();
         let spaces = server
             .mock("GET", "/space")
@@ -3278,7 +3280,7 @@ mod tests {
                 json!([{
                     "spaceId": "space_owner_main",
                     "spaceSlug": "owner-main",
-                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&root_space_key, &space_key).expect("space key wrap")),
+                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &space_key).expect("space key wrap")),
                     "encryptedProfile": "",
                     "keyVersion": 3
                 }])
@@ -3341,15 +3343,15 @@ mod tests {
     #[tokio::test]
     async fn update_space_profile_sends_encrypted_profile_and_profile_assets() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
         let space_key = generate_key();
         let spaces = server
             .mock("GET", "/space")
             .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
-                &root_space_key,
+                &space_root_key,
                 &space_key,
                 "space_owner_main",
                 "owner-main",
@@ -3431,8 +3433,8 @@ mod tests {
     #[tokio::test]
     async fn get_space_profile_decrypted_loads_and_decrypts_profile() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
         let space_key = generate_key();
         let encrypted_profile = encode_b64(
             &encrypt_secretbox_payload(&space_key, b"profile-json").expect("profile wrap"),
@@ -3463,7 +3465,7 @@ mod tests {
             .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
-                &root_space_key,
+                &space_root_key,
                 &space_key,
                 "space_owner_main",
                 "owner-main",
@@ -3489,8 +3491,8 @@ mod tests {
     #[tokio::test]
     async fn add_friend_from_link_creates_friend_request() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
         let requester_space_key = generate_key();
         let target_space_key = generate_key();
         let (target_public_key, _) = generate_keypair().expect("valid target keypair");
@@ -3503,7 +3505,7 @@ mod tests {
                 json!([{
                     "spaceId": "space_viewer_main",
                     "spaceSlug": "viewer-main",
-                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&root_space_key, &requester_space_key).expect("space key wrap")),
+                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &requester_space_key).expect("space key wrap")),
                     "encryptedProfile": "",
                     "keyVersion": 4
                 }])
@@ -3680,8 +3682,8 @@ mod tests {
     #[tokio::test]
     async fn message_actions_use_message_endpoints() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
         let space_key = generate_key();
         let (friend_public_key, _) = generate_keypair().expect("valid friend keypair");
 
@@ -3690,7 +3692,7 @@ mod tests {
             .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
-                &root_space_key,
+                &space_root_key,
                 &space_key,
                 "space_owner_main",
                 "owner-main",
@@ -3987,8 +3989,8 @@ mod tests {
     #[tokio::test]
     async fn refresh_friend_shares_accepts_empty_server_response() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
         let space_key = generate_key();
         let (friend_public_key, _) = generate_keypair().expect("valid friend keypair");
 
@@ -4000,7 +4002,7 @@ mod tests {
                 json!([{
                     "spaceId": "space_owner_main",
                     "spaceSlug": "owner-main",
-                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&root_space_key, &space_key).expect("space key wrap")),
+                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &space_key).expect("space key wrap")),
                     "encryptedProfile": "",
                     "keyVersion": 3
                 }])
@@ -4058,17 +4060,17 @@ mod tests {
     #[tokio::test]
     async fn space_link_status_create_and_delete_use_link_endpoints() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
         let space_key = generate_key();
         let created_access_key = "AbC123xYz789";
         let encrypted_created_access_key = encode_b64(
-            &encrypt_secretbox_payload(&root_space_key, created_access_key.as_bytes())
+            &encrypt_secretbox_payload(&space_root_key, created_access_key.as_bytes())
                 .expect("encrypted created access key"),
         );
         let rotated_access_key = "ZyX987cBa321";
         let encrypted_rotated_access_key = encode_b64(
-            &encrypt_secretbox_payload(&root_space_key, rotated_access_key.as_bytes())
+            &encrypt_secretbox_payload(&space_root_key, rotated_access_key.as_bytes())
                 .expect("encrypted rotated access key"),
         );
 
@@ -4077,7 +4079,7 @@ mod tests {
             .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
-                &root_space_key,
+                &space_root_key,
                 &space_key,
                 "space_owner_main",
                 "owner-main",
@@ -4197,12 +4199,12 @@ mod tests {
     #[tokio::test]
     async fn create_space_link_reuses_encrypted_access_key_returned_by_post() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
         let space_key = generate_key();
         let access_key = "AbC123xYz789";
         let encrypted_access_key = encode_b64(
-            &encrypt_secretbox_payload(&root_space_key, access_key.as_bytes())
+            &encrypt_secretbox_payload(&space_root_key, access_key.as_bytes())
                 .expect("encrypted access key"),
         );
 
@@ -4211,7 +4213,7 @@ mod tests {
             .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(owned_space_response(
-                &root_space_key,
+                &space_root_key,
                 &space_key,
                 "space_owner_main",
                 "owner-main",
@@ -4362,8 +4364,8 @@ mod tests {
     #[tokio::test]
     async fn fetch_post_decrypted_uses_post_by_id_endpoint() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
         let space_key = generate_key();
         let post_key = generate_key();
         let caption = b"hello from post";
@@ -4376,7 +4378,7 @@ mod tests {
                 json!([{
                     "spaceId": "space_owner_gallery",
                     "spaceSlug": "owner-gallery",
-                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&root_space_key, &space_key).expect("space key wrap")),
+                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &space_key).expect("space key wrap")),
                     "encryptedProfile": "",
                     "keyVersion": 3
                 }])
@@ -4428,8 +4430,8 @@ mod tests {
     #[tokio::test]
     async fn hydrate_space_keys_loads_owned_and_friends_spaces() {
         let mut server = Server::new_async().await;
-        let root_space_key = generate_key();
-        let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
+        let space_root_key = generate_key();
+        let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
         let owned_space_key = generate_key();
         let shared_space_key = generate_key();
         let sealed_share = seal_with_public_key(&shared_space_key, &test_public_key(&ctx))
@@ -4443,7 +4445,7 @@ mod tests {
                 json!([{
                     "spaceId": "space_owner_gallery",
                     "spaceSlug": "owner-gallery",
-                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&root_space_key, &owned_space_key).expect("owned wrap")),
+                    "encryptedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &owned_space_key).expect("owned wrap")),
                     "encryptedProfile": "",
                     "keyVersion": 1
                 }])

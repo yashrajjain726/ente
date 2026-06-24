@@ -10,7 +10,7 @@ type AssetRedirectRequest struct {
 type ListSpacesRequest struct{}
 
 type SpaceBrowserSessionRequest struct {
-	ClientKey string `json:"clientKey" binding:"required"`
+	SessionWrapKey string `json:"sessionWrapKey" binding:"required"`
 }
 
 type SpaceBrowserSessionResponse struct {
@@ -18,8 +18,8 @@ type SpaceBrowserSessionResponse struct {
 }
 
 type SpaceBrowserSessionBootstrapResponse struct {
-	ID        int64  `json:"id"`
-	ClientKey string `json:"clientKey"`
+	ID             int64  `json:"id"`
+	SessionWrapKey string `json:"sessionWrapKey"`
 }
 
 type SpaceEntityKeyRequest struct {

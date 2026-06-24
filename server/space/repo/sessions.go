@@ -7,17 +7,17 @@ import (
 	"github.com/ente-io/stacktrace"
 )
 
-func (r *SessionsRepository) CreateBrowserSession(ctx context.Context, tokenHash []byte, userID int64, clientKey string, expiresAt int64) error {
+func (r *SessionsRepository) CreateBrowserSession(ctx context.Context, tokenHash []byte, userID int64, sessionWrapKey string, expiresAt int64) error {
 	_, err := r.DB.ExecContext(ctx, `
-		INSERT INTO space_browser_sessions (token_hash, user_id, client_key, expires_at)
+		INSERT INTO space_browser_sessions (token_hash, user_id, session_wrap_key, expires_at)
 		VALUES ($1, $2, $3, $4)
-	`, tokenHash, userID, clientKey, expiresAt)
+	`, tokenHash, userID, sessionWrapKey, expiresAt)
 	return stacktrace.Propagate(err, "")
 }
 
 func (r *SessionsRepository) GetBrowserSession(ctx context.Context, tokenHash []byte) (*SpaceBrowserSessionRecord, error) {
 	row := r.DB.QueryRowContext(ctx, `
-		SELECT s.token_hash, s.user_id, s.client_key, s.expires_at, s.created_at, s.updated_at, s.last_used_at
+		SELECT s.token_hash, s.user_id, s.session_wrap_key, s.expires_at, s.created_at, s.updated_at, s.last_used_at
 		FROM space_browser_sessions s
 		WHERE s.token_hash = $1
 	`, tokenHash)
@@ -25,7 +25,7 @@ func (r *SessionsRepository) GetBrowserSession(ctx context.Context, tokenHash []
 	err := row.Scan(
 		&rec.TokenHash,
 		&rec.UserID,
-		&rec.ClientKey,
+		&rec.SessionWrapKey,
 		&rec.ExpiresAt,
 		&rec.CreatedAt,
 		&rec.UpdatedAt,

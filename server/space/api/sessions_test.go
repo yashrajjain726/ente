@@ -47,7 +47,7 @@ func TestCreateSpaceBrowserSessionReturnsToken(t *testing.T) {
 	handlers, repos, userID := setupSpaceSessionAPITest(t)
 	router := gin.New()
 	router.POST("/space/sessions", handlers.CreateBrowserSession)
-	req := httptest.NewRequest(http.MethodPost, "/space/sessions", bytes.NewBufferString(`{"clientKey":"client-key"}`))
+	req := httptest.NewRequest(http.MethodPost, "/space/sessions", bytes.NewBufferString(`{"sessionWrapKey":"session-wrap-key"}`))
 	req.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
 	recorder := httptest.NewRecorder()
 
@@ -100,7 +100,7 @@ func TestRequireSpaceBrowserSessionAcceptsValidHeader(t *testing.T) {
 	handlers, repos, userID := setupSpaceSessionAPITest(t)
 	token := "valid-space-session-token"
 	tokenHash := sha256.Sum256([]byte(token))
-	require.NoError(t, repos.Sessions.CreateBrowserSession(context.Background(), tokenHash[:], userID, "client-key", timeutil.NDaysFromNow(1)))
+	require.NoError(t, repos.Sessions.CreateBrowserSession(context.Background(), tokenHash[:], userID, "session-wrap-key", timeutil.NDaysFromNow(1)))
 
 	router := gin.New()
 	router.GET("/space", handlers.RequireSpaceBrowserSession(), func(c *gin.Context) {
@@ -137,7 +137,7 @@ func TestBootstrapBrowserSessionAcceptsHeader(t *testing.T) {
 	handlers, repos, userID := setupSpaceSessionAPITest(t)
 	token := "valid-space-session-token"
 	tokenHash := sha256.Sum256([]byte(token))
-	require.NoError(t, repos.Sessions.CreateBrowserSession(context.Background(), tokenHash[:], userID, "client-key", timeutil.NDaysFromNow(1)))
+	require.NoError(t, repos.Sessions.CreateBrowserSession(context.Background(), tokenHash[:], userID, "session-wrap-key", timeutil.NDaysFromNow(1)))
 	router := gin.New()
 	router.POST("/space/sessions/bootstrap", handlers.BootstrapBrowserSession)
 	req := httptest.NewRequest(http.MethodPost, "/space/sessions/bootstrap", nil)
@@ -147,14 +147,14 @@ func TestBootstrapBrowserSessionAcceptsHeader(t *testing.T) {
 	router.ServeHTTP(recorder, req)
 
 	require.Equal(t, http.StatusOK, recorder.Code)
-	require.JSONEq(t, `{"id":`+strconv.FormatInt(userID, 10)+`,"clientKey":"client-key"}`, recorder.Body.String())
+	require.JSONEq(t, `{"id":`+strconv.FormatInt(userID, 10)+`,"sessionWrapKey":"session-wrap-key"}`, recorder.Body.String())
 }
 
 func TestDeleteBrowserSessionRevokesHeaderSession(t *testing.T) {
 	handlers, repos, userID := setupSpaceSessionAPITest(t)
 	token := "valid-space-session-token"
 	tokenHash := sha256.Sum256([]byte(token))
-	require.NoError(t, repos.Sessions.CreateBrowserSession(context.Background(), tokenHash[:], userID, "client-key", timeutil.NDaysFromNow(1)))
+	require.NoError(t, repos.Sessions.CreateBrowserSession(context.Background(), tokenHash[:], userID, "session-wrap-key", timeutil.NDaysFromNow(1)))
 	router := gin.New()
 	router.DELETE("/space/sessions/current", handlers.DeleteBrowserSession)
 	req := httptest.NewRequest(http.MethodDelete, "/space/sessions/current", nil)

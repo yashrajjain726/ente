@@ -33,7 +33,7 @@ const SpaceBrowserSessionResponse = z.object({ sessionToken: z.string() });
 
 const SpaceBrowserSessionBootstrapResponse = z.object({
     id: z.number(),
-    clientKey: z.string(),
+    sessionWrapKey: z.string(),
 });
 
 const SpaceEntityKeyResponse = z.object({
@@ -77,14 +77,14 @@ export const createSpaceBrowserSession = async (
     spaceRootKey: string,
     authToken: string,
 ) => {
-    const clientKey = await generateKey();
+    const sessionWrapKey = await generateKey();
     const res = await fetch(await apiURL("/space/sessions"), {
         method: "POST",
         headers: {
             ...spaceBootstrapAuthHeaders(authToken),
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ clientKey }),
+        body: JSON.stringify({ sessionWrapKey }),
     });
     ensureOk(res);
     const { sessionToken } = SpaceBrowserSessionResponse.parse(
@@ -95,7 +95,7 @@ export const createSpaceBrowserSession = async (
     if (!user?.id || !user.email) {
         throw new Error("Space user is missing.");
     }
-    const box = await encryptBox(spaceRootKey, clientKey);
+    const box = await encryptBox(spaceRootKey, sessionWrapKey);
     localStorage.setItem(
         spaceBrowserSessionStorageKey,
         JSON.stringify({
@@ -154,7 +154,7 @@ const restoreSpaceBrowserSession = async () => {
             encryptedData: persisted.encryptedSpaceRootKey,
             nonce: persisted.nonce,
         },
-        bootstrap.clientKey,
+        bootstrap.sessionWrapKey,
     );
     replaceSavedLocalUser({ id: bootstrap.id, email: persisted.email });
     saveSpaceRootKeyInSpaceSession(spaceRootKey);

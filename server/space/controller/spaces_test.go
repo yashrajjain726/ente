@@ -98,7 +98,7 @@ func TestGetProfileReturnsProfileAssetObjectIDs(t *testing.T) {
 	)
 	require.NoError(t, err)
 	sessionHash := sha256.Sum256([]byte("alice-assets-session-token"))
-	require.NoError(t, repos.Sessions.CreateBrowserSession(ctx, sessionHash[:], aliceID, "client-key", timeutil.MicrosecondsAfterMinutes(5)))
+	require.NoError(t, repos.Sessions.CreateBrowserSession(ctx, sessionHash[:], aliceID, "session-wrap-key", timeutil.MicrosecondsAfterMinutes(5)))
 	ginCtx := newPublicSpaceContext()
 	ginCtx.Request.Header.Set(SpaceBrowserSessionTokenHeader, "alice-assets-session-token")
 
