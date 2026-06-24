@@ -1,8 +1,8 @@
+import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
-import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/components/collection_share_badge.dart";
 import "package:photos/ui/viewer/file/no_thumbnail_widget.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
@@ -41,8 +41,7 @@ class MemoryLinkAlbumItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -54,13 +53,11 @@ class MemoryLinkAlbumItem extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: _rowHeight),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: colorScheme.fill,
+          color: colors.fillLight,
           border: Border.all(
-            color: isSelected ? colorScheme.greenStroke : colorScheme.fill,
+            color: isSelected ? colors.strokeDark : colors.fillLight,
           ),
-          borderRadius: const BorderRadius.all(
-            Radius.circular(_cardRadius),
-          ),
+          borderRadius: const BorderRadius.all(Radius.circular(_cardRadius)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -100,11 +97,6 @@ class MemoryLinkAlbumItem extends StatelessWidget {
                             );
                           },
                         ),
-                        const Positioned(
-                          right: -4,
-                          bottom: -4,
-                          child: CollectionLinkBadge(),
-                        ),
                       ],
                     ),
                   ),
@@ -115,18 +107,31 @@ class MemoryLinkAlbumItem extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const CollectionLinkBadge(
+                              variant: CollectionShareBadgeVariant.outlined,
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          AppLocalizations.of(context).itemCount(
-                            count: fileCount ?? 0,
+                          AppLocalizations.of(
+                            context,
+                          ).itemCount(count: fileCount ?? 0),
+                          style: TextStyles.mini.copyWith(
+                            color: colors.textLight,
                           ),
-                          style: textTheme.smallMuted,
                           maxLines: 1,
                           softWrap: false,
                           overflow: TextOverflow.ellipsis,

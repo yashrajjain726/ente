@@ -108,8 +108,8 @@ export const SpaceOtpInput = React.forwardRef<
         setActiveIndex(Math.min(cellIndex, value.length));
     };
 
-    const handleBeforeInput = (event: React.FormEvent<HTMLInputElement>) => {
-        const inputEvent = event.nativeEvent as InputEvent;
+    const handleBeforeInput = (event: React.InputEvent<HTMLInputElement>) => {
+        const inputEvent = event.nativeEvent;
         if (!inputEvent.data) return;
 
         event.preventDefault();

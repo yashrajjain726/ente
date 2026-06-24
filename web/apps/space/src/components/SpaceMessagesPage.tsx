@@ -174,15 +174,15 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     const selectedFriendUsername = selectedFriend?.username;
     const isSelectedFriendCurrent = Boolean(
         selectedFriendSpaceId &&
-            friends.some((friend) => {
-                const currentFriendSpaceId = friendSpaceId(friend);
-                return (
-                    currentFriendSpaceId == selectedFriendSpaceId ||
-                    (selectedFriendSpaceSlug &&
-                        friend.spaceSlug == selectedFriendSpaceSlug) ||
-                    friend.username == selectedFriendUsername
-                );
-            }),
+        friends.some((friend) => {
+            const currentFriendSpaceId = friendSpaceId(friend);
+            return (
+                currentFriendSpaceId == selectedFriendSpaceId ||
+                (selectedFriendSpaceSlug &&
+                    friend.spaceSlug == selectedFriendSpaceSlug) ||
+                friend.username == selectedFriendUsername
+            );
+        }),
     );
     const isThreadReadOnly =
         Boolean(selectedFriend) && !isSelectedFriendCurrent;
@@ -375,10 +375,10 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
 
     const shouldLoadSelectedFriendProfile = Boolean(
         selectedSpaceId &&
-            !isConversationsLoading &&
-            !isFriendsLoading &&
-            !selectedConversation &&
-            !selectedFriendFromFriends,
+        !isConversationsLoading &&
+        !isFriendsLoading &&
+        !selectedConversation &&
+        !selectedFriendFromFriends,
     );
 
     React.useEffect(() => {

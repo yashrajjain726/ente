@@ -234,47 +234,47 @@ class _ButtonWidgetV2State extends State<ButtonWidgetV2>
     );
 
     if (widget.progressStatus != null) {
-      return Center(
+      return Row(
         key: const ValueKey('loading'),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ValueListenableBuilder<String>(
-              valueListenable: widget.progressStatus!,
-              builder: (context, value, _) {
-                if (value.isEmpty) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text(
-                    value,
-                    style: textTheme.smallBold.copyWith(
-                      color: colors.textColor,
-                    ),
-                  ),
-                );
-              },
-            ),
-            spinner,
-          ],
-        ),
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.max,
+        children: [
+          ValueListenableBuilder<String>(
+            valueListenable: widget.progressStatus!,
+            builder: (context, value, _) {
+              if (value.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Text(
+                  value,
+                  style: textTheme.smallBold.copyWith(color: colors.textColor),
+                ),
+              );
+            },
+          ),
+          spinner,
+        ],
       );
     }
 
-    return Center(
+    return Row(
       key: const ValueKey('loading'),
-      child: spinner,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [spinner],
     );
   }
 
   Widget _buildSuccessContent(ButtonColors colors) {
-    return Center(
+    return Row(
       key: const ValueKey('success'),
-      child: HugeIcon(
-        icon: HugeIcons.strokeRoundedTick02,
-        color: colors.checkmarkColor,
-        size: 24,
-      ),
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        HugeIcon(
+          icon: HugeIcons.strokeRoundedTick02,
+          color: colors.checkmarkColor,
+          size: 24,
+        ),
+      ],
     );
   }
 
@@ -323,9 +323,7 @@ class _ButtonWidgetV2State extends State<ButtonWidgetV2>
           if (hasLabel)
             Flexible(
               child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: hasLeading ? 0 : 8,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: hasLeading ? 0 : 8),
                 child: Text(
                   widget.labelText!,
                   style: labelStyle,

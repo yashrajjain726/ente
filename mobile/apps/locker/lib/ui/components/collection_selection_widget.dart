@@ -1,6 +1,8 @@
 import 'package:collection/collection.dart' show IterableExtension;
 import 'package:dotted_border/dotted_border.dart';
+import "package:ente_ui/theme/colors.dart";
 import 'package:ente_ui/theme/ente_theme.dart';
+import "package:ente_ui/theme/text_style.dart";
 import 'package:flutter/material.dart';
 import 'package:locker/extensions/collection_extension.dart';
 import 'package:locker/l10n/l10n.dart';
@@ -117,8 +119,9 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
       chips.add(
         CollectionChip(
           label: context.l10n.uncategorized,
-          isSelected: widget.selectedCollectionIds
-              .contains(_uncategorizedCollection?.id ?? -1),
+          isSelected: widget.selectedCollectionIds.contains(
+            _uncategorizedCollection?.id ?? -1,
+          ),
           onTap: () {
             if (_uncategorizedCollection != null) {
               _onCollectionTap(_uncategorizedCollection!.id);
@@ -131,10 +134,7 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
     }
 
     chips.add(
-      _buildNewCollectionChip(
-        colorScheme: colorScheme,
-        textTheme: textTheme,
-      ),
+      _buildNewCollectionChip(colorScheme: colorScheme, textTheme: textTheme),
     );
 
     for (final collection in _availableCollections) {
@@ -155,10 +155,7 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.title.isNotEmpty) ...[
-          Text(
-            widget.title,
-            style: textTheme.body,
-          ),
+          Text(widget.title, style: textTheme.body),
           const SizedBox(height: 12),
         ],
         ClipRRect(
@@ -172,11 +169,7 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
               child: SingleChildScrollView(
                 controller: _scrollController,
                 padding: const EdgeInsets.only(right: 12, bottom: 12),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 12,
-                  children: chips,
-                ),
+                child: Wrap(spacing: 8, runSpacing: 12, children: chips),
               ),
             ),
           ),
@@ -186,8 +179,8 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
   }
 
   Widget _buildNewCollectionChip({
-    required colorScheme,
-    required textTheme,
+    required EnteColorScheme colorScheme,
+    required EnteTextTheme textTheme,
   }) {
     return GestureDetector(
       onTap: () async {
@@ -207,17 +200,11 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.add_rounded,
-                size: 18,
-                color: colorScheme.textMuted,
-              ),
+              Icon(Icons.add_rounded, size: 18, color: colorScheme.textMuted),
               const SizedBox(width: 6),
               Text(
                 context.l10n.collectionLabel,
-                style: textTheme.small.copyWith(
-                  color: colorScheme.textMuted,
-                ),
+                style: textTheme.small.copyWith(color: colorScheme.textMuted),
               ),
             ],
           ),

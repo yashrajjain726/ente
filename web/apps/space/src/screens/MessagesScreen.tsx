@@ -1457,7 +1457,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     );
     const isContextMessageOwn = Boolean(
         messageContextMenu?.message &&
-            isCurrentProfileMessage(messageContextMenu.message, profile),
+        isCurrentProfileMessage(messageContextMenu.message, profile),
     );
 
     const sendMessage = () => {

@@ -9,6 +9,7 @@ import "package:photos/models/ffmpeg/ffprobe_props.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/location/location.dart";
+import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/services/isolated_ffmpeg_service.dart";
 import "package:photos/services/location_service.dart";
 import "package:photos/src/rust/api/motion_photo_api.dart";
@@ -27,7 +28,7 @@ const kEmptyExifDateTime = "0000:00:00 00:00:00";
 
 final _logger = Logger("ExifUtil");
 final _standardExifDateTimePattern = RegExp(
-  r'^\d{4}:(0[1-9]|1[0-2]):(0[1-9]|[12]\d|3[01]) ([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$',
+  r'^(\d{4}:(0[1-9]|1[0-2]):(0[1-9]|[12]\d|3[01]) ([01]\d|2[0-3]):([0-5]\d):([0-5]\d))([\.:]\d+)?$',
 );
 final _isoExifDateTimePattern = RegExp(
   r'^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])[T ]([01]\d|2[0-3]):([0-5]\d):([0-5]\d)([\.:]\d+)?([Zz]|[+-](?:[01]\d|2[0-3]):?[0-5]\d)?$',
@@ -83,7 +84,7 @@ Future<FFProbeProps?> getVideoPropsAsync(File originalFile) async {
       return null;
     }
 
-    final properties = await FFProbeProps.parseData(mediaInfo);
+    final properties = FFProbeProps.parseData(mediaInfo);
     _logger.info("getVideoPropsAsync took ${stopwatch.elapsedMilliseconds}ms");
 
     stopwatch.stop();
@@ -168,11 +169,14 @@ ParsedExifDateTime _getStandardExifDateTimeInDeviceTimezone(
   String exifTime,
   String? offsetString,
 ) {
-  final offsetTime = _normalizeOffset(offsetString, throwOnInvalid: true);
+  final offsetTime = _normalizeOffset(offsetString);
   final hasOffset = offsetTime != null;
-  final DateTime result = DateFormat(
-    kExifDateTimePattern,
-  ).parseStrict(exifTime, hasOffset);
+  final match = _standardExifDateTimePattern.firstMatch(exifTime)!;
+  final DateTime result = DateFormat(kExifDateTimePattern)
+      .parseStrict(match.group(1)!, hasOffset)
+      .add(
+        Duration(microseconds: _parseFractionalMicroseconds(match.group(7))),
+      );
   if (hasOffset && offsetTime != "Z") {
     final List<String> splitHHMM = offsetTime.split(":");
     final int offsetHours = int.parse(splitHHMM[0]);
@@ -186,13 +190,13 @@ ParsedExifDateTime _getStandardExifDateTimeInDeviceTimezone(
     final deviceLocalTime = photoUtcDate.toLocal();
     return ParsedExifDateTime(
       deviceLocalTime,
-      result.toIso8601String(),
+      formatPubMagicDateTime(result),
       offsetTime,
     );
   }
   return ParsedExifDateTime(
     result,
-    result.toIso8601String(),
+    formatPubMagicDateTime(result),
     offsetTime == "Z" ? "Z" : null,
   );
 }
@@ -207,10 +211,9 @@ ParsedExifDateTime _getIsoExifDateTimeInDeviceTimezone(
   }
 
   final metadataDateTime = _parseIsoDateTimeComponents(match);
-  final localDateTimeString = _dateTimeWithoutUtcMarker(metadataDateTime);
+  final localDateTimeString = formatPubMagicDateTime(metadataDateTime);
   final offsetTime =
-      _normalizeOffset(match.group(8)) ??
-      _normalizeOffset(offsetString, throwOnInvalid: true);
+      _normalizeOffset(match.group(8)) ?? _normalizeOffset(offsetString);
 
   if (offsetTime != null) {
     final deviceLocalTime = DateTime.parse(
@@ -218,7 +221,7 @@ ParsedExifDateTime _getIsoExifDateTimeInDeviceTimezone(
     ).toLocal();
     return ParsedExifDateTime(
       deviceLocalTime,
-      metadataDateTime.toIso8601String(),
+      formatPubMagicDateTime(metadataDateTime),
       offsetTime,
     );
   }
@@ -234,20 +237,17 @@ ParsedExifDateTime _getIsoExifDateTimeInDeviceTimezone(
       metadataDateTime.millisecond,
       metadataDateTime.microsecond,
     ),
-    metadataDateTime.toIso8601String(),
+    formatPubMagicDateTime(metadataDateTime),
     null,
   );
 }
 
-String? _normalizeOffset(String? offsetString, {bool throwOnInvalid = false}) {
+String? _normalizeOffset(String? offsetString) {
   final offset = offsetString?.trim();
   if (offset == null || offset.isEmpty) {
     return null;
   }
   if (!_offsetPattern.hasMatch(offset)) {
-    if (throwOnInvalid) {
-      throw FormatException("Invalid EXIF offset", offsetString);
-    }
     return null;
   }
   final normalizedOffset = offset.toUpperCase();
@@ -292,11 +292,6 @@ int _parseFractionalMicroseconds(String? fraction) {
   }
   final paddedFraction = fraction.substring(1).padRight(6, "0");
   return int.parse(paddedFraction.substring(0, 6));
-}
-
-String _dateTimeWithoutUtcMarker(DateTime dateTime) {
-  final value = dateTime.toIso8601String();
-  return value.endsWith("Z") ? value.substring(0, value.length - 1) : value;
 }
 
 Location? locationFromExif(Map<String, IfdTag> exif) {

@@ -153,7 +153,7 @@ class UserService {
             context,
             title: context.l10n.oops,
             message: context.l10n.emailAlreadyRegistered,
-            assetPath: 'assets/warning-green.png',
+            assetPath: 'assets/warning-grey.png',
           ),
         );
       } else if (enteErrCode != null && enteErrCode == "USER_NOT_REGISTERED") {
@@ -162,7 +162,7 @@ class UserService {
             context,
             title: context.l10n.oops,
             message: context.l10n.emailNotRegistered,
-            assetPath: 'assets/warning-green.png',
+            assetPath: 'assets/warning-grey.png',
           ),
         );
       } else if (enteErrCode == "USER_SIGNUP_INCOMPLETE") {
@@ -171,7 +171,7 @@ class UserService {
             context,
             title: context.l10n.oops,
             message: context.l10n.accountSetupIncompleteCreateAccount,
-            assetPath: 'assets/warning-green.png',
+            assetPath: 'assets/warning-grey.png',
           ),
         );
       } else if (e.response != null && e.response!.statusCode == 403) {
@@ -180,7 +180,7 @@ class UserService {
             context,
             title: AppLocalizations.of(context).oops,
             message: AppLocalizations.of(context).thisEmailIsAlreadyInUse,
-            assetPath: 'assets/warning-green.png',
+            assetPath: 'assets/warning-grey.png',
           ),
         );
       } else {
@@ -237,12 +237,14 @@ class UserService {
         final bool currentEmailMFAStatus =
             userDetails.profileData!.isEmailMFAEnabled;
         await _preferences.setBool(kIsEmailMFAEnabled, currentEmailMFAStatus);
-        hasSecurityStatusChanged = hasSecurityStatusChanged ||
+        hasSecurityStatusChanged =
+            hasSecurityStatusChanged ||
             previousEmailMFAStatus != currentEmailMFAStatus;
         final bool currentTwoFactorStatus =
             userDetails.profileData!.isTwoFactorEnabled;
         await setTwoFactor(value: currentTwoFactorStatus);
-        hasSecurityStatusChanged = hasSecurityStatusChanged ||
+        hasSecurityStatusChanged =
+            hasSecurityStatusChanged ||
             previousTwoFactorStatus != currentTwoFactorStatus;
       }
       if (hasSecurityStatusChanged) {
@@ -283,8 +285,8 @@ class UserService {
       final bool silentlyIgnoreError =
           // Token is already invalid (401 response)
           (e is DioException && e.response?.statusCode == 401) ||
-              // Custom endpoints where server might be non-existent or unavailable
-              !endpointConfig.isProduction;
+          // Custom endpoints where server might be non-existent or unavailable
+          !endpointConfig.isProduction;
 
       if (silentlyIgnoreError) {
         if (!endpointConfig.isProduction) {
@@ -376,6 +378,7 @@ class UserService {
             userPassword,
             Configuration.instance.getKeyAttributes()!,
           );
+          unawaited(installSourceService.autoAttributePendingSource());
         } else {
           throw Exception("unexpected response during passkey verification");
         }
@@ -453,7 +456,7 @@ class UserService {
           context,
           title: AppLocalizations.of(context).oops,
           message: AppLocalizations.of(context).yourVerificationCodeHasExpired,
-          assetPath: 'assets/warning-green.png',
+          assetPath: 'assets/warning-grey.png',
         );
         Navigator.of(context).pop();
       } else {
@@ -464,7 +467,7 @@ class UserService {
           message: AppLocalizations.of(
             context,
           ).sorryTheCodeYouveEnteredIsIncorrect,
-          assetPath: 'assets/warning-green.png',
+          assetPath: 'assets/warning-grey.png',
         );
       }
     } catch (e) {
@@ -475,7 +478,7 @@ class UserService {
         context,
         title: AppLocalizations.of(context).oops,
         message: AppLocalizations.of(context).verificationFailedPleaseTryAgain,
-        assetPath: 'assets/warning-green.png',
+        assetPath: 'assets/warning-grey.png',
       );
     }
   }
@@ -521,7 +524,7 @@ class UserService {
           context,
           title: AppLocalizations.of(context).oops,
           message: AppLocalizations.of(context).thisEmailIsAlreadyInUse,
-          assetPath: 'assets/warning-green.png',
+          assetPath: 'assets/warning-grey.png',
         );
       } else {
         // ignore: unawaited_futures
@@ -531,7 +534,7 @@ class UserService {
           message: AppLocalizations.of(
             context,
           ).authenticationFailedPleaseTryAgain,
-          assetPath: 'assets/warning-green.png',
+          assetPath: 'assets/warning-grey.png',
         );
       }
     } catch (e) {
@@ -542,7 +545,7 @@ class UserService {
         context,
         title: AppLocalizations.of(context).oops,
         message: AppLocalizations.of(context).verificationFailedPleaseTryAgain,
-        assetPath: 'assets/warning-green.png',
+        assetPath: 'assets/warning-grey.png',
       );
     }
   }
@@ -706,6 +709,7 @@ class UserService {
           Configuration.instance.getKeyAttributes()!,
           keyEncryptionKey: keyEncryptionKey,
         );
+        unawaited(installSourceService.autoAttributePendingSource());
         await flagService.tryRefreshFlags();
         Configuration.instance.resetVolatilePassword();
         page = const HomeWidget();
@@ -821,7 +825,7 @@ class UserService {
           message: AppLocalizations.of(
             context,
           ).authenticationFailedPleaseTryAgain,
-          assetPath: 'assets/warning-green.png',
+          assetPath: 'assets/warning-grey.png',
         );
       }
     } catch (e) {
@@ -834,7 +838,7 @@ class UserService {
         message: AppLocalizations.of(
           context,
         ).authenticationFailedPleaseTryAgain,
-        assetPath: 'assets/warning-green.png',
+        assetPath: 'assets/warning-grey.png',
       );
     }
   }
@@ -893,7 +897,7 @@ class UserService {
           message: AppLocalizations.of(
             context,
           ).somethingWentWrongPleaseTryAgain,
-          assetPath: 'assets/warning-green.png',
+          assetPath: 'assets/warning-grey.png',
         );
       }
     } catch (e) {
@@ -905,7 +909,7 @@ class UserService {
         context,
         title: AppLocalizations.of(context).oops,
         message: AppLocalizations.of(context).somethingWentWrongPleaseTryAgain,
-        assetPath: 'assets/warning-green.png',
+        assetPath: 'assets/warning-grey.png',
       );
     } finally {
       await dialog.hide();
@@ -950,7 +954,7 @@ class UserService {
         message: AppLocalizations.of(
           context,
         ).theRecoveryKeyYouEnteredIsIncorrect,
-        assetPath: 'assets/warning-green.png',
+        assetPath: 'assets/warning-grey.png',
       );
       return;
     }
@@ -997,7 +1001,7 @@ class UserService {
           message: AppLocalizations.of(
             context,
           ).somethingWentWrongPleaseTryAgain,
-          assetPath: 'assets/warning-green.png',
+          assetPath: 'assets/warning-grey.png',
         );
       }
     } catch (e) {
@@ -1009,7 +1013,7 @@ class UserService {
         context,
         title: AppLocalizations.of(context).oops,
         message: AppLocalizations.of(context).somethingWentWrongPleaseTryAgain,
-        assetPath: 'assets/warning-green.png',
+        assetPath: 'assets/warning-grey.png',
       );
     } finally {
       await dialog.hide();
@@ -1091,7 +1095,7 @@ class UserService {
             message: AppLocalizations.of(
               context,
             ).pleaseVerifyTheCodeYouHaveEntered,
-            assetPath: 'assets/warning-green.png',
+            assetPath: 'assets/warning-grey.png',
           );
           return false;
         }
@@ -1103,7 +1107,7 @@ class UserService {
         message: AppLocalizations.of(
           context,
         ).pleaseContactSupportIfTheProblemPersists,
-        assetPath: 'assets/warning-green.png',
+        assetPath: 'assets/warning-grey.png',
       );
     }
     return false;
@@ -1133,7 +1137,7 @@ class UserService {
         message: AppLocalizations.of(
           context,
         ).pleaseContactSupportIfTheProblemPersists,
-        assetPath: 'assets/warning-green.png',
+        assetPath: 'assets/warning-grey.png',
       );
     }
   }
@@ -1154,8 +1158,9 @@ class UserService {
   }
 
   Future<Uint8List> getOrCreateRecoveryKey(BuildContext context) async {
-    final String? encryptedRecoveryKey =
-        _config.getKeyAttributes()!.recoveryKeyEncryptedWithMasterKey;
+    final String? encryptedRecoveryKey = _config
+        .getKeyAttributes()!
+        .recoveryKeyEncryptedWithMasterKey;
     if (encryptedRecoveryKey == null || encryptedRecoveryKey.isEmpty) {
       final dialog = createProgressDialog(
         context,
@@ -1203,6 +1208,8 @@ class UserService {
     } else {
       await Configuration.instance.setToken(responseData["token"]);
     }
+    final isSignUp = responseData["encryptedToken"] == null;
+    unawaited(installSourceService.autoAttributeSource(isSignUp: isSignUp));
 
     // Initialize shared feed cutoff at login; feed path keeps the same fallback.
     localSettings.getOrCreateSharedPhotoFeedCutoffTime();

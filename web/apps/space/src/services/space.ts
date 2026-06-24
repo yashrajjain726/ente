@@ -321,7 +321,7 @@ const parseSpaceProfilePayload = (profile: string): SpaceProfilePayload => {
     if (!parsed || typeof parsed != "object" || Array.isArray(parsed)) {
         throw new Error("Space profile payload must be a JSON object.");
     }
-    return parsed as SpaceProfilePayload;
+    return parsed;
 };
 
 const textField = (value: unknown) =>
@@ -335,8 +335,16 @@ const timestampMsFromSpaceDate = (value: string) => {
     return parsed;
 };
 
+const blobPartForBytes = (bytes: Uint8Array): ArrayBuffer => {
+    const copy = new Uint8Array(bytes.byteLength);
+    copy.set(bytes);
+    return copy.buffer;
+};
+
 const blobURLForBytes = (bytes: Uint8Array, mediaType?: string) =>
-    URL.createObjectURL(new Blob([bytes], { type: mediaType || undefined }));
+    URL.createObjectURL(
+        new Blob([blobPartForBytes(bytes)], { type: mediaType || undefined }),
+    );
 
 const maxSpaceMediaCacheEntries = 128;
 const spaceMediaURLCache = new Map<string, Promise<string>>();

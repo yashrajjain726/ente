@@ -34,9 +34,9 @@ class AlbumRowItemWidget extends StatelessWidget {
   static const _cornerSmoothing = 0.6;
   static const _overlayPadding = 8.0;
   static const _thumbnailToTextSpacing = 8.0;
-  static const _titleToSubtitleSpacing = 4.0;
-  static const _sharePillPadding = EdgeInsets.all(2);
-  static const _sharedAvatarStrokeWidth = 2.0;
+  static const _titleToSubtitleSpacing = 2.0;
+  static const _sharePillPadding = EdgeInsets.all(1);
+  static const _sharedAvatarStrokeWidth = 1.0;
 
   const AlbumRowItemWidget(
     this.c,
@@ -59,13 +59,14 @@ class AlbumRowItemWidget extends StatelessWidget {
         "_" +
         c.id.toString();
     final componentColors = context.componentColors;
+    final bool shouldShowSharePill = isOwner && (c.hasSharees || c.hasLink);
     final Widget? linkIcon = c.hasLink && isOwner
         ? HugeIcon(
             icon: HugeIcons.strokeRoundedLink02,
             color: c.publicURLs.first.isExpired
                 ? componentColors.warning
-                : textBaseLight,
-            size: 10,
+                : componentColors.textBase,
+            size: 8,
             strokeWidth: 2,
           )
         : null;
@@ -115,19 +116,33 @@ class AlbumRowItemWidget extends StatelessWidget {
                               );
                               return Hero(
                                 tag: heroTag,
+                                flightShuttleBuilder:
+                                    (
+                                      flightContext,
+                                      animation,
+                                      flightDirection,
+                                      fromHeroContext,
+                                      toHeroContext,
+                                    ) => (toHeroContext.widget as Hero).child,
                                 transitionOnUserGestures: true,
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    thumbnailWidget,
-                                    if (isSelected)
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          color: componentColors.specialScrim
-                                              .withValues(alpha: 0.4),
+                                child: ClipSmoothRect(
+                                  radius: SmoothBorderRadius(
+                                    cornerRadius: _cornerRadius,
+                                    cornerSmoothing: _cornerSmoothing,
+                                  ),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      thumbnailWidget,
+                                      if (isSelected)
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: componentColors.specialScrim
+                                                .withValues(alpha: 0.4),
+                                          ),
                                         ),
-                                      ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               );
                             } else {
@@ -141,7 +156,7 @@ class AlbumRowItemWidget extends StatelessWidget {
                             }
                           },
                         ),
-                        if (isOwner && (c.hasSharees || c.hasLink))
+                        if (shouldShowSharePill)
                           Positioned(
                             top: _overlayPadding,
                             left: _overlayPadding,
@@ -151,7 +166,7 @@ class AlbumRowItemWidget extends StatelessWidget {
                               child: Container(
                                 padding: _sharePillPadding,
                                 decoration: BoxDecoration(
-                                  color: fillLightLight,
+                                  color: componentColors.fillLight,
                                   borderRadius: BorderRadius.circular(40),
                                 ),
                                 child: SizedBox(
@@ -216,8 +231,7 @@ class AlbumRowItemWidget extends StatelessWidget {
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
                                             border: Border.all(
-                                              color:
-                                                  componentColors.specialWhite,
+                                              color: componentColors.fillLight,
                                               width: _sharedAvatarStrokeWidth,
                                             ),
                                           ),
@@ -250,6 +264,8 @@ class AlbumRowItemWidget extends StatelessWidget {
               child: showFileCount
                   ? FutureBuilder<int>(
                       future: CollectionsService.instance.getFileCount(c),
+                      initialData: CollectionsService.instance
+                          .getCachedFileCount(c),
                       builder: (context, snapshot) {
                         int? cachedCount;
                         if (snapshot.hasData) {
@@ -373,13 +389,20 @@ class _AlbumRowSharePillContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayCount = min(sharees.length, _limitCountTo);
     final hasMore = sharees.length > _limitCountTo;
+    final displayCount = min(
+      sharees.length,
+      hasMore ? _limitCountTo - 1 : _limitCountTo,
+    );
     const type = AvatarType.xs;
     final double avatarSize = getAvatarSize(type);
     final double overlapPadding = getOverlapPadding(type);
-    final trailingWidgetWidth = trailingWidget == null ? 0.0 : avatarSize;
     final visibleAvatarCount = displayCount + (hasMore ? 1 : 0);
+    final trailingWidgetWidth = trailingWidget == null
+        ? 0.0
+        : visibleAvatarCount == 0
+        ? avatarSize
+        : 14.0;
     final visibleAvatarsWidth = visibleAvatarCount == 0
         ? 0.0
         : avatarSize + (visibleAvatarCount - 1) * overlapPadding;
@@ -405,6 +428,7 @@ class _AlbumRowSharePillContent extends StatelessWidget {
             sharees.length - displayCount,
             type: moreCountTypeFromAvatarType(type),
             thumbnailView: true,
+            backgroundColor: getUserAvatarColor(context, sharees[displayCount]),
           ),
         ),
       );
@@ -414,9 +438,12 @@ class _AlbumRowSharePillContent extends StatelessWidget {
       widgets.add(
         Positioned(
           left: visibleAvatarsWidth,
+          top: (avatarSize - trailingWidgetWidth) / 2,
           child: SizedBox.square(
-            dimension: avatarSize,
-            child: Center(child: trailingWidget!),
+            dimension: trailingWidgetWidth,
+            child: Center(
+              child: SizedBox.square(dimension: 8, child: trailingWidget!),
+            ),
           ),
         ),
       );

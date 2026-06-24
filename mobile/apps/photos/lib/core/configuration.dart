@@ -6,6 +6,7 @@ import 'package:backup_exclusion/backup_exclusion.dart';
 import 'package:bip39/bip39.dart' as bip39;
 import 'package:ente_contacts/contacts.dart';
 import "package:ente_crypto/ente_crypto.dart";
+import 'package:ente_lock_screen/lock_screen_host.dart';
 import "package:flutter/services.dart";
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logging/logging.dart';
@@ -44,24 +45,19 @@ import 'package:photos/services/search_service.dart';
 import 'package:photos/services/sync/sync_service.dart';
 import 'package:photos/services/video_preview_service.dart';
 import 'package:photos/utils/file_uploader.dart';
-import "package:photos/utils/lock_screen_settings.dart";
 import 'package:photos/utils/validator_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import "package:tuple/tuple.dart";
 import 'package:uuid/uuid.dart';
 
-class Configuration {
+class Configuration implements LockScreenHost {
   Configuration._privateConstructor();
 
   static final Configuration instance = Configuration._privateConstructor();
 
   static const emailKey = "email";
-  static const foldersToBackUpKey = "folders_to_back_up";
   static const keyAttributesKey = "key_attributes";
   static const keyKey = "key";
-  static const keyShouldBackupOverMobileData = "should_backup_over_mobile_data";
-  static const keyShouldBackupVideos = "should_backup_videos";
-  static const keyShowSystemLockScreen = "should_show_lock_screen";
   static const lastTempFolderClearTimeKey = "last_temp_folder_clear_time";
   static const secretKeyKey = "secret_key";
   static const tokenKey = "token";
@@ -84,9 +80,9 @@ class Configuration {
   late String _sharedDocumentsMediaDirectory;
   String? _volatilePassword;
 
-  Future<void> init() async {
+  Future<void> init(SharedPreferences preferences) async {
     try {
-      _preferences = await SharedPreferences.getInstance();
+      _preferences = preferences;
       _secureStorage = const FlutterSecureStorage(
         iOptions: IOSOptions(
           accessibility: KeychainAccessibility.first_unlock_this_device,
@@ -144,7 +140,7 @@ class Configuration {
         final PlatformException error = e;
         final bool isBadPaddingError =
             error.toString().contains('BadPaddingException') ||
-                (error.message ?? '').contains('BadPaddingException');
+            (error.message ?? '').contains('BadPaddingException');
         if (isBadPaddingError) {
           await logout(autoLogout: true);
           return;
@@ -191,6 +187,7 @@ class Configuration {
     }
   }
 
+  @override
   Future<void> logout({bool autoLogout = false}) async {
     _logger.info("Logging out, autoLogout: $autoLogout");
     if (!autoLogout) {
@@ -201,8 +198,8 @@ class Configuration {
         SyncService.instance.stopSync();
         try {
           await SyncService.instance.existingSync().timeout(
-                const Duration(seconds: 5),
-              );
+            const Duration(seconds: 5),
+          );
         } catch (e) {
           // ignore
         }
@@ -521,6 +518,7 @@ class Configuration {
     return _cachedToken;
   }
 
+  @override
   bool isLoggedIn() {
     return getToken() != null;
   }
@@ -555,14 +553,6 @@ class Configuration {
 
   Future<void> setUserID(int userID) async {
     await _preferences.setInt(userIDKey, userID);
-  }
-
-  Set<String> getPathsToBackUp() {
-    if (_preferences.containsKey(foldersToBackUpKey)) {
-      return _preferences.getStringList(foldersToBackUpKey)!.toSet();
-    } else {
-      return <String>{};
-    }
   }
 
   Future<void> setKeyAttributes(KeyAttributes attributes) async {
@@ -634,56 +624,6 @@ class Configuration {
 
   bool hasConfiguredAccount() {
     return isLoggedIn() && _key != null;
-  }
-
-  bool shouldBackupOverMobileData() {
-    if (_preferences.containsKey(keyShouldBackupOverMobileData)) {
-      return _preferences.getBool(keyShouldBackupOverMobileData)!;
-    } else {
-      return false;
-    }
-  }
-
-  Future<void> setBackupOverMobileData(bool value) async {
-    await _preferences.setBool(keyShouldBackupOverMobileData, value);
-    if (value) {
-      SyncService.instance.sync().ignore();
-    }
-  }
-
-  bool shouldBackupVideos() {
-    if (_preferences.containsKey(keyShouldBackupVideos)) {
-      return _preferences.getBool(keyShouldBackupVideos)!;
-    } else {
-      return true;
-    }
-  }
-
-  Future<void> setShouldBackupVideos(bool value) async {
-    await _preferences.setBool(keyShouldBackupVideos, value);
-    if (value) {
-      SyncService.instance.sync().ignore();
-    } else {
-      SyncService.instance.onVideoBackupPaused();
-    }
-  }
-
-  Future<bool> shouldShowLockScreen() async {
-    final bool isPin = await LockScreenSettings.instance.isPinSet();
-    final bool isPass = await LockScreenSettings.instance.isPasswordSet();
-    return isPin || isPass || shouldShowSystemLockScreen();
-  }
-
-  bool shouldShowSystemLockScreen() {
-    if (_preferences.containsKey(keyShowSystemLockScreen)) {
-      return _preferences.getBool(keyShowSystemLockScreen)!;
-    } else {
-      return false;
-    }
-  }
-
-  Future<void> setSystemLockScreen(bool value) {
-    return _preferences.setBool(keyShowSystemLockScreen, value);
   }
 
   void setVolatilePassword(String volatilePassword) {

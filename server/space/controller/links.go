@@ -153,10 +153,7 @@ func (c *LinksController) Login(ctx *gin.Context, req models.SpaceLinkLoginReque
 	if err != nil {
 		return nil, err
 	}
-	sessionToken, err := auth.GenerateURLSafeRandomString(32)
-	if err != nil {
-		return nil, err
-	}
+	sessionToken := auth.GenerateURLSafeRandomString(32)
 	sessionHash := sha256.Sum256([]byte(sessionToken))
 	if err := c.LinksRepo.CreateSession(ctx.Request.Context(), sessionHash[:], link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.MicrosecondsAfterMinutes(spaceLinkSessionDurationMinutes)); err != nil {
 		return nil, err

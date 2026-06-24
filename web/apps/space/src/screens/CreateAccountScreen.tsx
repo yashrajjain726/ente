@@ -324,7 +324,7 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
         }
     };
 
-    const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+    const handleSubmit: React.SubmitEventHandler<HTMLFormElement> = (event) => {
         event.preventDefault();
         submitCreateAccount();
     };

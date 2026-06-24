@@ -1,19 +1,45 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
-use ente_core::crypto::{hash, kdf, keys, secretbox};
+use ente_core::crypto::{Key, Nonce, PublicKey, SecretKey, hash, kdf, sealed, secretbox};
 use md5::{Digest, Md5};
 
 use crate::error::{Result, SpaceError};
 use crate::transport::EntityKeyPayload;
 
-pub const SECRETBOX_NONCE_BYTES: usize = secretbox::NONCE_BYTES;
+pub const SECRETBOX_NONCE_BYTES: usize = Nonce::BYTES;
 pub const SECRETBOX_MAC_BYTES: usize = secretbox::MAC_BYTES;
 pub const PACKED_SECRETBOX_OVERHEAD_BYTES: usize = 2 + SECRETBOX_NONCE_BYTES + SECRETBOX_MAC_BYTES;
 const SPACE_LINK_ACCESS_KEY_LEN: usize = 12;
 const SPACE_LINK_ACCESS_KEY_ALPHABET: &[u8] =
     b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const SPACE_LINK_AUTH_KDF_CONTEXT: &[u8; kdf::CONTEXT_BYTES] = b"spcauth1";
+const SPACE_LINK_WRAP_KDF_CONTEXT: &[u8; kdf::CONTEXT_BYTES] = b"spcview1";
 
 pub fn generate_key() -> Vec<u8> {
-    keys::generate_key_secure().into_vec()
+    Key::generate().as_bytes().to_vec()
+}
+
+pub fn generate_keypair() -> Result<(Vec<u8>, Vec<u8>)> {
+    let private_key = SecretKey::generate();
+    let public_key = private_key.public_key();
+    Ok((
+        public_key.as_bytes().to_vec(),
+        private_key.as_bytes().to_vec(),
+    ))
+}
+
+pub fn seal_with_public_key(plaintext: &[u8], public_key: &[u8]) -> Result<Vec<u8>> {
+    let public_key = PublicKey::try_from_slice(public_key)?;
+    sealed::seal(plaintext, &public_key).map_err(Into::into)
+}
+
+pub fn open_with_keypair(
+    ciphertext: &[u8],
+    public_key: &[u8],
+    private_key: &[u8],
+) -> Result<Vec<u8>> {
+    let public_key = PublicKey::try_from_slice(public_key)?;
+    let private_key = SecretKey::try_from_slice(private_key)?;
+    sealed::open(ciphertext, &public_key, &private_key).map_err(Into::into)
 }
 
 pub fn generate_space_link_access_key() -> Result<String> {
@@ -80,26 +106,22 @@ pub fn decode_b64(value: &str) -> Result<Vec<u8>> {
 }
 
 pub fn derive_space_link_auth_key(access_key: &[u8]) -> Result<Vec<u8>> {
-    Ok(kdf::derive_subkey(
-        access_key,
-        kdf::KEY_BYTES,
-        1,
-        b"spaceauth",
-    )?)
+    let access_key = Key::try_from_slice(access_key)?;
+    Ok(kdf::derive_subkey(&access_key, kdf::KEY_BYTES, 1, SPACE_LINK_AUTH_KDF_CONTEXT)?.to_vec())
 }
 
 pub fn derive_space_link_wrap_key(access_key: &[u8]) -> Result<Vec<u8>> {
-    Ok(kdf::derive_subkey(
-        access_key,
-        kdf::KEY_BYTES,
-        2,
-        b"spaceview",
-    )?)
+    let access_key = Key::try_from_slice(access_key)?;
+    Ok(kdf::derive_subkey(&access_key, kdf::KEY_BYTES, 2, SPACE_LINK_WRAP_KDF_CONTEXT)?.to_vec())
 }
 
 pub fn encrypt_secretbox_split(key: &[u8], plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
-    let encrypted = secretbox::encrypt_with_key(plaintext, key)?;
-    Ok((encrypted.ciphertext, encrypted.nonce))
+    let key = Key::try_from_slice(key)?;
+    let encrypted = secretbox::encrypt(plaintext, &key);
+    Ok((
+        encrypted.encrypted_data,
+        encrypted.nonce.as_bytes().to_vec(),
+    ))
 }
 
 pub fn decrypt_secretbox_split(key: &[u8], ciphertext: &[u8], nonce: &[u8]) -> Result<Vec<u8>> {
@@ -108,7 +130,9 @@ pub fn decrypt_secretbox_split(key: &[u8], ciphertext: &[u8], nonce: &[u8]) -> R
             "invalid secretbox nonce length".into(),
         ));
     }
-    secretbox::decrypt(ciphertext, nonce, key).map_err(Into::into)
+    let key = Key::try_from_slice(key)?;
+    let nonce = Nonce::try_from_slice(nonce)?;
+    secretbox::decrypt(ciphertext, &nonce, &key).map_err(Into::into)
 }
 
 pub fn encrypt_secretbox_packed(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
@@ -221,11 +245,11 @@ mod tests {
         let access_key = vec![0; 32];
         assert_eq!(
             encode_b64(&derive_space_link_auth_key(&access_key).unwrap()),
-            "as0yOusAPSAEGTxlmBN8flQf8KgIgry2ZpJrLdeUKyU="
+            "5ZS0aOQUedRW2BfwBuDf2hLMRLUZNpmXz2p6CzTX4Hw="
         );
         assert_eq!(
             encode_b64(&derive_space_link_wrap_key(&access_key).unwrap()),
-            "1ifrnxLcfZeyWCU2AwBxI8Z4z/51h5D+jK0XBxw+a2I="
+            "EAWvWpgRlx54HZNPCeyVy8nwjXzcBpiGlgbeK++KMeM="
         );
     }
 

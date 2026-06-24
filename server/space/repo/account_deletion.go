@@ -150,25 +150,26 @@ func queueProfileObjectsTx(ctx context.Context, tx *sql.Tx, userID int64) error 
 		return stacktrace.Propagate(err, "")
 	}
 
-	var cleanupObjects []SpaceTempObjectRecord
+	records := make([]SpaceTempObjectRecord, 0)
 	for rows.Next() {
 		var rec SpaceTempObjectRecord
 		var spaceID, objectID string
 		if err := rows.Scan(&spaceID, &rec.Purpose, &objectID, &rec.BucketID, &rec.ExpectedSize); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return stacktrace.Propagate(err, "")
 		}
 		rec.ObjectKey = ProfileAssetObjectKey(spaceID, rec.Purpose, objectID)
 		rec.OwnerID = userID
-		cleanupObjects = append(cleanupObjects, rec)
+		records = append(records, rec)
 	}
 	if err := rows.Err(); err != nil {
-		rows.Close()
+		_ = rows.Close()
 		return stacktrace.Propagate(err, "")
 	}
-	rows.Close()
-
-	for _, rec := range cleanupObjects {
+	if err := rows.Close(); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	for _, rec := range records {
 		if err := QueueObjectCleanupTx(ctx, tx, rec); err != nil {
 			return err
 		}
@@ -187,25 +188,26 @@ func queuePostObjectsTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs 
 		return stacktrace.Propagate(err, "")
 	}
 
-	var cleanupObjects []SpaceTempObjectRecord
+	records := make([]SpaceTempObjectRecord, 0)
 	for rows.Next() {
 		rec := SpaceTempObjectRecord{
 			OwnerID: userID,
 			Purpose: TempObjectPurposePost,
 		}
 		if err := rows.Scan(&rec.ObjectKey, &rec.BucketID, &rec.ExpectedSize); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return stacktrace.Propagate(err, "")
 		}
-		cleanupObjects = append(cleanupObjects, rec)
+		records = append(records, rec)
 	}
 	if err := rows.Err(); err != nil {
-		rows.Close()
+		_ = rows.Close()
 		return stacktrace.Propagate(err, "")
 	}
-	rows.Close()
-
-	for _, rec := range cleanupObjects {
+	if err := rows.Close(); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	for _, rec := range records {
 		if err := QueueObjectCleanupTx(ctx, tx, rec); err != nil {
 			return err
 		}

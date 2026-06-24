@@ -5,8 +5,8 @@ pub mod contacts;
 pub mod legacy;
 pub mod legacy_kit;
 pub mod space;
-pub mod suite;
 
+use ente_test_support::HARDCODED_OTT_EMAIL_SUFFIX;
 use std::collections::HashSet;
 use uuid::Uuid;
 
@@ -32,7 +32,7 @@ pub async fn assert_server_or_skip(endpoint: &str, test_name: &str) -> bool {
     }
 }
 
-pub fn assert_stage_enabled_or_skip(stage_name: &str) -> bool {
+pub fn stage_enabled(stage_name: &str) -> bool {
     let normalized_stage = stage_name.trim().to_ascii_lowercase();
     if let Some(only) = env_list("ENTE_E2E_ONLY")
         && !only.contains(&normalized_stage)
@@ -70,7 +70,7 @@ fn env_list(name: &str) -> Option<HashSet<String>> {
 }
 
 pub fn unique_test_email(prefix: &str) -> String {
-    format!("{prefix}-{}@ente-rust-test.org", Uuid::new_v4())
+    format!("{prefix}-{}{HARDCODED_OTT_EMAIL_SUFFIX}", Uuid::new_v4())
 }
 
 pub fn unique_password(prefix: &str) -> String {

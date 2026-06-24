@@ -21,6 +21,7 @@ import "package:photos/events/account_configured_event.dart";
 import "package:photos/events/app_mode_changed_event.dart";
 import "package:photos/events/backup_folders_updated_event.dart";
 import "package:photos/events/christmas_banner_event.dart";
+import "package:photos/events/clear_and_unfocus_search_bar_event.dart";
 import "package:photos/events/homepage_swipe_to_select_in_progress_event.dart";
 import "package:photos/events/opened_settings_event.dart";
 import "package:photos/events/permission_granted_event.dart";
@@ -101,9 +102,8 @@ class HomeWidget extends StatefulWidget {
 
 class _HomeWidgetState extends State<HomeWidget> {
   static const _feedTab = FeedScreen(showBackButton: false);
-  static const _searchTab = SearchTab();
-
   final _logger = Logger("HomeWidgetState");
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final _selectedAlbums = SelectedAlbums();
   final _selectedFiles = SelectedFiles();
 
@@ -125,6 +125,13 @@ class _HomeWidgetState extends State<HomeWidget> {
   bool _collectionsSyncTriggered = false;
   bool _isShowingChangeLog = false;
   final isOnSearchTabNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> _isAlbumsSearchActiveNotifier = ValueNotifier<bool>(
+    false,
+  );
+  final ValueNotifier<bool> _shouldAlbumsSearchConsumeBackNotifier =
+      ValueNotifier<bool>(false);
+  final ValueNotifier<bool> _shouldSearchTabSearchConsumeBackNotifier =
+      ValueNotifier<bool>(false);
   final ValueNotifier<bool> _swipeToSelectInProgressNotifier =
       ValueNotifier<bool>(false);
 
@@ -543,6 +550,9 @@ class _HomeWidgetState extends State<HomeWidget> {
     _accountConfiguredEvent.cancel();
     _intentDataStreamSubscription?.cancel();
     isOnSearchTabNotifier.dispose();
+    _isAlbumsSearchActiveNotifier.dispose();
+    _shouldAlbumsSearchConsumeBackNotifier.dispose();
+    _shouldSearchTabSearchConsumeBackNotifier.dispose();
     _pageController.dispose();
     _publicAlbumLinkSubscription?.cancel();
     _authDeepLinkSubscription?.cancel();
@@ -800,7 +810,6 @@ class _HomeWidgetState extends State<HomeWidget> {
   @override
   Widget build(BuildContext context) {
     _logger.info("Building home_Widget with tab $_selectedTabIndex");
-    bool isSettingsOpen = false;
     final enableDrawer = _shouldEnableDrawer();
     final action = AppLifecycleService.instance.mediaExtensionAction.action;
     final isOnOnlineGrantPermissionScreen =
@@ -825,7 +834,7 @@ class _HomeWidgetState extends State<HomeWidget> {
               _selectedFiles.clearAll();
               return;
             }
-            if (isSettingsOpen) {
+            if (_isDrawerOpen()) {
               Navigator.pop(context);
             } else if (Platform.isAndroid && action == IntentAction.main) {
               unawaited(MoveToBackground.moveTaskToBack());
@@ -839,12 +848,26 @@ class _HomeWidgetState extends State<HomeWidget> {
               _selectedAlbums.clearAll();
               return;
             }
+            if (_shouldAlbumsSearchConsumeBackNotifier.value) {
+              _isAlbumsSearchActiveNotifier.value = false;
+              return;
+            }
+            if (_isAlbumsSearchActiveNotifier.value) {
+              _isAlbumsSearchActiveNotifier.value = false;
+            }
+          }
+          if (_selectedTabIndex == 3) {
+            if (_shouldSearchTabSearchConsumeBackNotifier.value) {
+              Bus.instance.fire(ClearAndUnfocusSearchBar());
+              return;
+            }
           }
           Bus.instance.fire(
             TabChangedEvent(0, TabChangedEventSource.backButton),
           );
         },
         child: Scaffold(
+          key: _scaffoldKey,
           drawerScrimColor: getEnteColorScheme(context).strokeFainter,
           drawerEnableOpenDragGesture: false,
           //using a hack instead of enabling this as enabling this will create other problems
@@ -861,7 +884,6 @@ class _HomeWidgetState extends State<HomeWidget> {
                 )
               : null,
           onDrawerChanged: (isOpened) {
-            isSettingsOpen = isOpened;
             if (isOpened) {
               Bus.instance.fire(OpenedSettingsEvent());
             }
@@ -955,7 +977,7 @@ class _HomeWidgetState extends State<HomeWidget> {
   Widget _getBody(BuildContext context) {
     final bool localGalleryMode = isLocalGalleryMode;
     if (!Configuration.instance.hasConfiguredAccount()) {
-      _closeDrawerIfOpen(context);
+      _closeDrawerIfOpen();
       final shouldBootstrapLocalGalleryEntryFlow =
           widget.startWithoutAccount && !localGalleryMode;
       final hasPersistedLocalGalleryMode =
@@ -976,10 +998,8 @@ class _HomeWidgetState extends State<HomeWidget> {
         return const LandingPageWidget();
       }
     }
-    if (flagService.enableOnlyBackupFuturePhotos) {
-      _ensurePersonSync();
-      _ensureCollectionsSync();
-    }
+    _ensurePersonSync();
+    _ensureCollectionsSync();
     if (_shouldShowPermissionWidget()) {
       _ensurePersonSync();
       return const GrantPermissionsWidget();
@@ -1026,25 +1046,26 @@ class _HomeWidgetState extends State<HomeWidget> {
                           ? const NeverScrollableScrollPhysics()
                           : const BouncingScrollPhysics(),
                       children: [
-                        _buildTabHeroMode(
-                          0,
-                          selectedTabIndex,
-                          child!,
-                        ),
+                        _buildTabHeroMode(0, selectedTabIndex, child!),
                         _buildTabHeroMode(
                           1,
                           selectedTabIndex,
-                          AlbumsTab(selectedAlbums: _selectedAlbums),
+                          AlbumsTab(
+                            selectedAlbums: _selectedAlbums,
+                            isSearchActiveNotifier:
+                                _isAlbumsSearchActiveNotifier,
+                            shouldConsumeBackNotifier:
+                                _shouldAlbumsSearchConsumeBackNotifier,
+                          ),
                         ),
-                        _buildTabHeroMode(
-                          2,
-                          selectedTabIndex,
-                          _feedTab,
-                        ),
+                        _buildTabHeroMode(2, selectedTabIndex, _feedTab),
                         _buildTabHeroMode(
                           3,
                           selectedTabIndex,
-                          _searchTab,
+                          SearchTab(
+                            shouldConsumeBackNotifier:
+                                _shouldSearchTabSearchConsumeBackNotifier,
+                          ),
                         ),
                       ],
                     );
@@ -1120,18 +1141,21 @@ class _HomeWidgetState extends State<HomeWidget> {
   }
 
   Widget _buildTabHeroMode(int tabIndex, int selectedTabIndex, Widget child) {
-    return HeroMode(
-      enabled: tabIndex == selectedTabIndex,
-      child: child,
+    return ClipRect(
+      child: HeroMode(enabled: tabIndex == selectedTabIndex, child: child),
     );
   }
 
-  void _closeDrawerIfOpen(BuildContext context) {
-    Scaffold.of(context).isDrawerOpen
-        ? SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
-            Scaffold.of(context).closeDrawer();
-          })
-        : null;
+  bool _isDrawerOpen() {
+    return _scaffoldKey.currentState?.isDrawerOpen ?? false;
+  }
+
+  void _closeDrawerIfOpen() {
+    if (_isDrawerOpen()) {
+      SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
+        _scaffoldKey.currentState?.closeDrawer();
+      });
+    }
   }
 
   Future<bool> _initDeepLinks() async {
@@ -1179,7 +1203,7 @@ class _HomeWidgetState extends State<HomeWidget> {
     UserService.instance.verifyEmail(context, ott);
   }
 
-  showChangeLog(BuildContext context) async {
+  Future<void> showChangeLog(BuildContext context) async {
     if (_isShowingChangeLog || !mounted) {
       return;
     }
@@ -1187,7 +1211,6 @@ class _HomeWidgetState extends State<HomeWidget> {
     try {
       final action = await updateService.getChangeLogAction(
         locale: Localizations.localeOf(context),
-        isAndroid: Platform.isAndroid,
         isLocalGallery: isLocalGalleryMode,
         isSignedIn: Configuration.instance.isLoggedIn(),
       );
@@ -1315,26 +1338,18 @@ class _HomeWidgetState extends State<HomeWidget> {
   }
 
   bool _shouldShowPermissionWidget() {
-    if (flagService.enableOnlyBackupFuturePhotos) {
-      return !permissionService.hasGrantedPermissions() &&
-          !backupPreferenceService.hasSkippedOnboardingPermission;
-    } else {
-      return !permissionService.hasGrantedPermissions();
-    }
+    return !permissionService.hasGrantedPermissions() &&
+        !backupPreferenceService.hasSkippedOnboardingPermission;
   }
 
   bool _shouldShowLoadingWidget() {
     if (isLocalGalleryMode) {
       return false;
     }
-    if (flagService.enableOnlyBackupFuturePhotos) {
-      if (!permissionService.hasGrantedPermissions()) {
-        return false;
-      }
-      return !LocalSyncService.instance.hasCompletedFirstImportOrBypassed();
-    } else {
-      return !LocalSyncService.instance.hasCompletedFirstImport();
+    if (!permissionService.hasGrantedPermissions()) {
+      return false;
     }
+    return !LocalSyncService.instance.hasCompletedFirstImportOrBypassed();
   }
 
   void _ensurePersonSync() {
@@ -1361,6 +1376,9 @@ class _HomeWidgetState extends State<HomeWidget> {
         backupPreferenceService.isOnlyNewBackupEnabled)) {
       return;
     }
+    // When first import is bypassed by skipped onboarding or only-new backup,
+    // trigger collection sync here instead of waiting for the
+    // completedFirstGalleryImport refresh path.
     _collectionsSyncTriggered = true;
     CollectionsService.instance.sync().then((_) {
       if (mounted) {

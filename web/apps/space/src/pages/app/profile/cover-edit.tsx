@@ -82,7 +82,9 @@ const Page: React.FC = () => {
                         setPendingProfileCoverFile(null);
                     } catch (error) {
                         console.error("Space cover update failed", error);
-                        throw new Error(spaceProfileErrorMessage(error));
+                        throw new Error(spaceProfileErrorMessage(error), {
+                            cause: error,
+                        });
                     }
                 }}
             />

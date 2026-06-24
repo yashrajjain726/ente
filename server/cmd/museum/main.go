@@ -186,6 +186,7 @@ func main() {
 	legacyKitRepository := &legacykitrepo.Repository{DB: db}
 
 	notificationHistoryRepo := &repo.NotificationHistoryRepository{DB: db}
+	eventRepository := &repo.EventRepository{DB: db}
 	queueRepo := &repo.QueueRepository{DB: db}
 	objectRepo := &repo.ObjectRepository{DB: db, LatencySensitiveDB: latencySensitiveDB, QueueRepo: queueRepo}
 	objectCleanupRepo := &repo.ObjectCleanupRepository{DB: db}
@@ -281,8 +282,6 @@ func main() {
 	objectCleanupController := controller.NewObjectCleanupController(
 		objectCleanupRepo,
 		objectRepo,
-		lockController,
-		objectController,
 		s3Config,
 	)
 
@@ -574,6 +573,9 @@ func main() {
 		timeout.WithHandler(healthCheckHandler.PingDBStats),
 		timeout.WithResponse(timeOutResponse),
 	))
+	eventHandler := &api.EventHandler{Repo: eventRepository}
+	publicAPI.POST("/events", eventHandler.Create)
+	privateAPI.POST("/events/user", eventHandler.CreateForUser)
 	fileCopyCtrl := &file_copy.FileCopyController{
 		FileController: fileController,
 		CollectionCtrl: collectionController,
@@ -595,9 +597,7 @@ func main() {
 	privateAPI.POST("/files/upload-url", fileHandler.GetUploadURLV2)
 	privateAPI.POST("/files/multipart-upload-url", fileHandler.GetMultipartUploadURLV2)
 	privateAPI.GET("/files/download/:fileID", fileHandler.Get)
-	privateAPI.GET("/files/download/v2/:fileID", fileHandler.GetUsingFusedLookup)
 	privateAPI.GET("/files/preview/:fileID", fileHandler.GetThumbnail)
-	privateAPI.GET("/files/preview/v2/:fileID", fileHandler.GetThumbnailUsingFusedLookup)
 
 	privateAPI.POST("/files/share-url", fileHandler.ShareUrl)
 	privateAPI.GET("/files/share-url", fileHandler.GetUrls)
@@ -826,6 +826,8 @@ func main() {
 	}
 
 	publicAPI.POST("/cast/device-info", castHandler.RegisterDevice)
+	privateAPI.GET("/cast/device-info", castHandler.GetAllDevices)
+	privateAPI.DELETE("/cast/device-info/:deviceID", castHandler.DeleteDevice)
 	// Deprecated Nov 2024. Remove in a few months.
 	//
 	// This (and below) are deprecated copy of endpoints with a trailing slash.
@@ -927,25 +929,24 @@ func main() {
 	privateAPI.POST("/storage-bonus/referral-claim", storageBonusHandler.ClaimReferral)
 
 	adminHandler := &api.AdminHandler{
-		QueueRepo:               queueRepo,
-		UserRepo:                userRepo,
-		CollectionRepo:          collectionRepo,
-		AuthenticatorRepo:       authRepo,
-		UserAuthRepo:            userAuthRepo,
-		UserController:          userController,
-		FamilyController:        familyController,
-		EmergencyController:     emergencyCtrl,
-		RemoteStoreController:   remoteStoreController,
-		FileRepo:                fileRepo,
-		StorageBonusRepo:        storagBonusRepo,
-		BillingRepo:             billingRepo,
-		BillingController:       billingController,
-		ObjectCleanupController: objectCleanupController,
-		MailingListsController:  mailingListsController,
-		DiscordController:       discordController,
-		HashingKey:              hashingKeyBytes,
-		PasskeyController:       passkeyCtrl,
-		StorageBonusCtl:         storageBonusCtrl,
+		QueueRepo:              queueRepo,
+		UserRepo:               userRepo,
+		CollectionRepo:         collectionRepo,
+		AuthenticatorRepo:      authRepo,
+		UserAuthRepo:           userAuthRepo,
+		UserController:         userController,
+		FamilyController:       familyController,
+		EmergencyController:    emergencyCtrl,
+		RemoteStoreController:  remoteStoreController,
+		FileRepo:               fileRepo,
+		StorageBonusRepo:       storagBonusRepo,
+		BillingRepo:            billingRepo,
+		BillingController:      billingController,
+		MailingListsController: mailingListsController,
+		DiscordController:      discordController,
+		HashingKey:             hashingKeyBytes,
+		PasskeyController:      passkeyCtrl,
+		StorageBonusCtl:        storageBonusCtrl,
 	}
 	adminAPI.POST("/mail", adminHandler.SendMail)
 	adminAPI.POST("/mail/subscribe", adminHandler.SubscribeMail)
@@ -970,7 +971,6 @@ func main() {
 	adminAPI.PUT("/user/subscription", adminHandler.UpdateSubscription)
 	adminAPI.POST("/queue/re-queue", adminHandler.ReQueueItem)
 	adminAPI.POST("/user/bonus", adminHandler.UpdateBonus)
-	adminAPI.POST("/job/clear-orphan-objects", adminHandler.ClearOrphanObjects)
 
 	userEntityController := &userEntityCtrl.Controller{Repo: userEntityRepo}
 	userEntityHandler := &api.UserEntityHandler{Controller: userEntityController}
@@ -1167,8 +1167,8 @@ func setupDatabase() *sql.DB {
 		panic(err)
 	}
 
-	db.SetMaxIdleConns(6)
-	db.SetMaxOpenConns(45)
+	db.SetMaxIdleConns(30)
+	db.SetMaxOpenConns(60)
 	db.SetConnMaxLifetime(30 * time.Minute)
 	db.SetConnMaxIdleTime(10 * time.Minute)
 
@@ -1192,8 +1192,8 @@ func setupLatencySensitiveDatabase() *sql.DB {
 	}
 	log.Println("Pinged latency sensitive DB")
 
-	db.SetMaxIdleConns(20)
-	db.SetMaxOpenConns(40)
+	db.SetMaxIdleConns(50)
+	db.SetMaxOpenConns(100)
 	db.SetConnMaxLifetime(30 * time.Minute)
 	db.SetConnMaxIdleTime(10 * time.Minute)
 
@@ -1227,10 +1227,14 @@ func setupAndStartBackgroundJobs(
 		log.Info("Skipping Replication as replication is disabled")
 	}
 
+	if viper.GetBool("jobs.cron.skip") {
+		log.Info("Skipping background cleanup jobs")
+		return
+	}
+
 	fileDataCtrl.StartDataDeletion() // Start data deletion for file data;
 	contactController.StartDataDeletion()
 	objectCleanupController.StartRemovingUnreportedObjects()
-	objectCleanupController.StartClearingOrphanObjects()
 	spaceModule.Cleanup.StartRemovingUnreportedObjects()
 }
 
@@ -1248,12 +1252,12 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 	healthCheckHandler *api.HealthCheckHandler,
 	castDb castRepo.Repository,
 	inactiveUserOrchestrator *user.InactiveUserOrchestrator) {
-	const deletedTokenRetentionDays = 427 // 13-month deletion window (395 days) + 32-day safety buffer
-	shouldSkipCron := viper.GetBool("jobs.cron.skip")
-	if shouldSkipCron {
+	if viper.GetBool("jobs.cron.skip") {
 		log.Info("Skipping cron jobs")
 		return
 	}
+
+	const deletedTokenRetentionDays = 427 // 13-month deletion window (395 days) + 32-day safety buffer
 
 	c := cron.New()
 	schedule(c, "@every 1m", func() {
@@ -1297,6 +1301,9 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 
 	schedule(c, "@every 8m", func() {
 		fileController.CleanupDeletedFiles()
+	})
+	schedule(c, "@every 13m", func() {
+		fileController.CleanupOutdatedObjects()
 	})
 	schedule(c, "@every 101s", func() {
 		embeddingCtrl.CleanupDeletedEmbeddings()

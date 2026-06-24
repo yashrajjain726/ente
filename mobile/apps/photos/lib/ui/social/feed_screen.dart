@@ -87,11 +87,7 @@ class FeedScreen extends StatefulWidget {
   final FeedNavigationTarget? initialTarget;
   final bool showBackButton;
 
-  const FeedScreen({
-    super.key,
-    this.initialTarget,
-    this.showBackButton = true,
-  });
+  const FeedScreen({super.key, this.initialTarget, this.showBackButton = true});
 
   @override
   State<FeedScreen> createState() => _FeedScreenState();
@@ -357,13 +353,7 @@ class _FeedScreenState extends State<FeedScreen> {
       unawaited(
         routeToPage(
           context,
-          DetailPage(
-            DetailPageConfiguration(
-              [file],
-              0,
-              "feed_item",
-            ),
-          ),
+          DetailPage(DetailPageConfiguration([file], 0, "feed_item")),
           forceCustomPageRoute: true,
         ),
       );
@@ -563,6 +553,8 @@ class _FeedScreenState extends State<FeedScreen> {
         backgroundColor: isDark ? null : colorScheme.backgroundColour,
         elevation: 0,
         centerTitle: false,
+        leadingWidth: widget.showBackButton ? 48 : null,
+        titleSpacing: widget.showBackButton ? 4 : null,
         leading: widget.showBackButton
             ? IconButtonWidget(
                 iconButtonType: IconButtonType.primary,
@@ -570,16 +562,12 @@ class _FeedScreenState extends State<FeedScreen> {
                 onTap: () => Navigator.of(context).pop(),
               )
             : null,
-        title: _feedItems.isEmpty
-            ? null
-            : Text(
-                AppLocalizations.of(context).feed,
-                style: widget.showBackButton
-                    ? textTheme.bodyBold
-                    : TextStyles.h1Bold.copyWith(
-                        color: textTheme.h4Bold.color,
-                      ),
-              ),
+        title: Text(
+          AppLocalizations.of(context).feed,
+          style: widget.showBackButton
+              ? TextStyles.display3.copyWith(color: textTheme.h4Bold.color)
+              : TextStyles.display1.copyWith(color: textTheme.h4Bold.color),
+        ),
       ),
       body: _isLoading
           ? const Center(child: EnteLoadingWidget(size: 24))
@@ -605,9 +593,7 @@ class _FeedScreenState extends State<FeedScreen> {
                   if (index >= _feedItems.length) {
                     return const Padding(
                       padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(
-                        child: EnteLoadingWidget(size: 20),
-                      ),
+                      child: Center(child: EnteLoadingWidget(size: 20)),
                     );
                   }
                   final item = _feedItems[index];
@@ -615,9 +601,7 @@ class _FeedScreenState extends State<FeedScreen> {
                   final itemKey = _feedItemStableKey(item);
                   final heroTagPrefix = _heroTagPrefixForFeedItem(item);
                   final isForwardHeroSuppressed = _suppressedForwardHeroPrefixes
-                      .contains(
-                        heroTagPrefix,
-                      );
+                      .contains(heroTagPrefix);
                   final key = _shouldUseNavigationTargetKey(item)
                       ? _navigationTargetItemKey
                       : ValueKey(itemKey);
@@ -631,10 +615,8 @@ class _FeedScreenState extends State<FeedScreen> {
                         _anonDisplayNamesByCollection[item.collectionID] ??
                         const {},
                     isLastItem: isLastItem,
-                    onTap: () => _handleFeedItemTap(
-                      item,
-                      heroTagPrefix: heroTagPrefix,
-                    ),
+                    onTap: () =>
+                        _handleFeedItemTap(item, heroTagPrefix: heroTagPrefix),
                     onSharedHeaderTap: () => _openSharedCollection(
                       item,
                       heroTagPrefix: heroTagPrefix,
@@ -864,11 +846,7 @@ class _FeedScreenState extends State<FeedScreen> {
       routeToPage(
         context,
         DetailPage(
-          DetailPageConfiguration(
-            [file],
-            0,
-            heroTagPrefix ?? "feed_item",
-          ),
+          DetailPageConfiguration([file], 0, heroTagPrefix ?? "feed_item"),
         ),
         forceCustomPageRoute: true,
       ),

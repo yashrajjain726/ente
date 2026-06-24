@@ -12,6 +12,7 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/machine_learning/face_ml/face_filtering/face_filtering_constants.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/search_service.dart";
+import "package:photos/settings/local_settings.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/theme/text_style.dart";
@@ -22,7 +23,6 @@ import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
 import "package:photos/ui/viewer/people/person_face_widget.dart";
 import "package:photos/utils/dialog_util.dart";
-import "package:photos/utils/local_settings.dart";
 import "package:photos/utils/people_sort_util.dart";
 
 class AddFilesToPersonPage extends StatefulWidget {
@@ -38,8 +38,10 @@ class AddFilesToPersonPage extends StatefulWidget {
   });
 
   static Future<List<GenericSearchResult>> loadNamedPersons() async {
-    final results = await SearchService.instance
-        .getAllFace(null, minClusterSize: kMinimumClusterSizeAllFaces);
+    final results = await SearchService.instance.getAllFace(
+      null,
+      minClusterSize: kMinimumClusterSizeAllFaces,
+    );
     final named = results
         .where(
           (result) =>
@@ -114,9 +116,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
         : AddFilesToPersonPage.loadNamedPersons();
   }
 
-  List<GenericSearchResult> _filterPersons(
-    List<GenericSearchResult> persons,
-  ) {
+  List<GenericSearchResult> _filterPersons(List<GenericSearchResult> persons) {
     final query = _searchQuery.trim().toLowerCase();
     if (query.isEmpty) {
       return persons;
@@ -232,7 +232,10 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
                 child: Center(child: EnteLoadingWidget()),
               ),
             );
-            return CustomScrollView(slivers: slivers);
+            return CustomScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: slivers,
+            );
           } else if (snapshot.hasError) {
             AddFilesToPersonPage._logger.severe(
               "Failed to load persons for manual tagging",
@@ -244,7 +247,10 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
                 child: Center(child: Icon(Icons.error_outline_rounded)),
               ),
             );
-            return CustomScrollView(slivers: slivers);
+            return CustomScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: slivers,
+            );
           }
 
           final persons = snapshot.data ?? [];
@@ -259,12 +265,16 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
                 ),
               ),
             );
-            return CustomScrollView(slivers: slivers);
+            return CustomScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: slivers,
+            );
           }
           final screenWidth = MediaQuery.of(context).size.width;
           final estimatedCount = (screenWidth / 100).floor();
           final crossAxisCount = estimatedCount > 0 ? estimatedCount : 1;
-          final itemSize = (screenWidth -
+          final itemSize =
+              (screenWidth -
                   ((horizontalEdgePadding * 2) +
                       ((crossAxisCount - 1) * gridPadding))) /
               crossAxisCount;
@@ -305,7 +315,10 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
               ),
             ),
           );
-          return CustomScrollView(slivers: slivers);
+          return CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            slivers: slivers,
+          );
         },
       ),
     );
@@ -330,10 +343,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
             context: context,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              side: BorderSide(
-                width: 0.5,
-                color: colorScheme.strokeFaint,
-              ),
+              side: BorderSide(width: 0.5, color: colorScheme.strokeFaint),
               borderRadius: BorderRadius.circular(_sortMenuCornerRadius),
             ),
             position: RelativeRect.fromLTRB(
@@ -407,8 +417,9 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
         detail = _isSortAscending(key) ? "A-Z" : "Z-A";
         break;
       case PeopleSortKey.lastUpdated:
-        detail =
-            _isSortAscending(key) ? l10n.sortOldestFirst : l10n.sortNewestFirst;
+        detail = _isSortAscending(key)
+            ? l10n.sortOldestFirst
+            : l10n.sortNewestFirst;
         break;
     }
 
@@ -439,10 +450,7 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: textTheme.mini,
-            ),
+            Text(label, style: textTheme.mini),
             if (isSelected) ...[
               const SizedBox(width: 8),
               Container(
@@ -454,16 +462,9 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
                 ),
               ),
               const SizedBox(width: 6),
-              Text(
-                detail,
-                style: textTheme.miniMuted,
-              ),
+              Text(detail, style: textTheme.miniMuted),
               const SizedBox(width: 4),
-              Icon(
-                directionIcon,
-                size: 16,
-                color: colorScheme.textMuted,
-              ),
+              Icon(directionIcon, size: 16, color: colorScheme.textMuted),
             ],
           ],
         ),
@@ -505,8 +506,11 @@ class _AddFilesToPersonPageState extends State<AddFilesToPersonPage> {
       Navigator.of(context).pop(result);
     } catch (e, s) {
       await dialog.hide();
-      AddFilesToPersonPage._logger
-          .severe("Failed to add files to person", e, s);
+      AddFilesToPersonPage._logger.severe(
+        "Failed to add files to person",
+        e,
+        s,
+      );
       if (!mounted) {
         return;
       }

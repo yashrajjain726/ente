@@ -8,7 +8,7 @@ environment:
   flutter: ">=1.17.0"
 
 dependencies:
-  dio: 5.9.0
+  dio: 5.9.2
   ente_base:
     path: ../../packages/base
   ente_configuration:
@@ -26,13 +26,13 @@ dependencies:
     sdk: flutter
   flutter_animate: 4.5.2
   fluttertoast: 8.2.14
-  hugeicons: 1.1.5
+  hugeicons: 1.1.7
   modal_bottom_sheet: 3.0.0
   shared_preferences: 2.5.3
   window_manager: 0.5.1
 
 dev_dependencies:
-  flutter_lints: 5.0.0
+  flutter_lints: 6.0.0
   flutter_test:
     sdk: flutter
 

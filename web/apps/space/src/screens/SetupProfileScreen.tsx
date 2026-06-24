@@ -57,10 +57,12 @@ interface SetupProfileScreenProps {
 
 interface TextInputProps {
     endAdornment?: React.ReactNode;
+    id: string;
     label: string;
     onChange?: (value: string) => void;
     placeholder?: string;
     required?: boolean;
+    startAdornment?: React.ReactNode;
     value?: string;
 }
 
@@ -134,15 +136,18 @@ const UsernameStatusIcon: React.FC<{
 
 const TextInput: React.FC<TextInputProps> = ({
     endAdornment,
+    id,
     label,
     onChange,
     placeholder,
     required,
+    startAdornment,
     value,
 }) => (
     <Box sx={{ width: "100%" }}>
         <Box
             component="label"
+            htmlFor={id}
             sx={{
                 color: textBase,
                 display: "flex",
@@ -155,7 +160,11 @@ const TextInput: React.FC<TextInputProps> = ({
             }}
         >
             {label}
-            {required && <Box sx={{ color: warning }}>*</Box>}
+            {required && (
+                <Box component="span" sx={{ color: warning }}>
+                    *
+                </Box>
+            )}
         </Box>
         <Box
             sx={{
@@ -172,8 +181,10 @@ const TextInput: React.FC<TextInputProps> = ({
                 },
             }}
         >
+            {startAdornment}
             <Box
                 component="input"
+                id={id}
                 onChange={(event) => onChange?.(event.target.value)}
                 placeholder={placeholder}
                 type="text"
@@ -345,7 +356,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
         }
     };
 
-    const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+    const handleSubmit: React.SubmitEventHandler<HTMLFormElement> = (event) => {
         event.preventDefault();
         submitProfile();
     };
@@ -564,13 +575,32 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
                             endAdornment={
                                 <UsernameStatusIcon status={usernameStatus} />
                             }
+                            id="space-setup-profile-username"
                             label="Username"
                             onChange={handleUsernameChange}
-                            placeholder="Choose your username"
+                            placeholder="username"
                             required
+                            startAdornment={
+                                <Box
+                                    component="span"
+                                    aria-hidden
+                                    sx={{
+                                        color: textBase,
+                                        flexShrink: 0,
+                                        fontFamily:
+                                            '"Inter Variable", Inter, sans-serif',
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        lineHeight: "20px",
+                                    }}
+                                >
+                                    ente.space/
+                                </Box>
+                            }
                             value={username}
                         />
                         <TextInput
+                            id="space-setup-profile-name"
                             label="Name"
                             onChange={setFullName}
                             placeholder="Enter your name"

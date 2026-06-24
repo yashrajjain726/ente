@@ -45,9 +45,9 @@ func TestGetProfileIncludesFriendsCount(t *testing.T) {
 	module, repos, userAuthRepo, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-friends@example.com", "alice-public")
 	bobID := insertSpaceControllerUser(t, repos, "bob-friends@example.com", "bob-public")
-	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-friends", "alice-space-key", "alice-friends-public", "alice-friends-secret", "alice-friends-secret-nonce", "alice-profile")
+	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice_friends", "alice-space-key", "alice-friends-public", "alice-friends-secret", "alice-friends-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := repos.Spaces.CreateSpace(ctx, bobID, "bob-friends", "bob-space-key", "bob-friends-public", "bob-friends-secret", "bob-friends-secret-nonce", "bob-profile")
+	bobSpace, err := repos.Spaces.CreateSpace(ctx, bobID, "bob_friends", "bob-space-key", "bob-friends-public", "bob-friends-secret", "bob-friends-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, repos.Friends.AddFriend(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion))
 	require.NoError(t, userAuthRepo.AddToken(aliceID, ente.Photos, "alice-friends-token", "127.0.0.1", "space-test"))
@@ -66,7 +66,7 @@ func TestGetProfileIncludesFriendsCount(t *testing.T) {
 func TestGetProfileReturnsProfileAssetObjectIDs(t *testing.T) {
 	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-assets-profile@example.com", "alice-assets-public")
-	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-assets-profile", "alice-space-key", "alice-assets-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	space, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice_assets_profile", "alice-space-key", "alice-assets-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	for _, rec := range []spacerepo.SpaceTempObjectRecord{
 		{
@@ -195,7 +195,7 @@ func TestSlugAvailabilityReturnsFalseForExistingAndReservedSlugs(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, reserved.Available)
 
-	free, err := module.Spaces.SlugAvailability(ginCtx, "new-person")
+	free, err := module.Spaces.SlugAvailability(ginCtx, "new_person")
 	require.NoError(t, err)
 	require.True(t, free.Available)
 }
@@ -203,22 +203,22 @@ func TestSlugAvailabilityReturnsFalseForExistingAndReservedSlugs(t *testing.T) {
 func TestLookupBySlugHidesDeletedOwnerButReservesSlug(t *testing.T) {
 	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-deleted-lookup@example.com", "alice-public")
-	_, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-deleted-lookup", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	_, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice_deleted_lookup", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	ginCtx := newPublicSpaceContext()
 
-	lookup, err := module.Spaces.LookupBySlug(ginCtx, "alice-deleted-lookup")
+	lookup, err := module.Spaces.LookupBySlug(ginCtx, "alice_deleted_lookup")
 	require.NoError(t, err)
-	require.Equal(t, "alice-deleted-lookup", lookup.SpaceSlug)
+	require.Equal(t, "alice_deleted_lookup", lookup.SpaceSlug)
 
 	_, err = repos.Spaces.DB.Exec(`UPDATE users SET encrypted_email = NULL WHERE user_id = $1`, aliceID)
 	require.NoError(t, err)
 
-	lookup, err = module.Spaces.LookupBySlug(ginCtx, "alice-deleted-lookup")
+	lookup, err = module.Spaces.LookupBySlug(ginCtx, "alice_deleted_lookup")
 	require.Nil(t, lookup)
 	require.Error(t, err)
 
-	availability, err := module.Spaces.SlugAvailability(ginCtx, "alice-deleted-lookup")
+	availability, err := module.Spaces.SlugAvailability(ginCtx, "alice_deleted_lookup")
 	require.NoError(t, err)
 	require.False(t, availability.Available)
 }

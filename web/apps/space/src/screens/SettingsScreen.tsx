@@ -496,7 +496,7 @@ export const ChangeNameSettingsScreen: React.FC<
         trimmedName.length > 0 &&
         trimmedName != initialName.trim();
 
-    const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+    const handleSubmit: React.SubmitEventHandler<HTMLFormElement> = (event) => {
         event.preventDefault();
         if (canSave) onSave(trimmedName);
     };

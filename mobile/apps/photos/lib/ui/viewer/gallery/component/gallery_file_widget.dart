@@ -15,6 +15,7 @@ import "package:photos/services/app_lifecycle_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/touch_cross_detector.dart";
 import "package:photos/ui/sharing/user_avator_widget.dart";
+import "package:photos/ui/viewer/actions/select_all_status_icon.dart";
 import "package:photos/ui/viewer/file/detail_page.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/ui/viewer/gallery/component/swipe_selectable_file_widget.dart";
@@ -150,9 +151,12 @@ class _GalleryFileWidgetState extends State<GalleryFileWidget> {
                           flightDirection,
                           fromHeroContext,
                           toHeroContext,
-                        ) => thumbnailWidget,
+                        ) => (toHeroContext.widget as Hero).child,
                     transitionOnUserGestures: true,
-                    child: thumbnailWidget,
+                    child: ClipRRect(
+                      borderRadius: borderRadius,
+                      child: thumbnailWidget,
+                    ),
                   ),
                 ),
                 Container(
@@ -164,10 +168,11 @@ class _GalleryFileWidgetState extends State<GalleryFileWidget> {
                 Positioned(
                   right: 4,
                   top: 4,
-                  child: Icon(
-                    Icons.check_circle_rounded,
-                    size: 20,
-                    color: selectionColor, //same for both themes
+                  child: SelectAllStatusIcon(
+                    isSelected: true,
+                    size: 16,
+                    selectedFillColor: selectionColor, //same for both themes
+                    selectedTickCutsOut: true,
                   ),
                 ),
               ],
@@ -184,9 +189,12 @@ class _GalleryFileWidgetState extends State<GalleryFileWidget> {
                       flightDirection,
                       fromHeroContext,
                       toHeroContext,
-                    ) => thumbnailWidget,
+                    ) => (toHeroContext.widget as Hero).child,
                 transitionOnUserGestures: true,
-                child: thumbnailWidget,
+                child: ClipRRect(
+                  borderRadius: borderRadius,
+                  child: thumbnailWidget,
+                ),
               ),
             ),
     );

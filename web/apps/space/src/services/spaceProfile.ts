@@ -13,7 +13,7 @@ import {
 } from "services/spacePersistentSession";
 import { spaceRootKeyFromSpaceSession } from "services/spaceSecureSessionStorage";
 
-const usernamePattern = /^[a-z0-9][a-z0-9._-]*$/;
+const usernamePattern = /^[a-z0-9][a-z0-9._]*$/;
 const minUsernameLength = 3;
 const maxUsernameLength = 30;
 
@@ -74,7 +74,7 @@ export const spaceUsernameValidationError = (username: string) => {
         return "Username must be 30 characters or less.";
     }
     if (!usernamePattern.test(normalized)) {
-        return "Use lowercase letters, numbers, dots, dashes, or underscores.";
+        return "Use lowercase letters, numbers, dots, or underscores.";
     }
     if (normalized.startsWith("ente")) {
         return "This username is reserved.";
@@ -96,7 +96,7 @@ const parseSpaceProfilePayload = (profile: string): SpaceProfilePayload => {
     if (!parsed || typeof parsed != "object" || Array.isArray(parsed)) {
         throw new Error("Space profile payload must be a JSON object.");
     }
-    return parsed as SpaceProfilePayload;
+    return parsed;
 };
 
 const textField = (value: unknown) =>
@@ -112,12 +112,16 @@ const spaceHTTPStatus = (error: unknown) => {
 
 const defaultOwnedSpace = (spaces: OwnedSpace[]) => spaces[0];
 
+const blobPartForBytes = (bytes: Uint8Array): ArrayBuffer => {
+    const copy = new Uint8Array(bytes.byteLength);
+    copy.set(bytes);
+    return copy.buffer;
+};
+
 const currentSpaceContextConfig = async () => {
     await restoreSpaceBrowserSessionIfNeeded();
-    const [baseUrl, spaceRootKeyB64] = await Promise.all([
-        apiOrigin(),
-        spaceRootKeyFromSpaceSession(),
-    ]);
+    const baseUrl = await apiOrigin();
+    const spaceRootKeyB64 = spaceRootKeyFromSpaceSession();
     const user = savedPartialLocalUser();
     const spaceSessionToken = savedSpaceSessionToken();
 
@@ -216,7 +220,7 @@ const avatarURLForRemoteAvatar = async (
 ) => {
     if (!avatar?.objectID) return null;
     const bytes = await ctx.download_space_avatar(spaceId, avatar.objectID);
-    return URL.createObjectURL(new Blob([bytes]));
+    return URL.createObjectURL(new Blob([blobPartForBytes(bytes)]));
 };
 
 const coverURLForRemoteCover = async (
@@ -226,7 +230,7 @@ const coverURLForRemoteCover = async (
 ) => {
     if (!cover?.objectID) return null;
     const bytes = await ctx.download_space_cover(spaceId, cover.objectID);
-    return URL.createObjectURL(new Blob([bytes]));
+    return URL.createObjectURL(new Blob([blobPartForBytes(bytes)]));
 };
 
 const profileFromDecryptedSpaceProfile = (
@@ -325,8 +329,6 @@ export const saveSpaceProfile = async (
     profile: SetupProfileInput,
 ): Promise<SetupProfile> => {
     const username = normalizeSpaceUsername(profile.username);
-    const usernameError = spaceUsernameValidationError(username);
-    if (usernameError) throw new Error(usernameError);
 
     const ctx = await ensureCurrentSpaceContext();
     try {
@@ -335,6 +337,12 @@ export const saveSpaceProfile = async (
             (profile.spaceId &&
                 spaces.find((space) => space.spaceId == profile.spaceId)) ||
             defaultOwnedSpace(spaces);
+        if (
+            normalizeSpaceUsername(existingSpace?.spaceSlug ?? "") != username
+        ) {
+            const usernameError = spaceUsernameValidationError(username);
+            if (usernameError) throw new Error(usernameError);
+        }
         const profilePayload = spaceProfilePayloadFor({ ...profile, username });
 
         let spaceId: string;
@@ -407,7 +415,9 @@ export const saveSpaceProfile = async (
         };
     } catch (error) {
         if (spaceHTTPStatus(error) == 409) {
-            throw new Error("This username is already taken.");
+            throw new Error("This username is already taken.", {
+                cause: error,
+            });
         }
         throw error;
     } finally {

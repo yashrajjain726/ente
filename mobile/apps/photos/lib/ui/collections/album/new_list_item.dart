@@ -8,10 +8,7 @@ import "package:photos/ui/components/thumbnail_list_item.dart";
 class NewAlbumListItemWidget extends StatelessWidget {
   final Future<void> Function(BuildContext context)? onTap;
 
-  const NewAlbumListItemWidget({
-    super.key,
-    this.onTap,
-  });
+  const NewAlbumListItemWidget({super.key, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +37,7 @@ class NewAlbumListItemWidget extends StatelessWidget {
         ),
       ),
       title: Text(
-        AppLocalizations.of(context).addNew,
+        AppLocalizations.of(context).createAlbum,
         style: TextStyles.body.copyWith(color: colors.textLight),
         maxLines: 1,
         softWrap: false,

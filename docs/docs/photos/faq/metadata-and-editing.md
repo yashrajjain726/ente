@@ -39,7 +39,9 @@ Ente will import the date for your photos from three places (in order of priorit
 
 3. **File name**: If the photo does not have a date in the Exif data (and it is not a Google takeout), for example, for screenshots or WhatsApp forwards, Ente will try and deduce the correct date for the file from the name of the file.
 
-> **Note**: The filename-based detection works great most of the time, but it is inherently based on heuristics and is not exact.
+> [!NOTE]
+>
+> The filename-based detection works great most of the time, but it is inherently based on heuristics and is not exact.
 
 If we are unable to decipher the creation time from these 3 sources, we will set the upload time as the photo's creation time.
 
@@ -68,10 +70,7 @@ When you export your data using Google Takeout, Google provides both your photos
 
 For example, `flower.jpeg` might be in one zip and `flower.json` in another. This prevents Ente from correctly mapping them.
 
-**Best practice**: We [recommend](/photos/migration/from-google-photos/)
-unzipping all of your Google Takeout zips into a single parent folder, keeping
-subfolders as-is (do not flatten files), then importing that parent folder into
-Ente. This way, we can always correctly map photos and their metadata.
+**Best practice**: We [recommend](/photos/migration/from-google-photos/) unzipping all of your Google Takeout zips into a single parent folder, keeping subfolders as-is (do not flatten files), then importing that parent folder into Ente. This way, we can always correctly map photos and their metadata.
 
 ### Why are my Google Photos dates wrong after import? {#google-photos-dates-wrong}
 
@@ -82,8 +81,7 @@ If the dates appear incorrect after importing from Google Takeout, it's usually 
 
 To fix this:
 
-1. Make sure you unzipped all Google Takeout zips into one parent folder (with
-   subfolders kept as-is)
+1. Make sure you unzipped all Google Takeout zips into one parent folder (with subfolders kept as-is)
 2. Import that parent folder (not individual zips)
 3. This ensures Ente can match JSON files with their photos
 
@@ -126,7 +124,9 @@ This is useful for:
 - Adjusting timezone differences
 - Correcting dates on scanned photos
 
-**Note**: This feature is currently only available on the desktop app.
+> [!NOTE]
+>
+> This feature is currently only available on the desktop app.
 
 ### Can I bulk edit photo locations? {#bulk-edit-locations}
 
@@ -344,6 +344,21 @@ When you edit metadata on one device:
 - Bulk editing dates ("Edit time" feature)
 
 We're working on bringing all editing features to all platforms.
+
+### A photo I shared into Ente from WhatsApp shows the wrong date in the timeline. Why? {#whatsapp-wrong-date}
+
+Apps like WhatsApp strip the hidden "date taken" information from photos for privacy. When Ente can't find that information, and can't reliably extract it from the filename either (especially for videos), it falls back to the upload date.
+
+To fix dates already uploaded, the easiest path is the desktop app, which supports bulk editing:
+
+1. Install the desktop app and sign in.
+2. Select the affected photos and videos.
+3. Click **Edit time** in the action bar.
+4. Set the correct date and apply.
+
+The correction syncs to all your devices.
+
+To prevent this for future shared media, save photos to your phone's gallery first and let Ente back them up from the gallery. Ente reads dates correctly when files come from the gallery rather than directly from a sharing intent.
 
 ### Does Ente modify any file metadata? {#modify-file-metadata}
 

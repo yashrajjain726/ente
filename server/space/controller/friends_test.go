@@ -45,7 +45,7 @@ func TestFriendRelationshipReportsSelfFriendAndEmpty(t *testing.T) {
 func TestAddFriendRejectsOwnSpace(t *testing.T) {
 	friends, repos, ctx := setupFriendsControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-own-link@example.com", "alice-public")
-	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-own-link", "alice-space-key", "alice-own-link-public", "alice-own-link-secret", "alice-own-link-secret-nonce", "alice-profile")
+	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice_own_link", "alice-space-key", "alice-own-link-public", "alice-own-link-secret", "alice-own-link-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 
 	resp, err := friends.Add(newSpaceControllerContext(aliceID), models.AddFriendPayload{
@@ -64,9 +64,9 @@ func TestUnfriendBySpaceIDRemovesReciprocalShares(t *testing.T) {
 	friends, repos, ctx := setupFriendsControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-unfriend-space@example.com", "alice-public")
 	bobID := insertSpaceControllerUser(t, repos, "bob-unfriend-space@example.com", "bob-public")
-	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-unfriend-space", "alice-space-key", "alice-unfriend-space-public", "alice-unfriend-space-secret", "alice-unfriend-space-secret-nonce", "alice-profile")
+	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice_unfriend_space", "alice-space-key", "alice-unfriend-space-public", "alice-unfriend-space-secret", "alice-unfriend-space-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := repos.Spaces.CreateSpace(ctx, bobID, "bob-unfriend-space", "bob-space-key", "bob-unfriend-space-public", "bob-unfriend-space-secret", "bob-unfriend-space-secret-nonce", "bob-profile")
+	bobSpace, err := repos.Spaces.CreateSpace(ctx, bobID, "bob_unfriend_space", "bob-space-key", "bob-unfriend-space-public", "bob-unfriend-space-secret", "bob-unfriend-space-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, repos.Friends.AddFriend(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion))
 
@@ -85,13 +85,13 @@ func TestUnfriendByUsernameRemovesReciprocalShares(t *testing.T) {
 	friends, repos, ctx := setupFriendsControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-unfriend-username@example.com", "alice-public")
 	bobID := insertSpaceControllerUser(t, repos, "bob-unfriend-username@example.com", "bob-public")
-	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice-unfriend-username", "alice-space-key", "alice-unfriend-username-public", "alice-unfriend-username-secret", "alice-unfriend-username-secret-nonce", "alice-profile")
+	aliceSpace, err := repos.Spaces.CreateSpace(ctx, aliceID, "alice_unfriend_username", "alice-space-key", "alice-unfriend-username-public", "alice-unfriend-username-secret", "alice-unfriend-username-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := repos.Spaces.CreateSpace(ctx, bobID, "bob-unfriend-username", "bob-space-key", "bob-unfriend-username-public", "bob-unfriend-username-secret", "bob-unfriend-username-secret-nonce", "bob-profile")
+	bobSpace, err := repos.Spaces.CreateSpace(ctx, bobID, "bob_unfriend_username", "bob-space-key", "bob-unfriend-username-public", "bob-unfriend-username-secret", "bob-unfriend-username-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, repos.Friends.AddFriend(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion))
 
-	targetUsername := "bob-unfriend-username"
+	targetUsername := "bob_unfriend_username"
 	err = friends.Unfriend(newSpaceControllerContext(aliceID), models.FriendTargetPayload{TargetUsername: &targetUsername})
 
 	require.NoError(t, err)

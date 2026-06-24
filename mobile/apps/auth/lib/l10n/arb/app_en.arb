@@ -112,7 +112,9 @@
   "passwordEmptyError": "Password can not be empty",
   "passwordTooShort": "Password must be at least 8 characters",
   "importFromApp": "Import codes from {appName}",
-  "importGoogleAuthGuide": "Export your accounts from Google Authenticator to a QR code using the \"Transfer Accounts\" option. Then using another device, scan the QR code.\n\nTip: You can use your laptop's webcam to take a picture of the QR code.",
+  "importGoogleAuthGuide": "Export your accounts from Google Authenticator to a QR code using the \"Transfer Accounts\" option. Then scan the QR code or import it from an image.",
+  "scannerTorchOn": "Turn on torch",
+  "scannerTorchOff": "Turn off torch",
   "importSelectJsonFile": "Select JSON file",
   "importSelectAppExport": "Select {appName} export file",
   "importEnteEncGuide": "Select the encrypted JSON file exported from Ente",
@@ -332,6 +334,16 @@
       }
     }
   },
+  "importGoogleAuthConfirmation": "{codeCount, plural, one{Import 1 code from Google Authenticator?} other{Import {codeCount} codes from Google Authenticator?}}",
+  "@importGoogleAuthConfirmation": {
+    "placeholders": {
+      "codeCount": {
+        "description": "The number of Google Authenticator codes to import",
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
   "sorry": "Sorry",
   "pendingSyncs": "Warning",
   "pendingSyncsWarningBody": "Some of your codes have not been backed up.\n\nPlease ensure that you have a backup for these codes before you logout.",
@@ -486,6 +498,9 @@
   "somethingWentWrongParsingCode": "We were unable to parse {x} codes.",
   "updateNotAvailable": "Update not available",
   "viewRawCodes": "View raw codes",
+  "parsingError": "Parsing error",
+  "deleteUnparseableCodeTitle": "Delete unparseable code?",
+  "deleteUnparseableCodeMessage": "This will permanently delete this code from Auth. It will not be moved to trash.",
   "rawCodes": "Raw codes",
   "rawCodeData": "Raw code data",
   "appLock": "App lock",

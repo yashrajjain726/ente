@@ -67,7 +67,7 @@ export const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
         if (canVerify) onVerify?.(otp);
     };
 
-    const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+    const handleSubmit: React.SubmitEventHandler<HTMLFormElement> = (event) => {
         event.preventDefault();
         submitVerification();
     };

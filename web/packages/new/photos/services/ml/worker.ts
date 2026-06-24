@@ -26,6 +26,7 @@ import {
 import {
     _clusterFaces,
     reconcileClusters,
+    type ClusterFacesReason,
     type ClusteringProgress,
 } from "./cluster";
 import { saveFaceCrops } from "./crop";
@@ -321,11 +322,12 @@ export class MLWorker {
      * @param masterKey The user's master key (as a base64 string), required for
      * updating remote cgroups if needed.
      */
-    async clusterFaces(masterKey: string) {
+    async clusterFaces(masterKey: string, reason: ClusterFacesReason) {
         const { clusters, modifiedClusterIDs } = await _clusterFaces(
             await savedFaceIndexes(),
             await savedCollectionFiles(),
             (progress) => this.updateClusteringProgress(progress),
+            reason,
         );
         await reconcileClusters(clusters, modifiedClusterIDs, masterKey);
         this.updateClusteringProgress(undefined);
@@ -397,7 +399,7 @@ const indexNextBatch = async (
 
         // Wait for at least one to complete (the other runners continue running
         // even if one promise reaches the finish line).
-        await Promise.race(tasks);
+        await Promise.race(tasks.filter((task) => task !== undefined));
 
         // Let the main thread now we're doing something.
         delegate?.workerDidUpdateStatus();
@@ -408,7 +410,7 @@ const indexNextBatch = async (
     }
 
     // Wait for the pending tasks to drain out.
-    await Promise.all(tasks);
+    await Promise.all(tasks.filter((task) => task !== undefined));
 
     // Clear any cached CLIP indexes, since now we might have new ones.
     clearCachedCLIPIndexes();

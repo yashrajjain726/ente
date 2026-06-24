@@ -80,7 +80,7 @@ func TestUpdateSlugRejectsReservedSlug(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
 	userID := insertSpaceUser(t, module, "rename@example.com", "rename-public")
-	space, err := module.Spaces.CreateSpace(ctx, userID, "rename-user", "space-key", "rename-user-public", "rename-user-secret", "rename-user-secret-nonce", "profile")
+	space, err := module.Spaces.CreateSpace(ctx, userID, "rename_user", "space-key", "rename-user-public", "rename-user-secret", "rename-user-secret-nonce", "profile")
 	require.NoError(t, err)
 
 	_, err = module.Spaces.UpdateSlug(ctx, userID, space.SpaceID, "support")
@@ -89,7 +89,7 @@ func TestUpdateSlugRejectsReservedSlug(t *testing.T) {
 
 	unchanged, err := module.Spaces.GetSpaceByID(ctx, space.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, "rename-user", unchanged.SpaceSlug)
+	require.Equal(t, "rename_user", unchanged.SpaceSlug)
 }
 
 func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
@@ -99,11 +99,11 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 	aliceID := insertSpaceUser(t, module, "alice-reset-space@example.com", "alice-reset-public")
 	bobID := insertSpaceUser(t, module, "bob-reset-space@example.com", "bob-reset-public")
 	charlieID := insertSpaceUser(t, module, "charlie-reset-space@example.com", "charlie-reset-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-reset-space", "alice-space-key", "alice-reset-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_reset_space", "alice-space-key", "alice-reset-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-reset-space", "bob-space-key", "bob-reset-public", "bob-secret", "bob-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_reset_space", "bob-space-key", "bob-reset-public", "bob-secret", "bob-secret-nonce", "bob-profile")
 	require.NoError(t, err)
-	charlieSpace, err := module.Spaces.CreateSpace(ctx, charlieID, "charlie-reset-space", "charlie-space-key", "charlie-reset-public", "charlie-secret", "charlie-secret-nonce", "charlie-profile")
+	charlieSpace, err := module.Spaces.CreateSpace(ctx, charlieID, "charlie_reset_space", "charlie-space-key", "charlie-reset-public", "charlie-secret", "charlie-secret-nonce", "charlie-profile")
 	require.NoError(t, err)
 
 	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
@@ -130,6 +130,7 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceID, aliceSpace.SpaceID, true))
+	setMessageLikeCreatedAt(t, module, 1500, message.MessageID, aliceSpace.SpaceID)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, timeutil.Microseconds()))
 
 	require.NoError(t, module.ResetUserAccess(ctx, aliceID))
@@ -159,9 +160,9 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 
 	aliceID := insertSpaceUser(t, module, "alice-delete-space@example.com", "alice-delete-public")
 	bobID := insertSpaceUser(t, module, "bob-delete-space@example.com", "bob-delete-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-delete-space", "alice-space-key", "alice-delete-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_delete_space", "alice-space-key", "alice-delete-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-delete-space", "bob-space-key", "bob-delete-public", "bob-secret", "bob-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_delete_space", "bob-space-key", "bob-delete-public", "bob-secret", "bob-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 
 	_, err = module.Spaces.DB.Exec(`
@@ -232,9 +233,9 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	aliceID := insertSpaceUser(t, module, "alice-messages@example.com", "alice-public")
 	bobID := insertSpaceUser(t, module, "bob-messages@example.com", "bob-public")
 
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-messages", "alice-space-key", "alice-messages-public", "alice-messages-secret", "alice-messages-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_messages", "alice-space-key", "alice-messages-public", "alice-messages-secret", "alice-messages-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-messages", "bob-space-key", "bob-messages-public", "bob-messages-secret", "bob-messages-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_messages", "bob-space-key", "bob-messages-public", "bob-messages-secret", "bob-messages-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 
 	err = module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion)
@@ -336,9 +337,9 @@ func TestSpaceMessagesUseProfileAssetAvatars(t *testing.T) {
 	aliceID := insertSpaceUser(t, module, "alice-message-avatars@example.com", "alice-message-avatars-public")
 	bobID := insertSpaceUser(t, module, "bob-message-avatars@example.com", "bob-message-avatars-public")
 
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-message-avatars", "alice-space-key", "alice-message-avatars-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_message_avatars", "alice-space-key", "alice-message-avatars-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-message-avatars", "bob-space-key", "bob-message-avatars-public", "bob-secret", "bob-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_message_avatars", "bob-space-key", "bob-message-avatars-public", "bob-secret", "bob-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	_, err = module.Spaces.DB.Exec(`
 		INSERT INTO space_profile_assets (space_id, asset_type, object_id, bucket_id, size)
@@ -389,9 +390,9 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	aliceID := insertSpaceUser(t, module, "alice-activity@example.com", "alice-activity-public")
 	bobID := insertSpaceUser(t, module, "bob-activity@example.com", "bob-activity-public")
 
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-activity", "alice-space-key", "alice-activity-public", "alice-activity-secret", "alice-activity-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_activity", "alice-space-key", "alice-activity-public", "alice-activity-secret", "alice-activity-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-activity", "bob-space-key", "bob-activity-public", "bob-activity-secret", "bob-activity-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_activity", "bob-space-key", "bob-activity-public", "bob-activity-secret", "bob-activity-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 
 	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
@@ -544,9 +545,9 @@ func TestSpaceFriendEventsCreateConversationForBothSides(t *testing.T) {
 
 	aliceID := insertSpaceUser(t, module, "alice-friend-events@example.com", "alice-friend-events-public")
 	bobID := insertSpaceUser(t, module, "bob-friend-events@example.com", "bob-friend-events-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-friend-events", "alice-space-key", "alice-friend-events-public", "alice-friend-events-secret", "alice-friend-events-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_friend_events", "alice-space-key", "alice-friend-events-public", "alice-friend-events-secret", "alice-friend-events-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-friend-events", "bob-space-key", "bob-friend-events-public", "bob-friend-events-secret", "bob-friend-events-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_friend_events", "bob-space-key", "bob-friend-events-public", "bob-friend-events-secret", "bob-friend-events-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 
 	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
@@ -609,9 +610,9 @@ func TestConfirmFriendRequestCreatesFriendshipAndNotifiesRequester(t *testing.T)
 
 	aliceID := insertSpaceUser(t, module, "alice-confirm-request@example.com", "alice-confirm-request-public")
 	bobID := insertSpaceUser(t, module, "bob-confirm-request@example.com", "bob-confirm-request-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-confirm-request", "alice-space-key", "alice-confirm-request-public", "alice-confirm-secret", "alice-confirm-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_confirm_request", "alice-space-key", "alice-confirm-request-public", "alice-confirm-secret", "alice-confirm-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-confirm-request", "bob-space-key", "bob-confirm-request-public", "bob-confirm-secret", "bob-confirm-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_confirm_request", "bob-space-key", "bob-confirm-request-public", "bob-confirm-secret", "bob-confirm-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 
 	request, created, err := module.Friends.CreateFriendRequest(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion)
@@ -655,9 +656,9 @@ func TestDeleteFriendRequestClearsUnread(t *testing.T) {
 
 	aliceID := insertSpaceUser(t, module, "alice-delete-request@example.com", "alice-delete-request-public")
 	bobID := insertSpaceUser(t, module, "bob-delete-request@example.com", "bob-delete-request-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-delete-request", "alice-space-key", "alice-delete-request-public", "alice-delete-secret", "alice-delete-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_delete_request", "alice-space-key", "alice-delete-request-public", "alice-delete-secret", "alice-delete-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-delete-request", "bob-space-key", "bob-delete-request-public", "bob-delete-secret", "bob-delete-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_delete_request", "bob-space-key", "bob-delete-request-public", "bob-delete-secret", "bob-delete-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 
 	request, created, err := module.Friends.CreateFriendRequest(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion)
@@ -682,9 +683,9 @@ func TestFriendRequestConversationSupersedesPreviousFriendEvent(t *testing.T) {
 
 	aliceID := insertSpaceUser(t, module, "alice-request-conversation@example.com", "alice-request-conversation-public")
 	bobID := insertSpaceUser(t, module, "bob-request-conversation@example.com", "bob-request-conversation-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-request-conversation", "alice-space-key", "alice-request-conversation-public", "alice-request-secret", "alice-request-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_request_conversation", "alice-space-key", "alice-request-conversation-public", "alice-request-secret", "alice-request-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-request-conversation", "bob-space-key", "bob-request-conversation-public", "bob-request-secret", "bob-request-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_request_conversation", "bob-space-key", "bob-request-conversation-public", "bob-request-secret", "bob-request-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 
 	require.NoError(t, module.Friends.AddFriend(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion))
@@ -737,9 +738,9 @@ func TestSpaceMessageConversationPreviewUsesLatestActivityWithSeparateUnreadStat
 
 	aliceID := insertSpaceUser(t, module, "alice-preview-priority@example.com", "alice-preview-public")
 	bobID := insertSpaceUser(t, module, "bob-preview-priority@example.com", "bob-preview-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-preview-priority", "alice-space-key", "alice-preview-priority-public", "alice-preview-priority-secret", "alice-preview-priority-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_preview_priority", "alice-space-key", "alice-preview-priority-public", "alice-preview-priority-secret", "alice-preview-priority-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-preview-priority", "bob-space-key", "bob-preview-priority-public", "bob-preview-priority-secret", "bob-preview-priority-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_preview_priority", "bob-space-key", "bob-preview-priority-public", "bob-preview-priority-secret", "bob-preview-priority-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	setFriendEventCreatedAt(t, module, 100, "friend_add", bobID, aliceID)
@@ -799,9 +800,9 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 
 	aliceID := insertSpaceUser(t, module, "alice-post-like-unread@example.com", "alice-post-like-unread-public")
 	bobID := insertSpaceUser(t, module, "bob-post-like-unread@example.com", "bob-post-like-unread-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-post-like-unread", "alice-space-key", "alice-post-like-unread-public", "alice-post-like-unread-secret", "alice-post-like-unread-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_post_like_unread", "alice-space-key", "alice-post-like-unread-public", "alice-post-like-unread-secret", "alice-post-like-unread-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-post-like-unread", "bob-space-key", "bob-post-like-unread-public", "bob-post-like-unread-secret", "bob-post-like-unread-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_post_like_unread", "bob-space-key", "bob-post-like-unread-public", "bob-post-like-unread-secret", "bob-post-like-unread-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	setFriendEventCreatedAt(t, module, 100, "friend_add", bobID, aliceID)
@@ -1105,7 +1106,7 @@ func TestPostAssetPositionIsUnique(t *testing.T) {
 	module := newSpaceTestModule(t)
 
 	aliceID := insertSpaceUser(t, module, "alice-assets@example.com", "alice-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-assets", "alice-space-key", "alice-assets-public", "alice-assets-secret", "alice-assets-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_assets", "alice-space-key", "alice-assets-public", "alice-assets-secret", "alice-assets-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	postID, err := module.Posts.CreatePost(ctx, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
@@ -1179,7 +1180,7 @@ func TestUpdateProfileQueuesOldCoverForCleanup(t *testing.T) {
 	module := newSpaceTestModule(t)
 
 	aliceID := insertSpaceUser(t, module, "alice-cover@example.com", "alice-public")
-	space, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-cover", "alice-space-key", "alice-cover-public", "alice-cover-secret", "alice-cover-secret-nonce", "alice-profile")
+	space, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_cover", "alice-space-key", "alice-cover-public", "alice-cover-secret", "alice-cover-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 
 	for _, rec := range []SpaceTempObjectRecord{
@@ -1260,7 +1261,7 @@ func TestAddFriendRejectsSelfFriendship(t *testing.T) {
 	module := newSpaceTestModule(t)
 
 	aliceID := insertSpaceUser(t, module, "alice-self@example.com", "alice-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-self", "alice-space-key", "alice-self-public", "alice-self-secret", "alice-self-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_self", "alice-space-key", "alice-self-public", "alice-self-secret", "alice-self-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 
 	err = module.Friends.AddFriend(ctx, aliceID, aliceSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion)
@@ -1299,9 +1300,9 @@ func TestDeleteFriendshipRemovesReciprocalShares(t *testing.T) {
 
 	aliceID := insertSpaceUser(t, module, "alice-delete-friend@example.com", "alice-public")
 	bobID := insertSpaceUser(t, module, "bob-delete-friend@example.com", "bob-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-delete-friend", "alice-space-key", "alice-delete-friend-public", "alice-delete-friend-secret", "alice-delete-friend-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_delete_friend", "alice-space-key", "alice-delete-friend-public", "alice-delete-friend-secret", "alice-delete-friend-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-delete-friend", "bob-space-key", "bob-delete-friend-public", "bob-delete-friend-secret", "bob-delete-friend-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_delete_friend", "bob-space-key", "bob-delete-friend-public", "bob-delete-friend-secret", "bob-delete-friend-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 
 	err = module.Friends.AddFriend(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion)
@@ -1822,9 +1823,9 @@ func TestSpaceReadMarkersDriveNotificationState(t *testing.T) {
 
 	aliceID := insertSpaceUser(t, module, "alice-unread@example.com", "alice-unread-public")
 	bobID := insertSpaceUser(t, module, "bob-unread@example.com", "bob-unread-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-unread", "alice-space-key", "alice-unread-public", "alice-unread-secret", "alice-unread-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_unread", "alice-space-key", "alice-unread-public", "alice-unread-secret", "alice-unread-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-unread", "bob-space-key", "bob-unread-public", "bob-unread-secret", "bob-unread-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_unread", "bob-space-key", "bob-unread-public", "bob-unread-secret", "bob-unread-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	setFriendEventCreatedAt(t, module, 500, "friend_add", bobID, aliceID)
@@ -1888,11 +1889,11 @@ func TestSpaceNotificationReadMarkersArePerFriend(t *testing.T) {
 	aliceID := insertSpaceUser(t, module, "alice-per-friend-unread@example.com", "alice-per-friend-public")
 	bobID := insertSpaceUser(t, module, "bob-per-friend-unread@example.com", "bob-per-friend-public")
 	charlieID := insertSpaceUser(t, module, "charlie-per-friend-unread@example.com", "charlie-per-friend-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-per-friend-unread", "alice-space-key", "alice-per-friend-unread-public", "alice-per-friend-unread-secret", "alice-per-friend-unread-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_per_friend_unread", "alice-space-key", "alice-per-friend-unread-public", "alice-per-friend-unread-secret", "alice-per-friend-unread-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-per-friend-unread", "bob-space-key", "bob-per-friend-unread-public", "bob-per-friend-unread-secret", "bob-per-friend-unread-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_per_friend_unread", "bob-space-key", "bob-per-friend-unread-public", "bob-per-friend-unread-secret", "bob-per-friend-unread-secret-nonce", "bob-profile")
 	require.NoError(t, err)
-	charlieSpace, err := module.Spaces.CreateSpace(ctx, charlieID, "charlie-per-friend-unread", "charlie-space-key", "charlie-per-friend-unread-public", "charlie-per-friend-unread-secret", "charlie-per-friend-unread-secret-nonce", "charlie-profile")
+	charlieSpace, err := module.Spaces.CreateSpace(ctx, charlieID, "charlie_per_friend_unread", "charlie-space-key", "charlie-per-friend-unread-public", "charlie-per-friend-unread-secret", "charlie-per-friend-unread-secret-nonce", "charlie-profile")
 	require.NoError(t, err)
 	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-bob-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	require.NoError(t, module.Friends.AddFriend(ctx, charlieID, charlieSpace.SpaceID, aliceSpace.SpaceID, "alice-charlie-share-key", aliceSpace.CurrentVersion, "charlie-share-key", charlieSpace.CurrentVersion))
@@ -1987,9 +1988,9 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 
 	aliceID := insertSpaceUser(t, module, "alice-priority-unread@example.com", "alice-priority-unread-public")
 	bobID := insertSpaceUser(t, module, "bob-priority-unread@example.com", "bob-priority-unread-public")
-	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice-priority-unread", "alice-space-key", "alice-priority-unread-public", "alice-priority-unread-secret", "alice-priority-unread-secret-nonce", "alice-profile")
+	aliceSpace, err := module.Spaces.CreateSpace(ctx, aliceID, "alice_priority_unread", "alice-space-key", "alice-priority-unread-public", "alice-priority-unread-secret", "alice-priority-unread-secret-nonce", "alice-profile")
 	require.NoError(t, err)
-	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob-priority-unread", "bob-space-key", "bob-priority-unread-public", "bob-priority-unread-secret", "bob-priority-unread-secret-nonce", "bob-profile")
+	bobSpace, err := module.Spaces.CreateSpace(ctx, bobID, "bob_priority_unread", "bob-space-key", "bob-priority-unread-public", "bob-priority-unread-secret", "bob-priority-unread-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	setFriendEventCreatedAt(t, module, 100, "friend_add", bobID, aliceID)

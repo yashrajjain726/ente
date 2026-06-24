@@ -232,7 +232,6 @@
   "after1Month": "Через 1 місяць",
   "after1Year": "Через 1 рік",
   "manageParticipants": "Керування",
-  "collabLinkSectionDescription": "Створіть посилання, щоб дозволити людям додавати й переглядати фотографії у вашому спільному альбомі без використання застосунку Ente або облікового запису. Чудово підходить для збору фотографій з подій.",
   "collectPhotos": "Зібрати фотографії",
   "collaborativeLink": "Спільне посилання",
   "shareWithNonenteUsers": "Поділитися з користувачами без Ente",
@@ -329,7 +328,6 @@
   "creatingLink": "Створення посилання...",
   "removeWithQuestionMark": "Вилучити?",
   "removeParticipantBody": "{userEmail} буде вилучено з цього спільного альбому\n\nБудь-які додані вами фото, будуть також вилучені з альбому",
-  "keepPhotos": "Залишити фото",
   "deletePhotos": "Видалити фото",
   "inviteToEnte": "Запросити до Ente",
   "removePublicLink": "Вилучити публічне посилання",
@@ -337,6 +335,9 @@
   "sharing": "Відправлення...",
   "youCannotShareWithYourself": "Ви не можете поділитися із собою",
   "archive": "Архів",
+  "@archive": {
+    "description": "Action of 'Archiving' an element"
+  },
   "createAlbumActionHint": "Утримуйте, щоби вибрати фотографії, та натисніть «+», щоб створити альбом",
   "importing": "Імпортування...",
   "failedToLoadAlbums": "Не вдалося завантажити альбоми",
@@ -671,7 +672,6 @@
   "existingUser": "Наявний користувач",
   "newToEnte": "Уперше на Ente",
   "pleaseLoginAgain": "Увійдіть знову",
-  "autoLogoutMessage": "Через технічні збої ви вийшли з системи. Перепрошуємо за незручності.",
   "yourSubscriptionHasExpired": "Термін дії вашої передплати скінчився",
   "storageLimitExceeded": "Перевищено ліміт сховища",
   "upgrade": "Покращити",
@@ -692,11 +692,6 @@
   "collectEventPhotos": "Зібрати фотографії події",
   "sessionExpired": "Час сеансу минув",
   "loggingOut": "Вихід із системи...",
-  "@onDevice": {
-    "description": "The text displayed above folders/albums stored on device",
-    "type": "text"
-  },
-  "onDevice": "На пристрої",
   "@onEnte": {
     "description": "The text displayed above albums backed up to Ente",
     "type": "text"
@@ -737,6 +732,9 @@
   "moveToAlbum": "Перемістити до альбому",
   "unhide": "Показати",
   "unarchive": "Розархівувати",
+  "@unarchive": {
+    "description": "Action of 'Unarchiving' an element"
+  },
   "favorite": "Додати до улюбленого",
   "removeFromFavorite": "Вилучити з улюбленого",
   "shareLink": "Поділитися посиланням",
@@ -791,10 +789,7 @@
   "photosAddedByYouWillBeRemovedFromTheAlbum": "Додані вами фотографії будуть вилучені з альбому",
   "youveNoFilesInThisAlbumThatCanBeDeleted": "У цьому альбомі немає файлів, які можуть бути видалені",
   "youDontHaveAnyArchivedItems": "У вас немає жодних архівних елементів.",
-  "ignoredFolderUploadReason": "Деякі файли в цьому альбомі ігноруються після вивантаження, тому що вони раніше були видалені з Ente.",
   "resetIgnoredFiles": "Скинути ігноровані файли",
-  "deviceFilesAutoUploading": "Файли, додані до цього альбому на пристрої, автоматично завантажаться до Ente.",
-  "turnOnBackupForAutoUpload": "Увімкніть резервну копію для автоматичного завантаження файлів, доданих до теки пристрою в Ente.",
   "noHiddenPhotosOrVideos": "Немає прихованих фотографій чи відео",
   "toHideAPhotoOrVideo": "Щоб приховати фото або відео",
   "openTheItem": "• Відкрити елемент",
@@ -1109,8 +1104,6 @@
   "noPhotosFoundHere": "Тут немає фотографій",
   "zoomOutToSeePhotos": "Збільште, щоб побачити фотографії",
   "noImagesWithLocation": "Немає зображень з розташуванням",
-  "unpinAlbum": "Відкріпити альбом",
-  "pinAlbum": "Закріпити альбом",
   "pin": "Закріпити",
   "pinPerson": "Закріпити особу",
   "pinToTop": "Закріпити вгорі",
@@ -1124,7 +1117,6 @@
   "nothingSharedWithYouYet": "Поки що з вами ніхто не поділився",
   "noAlbumsSharedByYouYet": "Ви ще не поділилися жодним альбомом",
   "sharedWithYou": "Поділилися з вами",
-  "sharedByYou": "Поділилися вами",
   "inviteYourFriendsToEnte": "Запросіть своїх друзів до Ente",
   "failedToDownloadVideo": "Не вдалося завантажити відео",
   "hiding": "Приховуємо...",
