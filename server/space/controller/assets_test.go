@@ -1,13 +1,21 @@
 package controller
 
 import (
+	"net/http"
 	"strconv"
 	"testing"
 
 	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/space/models"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
+
+type testSpaceAssetBuckets map[string]bool
+
+func (b testSpaceAssetBuckets) IsBucketActive(bucketID string) bool {
+	return b[bucketID]
+}
 
 func TestPresignUploadRejectsOversizedPost(t *testing.T) {
 	controller := &AssetsController{}
@@ -88,6 +96,58 @@ func TestNormalizeContentMD5RejectsInvalidValues(t *testing.T) {
 	_, err = normalizeContentMD5("aGVsbG8=")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "contentMD5 must be exactly 16 bytes")
+}
+
+func TestValidateSpaceAssetsBucketID(t *testing.T) {
+	activeBuckets := testSpaceAssetBuckets{"b2-eu-cen": true}
+
+	bucketID, err := validateSpaceAssetsBucketID(" b2-eu-cen ", activeBuckets)
+	require.NoError(t, err)
+	require.Equal(t, "b2-eu-cen", bucketID)
+
+	for _, value := range []string{"", "   "} {
+		bucketID, err = validateSpaceAssetsBucketID(value, activeBuckets)
+		requireSpaceAssetsUnavailable(t, err)
+		require.Empty(t, bucketID)
+	}
+
+	bucketID, err = validateSpaceAssetsBucketID("missing-bucket", activeBuckets)
+	requireSpaceAssetsUnavailable(t, err)
+	require.Empty(t, bucketID)
+
+	bucketID, err = validateSpaceAssetsBucketID("b2-eu-cen", nil)
+	requireSpaceAssetsUnavailable(t, err)
+	require.Empty(t, bucketID)
+}
+
+func TestPresignUploadReturnsUnavailableWhenSpaceAssetBucketMissing(t *testing.T) {
+	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
+	aliceID := insertSpaceControllerUser(t, repos, "alice-asset-config@example.com", "alice-public")
+	space, err := testCreateSpace(ctx, repos, aliceID, "alice-asset-config", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	require.NoError(t, err)
+	viper.Set(spaceAssetsPrimaryBucketConfigKey, "")
+	t.Cleanup(func() {
+		viper.Set(spaceAssetsPrimaryBucketConfigKey, "")
+	})
+	spaceID := space.SpaceID
+
+	resp, err := module.Assets.PresignUpload(newSpaceControllerContext(aliceID), models.PresignUploadRequest{
+		SpaceID:    &spaceID,
+		Size:       1,
+		ContentMD5: "XUFAKrxLKna5cZ2REBfFkg==",
+	})
+
+	require.Nil(t, resp)
+	requireSpaceAssetsUnavailable(t, err)
+}
+
+func requireSpaceAssetsUnavailable(t *testing.T, err error) {
+	t.Helper()
+	var apiErr *ente.ApiError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, ente.ErrorCode("SPACE_ASSETS_UNAVAILABLE"), apiErr.Code)
+	require.Equal(t, http.StatusServiceUnavailable, apiErr.HttpStatusCode)
+	require.Equal(t, "space asset storage is unavailable", apiErr.Message)
 }
 
 func TestRedirectRejectsInvalidProfileAssetObjectID(t *testing.T) {

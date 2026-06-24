@@ -132,6 +132,12 @@ apps:
         # Default is my.ente.com
         cname:
 
+space:
+    assets:
+        # Bucket ID used for Space post, avatar, and cover uploads.
+        # If omitted, Space asset uploads return SPACE_ASSETS_UNAVAILABLE.
+        primaryBucket:
+
 # Database connection parameters
 db:
     host: localhost

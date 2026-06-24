@@ -82,7 +82,10 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 		return nil, ente.NewBadRequestWithMessage("invalid upload purpose")
 	}
 
-	bucketID := c.AssetsRepo.S3Config.GetHotDataCenter()
+	bucketID, err := resolveSpaceAssetsBucketID(c.AssetsRepo.S3Config)
+	if err != nil {
+		return nil, err
+	}
 	bucket := c.AssetsRepo.S3Config.GetBucket(bucketID)
 	s3Client := c.AssetsRepo.S3Config.GetS3Client(bucketID)
 
