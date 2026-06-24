@@ -13,11 +13,11 @@ const SPACE_LINK_ACCESS_KEY_ALPHABET: &[u8] =
 const SPACE_LINK_AUTH_KDF_CONTEXT: &[u8; kdf::CONTEXT_BYTES] = b"spcauth1";
 const SPACE_LINK_WRAP_KDF_CONTEXT: &[u8; kdf::CONTEXT_BYTES] = b"spcview1";
 
-pub fn generate_key() -> Vec<u8> {
+pub(crate) fn generate_key() -> Vec<u8> {
     Key::generate().as_bytes().to_vec()
 }
 
-pub fn generate_keypair() -> Result<(Vec<u8>, Vec<u8>)> {
+pub(crate) fn generate_keypair() -> Result<(Vec<u8>, Vec<u8>)> {
     let private_key = SecretKey::generate();
     let public_key = private_key.public_key();
     Ok((
@@ -26,12 +26,12 @@ pub fn generate_keypair() -> Result<(Vec<u8>, Vec<u8>)> {
     ))
 }
 
-pub fn seal_with_public_key(plaintext: &[u8], public_key: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn seal_with_public_key(plaintext: &[u8], public_key: &[u8]) -> Result<Vec<u8>> {
     let public_key = PublicKey::try_from_slice(public_key)?;
     sealed::seal(plaintext, &public_key).map_err(Into::into)
 }
 
-pub fn open_with_keypair(
+pub(crate) fn open_with_keypair(
     ciphertext: &[u8],
     public_key: &[u8],
     private_key: &[u8],
@@ -41,7 +41,7 @@ pub fn open_with_keypair(
     sealed::open(ciphertext, &public_key, &private_key).map_err(Into::into)
 }
 
-pub fn generate_space_link_access_key() -> Result<String> {
+pub(crate) fn generate_space_link_access_key() -> Result<String> {
     let seed = generate_key();
     let mut input = Vec::with_capacity(seed.len() + 32);
     input.extend_from_slice(b"ente.space.link.access-key.random.v1");
@@ -78,7 +78,7 @@ fn space_link_access_key_from_hash_input(input: &[u8]) -> Result<String> {
     Ok(out)
 }
 
-pub fn space_link_access_key_material(access_key: &str) -> Result<Vec<u8>> {
+pub(crate) fn space_link_access_key_material(access_key: &str) -> Result<Vec<u8>> {
     let trimmed = access_key.trim();
     let is_base62 = trimmed
         .bytes()
@@ -91,37 +91,37 @@ pub fn space_link_access_key_material(access_key: &str) -> Result<Vec<u8>> {
     hash::hash_default(trimmed.as_bytes()).map_err(Into::into)
 }
 
-pub fn content_md5_base64(bytes: &[u8]) -> String {
+pub(crate) fn content_md5_base64(bytes: &[u8]) -> String {
     let digest = Md5::digest(bytes);
     encode_b64(&digest)
 }
 
-pub fn derive_space_link_auth_key(access_key: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn derive_space_link_auth_key(access_key: &[u8]) -> Result<Vec<u8>> {
     let access_key = Key::try_from_slice(access_key)?;
     Ok(kdf::derive_subkey(&access_key, kdf::KEY_BYTES, 1, SPACE_LINK_AUTH_KDF_CONTEXT)?.to_vec())
 }
 
-pub fn derive_space_link_wrap_key(access_key: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn derive_space_link_wrap_key(access_key: &[u8]) -> Result<Vec<u8>> {
     let access_key = Key::try_from_slice(access_key)?;
     Ok(kdf::derive_subkey(&access_key, kdf::KEY_BYTES, 2, SPACE_LINK_WRAP_KDF_CONTEXT)?.to_vec())
 }
 
-pub fn encrypt_secretbox_payload(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn encrypt_secretbox_payload(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
     let key = Key::try_from_slice(key)?;
     Ok(secretbox::encrypt_combined(plaintext, &key))
 }
 
-pub fn decrypt_secretbox_payload(key: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn decrypt_secretbox_payload(key: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let key = Key::try_from_slice(key)?;
     secretbox::decrypt_combined(payload, &key).map_err(Into::into)
 }
 
-pub fn encrypt_asset_payload(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn encrypt_asset_payload(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
     let key = Key::try_from_slice(key)?;
     blob::encrypt_combined(plaintext, &key).map_err(Into::into)
 }
 
-pub fn decrypt_asset_payload(key: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn decrypt_asset_payload(key: &[u8], payload: &[u8]) -> Result<Vec<u8>> {
     let key = Key::try_from_slice(key)?;
     blob::decrypt_combined(payload, &key).map_err(Into::into)
 }
