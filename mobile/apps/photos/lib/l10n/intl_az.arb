@@ -268,7 +268,6 @@
   "after1Month": "1 aydan sonra",
   "after1Year": "1 ildən sonra",
   "manageParticipants": "İdarə et",
-  "collabLinkSectionDescription": "İnsanların Ente tətbiqi və ya hesabı olmadan paylaşılan albomunuza şəkil əlavə etməsinə və baxmasına icazə vermək üçün link yaradın. Tədbir fotolarını toplamaq üçün mükəmməldir.",
   "collectPhotos": "Fotoları topla",
   "collaborativeLink": "Birgə fəaliyyət linki",
   "shareWithNonenteUsers": "Ente istifadəçisi olmayanlarla paylaş",
@@ -389,7 +388,6 @@
   "creatingLink": "Link yaradılır...",
   "removeWithQuestionMark": "Silinsin?",
   "removeParticipantBody": "{userEmail} bu paylaşılan albomdan çıxarılacaq.\n\nOnlar tərəfindən əlavə edilmiş bütün fotoşəkillər də albomdan silinəcək",
-  "keepPhotos": "Fotoşəkilləri saxla",
   "deletePhotos": "Fotoşəkilləri sil",
   "inviteToEnte": "Ente-yə dəvət et",
   "removePublicLink": "İctimai linki sil",
@@ -397,6 +395,9 @@
   "sharing": "Paylaşılır...",
   "youCannotShareWithYourself": "Özünüzlə paylaşa bilməzsiniz",
   "archive": "Arxivlə",
+  "@archive": {
+    "description": "Action of 'Archiving' an element"
+  },
   "createAlbumActionHint": "Fotoşəkilləri seçmək üçün üzərinə uzun basın və albom yaratmaq üçün + düyməsinə klikləyin",
   "importing": "İdxal edilir....",
   "failedToLoadAlbums": "Albomları yükləmək mümkün olmadı",
@@ -640,7 +641,6 @@
   "referrals": "Tövsiyələr",
   "notifications": "Notifications",
   "socialNotifications": "Bəyənmələr və şərhlər",
-  "socialNotificationsExplanation": "Şəkillərinizə gələn bəyənmələr və üzvü olduğunuz albomlardakı şərhlər üçün bildiriş alın",
   "advanced": "Qabaqcıl",
   "general": "Ümumi",
   "security": "Təhlükəsizlik",
@@ -811,7 +811,6 @@
   "shareTheMoment": "Anı paylaşın",
   "letFriendsAndFamilyReact": "Dostlarınızın və ailənizin şəkillərinizə reaksiya verməsinə və şərh yazmasına icazə verin.",
   "pleaseLoginAgain": "Lütfən, yenidən daxil olun",
-  "autoLogoutMessage": "Texniki nasazlıq səbəbindən sistemdən çıxış etdiniz. Narahatlığa görə üzr istəyirik.",
   "yourSubscriptionHasExpired": "Abunəlik müddətiniz başa çatıb",
   "storageLimitExceeded": "Yaddaş limiti keçilib",
   "upgrade": "Yüksəlt",
@@ -833,11 +832,6 @@
   "collectEventPhotos": "Tədbir şəkillərini toplayın",
   "sessionExpired": "Sessiyanın vaxtı bitdi",
   "loggingOut": "Çıxış edilir...",
-  "@onDevice": {
-    "description": "The text displayed above folders/albums stored on device",
-    "type": "text"
-  },
-  "onDevice": "Cihazda",
   "@onEnte": {
     "description": "The text displayed above albums backed up to Ente",
     "type": "text"
@@ -879,6 +873,9 @@
   "moveToAlbum": "Alboma köçür",
   "unhide": "Gizlilikdən çıxar",
   "unarchive": "Unarchive",
+  "@unarchive": {
+    "description": "Action of 'Unarchiving' an element"
+  },
   "favorite": "Seçilmiş",
   "removeFromFavorite": "Seçilmişlərdən sil",
   "shareLink": "Linki paylaş",
@@ -935,10 +932,7 @@
   "photosAddedByYouWillBeRemovedFromTheAlbum": "Sizin tərəfinizdən əlavə edilən şəkillər albomdan silinəcək",
   "youveNoFilesInThisAlbumThatCanBeDeleted": "Bu albomda silinə biləcək faylınız yoxdur",
   "youDontHaveAnyArchivedItems": "Arxivlənmiş elementiniz yoxdur.",
-  "ignoredFolderUploadReason": "Bu albomdakı bəzi fayllar daha əvvəl Ente-dən silindiyi üçün yüklənmədi.",
   "resetIgnoredFiles": "Nəzərə alınmayan faylları sıfırla",
-  "deviceFilesAutoUploading": "Bu cihaz albomuna əlavə edilən fayllar avtomatik olaraq Ente-yə yüklənəcək.",
-  "turnOnBackupForAutoUpload": "Bu cihaz qovluğuna əlavə edilən faylların avtomatik Ente-yə yüklənməsi üçün ehtiyat nüsxələməni aktiv edin.",
   "noHiddenPhotosOrVideos": "Gizli şəkil və ya video yoxdur",
   "toHideAPhotoOrVideo": "Şəkil və ya videonu gizlətmək üçün",
   "openTheItem": "• Elementi açın",
@@ -1172,10 +1166,6 @@
   "@searchResultPerson": {
     "description": "Search result subtitle label for person results"
   },
-  "searchResultShared": "Paylaşılıb",
-  "@searchResultShared": {
-    "description": "Search result subtitle label for shared-with-you results"
-  },
   "searchResultUploadedBy": "Yüklədi",
   "@searchResultUploadedBy": {
     "description": "Search result subtitle label for uploader results"
@@ -1328,8 +1318,6 @@
   "noPhotosFoundHere": "Burada şəkil tapılmadı",
   "zoomOutToSeePhotos": "Şəkilləri görmək üçün miqyası kiçildin",
   "noImagesWithLocation": "Məkanı olan şəkil yoxdur",
-  "unpinAlbum": "Albomu sabitdən çıxar",
-  "pinAlbum": "Albomu sabitlə",
   "pin": "Sabitlə",
   "pinPerson": "Şəxsi sabitlə",
   "pinToTop": "Yuxarı sabitlə",
@@ -1344,7 +1332,6 @@
   "nothingSharedWithYouYet": "Hələlik sizinlə heç nə paylaşılmayıb",
   "noAlbumsSharedByYouYet": "Hələlik tərəfinizdən heç bir albom paylaşılmayıb",
   "sharedWithYou": "Sizinlə paylaşılanlar",
-  "sharedByYou": "Sizin paylaşdıqlarınız",
   "inviteYourFriendsToEnte": "Dostlarınızı Ente-yə dəvət edin",
   "failedToDownloadVideo": "Videonu yükləmək mümkün olmadı",
   "hiding": "Gizlədilir...",
@@ -2015,9 +2002,7 @@
   "newPhotosEmoji": " yeni 📸",
   "sorryWeHadToPauseYourBackups": "Üzr istəyirik, ehtiyat nüsxələməni dayandırmalı olduq",
   "clickToInstallOurBestVersionYet": "İndiyə qədərki ən yaxşı versiyamızı quraşdırmaq üçün klikləyin",
-  "onThisDayNotificationExplanation": "Ötən illərin bu günü ilə bağlı xatirələr haqqında xatırlatmalar alın.",
   "birthdayNotifications": "Ad günü bildirişləri",
-  "receiveRemindersOnBirthdays": "Kiminsə ad günü olduqda xatırlatmalar alın. Bildirişə toxunmaq sizi ad günü olan şəxsin fotolarına aparacaq.",
   "happyBirthday": "Ad günün mübarək! 🥳",
   "birthdays": "Ad günləri",
   "wishThemAHappyBirthday": "{name} şəxsini ad günü münasibətilə təbrik edin! 🎉",

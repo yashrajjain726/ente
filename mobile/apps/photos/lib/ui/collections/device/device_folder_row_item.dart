@@ -7,7 +7,7 @@ import 'package:photos/models/device_collection.dart';
 import "package:photos/service_locator.dart";
 import "package:photos/ui/components/collection_share_badge.dart";
 import 'package:photos/ui/viewer/file/thumbnail_widget.dart';
-import 'package:photos/ui/viewer/gallery/device_folder_page.dart';
+import 'package:photos/ui/viewer/gallery/device/device_folder_page.dart';
 
 class DeviceFolderRowItem extends StatelessWidget {
   final DeviceCollection deviceCollection;
@@ -17,7 +17,7 @@ class DeviceFolderRowItem extends StatelessWidget {
   static const _cornerSmoothing = 0.6;
   static const _overlayPadding = 8.0;
   static const _thumbnailToTextSpacing = 8.0;
-  static const _titleToSubtitleSpacing = 4.0;
+  static const _titleToSubtitleSpacing = 2.0;
 
   const DeviceFolderRowItem(
     this.deviceCollection, {
@@ -97,9 +97,9 @@ class DeviceFolderRowItem extends StatelessWidget {
           SizedBox(
             width: sideOfThumbnail,
             child: Text(
-              AppLocalizations.of(context).itemCount(
-                count: deviceCollection.count,
-              ),
+              AppLocalizations.of(
+                context,
+              ).itemCount(count: deviceCollection.count),
               textAlign: TextAlign.left,
               style: TextStyles.mini.copyWith(color: colors.textLight),
               maxLines: 1,

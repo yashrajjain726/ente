@@ -38,7 +38,6 @@ import {
 import { includes } from "ente-utils/type-guards";
 import { t } from "i18next";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useSettingsSnapshot } from "./utils/use-snapshot";
 
 export type CollectionSelectorAction =
     | "upload"
@@ -141,8 +140,6 @@ export const CollectionSelector: React.FC<CollectionSelectorProps> = ({
 }) => {
     // Make the dialog fullscreen if the screen is <= the dialog's max width.
     const isFullScreen = useMediaQuery("(max-width: 490px)");
-    const { isInternalUser } = useSettingsSnapshot();
-    const canUseSharedAlbumUpload = isInternalUser;
 
     const [searchTerm, setSearchTerm] = useState("");
     const [sortBy, setSortBy] =
@@ -166,14 +163,15 @@ export const CollectionSelector: React.FC<CollectionSelectorProps> = ({
             (cs) => {
                 if (cs.id === attributes.sourceCollectionSummaryID) {
                     return false;
-                } else if (attributes.action == "add") {
+                } else if (
+                    attributes.action == "add" ||
+                    attributes.action == "move"
+                ) {
                     return canAddToCollection(cs) && cs.type != "userFavorites";
                 } else if (attributes.action == "upload") {
-                    const canUploadToCollection = canUseSharedAlbumUpload
-                        ? canAddToCollection(cs)
-                        : canMoveToCollection(cs);
                     return (
-                        (canUploadToCollection || cs.type == "uncategorized") &&
+                        (canAddToCollection(cs) ||
+                            cs.type == "uncategorized") &&
                         cs.type != "userFavorites"
                     );
                 } else if (attributes.action == "restore") {
@@ -183,7 +181,7 @@ export const CollectionSelector: React.FC<CollectionSelectorProps> = ({
                         cs.type != "userFavorites"
                     );
                 } else {
-                    // "move" and "unhide"
+                    // "unhide"
                     return (
                         canMoveToCollection(cs) && cs.type != "userFavorites"
                     );
@@ -206,14 +204,7 @@ export const CollectionSelector: React.FC<CollectionSelectorProps> = ({
         }
 
         setFilteredCollections(collections);
-    }, [
-        collectionSummaries,
-        attributes,
-        open,
-        onClose,
-        sortBy,
-        canUseSharedAlbumUpload,
-    ]);
+    }, [collectionSummaries, attributes, open, onClose, sortBy]);
 
     const searchFilteredCollections = useMemo(() => {
         if (!searchTerm.trim()) {
@@ -381,7 +372,9 @@ const CollectionSummaryButton: React.FC<CollectionSummaryButtonProps> = ({
     onClick,
 }) => {
     const isFavorite = collectionSummary.type === "userFavorites";
-    const isPinned = collectionSummary.attributes.has("pinned");
+    const isPinned =
+        collectionSummary.attributes.has("pinned") ||
+        collectionSummary.attributes.has("shareePinned");
 
     return (
         <ItemCard

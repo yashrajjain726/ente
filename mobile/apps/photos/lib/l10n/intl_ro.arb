@@ -217,7 +217,6 @@
   "after1Month": "După o lună",
   "after1Year": "După un an",
   "manageParticipants": "Gestionare",
-  "collabLinkSectionDescription": "Creați un link pentru a permite oamenilor să adauge și să vizualizeze fotografii în albumul dvs. distribuit, fără a avea nevoie de o aplicație sau un cont Ente. Excelent pentru colectarea fotografiilor de la evenimente.",
   "collectPhotos": "Colectare fotografii",
   "collaborativeLink": "Link colaborativ",
   "shareWithNonenteUsers": "Distribuiți cu utilizatori din afara Ente",
@@ -310,7 +309,6 @@
   "creatingLink": "Se crează linkul...",
   "removeWithQuestionMark": "Eliminați?",
   "removeParticipantBody": "{userEmail} va fi eliminat din acest album distribuit\n\nOrice fotografii adăugate de acesta vor fi, de asemenea, eliminate din album",
-  "keepPhotos": "Păstrați fotografiile",
   "deletePhotos": "Ștergeți fotografiile",
   "inviteToEnte": "Invitați la Ente",
   "removePublicLink": "Eliminați linkul public",
@@ -318,6 +316,9 @@
   "sharing": "Se distribuie...",
   "youCannotShareWithYourself": "Nu poți distribui cu tine însuți",
   "archive": "Arhivă",
+  "@archive": {
+    "description": "Action of 'Archiving' an element"
+  },
   "createAlbumActionHint": "Apăsați lung pentru a selecta fotografii și apăsați pe + pentru a crea un album",
   "importing": "Se importă....",
   "failedToLoadAlbums": "Încărcarea albumelor nu a reușit",
@@ -653,7 +654,6 @@
   "existingUser": "Utilizator existent",
   "newToEnte": "Nou la Ente",
   "pleaseLoginAgain": "Vă rugăm, autentificați-vă din nou",
-  "autoLogoutMessage": "Din cauza unei probleme tehnice, ați fost deconectat. Ne cerem scuze pentru neplăcerile create.",
   "yourSubscriptionHasExpired": "Abonamentul dvs. a expirat",
   "storageLimitExceeded": "Limita de spațiu depășită",
   "upgrade": "Îmbunătățire",
@@ -674,11 +674,6 @@
   "collectEventPhotos": "Strângeți imagini de la evenimente",
   "sessionExpired": "Sesiune expirată",
   "loggingOut": "Se deconectează...",
-  "@onDevice": {
-    "description": "The text displayed above folders/albums stored on device",
-    "type": "text"
-  },
-  "onDevice": "Pe dispozitiv",
   "@onEnte": {
     "description": "The text displayed above albums backed up to Ente",
     "type": "text"
@@ -719,6 +714,9 @@
   "moveToAlbum": "Mutare în album",
   "unhide": "Reafişare",
   "unarchive": "Dezarhivare",
+  "@unarchive": {
+    "description": "Action of 'Unarchiving' an element"
+  },
   "favorite": "Favorit",
   "removeFromFavorite": "Eliminați din favorite",
   "shareLink": "Distribuiți linkul",
@@ -773,10 +771,7 @@
   "photosAddedByYouWillBeRemovedFromTheAlbum": "Fotografiile adăugate de dvs. vor fi eliminate din album",
   "youveNoFilesInThisAlbumThatCanBeDeleted": "Nu aveți fișiere în acest album care pot fi șterse",
   "youDontHaveAnyArchivedItems": "Nu aveți articole arhivate.",
-  "ignoredFolderUploadReason": "Unele fișiere din acest album sunt excluse de la încărcare deoarece au fost șterse anterior din Ente.",
   "resetIgnoredFiles": "Resetare fișiere ignorate",
-  "deviceFilesAutoUploading": "Fișierele adăugate la acest album de pe dispozitiv vor fi încărcate automat pe Ente.",
-  "turnOnBackupForAutoUpload": "Activați copia de rezervă pentru a încărca automat fișierele adăugate la acest dosar de pe dispozitiv în Ente.",
   "noHiddenPhotosOrVideos": "Fără poze sau videoclipuri ascunse",
   "toHideAPhotoOrVideo": "Pentru a ascunde o fotografie sau un videoclip",
   "openTheItem": "• Deschideți articolul",
@@ -1090,14 +1085,11 @@
   "noPhotosFoundHere": "Nu s-au găsit fotografii aici",
   "zoomOutToSeePhotos": "Micșorați pentru a vedea fotografiile",
   "noImagesWithLocation": "Nicio imagine cu locație",
-  "unpinAlbum": "Anulați fixarea albumului",
-  "pinAlbum": "Fixați albumul",
   "create": "Creare",
   "viewAll": "Vizualizați tot",
   "nothingSharedWithYouYet": "Nimic distribuit cu dvs. încă",
   "noAlbumsSharedByYouYet": "Niciun album nu a fost distribuit de dvs. încă",
   "sharedWithYou": "Distribuite cu dvs.",
-  "sharedByYou": "Distribuite de dvs.",
   "inviteYourFriendsToEnte": "Invitați-vă prietenii la Ente",
   "failedToDownloadVideo": "Descărcarea videoclipului nu a reușit",
   "hiding": "Se ascunde...",

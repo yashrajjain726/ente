@@ -16,6 +16,7 @@ import "package:photos/service_locator.dart";
 import "package:photos/services/machine_learning/face_ml/face_filtering/face_filtering_constants.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/search_service.dart";
+import "package:photos/settings/local_settings.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/theme/text_style.dart";
@@ -29,14 +30,10 @@ import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
 import "package:photos/ui/viewer/people/person_face_widget.dart";
 import "package:photos/utils/dialog_util.dart";
-import "package:photos/utils/local_settings.dart";
 import "package:photos/utils/people_sort_util.dart";
 import "package:photos/utils/person_contact_linking_util.dart";
 
-enum PersonSelectionMode {
-  linkContact,
-  autofillContact,
-}
+enum PersonSelectionMode { linkContact, autofillContact }
 
 class LinkContactToPersonSelectionPage extends StatefulWidget {
   final String? emailToLink;
@@ -79,8 +76,10 @@ class _LinkContactToPersonSelectionPageState
 
   Future<List<_PersonSelectionEntry>> _loadPersonEntries() async {
     final persons = await PersonService.instance.getPersons();
-    final results = await SearchService.instance
-        .getAllFace(null, minClusterSize: kMinimumClusterSizeAllFaces);
+    final results = await SearchService.instance.getAllFace(
+      null,
+      minClusterSize: kMinimumClusterSizeAllFaces,
+    );
     final resultsById = <String, GenericSearchResult>{};
     for (final result in results) {
       final personId = result.params[kPersonParamID] as String?;
@@ -105,10 +104,7 @@ class _LinkContactToPersonSelectionPageState
         continue;
       }
       entries.add(
-        _PersonSelectionEntry(
-          personEntity: person,
-          searchResult: searchResult,
-        ),
+        _PersonSelectionEntry(personEntity: person, searchResult: searchResult),
       );
     }
     return entries;
@@ -238,14 +234,16 @@ class _LinkContactToPersonSelectionPageState
         builder: (context, snapshot) {
           final slivers = <Widget>[
             SearchableAppBar(
-              title: Text(
-                context.l10n.selectPersonToLink,
-              ),
+              title: Text(context.l10n.selectPersonToLink),
               onSearch: _updateSearchQuery,
               onSearchClosed: _clearSearchQuery,
               centerTitle: false,
-              searchIconPadding:
-                  const EdgeInsets.fromLTRB(12, 12, horizontalEdgePadding, 12),
+              searchIconPadding: const EdgeInsets.fromLTRB(
+                12,
+                12,
+                horizontalEdgePadding,
+                12,
+              ),
               actions: [
                 Padding(
                   padding: const EdgeInsets.only(right: horizontalEdgePadding),
@@ -260,7 +258,10 @@ class _LinkContactToPersonSelectionPageState
                 child: Center(child: EnteLoadingWidget()),
               ),
             );
-            return CustomScrollView(slivers: slivers);
+            return CustomScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: slivers,
+            );
           } else if (snapshot.hasError) {
             _logger.severe(
               "Failed to load _personEntities",
@@ -272,17 +273,24 @@ class _LinkContactToPersonSelectionPageState
                 child: Center(child: Icon(Icons.error_outline_rounded)),
               ),
             );
-            return CustomScrollView(slivers: slivers);
+            return CustomScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: slivers,
+            );
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
             slivers.add(
               SliverFillRemaining(
                 child: Center(
-                  child:
-                      Text(AppLocalizations.of(context).noResultsFound + '.'),
+                  child: Text(
+                    AppLocalizations.of(context).noResultsFound + '.',
+                  ),
                 ),
               ),
             );
-            return CustomScrollView(slivers: slivers);
+            return CustomScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: slivers,
+            );
           }
 
           final sortedEntries = _sortEntries(snapshot.data!);
@@ -291,17 +299,22 @@ class _LinkContactToPersonSelectionPageState
             slivers.add(
               SliverFillRemaining(
                 child: Center(
-                  child:
-                      Text(AppLocalizations.of(context).noResultsFound + '.'),
+                  child: Text(
+                    AppLocalizations.of(context).noResultsFound + '.',
+                  ),
                 ),
               ),
             );
-            return CustomScrollView(slivers: slivers);
+            return CustomScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: slivers,
+            );
           }
 
           final screenWidth = MediaQuery.of(context).size.width;
           final crossAxisCount = (screenWidth / 100).floor();
-          final itemSize = (screenWidth -
+          final itemSize =
+              (screenWidth -
                   ((horizontalEdgePadding * 2) +
                       ((crossAxisCount - 1) * gridPadding))) /
               crossAxisCount;
@@ -362,7 +375,10 @@ class _LinkContactToPersonSelectionPageState
             ),
           );
 
-          return CustomScrollView(slivers: slivers);
+          return CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            slivers: slivers,
+          );
         },
       ),
     );
@@ -387,10 +403,7 @@ class _LinkContactToPersonSelectionPageState
             context: context,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              side: BorderSide(
-                width: 0.5,
-                color: colorScheme.strokeFaint,
-              ),
+              side: BorderSide(width: 0.5, color: colorScheme.strokeFaint),
               borderRadius: BorderRadius.circular(_sortMenuCornerRadius),
             ),
             position: RelativeRect.fromLTRB(
@@ -464,8 +477,9 @@ class _LinkContactToPersonSelectionPageState
         detail = _isSortAscending(key) ? "A-Z" : "Z-A";
         break;
       case PeopleSortKey.lastUpdated:
-        detail =
-            _isSortAscending(key) ? l10n.sortOldestFirst : l10n.sortNewestFirst;
+        detail = _isSortAscending(key)
+            ? l10n.sortOldestFirst
+            : l10n.sortNewestFirst;
         break;
     }
 
@@ -496,10 +510,7 @@ class _LinkContactToPersonSelectionPageState
         child: Row(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: textTheme.mini,
-            ),
+            Text(label, style: textTheme.mini),
             if (isSelected) ...[
               const SizedBox(width: 8),
               Container(
@@ -511,16 +522,9 @@ class _LinkContactToPersonSelectionPageState
                 ),
               ),
               const SizedBox(width: 6),
-              Text(
-                detail,
-                style: textTheme.miniMuted,
-              ),
+              Text(detail, style: textTheme.miniMuted),
               const SizedBox(width: 4),
-              Icon(
-                directionIcon,
-                size: 16,
-                color: colorScheme.textMuted,
-              ),
+              Icon(directionIcon, size: 16, color: colorScheme.textMuted),
             ],
           ],
         ),
@@ -556,8 +560,10 @@ class _LinkContactToPersonSelectionPageState
           labelText: context.l10n.link,
           isInAlert: true,
           onTap: () async {
-            updatedPerson = await PersonService.instance
-                .updateAttributes(personEntity.remoteID, email: emailToLink);
+            updatedPerson = await PersonService.instance.updateAttributes(
+              personEntity.remoteID,
+              email: emailToLink,
+            );
             Bus.instance.fire(
               PeopleChangedEvent(
                 type: PeopleEventType.saveOrEditPerson,
@@ -577,8 +583,9 @@ class _LinkContactToPersonSelectionPageState
     );
 
     if (result?.exception != null) {
-      Logger("linkPersonToContact")
-          .severe("Failed to link person to contact", result!.exception);
+      Logger(
+        "linkPersonToContact",
+      ).severe("Failed to link person to contact", result!.exception);
       await showGenericErrorDialog(context: context, error: result.exception);
       return null;
     } else {
@@ -599,10 +606,7 @@ class _PersonSelectionEntry {
 
 class ReassignMeSelectionPage extends StatefulWidget {
   final String currentMeId;
-  const ReassignMeSelectionPage({
-    required this.currentMeId,
-    super.key,
-  });
+  const ReassignMeSelectionPage({required this.currentMeId, super.key});
 
   @override
   State<ReassignMeSelectionPage> createState() =>
@@ -640,9 +644,7 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
     const gridPadding = 16.0;
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          context.l10n.selectYourFace,
-        ),
+        title: Text(context.l10n.selectYourFace),
         centerTitle: false,
       ),
       body: FutureBuilder<List<PersonEntity>>(
@@ -666,7 +668,8 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
             final screenWidth = MediaQuery.of(context).size.width;
             final crossAxisCount = (screenWidth / 100).floor();
 
-            final itemSize = (screenWidth -
+            final itemSize =
+                (screenWidth -
                     ((horizontalEdgePadding * 2) +
                         ((crossAxisCount - 1) * gridPadding))) /
                 crossAxisCount;
@@ -701,8 +704,9 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
                       );
                       showToast(
                         context,
-                        context.l10n
-                            .reassignedToName(name: results[index].data.name),
+                        context.l10n.reassignedToName(
+                          name: results[index].data.name,
+                        ),
                       );
                       await Future.delayed(const Duration(milliseconds: 1250));
                       unawaited(dialog.hide());
@@ -732,8 +736,10 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
     try {
       final email = Configuration.instance.getEmail();
 
-      final updatedPerson1 = await PersonService.instance
-          .updateAttributes(currentPersonID, email: '');
+      final updatedPerson1 = await PersonService.instance.updateAttributes(
+        currentPersonID,
+        email: '',
+      );
       Bus.instance.fire(
         PeopleChangedEvent(
           type: PeopleEventType.saveOrEditPerson,
@@ -742,8 +748,10 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
         ),
       );
 
-      final updatedPerson2 = await PersonService.instance
-          .updateAttributes(newPersonID, email: email);
+      final updatedPerson2 = await PersonService.instance.updateAttributes(
+        newPersonID,
+        email: email,
+      );
       Bus.instance.fire(
         PeopleChangedEvent(
           type: PeopleEventType.saveOrEditPerson,

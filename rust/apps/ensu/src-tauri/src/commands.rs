@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Read, Write};
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -14,7 +14,7 @@ use ente_core::{auth as core_auth, crypto as core_crypto};
 use inference_rs as llm;
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime;
-use tauri::{AppHandle, Manager, State, Window};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use uuid::Uuid;
 
 use crate::logging;
@@ -303,7 +303,6 @@ impl From<core_crypto::CryptoError> for ApiError {
             E::StreamTrailingData => "stream_trailing_data",
             E::SealedBoxOpenFailed => "sealed_box_open_failed",
             E::InvalidPublicKey => "invalid_public_key",
-            E::HashFailed => "hash_failed",
             E::Json(_) => "json",
             E::Argon2(_) => "argon2",
             E::Aead => "aead",
@@ -467,23 +466,26 @@ pub struct CryptoBlobDecryptInput {
 
 #[tauri::command]
 pub fn crypto_init() -> Result<(), ApiError> {
-    core_crypto::init().map_err(ApiError::from)
+    // No-op, kept only for frontend compatibility: the pure-Rust crypto
+    // needs no initialization.
+    Ok(())
 }
 
 #[tauri::command]
 pub fn crypto_generate_key() -> String {
-    core_crypto::encode_b64(&core_crypto::keys::generate_key())
+    core_crypto::encode_b64(core_crypto::Key::generate().as_bytes())
 }
 
 #[tauri::command]
 pub fn crypto_encrypt_box(input: CryptoBoxInput) -> Result<EncryptedBox, ApiError> {
     let data = core_crypto::decode_b64(&input.data_b64).map_err(ApiError::from)?;
     let key = core_crypto::decode_b64(&input.key_b64).map_err(ApiError::from)?;
-    let out = core_crypto::secretbox::encrypt_with_key(&data, &key).map_err(ApiError::from)?;
+    let key = core_crypto::Key::try_from_slice(&key).map_err(ApiError::from)?;
+    let out = core_crypto::secretbox::encrypt(&data, &key);
 
     Ok(EncryptedBox {
-        encrypted_data: core_crypto::encode_b64(&out.ciphertext),
-        nonce: core_crypto::encode_b64(&out.nonce),
+        encrypted_data: core_crypto::encode_b64(&out.encrypted_data),
+        nonce: core_crypto::encode_b64(out.nonce.as_bytes()),
     })
 }
 
@@ -492,6 +494,8 @@ pub fn crypto_decrypt_box(input: CryptoBoxDecryptInput) -> Result<String, ApiErr
     let ciphertext = core_crypto::decode_b64(&input.encrypted_data_b64).map_err(ApiError::from)?;
     let nonce = core_crypto::decode_b64(&input.nonce_b64).map_err(ApiError::from)?;
     let key = core_crypto::decode_b64(&input.key_b64).map_err(ApiError::from)?;
+    let nonce = core_crypto::Nonce::try_from_slice(&nonce).map_err(ApiError::from)?;
+    let key = core_crypto::Key::try_from_slice(&key).map_err(ApiError::from)?;
     let plaintext =
         core_crypto::secretbox::decrypt(&ciphertext, &nonce, &key).map_err(ApiError::from)?;
     Ok(core_crypto::encode_b64(&plaintext))
@@ -501,10 +505,11 @@ pub fn crypto_decrypt_box(input: CryptoBoxDecryptInput) -> Result<String, ApiErr
 pub fn crypto_encrypt_blob(input: CryptoBlobInput) -> Result<EncryptedBlob, ApiError> {
     let data = core_crypto::decode_b64(&input.data_b64).map_err(ApiError::from)?;
     let key = core_crypto::decode_b64(&input.key_b64).map_err(ApiError::from)?;
+    let key = core_crypto::Key::try_from_slice(&key).map_err(ApiError::from)?;
     let out = core_crypto::blob::encrypt(&data, &key).map_err(ApiError::from)?;
     Ok(EncryptedBlob {
         encrypted_data: core_crypto::encode_b64(&out.encrypted_data),
-        decryption_header: core_crypto::encode_b64(&out.decryption_header),
+        decryption_header: core_crypto::encode_b64(out.decryption_header.as_bytes()),
     })
 }
 
@@ -513,6 +518,8 @@ pub fn crypto_decrypt_blob(input: CryptoBlobDecryptInput) -> Result<String, ApiE
     let ciphertext = core_crypto::decode_b64(&input.encrypted_data_b64).map_err(ApiError::from)?;
     let header = core_crypto::decode_b64(&input.header_b64).map_err(ApiError::from)?;
     let key = core_crypto::decode_b64(&input.key_b64).map_err(ApiError::from)?;
+    let header = core_crypto::Header::try_from_slice(&header).map_err(ApiError::from)?;
+    let key = core_crypto::Key::try_from_slice(&key).map_err(ApiError::from)?;
     let plaintext =
         core_crypto::blob::decrypt(&ciphertext, &header, &key).map_err(ApiError::from)?;
     Ok(core_crypto::encode_b64(&plaintext))
@@ -539,7 +546,7 @@ pub fn auth_decrypt_secrets(input: DecryptSecretsInput) -> Result<DecryptedSecre
     Ok(DecryptedSecrets {
         master_key: core_crypto::encode_b64(&secrets.master_key),
         secret_key: core_crypto::encode_b64(&secrets.secret_key),
-        token: core_crypto::bin2base64(&secrets.token, true),
+        token: core_crypto::encode_b64_url_safe(&secrets.token),
     })
 }
 
@@ -1515,7 +1522,7 @@ const LLM_EVENT_BATCH_MS: u64 = 80;
 const LLM_EVENT_BATCH_BYTES: usize = 2048;
 
 struct LlmEventSink {
-    window: Window,
+    window: WebviewWindow,
     buffered_text: String,
     buffered_job_id: Option<llm::JobId>,
     buffered_token_id: Option<i32>,
@@ -1523,7 +1530,7 @@ struct LlmEventSink {
 }
 
 impl LlmEventSink {
-    fn new(window: Window) -> Self {
+    fn new(window: WebviewWindow) -> Self {
         Self {
             window,
             buffered_text: String::new(),
@@ -1565,10 +1572,10 @@ impl llm::EventSink for LlmEventSink {
                 text,
                 token_id,
             } => {
-                if let Some(current) = self.buffered_job_id {
-                    if current != job_id {
-                        self.flush_text();
-                    }
+                if let Some(current) = self.buffered_job_id
+                    && current != job_id
+                {
+                    self.flush_text();
                 }
 
                 if self.buffered_text.is_empty() {
@@ -1615,7 +1622,7 @@ pub fn get_ensu_defaults() -> TauriEnsuDefaults {
 
 #[tauri::command]
 pub async fn llm_download_model_files(
-    window: Window,
+    window: WebviewWindow,
     state: State<'_, LlmModelDownloadState>,
     downloads: Vec<TauriLlmModelDownloadTarget>,
 ) -> Result<(), ApiError> {
@@ -1917,7 +1924,7 @@ pub async fn llm_prewarm_multimodal_context(
 #[tauri::command]
 pub fn llm_generate_chat_stream(
     state: State<LlmState>,
-    window: Window,
+    window: WebviewWindow,
     request: llm::GenerateChatRequest,
 ) -> Result<(), ApiError> {
     let context = state
@@ -2080,10 +2087,10 @@ pub fn secure_storage_delete(key: String) -> Result<(), ApiError> {
 }
 
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, ApiError> {
-    let resolver = app.path_resolver();
-    let dir = resolver
+    let dir = app
+        .path()
         .app_data_dir()
-        .ok_or_else(|| ApiError::new("path", "App data directory unavailable"))?;
+        .map_err(|err| ApiError::new("path", err.to_string()))?;
     std::fs::create_dir_all(&dir).map_err(|err| ApiError::new("io", err.to_string()))?;
     Ok(dir)
 }

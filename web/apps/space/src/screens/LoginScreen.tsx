@@ -297,7 +297,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         }
     };
 
-    const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+    const handleSubmit: React.SubmitEventHandler<HTMLFormElement> = (event) => {
         event.preventDefault();
         submitLogin();
     };

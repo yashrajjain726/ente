@@ -96,9 +96,7 @@ import { type FileWithPath } from "react-dropzone";
 const LazyPublicAlbumSingleFileViewer =
     dynamic<PublicAlbumSingleFileViewerProps>(
         () =>
-            import(
-                "@/public-album/viewer/components/PublicAlbumSingleFileViewer"
-            ).then(
+            import("@/public-album/viewer/components/PublicAlbumSingleFileViewer").then(
                 ({ PublicAlbumSingleFileViewer }) =>
                     PublicAlbumSingleFileViewer,
             ),
@@ -138,6 +136,9 @@ const publicAlbumAllFilesCollectionID = 0;
 const isDeviceLimitExceededError = async (e: unknown) =>
     isHTTPErrorWithStatus(e, 429) ||
     (await isMuseumHTTPError(e, 403, "LINK_DEVICE_LIMIT_EXCEEDED"));
+
+const accessTokenFromURL = (url: URL) =>
+    url.searchParams.get("t") || url.pathname.split("/").find(Boolean);
 
 export default function PublicAlbumPage() {
     const { showMiniDialog, onGenericError } = useBaseContext();
@@ -268,6 +269,7 @@ export default function PublicAlbumPage() {
 
         isRedirectingToAlbumsAppRef.current = true;
 
+        albumsURL.pathname = currentURL.pathname;
         albumsURL.search = currentURL.search;
         albumsURL.hash = currentURL.hash;
 
@@ -284,7 +286,7 @@ export default function PublicAlbumPage() {
             let redirectingToWebsite = false;
             try {
                 const currentURL = new URL(window.location.href);
-                const t = currentURL.searchParams.get("t");
+                const accessToken = accessTokenFromURL(currentURL);
                 const [
                     { extractCollectionKeyFromShareURL },
                     {
@@ -298,19 +300,18 @@ export default function PublicAlbumPage() {
                     loadPublicAlbumsFDB(),
                 ]);
                 const ck = await extractCollectionKeyFromShareURL(currentURL);
-                if (!t && !ck) {
+                if (!accessToken && !ck) {
                     // Only redirect to ente.com if this is not a self-hosted instance.
                     if (!isCustomAPIOrigin) {
                         window.location.href = "https://ente.com";
                         redirectingToWebsite = true;
                     }
                 }
-                if (!t || !ck) {
+                if (!accessToken || !ck) {
                     return;
                 }
                 collectionKey.current = ck;
                 const collection = await savedPublicCollectionByKey(ck);
-                const accessToken = t;
                 const currentAPIOrigin = await apiOrigin();
                 let accessTokenJWT: string | undefined;
                 const linkDeviceToken =
@@ -544,9 +545,7 @@ export default function PublicAlbumPage() {
                 { verifyPublicAlbumPassword },
                 { savePublicCollectionAccessTokenJWT },
             ] = await Promise.all([
-                import(
-                    "@/public-album/access/services/verify-public-album-password"
-                ),
+                import("@/public-album/access/services/verify-public-album-password"),
                 loadPublicAlbumsFDB(),
             ]);
             const accessTokenJWT = await verifyPublicAlbumPassword(
@@ -586,9 +585,8 @@ export default function PublicAlbumPage() {
 
     const downloadFilesHelper = async () => {
         try {
-            const { downloadAndSaveFiles } = await import(
-                "@/public-album/download/services/save"
-            );
+            const { downloadAndSaveFiles } =
+                await import("@/public-album/download/services/save");
             const selectedFiles = getSelectedFiles(selected, publicFiles!);
             const singleFile =
                 selectedFiles.length === 1 ? selectedFiles[0] : undefined;
@@ -776,7 +774,7 @@ export default function PublicAlbumPage() {
                                 flex: "0 0 60px",
                                 px: "24px",
                                 "@media (width < 720px)": {
-                                    px: "4px",
+                                    px: "12px",
                                     ...(showMobileMasonryCover
                                         ? { borderBottom: "none" }
                                         : {}),
@@ -1459,7 +1457,7 @@ const PublicAlbumCoverHero: React.FC<PublicAlbumCoverHeroProps> = ({
                 return false;
             };
 
-            let didSetThumbnail = false;
+            let didSetThumbnail: boolean;
             try {
                 const cachedURL = await thumbnailManager.renderableThumbnailURL(
                     coverFile,

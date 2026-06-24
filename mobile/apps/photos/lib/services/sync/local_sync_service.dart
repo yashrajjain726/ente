@@ -64,15 +64,19 @@ class LocalSyncService {
       if (_permissionGrantedSubscription != null) {
         await _permissionGrantedSubscription!.cancel();
       }
-      _permissionGrantedSubscription =
-          Bus.instance.on<PermissionGrantedEvent>().listen((event) async {
-        _registerChangeCallback();
-        if (isLocalGalleryMode) {
-          // Local gallery onboarding grants permission without explicitly
-          // invoking SyncService, so trigger local import right away.
-          unawaited(checkAndSync());
-        }
-      });
+      _permissionGrantedSubscription = Bus.instance
+          .on<PermissionGrantedEvent>()
+          .listen((event) async {
+            if (!permissionService.hasGrantedPermissions()) {
+              return;
+            }
+            _registerChangeCallback();
+            if (isLocalGalleryMode) {
+              // Local gallery onboarding grants permission without explicitly
+              // invoking SyncService, so trigger local import right away.
+              unawaited(checkAndSync());
+            }
+          });
     }
   }
 
@@ -82,8 +86,8 @@ class LocalSyncService {
       return;
     }
     if (Platform.isAndroid && AppLifecycleService.instance.isForeground) {
-      final permissionState =
-          await permissionService.requestPhotoMangerPermissions();
+      final permissionState = await permissionService
+          .requestPhotoMangerPermissions();
       if (permissionState != PermissionState.authorized) {
         _logger.warning(
           "Skipping local sync because Android gallery permission is "
@@ -92,6 +96,7 @@ class LocalSyncService {
         return;
       }
     }
+    _registerChangeCallback();
     if (_existingSync != null) {
       _logger.warning("Sync already in progress, skipping.");
       return _existingSync!.future;
@@ -197,8 +202,8 @@ class LocalSyncService {
     );
     final int ownerID = Configuration.instance.getUserIDV2();
     final existingLocalFileIDs = await _db.getExistingLocalFileIDs(ownerID);
-    final Map<String, Set<String>> pathToLocalIDs =
-        await _db.getDevicePathIDToLocalIDMap();
+    final Map<String, Set<String>> pathToLocalIDs = await _db
+        .getDevicePathIDToLocalIDMap();
 
     final localDiffResult = await getDiffFromExistingImport(
       localAssets,
@@ -245,16 +250,16 @@ class LocalSyncService {
     if (flagService.syncRecoveryDiagnostics) {
       final int newMappingCount =
           localDiffResult.newPathToLocalIDs?.values.fold<int>(
-                0,
-                (sum, ids) => sum + ids.length,
-              ) ??
-              0;
+            0,
+            (sum, ids) => sum + ids.length,
+          ) ??
+          0;
       final int deletedMappingCount =
           localDiffResult.deletePathToLocalIDs?.values.fold<int>(
-                0,
-                (sum, ids) => sum + ids.length,
-              ) ??
-              0;
+            0,
+            (sum, ids) => sum + ids.length,
+          ) ??
+          0;
       if (newMappingCount > 0 || deletedMappingCount > 0 || hasUnsyncedFiles) {
         final sampleRecovered = (localDiffResult.uniqueLocalFiles ?? [])
             .take(3)
@@ -288,11 +293,14 @@ class LocalSyncService {
       // but the file might be available later
       return;
     }
+    final reason = error.reason == InvalidReason.photosResourceUnavailable
+        ? (error.message?.toString() ?? error.reason.name)
+        : error.reason.name;
     final ignored = IgnoredFile(
       file.localID,
       file.title,
       file.deviceFolder,
-      error.reason.name,
+      reason,
     );
     await IgnoredFilesService.instance.cacheAndInsert([ignored]);
   }
@@ -368,8 +376,10 @@ class LocalSyncService {
       _logger.info('Inserted ${files.length} out of ${allFiles.length} files');
       if (flagService.syncRecoveryDiagnostics &&
           allFiles.length != files.length) {
-        final sampleLocalIDs =
-            allFiles.take(3).map((file) => file.localID).toList();
+        final sampleLocalIDs = allFiles
+            .take(3)
+            .map((file) => file.localID)
+            .toList();
         _logger.info(
           "localSync partial materialization: "
           "from=$fromTime to=$toTime "

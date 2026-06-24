@@ -63,11 +63,11 @@ const Page: React.FC = () => {
     );
     const showProfileLoading = Boolean(
         selectedFriendSpaceId &&
-            (isProfileLoading || loadedProfileSpaceId != selectedFriendSpaceId),
+        (isProfileLoading || loadedProfileSpaceId != selectedFriendSpaceId),
     );
     const showPostsLoading = Boolean(
         selectedFriendSpaceId &&
-            (isPostsLoading || !hasLoadedPostsForSelectedFriend),
+        (isPostsLoading || !hasLoadedPostsForSelectedFriend),
     );
     const currentSelectedProfile =
         selectedProfile?.spaceId == selectedFriendSpaceId

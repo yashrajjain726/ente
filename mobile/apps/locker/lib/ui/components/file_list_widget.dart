@@ -40,7 +40,8 @@ class FileListWidget extends StatelessWidget {
         : null;
 
     final int? currentUserID = Configuration.instance.getUserID();
-    final bool isOwner = collection != null &&
+    final bool isOwner =
+        collection != null &&
         currentUserID != null &&
         collection.isOwner(currentUserID);
     final List<User> sharees =
@@ -151,10 +152,7 @@ class FileListWidget extends StatelessWidget {
                     layoutBuilder: (currentChild, previousChildren) {
                       return Stack(
                         alignment: Alignment.centerRight,
-                        children: [
-                          ...previousChildren,
-                          if (currentChild != null) currentChild,
-                        ],
+                        children: [...previousChildren, ?currentChild],
                       );
                     },
                     child: _buildTrailingIndicator(

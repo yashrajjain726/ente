@@ -1708,9 +1708,8 @@ export const CommentsSidebar: React.FC<CommentsSidebarProps> = ({
                                                           )
                                                         : undefined;
                                                 if (
-                                                    storedIdentity &&
                                                     replyingTo.anonUserID ===
-                                                        storedIdentity.anonUserID
+                                                    storedIdentity?.anonUserID
                                                 ) {
                                                     return t("yourself");
                                                 }

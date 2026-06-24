@@ -130,6 +130,7 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceID, aliceSpace.SpaceID, true))
+	setMessageLikeCreatedAt(t, module, 1500, message.MessageID, aliceSpace.SpaceID)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, timeutil.Microseconds()))
 
 	require.NoError(t, module.ResetUserAccess(ctx, aliceID))
@@ -244,6 +245,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 
 	err = module.Friends.AddFriend(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion)
 	require.NoError(t, err)
+	setFriendEventCreatedAt(t, module, 500, "friend_add", bobID, aliceID)
 
 	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
@@ -262,6 +264,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	require.False(t, message.ViewerLiked)
 
 	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceID, aliceSpace.SpaceID, true))
+	setMessageLikeCreatedAt(t, module, 1500, message.MessageID, aliceSpace.SpaceID)
 	likedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, aliceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), likedMessage.Likes)
@@ -1908,7 +1911,7 @@ func TestSpaceNotificationReadMarkersArePerFriend(t *testing.T) {
 	require.Equal(t, int64(1002), bobLatestActivityAt)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, bobLatestActivityAt))
 	bobConversation = conversationBySpaceID(bobSpace.SpaceID)
-	require.True(t, bobConversation.Unread)
+	require.False(t, bobConversation.Unread)
 	require.Equal(t, int64(0), bobConversation.UnreadCount)
 	charlieConversation = conversationBySpaceID(charlieSpace.SpaceID)
 	require.True(t, charlieConversation.Unread)

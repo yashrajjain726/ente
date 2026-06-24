@@ -12,12 +12,13 @@ import 'package:hugeicons/hugeicons.dart';
 /// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=4809-7992&m=dev
 /// Section: Bottom sheet / Bottom Sheet Header
 /// Specs: H2 title, optional 36px circular close action, and optional centered
-/// illustration slot for warning and error sheets.
+/// illustration for warning and error sheets.
 class _BottomSheetHeaderComponent extends StatelessWidget {
   const _BottomSheetHeaderComponent({
     this.title,
     this.illustration,
     this.onClose,
+    this.closeResult,
     this.showCloseButton = true,
     this.closeTooltip = 'Close',
     this.textAlign,
@@ -31,6 +32,7 @@ class _BottomSheetHeaderComponent extends StatelessWidget {
   ///
   /// Barrier taps, drag dismissals, and system back dismissals do not call this.
   final FutureOr<void> Function()? onClose;
+  final Object? closeResult;
   final bool showCloseButton;
   final String closeTooltip;
   final TextAlign? textAlign;
@@ -43,6 +45,7 @@ class _BottomSheetHeaderComponent extends StatelessWidget {
         title: title,
         illustration: illustration,
         onClose: onClose,
+        closeResult: closeResult,
         showCloseButton: showCloseButton,
         closeTooltip: closeTooltip,
       );
@@ -53,7 +56,11 @@ class _BottomSheetHeaderComponent extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           if (showCloseButton)
-            _BottomSheetCloseButton(onClose: onClose, tooltip: closeTooltip),
+            _BottomSheetCloseButton(
+              onClose: onClose,
+              closeResult: closeResult,
+              tooltip: closeTooltip,
+            ),
         ],
       );
     }
@@ -75,7 +82,11 @@ class _BottomSheetHeaderComponent extends StatelessWidget {
           ),
           if (showCloseButton) const SizedBox(width: Spacing.md),
           if (showCloseButton)
-            _BottomSheetCloseButton(onClose: onClose, tooltip: closeTooltip),
+            _BottomSheetCloseButton(
+              onClose: onClose,
+              closeResult: closeResult,
+              tooltip: closeTooltip,
+            ),
         ],
       ),
     );
@@ -96,13 +107,14 @@ class BottomSheetComponent extends StatelessWidget {
     this.content,
     this.actions = const [],
     this.onClose,
+    this.closeResult,
     this.showCloseButton = true,
     this.closeTooltip = 'Close',
     this.textAlign,
     this.crossAxisAlignment = CrossAxisAlignment.start,
     this.padding = const EdgeInsets.all(Spacing.xl),
     this.contentSpacing = Spacing.lg,
-    this.actionsTopSpacing = Spacing.lg,
+    this.actionsTopSpacing,
     this.backgroundColor,
     this.isKeyboardAware = false,
   });
@@ -118,13 +130,14 @@ class BottomSheetComponent extends StatelessWidget {
   ///
   /// Barrier taps, drag dismissals, and system back dismissals do not call this.
   final FutureOr<void> Function()? onClose;
+  final Object? closeResult;
   final bool showCloseButton;
   final String closeTooltip;
   final TextAlign? textAlign;
   final CrossAxisAlignment crossAxisAlignment;
   final EdgeInsets padding;
   final double contentSpacing;
-  final double actionsTopSpacing;
+  final double? actionsTopSpacing;
   final Color? backgroundColor;
   final bool isKeyboardAware;
 
@@ -143,6 +156,7 @@ class BottomSheetComponent extends StatelessWidget {
                 title: title,
                 illustration: illustration,
                 onClose: onClose,
+                closeResult: closeResult,
                 showCloseButton: showCloseButton,
                 closeTooltip: closeTooltip,
                 textAlign: textAlign,
@@ -162,14 +176,17 @@ class BottomSheetComponent extends StatelessWidget {
         ? CrossAxisAlignment.stretch
         : crossAxisAlignment;
     final effectiveContentSpacing = usesCenteredLayout
-        ? Spacing.xs
+        ? Spacing.lg
         : contentSpacing;
+    final effectiveActionsTopSpacing =
+        actionsTopSpacing ?? (usesCenteredLayout ? Spacing.xxl : Spacing.lg);
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: backgroundColor ?? colors.backgroundBase,
           borderRadius: const BorderRadius.only(
@@ -185,14 +202,14 @@ class BottomSheetComponent extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: effectiveCrossAxisAlignment,
               children: [
-                if (effectiveHeader != null) effectiveHeader,
+                ?effectiveHeader,
                 if (effectiveContent != null) ...[
                   if (effectiveHeader != null)
                     SizedBox(height: effectiveContentSpacing),
                   effectiveContent,
                 ],
                 if (actions.isNotEmpty) ...[
-                  SizedBox(height: actionsTopSpacing),
+                  SizedBox(height: effectiveActionsTopSpacing),
                   _BottomSheetActions(actions: actions),
                 ],
               ],
@@ -234,6 +251,7 @@ class _CenteredHeader extends StatelessWidget {
     required this.title,
     required this.illustration,
     required this.onClose,
+    required this.closeResult,
     required this.showCloseButton,
     required this.closeTooltip,
   });
@@ -241,6 +259,7 @@ class _CenteredHeader extends StatelessWidget {
   final String? title;
   final Widget? illustration;
   final FutureOr<void> Function()? onClose;
+  final Object? closeResult;
   final bool showCloseButton;
   final String closeTooltip;
 
@@ -255,12 +274,17 @@ class _CenteredHeader extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             if (showCloseButton)
-              _BottomSheetCloseButton(onClose: onClose, tooltip: closeTooltip),
+              _BottomSheetCloseButton(
+                onClose: onClose,
+                closeResult: closeResult,
+                tooltip: closeTooltip,
+              ),
           ],
         ),
         if (showCloseButton && (illustration != null || title != null))
           const SizedBox(height: Spacing.xs),
-        if (illustration != null) Center(child: illustration!),
+        if (illustration != null)
+          _BottomSheetIllustration(child: illustration!),
         if (title != null) ...[
           SizedBox(height: illustration == null ? 0 : Spacing.lg),
           Text(
@@ -276,11 +300,36 @@ class _CenteredHeader extends StatelessWidget {
   }
 }
 
+class _BottomSheetIllustration extends StatelessWidget {
+  const _BottomSheetIllustration({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: _illustrationSlotBottomInset),
+        child: FittedBox(
+          alignment: Alignment.bottomCenter,
+          fit: BoxFit.scaleDown,
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
 class _BottomSheetCloseButton extends StatelessWidget {
-  const _BottomSheetCloseButton({required this.onClose, required this.tooltip});
+  const _BottomSheetCloseButton({
+    required this.onClose,
+    required this.closeResult,
+    required this.tooltip,
+  });
 
   /// Called when the close button is pressed, before the sheet is dismissed.
   final FutureOr<void> Function()? onClose;
+  final Object? closeResult;
   final String tooltip;
 
   @override
@@ -305,7 +354,7 @@ class _BottomSheetCloseButton extends StatelessWidget {
 
     final route = ModalRoute.of(context);
     if (route == null || route.isCurrent) {
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(closeResult);
     }
   }
 }
@@ -331,3 +380,4 @@ class _BottomSheetActions extends StatelessWidget {
 }
 
 const double _headerHeight = 38;
+const double _illustrationSlotBottomInset = 11;

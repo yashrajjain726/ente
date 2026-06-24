@@ -1,6 +1,5 @@
 [package]
 name = "ente-core"
-version = "0.0.1"
 edition = "2024"
 
 [dependencies]
@@ -40,39 +39,21 @@ getrandom = { version = "0.2", features = ["js"] }
 base64 = "0.22"
 hex = "0.4"
 bip39 = { version = "2", default-features = false, features = ["std"] }
-zeroize = { version = "1.8", features = ["derive"] }
+zeroize = { version = "1.8.2", features = ["derive"] }
 
 [dev-dependencies]
-chacha20 = "0.9.1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 mockito = "1.6"
 
-# Keep SRP deps available for unit tests (the SRP module is compiled under cfg(test))
-srp = { git = "https://github.com/RustCrypto/PAKEs", package = "srp", rev = "5b3bd1f3a9d51121a698ffe5d6ecc33cafcd6413", default-features = false }
-sha2 = "0.11"
-getrandom = "0.2"
-
 [features]
-default = ["blob-require-final-tag"]
+default = []
 
 # Enable SRP (Secure Remote Password) client for password-based authentication.
 #
 # Without this feature, you can still derive KEK/login keys and decrypt secrets,
 # but cannot perform the SRP handshake (i.e. create/use `auth::SrpSession`).
 #
-# Example:
-# ente-core = { version = "0.0.1", features = ["srp"] }
 srp = ["dep:srp", "dep:sha2"]
-
-# Enforce TAG_FINAL on blob decrypt (reject non-final chunks).
-blob-require-final-tag = []
-
-# No features needed - pure Rust is always enabled
 
 [lints.rust]
 missing_docs = "warn"
-
-[lints.clippy]
-# Require tests for public functions (enforced via CI/review)
-# missing_panics_doc = "warn"
-# missing_errors_doc = "warn"

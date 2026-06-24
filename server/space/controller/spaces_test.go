@@ -112,7 +112,7 @@ func TestUpdateProfileRejectsStaleKeyVersion(t *testing.T) {
 	resp, err := module.Spaces.UpdateProfile(ginCtx, models.UpdateSpaceProfileRequest{
 		SpaceID:          space.SpaceID,
 		KeyVersion:       space.CurrentVersion + 1,
-		EncryptedProfile: "alice-profile-v2",
+		EncryptedProfile: "YWxpY2UtcHJvZmlsZS12Mg==",
 	})
 
 	require.Nil(t, resp)

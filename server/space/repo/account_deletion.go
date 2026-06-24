@@ -152,19 +152,30 @@ func queueProfileObjectsTx(ctx context.Context, tx *sql.Tx, userID int64) error 
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	defer rows.Close()
 
+	records := make([]SpaceTempObjectRecord, 0)
 	for rows.Next() {
 		var rec SpaceTempObjectRecord
 		if err := rows.Scan(&rec.ObjectKey, &rec.BucketID, &rec.ExpectedSize, &rec.Purpose); err != nil {
+			_ = rows.Close()
 			return stacktrace.Propagate(err, "")
 		}
 		rec.OwnerID = userID
+		records = append(records, rec)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return stacktrace.Propagate(err, "")
+	}
+	if err := rows.Close(); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	for _, rec := range records {
 		if err := QueueObjectCleanupTx(ctx, tx, rec); err != nil {
 			return err
 		}
 	}
-	return stacktrace.Propagate(rows.Err(), "")
+	return nil
 }
 
 func queuePostObjectsTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs []string) error {
@@ -177,21 +188,32 @@ func queuePostObjectsTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs 
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	defer rows.Close()
 
+	records := make([]SpaceTempObjectRecord, 0)
 	for rows.Next() {
 		rec := SpaceTempObjectRecord{
 			OwnerID: userID,
 			Purpose: TempObjectPurposePost,
 		}
 		if err := rows.Scan(&rec.ObjectKey, &rec.BucketID, &rec.ExpectedSize); err != nil {
+			_ = rows.Close()
 			return stacktrace.Propagate(err, "")
 		}
+		records = append(records, rec)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return stacktrace.Propagate(err, "")
+	}
+	if err := rows.Close(); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	for _, rec := range records {
 		if err := QueueObjectCleanupTx(ctx, tx, rec); err != nil {
 			return err
 		}
 	}
-	return stacktrace.Propagate(rows.Err(), "")
+	return nil
 }
 
 func deleteSpaceRowsTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs []string) error {

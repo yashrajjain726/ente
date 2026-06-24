@@ -60,23 +60,14 @@ class UserService {
   late ValueNotifier<String?> emailValueNotifier;
   late BaseConfiguration _config;
   late BaseHomePage _homePage;
-  late String _clientPackageName;
-  late String _passkeyRedirectUrl;
 
   UserService._privateConstructor();
 
   static final UserService instance = UserService._privateConstructor();
 
-  Future<void> init(
-    BaseConfiguration config,
-    BaseHomePage homePage, {
-    required String clientPackageName,
-    required String passkeyRedirectUrl,
-  }) async {
+  Future<void> init(BaseConfiguration config, BaseHomePage homePage) async {
     _config = config;
     _homePage = homePage;
-    _clientPackageName = clientPackageName;
-    _passkeyRedirectUrl = passkeyRedirectUrl;
     emailValueNotifier = ValueNotifier<String?>(config.getEmail());
     _preferences = await SharedPreferences.getInstance();
   }
@@ -205,9 +196,7 @@ class UserService {
     try {
       final response = await _enteDio.get(
         "/users/details/v2",
-        queryParameters: {
-          "memoryCount": memoryCount,
-        },
+        queryParameters: {"memoryCount": memoryCount},
       );
       final userDetails = UserDetails.fromMap(response.data);
       if (shouldCache) {
@@ -259,9 +248,7 @@ class UserService {
     try {
       await _enteDio.delete(
         "/users/session",
-        queryParameters: {
-          "token": token,
-        },
+        queryParameters: {"token": token},
       );
     } on DioException catch (e) {
       _logger.info(e);
@@ -289,7 +276,7 @@ class UserService {
     } catch (e) {
       final bool shouldLogoutLocally =
           (e is DioException && e.response?.statusCode == 401) ||
-              !_config.isEnteProduction();
+          !_config.isEnteProduction();
 
       if (shouldLogoutLocally) {
         if (!_config.isEnteProduction()) {
@@ -330,7 +317,6 @@ class UserService {
       final response = await _enteDio.get("/users/delete-challenge");
       if (response.statusCode == 200) {
         return DeleteChallengeResponse(
-          allowDelete: response.data["allowDelete"] as bool,
           encryptedChallenge: response.data["encryptedChallenge"],
         );
       } else {
@@ -338,10 +324,7 @@ class UserService {
       }
     } catch (e) {
       _logger.severe(e);
-      await showGenericErrorDialog(
-        context: context,
-        error: e,
-      );
+      await showGenericErrorDialog(context: context, error: e);
       return null;
     }
   }
@@ -353,9 +336,7 @@ class UserService {
     try {
       final response = await _enteDio.delete(
         "/users/delete",
-        data: {
-          "challenge": challengeResponse,
-        },
+        data: {"challenge": challengeResponse},
       );
       if (response.statusCode == 200) {
         // clear data
@@ -373,9 +354,7 @@ class UserService {
     try {
       final response = await _dio.get(
         "${_config.getHttpEndpoint()}/users/two-factor/passkeys/get-token",
-        queryParameters: {
-          "sessionID": sessionID,
-        },
+        queryParameters: {"sessionID": sessionID},
       );
       return response.data;
     } on DioException catch (e) {
@@ -395,8 +374,10 @@ class UserService {
   }
 
   Future<void> onPassKeyVerified(BuildContext context, Map response) async {
-    final ProgressDialog dialog =
-        createProgressDialog(context, context.strings.pleaseWait);
+    final ProgressDialog dialog = createProgressDialog(
+      context,
+      context.strings.pleaseWait,
+    );
     await dialog.show();
     try {
       final userPassword = _config.getVolatilePassword();
@@ -415,10 +396,7 @@ class UserService {
         navigator.pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (BuildContext _) {
-              return PasswordReentryPage(
-                _config,
-                _homePage,
-              );
+              return PasswordReentryPage(_config, _homePage);
             },
           ),
           (route) => false,
@@ -466,12 +444,10 @@ class UserService {
   }) async {
     final dialog = createProgressDialog(context, context.strings.pleaseWait);
     await dialog.show();
-    final verifyData = {
-      "email": _config.getEmail(),
-      "ott": ott,
-    };
+    final verifyData = {"email": _config.getEmail(), "ott": ott};
     if (!_config.isLoggedIn()) {
-      verifyData["source"] = 'auth:${_getRefSource()}';
+      verifyData["source"] =
+          '${_config.appIdentity.referralSourcePrefix}:${_getRefSource()}';
     }
     try {
       final response = await _dio.post(
@@ -495,8 +471,8 @@ class UserService {
             passkeySessionID,
             totp2FASessionID: twoFASessionID,
             accountsUrl: accountsUrl,
-            redirectUrl: _passkeyRedirectUrl,
-            clientPackage: _clientPackageName,
+            redirectUrl: _config.appIdentity.passkeyRedirectUrl,
+            clientPackage: _config.appIdentity.clientPackageName,
           );
         } else if (twoFASessionID.isNotEmpty) {
           page = TwoFactorAuthenticationPage(twoFASessionID);
@@ -504,22 +480,12 @@ class UserService {
           await _saveConfiguration(response);
           if (_config.getEncryptedToken() != null) {
             if (isResettingPasswordScreen) {
-              page = RecoveryPage(
-                _config,
-                _homePage,
-              );
+              page = RecoveryPage(_config, _homePage);
             } else {
-              page = PasswordReentryPage(
-                _config,
-                _homePage,
-              );
+              page = PasswordReentryPage(_config, _homePage);
             }
           } else {
-            page = PasswordEntryPage(
-              _config,
-              PasswordEntryMode.set,
-              _homePage,
-            );
+            page = PasswordEntryPage(_config, PasswordEntryMode.set, _homePage);
           }
         }
         // ignore: unawaited_futures
@@ -583,10 +549,7 @@ class UserService {
     try {
       final response = await _enteDio.post(
         "/users/change-email",
-        data: {
-          "email": email,
-          "ott": ott,
-        },
+        data: {"email": email, "ott": ott},
       );
       await dialog.hide();
       if (response.statusCode == 200) {
@@ -636,9 +599,7 @@ class UserService {
       await registerOrUpdateSrp(result.loginKey);
       await _enteDio.put(
         "/users/attributes",
-        data: {
-          "keyAttributes": result.keyAttributes.toMap(),
-        },
+        data: {"keyAttributes": result.keyAttributes.toMap()},
       );
       await _config.setKey(result.privateKeyAttributes.key);
       await _config.setSecretKey(result.privateKeyAttributes.secretKey);
@@ -653,9 +614,7 @@ class UserService {
     try {
       final response = await _dio.get(
         "${_config.getHttpEndpoint()}/users/srp/attributes",
-        queryParameters: {
-          "email": email,
-        },
+        queryParameters: {"email": email},
       );
       if (response.statusCode == 200) {
         return SrpAttributes.fromMap(response.data);
@@ -708,10 +667,12 @@ class UserService {
         data: request.toMap(),
       );
       if (response.statusCode == 200) {
-        final SetupSRPResponse setupSRPResponse =
-            SetupSRPResponse.fromJson(response.data);
-        final serverB =
-            SRP6Util.decodeBigInt(base64Decode(setupSRPResponse.srpB));
+        final SetupSRPResponse setupSRPResponse = SetupSRPResponse.fromJson(
+          response.data,
+        );
+        final serverB = SRP6Util.decodeBigInt(
+          base64Decode(setupSRPResponse.srpB),
+        );
         // ignore: unused_local_variable
         final clientS = client.calculateSecret(serverB);
         final clientM = client.calculateClientEvidenceMessage();
@@ -826,8 +787,8 @@ class UserService {
           passkeySessionID,
           totp2FASessionID: twoFASessionID,
           accountsUrl: accountsUrl,
-          redirectUrl: _passkeyRedirectUrl,
-          clientPackage: _clientPackageName,
+          redirectUrl: _config.appIdentity.passkeyRedirectUrl,
+          clientPackage: _config.appIdentity.clientPackageName,
         );
       } else if (twoFASessionID.isNotEmpty) {
         page = TwoFactorAuthenticationPage(twoFASessionID);
@@ -917,10 +878,7 @@ class UserService {
     try {
       final response = await _dio.post(
         "${_config.getHttpEndpoint()}/users/two-factor/verify",
-        data: {
-          "sessionID": sessionID,
-          "code": code,
-        },
+        data: {"sessionID": sessionID, "code": code},
       );
       await dialog.hide();
       if (response.statusCode == 200) {
@@ -930,10 +888,7 @@ class UserService {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (BuildContext context) {
-              return PasswordReentryPage(
-                _config,
-                _homePage,
-              );
+              return PasswordReentryPage(_config, _homePage);
             },
           ),
           (route) => route.isFirst,
@@ -1102,10 +1057,7 @@ class UserService {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (BuildContext context) {
-              return PasswordReentryPage(
-                _config,
-                _homePage,
-              );
+              return PasswordReentryPage(_config, _homePage);
             },
           ),
           (route) => route.isFirst,
@@ -1174,12 +1126,7 @@ class UserService {
 
   Future<void> updateEmailMFA(bool isEnabled) async {
     try {
-      await _enteDio.put(
-        "/users/email-mfa",
-        data: {
-          "isEnabled": isEnabled,
-        },
-      );
+      await _enteDio.put("/users/email-mfa", data: {"isEnabled": isEnabled});
       await _preferences.setBool(kIsEmailMFAEnabled, isEnabled);
     } catch (e) {
       _logger.severe("Failed to update email mfa", e);

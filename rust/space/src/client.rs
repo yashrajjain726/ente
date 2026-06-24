@@ -7,7 +7,8 @@ use crate::crypto::{
     PACKED_SECRETBOX_OVERHEAD_BYTES, content_md5_base64, decode_b64, decrypt_secretbox_packed,
     decrypt_secretbox_split, derive_space_link_auth_key, derive_space_link_wrap_key, encode_b64,
     encrypt_asset_payload, encrypt_secretbox_packed, encrypt_secretbox_split, generate_key,
-    generate_space_link_access_key, pack_payload, space_link_access_key_material, unpack_payload,
+    generate_keypair, generate_space_link_access_key, open_with_keypair, pack_payload,
+    seal_with_public_key, space_link_access_key_material, unpack_payload,
 };
 use crate::error::{Result, SpaceError};
 use crate::http::{HttpClient, HttpConfig};
@@ -31,7 +32,6 @@ use crate::transport::{
     UpdatePostCaptionRequest, UpdateSpaceProfileRequest, UpdateSpaceProfileResponse,
     UpdateSpaceSlugRequest,
 };
-use ente_core::crypto::{keys, sealed};
 use ente_core::http::Error as HttpError;
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
 const UPLOAD_PURPOSE_COVER: &str = "cover";
@@ -252,7 +252,8 @@ impl AccountSpaceCtx {
         if ciphertext.is_empty() {
             return Err(SpaceError::MissingEncryptedSpaceKey);
         }
-        let space_key = sealed::open(&ciphertext, &identity.public_key, &identity.private_key)?;
+        let space_key =
+            open_with_keypair(&ciphertext, &identity.public_key, &identity.private_key)?;
         Ok(DecryptedFriendShare {
             friend: share.friend.clone(),
             space_id: share.space_id.clone(),
@@ -307,7 +308,7 @@ impl AccountSpaceCtx {
         let root_space_key = self.get_or_create_root_space_key().await?;
         let encrypted_space_key =
             encode_b64(&encrypt_secretbox_packed(&root_space_key, space_key)?);
-        let (public_key, private_key) = keys::generate_keypair()?;
+        let (public_key, private_key) = generate_keypair()?;
         let (encrypted_secret_key, secret_key_decryption_nonce) =
             encrypt_secretbox_split(&root_space_key, &private_key)?;
         let encrypted_profile = encode_b64(&encrypt_secretbox_packed(space_key, profile)?);
@@ -1204,7 +1205,8 @@ impl AccountSpaceCtx {
         let identity = self.default_space_identity().await?;
         let packed_key = decode_b64(&message.encrypted_message_key)?;
         let (sealed_key, _) = unpack_payload(&packed_key)?;
-        let message_key = sealed::open(&sealed_key, &identity.public_key, &identity.private_key)?;
+        let message_key =
+            open_with_keypair(&sealed_key, &identity.public_key, &identity.private_key)?;
         let packed_message = decode_b64(&message.message_cipher)?;
         let plaintext = decrypt_secretbox_packed(&message_key, &packed_message)?;
         let payload: MessagePayload = serde_json::from_slice(&plaintext)
@@ -1262,8 +1264,8 @@ impl AccountSpaceCtx {
         let plaintext = serde_json::to_vec(payload)
             .map_err(|err| SpaceError::InvalidInput(format!("invalid message payload: {err}")))?;
         validate_message_payload(payload, plaintext.len())?;
-        let sender_key = sealed::seal(&message_key, &identity.public_key)?;
-        let recipient_key = sealed::seal(&message_key, &recipient_public_key)?;
+        let sender_key = seal_with_public_key(&message_key, &identity.public_key)?;
+        let recipient_key = seal_with_public_key(&message_key, &recipient_public_key)?;
         Ok(CreateMessageRequest {
             message_id: None,
             message_cipher: encode_b64(&encrypt_secretbox_packed(&message_key, &plaintext)?),
@@ -1289,7 +1291,7 @@ impl AccountSpaceCtx {
             ));
         }
         let (requester_space, requester_space_key) = self.default_profile_space_access().await?;
-        let requester_share = sealed::seal(&requester_space_key, target_public_key)?;
+        let requester_share = seal_with_public_key(&requester_space_key, target_public_key)?;
         let payload = AddFriendPayload {
             target_space_id: Some(target_space_id.to_owned()),
             target_username: None,
@@ -1343,7 +1345,7 @@ impl AccountSpaceCtx {
         }
         let requester_public_key = decode_b64(&request.requester.public_key)?;
         let (target_space, target_space_key) = self.default_profile_space_access().await?;
-        let target_share = sealed::seal(&target_space_key, &requester_public_key)?;
+        let target_share = seal_with_public_key(&target_space_key, &requester_public_key)?;
         let payload = ConfirmFriendRequestPayload {
             target_encrypted_space_key: encode_b64(&pack_payload(&target_share, &[])),
             target_key_version: target_space.key_version,
@@ -1424,7 +1426,7 @@ impl AccountSpaceCtx {
                 continue;
             }
             let public_key = decode_b64(&friend.friend.public_key)?;
-            let sealed_share = sealed::seal(&access.space_key, &public_key)?;
+            let sealed_share = seal_with_public_key(&access.space_key, &public_key)?;
             updates.push(ShareUpdatePayload {
                 friend_id: friend.friend.user_id,
                 friend_space_id: friend.friend.space_id,
@@ -2171,7 +2173,6 @@ fn build_space_key_history_map(
 mod tests {
     use super::*;
 
-    use ente_core::crypto::{keys, sealed};
     use mockito::{Matcher, Server};
     use serde_json::json;
 
@@ -2183,7 +2184,7 @@ mod tests {
     }
 
     fn test_account_ctx_with_root_key(base_url: &str, space_root_key: Vec<u8>) -> AccountSpaceCtx {
-        let (public_key, private_key) = keys::generate_keypair().expect("valid keypair");
+        let (public_key, private_key) = generate_keypair().expect("valid keypair");
         let ctx = AccountSpaceCtx::open(OpenAccountSpaceCtxInput {
             base_url: base_url.to_owned(),
             space_session_token: Some("space-session-token".to_owned()),
@@ -2581,8 +2582,8 @@ mod tests {
         let encrypted_profile = encode_b64(
             &encrypt_secretbox_packed(&friend_space_key, b"friend-profile").expect("profile wrap"),
         );
-        let sealed_share =
-            sealed::seal(&friend_space_key, &test_public_key(&ctx)).expect("friend share seal");
+        let sealed_share = seal_with_public_key(&friend_space_key, &test_public_key(&ctx))
+            .expect("friend share seal");
         let encrypted_space_key = encode_b64(&pack_payload(&sealed_share, &[]));
 
         let spaces = server
@@ -3335,7 +3336,7 @@ mod tests {
         let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let requester_space_key = generate_key();
         let target_space_key = generate_key();
-        let (target_public_key, _) = keys::generate_keypair().expect("valid target keypair");
+        let (target_public_key, _) = generate_keypair().expect("valid target keypair");
 
         let spaces = server
             .mock("GET", "/space")
@@ -3525,7 +3526,7 @@ mod tests {
         let root_space_key = generate_key();
         let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let space_key = generate_key();
-        let (friend_public_key, _) = keys::generate_keypair().expect("valid friend keypair");
+        let (friend_public_key, _) = generate_keypair().expect("valid friend keypair");
 
         let spaces = server
             .mock("GET", "/space")
@@ -3832,7 +3833,7 @@ mod tests {
         let root_space_key = generate_key();
         let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let space_key = generate_key();
-        let (friend_public_key, _) = keys::generate_keypair().expect("valid friend keypair");
+        let (friend_public_key, _) = generate_keypair().expect("valid friend keypair");
 
         let spaces = server
             .mock("GET", "/space")
@@ -4274,8 +4275,8 @@ mod tests {
         let ctx = test_account_ctx_with_root_key(&server.url(), root_space_key.clone());
         let owned_space_key = generate_key();
         let shared_space_key = generate_key();
-        let sealed_share =
-            sealed::seal(&shared_space_key, &test_public_key(&ctx)).expect("sealed space share");
+        let sealed_share = seal_with_public_key(&shared_space_key, &test_public_key(&ctx))
+            .expect("sealed space share");
 
         let owned = server
             .mock("GET", "/space")

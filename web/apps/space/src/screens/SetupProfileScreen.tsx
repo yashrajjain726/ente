@@ -345,7 +345,7 @@ export const SetupProfileScreen: React.FC<SetupProfileScreenProps> = ({
         }
     };
 
-    const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+    const handleSubmit: React.SubmitEventHandler<HTMLFormElement> = (event) => {
         event.preventDefault();
         submitProfile();
     };

@@ -55,7 +55,7 @@ void main() {
     expect(find.text('Secondary'), findsOneWidget);
   });
 
-  testWidgets('BottomSheetComponent centers illustration message', (
+  testWidgets('BottomSheetComponent respects explicit action spacing', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -63,20 +63,22 @@ void main() {
         const BottomSheetComponent(
           title: 'Title',
           message: 'Centered message',
-          illustration: SizedBox(
-            key: ValueKey('warning-illustration'),
-            width: 80,
-            height: 80,
-          ),
+          actionsTopSpacing: 7,
+          actions: [
+            ButtonComponent(key: ValueKey('action-button'), label: 'Action'),
+          ],
         ),
       ),
     );
 
-    expect(find.byKey(const ValueKey('warning-illustration')), findsOneWidget);
-    expect(find.text('Centered message'), findsOneWidget);
+    final messageBottom = tester
+        .getBottomLeft(find.text('Centered message'))
+        .dy;
+    final actionTop = tester
+        .getTopLeft(find.byKey(const ValueKey('action-button')))
+        .dy;
 
-    final message = tester.widget<Text>(find.text('Centered message'));
-    expect(message.textAlign, TextAlign.center);
+    expect(actionTop - messageBottom, 7);
   });
 
   testWidgets('BottomSheetComponent dismisses from close button by default', (
@@ -101,6 +103,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Default close'), findsNothing);
+  });
+
+  testWidgets('BottomSheetComponent returns closeResult from close button', (
+    tester,
+  ) async {
+    String? result;
+
+    await _pumpLauncher(tester, (context) async {
+      result = await showBottomSheetComponent<String>(
+        context: context,
+        builder: (_) => const BottomSheetComponent(
+          title: 'Close result',
+          content: Text('Sheet body'),
+          closeResult: 'cancelled',
+        ),
+      );
+    });
+
+    await _openLauncher(tester);
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+
+    expect(result, 'cancelled');
+    expect(find.text('Close result'), findsNothing);
   });
 
   testWidgets(
@@ -200,12 +226,7 @@ void main() {
         context: context,
         message: 'Something went wrong.',
         onClose: () => closeCount += 1,
-        actions: const [
-          ButtonComponent(
-            label: 'Contact support',
-            variant: ButtonComponentVariant.secondary,
-          ),
-        ],
+        actionLabel: 'Contact support',
       ),
       label: 'Show error',
     );

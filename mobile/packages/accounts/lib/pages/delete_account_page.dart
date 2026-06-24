@@ -5,10 +5,7 @@ import 'package:ente_configuration/base_configuration.dart';
 import 'package:ente_crypto_api/ente_crypto_api.dart';
 import 'package:ente_lock_screen/local_authentication_service.dart';
 import 'package:ente_strings/ente_strings.dart';
-import 'package:ente_ui/components/base_bottom_sheet.dart';
-import 'package:ente_ui/components/buttons/button_widget.dart';
 import 'package:ente_ui/components/buttons/gradient_button.dart';
-import 'package:ente_ui/components/buttons/models/button_type.dart';
 import 'package:ente_ui/components/dialogs.dart';
 import 'package:ente_ui/theme/ente_theme.dart';
 import 'package:ente_ui/utils/toast_util.dart';
@@ -18,10 +15,7 @@ import 'package:flutter/material.dart';
 class DeleteAccountPage extends StatelessWidget {
   final BaseConfiguration config;
 
-  const DeleteAccountPage(
-    this.config, {
-    super.key,
-  });
+  const DeleteAccountPage(this.config, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -43,22 +37,15 @@ class DeleteAccountPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Image.asset(
-                'assets/broken_heart.png',
-                width: 200,
-              ),
-              const SizedBox(
-                height: 24,
-              ),
+              Image.asset('assets/broken_heart.png', width: 200),
+              const SizedBox(height: 24),
               Center(
                 child: Text(
                   context.strings.deleteAccountQuery,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-              const SizedBox(
-                height: 12,
-              ),
+              const SizedBox(height: 12),
               RichText(
                 // textAlign: TextAlign.center,
                 text: TextSpan(
@@ -68,16 +55,12 @@ class DeleteAccountPage extends StatelessWidget {
                       text: "feedback@ente.com",
                       style: TextStyle(color: Color.fromRGBO(29, 185, 84, 1)),
                     ),
-                    TextSpan(
-                      text: ", maybe there is a way we can help.",
-                    ),
+                    TextSpan(text: ", maybe there is a way we can help."),
                   ],
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-              const SizedBox(
-                height: 24,
-              ),
+              const SizedBox(height: 24),
               GradientButton(
                 text: context.strings.yesSendFeedbackAction,
                 onTap: () async {
@@ -88,9 +71,7 @@ class DeleteAccountPage extends StatelessWidget {
                   );
                 },
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-              ),
+              const Padding(padding: EdgeInsets.symmetric(vertical: 8)),
               InkWell(
                 child: SizedBox(
                   width: double.infinity,
@@ -99,9 +80,7 @@ class DeleteAccountPage extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      side: const BorderSide(
-                        color: Colors.redAccent,
-                      ),
+                      side: const BorderSide(color: Colors.redAccent),
                       padding: const EdgeInsets.symmetric(
                         vertical: 18,
                         horizontal: 10,
@@ -129,9 +108,9 @@ class DeleteAccountPage extends StatelessWidget {
                 child: Text(
                   context.strings.deleteAccountWarning,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.redAccent,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.w800,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -143,27 +122,23 @@ class DeleteAccountPage extends StatelessWidget {
   }
 
   Future<void> _initiateDelete(BuildContext context) async {
-    final deleteChallengeResponse =
-        await UserService.instance.getDeleteChallenge(context);
+    final deleteChallengeResponse = await UserService.instance
+        .getDeleteChallenge(context);
     if (deleteChallengeResponse == null) {
       return;
     }
-    if (deleteChallengeResponse.allowDelete) {
-      await _confirmAndDelete(context, deleteChallengeResponse);
-    } else {
-      await _requestEmailForDeletion(context);
-    }
+    await _confirmAndDelete(context, deleteChallengeResponse);
   }
 
   Future<void> _confirmAndDelete(
     BuildContext context,
     DeleteChallengeResponse response,
   ) async {
-    final hasAuthenticated =
-        await LocalAuthenticationService.instance.requestLocalAuthentication(
-      context,
-      context.strings.initiateAccountDeleteTitle,
-    );
+    final hasAuthenticated = await LocalAuthenticationService.instance
+        .requestLocalAuthentication(
+          context,
+          context.strings.initiateAccountDeleteTitle,
+        );
 
     if (hasAuthenticated) {
       final choice = await showChoiceDialogOld(
@@ -180,9 +155,7 @@ class DeleteAccountPage extends StatelessWidget {
       }
       final decryptChallenge = CryptoUtil.openSealSync(
         CryptoUtil.base642bin(response.encryptedChallenge),
-        CryptoUtil.base642bin(
-          config.getKeyAttributes()!.publicKey,
-        ),
+        CryptoUtil.base642bin(config.getKeyAttributes()!.publicKey),
         config.getSecretKey()!,
       );
       final challengeResponseStr = utf8.decode(decryptChallenge);
@@ -193,62 +166,5 @@ class DeleteAccountPage extends StatelessWidget {
       showShortToast(context, context.strings.yourAccountHasBeenDeleted);
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
-  }
-
-  Future<void> _requestEmailForDeletion(BuildContext context) async {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
-
-    await showBaseBottomSheet(
-      context,
-      title: context.strings.deleteAccount,
-      headerSpacing: 20,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              children: [
-                const TextSpan(
-                  text: "Please send an email to ",
-                ),
-                TextSpan(
-                  text: "account-deletion@ente.com",
-                  style: TextStyle(
-                    color: Colors.orange[300],
-                  ),
-                ),
-                const TextSpan(
-                  text:
-                      " from your registered email address.\n\nYour request will be processed within 72 hours.",
-                ),
-              ],
-              style: textTheme.body.copyWith(
-                color: colorScheme.textBase,
-                height: 1.5,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ButtonWidget(
-              buttonType: ButtonType.critical,
-              labelText: context.strings.sendEmail,
-              onTap: () async {
-                Navigator.of(context).pop();
-                await sendEmail(
-                  context,
-                  to: 'account-deletion@ente.com',
-                  subject: '[Delete account]',
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

@@ -96,7 +96,7 @@ const parseSpaceProfilePayload = (profile: string): SpaceProfilePayload => {
     if (!parsed || typeof parsed != "object" || Array.isArray(parsed)) {
         throw new Error("Space profile payload must be a JSON object.");
     }
-    return parsed as SpaceProfilePayload;
+    return parsed;
 };
 
 const textField = (value: unknown) =>
@@ -112,12 +112,16 @@ const spaceHTTPStatus = (error: unknown) => {
 
 const defaultOwnedSpace = (spaces: OwnedSpace[]) => spaces[0];
 
+const blobPartForBytes = (bytes: Uint8Array): ArrayBuffer => {
+    const copy = new Uint8Array(bytes.byteLength);
+    copy.set(bytes);
+    return copy.buffer;
+};
+
 const currentSpaceContextConfig = async () => {
     await restoreSpaceBrowserSessionIfNeeded();
-    const [baseUrl, spaceRootKeyB64] = await Promise.all([
-        apiOrigin(),
-        spaceRootKeyFromSpaceSession(),
-    ]);
+    const baseUrl = await apiOrigin();
+    const spaceRootKeyB64 = spaceRootKeyFromSpaceSession();
     const user = savedPartialLocalUser();
     const spaceSessionToken = savedSpaceSessionToken();
 
@@ -216,7 +220,7 @@ const avatarURLForRemoteAvatar = async (
 ) => {
     if (!avatar?.objectKey) return null;
     const bytes = await ctx.download_space_avatar(spaceId, avatar.objectKey);
-    return URL.createObjectURL(new Blob([bytes]));
+    return URL.createObjectURL(new Blob([blobPartForBytes(bytes)]));
 };
 
 const coverURLForRemoteCover = async (
@@ -226,7 +230,7 @@ const coverURLForRemoteCover = async (
 ) => {
     if (!cover?.objectKey) return null;
     const bytes = await ctx.download_space_cover(spaceId, cover.objectKey);
-    return URL.createObjectURL(new Blob([bytes]));
+    return URL.createObjectURL(new Blob([blobPartForBytes(bytes)]));
 };
 
 const profileFromDecryptedSpaceProfile = (
@@ -407,7 +411,9 @@ export const saveSpaceProfile = async (
         };
     } catch (error) {
         if (spaceHTTPStatus(error) == 409) {
-            throw new Error("This username is already taken.");
+            throw new Error("This username is already taken.", {
+                cause: error,
+            });
         }
         throw error;
     } finally {

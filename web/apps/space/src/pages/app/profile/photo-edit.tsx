@@ -82,7 +82,9 @@ const Page: React.FC = () => {
                         setPendingProfileAvatarFile(null);
                     } catch (error) {
                         console.error("Space avatar update failed", error);
-                        throw new Error(spaceProfileErrorMessage(error));
+                        throw new Error(spaceProfileErrorMessage(error), {
+                            cause: error,
+                        });
                     }
                 }}
             />

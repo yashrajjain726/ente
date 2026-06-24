@@ -1,6 +1,5 @@
-# melos_managed_dependency_overrides: ente_cast,ente_crypto,ente_feature_flag,onnx_dart,ffi,flutter_sodium,intl,js,media_kit,media_kit_libs_ios_video,media_kit_libs_video,media_kit_video,protobuf,video_player_avfoundation,watcher,win32,log_viewer,native_video_editor,ente_qr_ui,ente_icons,ente_rust,ente_pure_utils,backup_exclusion,ente_contacts,ente_qr
+# melos_managed_dependency_overrides: ente_cast,ente_crypto,ente_feature_flag,onnx_dart,ffi,flutter_sodium,intl,js,video_player_avfoundation,watcher,win32,log_viewer,native_video_editor,ente_qr_ui,ente_icons,ente_rust,ente_pure_utils,backup_exclusion,ente_contacts,ente_qr,ente_accounts,ente_base,ente_configuration,ente_crypto_api,ente_events,ente_lock_screen,ente_logging,ente_network,ente_screen_cover,ente_strings,ente_ui,ente_utils,local_auth_linux
 dependency_overrides:
-  cronet_http: 1.6.0
   ente_cast:
     path: plugins/ente_cast
   ente_crypto:
@@ -16,38 +15,17 @@ dependency_overrides:
       ref: a05d5b1bfdce64a387f8f5970160b22ce7b88282
   intl: 0.20.2
   js: 0.6.7
-  media_kit:
-    git:
-      url: https://github.com/media-kit/media-kit
-      path: media_kit
-      ref: c9617f570b8c0ba02857e721997f78c053a856c1
-  media_kit_libs_ios_video:
-    git:
-      url: https://github.com/media-kit/media-kit
-      path: libs/ios/media_kit_libs_ios_video
-      ref: c9617f570b8c0ba02857e721997f78c053a856c1
-  media_kit_libs_video:
-    git:
-      url: https://github.com/media-kit/media-kit
-      path: libs/universal/media_kit_libs_video
-      ref: c9617f570b8c0ba02857e721997f78c053a856c1
-  media_kit_video:
-    git:
-      url: https://github.com/media-kit/media-kit
-      path: media_kit_video
-      ref: c9617f570b8c0ba02857e721997f78c053a856c1
   motion_sensors:
     git:
       url: https://github.com/deckerst/aves_panorama_motion_sensors.git
       ref: 4b11d59f4bda152627f701070272f657f8358e67
-  protobuf: 3.1.0
   video_player_avfoundation:
     git:
       url: https://github.com/ente-io/packages.git
       path: packages/video_player/video_player_avfoundation
       ref: e6f7518a2ea4b31cf44e7bd6f44b35b1d66b2085
   watcher: 1.1.2
-  win32: 5.10.1
+  win32: 5.15.0
   log_viewer:
     path: ../../packages/log_viewer
   native_video_editor:
@@ -65,6 +43,32 @@ dependency_overrides:
   ente_contacts:
     path: ../../packages/contacts
   ente_qr:
-    path: plugins/ente_qr
+    path: ../../packages/ente_qr
   ente_components:
     path: ../../packages/ente_components
+  ente_accounts:
+    path: ../../packages/accounts
+  ente_base:
+    path: ../../packages/base
+  ente_configuration:
+    path: ../../packages/configuration
+  ente_crypto_api:
+    path: ../../packages/ente_crypto_api
+  ente_events:
+    path: ../../packages/events
+  ente_lock_screen:
+    path: ../../packages/lock_screen
+  ente_logging:
+    path: ../../packages/logging
+  ente_network:
+    path: ../../packages/network
+  ente_screen_cover:
+    path: ../../packages/screen_cover
+  ente_strings:
+    path: ../../packages/strings
+  ente_ui:
+    path: ../../packages/ui
+  ente_utils:
+    path: ../../packages/utils
+  local_auth_linux:
+    path: ../../packages/local_auth_linux

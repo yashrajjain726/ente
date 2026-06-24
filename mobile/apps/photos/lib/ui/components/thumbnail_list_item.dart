@@ -66,16 +66,13 @@ class _ThumbnailListItemState extends State<ThumbnailListItem> {
         borderRadius: BorderRadius.all(Radius.circular(widget.borderRadius)),
         border: Border.all(
           color: widget.isSelected
-              ? widget.selectedBorderColor ?? colors.primaryStroke
+              ? widget.selectedBorderColor ?? colors.strokeDark
               : widget.borderColor ?? _backgroundColor(colors),
         ),
       ),
       child: Row(
         children: [
-          SizedBox.square(
-            dimension: widget.leadingSize,
-            child: widget.leading,
-          ),
+          SizedBox.square(dimension: widget.leadingSize, child: widget.leading),
           SizedBox(width: widget.contentSpacing),
           Expanded(
             child: Column(
@@ -85,7 +82,7 @@ class _ThumbnailListItemState extends State<ThumbnailListItem> {
               children: [
                 widget.title,
                 if (widget.subtitle != null) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   widget.subtitle!,
                 ],
               ],

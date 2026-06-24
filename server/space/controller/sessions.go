@@ -27,10 +27,7 @@ type CreatedBrowserSession struct {
 }
 
 func (c *SessionsController) CreateBrowserSession(ctx *gin.Context, userID int64, clientKey string) (*CreatedBrowserSession, error) {
-	sessionToken, err := auth.GenerateURLSafeRandomString(32)
-	if err != nil {
-		return nil, err
-	}
+	sessionToken := auth.GenerateURLSafeRandomString(32)
 	clientKey = strings.TrimSpace(clientKey)
 	if clientKey == "" {
 		return nil, ente.NewBadRequestWithMessage("clientKey is required")

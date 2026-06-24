@@ -17,17 +17,13 @@ import 'package:locker/services/files/sync/models/file.dart';
 import 'package:locker/services/trash/models/trash_file.dart';
 import 'package:locker/services/trash/trash_service.dart';
 import "package:locker/ui/components/delete_confirmation_sheet.dart";
-import "package:locker/ui/components/empty_state_widget.dart";
 import 'package:locker/ui/components/item_list_view.dart';
 import "package:locker/ui/viewer/actions/file_selection_overlay_bar.dart";
 
 class TrashPage extends StatefulWidget {
   final List<TrashFile> trashFiles;
 
-  const TrashPage({
-    super.key,
-    required this.trashFiles,
-  });
+  const TrashPage({super.key, required this.trashFiles});
 
   @override
   State<TrashPage> createState() => _TrashPageState();
@@ -64,6 +60,11 @@ class _TrashPageState extends State<TrashPage> {
   }
 
   Future<void> _emptyTrash() async {
+    if (_trashFiles.isEmpty) {
+      showToast(context, context.l10n.trashIsEmpty);
+      return;
+    }
+
     final result = await showDeleteConfirmationSheet(
       context,
       title: context.l10n.emptyTrash,
@@ -78,6 +79,11 @@ class _TrashPageState extends State<TrashPage> {
   }
 
   Future<void> _performEmptyTrash() async {
+    if (_trashFiles.isEmpty) {
+      showToast(context, context.l10n.trashIsEmpty);
+      return;
+    }
+
     final dialog = createProgressDialog(
       context,
       context.l10n.clearingTrash,
@@ -86,22 +92,18 @@ class _TrashPageState extends State<TrashPage> {
     await dialog.show();
     try {
       await TrashService.instance.emptyTrash();
+      await dialog.hide();
       _selectedFiles.clearAll();
       setState(() {
         _trashFiles.clear();
       });
-      showToast(
-        context,
-        context.l10n.trashClearedSuccessfully,
-      );
+      showToast(context, context.l10n.trashClearedSuccessfully);
       Navigator.of(context).pop();
     } catch (error) {
-      await showGenericErrorBottomSheet(
-        context: context,
-        error: error,
-      );
-    } finally {
       await dialog.hide();
+      if (mounted) {
+        await showGenericErrorBottomSheet(context: context, error: error);
+      }
     }
   }
 
@@ -146,38 +148,34 @@ class _TrashPageState extends State<TrashPage> {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TitleBarTitleWidget(
             title: context.l10n.trash,
             trailingWidgets: [
-              GestureDetector(
-                onTap: _emptyTrash,
-                child: Container(
-                  height: 44,
-                  width: 44,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: colorScheme.backdropBase,
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: HugeIcon(
-                    icon: HugeIcons.strokeRoundedDelete02,
-                    color: colorScheme.textBase,
+              if (_trashFiles.isNotEmpty)
+                GestureDetector(
+                  onTap: _emptyTrash,
+                  child: Container(
+                    height: 44,
+                    width: 44,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: colorScheme.backdropBase,
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: HugeIcon(
+                      icon: HugeIcons.strokeRoundedDelete02,
+                      color: colorScheme.textBase,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 24),
           Expanded(
             child: _trashFiles.isEmpty
-                ? Center(
-                    child: EmptyStateWidget(
-                      assetPath: 'assets/empty_state.png',
-                      title: context.l10n.yourTrashIsEmpty,
-                      showBorder: false,
-                    ),
-                  )
+                ? _TrashEmptyState(title: context.l10n.yourTrashIsEmpty)
                 : ItemListView(
                     files: _trashFiles.cast<EnteFile>(),
                     physics: const BouncingScrollPhysics(),
@@ -187,6 +185,36 @@ class _TrashPageState extends State<TrashPage> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TrashEmptyState extends StatelessWidget {
+  const _TrashEmptyState({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = getEnteColorScheme(context);
+    final textTheme = getEnteTextTheme(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset('assets/empty_state.png', height: 112),
+            const SizedBox(height: 20),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: textTheme.largeBold.copyWith(color: colorScheme.textBase),
+            ),
+          ],
+        ),
       ),
     );
   }

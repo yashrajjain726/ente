@@ -1,8 +1,6 @@
+import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
-import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/components/buttons/soft_icon_button.dart";
-import "package:photos/ui/components/text_input_widget_v2.dart";
 
 class SearchableAppBar extends StatefulWidget {
   final Widget title;
@@ -90,7 +88,6 @@ class _SearchableAppBarState extends State<SearchableAppBar> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
     return SliverAppBar(
       floating: !widget.pinned,
       pinned: widget.pinned,
@@ -105,32 +102,27 @@ class _SearchableAppBarState extends State<SearchableAppBar> {
         switchInCurve: Curves.easeOut,
         switchOutCurve: Curves.easeIn,
         transitionBuilder: (Widget child, Animation<double> animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: child,
-          );
+          return FadeTransition(opacity: animation, child: child);
         },
         child: _isSearchActive
             ? _buildSearchField()
             : widget.heroTag.isNotEmpty
-                ? Hero(
-                    key: const ValueKey('titleBar'),
-                    tag: widget.heroTag,
-                    child: widget.title,
-                  )
-                : widget.title,
+            ? Hero(
+                key: const ValueKey('titleBar'),
+                tag: widget.heroTag,
+                child: widget.title,
+              )
+            : widget.title,
       ),
       actions: _isSearchActive
           ? null
           : [
               Padding(
                 padding: widget.searchIconPadding,
-                child: SoftIconButton(
-                  icon: HugeIcon(
-                    icon: HugeIcons.strokeRoundedSearch01,
-                    size: 18,
-                    color: colorScheme.textBase,
-                  ),
+                child: IconButtonComponent(
+                  variant: IconButtonComponentVariant.primary,
+                  shouldSurfaceExecutionStates: false,
+                  icon: const HugeIcon(icon: HugeIcons.strokeRoundedSearch01),
                   onTap: _activateSearch,
                 ),
               ),
@@ -140,29 +132,27 @@ class _SearchableAppBarState extends State<SearchableAppBar> {
   }
 
   Widget _buildSearchField() {
-    final colorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
     return Container(
       key: const ValueKey('searchBar'),
       alignment: Alignment.center,
-      child: TextInputWidgetV2(
-        textEditingController: _searchController,
+      child: TextInputComponent(
+        controller: _searchController,
         focusNode: _searchFocusNode,
-        autoFocus: true,
-        shouldSurfaceExecutionStates: false,
-        leadingWidget: HugeIcon(
+        autofocus: true,
+        shouldUnfocusOnClearOrSubmit: true,
+        prefix: HugeIcon(
           icon: HugeIcons.strokeRoundedSearch01,
           size: 18,
-          color: colorScheme.textMuted,
+          color: colors.textLight,
         ),
-        trailingWidget: GestureDetector(
-          onTap: _deactivateSearch,
-          child: HugeIcon(
-            icon: HugeIcons.strokeRoundedCancel01,
-            size: 18,
-            color: colorScheme.textMuted,
-          ),
+        suffix: HugeIcon(
+          icon: HugeIcons.strokeRoundedCancel01,
+          size: 18,
+          color: colors.textLight,
         ),
-        onChange: widget.onSearch,
+        onSuffixTap: _deactivateSearch,
+        onChanged: widget.onSearch,
       ),
     );
   }

@@ -3,7 +3,6 @@ import "dart:async";
 import "package:ente_components/theme/text_styles.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
-import "package:photos/core/constants.dart";
 import "package:photos/events/event.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
@@ -17,6 +16,7 @@ import "package:photos/models/selected_people.dart";
 import "package:photos/service_locator.dart" show isLocalGalleryMode;
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/settings/ml/machine_learning_settings_page.dart";
+import "package:photos/ui/viewer/actions/select_all_status_icon.dart";
 import "package:photos/ui/viewer/file/no_thumbnail_widget.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/ui/viewer/people/add_person_action_sheet.dart";
@@ -25,14 +25,19 @@ import "package:photos/ui/viewer/people/people_page.dart";
 import 'package:photos/ui/viewer/people/person_face_widget.dart';
 import "package:photos/ui/viewer/search/result/people_section_all_page.dart";
 import "package:photos/ui/viewer/search/result/search_result_page.dart";
-import "package:photos/ui/viewer/search/search_section_cta.dart";
+import "package:photos/ui/viewer/search_tab/search_tab_horizontal_scroll.dart";
+import "package:photos/ui/viewer/search_tab/section_header.dart";
 
 class PeopleSection extends StatefulWidget {
   final SectionType sectionType = SectionType.face;
   final List<GenericSearchResult> examples;
-  final int limit;
+  final int resultLimit;
 
-  const PeopleSection({super.key, required this.examples, this.limit = 7});
+  const PeopleSection({
+    super.key,
+    required this.examples,
+    required this.resultLimit,
+  });
 
   @override
   State<PeopleSection> createState() => _PeopleSectionState();
@@ -54,7 +59,7 @@ class _PeopleSectionState extends State<PeopleSection> {
           _examples =
               await widget.sectionType.getData(
                     context,
-                    limit: kSearchSectionLimit,
+                    limit: widget.resultLimit + 1,
                   )
                   as List<GenericSearchResult>;
           setState(() {});
@@ -79,45 +84,26 @@ class _PeopleSectionState extends State<PeopleSection> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint("Building section for ${widget.sectionType.name}");
-    final shouldShowMore = _examples.isNotEmpty;
     final textTheme = getEnteTextTheme(context);
-    final colorScheme = getEnteColorScheme(context);
+    final visibleExamples = _examples
+        .take(widget.resultLimit)
+        .toList(growable: false);
     return _examples.isNotEmpty
         ? GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {
-              if (shouldShowMore) {
-                routeToPage(context, const PeopleSectionAllPage());
-              }
+              routeToPage(context, const PeopleSectionAllPage());
             },
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Text(
-                        widget.sectionType.sectionTitle(context),
-                        style: TextStyles.h2.copyWith(
-                          color: textTheme.largeBold.color,
-                        ),
-                      ),
-                    ),
-                    if (shouldShowMore)
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Icon(
-                          Icons.chevron_right_outlined,
-                          color: colorScheme.blurStrokePressed,
-                        ),
-                      ),
-                  ],
+                SectionHeader(
+                  widget.sectionType,
+                  hasMore: _examples.length > widget.resultLimit,
                 ),
-                const SizedBox(height: 2),
-                SearchExampleRow(_examples, widget.sectionType),
+                const SizedBox(height: 4),
+                SearchExampleRow(visibleExamples, widget.sectionType),
+                const SizedBox(height: 20),
               ],
             ),
           )
@@ -127,32 +113,31 @@ class _PeopleSectionState extends State<PeopleSection> {
               routeToPage(context, const MachineLearningSettingsPage());
             },
             child: Padding(
-              padding: const EdgeInsets.only(left: 16, right: 8),
+              padding: const EdgeInsets.only(
+                left: searchTabSectionHorizontalPadding,
+                right: searchTabSectionHorizontalPadding,
+                bottom: 20,
+              ),
               child: Row(
                 children: [
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.sectionType.sectionTitle(context),
-                            style: TextStyles.h2.copyWith(
-                              color: textTheme.largeBold.color,
-                            ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.sectionType.sectionTitle(context),
+                          style: TextStyles.h2.copyWith(
+                            color: textTheme.largeBold.color,
                           ),
-                          const SizedBox(height: 24),
-                          Text(
-                            widget.sectionType.getEmptyStateText(context),
-                            style: textTheme.smallMuted,
-                          ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          widget.sectionType.getEmptyStateText(context),
+                          style: textTheme.smallMuted,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  SearchSectionEmptyCTAIcon(widget.sectionType),
                 ],
               ),
             ),
@@ -168,21 +153,12 @@ class SearchExampleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 128,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        physics: const BouncingScrollPhysics(),
-        scrollDirection: Axis.horizontal,
-        itemCount: examples.length,
-        itemBuilder: (context, index) {
-          return PersonSearchExample(
-            searchResult: examples[index],
-            selectedPeople: null,
-          );
-        },
-        separatorBuilder: (context, index) => const SizedBox(width: 3),
-      ),
+    return SearchTabHorizontalRow(
+      spacing: 10,
+      children: [
+        for (final example in examples)
+          PersonSearchExample(searchResult: example, selectedPeople: null),
+      ],
     );
   }
 }
@@ -196,7 +172,7 @@ class PersonSearchExample extends StatelessWidget {
     super.key,
     required this.searchResult,
     required this.selectedPeople,
-    this.size = 102,
+    this.size = 108,
   });
 
   void toggleSelection() {
@@ -293,10 +269,11 @@ class PersonSearchExample extends StatelessWidget {
                       switchInCurve: Curves.easeOut,
                       switchOutCurve: Curves.easeIn,
                       child: isSelected
-                          ? const Icon(
-                              Icons.check_circle_rounded,
-                              color: Colors.white,
-                              size: 22,
+                          ? const SelectAllStatusIcon(
+                              isSelected: true,
+                              size: 18,
+                              selectedFillColor: Colors.white,
+                              selectedTickCutsOut: true,
                             )
                           : null,
                     ),
@@ -350,22 +327,45 @@ class PersonSearchExample extends StatelessWidget {
                             ),
                           )
                   : Padding(
-                      padding: const EdgeInsets.only(top: 6, bottom: 0),
-                      child: SizedBox(
+                      padding: EdgeInsets.zero,
+                      child: _PersonLabel(
+                        name: searchResult.name(),
                         width: size,
-                        child: Text(
-                          searchResult.name(),
-                          maxLines: 1,
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                          style: getEnteTextTheme(context).small,
-                        ),
                       ),
                     ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _PersonLabel extends StatelessWidget {
+  const _PersonLabel({required this.name, required this.width});
+
+  final String name;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = getEnteTextTheme(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: SizedBox(
+        width: width,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyles.body.copyWith(color: textTheme.body.color),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

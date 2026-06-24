@@ -1,17 +1,16 @@
 # CLAUDE.md
 
-Documentation for Ente's products (Photos, Auth, self-hosting), published at [ente.com/help](https://ente.com/help). Built with VitePress.
+Documentation for Ente's products published at [ente.com/help](https://ente.com/help). Built with VitePress.
 
 ## Development commands
 
-```bash
-npm ci          # Install dependencies from the committed lockfile
+```sh
+npm ci          # Install dependencies
 npm run dev     # Start local dev server
 npm run build   # Build for production
-npm run pretty  # Format all files with Prettier
 ```
 
-Use plain `npm install` only when intentionally updating dependencies and reviewing the resulting `package-lock.json` changes.
+Use `npm install` only when intentionally adding or updating dependencies, or if `package-lock.json` has not changed since the last `npm ci`.
 
 ## Commit messages
 
@@ -36,7 +35,7 @@ Platform instructions use bold headers: `**On mobile:**`, `**On desktop:**`, `**
 
 FAQ questions need unique anchor IDs: `### Question? {#descriptive-anchor-id}`. Use descriptive IDs (`{#enable-face-recognition-ml}`, not `{#faq1}`), and keep them unique across all FAQ files. Check for duplicates with:
 
-```bash
+```sh
 grep -rh "{#[a-z0-9-]*}" docs/photos/faq/*.md | sed 's/.*{#\([^}]*\)}.*/\1/' | sort | uniq -d
 ```
 

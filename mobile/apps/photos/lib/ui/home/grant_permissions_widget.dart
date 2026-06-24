@@ -35,7 +35,6 @@ class GrantPermissionsWidget extends StatefulWidget {
 
 class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
   final Logger _logger = Logger("_GrantPermissionsWidgetState");
-  final bool _showOnlyNewFeature = flagService.enableOnlyBackupFuturePhotos;
   final Debouncer _onlyNewActionDebouncer = Debouncer(
     const Duration(milliseconds: 500),
     leading: true,
@@ -85,11 +84,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                 padding: const EdgeInsets.only(top: 36, bottom: 20),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    _showOnlyNewFeature
-                        ? _buildNewFeatureActionArea(context)
-                        : _buildDefaultActionArea(context),
-                  ],
+                  children: [_buildNewFeatureActionArea(context)],
                 ),
               ),
             ),
@@ -131,9 +126,9 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
             context.l10n.readyToBackupSubtitle,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: colorScheme.contentLight,
-                ),
+              fontWeight: FontWeight.w500,
+              color: colorScheme.contentLight,
+            ),
           ),
         ),
       ],
@@ -183,6 +178,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
       if (state == PermissionState.authorized ||
           state == PermissionState.limited) {
         await localSettings.setAppMode(AppMode.localGallery);
+        localSettings.localGalleryModeEnabledThisSession = true;
         Bus.instance.fire(AppModeChangedEvent());
         await permissionService.onUpdatePermission(state);
         SyncService.instance.onPermissionGranted().ignore();
@@ -205,11 +201,6 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
 
   Future<void> _onTapSkip() async {
     await backupPreferenceService.setOnboardingPermissionSkipped(true);
-    final state = await permissionService.getPermissionState();
-    if (state == PermissionState.authorized ||
-        state == PermissionState.limited) {
-      await permissionService.onUpdatePermission(state);
-    }
     SyncService.instance.sync().ignore();
     if (mounted) {
       setState(() {});
@@ -290,19 +281,6 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
             shouldSurfaceExecutionStates: false,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildDefaultActionArea(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: ButtonWidgetV2(
-        key: const ValueKey("grantPermissionButton"),
-        buttonType: ButtonTypeV2.primary,
-        labelText: AppLocalizations.of(context).continueLabel,
-        onTap: _onTapSelectFolders,
-        shouldSurfaceExecutionStates: false,
       ),
     );
   }
@@ -405,15 +383,15 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
           'terms': StyledTextActionTag(
             (String? text, Map<String?, String?> attrs) =>
                 Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (BuildContext context) {
-                  return WebPage(
-                    AppLocalizations.of(context).termsOfServicesTitle,
-                    "https://ente.com/terms",
-                  );
-                },
-              ),
-            ),
+                  MaterialPageRoute(
+                    builder: (BuildContext context) {
+                      return WebPage(
+                        AppLocalizations.of(context).termsOfServicesTitle,
+                        "https://ente.com/terms",
+                      );
+                    },
+                  ),
+                ),
             style: textTheme.bodyMuted.copyWith(
               decoration: TextDecoration.underline,
               decorationColor: textTheme.bodyMuted.color,
@@ -422,15 +400,15 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
           'policy': StyledTextActionTag(
             (String? text, Map<String?, String?> attrs) =>
                 Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (BuildContext context) {
-                  return WebPage(
-                    AppLocalizations.of(context).privacyPolicyTitle,
-                    "https://ente.com/privacy",
-                  );
-                },
-              ),
-            ),
+                  MaterialPageRoute(
+                    builder: (BuildContext context) {
+                      return WebPage(
+                        AppLocalizations.of(context).privacyPolicyTitle,
+                        "https://ente.com/privacy",
+                      );
+                    },
+                  ),
+                ),
             style: textTheme.bodyMuted.copyWith(
               decoration: TextDecoration.underline,
               decorationColor: textTheme.bodyMuted.color,

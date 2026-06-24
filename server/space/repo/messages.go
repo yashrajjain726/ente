@@ -580,7 +580,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 					WHEN c.unread_count = 0
 					 AND c.post_like_unread_count = 1
 					 AND c.friend_request_unread_count = 0
-					 AND c.activity_type = 'post_like' THEN 0
+					 AND c.activity_type <> 'message_like' THEN 0
 					ELSE c.unread_count + c.post_like_unread_count + c.friend_request_unread_count
 				END AS conversation_unread_count,
 				BOOL_OR(c.notification_unread) OVER (PARTITION BY c.friend_space_id) AS conversation_notification_unread,

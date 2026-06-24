@@ -132,11 +132,12 @@ const sendSpaceLoginOTT = async (email: string) => {
                 log.warn("Ignoring error when parsing error payload", parseErr);
             }
             if (errorCode == "USER_NOT_REGISTERED") {
-                throw new Error("Email not registered");
+                throw new Error("Email not registered", { cause: error });
             }
             if (errorCode == "USER_SIGNUP_INCOMPLETE") {
                 throw new Error(
                     "Account setup incomplete. Create account to finish setup.",
+                    { cause: error },
                 );
             }
         }
@@ -179,7 +180,7 @@ export const beginSpaceLogin = async ({
             error instanceof Error &&
             error.message == srpVerificationUnauthorizedErrorMessage
         ) {
-            throw new Error("Incorrect email or password.");
+            throw new Error("Incorrect email or password.", { cause: error });
         }
         throw error;
     }
@@ -367,10 +368,8 @@ const finishSpaceLoginAuthorization = async ({
     id,
     keyAttributes,
 }: TwoFactorAuthorizationResponse): Promise<SpaceLoginResult> => {
-    const [stashedKEK, pendingCredentials] = await Promise.all([
-        unstashSpaceKeyEncryptionKeyFromSession(),
-        savedPendingSpaceLoginCredentials(),
-    ]);
+    const stashedKEK = unstashSpaceKeyEncryptionKeyFromSession();
+    const pendingCredentials = await savedPendingSpaceLoginCredentials();
     const kek =
         stashedKEK ??
         (pendingCredentials

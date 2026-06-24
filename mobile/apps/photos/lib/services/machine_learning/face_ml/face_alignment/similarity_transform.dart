@@ -21,12 +21,14 @@ class SimilarityTransform {
     <double>[41.5493, 92.3655],
     <double>[70.7299, 92.2041],
   ];
-  static get mobilefacenetIdealNormalized4 => _mobilefacenetIdeal4Landmarks
-      .map((list) => list.map((value) => value / 112.0).toList())
-      .toList();
-  static get mobilefacenetIdealNormalized5 => _mobilefacenetIdeal5Landmarks
-      .map((list) => list.map((value) => value / 112.0).toList())
-      .toList();
+  static List<List<double>> get mobilefacenetIdealNormalized4 =>
+      _mobilefacenetIdeal4Landmarks
+          .map((list) => list.map((value) => value / 112.0).toList())
+          .toList();
+  static List<List<double>> get mobilefacenetIdealNormalized5 =>
+      _mobilefacenetIdeal5Landmarks
+          .map((list) => list.map((value) => value / 112.0).toList())
+          .toList();
 
   SimilarityTransform();
 
@@ -42,8 +44,11 @@ class SimilarityTransform {
   /// estimates the parameters by solving a least-squares problem using
   /// the Umeyama algorithm, via [_umeyama].
   static (AlignmentResult, bool) estimate(List<List<double>> src) {
-    final (params, center, size, rotation) =
-        _umeyama(src, mobilefacenetIdealNormalized5, true);
+    final (params, center, size, rotation) = _umeyama(
+      src,
+      mobilefacenetIdealNormalized5,
+      true,
+    );
     final alignmentResult = AlignmentResult(
       affineMatrix: params.to2DList(),
       center: center,
@@ -51,8 +56,9 @@ class SimilarityTransform {
       rotation: rotation,
     );
     // We check for NaN in the transformation matrix params.
-    final isNoNanInParam =
-        !params.asFlattenedList.any((element) => element.isNaN);
+    final isNoNanInParam = !params.asFlattenedList.any(
+      (element) => element.isNaN,
+    );
     return (alignmentResult, isNoNanInParam);
   }
 

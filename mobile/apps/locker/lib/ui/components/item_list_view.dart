@@ -17,26 +17,6 @@ import "package:locker/ui/components/file_list_widget.dart";
 import 'package:locker/ui/pages/collection_page.dart';
 import 'package:locker/utils/collection_sort_util.dart';
 
-class OverflowMenuAction {
-  final String id;
-  final String label;
-  final Widget icon;
-  final bool isWarning;
-  final void Function(
-    BuildContext context,
-    EnteFile? file,
-    Collection? collection,
-  ) onTap;
-
-  const OverflowMenuAction({
-    required this.id,
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.isWarning = false,
-  });
-}
-
 class ItemListView extends StatefulWidget {
   static const double _selectionOverlayPadding = 200.0;
 
@@ -84,8 +64,9 @@ class _ItemListViewState extends State<ItemListView> {
   }
 
   void _updateItems() {
-    final sortedCollections =
-        CollectionSortUtil.getSortedCollections(widget.collections);
+    final sortedCollections = CollectionSortUtil.getSortedCollections(
+      widget.collections,
+    );
 
     _sortedItems = [
       ...sortedCollections.map((c) => _CollectionListItem(c)),
@@ -200,10 +181,7 @@ class _ItemListViewState extends State<ItemListView> {
       );
     }
 
-    return _createFileWidget(
-      file: file,
-      isLastItem: isLastItem,
-    );
+    return _createFileWidget(file: file, isLastItem: isLastItem);
   }
 
   Widget _createCollectionWidget({
@@ -243,17 +221,13 @@ class _ItemListViewState extends State<ItemListView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.folder_off,
-              size: 64,
-              color: Colors.grey,
-            ),
+            const Icon(Icons.folder_off, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
               context.l10n.noFilesFound,
-              style: getEnteTextTheme(context).body.copyWith(
-                    color: Colors.grey,
-                  ),
+              style: getEnteTextTheme(
+                context,
+              ).body.copyWith(color: Colors.grey),
               textAlign: TextAlign.center,
             ),
           ],
@@ -364,11 +338,7 @@ class FileListViewHelpers {
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                Icon(
-                  Icons.search,
-                  color: colorScheme.primary700,
-                  size: 24,
-                ),
+                Icon(Icons.search, color: colorScheme.primary700, size: 24),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(

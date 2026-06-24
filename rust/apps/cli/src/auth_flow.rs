@@ -1,5 +1,5 @@
 use crate::{
-    api::{ApiClient, models::KeyAttributes},
+    api::{ApiClient, client::USER_AGENT, models::KeyAttributes},
     models::{
         account::{AccountSecrets, App},
         error::{Error, Result},
@@ -27,7 +27,7 @@ fn shared_client(
 ) -> Result<shared::AccountsClient> {
     let mut config = shared::AccountsClientConfig::new(app.client_package())
         .with_base_url(api_client.base_url().to_string())
-        .with_user_agent(format!("ente-cli-rust/{}", env!("CARGO_PKG_VERSION")));
+        .with_user_agent(USER_AGENT);
     if let Some(token) = account_id.and_then(|id| api_client.get_token(id)) {
         config = config.with_auth_token(token);
     }
@@ -303,7 +303,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ente_core::crypto;
     use mockito::{Matcher, Server};
     use serde::{Deserialize, de::DeserializeOwned};
     use sha2::{Digest, Sha256};
@@ -429,8 +428,6 @@ mod tests {
 
     #[tokio::test]
     async fn create_account_persists_token_for_setup_two_factor() {
-        crypto::init().unwrap();
-
         let email = "fresh-user@example.org";
         let encoded_email = urlencoding::encode(email).into_owned();
         let signup_token_bytes = b"signup-session-token";
