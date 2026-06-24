@@ -57,8 +57,7 @@ const Page: React.FC = () => {
         localFeedPosts.length == 0;
     const isSkippingInitialFeedSkeleton =
         isInitialFeedLoading && skipNextHomeFeedSkeleton;
-    const isHomeFeedLoading =
-        isFriendsLoading || (isFeedLoading && !isSkippingInitialFeedSkeleton);
+    const isHomeFeedLoading = isFeedLoading && !isSkippingInitialFeedSkeleton;
     const closeFriendRequestSentToast = React.useCallback(
         () => setFriendRequestSentToastName(undefined),
         [],
@@ -211,6 +210,7 @@ const Page: React.FC = () => {
                 hasMoreFeedItems={Boolean(feedNextCursor)}
                 isFeedLoading={isHomeFeedLoading}
                 isFeedLoadingMore={isFeedLoadingMore}
+                isFriendsLoading={isFriendsLoading}
                 localFeedPosts={localFeedPosts}
                 profile={profile}
                 showInstallPrompt={

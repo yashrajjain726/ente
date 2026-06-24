@@ -110,6 +110,7 @@ interface HomeScreenProps {
     hasUnreadMessages?: boolean;
     isFeedLoading?: boolean;
     isFeedLoadingMore?: boolean;
+    isFriendsLoading?: boolean;
     localFeedPosts?: LocalSpaceFeedPost[];
     showInstallPrompt?: boolean;
     onCreatePost?: (
@@ -1269,6 +1270,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     hasUnreadMessages,
     isFeedLoading = false,
     isFeedLoadingMore = false,
+    isFriendsLoading = false,
     localFeedPosts = [],
     showInstallPrompt = false,
     onCreatePost,
@@ -1330,10 +1332,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const isInstallPromptEnabled =
         showInstallPrompt && !friendRequestSentToastName && !selectedViewer;
     const showUnreadIndicator = hasUnreadMessages === true;
-    const emptyFeedMessage =
-        friendsCount == 0
-            ? "When you add friends, their posts will appear here."
-            : "When your friends share posts, they'll appear here.";
+    const hasLoadedNoFriends = !isFriendsLoading && friendsCount == 0;
+    const emptyFeedMessage = hasLoadedNoFriends
+        ? "When you add friends, their posts will appear here."
+        : "When your friends share posts, they'll appear here.";
     const profileDisplayName =
         profile?.fullName.trim() || profile?.username.trim() || "";
     const revokeLocalPostObjectUrls = React.useCallback(() => {
@@ -2025,7 +2027,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             >
                                 {emptyFeedMessage}
                             </Box>
-                            {friendsCount == 0 && (
+                            {hasLoadedNoFriends && (
                                 <SpaceShareInviteButton
                                     profileLink={profileLink}
                                     sharing={isInviteSharing}
