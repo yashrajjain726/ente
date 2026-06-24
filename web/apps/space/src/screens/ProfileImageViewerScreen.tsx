@@ -35,9 +35,9 @@ export const ProfileImageViewerScreen: React.FC<
         ? "Change cover image"
         : "Change profile picture";
     const imageUrl = isCover ? profile.coverUrl : profile.avatarUrl;
-    const isCoverURLPending = isCover && Boolean(profile.coverObjectKey);
+    const isCoverURLPending = isCover && Boolean(profile.coverObjectID);
     const isAvatarURLPending =
-        !isCover && Boolean(profile.avatarObjectKey) && !imageUrl;
+        !isCover && Boolean(profile.avatarObjectID) && !imageUrl;
     const displayImageUrl =
         isCover && !imageUrl
             ? isCoverURLPending

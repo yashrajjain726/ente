@@ -196,7 +196,7 @@ const Page: React.FC = () => {
                         selectedFriend.avatarUrl ??
                         null,
                     coverUrl: currentSelectedProfile?.coverUrl ?? null,
-                    coverObjectKey: currentSelectedProfile?.coverObjectKey,
+                    coverObjectID: currentSelectedProfile?.coverObjectID,
                     coverUpdatedAt: currentSelectedProfile?.coverUpdatedAt,
                     fullName:
                         currentSelectedProfile?.fullName ??

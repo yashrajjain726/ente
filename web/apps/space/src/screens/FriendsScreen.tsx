@@ -31,7 +31,7 @@ const friendAvatarLoadRootMargin = "800px 0px";
 const friendAvatarCacheKey = (friend: FriendProfile) =>
     [
         friend.id,
-        friend.avatarObjectKey ?? "",
+        friend.avatarObjectID ?? "",
         friend.avatarUpdatedAt ?? "",
         friend.avatarSize ?? "",
     ].join(":");
@@ -69,7 +69,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
     const displayName = friend.fullName.trim() || friend.username.trim();
     const avatarRef = React.useRef<HTMLDivElement | null>(null);
     const [shouldLoadAvatar, setShouldLoadAvatar] = useState(
-        Boolean(avatarUrl || !friend.avatarObjectKey),
+        Boolean(avatarUrl || !friend.avatarObjectID),
     );
 
     const closeActions = () => setActionsAnchor(null);
@@ -84,7 +84,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
     }, [avatarUrl]);
 
     React.useEffect(() => {
-        if (shouldLoadAvatar || avatarUrl || !friend.avatarObjectKey) return;
+        if (shouldLoadAvatar || avatarUrl || !friend.avatarObjectID) return;
         const element = avatarRef.current;
         if (!element) return;
         if (
@@ -106,14 +106,14 @@ const FriendRow: React.FC<FriendRowProps> = ({
         );
         observer.observe(element);
         return () => observer.disconnect();
-    }, [avatarUrl, friend.avatarObjectKey, shouldLoadAvatar]);
+    }, [avatarUrl, friend.avatarObjectID, shouldLoadAvatar]);
 
     React.useEffect(() => {
-        if (!shouldLoadAvatar || avatarUrl || !friend.avatarObjectKey) return;
+        if (!shouldLoadAvatar || avatarUrl || !friend.avatarObjectID) return;
         void onLoadAvatar?.().catch((error: unknown) => {
             console.warn("Failed to load friend avatar", error);
         });
-    }, [avatarUrl, friend.avatarObjectKey, onLoadAvatar, shouldLoadAvatar]);
+    }, [avatarUrl, friend.avatarObjectID, onLoadAvatar, shouldLoadAvatar]);
 
     return (
         <Box
@@ -169,7 +169,7 @@ const FriendRow: React.FC<FriendRowProps> = ({
                         width: 48,
                     }}
                 >
-                    {avatarUrl || !friend.avatarObjectKey ? (
+                    {avatarUrl || !friend.avatarObjectID ? (
                         <SpaceAvatarImage src={avatarUrl} />
                     ) : (
                         <Skeleton
@@ -353,7 +353,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         (friend: FriendProfile) => {
             const loadedAvatarUrl = loadedAvatarURLFor(friend);
             if (loadedAvatarUrl) return Promise.resolve(loadedAvatarUrl);
-            if (!friend.avatarObjectKey || !onLoadFriendAvatar) {
+            if (!friend.avatarObjectID || !onLoadFriendAvatar) {
                 return Promise.resolve(undefined);
             }
 

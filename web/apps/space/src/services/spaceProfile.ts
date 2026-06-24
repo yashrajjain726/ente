@@ -18,7 +18,7 @@ const minUsernameLength = 3;
 const maxUsernameLength = 30;
 
 interface SpaceAvatar {
-    objectKey: string;
+    objectID: string;
     size?: number;
     updatedAt?: string;
 }
@@ -214,8 +214,8 @@ const avatarURLForRemoteAvatar = async (
     spaceId: string,
     avatar: SpaceAvatar | undefined,
 ) => {
-    if (!avatar?.objectKey) return null;
-    const bytes = await ctx.download_space_avatar(spaceId, avatar.objectKey);
+    if (!avatar?.objectID) return null;
+    const bytes = await ctx.download_space_avatar(spaceId, avatar.objectID);
     return URL.createObjectURL(new Blob([bytes]));
 };
 
@@ -224,8 +224,8 @@ const coverURLForRemoteCover = async (
     spaceId: string,
     cover: SpaceCover | undefined,
 ) => {
-    if (!cover?.objectKey) return null;
-    const bytes = await ctx.download_space_cover(spaceId, cover.objectKey);
+    if (!cover?.objectID) return null;
+    const bytes = await ctx.download_space_cover(spaceId, cover.objectID);
     return URL.createObjectURL(new Blob([bytes]));
 };
 
@@ -239,10 +239,10 @@ const profileFromDecryptedSpaceProfile = (
         spaceProfile.spaceSlug;
 
     return {
-        avatarObjectKey: spaceProfile.avatar?.objectKey,
+        avatarObjectID: spaceProfile.avatar?.objectID,
         avatarUpdatedAt: spaceProfile.avatar?.updatedAt,
         avatarUrl: null,
-        coverObjectKey: spaceProfile.cover?.objectKey,
+        coverObjectID: spaceProfile.cover?.objectID,
         coverUpdatedAt: spaceProfile.cover?.updatedAt,
         coverUrl: null,
         fullName,
@@ -268,16 +268,16 @@ export const loadExistingSpaceProfile = async () => {
 
 export const loadExistingSpaceAvatar = async (
     spaceId: string | undefined,
-    avatarObjectKey: string | undefined,
+    avatarObjectID: string | undefined,
 ) => {
-    if (!spaceId || !avatarObjectKey) return null;
+    if (!spaceId || !avatarObjectID) return null;
 
     const ctx = await openCurrentSpaceContext();
     if (!ctx) return null;
 
     try {
         return await avatarURLForRemoteAvatar(ctx, spaceId, {
-            objectKey: avatarObjectKey,
+            objectID: avatarObjectID,
         });
     } finally {
         ctx.free();
@@ -286,16 +286,16 @@ export const loadExistingSpaceAvatar = async (
 
 export const loadExistingSpaceCover = async (
     spaceId: string | undefined,
-    coverObjectKey: string | undefined,
+    coverObjectID: string | undefined,
 ) => {
-    if (!spaceId || !coverObjectKey) return null;
+    if (!spaceId || !coverObjectID) return null;
 
     const ctx = await openCurrentSpaceContext();
     if (!ctx) return null;
 
     try {
         return await coverURLForRemoteCover(ctx, spaceId, {
-            objectKey: coverObjectKey,
+            objectID: coverObjectID,
         });
     } finally {
         ctx.free();
@@ -390,13 +390,13 @@ export const saveSpaceProfile = async (
         }
 
         return {
-            avatarObjectKey:
-                updateResponse?.avatar?.objectKey ?? profile.avatarObjectKey,
+            avatarObjectID:
+                updateResponse?.avatar?.objectID ?? profile.avatarObjectID,
             avatarUpdatedAt:
                 updateResponse?.avatar?.updatedAt ?? profile.avatarUpdatedAt,
             avatarUrl,
-            coverObjectKey:
-                updateResponse?.cover?.objectKey ?? profile.coverObjectKey,
+            coverObjectID:
+                updateResponse?.cover?.objectID ?? profile.coverObjectID,
             coverUpdatedAt:
                 updateResponse?.cover?.updatedAt ?? profile.coverUpdatedAt,
             coverUrl,

@@ -1,5 +1,5 @@
 export interface FriendProfile {
-    avatarObjectKey?: string;
+    avatarObjectID?: string;
     avatarSize?: number;
     avatarUpdatedAt?: string;
     avatarUrl?: string | null;
@@ -8,7 +8,7 @@ export interface FriendProfile {
     fullName: string;
     id: string;
     username: string;
-    coverObjectKey?: string;
+    coverObjectID?: string;
     coverUpdatedAt?: string;
     spaceId?: string;
     spaceSlug?: string;

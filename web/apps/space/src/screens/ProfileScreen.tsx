@@ -562,7 +562,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const isFriendProfile = headerVariant == "friend";
     const displayName = profile.fullName.trim() || profile.username.trim();
     const coverUrl = profile.coverUrl ?? null;
-    const isCoverURLPending = Boolean(profile.coverObjectKey && !coverUrl);
+    const isCoverURLPending = Boolean(profile.coverObjectID && !coverUrl);
     const coverImageUrl = coverUrl
         ? coverUrl
         : isCoverURLPending
@@ -1277,7 +1277,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 },
                             }}
                         >
-                            {profile.avatarUrl || !profile.avatarObjectKey ? (
+                            {profile.avatarUrl || !profile.avatarObjectID ? (
                                 <SpaceAvatarImage src={profile.avatarUrl} />
                             ) : (
                                 <Skeleton

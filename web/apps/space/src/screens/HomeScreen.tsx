@@ -228,7 +228,7 @@ const feedPostImageCacheKey = (item: SpacePost) =>
 const feedPostAvatarCacheKey = (item: SpacePost) =>
     [
         item.spaceId,
-        item.avatarObjectKey ?? "",
+        item.avatarObjectID ?? "",
         item.avatarUpdatedAt ?? "",
         item.avatarSize ?? "",
     ].join(":");
@@ -1389,7 +1389,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const loadedFeedAvatarURLFor = React.useCallback(
         (item: SpacePost) => {
             if (item.avatarUrl) return item.avatarUrl;
-            if (!item.avatarObjectKey) return null;
+            if (!item.avatarObjectID) return null;
             return loadedFeedAvatarURLsByKey[feedPostAvatarCacheKey(item)];
         },
         [loadedFeedAvatarURLsByKey],
@@ -1433,7 +1433,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             if (loadedAvatarUrl !== undefined) {
                 return Promise.resolve(loadedAvatarUrl);
             }
-            if (!item.avatarObjectKey || !onLoadPostAvatar) {
+            if (!item.avatarObjectID || !onLoadPostAvatar) {
                 return Promise.resolve(null);
             }
 
@@ -1808,7 +1808,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             }}
                         >
                             {profile &&
-                            (profile.avatarUrl || !profile.avatarObjectKey) ? (
+                            (profile.avatarUrl || !profile.avatarObjectID) ? (
                                 <SpaceAvatarImage
                                     src={profile.avatarUrl}
                                     borderRadius="50%"

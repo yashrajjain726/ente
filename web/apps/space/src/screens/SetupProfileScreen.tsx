@@ -24,10 +24,10 @@ const setupProfileFormID = "space-setup-profile-form";
 
 export interface SetupProfile {
     avatarUrl: string | null;
-    avatarObjectKey?: string;
+    avatarObjectID?: string;
     avatarUpdatedAt?: string;
     coverUrl?: string | null;
-    coverObjectKey?: string;
+    coverObjectID?: string;
     coverUpdatedAt?: string;
     fullName: string;
     username: string;

@@ -131,7 +131,7 @@ export const ShareProfileLinkScreen: React.FC<ShareProfileLinkScreenProps> = ({
                             width: 176,
                         }}
                     >
-                        {profile.avatarUrl || !profile.avatarObjectKey ? (
+                        {profile.avatarUrl || !profile.avatarObjectID ? (
                             <SpaceAvatarImage src={profile.avatarUrl} />
                         ) : (
                             <Skeleton

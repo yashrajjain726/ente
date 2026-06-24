@@ -82,7 +82,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
     const loadProfileAvatar = useCallback(
         async (profileToHydrate: SetupProfile | null, generation: number) => {
             if (
-                !profileToHydrate?.avatarObjectKey ||
+                !profileToHydrate?.avatarObjectID ||
                 profileToHydrate.avatarUrl
             ) {
                 return;
@@ -91,7 +91,7 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             try {
                 const avatarUrl = await loadExistingSpaceAvatar(
                     profileToHydrate.spaceId,
-                    profileToHydrate.avatarObjectKey,
+                    profileToHydrate.avatarObjectID,
                 );
                 if (!avatarUrl) return;
 
@@ -100,8 +100,8 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
                     profileLoadGenerationRef.current != generation ||
                     !currentProfile ||
                     currentProfile.spaceId != profileToHydrate.spaceId ||
-                    currentProfile.avatarObjectKey !=
-                        profileToHydrate.avatarObjectKey
+                    currentProfile.avatarObjectID !=
+                        profileToHydrate.avatarObjectID
                 ) {
                     URL.revokeObjectURL(avatarUrl);
                     return;
@@ -117,17 +117,14 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
 
     const loadProfileCover = useCallback(
         async (profileToHydrate: SetupProfile | null, generation: number) => {
-            if (
-                !profileToHydrate?.coverObjectKey ||
-                profileToHydrate.coverUrl
-            ) {
+            if (!profileToHydrate?.coverObjectID || profileToHydrate.coverUrl) {
                 return;
             }
 
             try {
                 const coverUrl = await loadExistingSpaceCover(
                     profileToHydrate.spaceId,
-                    profileToHydrate.coverObjectKey,
+                    profileToHydrate.coverObjectID,
                 );
                 if (!coverUrl) return;
 
@@ -136,8 +133,8 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
                     profileLoadGenerationRef.current != generation ||
                     !currentProfile ||
                     currentProfile.spaceId != profileToHydrate.spaceId ||
-                    currentProfile.coverObjectKey !=
-                        profileToHydrate.coverObjectKey
+                    currentProfile.coverObjectID !=
+                        profileToHydrate.coverObjectID
                 ) {
                     URL.revokeObjectURL(coverUrl);
                     return;
