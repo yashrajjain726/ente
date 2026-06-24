@@ -3,15 +3,22 @@ import { apiOrigin } from "ente-base/origins";
 import type { SpaceAccountCtxHandle } from "ente-wasm";
 import type { PendingSpaceInvite } from "services/spaceInvite";
 import {
+    cachedSpaceMediaBlobURL,
+    rememberCachedSpaceMediaBlobURL,
+    spacePostMediaCacheKey,
+    spaceProfileMediaCacheKey,
+} from "services/spaceMediaCache";
+import {
     ensureCurrentSpaceContext,
     releaseCurrentSpaceContext,
 } from "services/spaceProfile";
 import {
-    blobPartForBytes,
     parseSpaceProfilePayload,
     spaceProfileTextField,
 } from "services/spaceProfilePayload";
 import { normalizeSpaceMessageText } from "utils/spaceMessageLimits";
+
+export { clearSpaceMediaURLCache } from "services/spaceMediaCache";
 
 const currentFeedPageSize = 10;
 
@@ -308,65 +315,7 @@ const timestampMsFromSpaceDate = (value: string) => {
     return parsed;
 };
 
-const blobURLForBytes = (bytes: Uint8Array, mediaType?: string) =>
-    URL.createObjectURL(
-        new Blob([blobPartForBytes(bytes)], { type: mediaType || undefined }),
-    );
-
-const maxSpaceMediaCacheEntries = 128;
-const spaceMediaURLCache = new Map<string, Promise<string>>();
 const spaceFriendsCache = new Map<string, Promise<FriendProfile[]>>();
-
-const trimSpaceMediaURLCache = () => {
-    while (spaceMediaURLCache.size > maxSpaceMediaCacheEntries) {
-        const oldest = spaceMediaURLCache.entries().next().value;
-        if (!oldest) break;
-        spaceMediaURLCache.delete(oldest[0]);
-        void oldest[1].then(
-            (url) => URL.revokeObjectURL(url),
-            () => undefined,
-        );
-    }
-};
-
-const cachedBlobURL = (
-    key: string,
-    load: () => Promise<Uint8Array>,
-    mediaType?: string,
-) => {
-    const cached = spaceMediaURLCache.get(key);
-    if (cached) {
-        spaceMediaURLCache.delete(key);
-        spaceMediaURLCache.set(key, cached);
-        return cached;
-    }
-
-    const promise = load()
-        .then((bytes) => blobURLForBytes(bytes, mediaType))
-        .catch((error: unknown) => {
-            spaceMediaURLCache.delete(key);
-            throw error;
-        });
-    spaceMediaURLCache.set(key, promise);
-    trimSpaceMediaURLCache();
-
-    return promise;
-};
-
-const rememberCachedBlobURL = (key: string, url: string) => {
-    spaceMediaURLCache.set(key, Promise.resolve(url));
-    trimSpaceMediaURLCache();
-};
-
-export const clearSpaceMediaURLCache = () => {
-    for (const promise of spaceMediaURLCache.values()) {
-        void promise.then(
-            (url) => URL.revokeObjectURL(url),
-            () => undefined,
-        );
-    }
-    spaceMediaURLCache.clear();
-};
 
 export const clearSpaceFriendsCache = () => {
     spaceFriendsCache.clear();
@@ -430,14 +379,8 @@ const accountCoverURL = async (
 ) => {
     if (!spaceId || !cover?.objectID) return null;
     try {
-        return await cachedBlobURL(
-            [
-                "cover",
-                spaceId,
-                cover.objectID,
-                cover.updatedAt ?? "",
-                cover.size ?? "",
-            ].join(":"),
+        return await cachedSpaceMediaBlobURL(
+            spaceProfileMediaCacheKey(spaceId, "cover", cover.objectID),
             () => ctx.download_space_cover(spaceId, cover.objectID),
         );
     } catch (error) {
@@ -453,14 +396,8 @@ const accountAvatarURL = async (
 ) => {
     if (!spaceId || !avatar?.objectID) return null;
     try {
-        return await cachedBlobURL(
-            [
-                "avatar",
-                spaceId,
-                avatar.objectID,
-                avatar.updatedAt ?? "",
-                avatar.size ?? "",
-            ].join(":"),
+        return await cachedSpaceMediaBlobURL(
+            spaceProfileMediaCacheKey(spaceId, "avatar", avatar.objectID),
             () => ctx.download_space_avatar(spaceId, avatar.objectID),
         );
     } catch (error) {
@@ -482,13 +419,13 @@ const postAssetFrom = (
 });
 
 const postAssetCacheKey = (asset: SpacePostAsset) =>
-    ["post", asset.spaceId, asset.objectKey].join(":");
+    spacePostMediaCacheKey(asset.spaceId, asset.objectKey);
 
 const accountPostAssetURLFromAsset = (
     ctx: SpaceAccountCtxHandle,
     asset: SpacePostAsset,
 ) =>
-    cachedBlobURL(
+    cachedSpaceMediaBlobURL(
         postAssetCacheKey(asset),
         () =>
             ctx.download_post_asset_with_key(
@@ -507,15 +444,13 @@ const accountPostAssetURL = (
     object: SpacePostObject,
 ) => accountPostAssetURLFromAsset(ctx, postAssetFrom(post, object));
 
-const cacheAccountPostAssetURL = (
+const cacheAccountPostAssetURL = async (
     post: SpacePostResponse,
     object: SpacePostObject,
     blob: Blob,
 ) => {
     const key = postAssetCacheKey(postAssetFrom(post, object));
-    if (spaceMediaURLCache.has(key)) return;
-
-    rememberCachedBlobURL(key, URL.createObjectURL(blob));
+    await rememberCachedSpaceMediaBlobURL(key, blob);
 };
 
 const accountPostAssetURLByPostId = (
@@ -525,8 +460,8 @@ const accountPostAssetURLByPostId = (
     objectKey: string,
     mediaType?: string,
 ) =>
-    cachedBlobURL(
-        ["post", spaceId, objectKey].join(":"),
+    cachedSpaceMediaBlobURL(
+        spacePostMediaCacheKey(spaceId, objectKey),
         () => ctx.download_post_asset(BigInt(postId), objectKey),
         mediaType,
     );
@@ -543,8 +478,8 @@ const accountPostAssetURLFromQuote = (
         return undefined;
     }
 
-    return cachedBlobURL(
-        ["post", quote.spaceId, quote.objectKey].join(":"),
+    return cachedSpaceMediaBlobURL(
+        spacePostMediaCacheKey(quote.spaceId, quote.objectKey),
         () =>
             ctx.download_post_asset_with_key(
                 quote.spaceId,
@@ -999,7 +934,7 @@ export const createCurrentPhotoPost = async ({
             file.type || null,
         )) as SpacePostResponse;
         const object = firstObject(created);
-        if (object) cacheAccountPostAssetURL(created, object, file);
+        if (object) await cacheAccountPostAssetURL(created, object, file);
         return await postFromAccountPost(ctx, created);
     } finally {
         releaseCurrentSpaceContext(ctx);

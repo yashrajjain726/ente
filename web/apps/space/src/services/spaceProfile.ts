@@ -8,11 +8,15 @@ import type {
     SetupProfileInput,
 } from "screens/SetupProfileScreen";
 import {
+    cachedSpaceMediaBlobURL,
+    rememberCachedSpaceMediaBlobURL,
+    spaceProfileMediaCacheKey,
+} from "services/spaceMediaCache";
+import {
     restoreSpaceBrowserSessionIfNeeded,
     savedSpaceSessionToken,
 } from "services/spacePersistentSession";
 import {
-    blobPartForBytes,
     parseSpaceProfilePayload,
     spaceProfileTextField,
 } from "services/spaceProfilePayload";
@@ -199,8 +203,10 @@ const avatarURLForRemoteAvatar = async (
     avatar: SpaceAvatar | undefined,
 ) => {
     if (!avatar?.objectID) return null;
-    const bytes = await ctx.download_space_avatar(spaceId, avatar.objectID);
-    return URL.createObjectURL(new Blob([blobPartForBytes(bytes)]));
+    return await cachedSpaceMediaBlobURL(
+        spaceProfileMediaCacheKey(spaceId, "avatar", avatar.objectID),
+        () => ctx.download_space_avatar(spaceId, avatar.objectID),
+    );
 };
 
 const coverURLForRemoteCover = async (
@@ -209,8 +215,10 @@ const coverURLForRemoteCover = async (
     cover: SpaceCover | undefined,
 ) => {
     if (!cover?.objectID) return null;
-    const bytes = await ctx.download_space_cover(spaceId, cover.objectID);
-    return URL.createObjectURL(new Blob([blobPartForBytes(bytes)]));
+    return await cachedSpaceMediaBlobURL(
+        spaceProfileMediaCacheKey(spaceId, "cover", cover.objectID),
+        () => ctx.download_space_cover(spaceId, cover.objectID),
+    );
 };
 
 const profileFromDecryptedSpaceProfile = (
@@ -359,7 +367,16 @@ export const saveSpaceProfile = async (
                 profilePayload,
                 avatarBytes,
             )) as UpdateSpaceProfileResponse;
-            avatarUrl = URL.createObjectURL(profile.avatarFile);
+            avatarUrl = updateResponse.avatar?.objectID
+                ? await rememberCachedSpaceMediaBlobURL(
+                      spaceProfileMediaCacheKey(
+                          spaceId,
+                          "avatar",
+                          updateResponse.avatar.objectID,
+                      ),
+                      profile.avatarFile,
+                  )
+                : URL.createObjectURL(profile.avatarFile);
         } else if (profile.coverFile) {
             const coverBytes = new Uint8Array(
                 await profile.coverFile.arrayBuffer(),
@@ -369,7 +386,16 @@ export const saveSpaceProfile = async (
                 profilePayload,
                 coverBytes,
             )) as UpdateSpaceProfileResponse;
-            coverUrl = URL.createObjectURL(profile.coverFile);
+            coverUrl = updateResponse.cover?.objectID
+                ? await rememberCachedSpaceMediaBlobURL(
+                      spaceProfileMediaCacheKey(
+                          spaceId,
+                          "cover",
+                          updateResponse.cover.objectID,
+                      ),
+                      profile.coverFile,
+                  )
+                : URL.createObjectURL(profile.coverFile);
         } else if (existingSpace) {
             updateResponse = (await ctx.update_space_profile(
                 spaceId,
