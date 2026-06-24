@@ -64,7 +64,6 @@ func toActorResponse(actor spacerepo.SpaceActorRecord, includePrivate bool) mode
 	if !includePrivate {
 		return resp
 	}
-	resp.UserID = actor.UserID
 	resp.SpaceID = actor.SpaceID
 	resp.PublicKey = encodeSpaceField(actor.PublicKey)
 	resp.KeyVersion = actor.KeyVersion
@@ -144,7 +143,6 @@ func toPostResponse(post *spacerepo.SpacePostRecord, assets []spacerepo.SpacePos
 		PostID:           post.PostID,
 		SpaceID:          post.SpaceID,
 		SpaceSlug:        post.SpaceSlug,
-		OwnerUserID:      post.OwnerID,
 		Author:           toActorResponse(post.Author, includeAuthorPrivate),
 		EncryptedPostKey: encodeSpaceField(post.EncryptedPostKey),
 		CaptionCipher:    encodeSpaceField(post.CaptionCipher),

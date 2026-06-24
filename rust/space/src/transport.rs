@@ -247,8 +247,6 @@ pub struct MessageConversationPost {
     pub space_id: String,
     pub space_slug: String,
     #[serde(default)]
-    pub owner_user_id: i64,
-    #[serde(default)]
     pub is_deleted: bool,
     #[serde(default)]
     pub objects: Vec<PostObjectPayload>,
@@ -275,8 +273,6 @@ pub struct PostResponse {
     pub post_id: i64,
     pub space_id: String,
     pub space_slug: String,
-    #[serde(default)]
-    pub owner_user_id: i64,
     pub author: SpaceActorResponse,
     pub encrypted_post_key: String,
     #[serde(default)]
@@ -300,8 +296,6 @@ pub struct PostPage {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceActorResponse {
-    #[serde(default)]
-    pub user_id: i64,
     #[serde(default)]
     pub space_id: String,
     pub space_slug: String,
@@ -512,14 +506,12 @@ mod tests {
 
         let conversation = &page.items[0];
         assert_eq!(conversation.friend.space_slug, "friend-main");
-        assert_eq!(conversation.friend.user_id, 0);
         let message = conversation
             .latest_activity
             .message
             .as_ref()
             .expect("latest activity message should be preserved");
         assert_eq!(message.sender.space_slug, "owner-main");
-        assert_eq!(message.sender.user_id, 0);
         assert_eq!(message.sender.public_key, "");
         assert_eq!(message.recipient.space_slug, "friend-main");
         assert_eq!(message.recipient.space_id, "");
@@ -586,7 +578,6 @@ pub struct SpaceFriendRequestResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ShareUpdatePayload {
-    pub friend_id: i64,
     pub friend_space_id: String,
     pub encrypted_space_key: String,
 }

@@ -32,7 +32,6 @@ const PersistedSpaceBrowserSession = z.object({
 const SpaceBrowserSessionResponse = z.object({ sessionToken: z.string() });
 
 const SpaceBrowserSessionBootstrapResponse = z.object({
-    id: z.number(),
     sessionWrapKey: z.string(),
 });
 
@@ -145,10 +144,6 @@ const restoreSpaceBrowserSession = async () => {
     const bootstrap = SpaceBrowserSessionBootstrapResponse.parse(
         await res.json(),
     );
-    if (persisted.userId != bootstrap.id) {
-        clearSpaceBrowserSession();
-        return false;
-    }
     const spaceRootKey = await decryptBox(
         {
             encryptedData: persisted.encryptedSpaceRootKey,
@@ -156,7 +151,7 @@ const restoreSpaceBrowserSession = async () => {
         },
         bootstrap.sessionWrapKey,
     );
-    replaceSavedLocalUser({ id: bootstrap.id, email: persisted.email });
+    replaceSavedLocalUser({ id: persisted.userId, email: persisted.email });
     saveSpaceRootKeyInSpaceSession(spaceRootKey);
     await removeAuthToken();
     return true;

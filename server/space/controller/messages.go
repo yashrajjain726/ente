@@ -373,11 +373,10 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 	}
 	if activity.Post != nil {
 		resp.Post = &models.MessageConversationPostResponse{
-			PostID:      activity.Post.PostID,
-			SpaceID:     activity.Post.SpaceID,
-			SpaceSlug:   activity.Post.SpaceSlug,
-			OwnerUserID: activity.Post.OwnerID,
-			IsDeleted:   activity.Post.IsDeleted,
+			PostID:    activity.Post.PostID,
+			SpaceID:   activity.Post.SpaceID,
+			SpaceSlug: activity.Post.SpaceSlug,
+			IsDeleted: activity.Post.IsDeleted,
 		}
 		if activity.Post.ObjectKey.Valid {
 			resp.Post.Objects = []models.PostObjectPayload{

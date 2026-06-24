@@ -147,7 +147,7 @@ func TestBootstrapBrowserSessionAcceptsHeader(t *testing.T) {
 	router.ServeHTTP(recorder, req)
 
 	require.Equal(t, http.StatusOK, recorder.Code)
-	require.JSONEq(t, `{"id":`+strconv.FormatInt(userID, 10)+`,"sessionWrapKey":"session-wrap-key"}`, recorder.Body.String())
+	require.JSONEq(t, `{"sessionWrapKey":"session-wrap-key"}`, recorder.Body.String())
 }
 
 func TestDeleteBrowserSessionRevokesHeaderSession(t *testing.T) {

@@ -423,9 +423,9 @@ func (r *FriendsRepository) UpsertShare(ctx context.Context, spaceID string, fri
 	return stacktrace.Propagate(err, "")
 }
 
-func (r *FriendsRepository) UpdateShare(ctx context.Context, spaceID string, friendID int64, friendSpaceID string, encryptedSpaceKey []byte, keyVersion int) error {
+func (r *FriendsRepository) UpdateShare(ctx context.Context, spaceID string, _ int64, friendSpaceID string, encryptedSpaceKey []byte, keyVersion int) error {
 	return r.UpdateShares(ctx, spaceID, []SpaceShareUpdateRecord{
-		{FriendID: friendID, FriendSpaceID: friendSpaceID, EncryptedSpaceKey: encryptedSpaceKey},
+		{FriendSpaceID: friendSpaceID, EncryptedSpaceKey: encryptedSpaceKey},
 	}, keyVersion)
 }
 
@@ -461,8 +461,8 @@ func (r *FriendsRepository) UpdateShares(ctx context.Context, spaceID string, sh
 			UPDATE space_friend_shares
 			SET encrypted_space_key = $3,
 			    key_version = $4
-			WHERE space_id = $1 AND friend_space_id = $2 AND friend_id = $5
-		`, spaceID, friendSpaceID, share.EncryptedSpaceKey, keyVersion, share.FriendID)
+			WHERE space_id = $1 AND friend_space_id = $2
+		`, spaceID, friendSpaceID, share.EncryptedSpaceKey, keyVersion)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}

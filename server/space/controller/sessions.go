@@ -48,7 +48,6 @@ func (c *SessionsController) BootstrapBrowserSession(ctx *gin.Context, sessionTo
 		return nil, err
 	}
 	return &models.SpaceBrowserSessionBootstrapResponse{
-		ID:             session.UserID,
 		SessionWrapKey: session.SessionWrapKey,
 	}, nil
 }

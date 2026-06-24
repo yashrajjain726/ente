@@ -129,7 +129,6 @@ pub struct FeedItem {
     pub post_id: i64,
     pub space_id: String,
     pub space_slug: String,
-    pub owner_user_id: i64,
     pub author: SpaceActorResponse,
     pub encrypted_post_key: String,
     #[serde(default)]

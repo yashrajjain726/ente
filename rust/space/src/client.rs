@@ -1181,7 +1181,11 @@ impl AccountSpaceCtx {
 
     pub async fn reply_to_post(&self, post_id: i64, text: &str) -> Result<MessageResponse> {
         let post = self.get_post(post_id).await?;
-        if Some(post.owner_user_id) == self.user_id {
+        if self
+            .resolve_owned_space_access(&post.space_id)
+            .await?
+            .is_some()
+        {
             return Err(SpaceError::InvalidInput(
                 "cannot reply to your own post".into(),
             ));
@@ -1453,7 +1457,6 @@ impl AccountSpaceCtx {
             let public_key = decode_b64(&friend.friend.public_key)?;
             let sealed_share = seal_with_public_key(&access.space_key, &public_key)?;
             updates.push(ShareUpdatePayload {
-                friend_id: friend.friend.user_id,
                 friend_space_id: friend.friend.space_id,
                 encrypted_space_key: encode_b64(&sealed_share),
             });
@@ -1823,7 +1826,6 @@ fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
         post_id: item.post_id,
         space_id: item.space_id.clone(),
         space_slug: item.space_slug.clone(),
-        owner_user_id: item.owner_user_id,
         author: item.author.clone(),
         encrypted_post_key: item.encrypted_post_key.clone(),
         caption_cipher: item.caption_cipher.clone(),
@@ -2540,9 +2542,7 @@ mod tests {
             post_id: 42,
             space_id: "space_owner_gallery".to_owned(),
             space_slug: "owner-gallery".to_owned(),
-            owner_user_id: 7,
             author: SpaceActorResponse {
-                user_id: 7,
                 space_id: "space_owner_gallery".to_owned(),
                 space_slug: "owner-gallery".to_owned(),
                 key_version: 2,
@@ -2677,7 +2677,6 @@ mod tests {
             .create_async()
             .await;
         let actor = SpaceActorResponse {
-            user_id: 7,
             space_id: "space_friend".to_owned(),
             space_slug: "friend".to_owned(),
             key_version: 1,
@@ -3711,7 +3710,6 @@ mod tests {
             .with_body(
                 json!([{
                     "friend": {
-                        "userId": 7,
                         "spaceId": "space_friend",
                         "spaceSlug": "friend",
                         "publicKey": encode_b64(&friend_public_key),
@@ -3739,14 +3737,12 @@ mod tests {
                     "messageId": "wmsg_reply",
                     "kind": "regular",
                     "sender": {
-                        "userId": 1,
                         "spaceId": "space_owner_main",
                         "spaceSlug": "owner-main",
                         "publicKey": encode_b64(&test_public_key(&ctx)),
                         "keyVersion": 3
                     },
                     "recipient": {
-                        "userId": 7,
                         "spaceId": "space_friend",
                         "spaceSlug": "friend",
                         "publicKey": encode_b64(&friend_public_key),
@@ -3859,7 +3855,6 @@ mod tests {
                 json!({
                     "likers": [{
                         "actor": {
-                            "userId": 8,
                             "spaceId": "space_liker",
                             "spaceSlug": "liker"
                         },
@@ -3897,7 +3892,6 @@ mod tests {
             .with_body(
                 json!([{
                     "friend": {
-                        "userId": 8,
                         "spaceId": "space_friend",
                         "spaceSlug": "friend",
                         "publicKey": "friend-public-key",
@@ -4021,7 +4015,6 @@ mod tests {
             .with_body(
                 json!([{
                     "friend": {
-                        "userId": 7,
                         "spaceId": "space_viewer",
                         "spaceSlug": "viewer",
                         "publicKey": encode_b64(&friend_public_key),
@@ -4038,7 +4031,6 @@ mod tests {
             .mock("POST", "/space/friends/shares/refresh")
             .match_header("x-space-session-token", "space-session-token")
             .match_body(Matcher::AllOf(vec![
-                Matcher::Regex("\"friendId\":7".into()),
                 Matcher::Regex("\"friendSpaceId\":\"space_viewer\"".into()),
                 Matcher::Regex("\"keyVersion\":3".into()),
             ]))
@@ -4278,9 +4270,7 @@ mod tests {
                         "postId": 42,
                         "spaceId": "space_owner_gallery",
                         "spaceSlug": "owner-gallery",
-                        "ownerUserId": 7,
                         "author": {
-                            "userId": 7,
                             "spaceId": "space_owner_gallery",
                             "spaceSlug": "owner-gallery"
                         },
@@ -4329,9 +4319,7 @@ mod tests {
                         "postId": 41,
                         "spaceId": "space_owner_gallery",
                         "spaceSlug": "owner-gallery",
-                        "ownerUserId": 7,
                         "author": {
-                            "userId": 7,
                             "spaceId": "space_owner_gallery",
                             "spaceSlug": "owner-gallery"
                         },
@@ -4396,7 +4384,6 @@ mod tests {
                     "spaceId": "space_owner_gallery",
                     "spaceSlug": "owner-gallery",
                     "author": {
-                        "userId": 7,
                         "spaceId": "space_owner_gallery",
                         "spaceSlug": "owner-gallery"
                     },

@@ -135,7 +135,6 @@ struct SpaceProfileJs {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ActorJs {
-    user_id: i64,
     space_id: String,
     space_slug: String,
     public_key: String,
@@ -152,7 +151,6 @@ struct PostJs {
     post_id: i64,
     space_id: String,
     space_slug: String,
-    owner_user_id: i64,
     author: ActorJs,
     caption: Option<String>,
     encrypted_post_key: String,
@@ -251,7 +249,6 @@ struct MessageConversationPostJs {
     post_id: i64,
     space_id: String,
     space_slug: String,
-    owner_user_id: i64,
     is_deleted: bool,
     objects: Vec<PostObjectJs>,
 }
@@ -356,7 +353,6 @@ fn actor_to_js(
     profile: Option<Vec<u8>>,
 ) -> Result<ActorJs, WasmSpaceError> {
     Ok(ActorJs {
-        user_id: actor.user_id,
         space_id: actor.space_id,
         space_slug: actor.space_slug,
         public_key: actor.public_key,
@@ -428,7 +424,6 @@ async fn account_post_to_js(
         post_id: post.post_id,
         space_id: post.space_id,
         space_slug: post.space_slug,
-        owner_user_id: post.owner_user_id,
         author,
         caption: optional_utf8_field(decrypted.caption_plaintext, "caption")?,
         encrypted_post_key: post.encrypted_post_key,
@@ -450,7 +445,6 @@ async fn link_post_to_js(
         post_id: post.post_id,
         space_id: post.space_id,
         space_slug: post.space_slug,
-        owner_user_id: post.owner_user_id,
         author,
         caption: optional_utf8_field(decrypted.caption_plaintext, "caption")?,
         encrypted_post_key: post.encrypted_post_key,
@@ -626,7 +620,6 @@ fn message_conversation_post_to_js(
         post_id: post.post_id,
         space_id: post.space_id,
         space_slug: post.space_slug,
-        owner_user_id: post.owner_user_id,
         is_deleted: post.is_deleted,
         objects: post_objects_to_js(None, post.objects)?,
     })
@@ -899,7 +892,6 @@ impl SpaceAccountCtxHandle {
                             post_id: item.post_id,
                             space_id: item.space_id,
                             space_slug: item.space_slug.clone(),
-                            owner_user_id: item.owner_user_id,
                             author: item.author,
                             encrypted_post_key: item.encrypted_post_key,
                             caption_cipher: item.caption_cipher,

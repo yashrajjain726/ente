@@ -47,7 +47,6 @@ interface SpaceActor {
     posts?: number;
     profile?: string;
     publicKey?: string;
-    userId?: number;
     spaceId: string;
     spaceSlug: string;
 }

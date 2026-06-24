@@ -18,7 +18,6 @@ type SpaceBrowserSessionResponse struct {
 }
 
 type SpaceBrowserSessionBootstrapResponse struct {
-	ID             int64  `json:"id"`
 	SessionWrapKey string `json:"sessionWrapKey"`
 }
 
@@ -120,7 +119,6 @@ type ProfileCoverPayload = ProfileAvatarPayload
 type ProfileCoverResponse = ProfileAvatarResponse
 
 type SpaceActorResponse struct {
-	UserID           int64                  `json:"userId,omitempty"`
 	SpaceID          string                 `json:"spaceId,omitempty"`
 	SpaceSlug        string                 `json:"spaceSlug"`
 	PublicKey        string                 `json:"publicKey,omitempty"`
@@ -281,7 +279,6 @@ type RefreshFriendSharesRequest struct {
 }
 
 type ShareUpdatePayload struct {
-	FriendID          int64  `json:"friendId"`
 	FriendSpaceID     string `json:"friendSpaceId"`
 	EncryptedSpaceKey string `json:"encryptedSpaceKey"`
 }
@@ -386,12 +383,11 @@ type MessageConversationActivityResponse struct {
 }
 
 type MessageConversationPostResponse struct {
-	PostID      int64               `json:"postId"`
-	SpaceID     string              `json:"spaceId"`
-	SpaceSlug   string              `json:"spaceSlug"`
-	OwnerUserID int64               `json:"ownerUserId"`
-	IsDeleted   bool                `json:"isDeleted"`
-	Objects     []PostObjectPayload `json:"objects,omitempty"`
+	PostID    int64               `json:"postId"`
+	SpaceID   string              `json:"spaceId"`
+	SpaceSlug string              `json:"spaceSlug"`
+	IsDeleted bool                `json:"isDeleted"`
+	Objects   []PostObjectPayload `json:"objects,omitempty"`
 }
 
 type MessageConversationPage struct {
@@ -410,7 +406,6 @@ type PostResponse struct {
 	PostID           int64               `json:"postId"`
 	SpaceID          string              `json:"spaceId"`
 	SpaceSlug        string              `json:"spaceSlug"`
-	OwnerUserID      int64               `json:"ownerUserId"`
 	Author           SpaceActorResponse  `json:"author"`
 	EncryptedPostKey string              `json:"encryptedPostKey"`
 	CaptionCipher    string              `json:"captionCipher,omitempty"`

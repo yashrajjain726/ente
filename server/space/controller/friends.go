@@ -246,15 +246,14 @@ func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFr
 	}
 	updates := make([]repo.SpaceShareUpdateRecord, 0, len(req.Shares))
 	for _, share := range req.Shares {
-		if share.FriendID == 0 || strings.TrimSpace(share.FriendSpaceID) == "" || strings.TrimSpace(share.EncryptedSpaceKey) == "" {
-			return ente.NewBadRequestWithMessage("friendId, friendSpaceId and encryptedSpaceKey are required for each share")
+		if strings.TrimSpace(share.FriendSpaceID) == "" || strings.TrimSpace(share.EncryptedSpaceKey) == "" {
+			return ente.NewBadRequestWithMessage("friendSpaceId and encryptedSpaceKey are required for each share")
 		}
 		encryptedSpaceKey, err := decodeEncodedSpaceField("encryptedSpaceKey", share.EncryptedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
 		if err != nil {
 			return err
 		}
 		updates = append(updates, repo.SpaceShareUpdateRecord{
-			FriendID:          share.FriendID,
 			FriendSpaceID:     strings.TrimSpace(share.FriendSpaceID),
 			EncryptedSpaceKey: encryptedSpaceKey,
 		})

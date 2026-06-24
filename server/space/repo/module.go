@@ -233,7 +233,6 @@ type SpaceShareRecord struct {
 }
 
 type SpaceShareUpdateRecord struct {
-	FriendID          int64
 	FriendSpaceID     string
 	EncryptedSpaceKey []byte
 }
