@@ -307,10 +307,39 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				FALSE AS is_outgoing
 			FROM post_reply_events r
 		),
+		empty_friend_candidates AS (
+			SELECT
+				'empty' AS activity_type,
+				'empty:' || viewer_share.friend_space_id AS activity_id,
+				GREATEST(viewer_share.created_at, friend_share.created_at) AS activity_created_at,
+				viewer_share.friend_space_id,
+				NULL::text AS message_id,
+				NULL::bigint AS post_id,
+				NULL::bigint AS notification_created_at,
+				FALSE AS is_outgoing
+			FROM space_friend_shares viewer_share
+			JOIN space_friend_shares friend_share
+			  ON friend_share.space_id = viewer_share.friend_space_id
+			 AND friend_share.friend_space_id = $2
+			WHERE viewer_share.space_id = $2
+			  AND NOT EXISTS (
+			      SELECT 1
+			      FROM space_messages existing_message
+			      WHERE (
+			          existing_message.sender_space_id = $2
+			          AND existing_message.recipient_space_id = viewer_share.friend_space_id
+			      ) OR (
+			          existing_message.sender_space_id = viewer_share.friend_space_id
+			          AND existing_message.recipient_space_id = $2
+			      )
+			  )
+		),
 		activity_candidates AS (
 			SELECT * FROM message_candidates
 			UNION ALL
 			SELECT * FROM post_reply_candidates
+			UNION ALL
+			SELECT * FROM empty_friend_candidates
 		),
 		readable_activities AS (
 			SELECT
@@ -550,6 +579,29 @@ func (r *MessagesRepository) GetLatestConversationActivityAt(ctx context.Context
 			  AND m.is_deleted = FALSE
 			  AND m.reply_post_id IS NOT NULL
 			  AND p.space_id = $1
+
+			UNION ALL
+
+			SELECT
+				GREATEST(viewer_share.created_at, friend_share.created_at) AS activity_created_at,
+				'empty:' || viewer_share.friend_space_id AS activity_id,
+				viewer_share.friend_space_id
+			FROM space_friend_shares viewer_share
+			JOIN space_friend_shares friend_share
+			  ON friend_share.space_id = viewer_share.friend_space_id
+			 AND friend_share.friend_space_id = $1
+			WHERE viewer_share.space_id = $1
+			  AND NOT EXISTS (
+			      SELECT 1
+			      FROM space_messages existing_message
+			      WHERE (
+			          existing_message.sender_space_id = $1
+			          AND existing_message.recipient_space_id = viewer_share.friend_space_id
+			      ) OR (
+			          existing_message.sender_space_id = viewer_share.friend_space_id
+			          AND existing_message.recipient_space_id = $1
+			      )
+			  )
 
 			)
 			SELECT c.activity_created_at

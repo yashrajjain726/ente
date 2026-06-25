@@ -466,7 +466,13 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	conversations, nextCursor, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Empty(t, nextCursor)
-	require.Empty(t, conversations)
+	require.Len(t, conversations, 1)
+	require.Equal(t, bobSpace.SpaceID, conversations[0].Friend.SpaceID)
+	require.Equal(t, "empty", conversations[0].LatestActivity.Type)
+	require.Nil(t, conversations[0].LatestActivity.Message)
+	require.False(t, conversations[0].Unread)
+	require.Zero(t, conversations[0].UnreadCount)
+	require.False(t, conversations[0].NotificationUnread)
 
 	bobMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
@@ -598,7 +604,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Equal(t, int64(5500), conversations[0].LatestActivity.CreatedAt)
 }
 
-func TestCurrentFriendsWithoutMessagesDoNotAppearInConversations(t *testing.T) {
+func TestCurrentFriendsWithoutMessagesAppearAsEmptyConversations(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
 
@@ -616,11 +622,19 @@ func TestCurrentFriendsWithoutMessagesDoNotAppearInConversations(t *testing.T) {
 	conversations, nextCursor, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Empty(t, nextCursor)
-	require.Empty(t, conversations)
+	require.Len(t, conversations, 1)
+	require.Equal(t, bobSpace.SpaceID, conversations[0].Friend.SpaceID)
+	require.Equal(t, "empty", conversations[0].LatestActivity.Type)
+	require.Equal(t, "empty:"+bobSpace.SpaceID, conversations[0].LatestActivity.ID)
+	require.Equal(t, int64(1000), conversations[0].LatestActivity.CreatedAt)
+	require.Nil(t, conversations[0].LatestActivity.Message)
+	require.False(t, conversations[0].Unread)
+	require.Zero(t, conversations[0].UnreadCount)
+	require.False(t, conversations[0].NotificationUnread)
 
 	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
-	require.ErrorIs(t, err, sql.ErrNoRows)
-	require.Zero(t, latestActivityAt)
+	require.NoError(t, err)
+	require.Equal(t, int64(1000), latestActivityAt)
 
 	require.NoError(t, module.Friends.DeleteFriendship(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID))
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
@@ -674,10 +688,20 @@ func TestConfirmFriendRequestCreatesFriendshipAndNotifiesRequester(t *testing.T)
 	require.False(t, bobUnread)
 	aliceConversations, _, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
-	require.Empty(t, aliceConversations)
+	require.Len(t, aliceConversations, 1)
+	require.Equal(t, bobSpace.SpaceID, aliceConversations[0].Friend.SpaceID)
+	require.Equal(t, "empty", aliceConversations[0].LatestActivity.Type)
+	require.False(t, aliceConversations[0].NotificationUnread)
+	require.False(t, aliceConversations[0].Unread)
+	require.Zero(t, aliceConversations[0].UnreadCount)
 	bobConversations, _, err := module.Messages.ListConversations(ctx, bobID, bobSpace.SpaceID, "", 10)
 	require.NoError(t, err)
-	require.Empty(t, bobConversations)
+	require.Len(t, bobConversations, 1)
+	require.Equal(t, aliceSpace.SpaceID, bobConversations[0].Friend.SpaceID)
+	require.Equal(t, "empty", bobConversations[0].LatestActivity.Type)
+	require.False(t, bobConversations[0].NotificationUnread)
+	require.False(t, bobConversations[0].Unread)
+	require.Zero(t, bobConversations[0].UnreadCount)
 }
 
 func TestDeleteFriendRequestClearsUnread(t *testing.T) {

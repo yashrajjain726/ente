@@ -193,6 +193,9 @@ const conversationPreview = (
     profile: SetupProfile,
 ) => {
     const activity = conversation.latestActivity;
+    if (activity.type == "empty") {
+        return "You are now friends";
+    }
     if (activity.type == "friend_request") {
         return "Friend request";
     }
@@ -1954,7 +1957,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         >
                                             {isThreadReadOnly
                                                 ? "No messages"
-                                                : "Say hello!"}
+                                                : "You are now friends"}
                                         </Box>
                                     </Box>
                                 ) : (
