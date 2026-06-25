@@ -184,8 +184,12 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
             );
         }),
     );
+    const isThreadRecipientLoading =
+        Boolean(selectedFriend) && isFriendsLoading && !isSelectedFriendCurrent;
     const isThreadReadOnly =
-        Boolean(selectedFriend) && !isSelectedFriendCurrent;
+        Boolean(selectedFriend) &&
+        !isFriendsLoading &&
+        !isSelectedFriendCurrent;
 
     const markConversationRead = React.useCallback((spaceId: string) => {
         setNewConversationIds((currentIds) =>
@@ -489,6 +493,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 isConversationsLoading={isConversationsLoading}
                 isThreadLoading={isThreadLoading}
                 isThreadReadOnly={isThreadReadOnly}
+                isThreadRecipientLoading={isThreadRecipientLoading}
                 messages={messages}
                 newConversationIds={newConversationIds}
                 onBack={() => void router.push(spaceRoutes.home)}

@@ -67,6 +67,7 @@ interface MessagesScreenProps {
     isConversationsLoading?: boolean;
     isThreadLoading?: boolean;
     isThreadReadOnly?: boolean;
+    isThreadRecipientLoading?: boolean;
     messages: SpaceMessage[];
     onBack?: () => void;
     onCloseThread: () => void;
@@ -1392,6 +1393,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     isConversationsLoading = false,
     isThreadLoading = false,
     isThreadReadOnly = false,
+    isThreadRecipientLoading = false,
     messages,
     newConversationIds = [],
     onBack,
@@ -1433,7 +1435,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     );
     const ignoreMessageActionsMouseAwayUntilRef = React.useRef(0);
     const isThreadOpen = Boolean(selectedFriend);
-    const canInteract = isThreadOpen && !isThreadReadOnly;
+    const canInteract =
+        isThreadOpen && !isThreadReadOnly && !isThreadRecipientLoading;
     const canSend =
         canInteract && messageText.trim().length > 0 && sendPhase == "idle";
     const selectedName = selectedFriend
@@ -1713,6 +1716,42 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         },
         [],
     );
+
+    const messageActionMenuItems = [
+        !isThreadReadOnly && !isContextMessageOwn ? (
+            <MessageActionMenuItem
+                key="like"
+                icon={<HeartIcon small />}
+                label={isContextMessageLiked ? "Unlike" : "Like"}
+                onClick={() => handleMessageAction("like")}
+            />
+        ) : null,
+        !isThreadReadOnly ? (
+            <MessageActionMenuItem
+                key="reply"
+                icon={<ReplyIcon />}
+                label="Reply"
+                onClick={() => handleMessageAction("reply")}
+            />
+        ) : null,
+        <MessageActionMenuItem
+            key="copy"
+            icon={<CopyIcon />}
+            label="Copy"
+            onClick={() => handleMessageAction("copy")}
+        />,
+        !isThreadReadOnly &&
+        messageContextMenu?.message &&
+        isContextMessageOwn ? (
+            <MessageActionMenuItem
+                key="delete"
+                icon={<DeleteIcon />}
+                label="Delete"
+                onClick={() => handleMessageAction("delete")}
+                tone="danger"
+            />
+        ) : null,
+    ].filter((item): item is React.ReactElement => Boolean(item));
 
     return (
         <>
@@ -2090,65 +2129,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                     }}
                                                     variant="menu"
                                                 >
-                                                    {!isThreadReadOnly && (
-                                                        <>
-                                                            {!isContextMessageOwn && (
-                                                                <MessageActionMenuItem
-                                                                    icon={
-                                                                        <HeartIcon
-                                                                            small
-                                                                        />
-                                                                    }
-                                                                    label={
-                                                                        isContextMessageLiked
-                                                                            ? "Unlike"
-                                                                            : "Like"
-                                                                    }
-                                                                    onClick={() =>
-                                                                        handleMessageAction(
-                                                                            "like",
-                                                                        )
-                                                                    }
-                                                                />
-                                                            )}
-                                                            <MessageActionMenuItem
-                                                                icon={
-                                                                    <ReplyIcon />
-                                                                }
-                                                                label="Reply"
-                                                                onClick={() =>
-                                                                    handleMessageAction(
-                                                                        "reply",
-                                                                    )
-                                                                }
-                                                            />
-                                                        </>
-                                                    )}
-                                                    <MessageActionMenuItem
-                                                        icon={<CopyIcon />}
-                                                        label="Copy"
-                                                        onClick={() =>
-                                                            handleMessageAction(
-                                                                "copy",
-                                                            )
-                                                        }
-                                                    />
-                                                    {!isThreadReadOnly &&
-                                                        messageContextMenu?.message &&
-                                                        isContextMessageOwn && (
-                                                            <MessageActionMenuItem
-                                                                icon={
-                                                                    <DeleteIcon />
-                                                                }
-                                                                label="Delete"
-                                                                onClick={() =>
-                                                                    handleMessageAction(
-                                                                        "delete",
-                                                                    )
-                                                                }
-                                                                tone="danger"
-                                                            />
-                                                        )}
+                                                    {messageActionMenuItems}
                                                 </MenuList>
                                             </Box>
                                         </Grow>
@@ -2309,6 +2290,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             onBlur={handleComposerBlur}
                                             onFocus={handleComposerFocus}
                                             placeholder="Message..."
+                                            disabled={isThreadRecipientLoading}
                                             rows={1}
                                             value={messageText}
                                             sx={{

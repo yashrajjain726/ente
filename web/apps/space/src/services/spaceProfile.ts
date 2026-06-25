@@ -166,9 +166,11 @@ export const ensureCurrentSpaceContext = async () => {
         return await pendingCurrentSpaceContext.promise;
     }
 
-    const { space_open_account_ctx } = await loadEnteWasm();
     const generation = currentSpaceContextGeneration;
-    const promise = space_open_account_ctx(config.input)
+    const promise = (async () => {
+        const { space_open_account_ctx } = await loadEnteWasm();
+        return await space_open_account_ctx(config.input);
+    })()
         .then((ctx) => {
             if (
                 currentSpaceContextGeneration != generation ||
