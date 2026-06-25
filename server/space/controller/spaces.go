@@ -142,37 +142,13 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 	if req.KeyVersion != current.CurrentVersion {
 		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
 	}
-	var avatar *repo.ProfileAssetUpdate
-	if req.Avatar != nil {
-		objectID := strings.TrimSpace(req.Avatar.ObjectID)
-		if !repo.IsProfileAssetObjectID(objectID) {
-			return nil, ente.NewBadRequestWithMessage("avatar objectID is required")
-		}
-		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, repo.ProfileAssetObjectKey(spaceID, repo.ProfileAssetTypeAvatar, objectID), repo.TempObjectPurposeAvatar, &spaceID)
-		if err != nil {
-			return nil, err
-		}
-		avatar = &repo.ProfileAssetUpdate{
-			ObjectID: objectID,
-			BucketID: staged.BucketID,
-			Size:     staged.ExpectedSize,
-		}
+	avatar, err := c.profileAssetUpdate(ctx, spaceID, "avatar", repo.ProfileAssetTypeAvatar, repo.TempObjectPurposeAvatar, req.Avatar)
+	if err != nil {
+		return nil, err
 	}
-	var cover *repo.ProfileAssetUpdate
-	if req.Cover != nil {
-		objectID := strings.TrimSpace(req.Cover.ObjectID)
-		if !repo.IsProfileAssetObjectID(objectID) {
-			return nil, ente.NewBadRequestWithMessage("cover objectID is required")
-		}
-		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, repo.ProfileAssetObjectKey(spaceID, repo.ProfileAssetTypeCover, objectID), repo.TempObjectPurposeCover, &spaceID)
-		if err != nil {
-			return nil, err
-		}
-		cover = &repo.ProfileAssetUpdate{
-			ObjectID: objectID,
-			BucketID: staged.BucketID,
-			Size:     staged.ExpectedSize,
-		}
+	cover, err := c.profileAssetUpdate(ctx, spaceID, "cover", repo.ProfileAssetTypeCover, repo.TempObjectPurposeCover, req.Cover)
+	if err != nil {
+		return nil, err
 	}
 	space, err := c.SpacesRepo.UpdateProfile(ctx.Request.Context(), userID, spaceID, req.KeyVersion, encryptedProfile, avatar, cover, req.RemoveAvatar, req.RemoveCover)
 	if err != nil {
@@ -185,6 +161,25 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 		Status: "updated",
 		Avatar: toAvatarResponse(space),
 		Cover:  toCoverResponse(space),
+	}, nil
+}
+
+func (c *SpacesController) profileAssetUpdate(ctx *gin.Context, spaceID, assetName, assetType, purpose string, payload *models.ProfileAvatarPayload) (*repo.ProfileAssetUpdate, error) {
+	if payload == nil {
+		return nil, nil
+	}
+	objectID := strings.TrimSpace(payload.ObjectID)
+	if !repo.IsProfileAssetObjectID(objectID) {
+		return nil, ente.NewBadRequestWithMessage(assetName + " objectID is required")
+	}
+	staged, err := verifyStagedUpload(ctx, c.AssetsRepo, repo.ProfileAssetObjectKey(spaceID, assetType, objectID), purpose, &spaceID)
+	if err != nil {
+		return nil, err
+	}
+	return &repo.ProfileAssetUpdate{
+		ObjectID: objectID,
+		BucketID: staged.BucketID,
+		Size:     staged.ExpectedSize,
 	}, nil
 }
 
