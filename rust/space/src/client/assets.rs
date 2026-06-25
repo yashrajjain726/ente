@@ -122,6 +122,7 @@ impl AccountSpaceCtx {
         width: Option<i32>,
         height: Option<i32>,
         media_type: Option<String>,
+        thumb_hash: Option<String>,
     ) -> Result<PostObjectPayload> {
         let inferred_media_type = ensure_supported_photo_bytes(plaintext)?;
         let media_type = ensure_supported_photo_media_type(media_type.as_deref())?
@@ -135,6 +136,7 @@ impl AccountSpaceCtx {
                 width: width.filter(|value| *value > 0),
                 height: height.filter(|value| *value > 0),
                 media_type: Some(media_type),
+                thumb_hash,
                 ..Default::default()
             },
         )?);

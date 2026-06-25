@@ -1,6 +1,7 @@
 import { lowercaseExtension, nameAndExtension } from "ente-base/file-name";
 import { isHEICExtension } from "ente-media/formats";
 import { heicToJPEG } from "ente-media/heic-convert";
+import { thumbHashBase64FromCanvas } from "utils/thumbhash";
 
 export interface PreparedSpaceImage {
     file: File;
@@ -10,7 +11,9 @@ export interface PreparedSpaceImage {
 
 export type PreparedSpaceAvatarImage = PreparedSpaceImage;
 export type PreparedSpaceCoverImage = PreparedSpaceImage;
-export type PreparedSpacePostImage = PreparedSpaceImage;
+export interface PreparedSpacePostImage extends PreparedSpaceImage {
+    thumbHash: string;
+}
 
 export interface SpaceAvatarCropImage {
     url: string;
@@ -80,9 +83,10 @@ export const prepareSpacePostImage = async (
     file: File,
 ): Promise<PreparedSpacePostImage> => {
     const renderableBlob = await renderableBlobForSpaceImage(file);
-    const { blob, height, width } = await webPBlobFromImage(
+    const { blob, height, thumbHash, width } = await webPBlobFromImage(
         renderableBlob,
         postCanvasPlan,
+        true,
     );
     assertSpaceImageSize(
         blob,
@@ -96,6 +100,7 @@ export const prepareSpacePostImage = async (
             type: spacePostImageMimeType,
         }),
         height,
+        thumbHash,
         width,
     };
 };
@@ -112,7 +117,7 @@ export const prepareSpacePostImageFromEdit = async (
     }
 
     const renderableBlob = await renderableBlobForSpaceImage(file);
-    const { blob, height, width } = await webPBlobFromEditedImage(
+    const { blob, height, thumbHash, width } = await webPBlobFromEditedImage(
         renderableBlob,
         cropArea,
         normalizedRotationDegrees,
@@ -129,6 +134,7 @@ export const prepareSpacePostImageFromEdit = async (
             type: spacePostImageMimeType,
         }),
         height,
+        thumbHash,
         width,
     };
 };
@@ -212,6 +218,7 @@ export const prepareSpaceAvatarImageFromCrop = async (
         imageURL,
         (width, height) => avatarCanvasPlanForCrop(width, height, cropArea),
         false,
+        false,
     );
     assertSpaceImageSize(
         blob,
@@ -237,6 +244,7 @@ export const prepareSpaceCoverImageFromCrop = async (
     const { blob, height, width } = await webPBlobFromImage(
         imageURL,
         (width, height) => coverCanvasPlanForCrop(width, height, cropArea),
+        false,
         false,
     );
     assertSpaceImageSize(
@@ -332,8 +340,14 @@ interface CanvasPlan {
 const webPBlobFromImage = async (
     imageSource: Blob | string,
     planForSource: (width: number, height: number) => CanvasPlan,
+    includeThumbHash = false,
     revokeImageURL = true,
-): Promise<{ blob: Blob; height: number; width: number }> => {
+): Promise<{
+    blob: Blob;
+    height: number;
+    thumbHash: string;
+    width: number;
+}> => {
     const imageURL =
         typeof imageSource == "string"
             ? imageSource
@@ -367,11 +381,16 @@ const webPBlobFromImage = async (
             plan.height,
         );
 
-        return {
+        const result = {
             blob: await canvasToBlob(canvas, spacePostImageMimeType),
             height: plan.height,
+            thumbHash: "",
             width: plan.width,
         };
+        if (includeThumbHash) {
+            result.thumbHash = thumbHashBase64FromCanvas(canvas);
+        }
+        return result;
     } finally {
         if (revokeImageURL) URL.revokeObjectURL(imageURL);
     }
@@ -381,7 +400,12 @@ const webPBlobFromEditedImage = async (
     imageSource: Blob | string,
     cropArea: SpaceImageCropArea | undefined,
     rotationDegrees: number,
-): Promise<{ blob: Blob; height: number; width: number }> => {
+): Promise<{
+    blob: Blob;
+    height: number;
+    thumbHash: string;
+    width: number;
+}> => {
     const imageURL =
         typeof imageSource == "string"
             ? imageSource
@@ -434,6 +458,7 @@ const webPBlobFromEditedImage = async (
         return {
             blob: await canvasToBlob(canvas, spacePostImageMimeType),
             height: dimensions.height,
+            thumbHash: thumbHashBase64FromCanvas(canvas),
             width: dimensions.width,
         };
     } finally {

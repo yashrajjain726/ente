@@ -497,6 +497,7 @@ async fn upload_post_photo_asset_attaches_photo_metadata() {
             Some(4032),
             Some(3024),
             Some("image/webp".to_owned()),
+            Some("thumbhash-test".to_owned()),
         )
         .await
         .expect("photo upload should succeed");
@@ -510,6 +511,7 @@ async fn upload_post_photo_asset_attaches_photo_metadata() {
     assert_eq!(metadata.width, Some(4032));
     assert_eq!(metadata.height, Some(3024));
     assert_eq!(metadata.media_type.as_deref(), Some("image/webp"));
+    assert_eq!(metadata.thumb_hash.as_deref(), Some("thumbhash-test"));
     presign.assert_async().await;
     upload.assert_async().await;
 }
@@ -527,6 +529,7 @@ async fn upload_post_photo_asset_rejects_video_media_type() {
             Some(4032),
             Some(3024),
             Some("video/mp4".to_owned()),
+            None,
         )
         .await
         .expect_err("video media type should fail before upload");
@@ -547,6 +550,7 @@ async fn upload_post_photo_asset_rejects_video_bytes() {
             Some(1920),
             Some(1080),
             Some("image/webp".to_owned()),
+            None,
         )
         .await
         .expect_err("video bytes should fail before upload");

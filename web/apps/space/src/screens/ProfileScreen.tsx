@@ -31,6 +31,7 @@ import {
     spacePostImageInputAccept,
     spacePostPreviewImageForFile,
 } from "utils/spacePostImage";
+import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
 export const profileBackground = "#FFFFFF";
 
@@ -73,6 +74,7 @@ export interface ProfilePostItem {
     name?: string;
     postId?: number;
     timestampMs: number;
+    thumbHash?: string;
     viewerLiked?: boolean;
     width?: number;
 }
@@ -265,7 +267,13 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
     onRememberDimensions,
 }) => {
     const [shouldLoad, setShouldLoad] = React.useState(Boolean(imageUrl));
+    const [readyImageUrl, setReadyImageUrl] = React.useState<string>();
     const tileRef = React.useRef<HTMLButtonElement | null>(null);
+    const thumbHashDataURL = React.useMemo(
+        () => thumbHashDataURLFromBase64(item.thumbHash),
+        [item.thumbHash],
+    );
+    const isCurrentImageReady = Boolean(imageUrl && readyImageUrl == imageUrl);
 
     React.useEffect(() => {
         if (imageUrl) setShouldLoad(true);
@@ -328,40 +336,61 @@ const ProfilePostTile: React.FC<ProfilePostTileProps> = ({
                 opacity: 1,
                 overflow: "hidden",
                 p: 0,
+                position: "relative",
                 "&:focus-visible": {
                     outline: `2px solid ${green}`,
                     outlineOffset: -2,
                 },
             }}
         >
+            {thumbHashDataURL ? (
+                <Box
+                    component="img"
+                    alt=""
+                    aria-hidden
+                    src={thumbHashDataURL}
+                    sx={{
+                        display: "block",
+                        filter: "blur(14px)",
+                        height: "100%",
+                        inset: 0,
+                        objectFit: "cover",
+                        objectPosition: "center",
+                        position: "absolute",
+                        transform: "scale(1.08)",
+                        width: "100%",
+                    }}
+                />
+            ) : null}
             {imageUrl ? (
                 <Box
                     component="img"
                     alt={`${groupLabel} post ${index + 1}`}
-                    onLoad={(event) =>
-                        onRememberDimensions(item.id, event.currentTarget)
-                    }
+                    onLoad={(event) => {
+                        setReadyImageUrl(imageUrl);
+                        onRememberDimensions(item.id, event.currentTarget);
+                    }}
                     src={imageUrl}
                     sx={{
                         display: "block",
                         height: "100%",
+                        inset: 0,
                         objectFit: "cover",
                         objectPosition: "center",
+                        opacity:
+                            isCurrentImageReady || !thumbHashDataURL ? 1 : 0,
+                        position: "absolute",
+                        transition: thumbHashDataURL
+                            ? "opacity 220ms ease"
+                            : "none",
                         width: "100%",
+                        "@media (prefers-reduced-motion: reduce)": {
+                            opacity: 1,
+                            transition: "none",
+                        },
                     }}
                 />
-            ) : (
-                <Skeleton
-                    variant="rectangular"
-                    sx={{
-                        bgcolor: photoMasonryPlaceholderBackground,
-                        display: "block",
-                        height: "100%",
-                        transform: "none",
-                        width: "100%",
-                    }}
-                />
-            )}
+            ) : null}
         </Box>
     );
 };
