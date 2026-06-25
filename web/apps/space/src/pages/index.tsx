@@ -189,7 +189,10 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                         overflowWrap: "anywhere",
                     }}
                 >
-                    @{identity.username} invited you!
+                    <Box component="span" sx={{ display: "block" }}>
+                        @{identity.username}
+                    </Box>
+                    invited you!
                 </Box>
                 <Box
                     component="p"
@@ -203,8 +206,7 @@ const PublicFriendRequestScreen: React.FC<PublicFriendRequestScreenProps> = ({
                         maxWidth: 260,
                     }}
                 >
-                    Add <Box component="span">@{identity.username}</Box> as a
-                    friend to see what they&apos;re up to on Ente Space
+                    {`Add @${identity.username} as a friend to see what they're up to on Ente Space`}
                 </Box>
             </Box>
             <Box

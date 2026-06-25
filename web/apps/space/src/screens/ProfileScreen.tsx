@@ -591,7 +591,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         isPostsLoading && (showPostLoadingIndicator ?? true);
     const shouldShowPostGrid =
         hasProfilePosts || shouldShowPostLoadingIndicator;
-    const isCoverImageLoading = Boolean(coverUrl && loadedCoverUrl != coverUrl);
+    const isCoverImageLoading = Boolean(
+        coverImageUrl && loadedCoverUrl != coverImageUrl,
+    );
     const shouldShowCoverSkeleton =
         isCoverLoading || isCoverURLPending || isCoverImageLoading;
     const selectedPostActionMode: SpaceViewerPostActionMode = isOwnerProfile
@@ -1075,9 +1077,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             component="img"
                             alt=""
                             src={coverImageUrl}
-                            onLoad={() => {
-                                if (coverUrl) setLoadedCoverUrl(coverUrl);
-                            }}
+                            onLoad={() => setLoadedCoverUrl(coverImageUrl)}
                             sx={{
                                 display: "block",
                                 height: "100%",
