@@ -13,9 +13,6 @@ CREATE TABLE IF NOT EXISTS spaces (
     CONSTRAINT uq_spaces_slug UNIQUE (space_slug)
 );
 
-CREATE INDEX IF NOT EXISTS idx_spaces_owner_id ON spaces (owner_id);
-CREATE INDEX IF NOT EXISTS idx_spaces_space_slug ON spaces (space_slug);
-
 CREATE TRIGGER update_spaces_updated_at
     BEFORE UPDATE ON spaces
     FOR EACH ROW
@@ -162,9 +159,6 @@ CREATE TABLE IF NOT EXISTS space_post_likes (
     created_at   BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     PRIMARY KEY (post_id, actor_space_id)
 );
-
-CREATE INDEX IF NOT EXISTS idx_space_post_likes_post_id
-    ON space_post_likes (post_id);
 
 CREATE INDEX IF NOT EXISTS idx_space_post_likes_post_created_user
     ON space_post_likes (post_id, created_at DESC, actor_space_id DESC);
