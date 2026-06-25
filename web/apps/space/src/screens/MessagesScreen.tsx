@@ -1541,7 +1541,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     ) => {
         const targetMessage = messageContextMenu?.message;
         if (!targetMessage) return;
-        if (isThreadReadOnly && action != "copy") {
+        if (!canInteract && action != "copy") {
             closeMessageActions();
             return;
         }
@@ -1718,7 +1718,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     );
 
     const messageActionMenuItems = [
-        !isThreadReadOnly && !isContextMessageOwn ? (
+        canInteract && !isContextMessageOwn ? (
             <MessageActionMenuItem
                 key="like"
                 icon={<HeartIcon small />}
@@ -1726,7 +1726,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                 onClick={() => handleMessageAction("like")}
             />
         ) : null,
-        !isThreadReadOnly ? (
+        canInteract ? (
             <MessageActionMenuItem
                 key="reply"
                 icon={<ReplyIcon />}
@@ -1740,9 +1740,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
             label="Copy"
             onClick={() => handleMessageAction("copy")}
         />,
-        !isThreadReadOnly &&
-        messageContextMenu?.message &&
-        isContextMessageOwn ? (
+        canInteract && messageContextMenu?.message && isContextMessageOwn ? (
             <MessageActionMenuItem
                 key="delete"
                 icon={<DeleteIcon />}
