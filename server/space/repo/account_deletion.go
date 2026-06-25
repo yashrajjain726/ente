@@ -90,25 +90,24 @@ func resetSpaceAccessTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs 
 		return stacktrace.Propagate(err, "failed to delete space notification read markers")
 	}
 	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM space_post_likes
-		WHERE actor_space_id = ANY($1)
-		   OR post_id IN (
+		DELETE FROM space_messages
+		WHERE kind = 'post_like'
+		  AND (
+		      sender_space_id = ANY($1)
+		      OR reply_post_id IN (
 		       SELECT post_id
 		       FROM space_posts
 		       WHERE space_id = ANY($1)
-		   )
+		      )
+		  )
 	`, spaceIDArray); err != nil {
 		return stacktrace.Propagate(err, "failed to delete space post likes")
 	}
 	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM space_message_likes
-		WHERE actor_space_id = ANY($1)
-		   OR message_id IN (
-		       SELECT message_id
-		       FROM space_messages
-		       WHERE sender_space_id = ANY($1)
-		          OR recipient_space_id = ANY($1)
-		   )
+		UPDATE space_messages
+		SET recipient_liked_at = NULL
+		WHERE recipient_liked_at IS NOT NULL
+		  AND (sender_space_id = ANY($1) OR recipient_space_id = ANY($1))
 	`, spaceIDArray); err != nil {
 		return stacktrace.Propagate(err, "failed to delete space message likes")
 	}

@@ -81,7 +81,7 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	require.True(t, liked.Liked)
 	viewed, err := repos.Messages.GetMessage(ctx, message.MessageID, aliceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), viewed.Likes)
+	require.True(t, viewed.Liked)
 	require.True(t, viewed.ViewerLiked)
 
 	require.NoError(t, controller.Delete(newSpaceControllerContext(bobID), messageToDelete.MessageID))

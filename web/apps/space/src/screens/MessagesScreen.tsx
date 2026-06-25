@@ -1258,7 +1258,7 @@ const MessageBubble: React.FC<{
                 minWidth: 0,
                 position: "relative",
                 width: "100%",
-                zIndex: isHighlighted ? 3 : message.likeCount > 0 ? 1 : "auto",
+                zIndex: isHighlighted ? 3 : message.liked ? 1 : "auto",
             }}
         >
             <Box
@@ -1350,7 +1350,7 @@ const MessageBubble: React.FC<{
                         >
                             {message.text}
                         </Box>
-                        {message.likeCount > 0 && (
+                        {message.liked && (
                             <Box
                                 component="span"
                                 role="img"

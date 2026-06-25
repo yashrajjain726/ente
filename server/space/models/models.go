@@ -344,7 +344,7 @@ type MessageResponse struct {
 	Quote               *MessageQuoteResponse `json:"quote,omitempty"`
 	ReplyPostID         *int64                `json:"replyPostId,omitempty"`
 	ReplyMessageID      *string               `json:"replyMessageId,omitempty"`
-	Likes               int64                 `json:"likes"`
+	Liked               bool                  `json:"liked"`
 	ViewerLiked         bool                  `json:"viewerLiked"`
 	IsDeleted           bool                  `json:"isDeleted"`
 	CreatedAt           string                `json:"createdAt"`
@@ -412,7 +412,6 @@ type PostResponse struct {
 	KeyVersion       int                 `json:"keyVersion"`
 	Objects          []PostObjectPayload `json:"objects,omitempty"`
 	CreatedAt        string              `json:"createdAt"`
-	Likes            int64               `json:"likes"`
 	ViewerLiked      bool                `json:"viewerLiked"`
 }
 

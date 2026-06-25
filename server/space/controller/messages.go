@@ -16,6 +16,7 @@ import (
 const (
 	spaceMessageKindRegular   = "regular"
 	spaceMessageKindPostReply = "post_reply"
+	spaceMessageKindPostLike  = "post_like"
 
 	maxSpaceMessageCipherEncodedBytes = 8 * 1024
 	maxSpaceMessageCipherDecodedBytes = 6 * 1024
@@ -203,10 +204,13 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 	if message.IsDeleted {
 		return nil, ente.NewBadRequestWithMessage("cannot like a deleted message")
 	}
-	otherSpaceID := message.SenderSpaceID
-	if message.SenderSpaceID == actorSpace.SpaceID {
-		otherSpaceID = message.RecipientSpaceID
+	if message.Kind == spaceMessageKindPostLike {
+		return nil, ente.NewBadRequestWithMessage("cannot like a post like")
 	}
+	if message.RecipientSpaceID != actorSpace.SpaceID {
+		return nil, ente.NewBadRequestWithMessage("only the recipient can like a message")
+	}
+	otherSpaceID := message.SenderSpaceID
 	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx.Request.Context(), userID, actorSpace.SpaceID, otherSpaceID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.ErrPermissionDenied
@@ -238,6 +242,9 @@ func (c *MessagesController) Delete(ctx *gin.Context, messageID string) error {
 	}
 	if message.SenderID != userID || message.SenderSpaceID != senderSpace.SpaceID {
 		return ente.ErrPermissionDenied
+	}
+	if message.Kind == spaceMessageKindPostLike {
+		return ente.NewBadRequestWithMessage("cannot delete a post like")
 	}
 	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx.Request.Context(), userID, senderSpace.SpaceID, message.RecipientSpaceID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
@@ -332,7 +339,7 @@ func toMessageResponse(message repo.SpaceMessageRecord) *models.MessageResponse 
 		MessageCipher:       encodeSpaceField(message.MessageCipher),
 		EncryptedMessageKey: encodeSpaceField(message.EncryptedMessageKey),
 		Text:                message.Text,
-		Likes:               message.Likes,
+		Liked:               message.Liked,
 		ViewerLiked:         message.ViewerLiked,
 		IsDeleted:           message.IsDeleted,
 		CreatedAt:           formatMicros(message.CreatedAt),

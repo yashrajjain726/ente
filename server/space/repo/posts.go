@@ -19,7 +19,6 @@ func postRecordSelectSQL(viewerLikedExpr string) string {
 		       (SELECT COUNT(*) FROM space_posts ap WHERE ap.space_id = w.space_id AND ap.is_deleted = FALSE) AS author_posts,
 		       p.encrypted_post_key, p.caption_cipher,
 		       p.key_version, p.created_at,
-		       (SELECT COUNT(*) FROM space_post_likes pl WHERE pl.post_id = p.post_id) AS likes,
 		       ` + viewerLikedExpr + ` AS viewer_liked`
 }
 
@@ -87,7 +86,7 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID
 
 func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID int64, viewerSpaceID string) (*SpacePostRecord, error) {
 	query := postRecordSelectSQL(`
-		       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2)`) + `
+		       EXISTS (SELECT 1 FROM space_messages m WHERE m.kind = 'post_like' AND m.reply_post_id = p.post_id AND m.sender_space_id = $2)`) + `
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
 			LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
@@ -103,7 +102,7 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 	}
 	args := []any{spaceID, viewerSpaceID}
 	query := postRecordSelectSQL(`
-			       EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2)`) + `
+			       EXISTS (SELECT 1 FROM space_messages m WHERE m.kind = 'post_like' AND m.reply_post_id = p.post_id AND m.sender_space_id = $2)`) + `
 				FROM space_posts p
 				JOIN spaces w ON w.space_id = p.space_id
 				LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
@@ -138,7 +137,7 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 	}
 	args := []any{viewerID, viewerSpaceID}
 	query := postRecordSelectSQL(`
-			       CASE WHEN p.space_id = $2 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_post_likes pl WHERE pl.post_id = p.post_id AND pl.actor_space_id = $2) END`) + `
+			       CASE WHEN p.space_id = $2 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_messages m WHERE m.kind = 'post_like' AND m.reply_post_id = p.post_id AND m.sender_space_id = $2) END`) + `
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
 			LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
@@ -233,7 +232,7 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 		if !isDeleted {
 			return nil, sql.ErrNoRows
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM space_post_likes WHERE post_id = $1`, postID); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		if err := tx.Commit(); err != nil {
@@ -279,7 +278,7 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 		}
 		keys = append(keys, object.key)
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM space_post_likes WHERE post_id = $1`, postID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	if err := tx.Commit(); err != nil {
@@ -290,7 +289,16 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 
 func (r *PostsRepository) SetLikeWithCreated(ctx context.Context, postID int64, actorSpaceID string, like bool) (bool, error) {
 	if like {
-		res, err := r.DB.ExecContext(ctx, `INSERT INTO space_post_likes (post_id, actor_space_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, postID, actorSpaceID)
+		messageID := "post_like:" + strconv.FormatInt(postID, 10) + ":" + strings.TrimSpace(actorSpaceID)
+		res, err := r.DB.ExecContext(ctx, `
+			INSERT INTO space_messages (message_id, sender_space_id, recipient_space_id, kind, reply_post_id)
+			SELECT $1, $2, p.space_id, 'post_like', p.post_id
+			FROM space_posts p
+			WHERE p.post_id = $3
+			  AND p.space_id <> $2
+			  AND p.is_deleted = FALSE
+			ON CONFLICT DO NOTHING
+		`, messageID, actorSpaceID, postID)
 		if err != nil {
 			return false, stacktrace.Propagate(err, "")
 		}
@@ -300,7 +308,7 @@ func (r *PostsRepository) SetLikeWithCreated(ctx context.Context, postID int64, 
 		}
 		return affected > 0, nil
 	}
-	res, err := r.DB.ExecContext(ctx, `DELETE FROM space_post_likes WHERE post_id = $1 AND actor_space_id = $2`, postID, actorSpaceID)
+	res, err := r.DB.ExecContext(ctx, `DELETE FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1 AND sender_space_id = $2`, postID, actorSpaceID)
 	if err != nil {
 		return false, stacktrace.Propagate(err, "")
 	}
@@ -323,17 +331,17 @@ func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, curs
 		       liker_avatar.size, liker_space.updated_at,
 		       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = liker_space.space_id) AS liker_friends,
 		       (SELECT COUNT(*) FROM space_posts lp WHERE lp.space_id = liker_space.space_id AND lp.is_deleted = FALSE) AS liker_posts,
-		       pl.created_at
-		FROM space_post_likes pl
-		JOIN spaces liker_space ON liker_space.space_id = pl.actor_space_id
+		       m.created_at
+		FROM space_messages m
+		JOIN spaces liker_space ON liker_space.space_id = m.sender_space_id
 		LEFT JOIN space_profile_assets liker_avatar ON liker_avatar.space_id = liker_space.space_id AND liker_avatar.asset_type = 'avatar'
-		WHERE pl.post_id = $1`
+		WHERE m.kind = 'post_like' AND m.reply_post_id = $1`
 	if cursorCreatedAt, cursorActorSpaceID, ok := parsePostLikerCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorActorSpaceID)
-		query += ` AND (pl.created_at, pl.actor_space_id) < ($2, $3)`
+		query += ` AND (m.created_at, m.sender_space_id) < ($2, $3)`
 	}
 	args = append(args, limit+1)
-	query += ` ORDER BY pl.created_at DESC, pl.actor_space_id DESC LIMIT $` + strconv.Itoa(len(args))
+	query += ` ORDER BY m.created_at DESC, m.sender_space_id DESC LIMIT $` + strconv.Itoa(len(args))
 	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, "", stacktrace.Propagate(err, "")
@@ -391,7 +399,7 @@ func scanPostRecord(scanner interface{ Scan(dest ...any) error }) (*SpacePostRec
 	var rec SpacePostRecord
 	dest := []any{&rec.PostID, &rec.SpaceID, &rec.SpaceSlug, &rec.OwnerID}
 	dest = append(dest, spaceActorScanDest(&rec.Author)...)
-	dest = append(dest, &rec.EncryptedPostKey, &rec.CaptionCipher, &rec.KeyVersion, &rec.CreatedAt, &rec.Likes, &rec.ViewerLiked)
+	dest = append(dest, &rec.EncryptedPostKey, &rec.CaptionCipher, &rec.KeyVersion, &rec.CreatedAt, &rec.ViewerLiked)
 	if err := scanner.Scan(dest...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

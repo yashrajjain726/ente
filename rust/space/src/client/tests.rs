@@ -270,7 +270,6 @@ async fn space_link_decrypt_post_key_uses_post_version() {
         key_version: 1,
         objects: Vec::new(),
         created_at: "2026-04-16T00:00:00Z".to_owned(),
-        likes: 0,
         viewer_liked: false,
     };
 
@@ -1444,7 +1443,7 @@ async fn message_actions_use_message_endpoints() {
                 "messageCipher": "cipher",
                 "encryptedMessageKey": "key",
                 "replyMessageId": "wmsg_parent",
-                "likes": 0,
+                "liked": false,
                 "viewerLiked": false,
                 "isDeleted": false,
                 "createdAt": "2026-04-16T00:00:00Z",
@@ -1963,7 +1962,6 @@ async fn list_feed_uses_space_feed_endpoint() {
                     "keyVersion": 3,
                     "objects": [],
                     "createdAt": "2026-04-16T00:00:00Z",
-                    "likes": 2,
                     "viewerLiked": true
                 }],
                 "nextCursor": "cursor-2"
@@ -2012,7 +2010,6 @@ async fn list_posts_uses_space_posts_page_endpoint() {
                     "keyVersion": 3,
                     "objects": [],
                     "createdAt": "2026-04-16T00:00:00Z",
-                    "likes": 2,
                     "viewerLiked": true
                 }],
                 "nextCursor": "41"
@@ -2076,7 +2073,6 @@ async fn fetch_post_decrypted_uses_post_by_id_endpoint() {
                     "keyVersion": 3,
                     "objects": [],
                     "createdAt": "2026-04-16T00:00:00Z",
-                    "likes": 0,
                     "viewerLiked": false
                 })
                 .to_string(),

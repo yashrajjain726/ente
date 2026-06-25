@@ -9,14 +9,11 @@ DROP TABLE IF EXISTS space_friend_requests;
 DROP TRIGGER IF EXISTS update_space_friend_shares_updated_at ON space_friend_shares;
 DROP TABLE IF EXISTS space_friend_shares;
 
-DROP TABLE IF EXISTS space_message_likes;
-
 DROP TRIGGER IF EXISTS update_space_messages_updated_at ON space_messages;
 DROP TRIGGER IF EXISTS space_messages_null_cipher_on_delete ON space_messages;
 DROP TABLE IF EXISTS space_messages;
 DROP FUNCTION IF EXISTS tg_space_messages_null_cipher_on_delete();
 
-DROP TABLE IF EXISTS space_post_likes;
 DROP TABLE IF EXISTS space_temp_objects;
 DROP TABLE IF EXISTS space_post_assets;
 

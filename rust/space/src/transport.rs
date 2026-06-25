@@ -195,7 +195,7 @@ pub struct MessageResponse {
     #[serde(default)]
     pub reply_message_id: Option<String>,
     #[serde(default)]
-    pub likes: i64,
+    pub liked: bool,
     #[serde(default)]
     pub viewer_liked: bool,
     #[serde(default)]
@@ -281,7 +281,6 @@ pub struct PostResponse {
     #[serde(default)]
     pub objects: Vec<PostObjectPayload>,
     pub created_at: String,
-    pub likes: i64,
     pub viewer_liked: bool,
 }
 

@@ -534,7 +534,6 @@ fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
         key_version: item.key_version,
         objects: item.objects.clone(),
         created_at: item.created_at.clone(),
-        likes: item.likes,
         viewer_liked: item.viewer_liked,
     }
 }

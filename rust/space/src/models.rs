@@ -139,7 +139,6 @@ pub struct FeedItem {
     #[serde(default)]
     pub objects: Vec<PostObjectPayload>,
     pub created_at: String,
-    pub likes: i64,
     pub viewer_liked: bool,
 }
 

@@ -99,7 +99,6 @@ type SpacePostRecord struct {
 	CaptionCipher    []byte
 	KeyVersion       int
 	CreatedAt        int64
-	Likes            int64
 	ViewerLiked      bool
 }
 
@@ -141,7 +140,7 @@ type SpaceMessageRecord struct {
 	EncryptedMessageKey []byte
 	ReplyPostID         sql.NullInt64
 	ReplyMessageID      sql.NullString
-	Likes               int64
+	Liked               bool
 	ViewerLiked         bool
 	IsDeleted           bool
 	Text                string

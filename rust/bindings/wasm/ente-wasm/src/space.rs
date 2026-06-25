@@ -159,7 +159,6 @@ struct PostJs {
     key_version: i32,
     objects: Vec<PostObjectJs>,
     created_at: String,
-    likes: i64,
     viewer_liked: bool,
 }
 
@@ -209,7 +208,7 @@ struct MessageJs {
     quote: Option<MessageQuoteJs>,
     reply_post_id: Option<i64>,
     reply_message_id: Option<String>,
-    likes: i64,
+    liked: bool,
     viewer_liked: bool,
     is_deleted: bool,
     created_at: String,
@@ -435,7 +434,6 @@ async fn account_post_to_js(
         key_version: post.key_version,
         objects: post_objects_to_js(Some(&decrypted.post_key), post.objects)?,
         created_at: post.created_at,
-        likes: post.likes,
         viewer_liked: post.viewer_liked,
     })
 }
@@ -456,7 +454,6 @@ async fn link_post_to_js(
         key_version: post.key_version,
         objects: post_objects_to_js(Some(&decrypted.post_key), post.objects)?,
         created_at: post.created_at,
-        likes: post.likes,
         viewer_liked: post.viewer_liked,
     })
 }
@@ -518,7 +515,7 @@ async fn account_message_to_js(
         quote,
         reply_post_id: message.reply_post_id,
         reply_message_id: message.reply_message_id,
-        likes: message.likes,
+        liked: message.liked,
         viewer_liked: message.viewer_liked,
         is_deleted: message.is_deleted,
         created_at: message.created_at,
@@ -589,7 +586,7 @@ async fn account_message_response_to_js(
         quote,
         reply_post_id: message.reply_post_id,
         reply_message_id: message.reply_message_id,
-        likes: message.likes,
+        liked: message.liked,
         viewer_liked: message.viewer_liked,
         is_deleted: message.is_deleted,
         created_at: message.created_at,
@@ -903,7 +900,6 @@ impl SpaceAccountCtxHandle {
                             key_version: item.key_version,
                             objects: item.objects,
                             created_at: item.created_at,
-                            likes: item.likes,
                             viewer_liked: item.viewer_liked,
                         })
                         .collect(),

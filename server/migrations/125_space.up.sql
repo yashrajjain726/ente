@@ -153,19 +153,6 @@ CREATE TABLE IF NOT EXISTS space_temp_objects (
 CREATE INDEX IF NOT EXISTS idx_space_temp_objects_expires
     ON space_temp_objects (cleanup_after ASC);
 
-CREATE TABLE IF NOT EXISTS space_post_likes (
-    post_id      BIGINT NOT NULL REFERENCES space_posts (post_id) ON DELETE CASCADE,
-    actor_space_id TEXT  NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    created_at   BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    PRIMARY KEY (post_id, actor_space_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_space_post_likes_post_created_user
-    ON space_post_likes (post_id, created_at DESC, actor_space_id DESC);
-
-CREATE INDEX IF NOT EXISTS idx_space_post_likes_actor_created_post
-    ON space_post_likes (actor_space_id, created_at DESC, post_id DESC);
-
 CREATE TABLE IF NOT EXISTS space_friend_shares (
     space_id              TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     friend_space_id       TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
@@ -219,6 +206,7 @@ BEGIN
         NEW.message_cipher := NULL;
         NEW.sender_encrypted_message_key := NULL;
         NEW.recipient_encrypted_message_key := NULL;
+        NEW.recipient_liked_at := NULL;
     END IF;
     RETURN NEW;
 END; $$ LANGUAGE plpgsql;
@@ -240,21 +228,46 @@ CREATE TABLE IF NOT EXISTS space_messages (
     recipient_encrypted_message_key BYTEA,
     reply_post_id                   BIGINT REFERENCES space_posts (post_id) ON DELETE SET NULL,
     reply_message_id                TEXT REFERENCES space_messages (message_id) ON DELETE SET NULL,
+    recipient_liked_at              BIGINT,
     is_deleted                      BOOLEAN NOT NULL DEFAULT FALSE,
     created_at                      BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
     updated_at                      BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
     CONSTRAINT chk_space_messages_distinct_spaces CHECK (sender_space_id <> recipient_space_id),
-    CONSTRAINT chk_space_messages_kind CHECK (kind IN ('regular', 'post_reply')),
+    CONSTRAINT chk_space_messages_kind CHECK (kind IN ('regular', 'post_reply', 'post_like')),
     CONSTRAINT chk_space_messages_regular_shape CHECK (kind <> 'regular' OR reply_post_id IS NULL),
+    CONSTRAINT chk_space_messages_post_like_shape CHECK (
+        kind <> 'post_like' OR (
+            reply_post_id IS NOT NULL
+            AND reply_message_id IS NULL
+            AND message_cipher IS NULL
+            AND sender_encrypted_message_key IS NULL
+            AND recipient_encrypted_message_key IS NULL
+            AND recipient_liked_at IS NULL
+            AND is_deleted = FALSE
+        )
+    ),
+    CONSTRAINT chk_space_messages_recipient_like CHECK (
+        recipient_liked_at IS NULL OR (kind <> 'post_like' AND is_deleted = FALSE)
+    ),
     CONSTRAINT chk_space_messages_single_reply_target CHECK (reply_post_id IS NULL OR reply_message_id IS NULL),
     CONSTRAINT chk_space_messages_cipher_on_delete CHECK (
         (
+            kind <> 'post_like'
+            AND
             is_deleted = FALSE
             AND message_cipher IS NOT NULL
             AND sender_encrypted_message_key IS NOT NULL
             AND recipient_encrypted_message_key IS NOT NULL
         ) OR (
+            kind <> 'post_like'
+            AND
             is_deleted = TRUE
+            AND message_cipher IS NULL
+            AND sender_encrypted_message_key IS NULL
+            AND recipient_encrypted_message_key IS NULL
+        ) OR (
+            kind = 'post_like'
+            AND is_deleted = FALSE
             AND message_cipher IS NULL
             AND sender_encrypted_message_key IS NULL
             AND recipient_encrypted_message_key IS NULL
@@ -281,15 +294,17 @@ CREATE INDEX IF NOT EXISTS idx_space_messages_reply_message
     ON space_messages (reply_message_id)
     WHERE reply_message_id IS NOT NULL;
 
-CREATE TABLE IF NOT EXISTS space_message_likes (
-    message_id  TEXT   NOT NULL REFERENCES space_messages (message_id) ON DELETE CASCADE,
-    actor_space_id TEXT NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    created_at  BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    PRIMARY KEY (message_id, actor_space_id)
-);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_space_messages_post_like
+    ON space_messages (reply_post_id, sender_space_id)
+    WHERE kind = 'post_like';
 
-CREATE INDEX IF NOT EXISTS idx_space_message_likes_actor_created
-    ON space_message_likes (actor_space_id, created_at DESC, message_id DESC);
+CREATE INDEX IF NOT EXISTS idx_space_messages_sender_liked
+    ON space_messages (sender_space_id, recipient_liked_at DESC, message_id DESC)
+    WHERE recipient_liked_at IS NOT NULL AND is_deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_space_messages_recipient_liked
+    ON space_messages (recipient_space_id, recipient_liked_at DESC, message_id DESC)
+    WHERE recipient_liked_at IS NOT NULL AND is_deleted = FALSE;
 
 CREATE TRIGGER space_messages_null_cipher_on_delete
     BEFORE INSERT OR UPDATE ON space_messages

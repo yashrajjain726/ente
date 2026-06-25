@@ -110,7 +110,7 @@ const createLocalMessage = ({
         id: createLocalMessageID(),
         isDeleted: false,
         kind: "regular",
-        likeCount: 0,
+        liked: false,
         recipient,
         replyMessageId,
         sender: currentProfileMessageActor(profile),
@@ -595,14 +595,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     setMessages((currentMessages) =>
                         currentMessages.map((message) =>
                             message.id == messageId
-                                ? {
-                                      ...message,
-                                      likeCount: Math.max(
-                                          0,
-                                          message.likeCount + (liked ? 1 : -1),
-                                      ),
-                                      viewerLiked: liked,
-                                  }
+                                ? { ...message, liked, viewerLiked: liked }
                                 : message,
                         ),
                     );

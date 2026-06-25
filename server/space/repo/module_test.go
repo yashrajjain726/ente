@@ -212,8 +212,8 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE requester_space_id = $1 OR target_space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_post_likes WHERE post_id = $1`, postID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_message_likes WHERE message_id = $1`, message.MessageID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE message_id = $1 AND recipient_liked_at IS NOT NULL`, message.MessageID))
 	_, _, err = testConfirmFriendRequest(ctx, module, charlieID, charlieSpace.SpaceID, pendingRequest.RequestID, "charlie-share-key", charlieSpace.CurrentVersion)
 	require.Error(t, err)
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE (space_id = $1 AND friend_space_id = $2) OR (space_id = $2 AND friend_space_id = $1)`, aliceSpace.SpaceID, charlieSpace.SpaceID))
@@ -322,18 +322,18 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "regular", message.Kind)
 	require.Equal(t, testSpaceBytes("sender-key"), message.EncryptedMessageKey)
-	require.Equal(t, int64(0), message.Likes)
+	require.False(t, message.Liked)
 	require.False(t, message.ViewerLiked)
 
 	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceSpace.SpaceID, true))
 	setMessageLikeCreatedAt(t, module, 1500, message.MessageID, aliceSpace.SpaceID)
 	likedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, aliceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), likedMessage.Likes)
+	require.True(t, likedMessage.Liked)
 	require.True(t, likedMessage.ViewerLiked)
 	bobViewedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, bobID, bobSpace.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), bobViewedMessage.Likes)
+	require.True(t, bobViewedMessage.Liked)
 	require.False(t, bobViewedMessage.ViewerLiked)
 
 	reply, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
@@ -375,7 +375,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	require.True(t, deletedMessage.IsDeleted)
 	require.Empty(t, deletedMessage.MessageCipher)
 	require.Empty(t, deletedMessage.EncryptedMessageKey)
-	require.Equal(t, int64(0), deletedMessage.Likes)
+	require.False(t, deletedMessage.Liked)
 	aliceThread, nextCursor, err = module.Messages.ListThread(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Empty(t, nextCursor)
@@ -1052,7 +1052,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	requireQueuedTempObject(t, module, "space/alice/post1/full", TempObjectPurposePost, "b2-eu-cen")
 	requireQueuedTempObject(t, module, "space/alice/post1/thumb", TempObjectPurposePost, "b2-eu-cen")
 	var likeCount int
-	err = module.Posts.DB.QueryRow(`SELECT COUNT(*) FROM space_post_likes WHERE post_id = $1`, postID).Scan(&likeCount)
+	err = module.Posts.DB.QueryRow(`SELECT COUNT(*) FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID).Scan(&likeCount)
 	require.NoError(t, err)
 	require.Zero(t, likeCount)
 
@@ -2242,7 +2242,7 @@ func setPostCreatedAt(t *testing.T, module *Module, createdAt int64, postIDs ...
 
 func setPostLikeCreatedAt(t *testing.T, module *Module, createdAt, postID int64, actorSpaceID string) {
 	t.Helper()
-	_, err := module.Posts.DB.Exec(`UPDATE space_post_likes SET created_at = $1 WHERE post_id = $2 AND actor_space_id = $3`, createdAt, postID, actorSpaceID)
+	_, err := module.Posts.DB.Exec(`UPDATE space_messages SET created_at = $1, updated_at = $1 WHERE kind = 'post_like' AND reply_post_id = $2 AND sender_space_id = $3`, createdAt, postID, actorSpaceID)
 	require.NoError(t, err)
 }
 
@@ -2266,6 +2266,6 @@ func setMessageCreatedAt(t *testing.T, module *Module, createdAt int64, messageI
 
 func setMessageLikeCreatedAt(t *testing.T, module *Module, createdAt int64, messageID string, actorSpaceID string) {
 	t.Helper()
-	_, err := module.Messages.DB.Exec(`UPDATE space_message_likes SET created_at = $1 WHERE message_id = $2 AND actor_space_id = $3`, createdAt, messageID, actorSpaceID)
+	_, err := module.Messages.DB.Exec(`UPDATE space_messages SET recipient_liked_at = $1 WHERE message_id = $2 AND recipient_space_id = $3`, createdAt, messageID, actorSpaceID)
 	require.NoError(t, err)
 }
