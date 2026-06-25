@@ -195,7 +195,7 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceID, aliceSpace.SpaceID, true))
 	setMessageLikeCreatedAt(t, module, 1500, message.MessageID, aliceSpace.SpaceID)
-	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, timeutil.Microseconds()))
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, timeutil.Microseconds()))
 
 	require.NoError(t, module.ResetUserAccess(ctx, aliceID))
 
@@ -269,7 +269,7 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceID, aliceSpace.SpaceID, true))
 	require.NoError(t, module.Posts.SetLike(ctx, postID, bobID, bobSpace.SpaceID, true))
-	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, timeutil.Microseconds()))
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, timeutil.Microseconds()))
 
 	require.NoError(t, module.DeleteUserData(ctx, aliceID))
 
@@ -847,7 +847,7 @@ func TestSpaceMessageConversationPreviewUsesLatestActivityWithSeparateUnreadStat
 	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(3000), latestActivityAt)
-	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
 
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -912,7 +912,7 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(3000), latestActivityAt)
-	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
 	require.NoError(t, module.Posts.SetLike(ctx, thirdPostID, bobID, bobSpace.SpaceID, true))
 	setPostLikeCreatedAt(t, module, 4000, thirdPostID, bobSpace.SpaceID)
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
@@ -934,7 +934,7 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 	latestActivityAt, err = module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(5000), latestActivityAt)
-	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
 	secondAliceMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
 		SenderID:                     aliceID,
@@ -1905,7 +1905,7 @@ func TestSpaceReadMarkersDriveNotificationState(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, notificationsUnread)
 
-	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, 2000))
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, 2000))
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.False(t, conversations[0].Unread)
@@ -2019,7 +2019,7 @@ func TestSpaceNotificationReadMarkersArePerFriend(t *testing.T) {
 	bobLatestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(1002), bobLatestActivityAt)
-	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, bobLatestActivityAt))
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, bobLatestActivityAt))
 	bobConversation = conversationBySpaceID(bobSpace.SpaceID)
 	require.False(t, bobConversation.Unread)
 	require.Equal(t, int64(0), bobConversation.UnreadCount)
@@ -2030,7 +2030,7 @@ func TestSpaceNotificationReadMarkersArePerFriend(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, notificationsUnread)
 
-	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, charlieSpace.SpaceID, 2000))
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, charlieSpace.SpaceID, 2000))
 	notificationsUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.False(t, notificationsUnread)
@@ -2089,7 +2089,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(2000), latestActivityAt)
-	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Equal(t, outgoing.MessageID, conversations[0].LatestActivity.Message.MessageID)
@@ -2248,7 +2248,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	latestActivityAt, err = module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(6000), latestActivityAt)
-	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.False(t, conversations[0].Unread)

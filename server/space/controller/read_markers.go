@@ -55,7 +55,7 @@ func (c *ReadMarkersController) MarkNotificationsRead(ctx *gin.Context, req mode
 		}
 		return nil, err
 	}
-	if err := c.ReadMarkersRepo.UpsertNotificationReadMarker(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.FriendSpaceID, readAt); err != nil {
+	if err := c.ReadMarkersRepo.UpsertNotificationReadMarker(ctx.Request.Context(), viewerSpace.SpaceID, req.FriendSpaceID, readAt); err != nil {
 		return nil, err
 	}
 	return c.GetUnreadStatus(ctx)

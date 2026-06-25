@@ -7,10 +7,10 @@ import (
 	"github.com/ente-io/stacktrace"
 )
 
-func (r *ReadMarkersRepository) UpsertNotificationReadMarker(ctx context.Context, userID int64, viewerSpaceID string, friendSpaceID string, readAt int64) error {
+func (r *ReadMarkersRepository) UpsertNotificationReadMarker(ctx context.Context, viewerSpaceID string, friendSpaceID string, readAt int64) error {
 	viewerSpaceID = strings.TrimSpace(viewerSpaceID)
 	friendSpaceID = strings.TrimSpace(friendSpaceID)
-	if userID <= 0 || viewerSpaceID == "" || friendSpaceID == "" || readAt <= 0 {
+	if viewerSpaceID == "" || friendSpaceID == "" || readAt <= 0 {
 		return nil
 	}
 	_, err := r.DB.ExecContext(ctx, `
