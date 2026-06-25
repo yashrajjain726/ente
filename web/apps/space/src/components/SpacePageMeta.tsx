@@ -4,8 +4,8 @@ import { onboardingDescription } from "screens/OnboardingScreen";
 
 const spacePreviewTitle = "Add me on Ente Space";
 const previewImages = {
-    home: "/images/meta.png",
-    invite: "/images/meta-invite.png",
+    home: "/images/meta.jpg",
+    invite: "/images/meta-invite.jpg",
 } as const;
 
 interface SpacePageMetaProps {
@@ -27,7 +27,7 @@ export const SpacePageMeta: React.FC<SpacePageMetaProps> = ({
             {previewImage && (
                 <>
                     <meta property="og:image" content={previewImage} />
-                    <meta property="og:image:type" content="image/png" />
+                    <meta property="og:image:type" content="image/jpeg" />
                     <meta property="og:image:width" content="1200" />
                     <meta property="og:image:height" content="630" />
                     <meta name="twitter:card" content="summary_large_image" />

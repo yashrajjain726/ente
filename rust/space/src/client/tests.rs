@@ -1,0 +1,2179 @@
+//! Integration tests for the Space client.
+//!
+//! Black-box tests over the public `AccountSpaceCtx` / `SpaceLinkCtx` API,
+//! driven by a mock HTTP server. Shared fixtures live in
+//! [`test_support`](super::test_support). Kept in-crate (rather than `tests/`)
+//! because a few fixtures need crate-internal crypto and constructors.
+
+use super::test_support::*;
+use super::*;
+use crate::crypto::{
+    derive_space_link_auth_key, derive_space_link_wrap_key, encrypt_asset_payload,
+    seal_with_public_key, space_link_access_key_material,
+};
+use crate::models::{MessageQuote, OpenSpaceLinkCtxInput};
+use crate::transport::{ProfileAvatarPayload, ProfileCoverPayload, SpaceActorResponse};
+
+use mockito::{Matcher, Server};
+use serde_json::json;
+
+#[tokio::test]
+async fn account_http_client_sends_space_session_token_header() {
+    let mut server = Server::new_async().await;
+    let request = server
+        .mock("GET", "/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body("{}")
+        .create_async()
+        .await;
+    let client = build_http_client(
+        &server.url(),
+        None,
+        Some("space-session-token".to_owned()),
+        None,
+        None,
+        None,
+    )
+    .expect("http client");
+
+    let _: serde_json::Value = client.get_json("/space", &[]).await.unwrap();
+
+    request.assert_async().await;
+}
+
+#[tokio::test]
+async fn get_space_root_key_returns_context_space_root_key() {
+    let server = Server::new_async().await;
+    let expected_space_root = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), expected_space_root.clone());
+
+    let space_root = ctx
+        .get_space_root_key()
+        .await
+        .expect("space root key should load")
+        .expect("space root key should exist");
+
+    assert_eq!(space_root, expected_space_root);
+}
+
+#[tokio::test]
+async fn get_or_create_space_root_key_returns_context_space_root_key() {
+    let server = Server::new_async().await;
+    let expected_space_root = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), expected_space_root.clone());
+
+    let space_root = ctx
+        .get_or_create_space_root_key()
+        .await
+        .expect("space root key should load");
+
+    assert_eq!(space_root, expected_space_root);
+}
+
+#[tokio::test]
+async fn space_link_open_decrypts_current_space_key() {
+    let mut server = Server::new_async().await;
+    let space_key = generate_key();
+    let access_key = "AbC123xYz789";
+    let access_key_material =
+        space_link_access_key_material(access_key).expect("access key material");
+    let auth_key = derive_space_link_auth_key(&access_key_material).expect("auth key");
+    let wrap_key = derive_space_link_wrap_key(&access_key_material).expect("wrap key");
+    let link_wrapped_space_key = encode_b64(
+        &encrypt_secretbox_payload(&wrap_key, &space_key).expect("link wrapped space key"),
+    );
+
+    let lookup = server
+        .mock("GET", "/space/public/by-slug/owner-gallery")
+        .with_status(200)
+        .with_body(
+            json!({
+                "spaceId": "space_owner_gallery",
+                "spaceSlug": "owner-gallery",
+                "owner": "owner-gallery",
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let session = server
+        .mock("POST", "/space/links/session")
+        .match_body(Matcher::JsonString(
+            json!({
+                "spaceId": "space_owner_gallery",
+                "authKey": encode_b64(&auth_key),
+            })
+            .to_string(),
+        ))
+        .with_status(200)
+        .with_body(
+            json!({
+                "sessionToken": "space-link-token",
+                "spaceId": "space_owner_gallery",
+                "spaceSlug": "owner-gallery",
+                "owner": "owner-handle",
+                "keyVersion": 3,
+                "linkWrappedSpaceKey": link_wrapped_space_key,
+                "encryptedProfile": "",
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let ctx = SpaceLinkCtx::open(OpenSpaceLinkCtxInput {
+        base_url: server.url(),
+        space_username: "@owner-gallery".to_owned(),
+        access_key: access_key.to_owned(),
+        user_agent: None,
+        client_package: None,
+        client_version: None,
+    })
+    .await
+    .expect("space link ctx should open");
+
+    assert_eq!(ctx.space_id(), "space_owner_gallery");
+    assert_eq!(ctx.space_slug(), "owner-gallery");
+    assert_eq!(ctx.key_version(), 3);
+    assert_eq!(ctx.space_key(), space_key.as_slice());
+    lookup.assert_async().await;
+    session.assert_async().await;
+}
+
+#[tokio::test]
+async fn space_link_open_rejects_wrong_access_key() {
+    let mut server = Server::new_async().await;
+    let space_key = generate_key();
+    let correct_access_key = "CorrectKey12";
+    let wrong_access_key = "WrongKey1234";
+    let correct_access_key_material =
+        space_link_access_key_material(correct_access_key).expect("correct access key material");
+    let wrong_access_key_material =
+        space_link_access_key_material(wrong_access_key).expect("wrong access key material");
+    let wrong_auth_key = derive_space_link_auth_key(&wrong_access_key_material).expect("auth key");
+    let correct_wrap_key =
+        derive_space_link_wrap_key(&correct_access_key_material).expect("wrap key");
+    let link_wrapped_space_key = encode_b64(
+        &encrypt_secretbox_payload(&correct_wrap_key, &space_key).expect("link wrapped space key"),
+    );
+
+    let lookup = server
+        .mock("GET", "/space/public/by-slug/owner-gallery")
+        .with_status(200)
+        .with_body(
+            json!({
+                "spaceId": "space_owner_gallery",
+                "spaceSlug": "owner-gallery",
+                "owner": "owner-gallery",
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let session = server
+        .mock("POST", "/space/links/session")
+        .match_body(Matcher::JsonString(
+            json!({
+                "spaceId": "space_owner_gallery",
+                "authKey": encode_b64(&wrong_auth_key),
+            })
+            .to_string(),
+        ))
+        .with_status(200)
+        .with_body(
+            json!({
+                "sessionToken": "space-link-token",
+                "spaceId": "space_owner_gallery",
+                "spaceSlug": "owner-gallery",
+                "owner": "owner-handle",
+                "keyVersion": 3,
+                "linkWrappedSpaceKey": link_wrapped_space_key,
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let err = match SpaceLinkCtx::open(OpenSpaceLinkCtxInput {
+        base_url: server.url(),
+        space_username: "owner-gallery".to_owned(),
+        access_key: wrong_access_key.to_owned(),
+        user_agent: None,
+        client_package: None,
+        client_version: None,
+    })
+    .await
+    {
+        Ok(_) => panic!("wrong access key should not decrypt space key"),
+        Err(err) => err,
+    };
+
+    assert!(matches!(err, SpaceError::Crypto(_)));
+    lookup.assert_async().await;
+    session.assert_async().await;
+}
+
+#[tokio::test]
+async fn space_link_decrypt_post_key_uses_post_version() {
+    let mut server = Server::new_async().await;
+    let current_space_key = generate_key();
+    let previous_space_key = generate_key();
+    let post_key = generate_key();
+    let wrapped_previous = encode_b64(
+        &encrypt_secretbox_payload(&current_space_key, &previous_space_key)
+            .expect("wrapped previous key"),
+    );
+    let versions = server
+        .mock("GET", "/space/versions")
+        .match_header("x-auth-token", "link-token")
+        .match_query(Matcher::UrlEncoded(
+            "spaceId".into(),
+            "space_owner_gallery".into(),
+        ))
+        .with_status(200)
+        .with_body(
+            json!([{
+                "version": 2,
+                "wrappedPrevKey": wrapped_previous,
+                "createdAt": "2026-04-16T00:00:00Z"
+            }])
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let ctx = space_link_ctx_for_test(
+        &server.url(),
+        "link-token",
+        "space_owner_gallery",
+        "owner-gallery",
+        Vec::new(),
+        current_space_key,
+        2,
+    );
+    let post = PostResponse {
+        post_id: 42,
+        space_id: "space_owner_gallery".to_owned(),
+        space_slug: "owner-gallery".to_owned(),
+        author: SpaceActorResponse {
+            space_id: "space_owner_gallery".to_owned(),
+            space_slug: "owner-gallery".to_owned(),
+            key_version: 2,
+            ..Default::default()
+        },
+        encrypted_post_key: encode_b64(
+            &encrypt_secretbox_payload(&previous_space_key, &post_key).expect("encrypted post key"),
+        ),
+        caption_cipher: String::new(),
+        key_version: 1,
+        objects: Vec::new(),
+        created_at: "2026-04-16T00:00:00Z".to_owned(),
+        likes: 0,
+        viewer_liked: false,
+    };
+
+    let decrypted = ctx
+        .decrypt_post_key(&post)
+        .await
+        .expect("historical post key should decrypt");
+
+    assert_eq!(decrypted, post_key);
+    versions.assert_async().await;
+}
+
+#[tokio::test]
+async fn space_link_download_post_asset_with_key_skips_post_fetch() {
+    let mut server = Server::new_async().await;
+    let space_key = generate_key();
+    let post_key = generate_key();
+    let object_key = "space/1/posts/post-object";
+    let encrypted_post_key =
+        encode_b64(&encrypt_secretbox_payload(&space_key, &post_key).expect("post key wrap"));
+    let encrypted_asset =
+        encrypt_asset_payload(&post_key, b"post-image").expect("asset encryption");
+
+    let redirect = server
+        .mock("GET", "/space/assets/redirect")
+        .match_header("x-auth-token", "link-token")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("spaceId".into(), "space_owner_gallery".into()),
+            Matcher::UrlEncoded("objectKey".into(), object_key.into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "url": format!("{}/objects/post-object", server.url()),
+                "expiresIn": 900
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let object = server
+        .mock("GET", "/objects/post-object")
+        .with_status(200)
+        .with_body(encrypted_asset)
+        .create_async()
+        .await;
+    let ctx = space_link_ctx_for_test(
+        &server.url(),
+        "link-token",
+        "space_owner_gallery",
+        "owner-gallery",
+        Vec::new(),
+        space_key,
+        1,
+    );
+
+    let bytes = ctx
+        .download_post_asset_with_key(42, &encrypted_post_key, 1, object_key)
+        .await
+        .expect("asset should decrypt");
+
+    assert_eq!(bytes, b"post-image");
+    redirect.assert_async().await;
+    object.assert_async().await;
+}
+
+#[tokio::test]
+async fn account_space_key_resolution_is_cached_within_context() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let friend_space_key = generate_key();
+    let encrypted_profile = encode_b64(
+        &encrypt_secretbox_payload(&friend_space_key, b"friend-profile").expect("profile wrap"),
+    );
+    let sealed_share =
+        seal_with_public_key(&friend_space_key, &test_public_key(&ctx)).expect("friend share seal");
+    let friend_sealed_space_key = encode_b64(&sealed_share);
+
+    let spaces = server
+        .mock("GET", "/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &space_root_key,
+            &generate_key(),
+            "space_owner_main",
+            "owner",
+            1,
+        ))
+        .expect(1)
+        .create_async()
+        .await;
+    let shares = server
+        .mock("GET", "/space/friends/shares")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(
+            json!([{
+                "friend": "friend",
+                "spaceId": "space_friend",
+                "spaceSlug": "friend",
+                "friendSealedSpaceKey": friend_sealed_space_key,
+                "keyVersion": 1
+            }])
+            .to_string(),
+        )
+        .expect(1)
+        .create_async()
+        .await;
+    let actor = SpaceActorResponse {
+        space_id: "space_friend".to_owned(),
+        space_slug: "friend".to_owned(),
+        key_version: 1,
+        encrypted_profile,
+        ..Default::default()
+    };
+
+    let first = ctx
+        .decrypt_actor_profile(&actor)
+        .await
+        .expect("first profile decrypt");
+    let second = ctx
+        .decrypt_actor_profile(&actor)
+        .await
+        .expect("second profile decrypt");
+
+    assert_eq!(first.as_deref(), Some(b"friend-profile".as_slice()));
+    assert_eq!(second.as_deref(), Some(b"friend-profile".as_slice()));
+    spaces.assert_async().await;
+    shares.assert_async().await;
+}
+
+#[tokio::test]
+async fn upload_post_asset_uses_presign_and_object_store() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+
+    let presign = server
+        .mock("POST", "/space/uploads/presign")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"size\"".into()),
+            Matcher::Regex("\"contentMD5\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "url": format!("{}/upload/object-1", server.url()),
+                "method": "PUT",
+                "headers": {
+                    "content-type": "application/octet-stream",
+                    "Content-MD5": "test-digest"
+                },
+                "objectKey": "object-1",
+                "expiresIn": 300
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let upload = server
+        .mock("PUT", "/upload/object-1")
+        .match_header("content-type", "application/octet-stream")
+        .match_header("content-md5", "test-digest")
+        .with_status(200)
+        .create_async()
+        .await;
+
+    let payload = ctx
+        .upload_post_asset("space_owner_main", &generate_key(), b"tiny-image", Some(0))
+        .await
+        .expect("upload should succeed");
+
+    assert_eq!(payload.object_key, "object-1");
+    assert_eq!(payload.position, Some(0));
+    assert!(payload.size.unwrap_or_default() > 0);
+    presign.assert_async().await;
+    upload.assert_async().await;
+}
+
+#[tokio::test]
+async fn upload_post_photo_asset_attaches_photo_metadata() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let presign = server
+        .mock("POST", "/space/uploads/presign")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"contentMD5\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "url": format!("{}/upload/photo-object", server.url()),
+                "method": "PUT",
+                "headers": {
+                    "content-type": "application/octet-stream",
+                    "Content-MD5": "test-digest"
+                },
+                "objectKey": "photo-object",
+                "expiresIn": 300
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let upload = server
+        .mock("PUT", "/upload/photo-object")
+        .match_header("content-type", "application/octet-stream")
+        .match_header("content-md5", "test-digest")
+        .with_status(200)
+        .create_async()
+        .await;
+
+    let post_key = generate_key();
+    let payload = ctx
+        .upload_post_photo_asset(
+            "space_owner_main",
+            &post_key,
+            TEST_WEBP_BYTES,
+            Some(4032),
+            Some(3024),
+            Some("image/webp".to_owned()),
+        )
+        .await
+        .expect("photo upload should succeed");
+
+    assert_eq!(payload.object_key, "photo-object");
+    assert_eq!(payload.position, Some(0));
+    let metadata = ctx
+        .decrypt_post_object_metadata(&post_key, &payload)
+        .expect("metadata should decrypt")
+        .expect("metadata should exist");
+    assert_eq!(metadata.width, Some(4032));
+    assert_eq!(metadata.height, Some(3024));
+    assert_eq!(metadata.media_type.as_deref(), Some("image/webp"));
+    presign.assert_async().await;
+    upload.assert_async().await;
+}
+
+#[tokio::test]
+async fn upload_post_photo_asset_rejects_video_media_type() {
+    let server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+
+    let err = ctx
+        .upload_post_photo_asset(
+            "space_owner_main",
+            &generate_key(),
+            TEST_WEBP_BYTES,
+            Some(4032),
+            Some(3024),
+            Some("video/mp4".to_owned()),
+        )
+        .await
+        .expect_err("video media type should fail before upload");
+
+    assert!(err.to_string().contains(ONLY_PHOTOS_UPLOAD_MESSAGE));
+}
+
+#[tokio::test]
+async fn upload_post_photo_asset_rejects_video_bytes() {
+    let server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+
+    let err = ctx
+        .upload_post_photo_asset(
+            "space_owner_main",
+            &generate_key(),
+            TEST_MP4_BYTES,
+            Some(1920),
+            Some(1080),
+            Some("image/webp".to_owned()),
+        )
+        .await
+        .expect_err("video bytes should fail before upload");
+
+    assert!(err.to_string().contains(ONLY_PHOTOS_UPLOAD_MESSAGE));
+}
+
+#[tokio::test]
+async fn presign_uploads_reject_oversized_space_assets() {
+    let server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+
+    let post_error = ctx
+        .presign_post_upload(
+            "space_owner_main",
+            MAX_SPACE_POST_UPLOAD_BYTES + 1,
+            "XUFAKrxLKna5cZ2REBfFkg==",
+        )
+        .await
+        .expect_err("oversized post upload should fail before presign");
+    assert!(post_error.to_string().contains("post upload size"));
+    assert!(
+        post_error
+            .to_string()
+            .contains(&MAX_SPACE_POST_UPLOAD_BYTES.to_string())
+    );
+
+    let avatar_error = ctx
+        .presign_avatar_upload(
+            "space_owner_main",
+            MAX_SPACE_AVATAR_UPLOAD_BYTES + 1,
+            "XUFAKrxLKna5cZ2REBfFkg==",
+        )
+        .await
+        .expect_err("oversized avatar upload should fail before presign");
+    assert!(avatar_error.to_string().contains("avatar upload size"));
+    assert!(
+        avatar_error
+            .to_string()
+            .contains(&MAX_SPACE_AVATAR_UPLOAD_BYTES.to_string())
+    );
+
+    let cover_error = ctx
+        .presign_cover_upload(
+            "space_owner_main",
+            MAX_SPACE_COVER_UPLOAD_BYTES + 1,
+            "XUFAKrxLKna5cZ2REBfFkg==",
+        )
+        .await
+        .expect_err("oversized cover upload should fail before presign");
+    assert!(cover_error.to_string().contains("cover upload size"));
+    assert!(
+        cover_error
+            .to_string()
+            .contains(&MAX_SPACE_COVER_UPLOAD_BYTES.to_string())
+    );
+}
+
+#[tokio::test]
+async fn upload_avatar_uses_avatar_presign_and_object_store() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let presign = server
+        .mock("POST", "/space/uploads/presign")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"purpose\":\"avatar\"".into()),
+            Matcher::Regex("\"contentMD5\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+            Matcher::Regex("\"size\"".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "url": format!("{}/upload/avatar-object", server.url()),
+                "method": "PUT",
+                "headers": {
+                    "content-type": "application/octet-stream",
+                    "Content-MD5": "test-digest"
+                },
+                "objectKey": "avatar-object",
+                "expiresIn": 300
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let upload = server
+        .mock("PUT", "/upload/avatar-object")
+        .match_header("content-type", "application/octet-stream")
+        .match_header("content-md5", "test-digest")
+        .with_status(200)
+        .create_async()
+        .await;
+
+    let payload = ctx
+        .upload_avatar("space_owner_main", &generate_key(), TEST_WEBP_BYTES)
+        .await
+        .expect("avatar upload should succeed");
+
+    assert_eq!(payload.object_id, "avatar-object");
+    assert!(payload.size.unwrap_or_default() > 0);
+    presign.assert_async().await;
+    upload.assert_async().await;
+}
+
+#[tokio::test]
+async fn upload_avatar_rejects_video_bytes() {
+    let server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+
+    let err = ctx
+        .upload_avatar("space_owner_main", &generate_key(), TEST_MP4_BYTES)
+        .await
+        .expect_err("video avatar bytes should fail before upload");
+
+    assert!(err.to_string().contains(ONLY_PHOTOS_UPLOAD_MESSAGE));
+}
+
+#[tokio::test]
+async fn upload_cover_uses_cover_presign_and_object_store() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let presign = server
+        .mock("POST", "/space/uploads/presign")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"purpose\":\"cover\"".into()),
+            Matcher::Regex("\"contentMD5\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+            Matcher::Regex("\"size\"".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "url": format!("{}/upload/cover-object", server.url()),
+                "method": "PUT",
+                "headers": {
+                    "content-type": "application/octet-stream",
+                    "Content-MD5": "test-digest"
+                },
+                "objectKey": "cover-object",
+                "expiresIn": 300
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let upload = server
+        .mock("PUT", "/upload/cover-object")
+        .match_header("content-type", "application/octet-stream")
+        .match_header("content-md5", "test-digest")
+        .with_status(200)
+        .create_async()
+        .await;
+
+    let payload = ctx
+        .upload_cover("space_owner_main", &generate_key(), TEST_WEBP_BYTES)
+        .await
+        .expect("cover upload should succeed");
+
+    assert_eq!(payload.object_id, "cover-object");
+    assert!(payload.size.unwrap_or_default() > 0);
+    presign.assert_async().await;
+    upload.assert_async().await;
+}
+
+#[tokio::test]
+async fn account_download_profile_avatar_uses_object_id_redirect() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let space_key = generate_key();
+    let encrypted_asset =
+        encrypt_asset_payload(&space_key, b"avatar-image").expect("asset encryption");
+    let redirect = server
+        .mock("GET", "/space/assets/redirect")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("spaceId".into(), "space_owner_main".into()),
+            Matcher::UrlEncoded("assetType".into(), "avatar".into()),
+            Matcher::UrlEncoded("objectID".into(), "avatar-object".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "url": format!("{}/objects/avatar-object", server.url()),
+                "expiresIn": 900
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let object = server
+        .mock("GET", "/objects/avatar-object")
+        .with_status(200)
+        .with_body(encrypted_asset)
+        .create_async()
+        .await;
+
+    let bytes = ctx
+        .download_profile_asset("space_owner_main", "avatar", "avatar-object", &space_key)
+        .await
+        .expect("avatar asset should download and decrypt");
+
+    assert_eq!(bytes, b"avatar-image");
+    redirect.assert_async().await;
+    object.assert_async().await;
+}
+
+#[tokio::test]
+async fn space_link_download_profile_cover_uses_object_id_redirect() {
+    let mut server = Server::new_async().await;
+    let space_key = generate_key();
+    let encrypted_asset =
+        encrypt_asset_payload(&space_key, b"cover-image").expect("asset encryption");
+    let redirect = server
+        .mock("GET", "/space/assets/redirect")
+        .match_header("x-auth-token", "link-token")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("spaceId".into(), "space_owner_gallery".into()),
+            Matcher::UrlEncoded("assetType".into(), "cover".into()),
+            Matcher::UrlEncoded("objectID".into(), "cover-object".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "url": format!("{}/objects/cover-object", server.url()),
+                "expiresIn": 900
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let object = server
+        .mock("GET", "/objects/cover-object")
+        .with_status(200)
+        .with_body(encrypted_asset)
+        .create_async()
+        .await;
+    let ctx = space_link_ctx_for_test(
+        &server.url(),
+        "link-token",
+        "space_owner_gallery",
+        "owner-gallery",
+        Vec::new(),
+        space_key,
+        1,
+    );
+
+    let bytes = ctx
+        .download_profile_asset("cover", "cover-object")
+        .await
+        .expect("cover asset should download and decrypt");
+
+    assert_eq!(bytes, b"cover-image");
+    redirect.assert_async().await;
+    object.assert_async().await;
+}
+
+#[tokio::test]
+async fn create_space_with_key_sends_encrypted_space_and_profile_payloads() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key);
+    let space_key = generate_key();
+    let create_space = server
+        .mock("POST", "/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"spaceSlug\":\"owner-main\"".into()),
+            Matcher::Regex("\"rootWrappedSpaceKey\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"publicKey\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"encryptedSecretKey\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"encryptedProfile\":\"[^\"]+\"".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "spaceId": "space_owner_main",
+                "spaceSlug": "owner-main",
+                "rootWrappedSpaceKey": "",
+                "encryptedProfile": "",
+                "keyVersion": 1
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let created = ctx
+        .create_space_with_key("owner-main", &space_key, b"profile-json")
+        .await
+        .expect("space should be created");
+
+    assert_eq!(created.space_id, "space_owner_main");
+    assert_eq!(created.space_slug, "owner-main");
+    assert_eq!(created.key_version, 1);
+    let profile_plaintext =
+        decrypt_secretbox_payload(&space_key, &decode_b64(&created.encrypted_profile).unwrap())
+            .expect("created profile should decrypt");
+    assert_eq!(profile_plaintext, b"profile-json");
+    create_space.assert_async().await;
+}
+
+#[tokio::test]
+async fn create_space_updates_loaded_owned_space_cache() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key);
+    let space_key = generate_key();
+    let list_spaces = server
+        .mock("GET", "/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body("[]")
+        .expect(1)
+        .create_async()
+        .await;
+    let create_space = server
+        .mock("POST", "/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(
+            json!({
+                "spaceId": "space_owner_main",
+                "spaceSlug": "owner-main",
+                "rootWrappedSpaceKey": "",
+                "encryptedProfile": "",
+                "keyVersion": 1
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let update_profile = server
+        .mock("POST", "/space/profile")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+            Matcher::Regex("\"encryptedProfile\":\"[^\"]+\"".into()),
+        ]))
+        .with_status(200)
+        .with_body(json!({ "status": "ok" }).to_string())
+        .create_async()
+        .await;
+
+    let spaces = ctx
+        .list_owned_spaces()
+        .await
+        .expect("space list should load");
+    assert!(spaces.is_empty());
+
+    let created = ctx
+        .create_space_with_key("owner-main", &space_key, b"profile-json")
+        .await
+        .expect("space should be created");
+    ctx.update_space_profile(&created.space_id, b"profile-json-2", None, false)
+        .await
+        .expect("created space should be available from cache");
+    let cached = ctx
+        .list_owned_spaces()
+        .await
+        .expect("owned space cache should remain usable");
+    let cached_profile = decrypt_secretbox_payload(
+        &space_key,
+        &decode_b64(&cached[0].encrypted_profile).unwrap(),
+    )
+    .expect("cached profile should decrypt");
+    assert_eq!(cached_profile.as_slice(), b"profile-json-2");
+
+    list_spaces.assert_async().await;
+    create_space.assert_async().await;
+    update_profile.assert_async().await;
+}
+
+#[tokio::test]
+async fn list_owned_spaces_reuses_loaded_cache() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let space_root_key = generate_key();
+    let space_key = generate_key();
+    let list_spaces = server
+        .mock("GET", "/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &space_root_key,
+            &space_key,
+            "space_owner_main",
+            "owner-main",
+            3,
+        ))
+        .expect(1)
+        .create_async()
+        .await;
+
+    let first = ctx
+        .list_owned_spaces()
+        .await
+        .expect("space list should load");
+    let second = ctx
+        .list_owned_spaces()
+        .await
+        .expect("space list should reuse cache");
+
+    assert_eq!(first.len(), 1);
+    assert_eq!(second.len(), 1);
+    assert_eq!(second[0].space_id, first[0].space_id);
+    assert_eq!(second[0].space_slug, first[0].space_slug);
+    assert_eq!(
+        second[0].root_wrapped_space_key,
+        first[0].root_wrapped_space_key
+    );
+    assert_eq!(second[0].key_version, first[0].key_version);
+    list_spaces.assert_async().await;
+}
+
+#[tokio::test]
+async fn create_post_includes_space_key_version() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let space_key = generate_key();
+    let spaces = server
+            .mock("GET", "/space")
+            .match_header("x-space-session-token", "space-session-token")
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "spaceId": "space_owner_main",
+                    "spaceSlug": "owner-main",
+                    "rootWrappedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &space_key).expect("space key wrap")),
+                    "encryptedProfile": "",
+                    "keyVersion": 3
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+    let create = server
+        .mock("POST", "/space/posts")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::Regex("\"keyVersion\":3".into()))
+        .with_status(200)
+        .with_body(json!({"postId": 42}).to_string())
+        .create_async()
+        .await;
+
+    let (post_id, _) = ctx
+        .create_post("space_owner_main", &[], None, None)
+        .await
+        .expect("post creation should send key version");
+
+    assert_eq!(post_id, 42);
+    spaces.assert_async().await;
+    create.assert_async().await;
+}
+
+#[tokio::test]
+async fn create_post_rejects_video_object_media_type() {
+    let server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let post_key = generate_key();
+    let metadata_cipher = encrypt_post_object_metadata(
+        &post_key,
+        &PostObjectMetadata {
+            width: Some(1920),
+            height: Some(1080),
+            media_type: Some("video/mp4".to_owned()),
+            ..Default::default()
+        },
+    )
+    .expect("metadata should encrypt");
+    let err = ctx
+        .create_post(
+            "space_owner_main",
+            &[PostObjectPayload {
+                object_key: "object-1".to_owned(),
+                size: None,
+                position: Some(0),
+                metadata_cipher: Some(metadata_cipher),
+            }],
+            None,
+            Some(&post_key),
+        )
+        .await
+        .expect_err("video post object should fail before network");
+
+    assert!(err.to_string().contains(ONLY_PHOTOS_UPLOAD_MESSAGE));
+}
+
+#[tokio::test]
+async fn update_space_profile_sends_encrypted_profile_and_profile_assets() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let space_key = generate_key();
+    let spaces = server
+        .mock("GET", "/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &space_root_key,
+            &space_key,
+            "space_owner_main",
+            "owner-main",
+            3,
+        ))
+        .create_async()
+        .await;
+    let update = server
+        .mock("POST", "/space/profile")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+            Matcher::Regex("\"keyVersion\":3".into()),
+            Matcher::Regex("\"encryptedProfile\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"avatar\"".into()),
+            Matcher::Regex("\"objectID\":\"avatar-object\"".into()),
+            Matcher::Regex("\"size\":123".into()),
+            Matcher::Regex("\"cover\"".into()),
+            Matcher::Regex("\"objectID\":\"cover-object\"".into()),
+            Matcher::Regex("\"size\":456".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "status": "ok",
+                "avatar": {
+                    "objectID": "avatar-object",
+                    "size": 123,
+                    "updatedAt": "2026-04-16T00:00:00Z"
+                },
+                "cover": {
+                    "objectID": "cover-object",
+                    "size": 456,
+                    "updatedAt": "2026-04-16T00:00:00Z"
+                }
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let response = ctx
+        .update_space_profile_assets(
+            "space_owner_main",
+            b"profile-v2",
+            Some(ProfileAvatarPayload {
+                object_id: "avatar-object".to_owned(),
+                size: Some(123),
+            }),
+            Some(ProfileCoverPayload {
+                object_id: "cover-object".to_owned(),
+                size: Some(456),
+            }),
+            false,
+            false,
+        )
+        .await
+        .expect("profile update should succeed");
+
+    assert_eq!(response.status, "ok");
+    assert_eq!(
+        response
+            .avatar
+            .as_ref()
+            .map(|avatar| avatar.object_id.as_str()),
+        Some("avatar-object")
+    );
+    assert_eq!(
+        response
+            .cover
+            .as_ref()
+            .map(|cover| cover.object_id.as_str()),
+        Some("cover-object")
+    );
+    spaces.assert_async().await;
+    update.assert_async().await;
+}
+
+#[tokio::test]
+async fn get_space_profile_decrypted_loads_and_decrypts_profile() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let space_key = generate_key();
+    let encrypted_profile =
+        encode_b64(&encrypt_secretbox_payload(&space_key, b"profile-json").expect("profile wrap"));
+    let profile = server
+        .mock("GET", "/space/profile")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::UrlEncoded(
+            "spaceId".into(),
+            "space_owner_main".into(),
+        ))
+        .with_status(200)
+        .with_body(
+            json!({
+                "spaceId": "space_owner_main",
+                "spaceSlug": "owner-main",
+                "version": 3,
+                "friends": 2,
+                "encryptedProfile": encrypted_profile,
+                "updatedAt": "2026-04-16T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let spaces = server
+        .mock("GET", "/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &space_root_key,
+            &space_key,
+            "space_owner_main",
+            "owner-main",
+            3,
+        ))
+        .create_async()
+        .await;
+
+    let decrypted = ctx
+        .get_space_profile_decrypted("space_owner_main", None)
+        .await
+        .expect("profile should decrypt");
+
+    assert_eq!(decrypted.space_id, "space_owner_main");
+    assert_eq!(decrypted.space_slug, "owner-main");
+    assert_eq!(decrypted.version, 3);
+    assert_eq!(decrypted.friends, 2);
+    assert_eq!(decrypted.profile, b"profile-json");
+    profile.assert_async().await;
+    spaces.assert_async().await;
+}
+
+#[tokio::test]
+async fn add_friend_from_link_creates_friend_request() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let requester_space_key = generate_key();
+    let target_space_key = generate_key();
+    let (target_public_key, _) = generate_keypair().expect("valid target keypair");
+
+    let spaces = server
+            .mock("GET", "/space")
+            .match_header("x-space-session-token", "space-session-token")
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "spaceId": "space_viewer_main",
+                    "spaceSlug": "viewer-main",
+                    "rootWrappedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &requester_space_key).expect("space key wrap")),
+                    "encryptedProfile": "",
+                    "keyVersion": 4
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+    let add = server
+        .mock("POST", "/space/friends/add")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"targetSpaceId\":\"space_owner_main\"".into()),
+            Matcher::Regex("\"requesterSpaceId\":\"space_viewer_main\"".into()),
+            Matcher::Regex("\"requesterKeyVersion\":4".into()),
+            Matcher::Regex("\"requesterFriendSealedSpaceKey\":\"[^\"]+\"".into()),
+        ]))
+        .with_status(200)
+        .with_body(json!({"status": "requested"}).to_string())
+        .create_async()
+        .await;
+    let link = space_link_ctx_for_test(
+        &server.url(),
+        "link-session-token",
+        "space_owner_main",
+        "owner-main",
+        target_public_key,
+        target_space_key,
+        5,
+    );
+
+    let response = ctx
+        .add_friend_from_link(&link)
+        .await
+        .expect("friend request should be sent");
+
+    assert_eq!(response.status, "requested");
+    spaces.assert_async().await;
+    add.assert_async().await;
+}
+
+#[tokio::test]
+async fn space_status_mutations_accept_empty_server_responses() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+
+    let delete_post = server
+        .mock("DELETE", "/space/posts/42")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .create_async()
+        .await;
+    let unfriend_space = server
+        .mock("POST", "/space/friends/unfriend")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::JsonString(
+            json!({"targetSpaceId": "space_owner_main"}).to_string(),
+        ))
+        .with_status(200)
+        .create_async()
+        .await;
+    let unfriend_username = server
+        .mock("POST", "/space/friends/unfriend")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::JsonString(
+            json!({"targetUsername": "owner"}).to_string(),
+        ))
+        .with_status(200)
+        .create_async()
+        .await;
+
+    ctx.delete_post(42)
+        .await
+        .expect("delete post should accept empty response");
+    ctx.unfriend_by_space("space_owner_main")
+        .await
+        .expect("unfriend by space should accept empty response");
+    ctx.unfriend_by_username("owner")
+        .await
+        .expect("unfriend by username should accept empty response");
+
+    delete_post.assert_async().await;
+    unfriend_space.assert_async().await;
+    unfriend_username.assert_async().await;
+}
+
+#[tokio::test]
+async fn update_post_caption_uses_caption_endpoint() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let update = server
+        .mock("POST", "/space/posts/42/caption")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::Regex("\"captionCipher\":\"[^\"]+\"".into()))
+        .with_status(200)
+        .create_async()
+        .await;
+
+    ctx.update_post_caption(42, &generate_key(), Some(b"updated caption"))
+        .await
+        .expect("caption update should succeed");
+
+    update.assert_async().await;
+}
+
+#[tokio::test]
+async fn like_post_uses_post_like_endpoint() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let like = server
+        .mock("POST", "/space/posts/42/like")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::JsonString(json!({"like": true}).to_string()))
+        .with_status(200)
+        .with_body(json!({"liked": true}).to_string())
+        .create_async()
+        .await;
+
+    let response = ctx
+        .like_post(42, true)
+        .await
+        .expect("post like should succeed");
+
+    assert!(response.liked);
+    like.assert_async().await;
+}
+
+#[tokio::test]
+async fn unread_methods_use_read_marker_endpoints() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let status = server
+        .mock("GET", "/space/unread")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(json!({"notificationsUnread": false}).to_string())
+        .create_async()
+        .await;
+    let notifications_read = server
+        .mock("POST", "/space/messages/read")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::JsonString(
+            json!({"friendSpaceId": "space_friend"}).to_string(),
+        ))
+        .with_status(200)
+        .with_body(json!({"notificationsUnread": false}).to_string())
+        .create_async()
+        .await;
+
+    let unread = ctx
+        .unread_status()
+        .await
+        .expect("unread status should load");
+    assert!(!unread.notifications_unread);
+    assert!(
+        !ctx.mark_notifications_read("space_friend")
+            .await
+            .expect("notifications read")
+            .notifications_unread
+    );
+
+    status.assert_async().await;
+    notifications_read.assert_async().await;
+}
+
+#[tokio::test]
+async fn message_actions_use_message_endpoints() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let space_key = generate_key();
+    let (friend_public_key, _) = generate_keypair().expect("valid friend keypair");
+
+    let spaces = server
+        .mock("GET", "/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &space_root_key,
+            &space_key,
+            "space_owner_main",
+            "owner-main",
+            3,
+        ))
+        .create_async()
+        .await;
+    let friends = server
+        .mock("GET", "/space/friends")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::UrlEncoded(
+            "spaceId".into(),
+            "space_owner_main".into(),
+        ))
+        .with_status(200)
+        .with_body(
+            json!([{
+                "friend": {
+                    "spaceId": "space_friend",
+                    "spaceSlug": "friend",
+                    "publicKey": encode_b64(&friend_public_key),
+                    "keyVersion": 2
+                },
+                "shareKeyVersion": 2,
+                "createdAt": "2026-04-16T00:00:00Z"
+            }])
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let reply = server
+        .mock("POST", "/space/messages/space_friend")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"replyMessageId\":\"wmsg_parent\"".into()),
+            Matcher::Regex("\"messageCipher\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"senderEncryptedMessageKey\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"recipientEncryptedMessageKey\":\"[^\"]+\"".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "messageId": "wmsg_reply",
+                "kind": "regular",
+                "sender": {
+                    "spaceId": "space_owner_main",
+                    "spaceSlug": "owner-main",
+                    "publicKey": encode_b64(&test_public_key(&ctx)),
+                    "keyVersion": 3
+                },
+                "recipient": {
+                    "spaceId": "space_friend",
+                    "spaceSlug": "friend",
+                    "publicKey": encode_b64(&friend_public_key),
+                    "keyVersion": 2
+                },
+                "messageCipher": "cipher",
+                "encryptedMessageKey": "key",
+                "replyMessageId": "wmsg_parent",
+                "likes": 0,
+                "viewerLiked": false,
+                "isDeleted": false,
+                "createdAt": "2026-04-16T00:00:00Z",
+                "updatedAt": "2026-04-16T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let like = server
+        .mock("POST", "/space/message/wmsg_reply/like")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::JsonString(json!({"like": true}).to_string()))
+        .with_status(200)
+        .with_body(json!({"liked": true}).to_string())
+        .create_async()
+        .await;
+    let delete = server
+        .mock("DELETE", "/space/message/wmsg_reply")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .create_async()
+        .await;
+
+    let created = ctx
+        .reply_to_message("space_friend", "wmsg_parent", "hello")
+        .await
+        .expect("message reply should be sent");
+    let liked = ctx
+        .like_message("wmsg_reply", true)
+        .await
+        .expect("message like should be sent");
+    ctx.delete_message("wmsg_reply")
+        .await
+        .expect("message delete should be sent");
+
+    assert_eq!(created.reply_message_id.as_deref(), Some("wmsg_parent"));
+    assert!(liked.liked);
+    spaces.assert_async().await;
+    friends.assert_async().await;
+    reply.assert_async().await;
+    like.assert_async().await;
+    delete.assert_async().await;
+}
+
+#[test]
+fn message_payload_limits_reject_oversized_text_and_payload() {
+    let valid = MessagePayload {
+        version: 1,
+        kind: MESSAGE_KIND_REGULAR.to_owned(),
+        text: "hello".to_owned(),
+        quote: None,
+    };
+    let valid_plaintext = serde_json::to_vec(&valid).expect("valid payload json");
+    validate_message_payload(&valid, valid_plaintext.len())
+        .expect("short message should be accepted");
+
+    let too_many_chars = MessagePayload {
+        text: "a".repeat(MAX_SPACE_MESSAGE_TEXT_CHARS + 1),
+        ..valid.clone()
+    };
+    let plaintext = serde_json::to_vec(&too_many_chars).expect("long text json");
+    let err = validate_message_payload(&too_many_chars, plaintext.len())
+        .expect_err("long message text should be rejected");
+    assert!(err.to_string().contains("characters or fewer"));
+
+    let oversized_payload = MessagePayload {
+        text: "ok".to_owned(),
+        quote: Some(MessageQuote {
+            post_id: 1,
+            space_id: "space_owner_main".to_owned(),
+            encrypted_post_key: None,
+            key_version: None,
+            caption: Some("a".repeat(MAX_SPACE_MESSAGE_PAYLOAD_BYTES)),
+            object_key: None,
+            width: None,
+            height: None,
+            media_type: None,
+        }),
+        ..valid
+    };
+    let plaintext = serde_json::to_vec(&oversized_payload).expect("large payload json");
+    let err = validate_message_payload(&oversized_payload, plaintext.len())
+        .expect_err("large serialized payload should be rejected");
+    assert!(err.to_string().contains("payload must be"));
+}
+
+#[tokio::test]
+async fn list_post_likers_uses_post_likes_endpoint() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let likers = server
+        .mock("GET", "/space/posts/42/likes")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("cursor".into(), "3000:7".into()),
+            Matcher::UrlEncoded("limit".into(), "5".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "likers": [{
+                    "actor": {
+                        "spaceId": "space_liker",
+                        "spaceSlug": "liker"
+                    },
+                    "createdAt": "2026-04-16T00:00:00Z"
+                }],
+                "nextCursor": "2000:8"
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let response = ctx
+        .list_post_likers(42, Some("3000:7".to_owned()), Some(5))
+        .await
+        .expect("likers should load");
+
+    assert_eq!(response.likers[0].actor.space_id, "space_liker");
+    assert_eq!(response.next_cursor, "2000:8");
+    likers.assert_async().await;
+}
+
+#[tokio::test]
+async fn list_space_friends_uses_space_friends_endpoint() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let friends = server
+        .mock("GET", "/space/friends")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::UrlEncoded(
+            "spaceId".into(),
+            "space_owner_main".into(),
+        ))
+        .with_status(200)
+        .with_body(
+            json!([{
+                "friend": {
+                    "spaceId": "space_friend",
+                    "spaceSlug": "friend",
+                    "publicKey": "friend-public-key",
+                    "keyVersion": 2,
+                    "encryptedProfile": "profile-cipher"
+                },
+                "shareKeyVersion": 2,
+                "createdAt": "2026-04-16T00:00:00Z"
+            }])
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let response = ctx
+        .list_space_friends("space_owner_main")
+        .await
+        .expect("friends should load");
+
+    assert_eq!(response.len(), 1);
+    assert_eq!(response[0].friend.space_id, "space_friend");
+    assert_eq!(response[0].share_key_version, 2);
+    friends.assert_async().await;
+}
+
+#[tokio::test]
+async fn get_relationship_uses_relationship_endpoint() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let relationship = server
+        .mock("GET", "/space/friends/relationship")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::UrlEncoded(
+            "targetSpaceId".into(),
+            "space_friend".into(),
+        ))
+        .with_status(200)
+        .with_body(json!({"relationship": "friend"}).to_string())
+        .create_async()
+        .await;
+
+    let response = ctx
+        .get_relationship("space_friend")
+        .await
+        .expect("relationship should load");
+
+    assert_eq!(response.relationship, "friend");
+    relationship.assert_async().await;
+}
+
+#[tokio::test]
+async fn space_link_list_post_likers_uses_session_token() {
+    let mut server = Server::new_async().await;
+    let ctx = space_link_ctx_for_test(
+        &server.url(),
+        "link-session-token",
+        "space_owner_main",
+        "owner-main",
+        Vec::new(),
+        generate_key(),
+        1,
+    );
+    let likers = server
+        .mock("GET", "/space/posts/42/likes")
+        .match_header("x-auth-token", "link-session-token")
+        .with_status(200)
+        .with_body(json!({"likers": [], "nextCursor": ""}).to_string())
+        .create_async()
+        .await;
+
+    let response = ctx
+        .list_post_likers(42, None, None)
+        .await
+        .expect("link likers should load");
+
+    assert!(response.likers.is_empty());
+    likers.assert_async().await;
+}
+
+#[tokio::test]
+async fn refresh_friend_shares_accepts_empty_server_response() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let space_key = generate_key();
+    let (friend_public_key, _) = generate_keypair().expect("valid friend keypair");
+
+    let spaces = server
+            .mock("GET", "/space")
+            .match_header("x-space-session-token", "space-session-token")
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "spaceId": "space_owner_main",
+                    "spaceSlug": "owner-main",
+                    "rootWrappedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &space_key).expect("space key wrap")),
+                    "encryptedProfile": "",
+                    "keyVersion": 3
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+    let friends = server
+        .mock("GET", "/space/friends")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::UrlEncoded(
+            "spaceId".into(),
+            "space_owner_main".into(),
+        ))
+        .with_status(200)
+        .with_body(
+            json!([{
+                "friend": {
+                    "spaceId": "space_viewer",
+                    "spaceSlug": "viewer",
+                    "publicKey": encode_b64(&friend_public_key),
+                    "keyVersion": 2
+                },
+                "shareKeyVersion": 2,
+                "createdAt": "2026-04-16T00:00:00Z"
+            }])
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let refresh = server
+        .mock("POST", "/space/friends/shares/refresh")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"friendSpaceId\":\"space_viewer\"".into()),
+            Matcher::Regex("\"keyVersion\":3".into()),
+        ]))
+        .with_status(200)
+        .create_async()
+        .await;
+
+    let updated = ctx
+        .refresh_friend_shares("space_owner_main")
+        .await
+        .expect("refresh should accept empty response");
+
+    assert_eq!(updated, 1);
+    spaces.assert_async().await;
+    friends.assert_async().await;
+    refresh.assert_async().await;
+}
+
+#[tokio::test]
+async fn space_link_status_create_and_delete_use_link_endpoints() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let space_key = generate_key();
+    let created_access_key = "AbC123xYz789";
+    let encrypted_created_access_key = encode_b64(
+        &encrypt_secretbox_payload(&space_root_key, created_access_key.as_bytes())
+            .expect("encrypted created access key"),
+    );
+    let rotated_access_key = "ZyX987cBa321";
+    let encrypted_rotated_access_key = encode_b64(
+        &encrypt_secretbox_payload(&space_root_key, rotated_access_key.as_bytes())
+            .expect("encrypted rotated access key"),
+    );
+
+    let spaces = server
+        .mock("GET", "/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &space_root_key,
+            &space_key,
+            "space_owner_main",
+            "owner-main",
+            3,
+        ))
+        .expect(1)
+        .create_async()
+        .await;
+    let status = server
+        .mock("GET", "/space/links/space_owner_main")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(
+            json!({
+                "spaceId": "space_owner_main",
+                "spaceSlug": "owner-main",
+                "keyVersion": 3,
+                "active": false,
+                "encryptedAccessKey": "",
+                "createdAt": "2026-04-16T00:00:00Z",
+                "updatedAt": "2026-04-16T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create_async()
+        .await;
+    let create = server
+        .mock("POST", "/space/links")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+            Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"keyVersion\":3".into()),
+            Matcher::Regex("\"linkWrappedSpaceKey\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"encryptedAccessKey\":\"[^\"]+\"".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "spaceId": "space_owner_main",
+                "spaceSlug": "owner-main",
+                "keyVersion": 3,
+                "active": true,
+                "encryptedAccessKey": encrypted_created_access_key,
+                "createdAt": "2026-04-16T00:00:00Z",
+                "updatedAt": "2026-04-16T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let rotate = server
+        .mock("POST", "/space/links/rotate")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+            Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"keyVersion\":3".into()),
+            Matcher::Regex("\"linkWrappedSpaceKey\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"encryptedAccessKey\":\"[^\"]+\"".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "spaceId": "space_owner_main",
+                "spaceSlug": "owner-main",
+                "keyVersion": 3,
+                "active": true,
+                "encryptedAccessKey": encrypted_rotated_access_key,
+                "createdAt": "2026-04-16T00:00:00Z",
+                "updatedAt": "2026-04-16T00:01:00Z"
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+    let delete = server
+        .mock("DELETE", "/space/links/space_owner_main")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .create_async()
+        .await;
+
+    let status_response = ctx
+        .get_space_link_status("space_owner_main")
+        .await
+        .expect("link status should load");
+    let created = ctx
+        .create_space_link("space_owner_main")
+        .await
+        .expect("link should be created");
+    let rotated = ctx
+        .rotate_space_link("space_owner_main")
+        .await
+        .expect("link should be rotated");
+    ctx.delete_space_link("space_owner_main")
+        .await
+        .expect("link should be deleted");
+
+    assert!(!status_response.active);
+    assert_eq!(created.space_id, "space_owner_main");
+    assert_eq!(created.space_username, "owner-main");
+    assert_eq!(created.access_key, created_access_key);
+    assert_eq!(created.key_version, 3);
+    assert_eq!(rotated.space_id, "space_owner_main");
+    assert_eq!(rotated.space_username, "owner-main");
+    assert_eq!(rotated.access_key, rotated_access_key);
+    assert_ne!(rotated.access_key, created.access_key);
+    status.assert_async().await;
+    spaces.assert_async().await;
+    create.assert_async().await;
+    rotate.assert_async().await;
+    delete.assert_async().await;
+}
+
+#[tokio::test]
+async fn create_space_link_reuses_encrypted_access_key_returned_by_post() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let space_key = generate_key();
+    let access_key = "AbC123xYz789";
+    let encrypted_access_key = encode_b64(
+        &encrypt_secretbox_payload(&space_root_key, access_key.as_bytes())
+            .expect("encrypted access key"),
+    );
+
+    let spaces = server
+        .mock("GET", "/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(owned_space_response(
+            &space_root_key,
+            &space_key,
+            "space_owner_main",
+            "owner-main",
+            3,
+        ))
+        .create_async()
+        .await;
+    let create = server
+        .mock("POST", "/space/links")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+            Matcher::Regex("\"authKey\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"keyVersion\":3".into()),
+            Matcher::Regex("\"linkWrappedSpaceKey\":\"[^\"]+\"".into()),
+            Matcher::Regex("\"encryptedAccessKey\":\"[^\"]+\"".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "spaceId": "space_owner_main",
+                "spaceSlug": "owner-main",
+                "keyVersion": 3,
+                "active": true,
+                "encryptedAccessKey": encrypted_access_key,
+                "createdAt": "2026-04-16T00:00:00Z",
+                "updatedAt": "2026-04-16T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let created = ctx
+        .create_space_link("space_owner_main")
+        .await
+        .expect("returned link should be reusable");
+
+    assert_eq!(created.access_key, access_key);
+    assert_eq!(created.space_id, "space_owner_main");
+    assert_eq!(created.space_username, "owner-main");
+    assert_eq!(created.key_version, 3);
+    spaces.assert_async().await;
+    create.assert_async().await;
+}
+
+#[tokio::test]
+async fn list_feed_uses_space_feed_endpoint() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let feed = server
+        .mock("GET", "/space/feed")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("cursor".into(), "cursor-1".into()),
+            Matcher::UrlEncoded("limit".into(), "5".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "items": [{
+                    "postId": 42,
+                    "spaceId": "space_owner_gallery",
+                    "spaceSlug": "owner-gallery",
+                    "author": {
+                        "spaceId": "space_owner_gallery",
+                        "spaceSlug": "owner-gallery"
+                    },
+                    "encryptedPostKey": "cGFja2Vk",
+                    "captionCipher": "",
+                    "keyVersion": 3,
+                    "objects": [],
+                    "createdAt": "2026-04-16T00:00:00Z",
+                    "likes": 2,
+                    "viewerLiked": true
+                }],
+                "nextCursor": "cursor-2"
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let page = ctx
+        .list_feed(Some("cursor-1".to_owned()), Some(5))
+        .await
+        .expect("feed page should load");
+
+    assert_eq!(page.items.len(), 1);
+    assert_eq!(page.items[0].post_id, 42);
+    assert_eq!(page.next_cursor, "cursor-2");
+    feed.assert_async().await;
+}
+
+#[tokio::test]
+async fn list_posts_uses_space_posts_page_endpoint() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let posts = server
+        .mock("GET", "/space/posts")
+        .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("spaceId".into(), "space_owner_gallery".into()),
+            Matcher::UrlEncoded("cursor".into(), "42".into()),
+            Matcher::UrlEncoded("limit".into(), "5".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "items": [{
+                    "postId": 41,
+                    "spaceId": "space_owner_gallery",
+                    "spaceSlug": "owner-gallery",
+                    "author": {
+                        "spaceId": "space_owner_gallery",
+                        "spaceSlug": "owner-gallery"
+                    },
+                    "encryptedPostKey": "cGFja2Vk",
+                    "captionCipher": "",
+                    "keyVersion": 3,
+                    "objects": [],
+                    "createdAt": "2026-04-16T00:00:00Z",
+                    "likes": 2,
+                    "viewerLiked": true
+                }],
+                "nextCursor": "41"
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let page = ctx
+        .list_posts("space_owner_gallery", Some("42".to_owned()), Some(5))
+        .await
+        .expect("post page should load");
+
+    assert_eq!(page.items.len(), 1);
+    assert_eq!(page.items[0].post_id, 41);
+    assert_eq!(page.next_cursor, "41");
+    posts.assert_async().await;
+}
+
+#[tokio::test]
+async fn fetch_post_decrypted_uses_post_by_id_endpoint() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let space_key = generate_key();
+    let post_key = generate_key();
+    let caption = b"hello from post";
+
+    let spaces = server
+            .mock("GET", "/space")
+            .match_header("x-space-session-token", "space-session-token")
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "spaceId": "space_owner_gallery",
+                    "spaceSlug": "owner-gallery",
+                    "rootWrappedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &space_key).expect("space key wrap")),
+                    "encryptedProfile": "",
+                    "keyVersion": 3
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+    let post = server
+            .mock("GET", "/space/posts/42")
+            .match_header("x-space-session-token", "space-session-token")
+            .with_status(200)
+            .with_body(
+                json!({
+                    "postId": 42,
+                    "spaceId": "space_owner_gallery",
+                    "spaceSlug": "owner-gallery",
+                    "author": {
+                        "spaceId": "space_owner_gallery",
+                        "spaceSlug": "owner-gallery"
+                    },
+                    "encryptedPostKey": encode_b64(&encrypt_secretbox_payload(&space_key, &post_key).expect("post key wrap")),
+                    "captionCipher": encode_b64(&encrypt_secretbox_payload(&post_key, caption).expect("caption wrap")),
+                    "keyVersion": 3,
+                    "objects": [],
+                    "createdAt": "2026-04-16T00:00:00Z",
+                    "likes": 0,
+                    "viewerLiked": false
+                })
+                .to_string(),
+            )
+            .create_async()
+            .await;
+
+    let decrypted = ctx
+        .fetch_post_decrypted(42)
+        .await
+        .expect("post should decrypt");
+
+    assert_eq!(decrypted.post_key, post_key);
+    assert_eq!(
+        decrypted.caption_plaintext.as_deref(),
+        Some(caption.as_slice())
+    );
+    spaces.assert_async().await;
+    post.assert_async().await;
+}
+
+#[tokio::test]
+async fn hydrate_space_keys_loads_owned_and_friends_spaces() {
+    let mut server = Server::new_async().await;
+    let space_root_key = generate_key();
+    let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
+    let owned_space_key = generate_key();
+    let shared_space_key = generate_key();
+    let sealed_share = seal_with_public_key(&shared_space_key, &test_public_key(&ctx))
+        .expect("sealed space share");
+
+    let owned = server
+            .mock("GET", "/space")
+            .match_header("x-space-session-token", "space-session-token")
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "spaceId": "space_owner_gallery",
+                    "spaceSlug": "owner-gallery",
+                    "rootWrappedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &owned_space_key).expect("owned wrap")),
+                    "encryptedProfile": "",
+                    "keyVersion": 1
+                }])
+                .to_string(),
+            )
+            .create_async()
+            .await;
+    let shares = server
+        .mock("GET", "/space/friends/shares")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(
+            json!([{
+                "friend": "owner",
+                "spaceId": "space_shared_gallery",
+                "spaceSlug": "shared-gallery",
+                "friendSealedSpaceKey": encode_b64(&sealed_share),
+                "encryptedProfile": "",
+                "keyVersion": 4
+            }])
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let hydrated = ctx
+        .hydrate_space_keys()
+        .await
+        .expect("space keys should hydrate");
+
+    assert_eq!(hydrated.owned.len(), 1);
+    assert_eq!(hydrated.owned[0].0, "space_owner_gallery");
+    assert_eq!(hydrated.owned[0].1, owned_space_key);
+    assert_eq!(hydrated.friends.len(), 1);
+    assert_eq!(hydrated.friends[0].space_id, "space_shared_gallery");
+    assert_eq!(hydrated.friends[0].space_key, shared_space_key);
+    owned.assert_async().await;
+    shares.assert_async().await;
+}
+
+#[test]
+fn build_history_walks_back_versions() {
+    let v3 = generate_key();
+    let v2 = generate_key();
+    let v1 = generate_key();
+    let versions = vec![
+        SpaceKeyVersionResponse {
+            version: 3,
+            wrapped_prev_key: encode_b64(&encrypt_secretbox_payload(&v3, &v2).expect("wrap v2")),
+            created_at: "2026-01-03T00:00:00Z".to_owned(),
+        },
+        SpaceKeyVersionResponse {
+            version: 2,
+            wrapped_prev_key: encode_b64(&encrypt_secretbox_payload(&v2, &v1).expect("wrap v1")),
+            created_at: "2026-01-02T00:00:00Z".to_owned(),
+        },
+    ];
+
+    let history = build_space_key_history_map(3, &v3, &versions).expect("history");
+
+    assert_eq!(history.get(&3), Some(&v3));
+    assert_eq!(history.get(&2), Some(&v2));
+    assert_eq!(history.get(&1), Some(&v1));
+}

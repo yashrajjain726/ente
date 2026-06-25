@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -77,7 +78,7 @@ func TestRegisteredTokenSessionRoutesAllowEntityKeyEnsureBeforeBrowserSession(t 
 	ensureReq := httptest.NewRequest(
 		http.MethodPost,
 		"/space/entity-key/ensure",
-		bytes.NewBufferString(`{"type":"space","encryptedKey":"ZW5jcnlwdGVkLWtleQ=="}`),
+		bytes.NewBufferString(`{"type":"space","encryptedKey":"`+testEncodedSpaceEntityKey(72)+`"}`),
 	)
 	ensureReq.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
 	ensureRecorder := httptest.NewRecorder()
@@ -85,7 +86,7 @@ func TestRegisteredTokenSessionRoutesAllowEntityKeyEnsureBeforeBrowserSession(t 
 	router.ServeHTTP(ensureRecorder, ensureReq)
 
 	require.Equal(t, http.StatusOK, ensureRecorder.Code)
-	require.JSONEq(t, `{"type":"space","encryptedKey":"ZW5jcnlwdGVkLWtleQ=="}`, ensureRecorder.Body.String())
+	require.JSONEq(t, `{"type":"space","encryptedKey":"`+testEncodedSpaceEntityKey(72)+`"}`, ensureRecorder.Body.String())
 
 	getReq := httptest.NewRequest(http.MethodGet, "/space/entity-key?type=space", nil)
 	getReq.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
@@ -94,6 +95,27 @@ func TestRegisteredTokenSessionRoutesAllowEntityKeyEnsureBeforeBrowserSession(t 
 	router.ServeHTTP(getRecorder, getReq)
 
 	require.Equal(t, http.StatusUnauthorized, getRecorder.Code)
+}
+
+func TestSpaceEntityKeyRejectsSplitFormatPayload(t *testing.T) {
+	handlers, repos, userID := setupSpaceSessionAPITest(t)
+	router := gin.New()
+	router.POST("/space/entity-key", handlers.CreateSpaceEntityKey)
+	router.POST("/space/entity-key/ensure", handlers.EnsureSpaceEntityKey)
+
+	body := `{"type":"space","encryptedKey":"` + testEncodedSpaceEntityKey(48) + `","header":"` + testEncodedSpaceEntityKey(24) + `"}`
+	for _, path := range []string{"/space/entity-key", "/space/entity-key/ensure"} {
+		req := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(body))
+		req.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
+		recorder := httptest.NewRecorder()
+
+		router.ServeHTTP(recorder, req)
+
+		require.Equal(t, http.StatusBadRequest, recorder.Code)
+	}
+
+	_, err := repos.EntityKeys.GetKey(context.Background(), userID, "space")
+	require.Error(t, err)
 }
 
 func TestRequireSpaceBrowserSessionAcceptsValidHeader(t *testing.T) {
@@ -115,6 +137,10 @@ func TestRequireSpaceBrowserSessionAcceptsValidHeader(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 	require.JSONEq(t, `{"userID":"`+strconv.FormatInt(userID, 10)+`"}`, recorder.Body.String())
+}
+
+func testEncodedSpaceEntityKey(size int) string {
+	return base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, size))
 }
 
 func TestRequireSpaceBrowserSessionRejectsInvalidHeader(t *testing.T) {

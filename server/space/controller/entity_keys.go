@@ -12,7 +12,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const spaceEntityKeyType = "space"
+const (
+	spaceEntityKeyType = "space"
+
+	spaceRootKeyBytes           = 32
+	spaceSecretboxNonceBytes    = 24
+	spaceSecretboxMACBytes      = 16
+	spaceEntityKeyCombinedBytes = spaceSecretboxNonceBytes + spaceSecretboxMACBytes + spaceRootKeyBytes
+)
 
 type EntityKeysController struct {
 	EntityKeysRepo *repo.EntityKeysRepository
@@ -28,7 +35,7 @@ func (c *EntityKeysController) CreateKey(ctx *gin.Context, req models.SpaceEntit
 	if err != nil {
 		return err
 	}
-	encryptedKey, err := decodeEncodedSpaceField("encryptedKey", req.EncryptedKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	encryptedKey, err := decodeSpaceEntityKey(req.EncryptedKey)
 	if err != nil {
 		return err
 	}
@@ -44,7 +51,7 @@ func (c *EntityKeysController) EnsureKey(ctx *gin.Context, req models.SpaceEntit
 	if err != nil {
 		return nil, err
 	}
-	encryptedKey, err := decodeEncodedSpaceField("encryptedKey", req.EncryptedKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	encryptedKey, err := decodeSpaceEntityKey(req.EncryptedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +87,17 @@ func validateSpaceEntityKeyType(value string) (string, error) {
 		return "", ente.NewBadRequestWithMessage("invalid entity key type")
 	}
 	return keyType, nil
+}
+
+func decodeSpaceEntityKey(value string) ([]byte, error) {
+	encryptedKey, err := decodeEncodedSpaceField("encryptedKey", value, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
+	if err != nil {
+		return nil, err
+	}
+	if len(encryptedKey) != spaceEntityKeyCombinedBytes {
+		return nil, ente.NewBadRequestWithMessage("encryptedKey has invalid format")
+	}
+	return encryptedKey, nil
 }
 
 func toSpaceEntityKeyResponse(rec *repo.SpaceEntityKeyRecord) *models.SpaceEntityKeyResponse {
