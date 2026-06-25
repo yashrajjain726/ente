@@ -1,0 +1,99 @@
+//! Space profiles.
+//!
+//! A Space profile is an encrypted blob (display name, bio, and the like) plus
+//! optional avatar and cover assets, all keyed by the Space key for its
+//! version. These methods fetch the raw or decrypted profile and update it,
+//! re-using the cached owned-Space key via the spine in
+//! [`super`](super::AccountSpaceCtx).
+
+use super::{AccountSpaceCtx, decrypt_space_profile};
+use crate::crypto::encrypt_secretbox_payload;
+use crate::error::{Result, SpaceError};
+use crate::models::DecryptedSpaceProfile;
+use crate::transport::{
+    ProfileAvatarPayload, ProfileCoverPayload, SpaceProfileResponse, UpdateSpaceProfileRequest,
+    UpdateSpaceProfileResponse,
+};
+use ente_core::crypto::encode_b64;
+
+impl AccountSpaceCtx {
+    pub async fn get_space_profile_raw(
+        &self,
+        space_id: &str,
+        version: Option<i32>,
+    ) -> Result<SpaceProfileResponse> {
+        let mut query = vec![("spaceId", space_id.to_owned())];
+        if let Some(value) = version {
+            query.push(("version", value.to_string()));
+        }
+        self.client()
+            .get_json("/space/profile", &query)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn get_space_profile_decrypted(
+        &self,
+        space_id: &str,
+        version: Option<i32>,
+    ) -> Result<DecryptedSpaceProfile> {
+        let profile = self.get_space_profile_raw(space_id, version).await?;
+        let space_key = self
+            .resolve_space_key_for_version(space_id, Some(profile.version))
+            .await?
+            .ok_or_else(|| {
+                SpaceError::InvalidInput(format!(
+                    "no key available for space {space_id} version {}",
+                    profile.version
+                ))
+            })?;
+        decrypt_space_profile(&profile, &space_key)
+    }
+
+    pub async fn update_space_profile(
+        &self,
+        space_id: &str,
+        profile: &[u8],
+        avatar: Option<ProfileAvatarPayload>,
+        remove_avatar: bool,
+    ) -> Result<UpdateSpaceProfileResponse> {
+        self.update_space_profile_assets(space_id, profile, avatar, None, remove_avatar, false)
+            .await
+    }
+
+    pub async fn update_space_profile_assets(
+        &self,
+        space_id: &str,
+        profile: &[u8],
+        avatar: Option<ProfileAvatarPayload>,
+        cover: Option<ProfileCoverPayload>,
+        remove_avatar: bool,
+        remove_cover: bool,
+    ) -> Result<UpdateSpaceProfileResponse> {
+        let space_key = self
+            .resolve_owned_space_access(space_id)
+            .await?
+            .ok_or_else(|| {
+                SpaceError::InvalidInput(format!("space {space_id} is not owned by the account"))
+            })?;
+        let request = UpdateSpaceProfileRequest {
+            space_id: space_id.to_owned(),
+            key_version: space_key.key_version,
+            encrypted_profile: encode_b64(&encrypt_secretbox_payload(
+                &space_key.space_key,
+                profile,
+            )?),
+            avatar,
+            cover,
+            remove_avatar,
+            remove_cover,
+        };
+        let response = self
+            .client()
+            .post_json("/space/profile", &request)
+            .await
+            .map_err(SpaceError::from)?;
+        self.update_cached_owned_space_profile(space_id, request.encrypted_profile)?;
+        Ok(response)
+    }
+}
