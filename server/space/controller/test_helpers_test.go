@@ -43,7 +43,8 @@ func testRotateKey(ctx context.Context, module *spacerepo.Module, ownerID int64,
 }
 
 func testAddFriend(ctx context.Context, module *spacerepo.Module, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey string, targetKeyVersion int, requesterFriendSealedSpaceKey string, requesterKeyVersion int) error {
-	return module.Friends.AddFriend(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion, testSpaceBytes(requesterFriendSealedSpaceKey), requesterKeyVersion)
+	_, err := module.Friends.AddFriendWithCreated(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion, testSpaceBytes(requesterFriendSealedSpaceKey), requesterKeyVersion)
+	return err
 }
 
 func testUpsertLink(ctx context.Context, module *spacerepo.Module, spaceID string, authKeyHash []byte, keyVersion int, linkWrappedSpaceKey string, encryptedAccessKey string) (*spacerepo.SpaceLinkRecord, error) {

@@ -26,11 +26,6 @@ type friendShareExecer interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
-func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey []byte, targetKeyVersion int, requesterFriendSealedSpaceKey []byte, requesterKeyVersion int) error {
-	_, err := r.AddFriendWithCreated(ctx, requesterID, requesterSpaceID, targetSpaceID, targetFriendSealedSpaceKey, targetKeyVersion, requesterFriendSealedSpaceKey, requesterKeyVersion)
-	return err
-}
-
 func (r *FriendsRepository) AddFriendWithCreated(ctx context.Context, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey []byte, targetKeyVersion int, requesterFriendSealedSpaceKey []byte, requesterKeyVersion int) (bool, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
