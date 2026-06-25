@@ -155,6 +155,7 @@ const Page: React.FC = () => {
                             file: preparedImage.file,
                             height: preparedImage.height,
                             spaceId,
+                            thumbHash: preparedImage.thumbHash,
                             width: preparedImage.width,
                         });
                         if (!post) throw new Error("Couldn't create post.");

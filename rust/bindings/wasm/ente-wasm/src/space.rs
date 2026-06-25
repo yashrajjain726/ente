@@ -268,6 +268,8 @@ struct PostObjectJs {
     #[serde(skip_serializing_if = "Option::is_none")]
     blur_hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    thumb_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     width: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     height: Option<i32>,
@@ -400,6 +402,7 @@ fn post_object_to_js(
         position: object.position,
         variant: metadata.as_ref().and_then(|value| value.variant.clone()),
         blur_hash: metadata.as_ref().and_then(|value| value.blur_hash.clone()),
+        thumb_hash: metadata.as_ref().and_then(|value| value.thumb_hash.clone()),
         width: metadata.as_ref().and_then(|value| value.width),
         height: metadata.as_ref().and_then(|value| value.height),
         media_type: metadata.and_then(|value| value.media_type),
@@ -962,6 +965,7 @@ impl SpaceAccountCtxHandle {
         width: Option<i32>,
         height: Option<i32>,
         media_type: Option<String>,
+        thumb_hash: Option<String>,
     ) -> Result<JsValue, WasmSpaceError> {
         let post_key = self.inner.generate_post_key();
         let object = self
@@ -973,6 +977,7 @@ impl SpaceAccountCtxHandle {
                 width,
                 height,
                 media_type,
+                thumb_hash,
             )
             .await?;
         let (post_id, _) = self

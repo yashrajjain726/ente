@@ -32,6 +32,7 @@ export const profilePostGroupsFromPosts = (
             name: post.name,
             postId: post.postId,
             timestampMs: post.timestampMs,
+            thumbHash: post.thumbHash,
             viewerLiked: post.viewerLiked,
             width: post.width,
         });

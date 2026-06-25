@@ -108,6 +108,7 @@ async fn space_bootstrap_posts_friend_share_and_link_suite() {
             Some(320),
             Some(240),
             Some("image/webp".to_owned()),
+            None,
         )
         .await
         .expect("post asset upload should succeed");
@@ -337,6 +338,7 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite() {
             Some(320),
             Some(240),
             Some("image/webp".to_owned()),
+            None,
         )
         .await
         .expect("post asset upload should succeed");
@@ -576,6 +578,7 @@ async fn space_rotation_history_refresh_and_link_suite() {
             Some(320),
             Some(240),
             Some("image/webp".to_owned()),
+            None,
         )
         .await
         .expect("v1 post asset upload should succeed");
@@ -642,6 +645,7 @@ async fn space_rotation_history_refresh_and_link_suite() {
             Some(320),
             Some(240),
             Some("image/webp".to_owned()),
+            None,
         )
         .await
         .expect("v2 post asset upload should succeed");

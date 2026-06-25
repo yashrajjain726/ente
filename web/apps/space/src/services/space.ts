@@ -56,6 +56,7 @@ interface SpacePostObject {
     mediaType?: string;
     objectKey: string;
     size?: number;
+    thumbHash?: string;
     width?: number;
 }
 
@@ -174,6 +175,7 @@ interface SpacePostBase {
     name: string;
     postId: number;
     timestampMs: number;
+    thumbHash?: string;
     viewerLiked: boolean;
     spaceId: string;
     width?: number;
@@ -533,6 +535,7 @@ const postFromAccountPost = async (
         name: author.fullName || author.username,
         postId: post.postId,
         timestampMs: timestampMsFromSpaceDate(post.createdAt),
+        thumbHash: object.thumbHash,
         viewerLiked: post.viewerLiked,
         spaceId: post.spaceId,
         width: object.width,
@@ -558,6 +561,7 @@ const profilePostFromPost = (
         name: author.fullName || author.username,
         postId: post.postId,
         timestampMs: timestampMsFromSpaceDate(post.createdAt),
+        thumbHash: object.thumbHash,
         viewerLiked: post.viewerLiked,
         spaceId: post.spaceId,
         width: object.width,
@@ -917,12 +921,14 @@ export const createCurrentPhotoPost = async ({
     file,
     height,
     spaceId,
+    thumbHash,
     width,
 }: {
     caption?: string;
     file: File;
     height?: number;
     spaceId: string;
+    thumbHash: string;
     width?: number;
 }) => {
     const ctx = await ensureCurrentSpaceContext();
@@ -937,6 +943,7 @@ export const createCurrentPhotoPost = async ({
             normalizedWidth,
             normalizedHeight,
             file.type || null,
+            thumbHash || null,
         )) as SpacePostResponse;
         const object = firstObject(created);
         if (object) await cacheAccountPostAssetURL(created, object, file);
@@ -1070,10 +1077,10 @@ export const loadCurrentFriendRequestConversations =
     async (): Promise<SpaceMessageConversation[]> => {
         const ctx = await ensureCurrentSpaceContext();
         try {
-            const requests: SpaceFriendRequestResponse[] = await (
+            const requests = (await (
                 ctx as SpaceFriendRequestContext
-            ).list_friend_requests();
-            return (requests ?? []).map((request) => ({
+            ).list_friend_requests()) as SpaceFriendRequestResponse[];
+            return requests.map((request) => ({
                 friend: actorProfile(request.requester),
                 latestActivity: {
                     createdAtMs: timestampMsFromSpaceDate(request.createdAt),

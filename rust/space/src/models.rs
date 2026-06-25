@@ -70,6 +70,8 @@ pub struct PostObjectMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blur_hash: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thumb_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub width: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub height: Option<i32>,

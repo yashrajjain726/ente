@@ -42,6 +42,7 @@ import {
     spacePostImageInputAccept,
     spacePostPreviewImageForFile,
 } from "utils/spacePostImage";
+import { thumbHashDataURLFromBase64 } from "utils/thumbhash";
 
 export const homeBackground = "#F5F5F7";
 
@@ -184,6 +185,7 @@ interface FeedItemProps {
     onOpenProfile?: () => void;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     postId: number;
+    thumbHash?: string;
     timestampStatus?: FeedTimestampStatus;
     timestampMs: number;
     viewerLiked: boolean;
@@ -195,6 +197,7 @@ interface FeedSkeletonItemProps {
     pb?: string;
     rootRef?: React.Ref<HTMLElement>;
     showFooter?: boolean;
+    thumbHashDataURL?: string;
 }
 
 interface AddedFriendToastProps {
@@ -363,6 +366,7 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({
     pb = "8px",
     rootRef,
     showFooter = true,
+    thumbHashDataURL,
 }) => (
     <Box
         ref={rootRef}
@@ -395,17 +399,35 @@ const FeedSkeletonItem: React.FC<FeedSkeletonItemProps> = ({
                 width: "100%",
             }}
         >
-            <Skeleton
-                variant="rectangular"
-                sx={{
-                    aspectRatio,
-                    bgcolor: feedSkeletonElementBackground,
-                    display: "block",
-                    height: "100%",
-                    transform: "none",
-                    width: "100%",
-                }}
-            />
+            {thumbHashDataURL ? (
+                <Box
+                    component="img"
+                    alt=""
+                    aria-hidden
+                    src={thumbHashDataURL}
+                    sx={{
+                        display: "block",
+                        filter: "blur(14px)",
+                        height: "100%",
+                        objectFit: "cover",
+                        objectPosition: "center",
+                        transform: "scale(1.08)",
+                        width: "100%",
+                    }}
+                />
+            ) : (
+                <Skeleton
+                    variant="rectangular"
+                    sx={{
+                        aspectRatio,
+                        bgcolor: feedSkeletonElementBackground,
+                        display: "block",
+                        height: "100%",
+                        transform: "none",
+                        width: "100%",
+                    }}
+                />
+            )}
             <Box
                 sx={{
                     alignItems: "center",
@@ -633,6 +655,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     onOpenProfile,
     onSetPostLiked,
     postId,
+    thumbHash,
     timestampStatus,
     timestampMs,
     viewerLiked,
@@ -647,6 +670,10 @@ const FeedItem: React.FC<FeedItemProps> = ({
     const dateLabel = formatSpaceDate(timestampMs);
     const postingDotCount = usePostingDotCount(timestampStatus == "posting");
     const displayCaption = caption?.trim();
+    const thumbHashDataURL = React.useMemo(
+        () => thumbHashDataURLFromBase64(thumbHash),
+        [thumbHash],
+    );
     const showFooter = !isOwnPost || Boolean(displayCaption);
     const canOpenAuthor = isOwnPost
         ? Boolean(onOpenProfile)
@@ -678,6 +705,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
         feedPhotoFrameDimensionsFor(photoDimensions);
     const isFeedItemReady =
         Boolean(displayImageUrl) && decodedPhoto.ready && isAvatarReady;
+    const [showResolvedPhoto, setShowResolvedPhoto] = useState(false);
     const decodedPhotoHeight = decodedPhoto.height;
     const decodedPhotoSrc = decodedPhoto.src;
     const decodedPhotoWidth = decodedPhoto.width;
@@ -807,6 +835,20 @@ const FeedItem: React.FC<FeedItemProps> = ({
         return () => window.clearTimeout(timeoutID);
     }, [likePopID]);
 
+    React.useEffect(() => {
+        setShowResolvedPhoto(false);
+        if (!isFeedItemReady) return;
+        if (!thumbHashDataURL) {
+            setShowResolvedPhoto(true);
+            return;
+        }
+
+        const frameID = window.requestAnimationFrame(() =>
+            setShowResolvedPhoto(true),
+        );
+        return () => window.cancelAnimationFrame(frameID);
+    }, [displayImageUrl, isFeedItemReady, thumbHashDataURL]);
+
     if (!isFeedItemReady) {
         return (
             <FeedSkeletonItem
@@ -815,6 +857,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 pb={isOwnPost ? "5px" : "8px"}
                 rootRef={rootRef}
                 showFooter={showFooter}
+                thumbHashDataURL={thumbHashDataURL}
             />
         );
     }
@@ -865,7 +908,9 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         height: "100%",
                         maxWidth: "100%",
                         minWidth: 0,
+                        overflow: "hidden",
                         p: 0,
+                        position: "relative",
                         width: "100%",
                         "&:focus-visible": {
                             outline: `2px solid ${green}`,
@@ -873,6 +918,25 @@ const FeedItem: React.FC<FeedItemProps> = ({
                         },
                     }}
                 >
+                    {thumbHashDataURL ? (
+                        <Box
+                            component="img"
+                            alt=""
+                            aria-hidden
+                            src={thumbHashDataURL}
+                            sx={{
+                                display: "block",
+                                filter: "blur(14px)",
+                                height: "100%",
+                                inset: 0,
+                                objectFit: "cover",
+                                objectPosition: "center",
+                                position: "absolute",
+                                transform: "scale(1.08)",
+                                width: "100%",
+                            }}
+                        />
+                    ) : null}
                     <Box
                         component="img"
                         alt={`${name} post`}
@@ -885,7 +949,17 @@ const FeedItem: React.FC<FeedItemProps> = ({
                             minWidth: 0,
                             objectFit: "cover",
                             objectPosition: "center",
+                            opacity: showResolvedPhoto ? 1 : 0,
+                            position: "relative",
+                            transition: thumbHashDataURL
+                                ? "opacity 220ms ease"
+                                : "none",
                             width: "100%",
+                            zIndex: 1,
+                            "@media (prefers-reduced-motion: reduce)": {
+                                opacity: 1,
+                                transition: "none",
+                            },
                         }}
                     />
                 </Box>
@@ -1503,6 +1577,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onOpenProfile={onOpenProfile}
                 onSetPostLiked={onSetPostLiked}
                 postId={item.postId}
+                thumbHash={item.thumbHash}
                 timestampStatus={timestampStatus}
                 timestampMs={item.timestampMs}
                 viewerLiked={item.viewerLiked}
