@@ -193,9 +193,6 @@ const conversationPreview = (
     profile: SetupProfile,
 ) => {
     const activity = conversation.latestActivity;
-    if (activity.type == "friend") {
-        return "You're now friends. Say hello!";
-    }
     if (activity.type == "friend_request") {
         return "Friend request";
     }

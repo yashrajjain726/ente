@@ -79,7 +79,6 @@ interface SpacePostPageResponse {
 }
 
 type SpaceMessageConversationActivityType =
-    | "friend"
     | "friend_request"
     | "message"
     | "message_like"

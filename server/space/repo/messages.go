@@ -440,46 +440,23 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				r.replied_at AS notification_created_at,
 				FALSE AS is_outgoing
 			FROM post_reply_events r
-		),
-		activity_candidates AS (
-			SELECT * FROM message_candidates
-			UNION ALL
-			SELECT * FROM post_like_candidates
-			UNION ALL
-			SELECT * FROM post_reply_candidates
-		),
-		friendship_candidates AS (
-			SELECT
-				'friend' AS activity_type,
-				'friend:' || fs.friend_space_id AS activity_id,
-				fs.created_at AS activity_created_at,
-				fs.friend_space_id,
-				NULL::text AS message_id,
-				NULL::bigint AS post_id,
-				NULL::bigint AS notification_created_at,
-				FALSE AS is_outgoing
-			FROM space_friend_shares fs
-			WHERE fs.space_id = $2
-			  AND NOT EXISTS (
-				SELECT 1
-				FROM activity_candidates ac
-				WHERE ac.friend_space_id = fs.friend_space_id
-			  )
-		),
-		candidates AS (
-			SELECT * FROM activity_candidates
-			UNION ALL
-			SELECT * FROM friendship_candidates
-		),
-		readable_activities AS (
-			SELECT
-				m.sender_space_id AS friend_space_id,
-				m.created_at AS readable_created_at
-			FROM space_messages m
-			WHERE m.recipient_space_id = $2
-			  AND m.sender_space_id <> $2
-			  AND m.kind = 'regular'
-			  AND m.is_deleted = FALSE
+			),
+			activity_candidates AS (
+				SELECT * FROM message_candidates
+				UNION ALL
+				SELECT * FROM post_like_candidates
+				UNION ALL
+				SELECT * FROM post_reply_candidates
+			),
+			readable_activities AS (
+				SELECT
+					m.sender_space_id AS friend_space_id,
+					m.created_at AS readable_created_at
+				FROM space_messages m
+				WHERE m.recipient_space_id = $2
+				  AND m.sender_space_id <> $2
+				  AND m.kind = 'regular'
+				  AND m.is_deleted = FALSE
 
 			UNION ALL
 
@@ -522,28 +499,28 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			  AND pl.created_at > COALESCE(nrm.read_at, 0)
 			GROUP BY actor_space.space_id
 		),
-		latest_activities AS (
-			SELECT DISTINCT ON (friend_space_id)
-				friend_space_id,
-				activity_created_at AS sort_created_at,
-				activity_id AS sort_id
-			FROM candidates
-			ORDER BY friend_space_id, activity_created_at DESC, activity_id DESC
-		),
-		candidates_with_read_state AS (
-			SELECT
-				c.*,
-				COALESCE(nrm.read_at, 0) AS read_at,
-				COALESCE(ruc.unread_count, 0) AS unread_count,
-				COALESCE(pluc.unread_count, 0) AS post_like_unread_count,
-				la.sort_created_at,
-				la.sort_id,
-				(
-					c.notification_created_at IS NOT NULL
-					AND c.notification_created_at > COALESCE(nrm.read_at, 0)
-				) AS notification_unread
-			FROM candidates c
-			JOIN latest_activities la ON la.friend_space_id = c.friend_space_id
+			latest_activities AS (
+				SELECT DISTINCT ON (friend_space_id)
+					friend_space_id,
+					activity_created_at AS sort_created_at,
+					activity_id AS sort_id
+				FROM activity_candidates
+				ORDER BY friend_space_id, activity_created_at DESC, activity_id DESC
+			),
+			candidates_with_read_state AS (
+				SELECT
+					c.*,
+					COALESCE(nrm.read_at, 0) AS read_at,
+					COALESCE(ruc.unread_count, 0) AS unread_count,
+					COALESCE(pluc.unread_count, 0) AS post_like_unread_count,
+					la.sort_created_at,
+					la.sort_id,
+					(
+						c.notification_created_at IS NOT NULL
+						AND c.notification_created_at > COALESCE(nrm.read_at, 0)
+					) AS notification_unread
+				FROM activity_candidates c
+				JOIN latest_activities la ON la.friend_space_id = c.friend_space_id
 			LEFT JOIN space_notification_read_markers nrm
 			  ON nrm.viewer_space_id = $2
 			 AND nrm.friend_space_id = c.friend_space_id
@@ -769,32 +746,14 @@ func (r *MessagesRepository) GetLatestConversationActivityAt(ctx context.Context
 			  AND m.reply_post_id IS NOT NULL
 			  AND p.space_id = $1
 
-		),
-		friendship_candidates AS (
-			SELECT
-				fs.created_at AS activity_created_at,
-				'friend:' || fs.friend_space_id AS activity_id,
-				fs.friend_space_id
-			FROM space_friend_shares fs
-			WHERE fs.space_id = $1
-			  AND NOT EXISTS (
-				SELECT 1
-				FROM activity_candidates ac
-				WHERE ac.friend_space_id = fs.friend_space_id
-			  )
-		),
-		candidates AS (
-			SELECT * FROM activity_candidates
-			UNION ALL
-			SELECT * FROM friendship_candidates
-		)
-		SELECT c.activity_created_at
-		FROM candidates c
-		JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
-		JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
-		WHERE c.friend_space_id = $2
-		ORDER BY c.activity_created_at DESC, c.activity_id DESC
-		LIMIT 1
+			)
+			SELECT c.activity_created_at
+			FROM activity_candidates c
+			JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
+			JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
+			WHERE c.friend_space_id = $2
+			ORDER BY c.activity_created_at DESC, c.activity_id DESC
+			LIMIT 1
 	`, strings.TrimSpace(viewerSpaceID), strings.TrimSpace(friendSpaceID)).Scan(&activityCreatedAt); err != nil {
 		return 0, stacktrace.Propagate(err, "")
 	}
