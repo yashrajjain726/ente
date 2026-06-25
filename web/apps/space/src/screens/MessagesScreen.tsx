@@ -193,16 +193,11 @@ const conversationPreview = (
     profile: SetupProfile,
 ) => {
     const activity = conversation.latestActivity;
-    if (activity.type == "friend_request") {
-        return "Friend request";
-    }
-    if (activity.type == "friend_add") {
+    if (activity.type == "friend") {
         return "You're now friends. Say hello!";
     }
-    if (activity.type == "friend_remove") {
-        return activity.outgoing
-            ? "You're no longer friends"
-            : "Removed you as a friend";
+    if (activity.type == "friend_request") {
+        return "Friend request";
     }
     if (activity.type == "post_like") {
         return activity.outgoing ? "You liked a post" : "Liked your post";
@@ -325,7 +320,6 @@ const conversationTimeSections = (
         { title: "Last 7 days", items: [] },
         { title: "Last 30 days", items: [] },
         { title: "Older", items: [] },
-        { title: "No messages", items: [] },
     ];
 
     for (const conversation of conversations) {

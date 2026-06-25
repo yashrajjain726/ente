@@ -418,7 +418,7 @@ mod tests {
     #[test]
     fn message_conversation_activity_deserializes_outgoing() {
         let activity: MessageConversationActivity = serde_json::from_str(
-            r#"{"id":"friend_event:1","type":"friend_add","createdAt":"2026-05-25T00:00:00Z","outgoing":true}"#,
+            r#"{"id":"message:example","type":"message","createdAt":"2026-05-25T00:00:00Z","outgoing":true}"#,
         )
         .expect("activity should deserialize");
         assert!(activity.outgoing);

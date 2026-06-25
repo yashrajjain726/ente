@@ -242,33 +242,6 @@ CREATE TRIGGER update_space_friend_requests_updated_at
     FOR EACH ROW
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
-CREATE TABLE IF NOT EXISTS space_friend_events (
-    event_id        BIGSERIAL PRIMARY KEY,
-    event_type      TEXT   NOT NULL DEFAULT 'friend_add',
-    actor_id        BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    actor_space_id   TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    target_id       BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    target_space_id  TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    created_at      BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    CONSTRAINT chk_space_friend_events_distinct_users CHECK (actor_id <> target_id),
-    CONSTRAINT chk_space_friend_events_type CHECK (event_type IN ('friend_add', 'friend_remove'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_space_friend_events_target_created
-    ON space_friend_events (target_id, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_space_friend_events_target_type_created
-    ON space_friend_events (target_id, event_type, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_space_friend_events_target_space_created
-    ON space_friend_events (target_space_id, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_space_friend_events_target_space_type_created
-    ON space_friend_events (target_space_id, event_type, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_space_friend_events_actor_space_created
-    ON space_friend_events (actor_space_id, created_at DESC);
-
 CREATE OR REPLACE FUNCTION tg_space_messages_null_cipher_on_delete() RETURNS trigger AS $$
 BEGIN
     IF NEW.is_deleted THEN

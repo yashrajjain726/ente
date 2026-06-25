@@ -95,15 +95,6 @@ func (r *FriendsRepository) AddFriendWithCreated(ctx context.Context, requesterI
 		return false, stacktrace.Propagate(err, "")
 	}
 
-	if !alreadyFriends {
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO space_friend_events (event_type, actor_id, actor_space_id, target_id, target_space_id)
-			VALUES ('friend_add', $1, $2, $3, $4)
-		`, requesterID, requesterSpaceID, targetOwnerID, targetSpaceID); err != nil {
-			return false, stacktrace.Propagate(err, "")
-		}
-	}
-
 	if err := tx.Commit(); err != nil {
 		return false, stacktrace.Propagate(err, "")
 	}
@@ -360,15 +351,6 @@ func (r *FriendsRepository) ConfirmFriendRequest(ctx context.Context, targetID i
 		return 0, false, stacktrace.Propagate(err, "")
 	}
 
-	if !alreadyFriends {
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO space_friend_events (event_type, actor_id, actor_space_id, target_id, target_space_id)
-			VALUES ('friend_add', $1, $2, $3, $4)
-		`, targetID, targetSpaceID, requesterID, requesterSpaceID); err != nil {
-			return 0, false, stacktrace.Propagate(err, "")
-		}
-	}
-
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE space_friend_requests
 		SET is_deleted = TRUE,
@@ -497,27 +479,13 @@ func (r *FriendsRepository) DeleteFriendship(ctx context.Context, userID int64, 
 		return nil
 	}
 
-	res, err := tx.ExecContext(ctx, `
+	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM space_friend_shares
 		WHERE (space_id = $1 AND friend_space_id = $2 AND friend_id = $3)
 		   OR (space_id = $2 AND friend_space_id = $1 AND friend_id = $4)
-	`, targetSpaceID, actorSpaceID, userID, targetOwnerID)
-	if err != nil {
+	`, targetSpaceID, actorSpaceID, userID, targetOwnerID); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	if affected > 0 {
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO space_friend_events (event_type, actor_id, actor_space_id, target_id, target_space_id)
-			VALUES ('friend_remove', $1, $2, $3, $4)
-		`, userID, actorSpaceID, targetOwnerID, targetSpaceID); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	}
-
 	return stacktrace.Propagate(tx.Commit(), "")
 }
 
