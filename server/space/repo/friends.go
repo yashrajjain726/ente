@@ -15,6 +15,17 @@ var (
 	ErrSelfFriendship = errors.New("space users cannot friend themselves")
 )
 
+type friendShareMutation struct {
+	SpaceID              string
+	FriendSpaceID        string
+	FriendSealedSpaceKey []byte
+	KeyVersion           int
+}
+
+type friendShareExecer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 func (r *FriendsRepository) AddFriend(ctx context.Context, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey []byte, targetKeyVersion int, requesterFriendSealedSpaceKey []byte, requesterKeyVersion int) error {
 	_, err := r.AddFriendWithCreated(ctx, requesterID, requesterSpaceID, targetSpaceID, targetFriendSealedSpaceKey, targetKeyVersion, requesterFriendSealedSpaceKey, requesterKeyVersion)
 	return err
@@ -58,45 +69,67 @@ func (r *FriendsRepository) AddFriendWithCreated(ctx context.Context, requesterI
 		return false, sql.ErrNoRows
 	}
 
-	var alreadyFriends bool
-	if err := tx.QueryRowContext(ctx, `
-			SELECT EXISTS (
-				SELECT 1
-				FROM space_friend_shares target_share
-				JOIN space_friend_shares requester_share
-				  ON requester_share.space_id = $1
-				 AND requester_share.friend_space_id = $2
-				WHERE target_share.space_id = $2
-				  AND target_share.friend_space_id = $1
-			)
-		`, requesterSpaceID, targetSpaceID).Scan(&alreadyFriends); err != nil {
-		return false, stacktrace.Propagate(err, "")
+	alreadyFriends, err := areMutualFriendsTx(ctx, tx, requesterSpaceID, targetSpaceID)
+	if err != nil {
+		return false, err
 	}
-
-	if _, err := tx.ExecContext(ctx, `
-			INSERT INTO space_friend_shares (space_id, friend_space_id, friend_sealed_space_key, key_version)
-			VALUES ($1, $2, $3, $4)
-			ON CONFLICT (space_id, friend_space_id) DO UPDATE
-			SET friend_sealed_space_key = EXCLUDED.friend_sealed_space_key,
-			    key_version = EXCLUDED.key_version
-		`, targetSpaceID, requesterSpaceID, targetFriendSealedSpaceKey, targetKeyVersion); err != nil {
-		return false, stacktrace.Propagate(err, "")
-	}
-
-	if _, err := tx.ExecContext(ctx, `
-			INSERT INTO space_friend_shares (space_id, friend_space_id, friend_sealed_space_key, key_version)
-			VALUES ($1, $2, $3, $4)
-			ON CONFLICT (space_id, friend_space_id) DO UPDATE
-			SET friend_sealed_space_key = EXCLUDED.friend_sealed_space_key,
-			    key_version = EXCLUDED.key_version
-		`, requesterSpaceID, targetSpaceID, requesterFriendSealedSpaceKey, requesterKeyVersion); err != nil {
-		return false, stacktrace.Propagate(err, "")
+	if err := upsertMutualFriendSharesTx(ctx, tx,
+		friendShareMutation{
+			SpaceID:              targetSpaceID,
+			FriendSpaceID:        requesterSpaceID,
+			FriendSealedSpaceKey: targetFriendSealedSpaceKey,
+			KeyVersion:           targetKeyVersion,
+		},
+		friendShareMutation{
+			SpaceID:              requesterSpaceID,
+			FriendSpaceID:        targetSpaceID,
+			FriendSealedSpaceKey: requesterFriendSealedSpaceKey,
+			KeyVersion:           requesterKeyVersion,
+		},
+	); err != nil {
+		return false, err
 	}
 
 	if err := tx.Commit(); err != nil {
 		return false, stacktrace.Propagate(err, "")
 	}
 	return !alreadyFriends, nil
+}
+
+func areMutualFriendsTx(ctx context.Context, tx *sql.Tx, firstSpaceID string, secondSpaceID string) (bool, error) {
+	var alreadyFriends bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM space_friend_shares second_share
+			JOIN space_friend_shares first_share
+			  ON first_share.space_id = $1
+			 AND first_share.friend_space_id = $2
+			WHERE second_share.space_id = $2
+			  AND second_share.friend_space_id = $1
+		)
+	`, firstSpaceID, secondSpaceID).Scan(&alreadyFriends); err != nil {
+		return false, stacktrace.Propagate(err, "")
+	}
+	return alreadyFriends, nil
+}
+
+func upsertMutualFriendSharesTx(ctx context.Context, tx *sql.Tx, first friendShareMutation, second friendShareMutation) error {
+	if err := upsertFriendShare(ctx, tx, first); err != nil {
+		return err
+	}
+	return upsertFriendShare(ctx, tx, second)
+}
+
+func upsertFriendShare(ctx context.Context, execer friendShareExecer, share friendShareMutation) error {
+	_, err := execer.ExecContext(ctx, `
+		INSERT INTO space_friend_shares (space_id, friend_space_id, friend_sealed_space_key, key_version)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (space_id, friend_space_id) DO UPDATE
+		SET friend_sealed_space_key = EXCLUDED.friend_sealed_space_key,
+		    key_version = EXCLUDED.key_version
+	`, share.SpaceID, share.FriendSpaceID, share.FriendSealedSpaceKey, share.KeyVersion)
+	return stacktrace.Propagate(err, "")
 }
 
 func (r *FriendsRepository) CreateFriendRequest(ctx context.Context, requesterID int64, requesterSpaceID string, targetSpaceID string, requesterFriendSealedSpaceKey []byte, requesterKeyVersion int) (*SpaceFriendRequestRecord, bool, error) {
@@ -134,19 +167,9 @@ func (r *FriendsRepository) CreateFriendRequest(ctx context.Context, requesterID
 		return nil, false, ErrSelfFriendship
 	}
 
-	var alreadyFriends bool
-	if err := tx.QueryRowContext(ctx, `
-			SELECT EXISTS (
-				SELECT 1
-				FROM space_friend_shares target_share
-				JOIN space_friend_shares requester_share
-				  ON requester_share.space_id = $1
-				 AND requester_share.friend_space_id = $2
-				WHERE target_share.space_id = $2
-				  AND target_share.friend_space_id = $1
-			)
-		`, requesterSpaceID, targetSpaceID).Scan(&alreadyFriends); err != nil {
-		return nil, false, stacktrace.Propagate(err, "")
+	alreadyFriends, err := areMutualFriendsTx(ctx, tx, requesterSpaceID, targetSpaceID)
+	if err != nil {
+		return nil, false, err
 	}
 	if alreadyFriends {
 		return nil, false, ErrAlreadyFriends
@@ -309,39 +332,25 @@ func (r *FriendsRepository) ConfirmFriendRequest(ctx context.Context, targetID i
 		return 0, false, sql.ErrNoRows
 	}
 
-	var alreadyFriends bool
-	if err := tx.QueryRowContext(ctx, `
-			SELECT EXISTS (
-				SELECT 1
-				FROM space_friend_shares target_share
-				JOIN space_friend_shares requester_share
-				  ON requester_share.space_id = $1
-				 AND requester_share.friend_space_id = $2
-				WHERE target_share.space_id = $2
-				  AND target_share.friend_space_id = $1
-			)
-		`, requesterSpaceID, targetSpaceID).Scan(&alreadyFriends); err != nil {
-		return 0, false, stacktrace.Propagate(err, "")
+	alreadyFriends, err := areMutualFriendsTx(ctx, tx, requesterSpaceID, targetSpaceID)
+	if err != nil {
+		return 0, false, err
 	}
-
-	if _, err := tx.ExecContext(ctx, `
-			INSERT INTO space_friend_shares (space_id, friend_space_id, friend_sealed_space_key, key_version)
-			VALUES ($1, $2, $3, $4)
-			ON CONFLICT (space_id, friend_space_id) DO UPDATE
-			SET friend_sealed_space_key = EXCLUDED.friend_sealed_space_key,
-			    key_version = EXCLUDED.key_version
-		`, targetSpaceID, requesterSpaceID, targetFriendSealedSpaceKey, targetKeyVersion); err != nil {
-		return 0, false, stacktrace.Propagate(err, "")
-	}
-
-	if _, err := tx.ExecContext(ctx, `
-			INSERT INTO space_friend_shares (space_id, friend_space_id, friend_sealed_space_key, key_version)
-			VALUES ($1, $2, $3, $4)
-			ON CONFLICT (space_id, friend_space_id) DO UPDATE
-			SET friend_sealed_space_key = EXCLUDED.friend_sealed_space_key,
-			    key_version = EXCLUDED.key_version
-		`, requesterSpaceID, targetSpaceID, requesterFriendSealedSpaceKey, requesterKeyVersion); err != nil {
-		return 0, false, stacktrace.Propagate(err, "")
+	if err := upsertMutualFriendSharesTx(ctx, tx,
+		friendShareMutation{
+			SpaceID:              targetSpaceID,
+			FriendSpaceID:        requesterSpaceID,
+			FriendSealedSpaceKey: targetFriendSealedSpaceKey,
+			KeyVersion:           targetKeyVersion,
+		},
+		friendShareMutation{
+			SpaceID:              requesterSpaceID,
+			FriendSpaceID:        targetSpaceID,
+			FriendSealedSpaceKey: requesterFriendSealedSpaceKey,
+			KeyVersion:           requesterKeyVersion,
+		},
+	); err != nil {
+		return 0, false, err
 	}
 
 	if _, err := tx.ExecContext(ctx, `
@@ -390,14 +399,12 @@ func (r *FriendsRepository) DeleteFriendRequest(ctx context.Context, targetID in
 }
 
 func (r *FriendsRepository) UpsertShare(ctx context.Context, spaceID string, friendSpaceID string, friendSealedSpaceKey []byte, keyVersion int) error {
-	_, err := r.DB.ExecContext(ctx, `
-		INSERT INTO space_friend_shares (space_id, friend_space_id, friend_sealed_space_key, key_version)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (space_id, friend_space_id) DO UPDATE
-		SET friend_sealed_space_key = EXCLUDED.friend_sealed_space_key,
-		    key_version = EXCLUDED.key_version
-	`, spaceID, friendSpaceID, friendSealedSpaceKey, keyVersion)
-	return stacktrace.Propagate(err, "")
+	return upsertFriendShare(ctx, r.DB, friendShareMutation{
+		SpaceID:              spaceID,
+		FriendSpaceID:        friendSpaceID,
+		FriendSealedSpaceKey: friendSealedSpaceKey,
+		KeyVersion:           keyVersion,
+	})
 }
 
 func (r *FriendsRepository) UpdateShare(ctx context.Context, spaceID string, friendSpaceID string, friendSealedSpaceKey []byte, keyVersion int) error {
