@@ -65,7 +65,7 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 		if err != nil {
 			return nil, err
 		}
-		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, object.ObjectKey, repo.TempObjectPurposePost, &space.SpaceID)
+		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, object.ObjectKey, repo.TempObjectPurposePost, &space.SpaceID)
 		if err != nil {
 			return nil, err
 		}

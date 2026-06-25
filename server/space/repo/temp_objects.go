@@ -20,9 +20,9 @@ func (r *AssetsRepository) AddTempObject(ctx context.Context, rec SpaceTempObjec
 		cleanupAfter = rec.ExpiresAt
 	}
 	_, err := r.DB.ExecContext(ctx, `
-		INSERT INTO space_temp_objects (object_key, owner_id, space_id, purpose, bucket_id, expected_size, expires_at, cleanup_after)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, rec.ObjectKey, rec.OwnerID, rec.SpaceID, rec.Purpose, rec.BucketID, rec.ExpectedSize, rec.ExpiresAt, cleanupAfter)
+		INSERT INTO space_temp_objects (object_key, space_id, purpose, bucket_id, expected_size, expires_at, cleanup_after)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, rec.ObjectKey, rec.SpaceID, rec.Purpose, rec.BucketID, rec.ExpectedSize, rec.ExpiresAt, cleanupAfter)
 	return stacktrace.Propagate(err, "")
 }
 
@@ -32,26 +32,25 @@ func QueueObjectCleanupTx(ctx context.Context, tx *sql.Tx, rec SpaceTempObjectRe
 		expectedSize = 1
 	}
 	_, err := tx.ExecContext(ctx, `
-		INSERT INTO space_temp_objects (object_key, owner_id, space_id, purpose, bucket_id, expected_size, expires_at, cleanup_after)
-		VALUES ($1, $2, $3, $4, $5, $6, now_utc_micro_seconds(), now_utc_micro_seconds())
+		INSERT INTO space_temp_objects (object_key, space_id, purpose, bucket_id, expected_size, expires_at, cleanup_after)
+		VALUES ($1, $2, $3, $4, $5, now_utc_micro_seconds(), now_utc_micro_seconds())
 		ON CONFLICT (object_key) DO UPDATE
-		SET owner_id = EXCLUDED.owner_id,
-		    space_id = EXCLUDED.space_id,
+		SET space_id = EXCLUDED.space_id,
 		    purpose = EXCLUDED.purpose,
 		    bucket_id = EXCLUDED.bucket_id,
 		    expected_size = EXCLUDED.expected_size,
 		    expires_at = EXCLUDED.expires_at,
 		    cleanup_after = EXCLUDED.cleanup_after
-	`, rec.ObjectKey, rec.OwnerID, rec.SpaceID, rec.Purpose, rec.BucketID, expectedSize)
+	`, rec.ObjectKey, rec.SpaceID, rec.Purpose, rec.BucketID, expectedSize)
 	return stacktrace.Propagate(err, "")
 }
 
-func (r *AssetsRepository) GetTempObject(ctx context.Context, ownerID int64, objectKey, purpose string, spaceID *string) (*SpaceTempObjectRecord, error) {
-	args := []any{objectKey, ownerID, purpose}
+func (r *AssetsRepository) GetTempObject(ctx context.Context, objectKey, purpose string, spaceID *string) (*SpaceTempObjectRecord, error) {
+	args := []any{objectKey, purpose}
 	query := `
-		SELECT object_key, owner_id, space_id, purpose, bucket_id, expected_size, expires_at, cleanup_after, created_at
+		SELECT object_key, space_id, purpose, bucket_id, expected_size, expires_at, cleanup_after, created_at
 		FROM space_temp_objects
-		WHERE object_key = $1 AND owner_id = $2 AND purpose = $3 AND expires_at > now_utc_micro_seconds()`
+		WHERE object_key = $1 AND purpose = $2 AND expires_at > now_utc_micro_seconds()`
 	if spaceID != nil {
 		args = append(args, *spaceID)
 		query += fmt.Sprintf(" AND space_id = $%d", len(args))
@@ -59,9 +58,9 @@ func (r *AssetsRepository) GetTempObject(ctx context.Context, ownerID int64, obj
 	return scanSpaceTempObject(r.DB.QueryRowContext(ctx, query, args...))
 }
 
-func ConsumeTempObjectTx(ctx context.Context, tx *sql.Tx, ownerID int64, objectKey, purpose string, spaceID *string) error {
-	args := []any{objectKey, ownerID, purpose}
-	query := `DELETE FROM space_temp_objects WHERE object_key = $1 AND owner_id = $2 AND purpose = $3`
+func ConsumeTempObjectTx(ctx context.Context, tx *sql.Tx, objectKey, purpose string, spaceID *string) error {
+	args := []any{objectKey, purpose}
+	query := `DELETE FROM space_temp_objects WHERE object_key = $1 AND purpose = $2`
 	if spaceID != nil {
 		args = append(args, *spaceID)
 		query += fmt.Sprintf(" AND space_id = $%d", len(args))
@@ -86,7 +85,7 @@ func (r *AssetsRepository) GetAndLockExpiredTempObjects(ctx context.Context, now
 		return nil, nil, stacktrace.Propagate(err, "")
 	}
 	rows, err := tx.QueryContext(ctx, `
-		SELECT object_key, owner_id, space_id, purpose, bucket_id, expected_size, expires_at, cleanup_after, created_at
+		SELECT object_key, space_id, purpose, bucket_id, expected_size, expires_at, cleanup_after, created_at
 		FROM space_temp_objects
 		WHERE cleanup_after <= $1
 		ORDER BY cleanup_after ASC
@@ -161,7 +160,6 @@ func scanSpaceTempObject(scanner interface{ Scan(dest ...any) error }) (*SpaceTe
 	var rec SpaceTempObjectRecord
 	err := scanner.Scan(
 		&rec.ObjectKey,
-		&rec.OwnerID,
 		&rec.SpaceID,
 		&rec.Purpose,
 		&rec.BucketID,

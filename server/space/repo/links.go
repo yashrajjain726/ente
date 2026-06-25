@@ -159,8 +159,8 @@ func (r *LinksRepository) GetLinkByAuthHash(ctx context.Context, spaceID string,
 
 func (r *LinksRepository) CreateSession(ctx context.Context, tokenHash []byte, spaceID string, authKeyHash []byte, keyVersion int, expiresAt int64) error {
 	res, err := r.DB.ExecContext(ctx, `
-		INSERT INTO space_link_sessions (token_hash, space_id, owner_id, auth_key_hash, key_version, expires_at)
-		SELECT $1, l.space_id, w.owner_id, l.auth_key_hash, l.key_version, $5
+		INSERT INTO space_link_sessions (token_hash, space_id, auth_key_hash, key_version, expires_at)
+		SELECT $1, l.space_id, l.auth_key_hash, l.key_version, $5
 		FROM space_links l
 		JOIN spaces w ON w.space_id = l.space_id
 		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
@@ -184,7 +184,7 @@ func (r *LinksRepository) CreateSession(ctx context.Context, tokenHash []byte, s
 
 func (r *LinksRepository) GetSession(ctx context.Context, tokenHash []byte) (*SpaceLinkSessionRecord, error) {
 	row := r.DB.QueryRowContext(ctx, `
-		SELECT s.token_hash, s.space_id, s.owner_id, s.auth_key_hash, s.key_version, s.expires_at, s.created_at,
+		SELECT s.token_hash, s.space_id, w.owner_id, s.auth_key_hash, s.key_version, s.expires_at, s.created_at,
 		       w.space_slug, w.space_slug, l.link_wrapped_space_key
 		FROM space_link_sessions s
 		JOIN spaces w ON w.space_id = s.space_id

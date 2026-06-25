@@ -11,7 +11,7 @@ import (
 
 func postRecordSelectSQL(viewerLikedExpr string) string {
 	return `
-		SELECT p.post_id, p.space_id, w.space_slug, p.owner_id,
+		SELECT p.post_id, p.space_id, w.space_slug, w.owner_id,
 		       w.owner_id, w.space_id, w.space_slug, w.public_key,
 		       w.current_version, w.encrypted_profile, w_avatar.object_id,
 		       w_avatar.size, w.updated_at,
@@ -62,10 +62,10 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID
 	}
 	var postID int64
 	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO space_posts (space_id, owner_id, encrypted_post_key, caption_cipher, key_version)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO space_posts (space_id, encrypted_post_key, caption_cipher, key_version)
+		VALUES ($1, $2, $3, $4)
 		RETURNING post_id
-	`, spaceID, ownerID, encryptedPostKey, caption, keyVersion).Scan(&postID); err != nil {
+	`, spaceID, encryptedPostKey, caption, keyVersion).Scan(&postID); err != nil {
 		return 0, stacktrace.Propagate(err, "")
 	}
 	for _, obj := range objects {
@@ -75,7 +75,7 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID
 		`, postID, obj.ObjectKey, obj.BucketID, obj.Size, obj.Position, obj.MetadataCipher); err != nil {
 			return 0, stacktrace.Propagate(err, "")
 		}
-		if err := ConsumeTempObjectTx(ctx, tx, ownerID, obj.ObjectKey, TempObjectPurposePost, &spaceID); err != nil {
+		if err := ConsumeTempObjectTx(ctx, tx, obj.ObjectKey, TempObjectPurposePost, &spaceID); err != nil {
 			return 0, stacktrace.Propagate(err, "failed to consume staged space post upload")
 		}
 	}
@@ -144,11 +144,15 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSp
 			LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
 			JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
 			WHERE p.is_deleted = FALSE
+			  AND EXISTS (
+			      SELECT 1 FROM spaces viewer_space
+			      WHERE viewer_space.space_id = $2 AND viewer_space.owner_id = $1
+			  )
 			  AND (
-			    p.space_id = $2 OR EXISTS (
-			      SELECT 1 FROM space_friend_shares fs
-			      WHERE fs.friend_id = $1 AND fs.friend_space_id = $2 AND fs.space_id = p.space_id
-			    )
+			      p.space_id = $2 OR EXISTS (
+			          SELECT 1 FROM space_friend_shares fs
+			          WHERE fs.friend_space_id = $2 AND fs.space_id = p.space_id
+			      )
 			  )`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorPostID)
@@ -200,7 +204,15 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `UPDATE space_posts SET is_deleted = TRUE WHERE post_id = $1 AND owner_id = $2 AND is_deleted = FALSE`, postID, ownerID)
+	res, err := tx.ExecContext(ctx, `
+		UPDATE space_posts p
+		SET is_deleted = TRUE
+		FROM spaces s
+		WHERE p.post_id = $1
+		  AND p.space_id = s.space_id
+		  AND s.owner_id = $2
+		  AND p.is_deleted = FALSE
+	`, postID, ownerID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
@@ -210,7 +222,12 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 	}
 	if affected == 0 {
 		var isDeleted bool
-		if err := tx.QueryRowContext(ctx, `SELECT is_deleted FROM space_posts WHERE post_id = $1 AND owner_id = $2`, postID, ownerID).Scan(&isDeleted); err != nil {
+		if err := tx.QueryRowContext(ctx, `
+			SELECT p.is_deleted
+			FROM space_posts p
+			JOIN spaces s ON s.space_id = p.space_id
+			WHERE p.post_id = $1 AND s.owner_id = $2
+		`, postID, ownerID).Scan(&isDeleted); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		if !isDeleted {
@@ -246,7 +263,6 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 			return nil, stacktrace.Propagate(err, "")
 		}
 		rec.ObjectKey = key
-		rec.OwnerID = ownerID
 		rec.SpaceID.Valid = rec.SpaceID.String != ""
 		rec.Purpose = TempObjectPurposePost
 		cleanupObjects = append(cleanupObjects, cleanupObject{key: key, rec: rec})
@@ -277,9 +293,9 @@ func (r *PostsRepository) SetLike(ctx context.Context, postID, userID int64, act
 	return err
 }
 
-func (r *PostsRepository) SetLikeWithCreated(ctx context.Context, postID, userID int64, actorSpaceID string, like bool) (bool, error) {
+func (r *PostsRepository) SetLikeWithCreated(ctx context.Context, postID, _ int64, actorSpaceID string, like bool) (bool, error) {
 	if like {
-		res, err := r.DB.ExecContext(ctx, `INSERT INTO space_post_likes (post_id, user_id, actor_space_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, postID, userID, actorSpaceID)
+		res, err := r.DB.ExecContext(ctx, `INSERT INTO space_post_likes (post_id, actor_space_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, postID, actorSpaceID)
 		if err != nil {
 			return false, stacktrace.Propagate(err, "")
 		}
@@ -354,7 +370,15 @@ func (r *PostsRepository) UpdateCaption(ctx context.Context, postID, ownerID int
 	if captionCipher != nil {
 		caption = captionCipher
 	}
-	res, err := r.DB.ExecContext(ctx, `UPDATE space_posts SET caption_cipher = $1 WHERE post_id = $2 AND owner_id = $3 AND is_deleted = FALSE`, caption, postID, ownerID)
+	res, err := r.DB.ExecContext(ctx, `
+		UPDATE space_posts p
+		SET caption_cipher = $1
+		FROM spaces s
+		WHERE p.post_id = $2
+		  AND p.space_id = s.space_id
+		  AND s.owner_id = $3
+		  AND p.is_deleted = FALSE
+	`, caption, postID, ownerID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}

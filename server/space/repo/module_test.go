@@ -200,13 +200,13 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 	require.NoError(t, module.ResetUserAccess(ctx, aliceID))
 
 	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM spaces WHERE owner_id = $1`, aliceID))
-	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_posts WHERE owner_id = $1`, aliceID))
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_posts WHERE space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_browser_sessions WHERE user_id = $1`, aliceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_link_sessions WHERE space_id = $1`, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1 OR friend_id = $2`, aliceSpace.SpaceID, aliceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE requester_id = $1 OR target_id = $1 OR requester_space_id = $2 OR target_space_id = $2`, aliceID, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_events WHERE actor_space_id = $1 OR target_space_id = $1 OR actor_id = $2 OR target_id = $2`, aliceSpace.SpaceID, aliceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1 OR user_id = $2`, aliceSpace.SpaceID, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE requester_space_id = $1 OR target_space_id = $1`, aliceSpace.SpaceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_events WHERE actor_space_id = $1 OR target_space_id = $1`, aliceSpace.SpaceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_post_likes WHERE post_id = $1`, postID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_message_likes WHERE message_id = $1`, message.MessageID))
 	_, _, err = testConfirmFriendRequest(ctx, module, charlieID, charlieSpace.SpaceID, pendingRequest.RequestID, "charlie-share-key", charlieSpace.CurrentVersion)
@@ -244,7 +244,6 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, module.Assets.AddTempObject(ctx, SpaceTempObjectRecord{
 		ObjectKey:    "space/alice/staged-upload",
-		OwnerID:      aliceID,
 		SpaceID:      sql.NullString{String: aliceSpace.SpaceID, Valid: true},
 		Purpose:      TempObjectPurposePost,
 		BucketID:     "hot",
@@ -275,18 +274,18 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 	require.NoError(t, module.DeleteUserData(ctx, aliceID))
 
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM spaces WHERE owner_id = $1`, aliceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_posts WHERE owner_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_posts WHERE space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_post_assets WHERE object_key = $1`, "space/alice/post-asset"))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE sender_id = $1 OR recipient_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE sender_space_id = $1 OR recipient_space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_entity_keys WHERE user_id = $1`, aliceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_browser_sessions WHERE user_id = $1`, aliceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_link_sessions WHERE owner_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_link_sessions WHERE space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_links WHERE space_id = $1`, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1 OR friend_id = $2`, aliceSpace.SpaceID, aliceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1 OR user_id = $2`, aliceSpace.SpaceID, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
 
 	for _, objectKey := range []string{ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeAvatar, "avatar"), ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeCover, "cover"), "space/alice/post-asset", "space/alice/staged-upload"} {
-		require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_temp_objects WHERE object_key = $1 AND owner_id = $2 AND space_id IS NULL AND cleanup_after <= now_utc_micro_seconds()`, objectKey, aliceID))
+		require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_temp_objects WHERE object_key = $1 AND space_id IS NULL AND cleanup_after <= now_utc_micro_seconds()`, objectKey))
 	}
 }
 
@@ -304,7 +303,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 
 	err = testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion)
 	require.NoError(t, err)
-	setFriendEventCreatedAt(t, module, 500, "friend_add", bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 500, "friend_add", bobSpace.SpaceID, aliceSpace.SpaceID)
 
 	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
@@ -318,7 +317,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "regular", message.Kind)
-	require.Equal(t, "sender-key", message.EncryptedMessageKey)
+	require.Equal(t, testSpaceBytes("sender-key"), message.EncryptedMessageKey)
 	require.Equal(t, int64(0), message.Likes)
 	require.False(t, message.ViewerLiked)
 
@@ -355,7 +354,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	require.Len(t, aliceThread, 2)
 	require.Equal(t, reply.MessageID, aliceThread[0].MessageID)
 	require.Equal(t, message.MessageID, aliceThread[0].ReplyMessageID.String)
-	require.Equal(t, "recipient-key", aliceThread[1].EncryptedMessageKey)
+	require.Equal(t, testSpaceBytes("recipient-key"), aliceThread[1].EncryptedMessageKey)
 	require.Equal(t, bobSpace.SpaceID, aliceThread[1].Sender.SpaceID)
 
 	conversations, nextCursor, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
@@ -412,7 +411,7 @@ func TestSpaceMessagesUseProfileAssetAvatars(t *testing.T) {
 	`, aliceSpace.SpaceID, ProfileAssetTypeAvatar, "alice-avatar-object-id", "b2-eu-cen", bobSpace.SpaceID, "bob-avatar-object-id")
 	require.NoError(t, err)
 	require.NoError(t, testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
-	setFriendEventCreatedAt(t, module, 500, "friend_add", bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 500, "friend_add", bobSpace.SpaceID, aliceSpace.SpaceID)
 
 	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
@@ -460,7 +459,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
-	setFriendEventCreatedAt(t, module, 1000, "friend_add", bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 1000, "friend_add", bobSpace.SpaceID, aliceSpace.SpaceID)
 
 	conversations, nextCursor, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -594,7 +593,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.True(t, notificationsUnread)
 
 	require.NoError(t, module.Friends.DeleteFriendship(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID))
-	setFriendEventCreatedAt(t, module, 6000, "friend_remove", bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 6000, "friend_remove", bobSpace.SpaceID, aliceSpace.SpaceID)
 
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -615,7 +614,7 @@ func TestSpaceFriendEventsCreateConversationForBothSides(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
-	setFriendEventCreatedAt(t, module, 1000, "friend_add", bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 1000, "friend_add", bobSpace.SpaceID, aliceSpace.SpaceID)
 
 	aliceConversations, _, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -646,7 +645,7 @@ func TestSpaceFriendEventsCreateConversationForBothSides(t *testing.T) {
 	require.Equal(t, int64(1000), bobLatestActivityAt)
 
 	require.NoError(t, module.Friends.DeleteFriendship(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID))
-	setFriendEventCreatedAt(t, module, 2000, "friend_remove", bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 2000, "friend_remove", bobSpace.SpaceID, aliceSpace.SpaceID)
 
 	aliceConversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -753,9 +752,9 @@ func TestFriendRequestConversationSupersedesPreviousFriendEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, testAddFriend(ctx, module, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion))
-	setFriendEventCreatedAt(t, module, 500, "friend_add", aliceID, bobID)
+	setFriendEventCreatedAt(t, module, 500, "friend_add", aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, module.Friends.DeleteFriendship(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID))
-	setFriendEventCreatedAt(t, module, 1000, "friend_remove", aliceID, bobID)
+	setFriendEventCreatedAt(t, module, 1000, "friend_remove", aliceSpace.SpaceID, bobSpace.SpaceID)
 	request, created, err := testCreateFriendRequest(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "bob-share-key-v2", bobSpace.CurrentVersion)
 	require.NoError(t, err)
 	require.True(t, created)
@@ -807,7 +806,7 @@ func TestSpaceMessageConversationPreviewUsesLatestActivityWithSeparateUnreadStat
 	bobSpace, err := testCreateSpace(ctx, module, bobID, "bob_preview_priority", "bob-space-key", "bob-preview-priority-public", "bob-preview-priority-secret", "bob-preview-priority-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
-	setFriendEventCreatedAt(t, module, 100, "friend_add", bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 100, "friend_add", bobSpace.SpaceID, aliceSpace.SpaceID)
 
 	aliceOldMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
@@ -869,7 +868,7 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 	bobSpace, err := testCreateSpace(ctx, module, bobID, "bob_post_like_unread", "bob-space-key", "bob-post-like-unread-public", "bob-post-like-unread-secret", "bob-post-like-unread-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
-	setFriendEventCreatedAt(t, module, 100, "friend_add", bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 100, "friend_add", bobSpace.SpaceID, aliceSpace.SpaceID)
 
 	aliceMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
@@ -978,7 +977,6 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 
 	err = module.Assets.AddTempObject(ctx, SpaceTempObjectRecord{
 		ObjectKey:    ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeAvatar, "avatar.jpg"),
-		OwnerID:      aliceID,
 		SpaceID:      sql.NullString{String: aliceSpace.SpaceID, Valid: true},
 		Purpose:      TempObjectPurposeAvatar,
 		BucketID:     "b2-eu-cen",
@@ -1030,7 +1028,6 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	for _, tempObject := range []SpaceTempObjectRecord{
 		{
 			ObjectKey:    "space/alice/post1/full",
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: aliceSpace.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposePost,
 			BucketID:     "b2-eu-cen",
@@ -1039,7 +1036,6 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 		},
 		{
 			ObjectKey:    "space/alice/post1/thumb",
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: aliceSpace.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposePost,
 			BucketID:     "b2-eu-cen",
@@ -1199,7 +1195,6 @@ func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
 	for _, rec := range []SpaceTempObjectRecord{
 		{
 			ObjectKey:    ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeAvatar, "avatar-old"),
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposeAvatar,
 			BucketID:     "b2-eu-cen",
@@ -1208,7 +1203,6 @@ func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
 		},
 		{
 			ObjectKey:    ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeAvatar, "avatar-new"),
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposeAvatar,
 			BucketID:     "b2-us-west",
@@ -1250,7 +1244,6 @@ func TestUpdateProfileQueuesOldCoverForCleanup(t *testing.T) {
 	for _, rec := range []SpaceTempObjectRecord{
 		{
 			ObjectKey:    ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeCover, "cover-old"),
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposeCover,
 			BucketID:     "b2-eu-cen",
@@ -1259,7 +1252,6 @@ func TestUpdateProfileQueuesOldCoverForCleanup(t *testing.T) {
 		},
 		{
 			ObjectKey:    ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeCover, "cover-new"),
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposeCover,
 			BucketID:     "b2-us-west",
@@ -1315,7 +1307,7 @@ func TestAddFriendCreatesReciprocalSharesAndEvent(t *testing.T) {
 	require.Equal(t, bobSpace.CurrentVersion, reciprocalShare.KeyVersion)
 
 	var eventCount int
-	err = module.Friends.DB.QueryRow(`SELECT COUNT(*) FROM space_friend_events WHERE event_type = 'friend_add' AND actor_id = $1 AND target_id = $2`, bobID, aliceID).Scan(&eventCount)
+	err = module.Friends.DB.QueryRow(`SELECT COUNT(*) FROM space_friend_events WHERE event_type = 'friend_add' AND actor_space_id = $1 AND target_space_id = $2`, bobSpace.SpaceID, aliceSpace.SpaceID).Scan(&eventCount)
 	require.NoError(t, err)
 	require.Equal(t, 1, eventCount)
 }
@@ -1353,7 +1345,7 @@ func TestAddFriendIsIdempotentForExistingFriends(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, testSpaceBytes("alice-share-key-v2"), share.FriendSealedSpaceKey)
 	var eventCount int
-	err = module.Friends.DB.QueryRow(`SELECT COUNT(*) FROM space_friend_events WHERE event_type = 'friend_add' AND actor_id = $1 AND target_id = $2`, bobID, aliceID).Scan(&eventCount)
+	err = module.Friends.DB.QueryRow(`SELECT COUNT(*) FROM space_friend_events WHERE event_type = 'friend_add' AND actor_space_id = $1 AND target_space_id = $2`, bobSpace.SpaceID, aliceSpace.SpaceID).Scan(&eventCount)
 	require.NoError(t, err)
 	require.Equal(t, 1, eventCount)
 }
@@ -1401,25 +1393,23 @@ func TestDeleteFriendshipRemovesReciprocalShares(t *testing.T) {
 	var removeEventCount int
 	err = module.Friends.DB.QueryRow(`
 		SELECT COUNT(*)
-		FROM space_friend_events
-		WHERE event_type = 'friend_remove'
-		  AND actor_id = $1
-		  AND actor_space_id = $2
-		  AND target_id = $3
-		  AND target_space_id = $4
-	`, aliceID, aliceSpace.SpaceID, bobID, bobSpace.SpaceID).Scan(&removeEventCount)
+			FROM space_friend_events
+			WHERE event_type = 'friend_remove'
+			  AND actor_space_id = $1
+			  AND target_space_id = $2
+		`, aliceSpace.SpaceID, bobSpace.SpaceID).Scan(&removeEventCount)
 	require.NoError(t, err)
 	require.Equal(t, 1, removeEventCount)
 
 	err = module.Friends.DeleteFriendship(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	err = module.Friends.DB.QueryRow(`
-		SELECT COUNT(*)
-		FROM space_friend_events
-		WHERE event_type = 'friend_remove'
-		  AND actor_id = $1
-		  AND target_id = $2
-	`, aliceID, bobID).Scan(&removeEventCount)
+			SELECT COUNT(*)
+			FROM space_friend_events
+			WHERE event_type = 'friend_remove'
+			  AND actor_space_id = $1
+			  AND target_space_id = $2
+		`, aliceSpace.SpaceID, bobSpace.SpaceID).Scan(&removeEventCount)
 	require.NoError(t, err)
 	require.Equal(t, 1, removeEventCount)
 }
@@ -1724,9 +1714,9 @@ func TestGetSessionRejectsStaleLinkMetadata(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = module.Links.DB.Exec(`
-		INSERT INTO space_link_sessions (token_hash, space_id, owner_id, auth_key_hash, key_version, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, []byte("stale-auth-token"), oldLink.SpaceID, oldLink.OwnerID, oldLink.AuthKeyHash, oldLink.KeyVersion, timeutil.NMinFromNow(30))
+		INSERT INTO space_link_sessions (token_hash, space_id, auth_key_hash, key_version, expires_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`, []byte("stale-auth-token"), oldLink.SpaceID, oldLink.AuthKeyHash, oldLink.KeyVersion, timeutil.NMinFromNow(30))
 	require.NoError(t, err)
 	_, err = module.Links.GetSession(ctx, []byte("stale-auth-token"))
 	require.Error(t, err)
@@ -1736,9 +1726,9 @@ func TestGetSessionRejectsStaleLinkMetadata(t *testing.T) {
 	reusedHashLink, err := testUpsertLink(ctx, module, space.SpaceID, []byte("fresh-after-space-rotate"), rotatedSpace.CurrentVersion, "fresh-new-version-key", "fresh-owner-link-secret")
 	require.NoError(t, err)
 	_, err = module.Links.DB.Exec(`
-		INSERT INTO space_link_sessions (token_hash, space_id, owner_id, auth_key_hash, key_version, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, []byte("stale-version-token"), reusedHashLink.SpaceID, reusedHashLink.OwnerID, reusedHashLink.AuthKeyHash, space.CurrentVersion, timeutil.NMinFromNow(30))
+		INSERT INTO space_link_sessions (token_hash, space_id, auth_key_hash, key_version, expires_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`, []byte("stale-version-token"), reusedHashLink.SpaceID, reusedHashLink.AuthKeyHash, space.CurrentVersion, timeutil.NMinFromNow(30))
 	require.NoError(t, err)
 	_, err = module.Links.GetSession(ctx, []byte("stale-version-token"))
 	require.Error(t, err)
@@ -1892,7 +1882,7 @@ func TestSpaceReadMarkersDriveNotificationState(t *testing.T) {
 	bobSpace, err := testCreateSpace(ctx, module, bobID, "bob_unread", "bob-space-key", "bob-unread-public", "bob-unread-secret", "bob-unread-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
-	setFriendEventCreatedAt(t, module, 500, "friend_add", bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 500, "friend_add", bobSpace.SpaceID, aliceSpace.SpaceID)
 
 	incoming, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
@@ -1961,8 +1951,8 @@ func TestSpaceNotificationReadMarkersArePerFriend(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-bob-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	require.NoError(t, testAddFriend(ctx, module, charlieID, charlieSpace.SpaceID, aliceSpace.SpaceID, "alice-charlie-share-key", aliceSpace.CurrentVersion, "charlie-share-key", charlieSpace.CurrentVersion))
-	setFriendEventCreatedAt(t, module, 100, "friend_add", bobID, aliceID)
-	setFriendEventCreatedAt(t, module, 200, "friend_add", charlieID, aliceID)
+	setFriendEventCreatedAt(t, module, 100, "friend_add", bobSpace.SpaceID, aliceSpace.SpaceID)
+	setFriendEventCreatedAt(t, module, 200, "friend_add", charlieSpace.SpaceID, aliceSpace.SpaceID)
 
 	bobMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
@@ -2057,7 +2047,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	bobSpace, err := testCreateSpace(ctx, module, bobID, "bob_priority_unread", "bob-space-key", "bob-priority-unread-public", "bob-priority-unread-secret", "bob-priority-unread-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 	require.NoError(t, testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
-	setFriendEventCreatedAt(t, module, 100, "friend_add", bobID, aliceID)
+	setFriendEventCreatedAt(t, module, 100, "friend_add", bobSpace.SpaceID, aliceSpace.SpaceID)
 
 	incoming, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
@@ -2341,9 +2331,9 @@ func setPostLikeCreatedAt(t *testing.T, module *Module, createdAt, postID int64,
 	require.NoError(t, err)
 }
 
-func setFriendEventCreatedAt(t *testing.T, module *Module, createdAt int64, eventType string, actorID, targetID int64) {
+func setFriendEventCreatedAt(t *testing.T, module *Module, createdAt int64, eventType, actorSpaceID, targetSpaceID string) {
 	t.Helper()
-	_, err := module.Friends.DB.Exec(`UPDATE space_friend_events SET created_at = $1 WHERE event_type = $2 AND actor_id = $3 AND target_id = $4`, createdAt, eventType, actorID, targetID)
+	_, err := module.Friends.DB.Exec(`UPDATE space_friend_events SET created_at = $1 WHERE event_type = $2 AND actor_space_id = $3 AND target_space_id = $4`, createdAt, eventType, actorSpaceID, targetSpaceID)
 	require.NoError(t, err)
 }
 

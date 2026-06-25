@@ -72,7 +72,6 @@ func TestGetProfileReturnsProfileAssetObjectIDs(t *testing.T) {
 	for _, rec := range []spacerepo.SpaceTempObjectRecord{
 		{
 			ObjectKey:    spacerepo.ProfileAssetObjectKey(space.SpaceID, spacerepo.ProfileAssetTypeAvatar, "avatar-object-id"),
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      spacerepo.TempObjectPurposeAvatar,
 			BucketID:     "b2-eu-cen",
@@ -81,7 +80,6 @@ func TestGetProfileReturnsProfileAssetObjectIDs(t *testing.T) {
 		},
 		{
 			ObjectKey:    spacerepo.ProfileAssetObjectKey(space.SpaceID, spacerepo.ProfileAssetTypeCover, "cover-object-id"),
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      spacerepo.TempObjectPurposeCover,
 			BucketID:     "b2-us-west",

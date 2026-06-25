@@ -148,7 +148,7 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 		if !repo.IsProfileAssetObjectID(objectID) {
 			return nil, ente.NewBadRequestWithMessage("avatar objectID is required")
 		}
-		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, repo.ProfileAssetObjectKey(spaceID, repo.ProfileAssetTypeAvatar, objectID), repo.TempObjectPurposeAvatar, &spaceID)
+		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, repo.ProfileAssetObjectKey(spaceID, repo.ProfileAssetTypeAvatar, objectID), repo.TempObjectPurposeAvatar, &spaceID)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +164,7 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 		if !repo.IsProfileAssetObjectID(objectID) {
 			return nil, ente.NewBadRequestWithMessage("cover objectID is required")
 		}
-		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, userID, repo.ProfileAssetObjectKey(spaceID, repo.ProfileAssetTypeCover, objectID), repo.TempObjectPurposeCover, &spaceID)
+		staged, err := verifyStagedUpload(ctx, c.AssetsRepo, repo.ProfileAssetObjectKey(spaceID, repo.ProfileAssetTypeCover, objectID), repo.TempObjectPurposeCover, &spaceID)
 		if err != nil {
 			return nil, err
 		}

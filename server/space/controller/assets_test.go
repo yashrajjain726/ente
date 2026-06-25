@@ -123,7 +123,7 @@ func TestValidateSpaceAssetsBucketID(t *testing.T) {
 func TestPresignUploadReturnsUnavailableWhenSpaceAssetBucketMissing(t *testing.T) {
 	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-asset-config@example.com", "alice-public")
-	space, err := testCreateSpace(ctx, repos, aliceID, "alice-asset-config", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	space, err := testCreateSpace(ctx, repos, aliceID, "alice_asset_config", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	viper.Set(spaceAssetsPrimaryBucketConfigKey, "")
 	t.Cleanup(func() {
@@ -153,7 +153,7 @@ func requireSpaceAssetsUnavailable(t *testing.T, err error) {
 func TestRedirectRejectsInvalidProfileAssetObjectID(t *testing.T) {
 	module, repos, userAuthRepo, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-asset-redirect@example.com", "alice-public")
-	space, err := testCreateSpace(ctx, repos, aliceID, "alice-asset-redirect", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	space, err := testCreateSpace(ctx, repos, aliceID, "alice_asset_redirect", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 	require.NoError(t, userAuthRepo.AddToken(aliceID, ente.Photos, "alice-asset-token", "127.0.0.1", "space-test"))
 	ginCtx := newPublicSpaceContext()

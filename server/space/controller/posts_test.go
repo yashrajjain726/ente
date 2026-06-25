@@ -52,7 +52,6 @@ func TestListPostsHydratesPostAssets(t *testing.T) {
 	objectKey := "space/alice-list-assets/post/full"
 	err = repos.Assets.AddTempObject(ctx, spacerepo.SpaceTempObjectRecord{
 		ObjectKey:    objectKey,
-		OwnerID:      aliceID,
 		SpaceID:      sql.NullString{String: aliceSpace.SpaceID, Valid: true},
 		Purpose:      spacerepo.TempObjectPurposePost,
 		BucketID:     "b2-eu-cen",

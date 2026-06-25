@@ -14,13 +14,13 @@ func (r *ReadMarkersRepository) UpsertNotificationReadMarker(ctx context.Context
 		return nil
 	}
 	_, err := r.DB.ExecContext(ctx, `
-		INSERT INTO space_notification_read_markers (user_id, viewer_space_id, friend_space_id, read_at)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO space_notification_read_markers (viewer_space_id, friend_space_id, read_at)
+		VALUES ($1, $2, $3)
 		ON CONFLICT (viewer_space_id, friend_space_id) DO UPDATE
 		SET read_at = GREATEST(
 			space_notification_read_markers.read_at,
 			EXCLUDED.read_at
 		)
-	`, userID, viewerSpaceID, friendSpaceID, readAt)
+	`, viewerSpaceID, friendSpaceID, readAt)
 	return stacktrace.Propagate(err, "")
 }
