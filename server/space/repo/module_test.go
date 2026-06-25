@@ -51,12 +51,12 @@ func testConfirmFriendRequest(ctx context.Context, module *Module, targetID int6
 	return module.Friends.ConfirmFriendRequest(ctx, targetID, targetSpaceID, requestID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion)
 }
 
-func testUpsertShare(ctx context.Context, module *Module, spaceID string, friendID int64, friendSpaceID string, friendSealedSpaceKey string, keyVersion int) error {
-	return module.Friends.UpsertShare(ctx, spaceID, friendID, friendSpaceID, testSpaceBytes(friendSealedSpaceKey), keyVersion)
+func testUpsertShare(ctx context.Context, module *Module, spaceID string, friendSpaceID string, friendSealedSpaceKey string, keyVersion int) error {
+	return module.Friends.UpsertShare(ctx, spaceID, friendSpaceID, testSpaceBytes(friendSealedSpaceKey), keyVersion)
 }
 
-func testUpdateShare(ctx context.Context, module *Module, spaceID string, friendID int64, friendSpaceID string, friendSealedSpaceKey string, keyVersion int) error {
-	return module.Friends.UpdateShare(ctx, spaceID, friendID, friendSpaceID, testSpaceBytes(friendSealedSpaceKey), keyVersion)
+func testUpdateShare(ctx context.Context, module *Module, spaceID string, friendSpaceID string, friendSealedSpaceKey string, keyVersion int) error {
+	return module.Friends.UpdateShare(ctx, spaceID, friendSpaceID, testSpaceBytes(friendSealedSpaceKey), keyVersion)
 }
 
 func testUpsertLink(ctx context.Context, module *Module, spaceID string, authKeyHash []byte, keyVersion int, linkWrappedSpaceKey string, encryptedAccessKey string) (*SpaceLinkRecord, error) {
@@ -181,7 +181,7 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 
 	postID, err := testCreatePost(ctx, module, aliceID, aliceSpace.SpaceID, "alice-post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
-	require.NoError(t, module.Posts.SetLike(ctx, postID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, postID, bobSpace.SpaceID, true))
 	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
 		SenderID:                     bobID,
@@ -193,7 +193,7 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 		RecipientEncryptedMessageKey: testSpaceBytes("recipient-key"),
 	})
 	require.NoError(t, err)
-	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceID, aliceSpace.SpaceID, true))
+	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceSpace.SpaceID, true))
 	setMessageLikeCreatedAt(t, module, 1500, message.MessageID, aliceSpace.SpaceID)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, timeutil.Microseconds()))
 
@@ -266,8 +266,8 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 		RecipientEncryptedMessageKey: testSpaceBytes("recipient-key"),
 	})
 	require.NoError(t, err)
-	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceID, aliceSpace.SpaceID, true))
-	require.NoError(t, module.Posts.SetLike(ctx, postID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceSpace.SpaceID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, postID, bobSpace.SpaceID, true))
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, timeutil.Microseconds()))
 
 	require.NoError(t, module.DeleteUserData(ctx, aliceID))
@@ -319,7 +319,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	require.Equal(t, int64(0), message.Likes)
 	require.False(t, message.ViewerLiked)
 
-	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceID, aliceSpace.SpaceID, true))
+	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceSpace.SpaceID, true))
 	setMessageLikeCreatedAt(t, module, 1500, message.MessageID, aliceSpace.SpaceID)
 	likedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, aliceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
@@ -497,9 +497,9 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	})
 	require.NoError(t, err)
 	setMessageCreatedAt(t, module, 2500, aliceMessage.MessageID)
-	require.NoError(t, module.Messages.SetLike(ctx, aliceMessage.MessageID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Messages.SetLike(ctx, aliceMessage.MessageID, bobSpace.SpaceID, true))
 	setMessageLikeCreatedAt(t, module, 3000, aliceMessage.MessageID, bobSpace.SpaceID)
-	require.NoError(t, module.Messages.SetLike(ctx, bobMessage.MessageID, aliceID, aliceSpace.SpaceID, true))
+	require.NoError(t, module.Messages.SetLike(ctx, bobMessage.MessageID, aliceSpace.SpaceID, true))
 	setMessageLikeCreatedAt(t, module, 3500, bobMessage.MessageID, aliceSpace.SpaceID)
 
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
@@ -515,7 +515,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 			VALUES ($1, $2, $3, $4)
 		`, postID, "activity-post-object", "bucket", "metadata")
 	require.NoError(t, err)
-	require.NoError(t, module.Posts.SetLike(ctx, postID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, postID, bobSpace.SpaceID, true))
 	setPostLikeCreatedAt(t, module, 4000, postID, bobSpace.SpaceID)
 
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
@@ -792,7 +792,7 @@ func TestSpaceMessageConversationPreviewUsesLatestActivityWithSeparateUnreadStat
 	})
 	require.NoError(t, err)
 	setMessageCreatedAt(t, module, 2000, bobNewMessage.MessageID)
-	require.NoError(t, module.Messages.SetLike(ctx, aliceOldMessage.MessageID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Messages.SetLike(ctx, aliceOldMessage.MessageID, bobSpace.SpaceID, true))
 	setMessageLikeCreatedAt(t, module, 3000, aliceOldMessage.MessageID, bobSpace.SpaceID)
 
 	conversations, _, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
@@ -849,7 +849,7 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 	thirdPostID, err := testCreatePost(ctx, module, aliceID, aliceSpace.SpaceID, "third-post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
 
-	require.NoError(t, module.Posts.SetLike(ctx, firstPostID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, firstPostID, bobSpace.SpaceID, true))
 	setPostLikeCreatedAt(t, module, 2000, firstPostID, bobSpace.SpaceID)
 	conversations, _, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -859,7 +859,7 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 	require.Equal(t, int64(0), conversations[0].UnreadCount)
 	require.True(t, conversations[0].NotificationUnread)
 
-	require.NoError(t, module.Posts.SetLike(ctx, secondPostID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, secondPostID, bobSpace.SpaceID, true))
 	setPostLikeCreatedAt(t, module, 3000, secondPostID, bobSpace.SpaceID)
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -872,7 +872,7 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(3000), latestActivityAt)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
-	require.NoError(t, module.Posts.SetLike(ctx, thirdPostID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, thirdPostID, bobSpace.SpaceID, true))
 	setPostLikeCreatedAt(t, module, 4000, thirdPostID, bobSpace.SpaceID)
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -881,7 +881,7 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 	require.Equal(t, int64(0), conversations[0].UnreadCount)
 	require.True(t, conversations[0].NotificationUnread)
 
-	require.NoError(t, module.Messages.SetLike(ctx, aliceMessage.MessageID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Messages.SetLike(ctx, aliceMessage.MessageID, bobSpace.SpaceID, true))
 	setMessageLikeCreatedAt(t, module, 5000, aliceMessage.MessageID, bobSpace.SpaceID)
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -906,7 +906,7 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 	})
 	require.NoError(t, err)
 	setMessageCreatedAt(t, module, 6000, secondAliceMessage.MessageID)
-	require.NoError(t, module.Messages.SetLike(ctx, secondAliceMessage.MessageID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Messages.SetLike(ctx, secondAliceMessage.MessageID, bobSpace.SpaceID, true))
 	setMessageLikeCreatedAt(t, module, 7000, secondAliceMessage.MessageID, bobSpace.SpaceID)
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -1027,7 +1027,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "alice", post.Author.SpaceSlug)
 
-	err = module.Posts.SetLike(ctx, postID, bobID, bobSpace.SpaceID, true)
+	err = module.Posts.SetLike(ctx, postID, bobSpace.SpaceID, true)
 	require.NoError(t, err)
 
 	assets, err := module.Posts.ListAssetsByPostIDs(ctx, []int64{postID})
@@ -1356,22 +1356,22 @@ func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
 	bobSpace, err := testCreateSpace(ctx, module, bobID, "bob", "bob-space-key", "bob-public", "bob-secret", "bob-secret-nonce", "bob-profile")
 	require.NoError(t, err)
 
-	err = testUpsertShare(ctx, module, aliceSpace.SpaceID, bobID, bobSpace.SpaceID, "share-key-v1", aliceSpace.CurrentVersion)
+	err = testUpsertShare(ctx, module, aliceSpace.SpaceID, bobSpace.SpaceID, "share-key-v1", aliceSpace.CurrentVersion)
 	require.NoError(t, err)
 
 	rotatedSpace, err := testRotateKey(ctx, module, aliceID, aliceSpace.SpaceID, aliceSpace.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
 
-	err = testUpdateShare(ctx, module, aliceSpace.SpaceID, bobID, bobSpace.SpaceID, "share-key-v2", rotatedSpace.CurrentVersion)
+	err = testUpdateShare(ctx, module, aliceSpace.SpaceID, bobSpace.SpaceID, "share-key-v2", rotatedSpace.CurrentVersion)
 	require.NoError(t, err)
 	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, testSpaceBytes("share-key-v2"), share.FriendSealedSpaceKey)
 	require.Equal(t, rotatedSpace.CurrentVersion, share.KeyVersion)
 
-	err = module.Friends.DeleteShareBySpaceAndFriend(ctx, aliceSpace.SpaceID, bobID, bobSpace.SpaceID)
+	err = module.Friends.DeleteShareBySpaceAndFriend(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
-	err = testUpdateShare(ctx, module, aliceSpace.SpaceID, bobID, bobSpace.SpaceID, "stale-share-key", rotatedSpace.CurrentVersion)
+	err = testUpdateShare(ctx, module, aliceSpace.SpaceID, bobSpace.SpaceID, "stale-share-key", rotatedSpace.CurrentVersion)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
 	_, err = module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
@@ -1476,12 +1476,12 @@ func TestUpdateShareRejectsStaleKeyVersion(t *testing.T) {
 	require.NoError(t, err)
 	bobSpace, err := testCreateSpace(ctx, module, bobID, "bob", "bob-space-key", "bob-public", "bob-secret", "bob-secret-nonce", "bob-profile")
 	require.NoError(t, err)
-	err = testUpsertShare(ctx, module, aliceSpace.SpaceID, bobID, bobSpace.SpaceID, "share-key-v1", aliceSpace.CurrentVersion)
+	err = testUpsertShare(ctx, module, aliceSpace.SpaceID, bobSpace.SpaceID, "share-key-v1", aliceSpace.CurrentVersion)
 	require.NoError(t, err)
 	_, err = testRotateKey(ctx, module, aliceID, aliceSpace.SpaceID, aliceSpace.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
 	require.NoError(t, err)
 
-	err = testUpdateShare(ctx, module, aliceSpace.SpaceID, bobID, bobSpace.SpaceID, "stale-share-key", aliceSpace.CurrentVersion)
+	err = testUpdateShare(ctx, module, aliceSpace.SpaceID, bobSpace.SpaceID, "stale-share-key", aliceSpace.CurrentVersion)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
 	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
@@ -1906,7 +1906,7 @@ func TestSpaceNotificationReadMarkersArePerFriend(t *testing.T) {
 	})
 	require.NoError(t, err)
 	setMessageCreatedAt(t, module, 1001, aliceMessageToBob.MessageID)
-	require.NoError(t, module.Messages.SetLike(ctx, aliceMessageToBob.MessageID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Messages.SetLike(ctx, aliceMessageToBob.MessageID, bobSpace.SpaceID, true))
 	setMessageLikeCreatedAt(t, module, 1002, aliceMessageToBob.MessageID, bobSpace.SpaceID)
 	charlieMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
@@ -2027,7 +2027,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	require.NoError(t, err)
 	require.False(t, notificationsUnread)
 
-	require.NoError(t, module.Messages.SetLike(ctx, incoming.MessageID, aliceID, aliceSpace.SpaceID, true))
+	require.NoError(t, module.Messages.SetLike(ctx, incoming.MessageID, aliceSpace.SpaceID, true))
 	setMessageLikeCreatedAt(t, module, 2500, incoming.MessageID, aliceSpace.SpaceID)
 
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
@@ -2055,7 +2055,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 			VALUES ($1, $2, $3, $4)
 		`, bobPostID, "bob-post-object", "bucket", "metadata")
 	require.NoError(t, err)
-	require.NoError(t, module.Posts.SetLike(ctx, alicePostID, bobID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, alicePostID, bobSpace.SpaceID, true))
 	setPostLikeCreatedAt(t, module, 3000, alicePostID, bobSpace.SpaceID)
 	outgoingPostReply, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "post_reply",
@@ -2086,7 +2086,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	require.NoError(t, err)
 	require.True(t, notificationsUnread)
 
-	require.NoError(t, module.Posts.SetLike(ctx, bobPostID, aliceID, aliceSpace.SpaceID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, bobPostID, aliceSpace.SpaceID, true))
 	setPostLikeCreatedAt(t, module, 4500, bobPostID, aliceSpace.SpaceID)
 
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
@@ -2201,8 +2201,8 @@ func TestListPostLikersPaginates(t *testing.T) {
 	require.NoError(t, err)
 	postID, err := testCreatePost(ctx, module, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
-	require.NoError(t, module.Posts.SetLike(ctx, postID, bobID, bobSpace.SpaceID, true))
-	require.NoError(t, module.Posts.SetLike(ctx, postID, charlieID, charlieSpace.SpaceID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, postID, bobSpace.SpaceID, true))
+	require.NoError(t, module.Posts.SetLike(ctx, postID, charlieSpace.SpaceID, true))
 	setPostLikeCreatedAt(t, module, 3000, postID, bobSpace.SpaceID)
 	setPostLikeCreatedAt(t, module, 2000, postID, charlieSpace.SpaceID)
 

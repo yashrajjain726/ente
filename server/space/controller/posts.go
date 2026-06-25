@@ -273,7 +273,7 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models
 	if err := c.auth.canViewSpace(ctx.Request.Context(), &viewerAuth{UserID: userID, SpaceID: actorSpace.SpaceID}, space); err != nil {
 		return nil, err
 	}
-	created, err := c.PostsRepo.SetLikeWithCreated(ctx.Request.Context(), id, userID, actorSpace.SpaceID, req.Like)
+	created, err := c.PostsRepo.SetLikeWithCreated(ctx.Request.Context(), id, actorSpace.SpaceID, req.Like)
 	if err != nil {
 		return nil, err
 	}

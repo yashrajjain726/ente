@@ -163,10 +163,10 @@ func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spa
 	`, encryptedProfile, ownerID, spaceID); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
-	if err := updateProfileAssetTx(ctx, tx, ownerID, spaceID, ProfileAssetTypeAvatar, avatar, removeAvatar, previousAssets[ProfileAssetTypeAvatar]); err != nil {
+	if err := updateProfileAssetTx(ctx, tx, spaceID, ProfileAssetTypeAvatar, avatar, removeAvatar, previousAssets[ProfileAssetTypeAvatar]); err != nil {
 		return nil, err
 	}
-	if err := updateProfileAssetTx(ctx, tx, ownerID, spaceID, ProfileAssetTypeCover, cover, removeCover, previousAssets[ProfileAssetTypeCover]); err != nil {
+	if err := updateProfileAssetTx(ctx, tx, spaceID, ProfileAssetTypeCover, cover, removeCover, previousAssets[ProfileAssetTypeCover]); err != nil {
 		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx, `

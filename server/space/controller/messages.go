@@ -213,7 +213,7 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 		}
 		return nil, err
 	}
-	if err := c.MessagesRepo.SetLike(ctx.Request.Context(), messageID, userID, actorSpace.SpaceID, req.Like); err != nil {
+	if err := c.MessagesRepo.SetLike(ctx.Request.Context(), messageID, actorSpace.SpaceID, req.Like); err != nil {
 		return nil, err
 	}
 	return &models.LikeMessageResponse{Liked: req.Like}, nil

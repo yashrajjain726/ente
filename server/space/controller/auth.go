@@ -117,26 +117,6 @@ func (a authDeps) requireDefaultSpace(ctx context.Context, ownerID int64) (*spac
 	return space, nil
 }
 
-func (a authDeps) requireLinkSession(ctx context.Context, token string) (*spacerepo.SpaceLinkSessionRecord, error) {
-	token = strings.TrimSpace(token)
-	if token == "" || a.LinksRepo == nil {
-		return nil, ente.ErrAuthenticationRequired
-	}
-	sum := sha256.Sum256([]byte(token))
-	session, err := a.LinksRepo.GetSession(ctx, sum[:])
-	if err != nil {
-		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
-			return nil, ente.ErrAuthenticationRequired
-		}
-		return nil, err
-	}
-	if session.ExpiresAt <= timeutil.Microseconds() {
-		_ = a.LinksRepo.DeleteSession(ctx, sum[:])
-		return nil, ente.ErrAuthenticationRequired
-	}
-	return session, nil
-}
-
 func (a authDeps) canViewSpace(ctx context.Context, viewer *viewerAuth, space *spacerepo.SpaceRecord) error {
 	if err := a.requireActiveSpaceOwner(ctx, space); err != nil {
 		return err

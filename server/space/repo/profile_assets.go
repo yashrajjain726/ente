@@ -94,7 +94,7 @@ func deleteProfileAssetTx(ctx context.Context, tx *sql.Tx, spaceID, assetType st
 	return stacktrace.Propagate(err, "")
 }
 
-func queueProfileAssetCleanupTx(ctx context.Context, tx *sql.Tx, _ int64, asset profileAssetRecord, clearSpaceID bool) error {
+func queueProfileAssetCleanupTx(ctx context.Context, tx *sql.Tx, asset profileAssetRecord, clearSpaceID bool) error {
 	size := int64(1)
 	if asset.Size.Valid && asset.Size.Int64 > 0 {
 		size = asset.Size.Int64
@@ -112,14 +112,14 @@ func queueProfileAssetCleanupTx(ctx context.Context, tx *sql.Tx, _ int64, asset 
 	})
 }
 
-func updateProfileAssetTx(ctx context.Context, tx *sql.Tx, ownerID int64, spaceID, assetType string, update *ProfileAssetUpdate, remove bool, previous profileAssetRecord) error {
+func updateProfileAssetTx(ctx context.Context, tx *sql.Tx, spaceID, assetType string, update *ProfileAssetUpdate, remove bool, previous profileAssetRecord) error {
 	hadPrevious := previous.ObjectID != ""
 	if remove {
 		if err := deleteProfileAssetTx(ctx, tx, spaceID, assetType); err != nil {
 			return err
 		}
 		if hadPrevious {
-			return queueProfileAssetCleanupTx(ctx, tx, ownerID, previous, false)
+			return queueProfileAssetCleanupTx(ctx, tx, previous, false)
 		}
 		return nil
 	}
@@ -138,7 +138,7 @@ func updateProfileAssetTx(ctx context.Context, tx *sql.Tx, ownerID int64, spaceI
 		return stacktrace.Propagate(err, "failed to consume staged space profile upload")
 	}
 	if hadPrevious && previous.ObjectID != objectID {
-		return queueProfileAssetCleanupTx(ctx, tx, ownerID, previous, false)
+		return queueProfileAssetCleanupTx(ctx, tx, previous, false)
 	}
 	return nil
 }

@@ -389,7 +389,7 @@ func (r *FriendsRepository) DeleteFriendRequest(ctx context.Context, targetID in
 	return nil
 }
 
-func (r *FriendsRepository) UpsertShare(ctx context.Context, spaceID string, _ int64, friendSpaceID string, friendSealedSpaceKey []byte, keyVersion int) error {
+func (r *FriendsRepository) UpsertShare(ctx context.Context, spaceID string, friendSpaceID string, friendSealedSpaceKey []byte, keyVersion int) error {
 	_, err := r.DB.ExecContext(ctx, `
 		INSERT INTO space_friend_shares (space_id, friend_space_id, friend_sealed_space_key, key_version)
 		VALUES ($1, $2, $3, $4)
@@ -400,7 +400,7 @@ func (r *FriendsRepository) UpsertShare(ctx context.Context, spaceID string, _ i
 	return stacktrace.Propagate(err, "")
 }
 
-func (r *FriendsRepository) UpdateShare(ctx context.Context, spaceID string, _ int64, friendSpaceID string, friendSealedSpaceKey []byte, keyVersion int) error {
+func (r *FriendsRepository) UpdateShare(ctx context.Context, spaceID string, friendSpaceID string, friendSealedSpaceKey []byte, keyVersion int) error {
 	return r.UpdateShares(ctx, spaceID, []SpaceShareUpdateRecord{
 		{FriendSpaceID: friendSpaceID, FriendSealedSpaceKey: friendSealedSpaceKey},
 	}, keyVersion)
@@ -484,7 +484,7 @@ func (r *FriendsRepository) DeleteFriendship(ctx context.Context, userID int64, 
 	return stacktrace.Propagate(tx.Commit(), "")
 }
 
-func (r *FriendsRepository) DeleteShareBySpaceAndFriend(ctx context.Context, spaceID string, _ int64, friendSpaceID string) error {
+func (r *FriendsRepository) DeleteShareBySpaceAndFriend(ctx context.Context, spaceID string, friendSpaceID string) error {
 	_, err := r.DB.ExecContext(ctx, `DELETE FROM space_friend_shares WHERE space_id = $1 AND friend_space_id = $2`, spaceID, friendSpaceID)
 	return stacktrace.Propagate(err, "")
 }

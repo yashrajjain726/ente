@@ -263,7 +263,7 @@ func (r *MessagesRepository) listThreadPostLikes(ctx context.Context, viewerID i
 	return out, nil
 }
 
-func (r *MessagesRepository) SetLike(ctx context.Context, messageID string, _ int64, actorSpaceID string, like bool) error {
+func (r *MessagesRepository) SetLike(ctx context.Context, messageID string, actorSpaceID string, like bool) error {
 	if like {
 		_, err := r.DB.ExecContext(ctx, `INSERT INTO space_message_likes (message_id, actor_space_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, messageID, actorSpaceID)
 		return stacktrace.Propagate(err, "")

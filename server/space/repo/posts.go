@@ -288,12 +288,12 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 	return keys, nil
 }
 
-func (r *PostsRepository) SetLike(ctx context.Context, postID, userID int64, actorSpaceID string, like bool) error {
-	_, err := r.SetLikeWithCreated(ctx, postID, userID, actorSpaceID, like)
+func (r *PostsRepository) SetLike(ctx context.Context, postID int64, actorSpaceID string, like bool) error {
+	_, err := r.SetLikeWithCreated(ctx, postID, actorSpaceID, like)
 	return err
 }
 
-func (r *PostsRepository) SetLikeWithCreated(ctx context.Context, postID, _ int64, actorSpaceID string, like bool) (bool, error) {
+func (r *PostsRepository) SetLikeWithCreated(ctx context.Context, postID int64, actorSpaceID string, like bool) (bool, error) {
 	if like {
 		res, err := r.DB.ExecContext(ctx, `INSERT INTO space_post_likes (post_id, actor_space_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, postID, actorSpaceID)
 		if err != nil {
