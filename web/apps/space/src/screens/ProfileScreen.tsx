@@ -5,7 +5,7 @@ import {
     MultiplicationSignIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, CircularProgress, Skeleton } from "@mui/material";
+import { Box, Skeleton } from "@mui/material";
 import { SpaceAvatarImage } from "components/SpaceAvatarImage";
 import {
     SpaceFileViewer,
@@ -15,6 +15,7 @@ import {
     type SpaceViewerPostActionMode,
 } from "components/SpaceFileViewer";
 import { SpacePostFloatingActionButton } from "components/SpacePostFloatingActionButton";
+import { SpaceLoadingSpinner } from "components/SpaceRouteFallback";
 import { SpaceShareIcon } from "components/SpaceShareInviteButton";
 import { useBrowserBackClose } from "hooks/useBrowserBackClose";
 import React, { useState } from "react";
@@ -220,18 +221,19 @@ const ProfileStatsSkeleton: React.FC = () => (
 
 const ProfilePostLoadingIndicator: React.FC = () => (
     <Box
-        role="status"
-        aria-label="Loading posts"
         sx={{
             alignItems: "center",
+            bottom: 0,
             display: "flex",
+            insetInline: 0,
             justifyContent: "center",
-            minHeight: 144,
-            mx: "16px",
-            width: "calc(100% - 32px)",
+            pointerEvents: "none",
+            position: "absolute",
+            top: `${profileCoverHeight}px`,
+            width: "100%",
         }}
     >
-        <CircularProgress size={26} thickness={4} sx={{ color: green }} />
+        <SpaceLoadingSpinner ariaLabel="Loading posts" />
     </Box>
 );
 
@@ -589,8 +591,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const hasProfilePosts = postsSharedCount > 0;
     const shouldShowPostLoadingIndicator =
         isPostsLoading && (showPostLoadingIndicator ?? true);
-    const shouldShowPostGrid =
-        hasProfilePosts || shouldShowPostLoadingIndicator;
     const isCoverImageLoading = Boolean(
         coverImageUrl && loadedCoverUrl != coverImageUrl,
     );
@@ -1456,10 +1456,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         alignItems: "stretch",
                         boxSizing: "border-box",
                         display: "flex",
-                        flex: shouldShowPostGrid ? "0 0 auto" : "1 1 0",
+                        flex: hasProfilePosts ? "0 0 auto" : "1 1 0",
                         flexDirection: "column",
                         gap: "24px",
-                        minHeight: shouldShowPostGrid ? undefined : 0,
+                        minHeight: hasProfilePosts ? undefined : 0,
                         mt: "24px",
                         pb: "16px",
                         px: 0,

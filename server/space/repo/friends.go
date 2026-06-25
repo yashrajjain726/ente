@@ -93,15 +93,6 @@ func (r *FriendsRepository) AddFriendWithCreated(ctx context.Context, requesterI
 		return false, stacktrace.Propagate(err, "")
 	}
 
-	if !alreadyFriends {
-		if _, err := tx.ExecContext(ctx, `
-				INSERT INTO space_friend_events (event_type, actor_space_id, target_space_id)
-				VALUES ('friend_add', $1, $2)
-			`, requesterSpaceID, targetSpaceID); err != nil {
-			return false, stacktrace.Propagate(err, "")
-		}
-	}
-
 	if err := tx.Commit(); err != nil {
 		return false, stacktrace.Propagate(err, "")
 	}
@@ -353,15 +344,6 @@ func (r *FriendsRepository) ConfirmFriendRequest(ctx context.Context, targetID i
 		return 0, false, stacktrace.Propagate(err, "")
 	}
 
-	if !alreadyFriends {
-		if _, err := tx.ExecContext(ctx, `
-				INSERT INTO space_friend_events (event_type, actor_space_id, target_space_id)
-				VALUES ('friend_add', $1, $2)
-			`, targetSpaceID, requesterSpaceID); err != nil {
-			return 0, false, stacktrace.Propagate(err, "")
-		}
-	}
-
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE space_friend_requests
 		SET is_deleted = TRUE,
@@ -492,27 +474,13 @@ func (r *FriendsRepository) DeleteFriendship(ctx context.Context, userID int64, 
 		return nil
 	}
 
-	res, err := tx.ExecContext(ctx, `
+	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM space_friend_shares
 		WHERE (space_id = $1 AND friend_space_id = $2)
 		   OR (space_id = $2 AND friend_space_id = $1)
-	`, targetSpaceID, actorSpaceID)
-	if err != nil {
+	`, targetSpaceID, actorSpaceID); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	if affected > 0 {
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO space_friend_events (event_type, actor_space_id, target_space_id)
-			VALUES ('friend_remove', $1, $2)
-		`, actorSpaceID, targetSpaceID); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	}
-
 	return stacktrace.Propagate(tx.Commit(), "")
 }
 

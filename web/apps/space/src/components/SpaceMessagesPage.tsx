@@ -7,6 +7,7 @@ import {
     confirmCurrentFriendRequest,
     deleteCurrentFriendRequest,
     deleteCurrentMessage,
+    loadCurrentFriendRequestConversations,
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
     loadCurrentSpaceFriends,
@@ -41,6 +42,24 @@ const friendRequestIdFromConversation = (
 
 const isFriendRequestConversation = (conversation: SpaceMessageConversation) =>
     conversation.latestActivity.type == "friend_request";
+
+const mergedMessageConversations = (
+    messageConversations: SpaceMessageConversation[],
+    friendRequestConversations: SpaceMessageConversation[],
+) => {
+    const pendingRequestSpaceIds = new Set(
+        friendRequestConversations.map((conversation) =>
+            friendSpaceId(conversation.friend),
+        ),
+    );
+    return [
+        ...friendRequestConversations,
+        ...messageConversations.filter(
+            (conversation) =>
+                !pendingRequestSpaceIds.has(friendSpaceId(conversation.friend)),
+        ),
+    ];
+};
 
 let nextLocalMessageID = 0;
 
@@ -184,8 +203,12 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
             );
         }),
     );
+    const isThreadRecipientLoading =
+        Boolean(selectedFriend) && isFriendsLoading && !isSelectedFriendCurrent;
     const isThreadReadOnly =
-        Boolean(selectedFriend) && !isSelectedFriendCurrent;
+        Boolean(selectedFriend) &&
+        !isFriendsLoading &&
+        !isSelectedFriendCurrent;
 
     const markConversationRead = React.useCallback((spaceId: string) => {
         setNewConversationIds((currentIds) =>
@@ -211,8 +234,19 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     const refreshConversations = React.useCallback(async () => {
         setIsConversationsLoading(true);
         try {
-            const page = await loadCurrentMessageConversations();
-            const items = page.items;
+            const [page, friendRequestConversations] = await Promise.all([
+                loadCurrentMessageConversations(),
+                loadCurrentFriendRequestConversations(),
+            ]);
+            const items = mergedMessageConversations(
+                page.items,
+                friendRequestConversations,
+            ).sort((a, b) => {
+                const createdAtDiff =
+                    b.latestActivity.createdAtMs - a.latestActivity.createdAtMs;
+                if (createdAtDiff != 0) return createdAtDiff;
+                return b.latestActivity.id.localeCompare(a.latestActivity.id);
+            });
             const unreadConversationIds = items
                 .filter((conversation) => conversation.notificationUnread)
                 .map(conversationId);
@@ -489,6 +523,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 isConversationsLoading={isConversationsLoading}
                 isThreadLoading={isThreadLoading}
                 isThreadReadOnly={isThreadReadOnly}
+                isThreadRecipientLoading={isThreadRecipientLoading}
                 messages={messages}
                 newConversationIds={newConversationIds}
                 onBack={() => void router.push(spaceRoutes.home)}

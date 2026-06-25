@@ -78,8 +78,7 @@ interface SpacePostPageResponse {
 }
 
 type SpaceMessageConversationActivityType =
-    | "friend_add"
-    | "friend_remove"
+    | "friend"
     | "friend_request"
     | "message"
     | "message_like"
@@ -156,6 +155,12 @@ interface SpaceMessageConversationResponse {
 interface SpaceMessageConversationPageResponse {
     items?: SpaceMessageConversationResponse[];
     nextCursor?: string;
+}
+
+interface SpaceFriendRequestResponse {
+    requestId: number;
+    requester: SpaceActor;
+    createdAt: string;
 }
 
 interface SpacePostBase {
@@ -303,6 +308,7 @@ interface SpaceUnreadStatusResponse {
 type SpaceFriendRequestContext = SpaceAccountCtxHandle & {
     confirm_friend_request: (requestId: bigint) => Promise<unknown>;
     delete_friend_request: (requestId: bigint) => Promise<void>;
+    list_friend_requests: () => Promise<SpaceFriendRequestResponse[]>;
     request_friend_by_username: (username: string) => Promise<unknown>;
 };
 
@@ -1055,6 +1061,30 @@ export const loadCurrentMessageConversations =
                 }),
             );
             return { items, nextCursor: page.nextCursor || undefined };
+        } finally {
+            releaseCurrentSpaceContext(ctx);
+        }
+    };
+
+export const loadCurrentFriendRequestConversations =
+    async (): Promise<SpaceMessageConversation[]> => {
+        const ctx = await ensureCurrentSpaceContext();
+        try {
+            const requests: SpaceFriendRequestResponse[] = await (
+                ctx as SpaceFriendRequestContext
+            ).list_friend_requests();
+            return (requests ?? []).map((request) => ({
+                friend: actorProfile(request.requester),
+                latestActivity: {
+                    createdAtMs: timestampMsFromSpaceDate(request.createdAt),
+                    id: `friend_request:${request.requestId}`,
+                    outgoing: false,
+                    type: "friend_request",
+                },
+                notificationUnread: true,
+                unread: true,
+                unreadCount: 1,
+            }));
         } finally {
             releaseCurrentSpaceContext(ctx);
         }
