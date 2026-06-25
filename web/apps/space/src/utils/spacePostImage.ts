@@ -39,13 +39,13 @@ export const spaceDefaultCoverImagePath = "/images/default-cover-image.png";
 export const spaceProfileCoverAspectRatio = 39 / 17;
 const spaceAvatarImageMaxEdge = 512;
 const spaceCoverImageMaxWidth = 1170;
-const spacePostImageMaxLongEdge = 2560;
-const spacePostImageWebPQuality = 0.85;
+const spacePostImageMaxLongEdge = 1600;
+const spacePostImageWebPQuality = 0.82;
 const spacePostImageMimeType = "image/webp";
 const spaceAssetEncryptionOverheadBytes = 42;
 const spaceAvatarUploadMaxBytes = 2 * 1024 * 1024;
 const spaceCoverUploadMaxBytes = 2 * 1024 * 1024;
-const spacePostUploadMaxBytes = 10 * 1024 * 1024;
+const spacePostUploadMaxBytes = 5 * 1024 * 1024;
 
 export const maxSpaceAvatarImageBytes =
     spaceAvatarUploadMaxBytes - spaceAssetEncryptionOverheadBytes;
