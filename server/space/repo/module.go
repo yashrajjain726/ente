@@ -116,7 +116,6 @@ type SpacePostAssetRecord struct {
 
 type SpaceTempObjectRecord struct {
 	ObjectKey    string
-	OwnerID      int64
 	SpaceID      sql.NullString
 	Purpose      string
 	BucketID     string

@@ -14,9 +14,9 @@ import (
 const spaceMessageSelectColumns = `
 	m.message_id,
 	m.kind,
-	m.sender_id,
+	sender_space.owner_id AS sender_id,
 	m.sender_space_id,
-	m.recipient_id,
+	recipient_space.owner_id AS recipient_id,
 	m.recipient_space_id,
 	COALESCE(m.message_cipher, '\x'::bytea),
 	CASE
@@ -84,9 +84,7 @@ func (r *MessagesRepository) CreateMessage(ctx context.Context, input CreateSpac
 	if _, err := r.DB.ExecContext(ctx, `
 		INSERT INTO space_messages (
 			message_id,
-			sender_id,
 			sender_space_id,
-			recipient_id,
 			recipient_space_id,
 			kind,
 			message_cipher,
@@ -95,8 +93,8 @@ func (r *MessagesRepository) CreateMessage(ctx context.Context, input CreateSpac
 			reply_post_id,
 			reply_message_id
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-	`, messageID, input.SenderID, input.SenderSpaceID, input.RecipientID, input.RecipientSpaceID, input.Kind, input.MessageCipher, input.SenderEncryptedMessageKey, input.RecipientEncryptedMessageKey, replyPostID, replyMessageID); err != nil {
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`, messageID, input.SenderSpaceID, input.RecipientSpaceID, input.Kind, input.MessageCipher, input.SenderEncryptedMessageKey, input.RecipientEncryptedMessageKey, replyPostID, replyMessageID); err != nil {
 		return nil, wrapUnique(err, "message already exists")
 	}
 	return r.GetMessage(ctx, messageID, input.SenderID, input.SenderSpaceID)
@@ -108,8 +106,8 @@ func (r *MessagesRepository) GetMessage(ctx context.Context, messageID string, v
 		FROM space_messages m
 		` + spaceMessageJoins + `
 		WHERE m.message_id = $1
-		  AND (m.sender_id = $2 OR m.recipient_id = $2)
 		  AND (m.sender_space_id = $3 OR m.recipient_space_id = $3)
+		  AND (sender_space.owner_id = $2 OR recipient_space.owner_id = $2)
 	`
 	return scanMessageRecord(r.DB.QueryRowContext(ctx, query, messageID, viewerID, viewerSpaceID))
 }
@@ -129,8 +127,8 @@ func (r *MessagesRepository) ListThread(ctx context.Context, viewerID int64, vie
 			OR
 			(m.recipient_space_id = $2 AND m.sender_space_id = $3)
 		)
-		  AND (m.sender_id = $1 OR m.recipient_id = $1)
-		  AND m.is_deleted = FALSE`
+	  AND (sender_space.owner_id = $1 OR recipient_space.owner_id = $1)
+	  AND m.is_deleted = FALSE`
 	if cursorCreatedAt, cursorMessageID, ok := parseMessageCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorMessageID)
 		query += ` AND (m.created_at, m.message_id) < ($4, $5)`
@@ -178,9 +176,9 @@ func (r *MessagesRepository) listThreadPostLikes(ctx context.Context, viewerID i
 		SELECT
 			'post_like:' || p.post_id::text || ':' || pl.actor_space_id AS message_id,
 			'post_like' AS kind,
-			pl.user_id AS sender_id,
+			sender_space.owner_id AS sender_id,
 			pl.actor_space_id AS sender_space_id,
-			p.owner_id AS recipient_id,
+			recipient_space.owner_id AS recipient_id,
 			p.space_id AS recipient_space_id,
 			'\x'::bytea AS message_cipher,
 			'\x'::bytea AS encrypted_message_key,
@@ -238,7 +236,7 @@ func (r *MessagesRepository) listThreadPostLikes(ctx context.Context, viewerID i
 			OR
 			(pl.actor_space_id = $3 AND p.space_id = $2)
 		)
-		  AND (pl.user_id = $1 OR p.owner_id = $1)
+		  AND (sender_space.owner_id = $1 OR recipient_space.owner_id = $1)
 		  AND p.is_deleted = FALSE`
 	if cursorCreatedAt, cursorMessageID, ok := parseMessageCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorMessageID)
@@ -265,9 +263,9 @@ func (r *MessagesRepository) listThreadPostLikes(ctx context.Context, viewerID i
 	return out, nil
 }
 
-func (r *MessagesRepository) SetLike(ctx context.Context, messageID string, userID int64, actorSpaceID string, like bool) error {
+func (r *MessagesRepository) SetLike(ctx context.Context, messageID string, _ int64, actorSpaceID string, like bool) error {
 	if like {
-		_, err := r.DB.ExecContext(ctx, `INSERT INTO space_message_likes (message_id, user_id, actor_space_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, messageID, userID, actorSpaceID)
+		_, err := r.DB.ExecContext(ctx, `INSERT INTO space_message_likes (message_id, actor_space_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, messageID, actorSpaceID)
 		return stacktrace.Propagate(err, "")
 	}
 	_, err := r.DB.ExecContext(ctx, `DELETE FROM space_message_likes WHERE message_id = $1 AND actor_space_id = $2`, messageID, actorSpaceID)
@@ -280,7 +278,16 @@ func (r *MessagesRepository) DeleteMessage(ctx context.Context, messageID string
 		return stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `UPDATE space_messages SET is_deleted = TRUE WHERE message_id = $1 AND sender_id = $2 AND sender_space_id = $3 AND is_deleted = FALSE`, messageID, senderID, senderSpaceID)
+	res, err := tx.ExecContext(ctx, `
+		UPDATE space_messages m
+		SET is_deleted = TRUE
+		FROM spaces sender_space
+		WHERE m.message_id = $1
+		  AND m.sender_space_id = sender_space.space_id
+		  AND sender_space.owner_id = $2
+		  AND m.sender_space_id = $3
+		  AND m.is_deleted = FALSE
+	`, messageID, senderID, senderSpaceID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -324,7 +331,6 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 				FALSE AS is_outgoing
 			FROM space_messages m
 			WHERE (m.sender_space_id = $2 OR m.recipient_space_id = $2)
-			  AND (m.sender_id = $1 OR m.recipient_id = $1)
 			  AND m.is_deleted = FALSE
 			  AND NOT (m.kind = 'post_reply' AND m.recipient_space_id = $2)
 
@@ -585,9 +591,9 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			(SELECT COUNT(*) FROM space_posts fp WHERE fp.space_id = friend_space.space_id AND fp.is_deleted = FALSE) AS friend_posts,
 			COALESCE(m.message_id, '') AS message_id,
 			COALESCE(m.kind, '') AS kind,
-			COALESCE(m.sender_id, 0) AS sender_id,
+			COALESCE(sender_space.owner_id, 0) AS sender_id,
 			COALESCE(m.sender_space_id, '') AS sender_space_id,
-			COALESCE(m.recipient_id, 0) AS recipient_id,
+			COALESCE(recipient_space.owner_id, 0) AS recipient_id,
 			COALESCE(m.recipient_space_id, '') AS recipient_space_id,
 			COALESCE(m.message_cipher, '\x'::bytea) AS message_cipher,
 			CASE
@@ -627,7 +633,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 			p.post_id,
 			COALESCE(p.space_id, '') AS post_space_id,
 			COALESCE(post_space.space_slug, '') AS post_space_slug,
-			COALESCE(p.owner_id, 0) AS post_owner_id,
+			COALESCE(post_space.owner_id, 0) AS post_owner_id,
 			COALESCE(p.is_deleted, FALSE) AS post_is_deleted,
 			asset.object_key AS post_object_key,
 			asset.size AS post_object_size,
@@ -644,17 +650,21 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerID int
 		LEFT JOIN space_profile_assets recipient_avatar ON recipient_avatar.space_id = recipient_space.space_id AND recipient_avatar.asset_type = 'avatar'
 		LEFT JOIN space_posts p ON p.post_id = c.post_id
 		LEFT JOIN spaces post_space ON post_space.space_id = p.space_id
-		LEFT JOIN LATERAL (
-			SELECT object_key, size, position, metadata_cipher
-			FROM space_post_assets
-			WHERE post_id = p.post_id AND p.is_deleted = FALSE
-			ORDER BY position ASC, asset_id ASC
-			LIMIT 1
-		) asset ON TRUE
-		WHERE c.rn = 1
-		  AND ($3::bigint IS NULL OR (c.sort_created_at, c.sort_id) < ($3::bigint, $4::text))
-		ORDER BY c.sort_created_at DESC, c.sort_id DESC
-		LIMIT $5
+			LEFT JOIN LATERAL (
+				SELECT object_key, size, position, metadata_cipher
+				FROM space_post_assets
+				WHERE post_id = p.post_id AND p.is_deleted = FALSE
+				ORDER BY position ASC, asset_id ASC
+				LIMIT 1
+			) asset ON TRUE
+			WHERE c.rn = 1
+			  AND EXISTS (
+			      SELECT 1 FROM spaces viewer_space
+			      WHERE viewer_space.space_id = $2 AND viewer_space.owner_id = $1
+			  )
+			  AND ($3::bigint IS NULL OR (c.sort_created_at, c.sort_id) < ($3::bigint, $4::text))
+			ORDER BY c.sort_created_at DESC, c.sort_id DESC
+			LIMIT $5
 	`, viewerID, viewerSpaceID, cursorCreatedAt, cursorID, limit+1)
 	if err != nil {
 		return nil, "", stacktrace.Propagate(err, "")
@@ -849,22 +859,29 @@ func (r *MessagesRepository) HasUnreadNotifications(ctx context.Context, viewerI
 			FROM notification_candidates c
 			JOIN spaces friend_space ON friend_space.space_id = c.friend_space_id
 			JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
-			LEFT JOIN space_notification_read_markers nrm
-			  ON nrm.viewer_space_id = $1
-			 AND nrm.friend_space_id = c.friend_space_id
-			WHERE c.notification_created_at > COALESCE(nrm.read_at, 0)
-			LIMIT 1
-		) OR EXISTS (
-			SELECT 1
-			FROM space_friend_requests fr
-			JOIN spaces requester_space ON requester_space.space_id = fr.requester_space_id
-			JOIN users requester_owner ON requester_owner.user_id = requester_space.owner_id AND requester_owner.encrypted_email IS NOT NULL
-			WHERE fr.target_space_id = $1
-			  AND fr.target_id = $2
-			  AND fr.is_deleted = FALSE
-			  AND fr.resolved_at IS NULL
-			LIMIT 1
-		)
+				LEFT JOIN space_notification_read_markers nrm
+				  ON nrm.viewer_space_id = $1
+				 AND nrm.friend_space_id = c.friend_space_id
+				WHERE c.notification_created_at > COALESCE(nrm.read_at, 0)
+				  AND EXISTS (
+				      SELECT 1 FROM spaces viewer_space
+				      WHERE viewer_space.space_id = $1 AND viewer_space.owner_id = $2
+				  )
+				LIMIT 1
+			) OR EXISTS (
+				SELECT 1
+				FROM space_friend_requests fr
+				JOIN spaces requester_space ON requester_space.space_id = fr.requester_space_id
+				JOIN users requester_owner ON requester_owner.user_id = requester_space.owner_id AND requester_owner.encrypted_email IS NOT NULL
+				WHERE fr.target_space_id = $1
+				  AND EXISTS (
+				      SELECT 1 FROM spaces viewer_space
+				      WHERE viewer_space.space_id = $1 AND viewer_space.owner_id = $2
+				  )
+				  AND fr.is_deleted = FALSE
+				  AND fr.resolved_at IS NULL
+				LIMIT 1
+			)
 	`, strings.TrimSpace(viewerSpaceID), viewerID).Scan(&exists); err != nil {
 		return false, stacktrace.Propagate(err, "")
 	}

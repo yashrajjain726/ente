@@ -41,7 +41,6 @@ CREATE TRIGGER update_space_profile_assets_updated_at
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
 CREATE TABLE IF NOT EXISTS space_notification_read_markers (
-    user_id        BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     viewer_space_id TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     friend_space_id TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     read_at        BIGINT NOT NULL DEFAULT 0,
@@ -49,9 +48,6 @@ CREATE TABLE IF NOT EXISTS space_notification_read_markers (
     updated_at     BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     PRIMARY KEY (viewer_space_id, friend_space_id)
 );
-
-CREATE INDEX IF NOT EXISTS idx_space_notification_read_markers_user
-    ON space_notification_read_markers (user_id, read_at DESC);
 
 CREATE TRIGGER update_space_notification_read_markers_updated_at
     BEFORE UPDATE ON space_notification_read_markers
@@ -109,7 +105,6 @@ CREATE INDEX IF NOT EXISTS idx_space_key_versions_space_created
 CREATE TABLE IF NOT EXISTS space_posts (
     post_id              BIGSERIAL PRIMARY KEY,
     space_id              TEXT    NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    owner_id             BIGINT  NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     encrypted_post_key   BYTEA   NOT NULL,
     caption_cipher       BYTEA   NOT NULL DEFAULT '\x'::bytea,
     key_version          INTEGER NOT NULL DEFAULT 1,
@@ -120,10 +115,6 @@ CREATE TABLE IF NOT EXISTS space_posts (
 
 CREATE INDEX IF NOT EXISTS idx_space_posts_space_created
     ON space_posts (space_id, created_at DESC)
-    WHERE is_deleted = FALSE;
-
-CREATE INDEX IF NOT EXISTS idx_space_posts_owner_created
-    ON space_posts (owner_id, created_at DESC)
     WHERE is_deleted = FALSE;
 
 CREATE TRIGGER update_space_posts_updated_at
@@ -151,7 +142,6 @@ CREATE INDEX IF NOT EXISTS idx_space_post_assets_post_position
 
 CREATE TABLE IF NOT EXISTS space_temp_objects (
     object_key      TEXT PRIMARY KEY,
-    owner_id        BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     space_id         TEXT REFERENCES spaces (space_id) ON DELETE CASCADE,
     purpose         TEXT NOT NULL,
     bucket_id       TEXT NOT NULL,
@@ -166,12 +156,8 @@ CREATE TABLE IF NOT EXISTS space_temp_objects (
 CREATE INDEX IF NOT EXISTS idx_space_temp_objects_expires
     ON space_temp_objects (cleanup_after ASC);
 
-CREATE INDEX IF NOT EXISTS idx_space_temp_objects_owner_purpose
-    ON space_temp_objects (owner_id, purpose, created_at DESC);
-
 CREATE TABLE IF NOT EXISTS space_post_likes (
     post_id      BIGINT NOT NULL REFERENCES space_posts (post_id) ON DELETE CASCADE,
-    user_id      BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     actor_space_id TEXT  NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     created_at   BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     PRIMARY KEY (post_id, actor_space_id)
@@ -183,15 +169,11 @@ CREATE INDEX IF NOT EXISTS idx_space_post_likes_post_id
 CREATE INDEX IF NOT EXISTS idx_space_post_likes_post_created_user
     ON space_post_likes (post_id, created_at DESC, actor_space_id DESC);
 
-CREATE INDEX IF NOT EXISTS idx_space_post_likes_user_created
-    ON space_post_likes (user_id, created_at DESC, post_id DESC);
-
 CREATE INDEX IF NOT EXISTS idx_space_post_likes_actor_created_post
     ON space_post_likes (actor_space_id, created_at DESC, post_id DESC);
 
 CREATE TABLE IF NOT EXISTS space_friend_shares (
     space_id              TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    friend_id            BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     friend_space_id       TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     friend_sealed_space_key BYTEA NOT NULL,
     key_version          INTEGER NOT NULL DEFAULT 1,
@@ -199,9 +181,6 @@ CREATE TABLE IF NOT EXISTS space_friend_shares (
     updated_at           BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
     PRIMARY KEY (space_id, friend_space_id)
 );
-
-CREATE INDEX IF NOT EXISTS idx_space_friend_shares_friend
-    ON space_friend_shares (friend_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_space_friend_shares_friend_space
     ON space_friend_shares (friend_space_id, created_at DESC);
@@ -213,9 +192,7 @@ EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
 CREATE TABLE IF NOT EXISTS space_friend_requests (
     request_id                   BIGSERIAL PRIMARY KEY,
-    requester_id                 BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     requester_space_id           TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    target_id                    BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     target_space_id              TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     requester_friend_sealed_space_key BYTEA NOT NULL,
     requester_key_version        INTEGER NOT NULL DEFAULT 1,
@@ -223,7 +200,7 @@ CREATE TABLE IF NOT EXISTS space_friend_requests (
     resolved_at                  BIGINT,
     created_at                   BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     updated_at                   BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    CONSTRAINT chk_space_friend_requests_distinct_users CHECK (requester_id <> target_id)
+    CONSTRAINT chk_space_friend_requests_distinct_spaces CHECK (requester_space_id <> target_space_id)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_space_friend_requests_active_pair
@@ -254,9 +231,7 @@ END; $$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS space_messages (
     message_id                      TEXT PRIMARY KEY,
-    sender_id                       BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     sender_space_id                  TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    recipient_id                    BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     recipient_space_id               TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     thread_key                      TEXT GENERATED ALWAYS AS (
         CASE
@@ -274,7 +249,7 @@ CREATE TABLE IF NOT EXISTS space_messages (
     is_deleted                      BOOLEAN NOT NULL DEFAULT FALSE,
     created_at                      BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
     updated_at                      BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
-    CONSTRAINT chk_space_messages_distinct_users CHECK (sender_id <> recipient_id),
+    CONSTRAINT chk_space_messages_distinct_spaces CHECK (sender_space_id <> recipient_space_id),
     CONSTRAINT chk_space_messages_kind CHECK (kind IN ('regular', 'post_reply')),
     CONSTRAINT chk_space_messages_regular_shape CHECK (kind <> 'regular' OR reply_post_id IS NULL),
     CONSTRAINT chk_space_messages_single_reply_target CHECK (reply_post_id IS NULL OR reply_message_id IS NULL),
@@ -292,12 +267,6 @@ CREATE TABLE IF NOT EXISTS space_messages (
         )
     )
 );
-
-CREATE INDEX IF NOT EXISTS idx_space_messages_sender_updated
-    ON space_messages (sender_id, updated_at DESC, message_id DESC);
-
-CREATE INDEX IF NOT EXISTS idx_space_messages_recipient_updated
-    ON space_messages (recipient_id, updated_at DESC, message_id DESC);
 
 CREATE INDEX IF NOT EXISTS idx_space_messages_sender_space_created
     ON space_messages (sender_space_id, created_at DESC, message_id DESC)
@@ -320,14 +289,10 @@ CREATE INDEX IF NOT EXISTS idx_space_messages_reply_message
 
 CREATE TABLE IF NOT EXISTS space_message_likes (
     message_id  TEXT   NOT NULL REFERENCES space_messages (message_id) ON DELETE CASCADE,
-    user_id     BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     actor_space_id TEXT NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     created_at  BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     PRIMARY KEY (message_id, actor_space_id)
 );
-
-CREATE INDEX IF NOT EXISTS idx_space_message_likes_user_created
-    ON space_message_likes (user_id, created_at DESC, message_id DESC);
 
 CREATE INDEX IF NOT EXISTS idx_space_message_likes_actor_created
     ON space_message_likes (actor_space_id, created_at DESC, message_id DESC);
@@ -368,7 +333,6 @@ EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 CREATE TABLE IF NOT EXISTS space_link_sessions (
     token_hash           BYTEA PRIMARY KEY,
     space_id              TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    owner_id             BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     auth_key_hash        BYTEA   NOT NULL,
     key_version          INTEGER NOT NULL,
     expires_at           BIGINT NOT NULL,

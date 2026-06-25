@@ -200,12 +200,12 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 	require.NoError(t, module.ResetUserAccess(ctx, aliceID))
 
 	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM spaces WHERE owner_id = $1`, aliceID))
-	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_posts WHERE owner_id = $1`, aliceID))
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_posts WHERE space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_browser_sessions WHERE user_id = $1`, aliceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_link_sessions WHERE space_id = $1`, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1 OR friend_id = $2`, aliceSpace.SpaceID, aliceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE requester_id = $1 OR target_id = $1 OR requester_space_id = $2 OR target_space_id = $2`, aliceID, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1 OR user_id = $2`, aliceSpace.SpaceID, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE requester_space_id = $1 OR target_space_id = $1`, aliceSpace.SpaceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_post_likes WHERE post_id = $1`, postID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_message_likes WHERE message_id = $1`, message.MessageID))
 	_, _, err = testConfirmFriendRequest(ctx, module, charlieID, charlieSpace.SpaceID, pendingRequest.RequestID, "charlie-share-key", charlieSpace.CurrentVersion)
@@ -243,7 +243,6 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, module.Assets.AddTempObject(ctx, SpaceTempObjectRecord{
 		ObjectKey:    "space/alice/staged-upload",
-		OwnerID:      aliceID,
 		SpaceID:      sql.NullString{String: aliceSpace.SpaceID, Valid: true},
 		Purpose:      TempObjectPurposePost,
 		BucketID:     "hot",
@@ -274,18 +273,18 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 	require.NoError(t, module.DeleteUserData(ctx, aliceID))
 
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM spaces WHERE owner_id = $1`, aliceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_posts WHERE owner_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_posts WHERE space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_post_assets WHERE object_key = $1`, "space/alice/post-asset"))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE sender_id = $1 OR recipient_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE sender_space_id = $1 OR recipient_space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_entity_keys WHERE user_id = $1`, aliceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_browser_sessions WHERE user_id = $1`, aliceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_link_sessions WHERE owner_id = $1`, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_link_sessions WHERE space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_links WHERE space_id = $1`, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1 OR friend_id = $2`, aliceSpace.SpaceID, aliceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1 OR user_id = $2`, aliceSpace.SpaceID, aliceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
+	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
 
 	for _, objectKey := range []string{ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeAvatar, "avatar"), ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeCover, "cover"), "space/alice/post-asset", "space/alice/staged-upload"} {
-		require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_temp_objects WHERE object_key = $1 AND owner_id = $2 AND space_id IS NULL AND cleanup_after <= now_utc_micro_seconds()`, objectKey, aliceID))
+		require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_temp_objects WHERE object_key = $1 AND space_id IS NULL AND cleanup_after <= now_utc_micro_seconds()`, objectKey))
 	}
 }
 
@@ -316,7 +315,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "regular", message.Kind)
-	require.Equal(t, "sender-key", message.EncryptedMessageKey)
+	require.Equal(t, testSpaceBytes("sender-key"), message.EncryptedMessageKey)
 	require.Equal(t, int64(0), message.Likes)
 	require.False(t, message.ViewerLiked)
 
@@ -353,7 +352,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	require.Len(t, aliceThread, 2)
 	require.Equal(t, reply.MessageID, aliceThread[0].MessageID)
 	require.Equal(t, message.MessageID, aliceThread[0].ReplyMessageID.String)
-	require.Equal(t, "recipient-key", aliceThread[1].EncryptedMessageKey)
+	require.Equal(t, testSpaceBytes("recipient-key"), aliceThread[1].EncryptedMessageKey)
 	require.Equal(t, bobSpace.SpaceID, aliceThread[1].Sender.SpaceID)
 
 	conversations, nextCursor, err := module.Messages.ListConversations(ctx, aliceID, aliceSpace.SpaceID, "", 10)
@@ -937,7 +936,6 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 
 	err = module.Assets.AddTempObject(ctx, SpaceTempObjectRecord{
 		ObjectKey:    ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeAvatar, "avatar.jpg"),
-		OwnerID:      aliceID,
 		SpaceID:      sql.NullString{String: aliceSpace.SpaceID, Valid: true},
 		Purpose:      TempObjectPurposeAvatar,
 		BucketID:     "b2-eu-cen",
@@ -989,7 +987,6 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	for _, tempObject := range []SpaceTempObjectRecord{
 		{
 			ObjectKey:    "space/alice/post1/full",
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: aliceSpace.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposePost,
 			BucketID:     "b2-eu-cen",
@@ -998,7 +995,6 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 		},
 		{
 			ObjectKey:    "space/alice/post1/thumb",
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: aliceSpace.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposePost,
 			BucketID:     "b2-eu-cen",
@@ -1158,7 +1154,6 @@ func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
 	for _, rec := range []SpaceTempObjectRecord{
 		{
 			ObjectKey:    ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeAvatar, "avatar-old"),
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposeAvatar,
 			BucketID:     "b2-eu-cen",
@@ -1167,7 +1162,6 @@ func TestUpdateProfileQueuesOldAvatarForCleanup(t *testing.T) {
 		},
 		{
 			ObjectKey:    ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeAvatar, "avatar-new"),
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposeAvatar,
 			BucketID:     "b2-us-west",
@@ -1209,7 +1203,6 @@ func TestUpdateProfileQueuesOldCoverForCleanup(t *testing.T) {
 	for _, rec := range []SpaceTempObjectRecord{
 		{
 			ObjectKey:    ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeCover, "cover-old"),
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposeCover,
 			BucketID:     "b2-eu-cen",
@@ -1218,7 +1211,6 @@ func TestUpdateProfileQueuesOldCoverForCleanup(t *testing.T) {
 		},
 		{
 			ObjectKey:    ProfileAssetObjectKey(space.SpaceID, ProfileAssetTypeCover, "cover-new"),
-			OwnerID:      aliceID,
 			SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 			Purpose:      TempObjectPurposeCover,
 			BucketID:     "b2-us-west",
@@ -1653,9 +1645,9 @@ func TestGetSessionRejectsStaleLinkMetadata(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = module.Links.DB.Exec(`
-		INSERT INTO space_link_sessions (token_hash, space_id, owner_id, auth_key_hash, key_version, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, []byte("stale-auth-token"), oldLink.SpaceID, oldLink.OwnerID, oldLink.AuthKeyHash, oldLink.KeyVersion, timeutil.NMinFromNow(30))
+		INSERT INTO space_link_sessions (token_hash, space_id, auth_key_hash, key_version, expires_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`, []byte("stale-auth-token"), oldLink.SpaceID, oldLink.AuthKeyHash, oldLink.KeyVersion, timeutil.NMinFromNow(30))
 	require.NoError(t, err)
 	_, err = module.Links.GetSession(ctx, []byte("stale-auth-token"))
 	require.Error(t, err)
@@ -1665,9 +1657,9 @@ func TestGetSessionRejectsStaleLinkMetadata(t *testing.T) {
 	reusedHashLink, err := testUpsertLink(ctx, module, space.SpaceID, []byte("fresh-after-space-rotate"), rotatedSpace.CurrentVersion, "fresh-new-version-key", "fresh-owner-link-secret")
 	require.NoError(t, err)
 	_, err = module.Links.DB.Exec(`
-		INSERT INTO space_link_sessions (token_hash, space_id, owner_id, auth_key_hash, key_version, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, []byte("stale-version-token"), reusedHashLink.SpaceID, reusedHashLink.OwnerID, reusedHashLink.AuthKeyHash, space.CurrentVersion, timeutil.NMinFromNow(30))
+		INSERT INTO space_link_sessions (token_hash, space_id, auth_key_hash, key_version, expires_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`, []byte("stale-version-token"), reusedHashLink.SpaceID, reusedHashLink.AuthKeyHash, space.CurrentVersion, timeutil.NMinFromNow(30))
 	require.NoError(t, err)
 	_, err = module.Links.GetSession(ctx, []byte("stale-version-token"))
 	require.Error(t, err)

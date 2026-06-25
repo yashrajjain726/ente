@@ -111,7 +111,6 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	}
 	err = c.AssetsRepo.AddTempObject(ctx.Request.Context(), spacerepo.SpaceTempObjectRecord{
 		ObjectKey:    objectKey,
-		OwnerID:      userID,
 		SpaceID:      spaceID,
 		Purpose:      purpose,
 		BucketID:     bucketID,
@@ -163,12 +162,12 @@ func maxUploadBytesForPurpose(purpose string) (int64, error) {
 	}
 }
 
-func verifyStagedUpload(ctx *gin.Context, assetsRepo *spacerepo.AssetsRepository, ownerID int64, objectKey, purpose string, spaceID *string) (*spacerepo.SpaceTempObjectRecord, error) {
+func verifyStagedUpload(ctx *gin.Context, assetsRepo *spacerepo.AssetsRepository, objectKey, purpose string, spaceID *string) (*spacerepo.SpaceTempObjectRecord, error) {
 	objectKey = strings.TrimSpace(objectKey)
 	if objectKey == "" {
 		return nil, ente.NewBadRequestWithMessage("objectKey is required")
 	}
-	rec, err := assetsRepo.GetTempObject(ctx.Request.Context(), ownerID, objectKey, purpose, spaceID)
+	rec, err := assetsRepo.GetTempObject(ctx.Request.Context(), objectKey, purpose, spaceID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("staged space upload not found")
