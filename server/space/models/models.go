@@ -8,8 +8,6 @@ type AssetRedirectRequest struct {
 	ObjectID      string `form:"objectID"`
 }
 
-type ListSpacesRequest struct{}
-
 type SpaceBrowserSessionRequest struct {
 	SessionWrapKey string `json:"sessionWrapKey" binding:"required"`
 }
@@ -64,20 +62,10 @@ type GetPostRequest struct {
 	ViewerSpaceID string `form:"viewerSpaceId"`
 }
 
-type SpaceUnreadStatusRequest struct{}
-
 type ListMessageThreadRequest struct {
 	Cursor string `form:"cursor"`
 	Limit  int    `form:"limit"`
 }
-
-type ListSpaceFriendsRequest struct{}
-
-type ListFriendRequestsRequest struct{}
-
-type DeleteFriendRequestRequest struct{}
-
-type ListFriendSharesRequest struct{}
 
 type FriendRelationshipRequest struct {
 	TargetSpaceID string `form:"targetSpaceId" binding:"required"`
@@ -330,8 +318,6 @@ type CreateMessageRequest struct {
 type LikeMessageRequest struct {
 	Like bool `json:"like"`
 }
-
-type DeleteMessageRequest struct{}
 
 type LikeMessageResponse struct {
 	Liked bool `json:"liked"`

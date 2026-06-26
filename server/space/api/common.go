@@ -2,7 +2,10 @@ package api
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 
+	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/pkg/utils/handler"
 	"github.com/ente-io/stacktrace"
 	"github.com/gin-gonic/gin"
@@ -32,4 +35,14 @@ func respondStatus(c *gin.Context, err error) {
 		return
 	}
 	c.Status(http.StatusOK)
+}
+
+func positiveInt64Param(c *gin.Context, name string) (int64, bool) {
+	value := strings.TrimSpace(c.Param(name))
+	id, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || id <= 0 {
+		respondJSON(c, nil, ente.NewBadRequestWithMessage("invalid "+name))
+		return 0, false
+	}
+	return id, true
 }

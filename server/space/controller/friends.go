@@ -3,7 +3,6 @@ package controller
 import (
 	"database/sql"
 	"errors"
-	"strconv"
 	"strings"
 
 	"github.com/ente-io/museum/ente"
@@ -70,7 +69,7 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 	return &models.FriendStatusResponse{Status: "requested"}, nil
 }
 
-func (c *FriendsController) ListRequests(ctx *gin.Context, req models.ListFriendRequestsRequest) ([]models.SpaceFriendRequestResponse, error) {
+func (c *FriendsController) ListRequests(ctx *gin.Context) ([]models.SpaceFriendRequestResponse, error) {
 	space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
@@ -90,14 +89,10 @@ func (c *FriendsController) ListRequests(ctx *gin.Context, req models.ListFriend
 	return resp, nil
 }
 
-func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestIDValue string, req models.ConfirmFriendRequestPayload) (*models.FriendStatusResponse, error) {
+func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestID int64, req models.ConfirmFriendRequestPayload) (*models.FriendStatusResponse, error) {
 	targetSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
-	}
-	requestID, err := strconv.ParseInt(strings.TrimSpace(requestIDValue), 10, 64)
-	if err != nil || requestID <= 0 {
-		return nil, ente.ErrBadRequest
 	}
 	if strings.TrimSpace(req.TargetFriendSealedSpaceKey) == "" || req.TargetKeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("targetFriendSealedSpaceKey and targetKeyVersion are required")
@@ -125,14 +120,10 @@ func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestIDValue stri
 	return &models.FriendStatusResponse{Status: "friend"}, nil
 }
 
-func (c *FriendsController) DeleteRequest(ctx *gin.Context, requestIDValue string, req models.DeleteFriendRequestRequest) error {
+func (c *FriendsController) DeleteRequest(ctx *gin.Context, requestID int64) error {
 	targetSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return err
-	}
-	requestID, err := strconv.ParseInt(strings.TrimSpace(requestIDValue), 10, 64)
-	if err != nil || requestID <= 0 {
-		return ente.ErrBadRequest
 	}
 	if err := c.FriendsRepo.DeleteFriendRequest(ctx, targetSpace.SpaceID, requestID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
@@ -163,7 +154,7 @@ func (c *FriendsController) Unfriend(ctx *gin.Context, req models.FriendTargetPa
 	return c.FriendsRepo.DeleteFriendship(ctx, actorSpace.SpaceID, space.SpaceID)
 }
 
-func (c *FriendsController) ListFriends(ctx *gin.Context, req models.ListSpaceFriendsRequest) ([]models.SpaceFriendResponse, error) {
+func (c *FriendsController) ListFriends(ctx *gin.Context) ([]models.SpaceFriendResponse, error) {
 	space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
@@ -240,7 +231,7 @@ func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFr
 	return nil
 }
 
-func (c *FriendsController) ListShares(ctx *gin.Context, req models.ListFriendSharesRequest) ([]models.FriendShareResponse, error) {
+func (c *FriendsController) ListShares(ctx *gin.Context) ([]models.FriendShareResponse, error) {
 	space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err

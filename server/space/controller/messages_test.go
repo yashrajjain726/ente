@@ -84,7 +84,7 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	require.True(t, viewed.Liked)
 	require.True(t, viewed.ViewerLiked)
 
-	require.NoError(t, controller.Delete(newSelectedSpaceControllerContext(bobID, bobSpace), messageToDelete.MessageID, models.DeleteMessageRequest{}))
+	require.NoError(t, controller.Delete(newSelectedSpaceControllerContext(bobID, bobSpace), messageToDelete.MessageID))
 	_, err = controller.ToggleLike(newSelectedSpaceControllerContext(aliceID, aliceSpace), messageToDelete.MessageID, models.LikeMessageRequest{Like: true})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot like a deleted message")
@@ -96,8 +96,8 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, thread, 1)
 
-	require.Error(t, controller.Delete(newSelectedSpaceControllerContext(aliceID, aliceSpace), message.MessageID, models.DeleteMessageRequest{}))
-	err = controller.Delete(newSelectedSpaceControllerContext(bobID, bobSpace), message.MessageID, models.DeleteMessageRequest{})
+	require.Error(t, controller.Delete(newSelectedSpaceControllerContext(aliceID, aliceSpace), message.MessageID))
+	err = controller.Delete(newSelectedSpaceControllerContext(bobID, bobSpace), message.MessageID)
 	require.True(t, errors.Is(err, ente.ErrPermissionDenied))
 }
 

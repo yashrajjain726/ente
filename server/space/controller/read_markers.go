@@ -18,7 +18,7 @@ type ReadMarkersController struct {
 	auth            authDeps
 }
 
-func (c *ReadMarkersController) GetUnreadStatus(ctx *gin.Context, req models.SpaceUnreadStatusRequest) (*models.SpaceUnreadStatusResponse, error) {
+func (c *ReadMarkersController) GetUnreadStatus(ctx *gin.Context) (*models.SpaceUnreadStatusResponse, error) {
 	viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
@@ -50,5 +50,5 @@ func (c *ReadMarkersController) MarkNotificationsRead(ctx *gin.Context, req mode
 	if err := c.ReadMarkersRepo.UpsertNotificationReadMarker(ctx, viewerSpace.SpaceID, req.FriendSpaceID, readAt); err != nil {
 		return nil, err
 	}
-	return c.GetUnreadStatus(ctx, models.SpaceUnreadStatusRequest{})
+	return c.GetUnreadStatus(ctx)
 }

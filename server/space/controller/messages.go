@@ -3,7 +3,6 @@ package controller
 import (
 	"database/sql"
 	"errors"
-	"strconv"
 	"strings"
 
 	"github.com/ente-io/museum/ente"
@@ -67,7 +66,7 @@ func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req 
 	return toMessageResponse(*message), nil
 }
 
-func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req models.CreateMessageRequest) (*models.MessageResponse, error) {
+func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID int64, req models.CreateMessageRequest) (*models.MessageResponse, error) {
 	senderSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
@@ -79,11 +78,7 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 	if strings.TrimSpace(req.ReplyMessageID) != "" {
 		return nil, ente.NewBadRequestWithMessage("replyMessageId is not supported for post replies")
 	}
-	id, err := strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
-	if err != nil || id <= 0 {
-		return nil, ente.NewBadRequestWithMessage("invalid postID")
-	}
-	post, err := c.PostsRepo.GetPost(ctx, id, senderSpace.SpaceID)
+	post, err := c.PostsRepo.GetPost(ctx, postID, senderSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +104,7 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 		MessageCipher:                messageCipher,
 		SenderEncryptedMessageKey:    senderEncryptedMessageKey,
 		RecipientEncryptedMessageKey: recipientEncryptedMessageKey,
-		ReplyPostID:                  sql.NullInt64{Int64: id, Valid: true},
+		ReplyPostID:                  sql.NullInt64{Int64: postID, Valid: true},
 	})
 	if err != nil {
 		return nil, err
@@ -232,7 +227,7 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 	return &models.LikeMessageResponse{Liked: req.Like}, nil
 }
 
-func (c *MessagesController) Delete(ctx *gin.Context, messageID string, req models.DeleteMessageRequest) error {
+func (c *MessagesController) Delete(ctx *gin.Context, messageID string) error {
 	senderSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return err

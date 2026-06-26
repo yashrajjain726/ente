@@ -3,7 +3,6 @@ package controller
 import (
 	"crypto/sha256"
 	"database/sql"
-	"strconv"
 	"testing"
 
 	timeutil "github.com/ente-io/museum/pkg/utils/time"
@@ -20,7 +19,7 @@ func TestPostLikeRejectsOwnPost(t *testing.T) {
 	postID, err := testCreatePost(ctx, repos, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
 
-	_, err = controller.ToggleLike(newSelectedSpaceControllerContext(aliceID, aliceSpace), strconv.FormatInt(postID, 10), models.LikePostRequest{Like: true})
+	_, err = controller.ToggleLike(newSelectedSpaceControllerContext(aliceID, aliceSpace), postID, models.LikePostRequest{Like: true})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot like your own post")
 }
@@ -108,12 +107,12 @@ func TestListPostLikersUsesRequestPagination(t *testing.T) {
 	ginCtx := newPublicSpaceContext()
 	ginCtx.Request.Header.Set(SpaceBrowserSessionTokenHeader, "alice-list-likers-session")
 
-	page, err := controller.ListLikers(ginCtx, strconv.FormatInt(postID, 10), models.ListPostLikersRequest{Limit: 1})
+	page, err := controller.ListLikers(ginCtx, postID, models.ListPostLikersRequest{Limit: 1})
 	require.NoError(t, err)
 	require.Len(t, page.Likers, 1)
 	require.NotEmpty(t, page.NextCursor)
 
-	page, err = controller.ListLikers(ginCtx, strconv.FormatInt(postID, 10), models.ListPostLikersRequest{
+	page, err = controller.ListLikers(ginCtx, postID, models.ListPostLikersRequest{
 		Cursor: page.NextCursor,
 		Limit:  1,
 	})

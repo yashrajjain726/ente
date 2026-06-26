@@ -11,12 +11,7 @@ import (
 )
 
 func (h *Handlers) ListSpaces(c *gin.Context) {
-	var req models.ListSpacesRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
-		return
-	}
-	resp, err := h.Module.Spaces.List(c, req)
+	resp, err := h.Module.Spaces.List(c)
 	respondJSON(c, resp, err)
 }
 

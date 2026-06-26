@@ -42,7 +42,11 @@ func (h *Handlers) GetPost(c *gin.Context) {
 		respondJSON(c, nil, ente.ErrBadRequest)
 		return
 	}
-	resp, err := h.Module.Posts.Get(c, c.Param("postID"), req)
+	postID, ok := positiveInt64Param(c, "postID")
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Posts.Get(c, postID, req)
 	respondJSON(c, resp, err)
 }
 
@@ -52,7 +56,11 @@ func (h *Handlers) UpdatePostCaption(c *gin.Context) {
 		respondJSON(c, nil, ente.ErrBadRequest)
 		return
 	}
-	resp, err := h.Module.Posts.UpdateCaption(c, c.Param("postID"), req)
+	postID, ok := positiveInt64Param(c, "postID")
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Posts.UpdateCaption(c, postID, req)
 	respondJSON(c, resp, err)
 }
 
@@ -62,7 +70,11 @@ func (h *Handlers) TogglePostLike(c *gin.Context) {
 		respondJSON(c, nil, ente.ErrBadRequest)
 		return
 	}
-	resp, err := h.Module.Posts.ToggleLike(c, c.Param("postID"), req)
+	postID, ok := positiveInt64Param(c, "postID")
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Posts.ToggleLike(c, postID, req)
 	respondJSON(c, resp, err)
 }
 
@@ -72,10 +84,18 @@ func (h *Handlers) ListPostLikers(c *gin.Context) {
 		respondJSON(c, nil, ente.ErrBadRequest)
 		return
 	}
-	resp, err := h.Module.Posts.ListLikers(c, c.Param("postID"), req)
+	postID, ok := positiveInt64Param(c, "postID")
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Posts.ListLikers(c, postID, req)
 	respondJSON(c, resp, err)
 }
 
 func (h *Handlers) DeletePost(c *gin.Context) {
-	respondStatus(c, h.Module.Posts.Delete(c, c.Param("postID")))
+	postID, ok := positiveInt64Param(c, "postID")
+	if !ok {
+		return
+	}
+	respondStatus(c, h.Module.Posts.Delete(c, postID))
 }

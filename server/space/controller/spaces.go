@@ -18,7 +18,7 @@ type SpacesController struct {
 	auth       authDeps
 }
 
-func (c *SpacesController) List(ctx *gin.Context, _ models.ListSpacesRequest) ([]models.SpaceKeyResponse, error) {
+func (c *SpacesController) List(ctx *gin.Context) ([]models.SpaceKeyResponse, error) {
 	userID, err := c.auth.requireUser(ctx)
 	if err != nil {
 		return nil, err

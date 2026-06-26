@@ -27,7 +27,7 @@ func (h *Handlers) ToggleMessageLike(c *gin.Context) {
 }
 
 func (h *Handlers) DeleteMessage(c *gin.Context) {
-	err := h.Module.Messages.Delete(c, c.Param("messageID"), models.DeleteMessageRequest{})
+	err := h.Module.Messages.Delete(c, c.Param("messageID"))
 	respondJSON(c, nil, err)
 }
 
@@ -37,7 +37,11 @@ func (h *Handlers) ReplyToPost(c *gin.Context) {
 		respondJSON(c, nil, ente.ErrBadRequest)
 		return
 	}
-	resp, err := h.Module.Messages.ReplyToPost(c, c.Param("postID"), req)
+	postID, ok := positiveInt64Param(c, "postID")
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Messages.ReplyToPost(c, postID, req)
 	respondJSON(c, resp, err)
 }
 

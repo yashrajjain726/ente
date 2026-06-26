@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strconv"
 	"strings"
 
 	"github.com/ente-io/museum/ente"
@@ -180,11 +179,7 @@ func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest)
 	}, nil
 }
 
-func (c *PostsController) Get(ctx *gin.Context, postID string, req models.GetPostRequest) (*models.PostResponse, error) {
-	id, err := strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
-	if err != nil || id <= 0 {
-		return nil, ente.NewBadRequestWithMessage("invalid postID")
-	}
+func (c *PostsController) Get(ctx *gin.Context, postID int64, req models.GetPostRequest) (*models.PostResponse, error) {
 	viewer, err := c.auth.resolveViewer(ctx, req.ViewerSpaceID)
 	if err != nil {
 		return nil, err
@@ -193,7 +188,7 @@ func (c *PostsController) Get(ctx *gin.Context, postID string, req models.GetPos
 	if viewer != nil {
 		viewerSpaceID = viewer.SpaceID
 	}
-	post, err := c.PostsRepo.GetPost(ctx, id, viewerSpaceID)
+	post, err := c.PostsRepo.GetPost(ctx, postID, viewerSpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -207,39 +202,31 @@ func (c *PostsController) Get(ctx *gin.Context, postID string, req models.GetPos
 	return c.postResponse(ctx, post, true)
 }
 
-func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req models.UpdatePostCaptionRequest) (*models.PostResponse, error) {
+func (c *PostsController) UpdateCaption(ctx *gin.Context, postID int64, req models.UpdatePostCaptionRequest) (*models.PostResponse, error) {
 	viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
-	}
-	id, err := strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
-	if err != nil || id <= 0 {
-		return nil, ente.NewBadRequestWithMessage("invalid postID")
 	}
 	captionCipher, err := decodeOptionalEncodedSpacePointerField("captionCipher", req.CaptionCipher, maxSpaceCaptionCipherEncodedBytes, maxSpaceCaptionCipherDecodedBytes)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.PostsRepo.UpdateCaption(ctx, id, viewerSpace.SpaceID, captionCipher); err != nil {
+	if err := c.PostsRepo.UpdateCaption(ctx, postID, viewerSpace.SpaceID, captionCipher); err != nil {
 		return nil, err
 	}
-	post, err := c.PostsRepo.GetPost(ctx, id, viewerSpace.SpaceID)
+	post, err := c.PostsRepo.GetPost(ctx, postID, viewerSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
 	return c.postResponse(ctx, post, true)
 }
 
-func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models.LikePostRequest) (*models.LikePostResponse, error) {
+func (c *PostsController) ToggleLike(ctx *gin.Context, postID int64, req models.LikePostRequest) (*models.LikePostResponse, error) {
 	actorSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
-	id, err := strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
-	if err != nil || id <= 0 {
-		return nil, ente.NewBadRequestWithMessage("invalid postID")
-	}
-	post, err := c.PostsRepo.GetPost(ctx, id, actorSpace.SpaceID)
+	post, err := c.PostsRepo.GetPost(ctx, postID, actorSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +240,7 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models
 	if err := c.auth.canViewSpace(ctx, &viewerAuth{UserID: actorSpace.OwnerID, SpaceID: actorSpace.SpaceID}, space); err != nil {
 		return nil, err
 	}
-	created, err := c.PostsRepo.SetLikeWithCreated(ctx, id, actorSpace.SpaceID, req.Like)
+	created, err := c.PostsRepo.SetLikeWithCreated(ctx, postID, actorSpace.SpaceID, req.Like)
 	if err != nil {
 		return nil, err
 	}
@@ -263,11 +250,7 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models
 	return &models.LikePostResponse{Liked: req.Like}, nil
 }
 
-func (c *PostsController) ListLikers(ctx *gin.Context, postID string, req models.ListPostLikersRequest) (*models.ListPostLikersResponse, error) {
-	id, err := strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
-	if err != nil || id <= 0 {
-		return nil, ente.NewBadRequestWithMessage("invalid postID")
-	}
+func (c *PostsController) ListLikers(ctx *gin.Context, postID int64, req models.ListPostLikersRequest) (*models.ListPostLikersResponse, error) {
 	viewer, err := c.auth.resolveViewer(ctx, req.ViewerSpaceID)
 	if err != nil {
 		return nil, err
@@ -276,7 +259,7 @@ func (c *PostsController) ListLikers(ctx *gin.Context, postID string, req models
 	if viewer != nil {
 		viewerSpaceID = viewer.SpaceID
 	}
-	post, err := c.PostsRepo.GetPost(ctx, id, viewerSpaceID)
+	post, err := c.PostsRepo.GetPost(ctx, postID, viewerSpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +270,7 @@ func (c *PostsController) ListLikers(ctx *gin.Context, postID string, req models
 	if err := c.auth.canViewSpace(ctx, viewer, space); err != nil {
 		return nil, err
 	}
-	likers, nextCursor, err := c.PostsRepo.ListPostLikers(ctx, id, req.Cursor, req.Limit)
+	likers, nextCursor, err := c.PostsRepo.ListPostLikers(ctx, postID, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -309,15 +292,11 @@ func (c *PostsController) ListLikers(ctx *gin.Context, postID string, req models
 	return &models.ListPostLikersResponse{Likers: resp, NextCursor: nextCursor}, nil
 }
 
-func (c *PostsController) Delete(ctx *gin.Context, postID string) error {
+func (c *PostsController) Delete(ctx *gin.Context, postID int64) error {
 	space, err := selectedSpace(ctx)
 	if err != nil {
 		return err
 	}
-	id, err := strconv.ParseInt(strings.TrimSpace(postID), 10, 64)
-	if err != nil || id <= 0 {
-		return ente.NewBadRequestWithMessage("invalid postID")
-	}
-	_, err = c.PostsRepo.DeletePost(ctx, id, space.SpaceID)
+	_, err = c.PostsRepo.DeletePost(ctx, postID, space.SpaceID)
 	return err
 }
