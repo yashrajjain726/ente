@@ -145,6 +145,10 @@ func TestValidateCreateMessageRequestLimits(t *testing.T) {
 	_, _, _, err = decodeCreateMessageRequest(tooLargeKey)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "senderEncryptedMessageKey is too large")
+
+	_, err = normalizeOptionalMessageID(strings.Repeat("m", maxSpaceMessageIDBytes+1))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "messageId is too large")
 }
 
 func createMessageControllerUserAndSpace(t *testing.T, repos *spacerepo.Module, slug string, publicKey string) (int64, *spacerepo.SpaceRecord) {

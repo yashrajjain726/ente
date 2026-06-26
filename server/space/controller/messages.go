@@ -21,6 +21,7 @@ const (
 	maxSpaceMessageCipherDecodedBytes = 6 * 1024
 	maxSpaceMessageKeyEncodedBytes    = 1024
 	maxSpaceMessageKeyDecodedBytes    = 768
+	maxSpaceMessageIDBytes            = 128
 )
 
 type MessagesController struct {
@@ -42,6 +43,10 @@ func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req 
 	if err != nil {
 		return nil, err
 	}
+	messageID, err := normalizeOptionalMessageID(req.MessageID)
+	if err != nil {
+		return nil, err
+	}
 	recipientSpace, err := c.requireFriendMessageTarget(ctx, senderSpace, targetSpaceID)
 	if err != nil {
 		return nil, err
@@ -51,7 +56,7 @@ func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req 
 		return nil, err
 	}
 	message, err := c.MessagesRepo.CreateMessage(ctx, repo.CreateSpaceMessageRecord{
-		MessageID:                    req.MessageID,
+		MessageID:                    messageID,
 		Kind:                         spaceMessageKindRegular,
 		SenderSpaceID:                senderSpace.SpaceID,
 		RecipientSpaceID:             recipientSpace.SpaceID,
@@ -72,6 +77,10 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID int64, req mod
 		return nil, err
 	}
 	messageCipher, senderEncryptedMessageKey, recipientEncryptedMessageKey, err := decodeCreateMessageRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	messageID, err := normalizeOptionalMessageID(req.MessageID)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +106,7 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID int64, req mod
 		return nil, err
 	}
 	message, err := c.MessagesRepo.CreateMessage(ctx, repo.CreateSpaceMessageRecord{
-		MessageID:                    req.MessageID,
+		MessageID:                    messageID,
 		Kind:                         spaceMessageKindPostReply,
 		SenderSpaceID:                senderSpace.SpaceID,
 		RecipientSpaceID:             recipientSpace.SpaceID,
@@ -303,6 +312,14 @@ func (c *MessagesController) validateReplyMessage(ctx *gin.Context, replyMessage
 func sameMessageThread(message *repo.SpaceMessageRecord, firstSpaceID, secondSpaceID string) bool {
 	return (message.SenderSpaceID == firstSpaceID && message.RecipientSpaceID == secondSpaceID) ||
 		(message.SenderSpaceID == secondSpaceID && message.RecipientSpaceID == firstSpaceID)
+}
+
+func normalizeOptionalMessageID(messageID string) (string, error) {
+	messageID = strings.TrimSpace(messageID)
+	if len(messageID) > maxSpaceMessageIDBytes {
+		return "", ente.NewBadRequestWithMessage("messageId is too large")
+	}
+	return messageID, nil
 }
 
 func decodeCreateMessageRequest(req models.CreateMessageRequest) ([]byte, []byte, []byte, error) {
