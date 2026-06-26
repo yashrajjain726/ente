@@ -176,7 +176,7 @@ func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest)
 	if err != nil {
 		return nil, err
 	}
-	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.Cursor, req.Limit)
+	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx.Request.Context(), viewerSpace.SpaceID, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}

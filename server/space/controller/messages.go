@@ -137,7 +137,7 @@ func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesReque
 	if err != nil {
 		return nil, err
 	}
-	conversations, nextCursor, err := c.MessagesRepo.ListConversations(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.Cursor, req.Limit)
+	conversations, nextCursor, err := c.MessagesRepo.ListConversations(ctx.Request.Context(), viewerSpace.SpaceID, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}

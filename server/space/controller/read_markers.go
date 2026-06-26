@@ -27,7 +27,7 @@ func (c *ReadMarkersController) GetUnreadStatus(ctx *gin.Context) (*models.Space
 	if err != nil {
 		return nil, err
 	}
-	notificationsUnread, err := c.MessagesRepo.HasUnreadNotifications(ctx.Request.Context(), userID, viewerSpace.SpaceID)
+	notificationsUnread, err := c.MessagesRepo.HasUnreadNotifications(ctx.Request.Context(), viewerSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}

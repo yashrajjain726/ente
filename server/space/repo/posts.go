@@ -130,32 +130,28 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 	return out, nextCursor, nil
 }
 
-func (r *PostsRepository) ListFeed(ctx context.Context, viewerID int64, viewerSpaceID string, cursor string, limit int) ([]SpacePostRecord, string, error) {
+func (r *PostsRepository) ListFeed(ctx context.Context, viewerSpaceID string, cursor string, limit int) ([]SpacePostRecord, string, error) {
 	limit = optionalInt(limit, 25)
 	if limit > 100 {
 		limit = 100
 	}
-	args := []any{viewerID, viewerSpaceID}
+	args := []any{viewerSpaceID}
 	query := postRecordSelectSQL(`
-			       CASE WHEN p.space_id = $2 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_messages m WHERE m.kind = 'post_like' AND m.reply_post_id = p.post_id AND m.sender_space_id = $2) END`) + `
+			       CASE WHEN p.space_id = $1 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_messages m WHERE m.kind = 'post_like' AND m.reply_post_id = p.post_id AND m.sender_space_id = $1) END`) + `
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
 			LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
 			JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
 			WHERE p.is_deleted = FALSE
-			  AND EXISTS (
-			      SELECT 1 FROM spaces viewer_space
-			      WHERE viewer_space.space_id = $2 AND viewer_space.owner_id = $1
-			  )
 			  AND (
-			      p.space_id = $2 OR EXISTS (
+			      p.space_id = $1 OR EXISTS (
 			          SELECT 1 FROM space_friend_shares fs
-			          WHERE fs.friend_space_id = $2 AND fs.space_id = p.space_id
+			          WHERE fs.friend_space_id = $1 AND fs.space_id = p.space_id
 			      )
 			  )`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorPostID)
-		query += ` AND (p.created_at, p.post_id) < ($3, $4)`
+		query += ` AND (p.created_at, p.post_id) < ($2, $3)`
 	}
 	args = append(args, limit+1)
 	query += ` ORDER BY p.created_at DESC, p.post_id DESC LIMIT $` + strconv.Itoa(len(args))
