@@ -160,16 +160,6 @@ type SpaceMessageQuoteRecord struct {
 	ObjectKey        sql.NullString
 }
 
-type SpaceMessageConversationRecord struct {
-	Friend             SpaceActorRecord
-	LatestActivity     SpaceMessageConversationActivityRecord
-	Unread             bool
-	UnreadCount        int64
-	NotificationUnread bool
-	SortCreatedAt      int64
-	SortID             string
-}
-
 type SpaceConversationChatSummaryRecord struct {
 	FriendSpaceID      string
 	LatestActivity     SpaceMessageConversationActivityRecord

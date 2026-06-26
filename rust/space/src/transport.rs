@@ -211,19 +211,6 @@ pub struct MessagePage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MessageConversationResponse {
-    pub friend: SpaceActorResponse,
-    pub latest_activity: MessageConversationActivity,
-    #[serde(default)]
-    pub unread: bool,
-    #[serde(default)]
-    pub unread_count: i64,
-    #[serde(default)]
-    pub notification_unread: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct MessageConversationActivity {
     pub id: String,
     #[serde(rename = "type")]
@@ -247,14 +234,6 @@ pub struct MessageConversationPost {
     pub is_deleted: bool,
     #[serde(default)]
     pub objects: Vec<PostObjectPayload>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MessageConversationPage {
-    pub items: Vec<MessageConversationResponse>,
-    #[serde(default)]
-    pub next_cursor: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -418,7 +397,7 @@ pub struct SpaceKeyVersionResponse {
 #[cfg(test)]
 mod tests {
     use super::{
-        AssetDownloadResponse, MessageConversationActivity, MessageConversationPage,
+        AssetDownloadResponse, ConversationsResponse, MessageConversationActivity,
         ProfileAvatarPayload, ProfileCoverPayload, SpaceProfileResponse, UpdateSpaceProfileRequest,
     };
 
@@ -495,12 +474,14 @@ mod tests {
     }
 
     #[test]
-    fn message_conversation_response_deserializes_minimal_embedded_actors() {
-        let page: MessageConversationPage = serde_json::from_str(
+    fn conversations_response_deserializes_minimal_embedded_actors() {
+        let response: ConversationsResponse = serde_json::from_str(
             r#"{
-                "items":[{
-                    "friend":{"spaceSlug":"friend-main"},
-                    "latestActivity":{
+                "friends":[{"friend":{"spaceId":"space_friend","spaceSlug":"friend-main"},"createdAt":"2026-05-25T00:00:00Z"}],
+                "pendingRequests":[],
+                "chatSummaries":{
+                    "space_friend":{
+                        "latestActivity":{
                         "id":"message:msg_1",
                         "type":"message",
                         "createdAt":"2026-05-25T00:00:00Z",
@@ -513,15 +494,16 @@ mod tests {
                             "createdAt":"2026-05-25T00:00:00Z",
                             "updatedAt":"2026-05-25T00:00:00Z"
                         }
+                        }
                     }
-                }]
+                }
             }"#,
         )
-        .expect("conversation page should deserialize");
+        .expect("conversations response should deserialize");
 
-        let conversation = &page.items[0];
-        assert_eq!(conversation.friend.space_slug, "friend-main");
-        let message = conversation
+        let friend = &response.friends[0];
+        assert_eq!(friend.friend.space_slug, "friend-main");
+        let message = response.chat_summaries["space_friend"]
             .latest_activity
             .message
             .as_ref()

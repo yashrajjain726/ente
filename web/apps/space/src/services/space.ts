@@ -295,9 +295,8 @@ export interface SpaceMessageConversation {
     unreadCount: number;
 }
 
-export interface SpaceMessageConversationPage {
+export interface SpaceMessageConversationList {
     items: SpaceMessageConversation[];
-    nextCursor?: string;
 }
 
 export interface SpaceUnreadStatus {
@@ -1199,7 +1198,7 @@ export const deleteCurrentMessage = async (
 
 export const loadCurrentMessageConversations = async (
     spaceId: string,
-): Promise<SpaceMessageConversationPage> => {
+): Promise<SpaceMessageConversationList> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
         const response = await (ctx as unknown as SpaceConversationsContext)

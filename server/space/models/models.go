@@ -66,11 +66,6 @@ type GetPostRequest struct {
 
 type SpaceUnreadStatusRequest struct{}
 
-type ListMessagesRequest struct {
-	Cursor string `form:"cursor"`
-	Limit  int    `form:"limit"`
-}
-
 type ListMessageThreadRequest struct {
 	Cursor string `form:"cursor"`
 	Limit  int    `form:"limit"`
@@ -374,14 +369,6 @@ type MessagePage struct {
 	NextCursor string            `json:"nextCursor,omitempty"`
 }
 
-type MessageConversationResponse struct {
-	Friend             SpaceActorResponse                  `json:"friend"`
-	LatestActivity     MessageConversationActivityResponse `json:"latestActivity"`
-	Unread             bool                                `json:"unread"`
-	UnreadCount        int64                               `json:"unreadCount"`
-	NotificationUnread bool                                `json:"notificationUnread"`
-}
-
 type MessageConversationActivityResponse struct {
 	ID        string                           `json:"id"`
 	Type      string                           `json:"type"`
@@ -397,11 +384,6 @@ type MessageConversationPostResponse struct {
 	SpaceSlug string              `json:"spaceSlug"`
 	IsDeleted bool                `json:"isDeleted"`
 	Objects   []PostObjectPayload `json:"objects,omitempty"`
-}
-
-type MessageConversationPage struct {
-	Items      []MessageConversationResponse `json:"items"`
-	NextCursor string                        `json:"nextCursor,omitempty"`
 }
 
 type ConversationChatSummaryResponse struct {

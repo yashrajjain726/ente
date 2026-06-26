@@ -41,16 +41,6 @@ func (h *Handlers) ReplyToPost(c *gin.Context) {
 	respondJSON(c, resp, err)
 }
 
-func (h *Handlers) ListMessages(c *gin.Context) {
-	var req models.ListMessagesRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
-		return
-	}
-	resp, err := h.Module.Messages.List(c, req)
-	respondJSON(c, resp, err)
-}
-
 func (h *Handlers) ListConversations(c *gin.Context) {
 	resp, err := h.Module.Messages.ListConversations(c)
 	respondJSON(c, resp, err)

@@ -120,28 +120,6 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 	return toMessageResponse(*message), nil
 }
 
-func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesRequest) (*models.MessageConversationPage, error) {
-	viewerSpace, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
-	conversations, nextCursor, err := c.MessagesRepo.ListConversations(ctx, viewerSpace.SpaceID, req.Cursor, req.Limit)
-	if err != nil {
-		return nil, err
-	}
-	items := make([]models.MessageConversationResponse, 0, len(conversations))
-	for _, conversation := range conversations {
-		items = append(items, models.MessageConversationResponse{
-			Friend:             toActorResponse(conversation.Friend, true),
-			LatestActivity:     toMessageConversationActivityResponse(conversation.LatestActivity),
-			Unread:             conversation.Unread,
-			UnreadCount:        conversation.UnreadCount,
-			NotificationUnread: conversation.NotificationUnread,
-		})
-	}
-	return &models.MessageConversationPage{Items: items, NextCursor: nextCursor}, nil
-}
-
 func (c *MessagesController) ListConversations(ctx *gin.Context) (*models.ConversationsResponse, error) {
 	viewerSpace, err := selectedSpace(ctx)
 	if err != nil {

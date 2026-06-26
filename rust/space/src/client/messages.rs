@@ -17,31 +17,11 @@ use crate::error::{Result, SpaceError};
 use crate::models::{DecryptedMessage, MessagePayload, MessageQuote};
 use crate::transport::{
     ConversationsResponse, CreateMessageRequest, LikeMessageRequest, LikeMessageResponse,
-    MessageConversationPage, MessagePage, MessageResponse, SpaceActorResponse,
+    MessagePage, MessageResponse, SpaceActorResponse,
 };
 use ente_core::crypto::{decode_b64, encode_b64};
 
 impl AccountSpaceCtx {
-    pub async fn list_message_conversations(
-        &self,
-        space_id: &str,
-        cursor: Option<String>,
-        limit: Option<i32>,
-    ) -> Result<MessageConversationPage> {
-        let mut query = Vec::new();
-        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
-            query.push(("cursor", value));
-        }
-        if let Some(value) = limit {
-            query.push(("limit", value.to_string()));
-        }
-        let path = format!("/spaces/{space_id}/messages");
-        self.client()
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
-    }
-
     pub async fn list_conversations(&self, space_id: &str) -> Result<ConversationsResponse> {
         let path = format!("/spaces/{space_id}/conversations");
         self.client().get_json(&path, &[]).await.map_err(Into::into)

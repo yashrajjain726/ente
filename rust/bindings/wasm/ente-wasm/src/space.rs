@@ -226,16 +226,6 @@ struct MessagePageJs {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct MessageConversationJs {
-    friend: ActorJs,
-    latest_activity: MessageConversationActivityJs,
-    unread: bool,
-    unread_count: i64,
-    notification_unread: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
 struct MessageConversationActivityJs {
     id: String,
     #[serde(rename = "type")]
@@ -276,13 +266,6 @@ struct PostObjectJs {
     height: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     media_type: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct MessageConversationPageJs {
-    items: Vec<MessageConversationJs>,
-    next_cursor: String,
 }
 
 #[derive(Serialize)]
@@ -1254,40 +1237,6 @@ impl SpaceAccountCtxHandle {
             .delete_message(&space_id, &message_id)
             .await
             .map_err(Into::into)
-    }
-
-    /// List 1:1 message conversations with decrypted latest activity messages.
-    pub async fn list_message_conversations(
-        &self,
-        space_id: String,
-        cursor: Option<String>,
-        limit: Option<i32>,
-    ) -> Result<JsValue, WasmSpaceError> {
-        let page = self
-            .inner
-            .list_message_conversations(&space_id, cursor, limit)
-            .await?;
-        let mut items = Vec::with_capacity(page.items.len());
-        for conversation in page.items {
-            let friend = account_actor_to_js(&self.inner, conversation.friend).await?;
-            items.push(MessageConversationJs {
-                friend,
-                latest_activity: message_conversation_activity_to_js(
-                    &self.inner,
-                    &space_id,
-                    conversation.latest_activity,
-                )
-                .await?,
-                unread: conversation.unread,
-                unread_count: conversation.unread_count,
-                notification_unread: conversation.notification_unread,
-            });
-        }
-        swb::to_value(&MessageConversationPageJs {
-            items,
-            next_cursor: page.next_cursor,
-        })
-        .map_err(Into::into)
     }
 
     /// List current friends, pending requests, and latest chat summaries.
