@@ -8,6 +8,7 @@ import {
     deleteCurrentFriendRequest,
     deleteCurrentMessage,
     loadCurrentFriendRequestConversations,
+    loadCurrentMessageActivityPostPreview,
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
     loadCurrentSpaceFriends,
@@ -576,6 +577,9 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     )
                 }
                 onOpenThread={openConversation}
+                onLoadActivityPost={(post) =>
+                    loadCurrentMessageActivityPostPreview(post, actorSpaceId)
+                }
                 onSendMessage={async (spaceId, text) => {
                     const optimisticMessage = createLocalMessage({
                         profile,

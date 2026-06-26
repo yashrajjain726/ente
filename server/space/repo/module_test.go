@@ -433,8 +433,8 @@ func TestSpaceMessagesUseProfileAssetAvatars(t *testing.T) {
 	require.Equal(t, "bob-avatar-object-id", conversations[0].Friend.AvatarObjectID.String)
 	require.EqualValues(t, 202, conversations[0].Friend.AvatarSize.Int64)
 	require.NotNil(t, conversations[0].LatestActivity.Message)
-	require.Equal(t, "bob-avatar-object-id", conversations[0].LatestActivity.Message.Sender.AvatarObjectID.String)
-	require.Equal(t, "alice-avatar-object-id", conversations[0].LatestActivity.Message.Recipient.AvatarObjectID.String)
+	require.False(t, conversations[0].LatestActivity.Message.Sender.AvatarObjectID.Valid)
+	require.False(t, conversations[0].LatestActivity.Message.Recipient.AvatarObjectID.Valid)
 }
 
 func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
@@ -514,7 +514,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Equal(t, "post_like", conversations[0].LatestActivity.Type)
 	require.NotNil(t, conversations[0].LatestActivity.Post)
 	require.Equal(t, postID, conversations[0].LatestActivity.Post.PostID)
-	require.Equal(t, "activity-post-object", conversations[0].LatestActivity.Post.ObjectKey.String)
+	require.False(t, conversations[0].LatestActivity.Post.ObjectKey.Valid)
 
 	postReply, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "post_reply",
@@ -850,8 +850,8 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Equal(t, "post_like", conversations[0].LatestActivity.Type)
-	require.True(t, conversations[0].Unread)
-	require.Equal(t, int64(2), conversations[0].UnreadCount)
+	require.False(t, conversations[0].Unread)
+	require.Equal(t, int64(0), conversations[0].UnreadCount)
 	require.True(t, conversations[0].NotificationUnread)
 
 	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
@@ -872,8 +872,8 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Equal(t, "message_like", conversations[0].LatestActivity.Type)
-	require.True(t, conversations[0].Unread)
-	require.Equal(t, int64(1), conversations[0].UnreadCount)
+	require.False(t, conversations[0].Unread)
+	require.Equal(t, int64(0), conversations[0].UnreadCount)
 	require.True(t, conversations[0].NotificationUnread)
 
 	latestActivityAt, err = module.Messages.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
@@ -2045,7 +2045,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	require.Equal(t, outgoingPostReply.MessageID, conversations[0].LatestActivity.Message.MessageID)
 	require.NotNil(t, conversations[0].LatestActivity.Post)
 	require.Equal(t, bobPostID, conversations[0].LatestActivity.Post.PostID)
-	require.Equal(t, "bob-post-object", conversations[0].LatestActivity.Post.ObjectKey.String)
+	require.False(t, conversations[0].LatestActivity.Post.ObjectKey.Valid)
 	require.Equal(t, int64(4000), conversations[0].SortCreatedAt)
 	require.False(t, conversations[0].Unread)
 	require.Equal(t, int64(0), conversations[0].UnreadCount)
@@ -2063,7 +2063,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	require.True(t, conversations[0].LatestActivity.Outgoing)
 	require.NotNil(t, conversations[0].LatestActivity.Post)
 	require.Equal(t, bobPostID, conversations[0].LatestActivity.Post.PostID)
-	require.Equal(t, "bob-post-object", conversations[0].LatestActivity.Post.ObjectKey.String)
+	require.False(t, conversations[0].LatestActivity.Post.ObjectKey.Valid)
 	require.Equal(t, int64(4500), conversations[0].SortCreatedAt)
 	require.False(t, conversations[0].Unread)
 	require.Equal(t, int64(0), conversations[0].UnreadCount)
@@ -2116,7 +2116,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	require.Equal(t, secondIncomingPostReply.MessageID, conversations[0].LatestActivity.Message.MessageID)
 	require.Equal(t, int64(5001), conversations[0].SortCreatedAt)
 	require.True(t, conversations[0].Unread)
-	require.Equal(t, int64(3), conversations[0].UnreadCount)
+	require.Equal(t, int64(2), conversations[0].UnreadCount)
 	require.True(t, conversations[0].NotificationUnread)
 	notificationsUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
@@ -2130,7 +2130,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	require.Equal(t, alicePostID, conversations[0].LatestActivity.Post.PostID)
 	require.Equal(t, int64(6000), conversations[0].SortCreatedAt)
 	require.True(t, conversations[0].Unread)
-	require.Equal(t, int64(3), conversations[0].UnreadCount)
+	require.Equal(t, int64(2), conversations[0].UnreadCount)
 	require.True(t, conversations[0].NotificationUnread)
 	notificationsUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)

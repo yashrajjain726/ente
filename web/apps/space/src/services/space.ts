@@ -754,6 +754,27 @@ const messageActivityPostFromSpacePost = async (
     return spacePost;
 };
 
+export const loadCurrentMessageActivityPostPreview = async (
+    post: SpaceMessageActivityPost,
+    viewerSpaceId?: string,
+): Promise<SpaceMessageActivityPost | undefined> => {
+    if (post.isDeleted) return post;
+    const loadedPost = await loadCurrentSpacePost(
+        post.spaceId,
+        post.postId,
+        viewerSpaceId,
+    );
+    if (!loadedPost) return post;
+    return {
+        ...post,
+        height: loadedPost.height,
+        imageUrl: loadedPost.imageUrl,
+        mediaType: loadedPost.imageAsset?.mediaType,
+        objectKey: loadedPost.imageAsset?.objectKey,
+        width: loadedPost.width,
+    };
+};
+
 const messageActivityFromSpaceActivity = async (
     ctx: SpaceAccountCtxHandle,
     activity: SpaceMessageConversationActivity,

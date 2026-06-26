@@ -22,6 +22,7 @@ import { flushSync } from "react-dom";
 import type { SetupProfile } from "screens/SetupProfileScreen";
 import type {
     SpaceMessage,
+    SpaceMessageActivityPost,
     SpaceMessageConversation,
     SpaceMessageQuote,
 } from "services/space";
@@ -83,6 +84,9 @@ interface MessagesScreenProps {
     ) => void;
     onOpenQuotePost: (quote: SpaceMessageQuote) => void;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
+    onLoadActivityPost?: (
+        post: SpaceMessageActivityPost,
+    ) => Promise<SpaceMessageActivityPost | undefined>;
     onReplyToMessage: (
         spaceId: string,
         messageId: string,
@@ -296,6 +300,9 @@ const conversationId = (conversation: SpaceMessageConversation) =>
         ? conversation.latestActivity.id
         : (conversation.friend.spaceId ?? conversation.friend.id);
 
+const activityPostKey = (post: SpaceMessageActivityPost) =>
+    `${post.spaceId}:${post.postId}`;
+
 const conversationTimeSections = (
     conversations: SpaceMessageConversation[],
     newConversationIds: string[],
@@ -430,6 +437,7 @@ const MessageTimeSeparator: React.FC<{ timestampMs: number }> = ({
 );
 
 const ConversationListItem: React.FC<{
+    activityPost?: SpaceMessageActivityPost;
     conversation: SpaceMessageConversation;
     onConfirmFriendRequest: (
         conversation: SpaceMessageConversation,
@@ -437,12 +445,15 @@ const ConversationListItem: React.FC<{
     onDeleteFriendRequest: (
         conversation: SpaceMessageConversation,
     ) => Promise<void>;
+    onLoadActivityPost?: (post: SpaceMessageActivityPost) => void;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
     profile: SetupProfile;
 }> = ({
+    activityPost,
     conversation,
     onConfirmFriendRequest,
     onDeleteFriendRequest,
+    onLoadActivityPost,
     onOpenThread,
     profile,
 }) => {
@@ -453,8 +464,21 @@ const ConversationListItem: React.FC<{
     );
     const isFriendRequest =
         conversation.latestActivity.type == "friend_request";
-    const postThumbnailUrl = conversation.latestActivity.post?.imageUrl;
+    const post = conversation.latestActivity.post;
+    const postThumbnailUrl = (activityPost ?? post)?.imageUrl;
     const unreadCount = conversation.unreadCount;
+    React.useEffect(() => {
+        if (!post || post.isDeleted || post.imageUrl || activityPost?.imageUrl) {
+            return;
+        }
+        onLoadActivityPost?.(post);
+    }, [
+        activityPost?.imageUrl,
+        onLoadActivityPost,
+        post,
+        post?.imageUrl,
+        post?.isDeleted,
+    ]);
     const confirmFriendRequest = () => {
         void onConfirmFriendRequest(conversation).catch((error: unknown) =>
             console.error("Failed to confirm friend request", error),
@@ -675,18 +699,22 @@ const ConversationListItem: React.FC<{
 };
 
 const ConversationSection: React.FC<{
+    activityPostsByKey: Record<string, SpaceMessageActivityPost>;
     onConfirmFriendRequest: (
         conversation: SpaceMessageConversation,
     ) => Promise<void>;
     onDeleteFriendRequest: (
         conversation: SpaceMessageConversation,
     ) => Promise<void>;
+    onLoadActivityPost?: (post: SpaceMessageActivityPost) => void;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
     profile: SetupProfile;
     section: ConversationSection;
 }> = ({
+    activityPostsByKey,
     onConfirmFriendRequest,
     onDeleteFriendRequest,
+    onLoadActivityPost,
     onOpenThread,
     profile,
     section,
@@ -714,9 +742,19 @@ const ConversationSection: React.FC<{
                 {section.items.map((conversation) => (
                     <ConversationListItem
                         key={conversationId(conversation)}
+                        activityPost={
+                            conversation.latestActivity.post
+                                ? activityPostsByKey[
+                                      activityPostKey(
+                                          conversation.latestActivity.post,
+                                      )
+                                  ]
+                                : undefined
+                        }
                         conversation={conversation}
                         onConfirmFriendRequest={onConfirmFriendRequest}
                         onDeleteFriendRequest={onDeleteFriendRequest}
+                        onLoadActivityPost={onLoadActivityPost}
                         onOpenThread={onOpenThread}
                         profile={profile}
                     />
@@ -1398,6 +1436,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     onOpenSelectedFriendProfile,
     onOpenQuotePost,
     onOpenThread,
+    onLoadActivityPost,
     onReplyToMessage,
     onSendMessage,
     onSetMessageLiked,
@@ -1416,6 +1455,9 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         "idle",
     );
     const [isInviteSharing, setIsInviteSharing] = React.useState(false);
+    const [activityPostsByKey, setActivityPostsByKey] = React.useState<
+        Record<string, SpaceMessageActivityPost>
+    >({});
     const composerRef = React.useRef<HTMLTextAreaElement | null>(null);
     const threadScrollRef = React.useRef<HTMLDivElement | null>(null);
     const stickToThreadBottomRef = React.useRef(true);
@@ -1428,6 +1470,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         undefined,
     );
     const ignoreMessageActionsMouseAwayUntilRef = React.useRef(0);
+    const activityPostLoadsInFlightRef = React.useRef<Set<string>>(new Set());
     const isThreadOpen = Boolean(selectedFriend);
     const canInteract =
         isThreadOpen && !isThreadReadOnly && !isThreadRecipientLoading;
@@ -1444,6 +1487,35 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
     const conversationSections = React.useMemo(
         () => conversationTimeSections(conversations, newConversationIds),
         [conversations, newConversationIds],
+    );
+    const loadActivityPost = React.useCallback(
+        (post: SpaceMessageActivityPost) => {
+            if (!onLoadActivityPost) return;
+            const key = activityPostKey(post);
+            if (
+                activityPostsByKey[key] ||
+                activityPostLoadsInFlightRef.current.has(key)
+            ) {
+                return;
+            }
+            activityPostLoadsInFlightRef.current.add(key);
+            void onLoadActivityPost(post)
+                .then((loadedPost) => {
+                    if (!loadedPost) return;
+                    setActivityPostsByKey((currentPosts) =>
+                        currentPosts[key]
+                            ? currentPosts
+                            : { ...currentPosts, [key]: loadedPost },
+                    );
+                })
+                .catch((error: unknown) => {
+                    console.warn("Failed to load message activity post", error);
+                })
+                .finally(() => {
+                    activityPostLoadsInFlightRef.current.delete(key);
+                });
+        },
+        [activityPostsByKey, onLoadActivityPost],
     );
     const messageByID = React.useMemo(
         () => new Map(messages.map((message) => [message.id, message])),
@@ -2487,11 +2559,17 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     {conversationSections.map((section) => (
                                         <ConversationSection
                                             key={section.title}
+                                            activityPostsByKey={
+                                                activityPostsByKey
+                                            }
                                             onConfirmFriendRequest={
                                                 onConfirmFriendRequest
                                             }
                                             onDeleteFriendRequest={
                                                 onDeleteFriendRequest
+                                            }
+                                            onLoadActivityPost={
+                                                loadActivityPost
                                             }
                                             onOpenThread={onOpenThread}
                                             profile={profile}
