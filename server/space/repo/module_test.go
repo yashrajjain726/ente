@@ -622,6 +622,65 @@ func TestCurrentFriendsWithoutMessagesAppearAsEmptyConversations(t *testing.T) {
 	require.Empty(t, conversations)
 }
 
+func TestLatestChatSummariesUseCurrentFriendActivities(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+
+	aliceID := insertSpaceUser(t, module, "alice-chat-summary@example.com", "alice-chat-summary-public")
+	bobID := insertSpaceUser(t, module, "bob-chat-summary@example.com", "bob-chat-summary-public")
+	charlieID := insertSpaceUser(t, module, "charlie-chat-summary@example.com", "charlie-chat-summary-public")
+	aliceSpace, err := testCreateSpace(ctx, module, aliceID, "alice_chat_summary", "alice-space-key", "alice-chat-summary-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	require.NoError(t, err)
+	bobSpace, err := testCreateSpace(ctx, module, bobID, "bob_chat_summary", "bob-space-key", "bob-chat-summary-public", "bob-secret", "bob-secret-nonce", "bob-profile")
+	require.NoError(t, err)
+	charlieSpace, err := testCreateSpace(ctx, module, charlieID, "charlie_chat_summary", "charlie-space-key", "charlie-chat-summary-public", "charlie-secret", "charlie-secret-nonce", "charlie-profile")
+	require.NoError(t, err)
+	require.NoError(t, testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-bob-share-key", aliceSpace.CurrentVersion, "bob-alice-share-key", bobSpace.CurrentVersion))
+	require.NoError(t, testAddFriend(ctx, module, charlieID, charlieSpace.SpaceID, aliceSpace.SpaceID, "alice-charlie-share-key", aliceSpace.CurrentVersion, "charlie-alice-share-key", charlieSpace.CurrentVersion))
+
+	bobMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
+		Kind:                         "regular",
+		SenderSpaceID:                bobSpace.SpaceID,
+		RecipientSpaceID:             aliceSpace.SpaceID,
+		MessageCipher:                testSpaceBytes("bob-summary-message-cipher"),
+		SenderEncryptedMessageKey:    testSpaceBytes("bob-summary-message-sender-key"),
+		RecipientEncryptedMessageKey: testSpaceBytes("bob-summary-message-recipient-key"),
+	})
+	require.NoError(t, err)
+	setMessageCreatedAt(t, module, 2000, bobMessage.MessageID)
+	postID, err := testCreatePost(ctx, module, aliceID, aliceSpace.SpaceID, "summary-post-key", nil, aliceSpace.CurrentVersion, nil)
+	require.NoError(t, err)
+	require.NoError(t, testSetPostLike(ctx, module, postID, bobSpace.SpaceID, true))
+	setPostLikeCreatedAt(t, module, 3000, postID, bobSpace.SpaceID)
+
+	summaries, err := module.Messages.ListLatestChatSummaries(ctx, aliceSpace.SpaceID, []string{bobSpace.SpaceID, charlieSpace.SpaceID})
+	require.NoError(t, err)
+	require.Len(t, summaries, 1)
+	require.NotContains(t, summaries, charlieSpace.SpaceID)
+	bobSummary := summaries[bobSpace.SpaceID]
+	require.Equal(t, "post_like", bobSummary.LatestActivity.Type)
+	require.NotNil(t, bobSummary.LatestActivity.Post)
+	require.Equal(t, postID, bobSummary.LatestActivity.Post.PostID)
+	require.False(t, bobSummary.LatestActivity.Post.ObjectKey.Valid)
+	require.True(t, bobSummary.Unread)
+	require.Equal(t, int64(1), bobSummary.UnreadCount)
+	require.True(t, bobSummary.NotificationUnread)
+
+	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, 3000))
+	summaries, err = module.Messages.ListLatestChatSummaries(ctx, aliceSpace.SpaceID, []string{bobSpace.SpaceID, charlieSpace.SpaceID})
+	require.NoError(t, err)
+	bobSummary = summaries[bobSpace.SpaceID]
+	require.False(t, bobSummary.Unread)
+	require.Zero(t, bobSummary.UnreadCount)
+	require.False(t, bobSummary.NotificationUnread)
+	require.Equal(t, "post_like", bobSummary.LatestActivity.Type)
+
+	require.NoError(t, module.Friends.DeleteFriendship(ctx, aliceSpace.SpaceID, bobSpace.SpaceID))
+	notificationsUnread, err := module.Messages.HasUnreadNotifications(ctx, aliceSpace.SpaceID)
+	require.NoError(t, err)
+	require.False(t, notificationsUnread)
+}
+
 func TestConfirmFriendRequestCreatesFriendshipAndNotifiesRequester(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)

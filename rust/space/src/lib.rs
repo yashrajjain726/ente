@@ -18,12 +18,13 @@ pub use models::{
     OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostObjectMetadata,
 };
 pub use transport::{
-    EntityKeyPayload, FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse,
-    LikeMessageResponse, LikePostResponse, ListPostLikersResponse, MessageConversationActivity,
-    MessageConversationPage, MessageConversationPost, MessageConversationResponse, MessagePage,
-    MessageResponse, PostLikerResponse, PostObjectPayload, PostPage, PostResponse,
-    PresignUploadResponse, ProfileAvatarPayload, ProfileAvatarResponse, ProfileCoverPayload,
-    ProfileCoverResponse, SpaceActorResponse, SpaceFriendRequestResponse, SpaceFriendResponse,
-    SpaceKeyResponse, SpaceKeyVersionResponse, SpaceLinkLoginResponse, SpaceLinkStatusResponse,
-    SpaceLookupResponse, SpaceProfileResponse, SpaceUnreadStatusResponse,
+    ConversationChatSummaryResponse, ConversationsResponse, EntityKeyPayload,
+    FriendRelationshipResponse, FriendShareResponse, FriendStatusResponse, LikeMessageResponse,
+    LikePostResponse, ListPostLikersResponse, MessageConversationActivity, MessageConversationPage,
+    MessageConversationPost, MessageConversationResponse, MessagePage, MessageResponse,
+    PostLikerResponse, PostObjectPayload, PostPage, PostResponse, PresignUploadResponse,
+    ProfileAvatarPayload, ProfileAvatarResponse, ProfileCoverPayload, ProfileCoverResponse,
+    SpaceActorResponse, SpaceFriendRequestResponse, SpaceFriendResponse, SpaceKeyResponse,
+    SpaceKeyVersionResponse, SpaceLinkLoginResponse, SpaceLinkStatusResponse, SpaceLookupResponse,
+    SpaceProfileResponse, SpaceUnreadStatusResponse,
 };

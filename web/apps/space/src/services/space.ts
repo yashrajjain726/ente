@@ -146,23 +146,23 @@ interface SpaceMessagePageResponse {
     nextCursor?: string;
 }
 
-interface SpaceMessageConversationResponse {
-    friend: SpaceActor;
-    latestActivity: SpaceMessageConversationActivity;
-    notificationUnread?: boolean;
-    unread?: boolean;
-    unreadCount: number;
-}
-
-interface SpaceMessageConversationPageResponse {
-    items?: SpaceMessageConversationResponse[];
-    nextCursor?: string;
-}
-
 interface SpaceFriendRequestResponse {
     requestId: number;
     requester: SpaceActor;
     createdAt: string;
+}
+
+interface SpaceConversationChatSummaryResponse {
+    latestActivity: SpaceMessageConversationActivity;
+    notificationUnread?: boolean;
+    unread?: boolean;
+    unreadCount?: number;
+}
+
+interface SpaceConversationsResponse {
+    chatSummaries?: Record<string, SpaceConversationChatSummaryResponse>;
+    friends?: SpaceFriend[];
+    pendingRequests?: SpaceFriendRequestResponse[];
 }
 
 interface SpacePostBase {
@@ -317,13 +317,14 @@ interface SpaceFriendRequestContext {
         spaceId: string,
         requestId: bigint,
     ) => Promise<void>;
-    list_friend_requests: (
-        spaceId: string,
-    ) => Promise<SpaceFriendRequestResponse[]>;
     request_friend_by_username: (
         spaceId: string,
         username: string,
     ) => Promise<unknown>;
+}
+
+interface SpaceConversationsContext {
+    list_conversations: (spaceId: string) => Promise<SpaceConversationsResponse>;
 }
 
 const timestampMsFromSpaceDate = (value: string) => {
@@ -1201,13 +1202,11 @@ export const loadCurrentMessageConversations = async (
 ): Promise<SpaceMessageConversationPage> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
-        const page = (await ctx.list_message_conversations(
-            spaceId,
-            null,
-            50,
-        )) as SpaceMessageConversationPageResponse;
-        const items = await Promise.all(
-            (page.items ?? []).map(async (conversation) => {
+        const response = await (ctx as unknown as SpaceConversationsContext)
+            .list_conversations(spaceId);
+        const summaries = response.chatSummaries ?? {};
+        const friendItems = await Promise.all(
+            (response.friends ?? []).map(async (conversation) => {
                 const friend = actorProfile(conversation.friend);
                 friend.avatarUrl = await accountAvatarURL(
                     ctx,
@@ -1215,46 +1214,44 @@ export const loadCurrentMessageConversations = async (
                     conversation.friend.avatar,
                     spaceId,
                 );
+                const summary = summaries[conversation.friend.spaceId];
                 return {
                     friend,
-                    latestActivity: await messageActivityFromSpaceActivity(
-                        ctx,
-                        conversation.latestActivity,
-                        spaceId,
-                    ),
-                    notificationUnread: Boolean(
-                        conversation.notificationUnread,
-                    ),
-                    unread: Boolean(conversation.unread),
-                    unreadCount: conversation.unreadCount,
+                    latestActivity: summary
+                        ? await messageActivityFromSpaceActivity(
+                              ctx,
+                              summary.latestActivity,
+                              spaceId,
+                          )
+                        : {
+                              createdAtMs: timestampMsFromSpaceDate(
+                                  conversation.createdAt,
+                              ),
+                              id: `empty:${conversation.friend.spaceId}`,
+                              outgoing: false,
+                              type: "empty" as const,
+                          },
+                    notificationUnread: Boolean(summary?.notificationUnread),
+                    unread: Boolean(summary?.unread),
+                    unreadCount: summary?.unreadCount ?? 0,
                 };
             }),
         );
-        return { items, nextCursor: page.nextCursor || undefined };
-    } finally {
-        releaseCurrentSpaceContext(ctx);
-    }
-};
-
-export const loadCurrentFriendRequestConversations = async (
-    spaceId: string,
-): Promise<SpaceMessageConversation[]> => {
-    const ctx = await ensureCurrentSpaceContext();
-    try {
-        const friendRequestCtx = ctx as unknown as SpaceFriendRequestContext;
-        const requests = await friendRequestCtx.list_friend_requests(spaceId);
-        return requests.map((request) => ({
-            friend: actorProfile(request.requester),
-            latestActivity: {
-                createdAtMs: timestampMsFromSpaceDate(request.createdAt),
-                id: `friend_request:${request.requestId}`,
-                outgoing: false,
-                type: "friend_request",
-            },
-            notificationUnread: true,
-            unread: true,
-            unreadCount: 1,
-        }));
+        const requestItems = (response.pendingRequests ?? []).map(
+            (request) => ({
+                friend: actorProfile(request.requester),
+                latestActivity: {
+                    createdAtMs: timestampMsFromSpaceDate(request.createdAt),
+                    id: `friend_request:${request.requestId}`,
+                    outgoing: false,
+                    type: "friend_request" as const,
+                },
+                notificationUnread: true,
+                unread: true,
+                unreadCount: 1,
+            }),
+        );
+        return { items: [...requestItems, ...friendItems] };
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

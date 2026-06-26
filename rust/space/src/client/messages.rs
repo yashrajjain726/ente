@@ -16,8 +16,8 @@ use crate::crypto::{
 use crate::error::{Result, SpaceError};
 use crate::models::{DecryptedMessage, MessagePayload, MessageQuote};
 use crate::transport::{
-    CreateMessageRequest, LikeMessageRequest, LikeMessageResponse, MessageConversationPage,
-    MessagePage, MessageResponse, SpaceActorResponse,
+    ConversationsResponse, CreateMessageRequest, LikeMessageRequest, LikeMessageResponse,
+    MessageConversationPage, MessagePage, MessageResponse, SpaceActorResponse,
 };
 use ente_core::crypto::{decode_b64, encode_b64};
 
@@ -40,6 +40,11 @@ impl AccountSpaceCtx {
             .get_json(&path, &query)
             .await
             .map_err(Into::into)
+    }
+
+    pub async fn list_conversations(&self, space_id: &str) -> Result<ConversationsResponse> {
+        let path = format!("/spaces/{space_id}/conversations");
+        self.client().get_json(&path, &[]).await.map_err(Into::into)
     }
 
     pub async fn list_message_thread(

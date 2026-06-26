@@ -1,5 +1,7 @@
 //! WASM bindings for space flows.
 
+use std::collections::BTreeMap;
+
 use ente_core::{
     crypto::{decode_b64, encode_b64},
     http::Error as HttpError,
@@ -281,6 +283,23 @@ struct PostObjectJs {
 struct MessageConversationPageJs {
     items: Vec<MessageConversationJs>,
     next_cursor: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ConversationChatSummaryJs {
+    latest_activity: MessageConversationActivityJs,
+    unread: bool,
+    unread_count: i64,
+    notification_unread: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ConversationsJs {
+    friends: Vec<FriendJs>,
+    pending_requests: Vec<FriendRequestJs>,
+    chat_summaries: BTreeMap<String, ConversationChatSummaryJs>,
 }
 
 #[derive(Serialize)]
@@ -1267,6 +1286,53 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&MessageConversationPageJs {
             items,
             next_cursor: page.next_cursor,
+        })
+        .map_err(Into::into)
+    }
+
+    /// List current friends, pending requests, and latest chat summaries.
+    pub async fn list_conversations(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
+        let response = self.inner.list_conversations(&space_id).await?;
+        let mut friends = Vec::with_capacity(response.friends.len());
+        for friend in response.friends {
+            friends.push(FriendJs {
+                friend: account_actor_to_js(&self.inner, friend.friend).await?,
+                share_key_version: friend.share_key_version,
+                created_at: friend.created_at,
+            });
+        }
+
+        let mut pending_requests = Vec::with_capacity(response.pending_requests.len());
+        for request in response.pending_requests {
+            pending_requests.push(FriendRequestJs {
+                request_id: request.request_id,
+                requester: public_actor_to_js(request.requester)?,
+                created_at: request.created_at,
+            });
+        }
+
+        let mut chat_summaries = BTreeMap::new();
+        for (friend_space_id, summary) in response.chat_summaries {
+            chat_summaries.insert(
+                friend_space_id,
+                ConversationChatSummaryJs {
+                    latest_activity: message_conversation_activity_to_js(
+                        &self.inner,
+                        &space_id,
+                        summary.latest_activity,
+                    )
+                    .await?,
+                    unread: summary.unread,
+                    unread_count: summary.unread_count,
+                    notification_unread: summary.notification_unread,
+                },
+            );
+        }
+
+        swb::to_value(&ConversationsJs {
+            friends,
+            pending_requests,
+            chat_summaries,
         })
         .map_err(Into::into)
     }

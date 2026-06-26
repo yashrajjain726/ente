@@ -257,6 +257,28 @@ pub struct MessageConversationPage {
     pub next_cursor: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationChatSummaryResponse {
+    pub latest_activity: MessageConversationActivity,
+    #[serde(default)]
+    pub unread: bool,
+    #[serde(default)]
+    pub unread_count: i64,
+    #[serde(default)]
+    pub notification_unread: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationsResponse {
+    pub friends: Vec<SpaceFriendResponse>,
+    #[serde(default)]
+    pub pending_requests: Vec<SpaceFriendRequestResponse>,
+    #[serde(default)]
+    pub chat_summaries: std::collections::BTreeMap<String, ConversationChatSummaryResponse>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePostCaptionRequest {

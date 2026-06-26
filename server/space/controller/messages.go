@@ -142,6 +142,57 @@ func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesReque
 	return &models.MessageConversationPage{Items: items, NextCursor: nextCursor}, nil
 }
 
+func (c *MessagesController) ListConversations(ctx *gin.Context) (*models.ConversationsResponse, error) {
+	viewerSpace, err := selectedSpace(ctx)
+	if err != nil {
+		return nil, err
+	}
+	friends, err := c.FriendsRepo.ListFriendsForSpace(ctx, viewerSpace.SpaceID)
+	if err != nil {
+		return nil, err
+	}
+	pendingRequests, err := c.FriendsRepo.ListFriendRequestsForSpace(ctx, viewerSpace.SpaceID)
+	if err != nil {
+		return nil, err
+	}
+	friendResponses := make([]models.SpaceFriendResponse, 0, len(friends))
+	friendSpaceIDs := make([]string, 0, len(friends))
+	for _, friend := range friends {
+		friendResponses = append(friendResponses, models.SpaceFriendResponse{
+			Friend:          toActorResponse(friend.Friend, true),
+			ShareKeyVersion: friend.ShareKeyVersion,
+			CreatedAt:       formatMicros(friend.CreatedAt),
+		})
+		friendSpaceIDs = append(friendSpaceIDs, friend.Friend.SpaceID)
+	}
+	summaries, err := c.MessagesRepo.ListLatestChatSummaries(ctx, viewerSpace.SpaceID, friendSpaceIDs)
+	if err != nil {
+		return nil, err
+	}
+	chatSummaries := make(map[string]models.ConversationChatSummaryResponse, len(summaries))
+	for friendSpaceID, summary := range summaries {
+		chatSummaries[friendSpaceID] = models.ConversationChatSummaryResponse{
+			LatestActivity:     toMessageConversationActivityResponse(summary.LatestActivity),
+			Unread:             summary.Unread,
+			UnreadCount:        summary.UnreadCount,
+			NotificationUnread: summary.NotificationUnread,
+		}
+	}
+	requestResponses := make([]models.SpaceFriendRequestResponse, 0, len(pendingRequests))
+	for _, request := range pendingRequests {
+		requestResponses = append(requestResponses, models.SpaceFriendRequestResponse{
+			RequestID: request.RequestID,
+			Requester: toActorResponse(request.Requester, true),
+			CreatedAt: formatMicros(request.CreatedAt),
+		})
+	}
+	return &models.ConversationsResponse{
+		Friends:         friendResponses,
+		PendingRequests: requestResponses,
+		ChatSummaries:   chatSummaries,
+	}, nil
+}
+
 func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, req models.ListMessageThreadRequest) (*models.MessagePage, error) {
 	viewerSpace, err := selectedSpace(ctx)
 	if err != nil {

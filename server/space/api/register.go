@@ -21,6 +21,7 @@ func Register(privateAPI, publicAPI gin.IRouter, handlers *Handlers) {
 	spaceAPI.POST("/posts/:postID/like", handlers.TogglePostLike)
 	spaceAPI.POST("/posts/:postID/reply", handlers.ReplyToPost)
 	spaceAPI.DELETE("/posts/:postID", handlers.DeletePost)
+	spaceAPI.GET("/conversations", handlers.ListConversations)
 	spaceAPI.GET("/messages", handlers.ListMessages)
 	spaceAPI.POST("/messages/read", handlers.MarkNotificationsRead)
 	spaceAPI.GET("/messages/:friendSpaceID", handlers.ListMessageThread)

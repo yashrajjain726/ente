@@ -51,6 +51,11 @@ func (h *Handlers) ListMessages(c *gin.Context) {
 	respondJSON(c, resp, err)
 }
 
+func (h *Handlers) ListConversations(c *gin.Context) {
+	resp, err := h.Module.Messages.ListConversations(c)
+	respondJSON(c, resp, err)
+}
+
 func (h *Handlers) ListMessageThread(c *gin.Context) {
 	var req models.ListMessageThreadRequest
 	if err := c.ShouldBindQuery(&req); err != nil {

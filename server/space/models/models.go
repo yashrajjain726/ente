@@ -404,6 +404,19 @@ type MessageConversationPage struct {
 	NextCursor string                        `json:"nextCursor,omitempty"`
 }
 
+type ConversationChatSummaryResponse struct {
+	LatestActivity     MessageConversationActivityResponse `json:"latestActivity"`
+	Unread             bool                                `json:"unread"`
+	UnreadCount        int64                               `json:"unreadCount"`
+	NotificationUnread bool                                `json:"notificationUnread"`
+}
+
+type ConversationsResponse struct {
+	Friends         []SpaceFriendResponse                      `json:"friends"`
+	PendingRequests []SpaceFriendRequestResponse               `json:"pendingRequests"`
+	ChatSummaries   map[string]ConversationChatSummaryResponse `json:"chatSummaries"`
+}
+
 type PostObjectPayload struct {
 	ObjectKey      string `json:"objectKey"`
 	Size           int64  `json:"size,omitempty"`
