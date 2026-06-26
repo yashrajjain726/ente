@@ -193,7 +193,7 @@ func (r *PostsRepository) ListAssetsByPostIDs(ctx context.Context, postIDs []int
 	return result, stacktrace.Propagate(rows.Err(), "")
 }
 
-func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64) ([]string, error) {
+func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64, spaceID string) ([]string, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -206,8 +206,9 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 		WHERE p.post_id = $1
 		  AND p.space_id = s.space_id
 		  AND s.owner_id = $2
+		  AND p.space_id = $3
 		  AND p.is_deleted = FALSE
-	`, postID, ownerID)
+	`, postID, ownerID, spaceID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
@@ -221,8 +222,8 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64)
 			SELECT p.is_deleted
 			FROM space_posts p
 			JOIN spaces s ON s.space_id = p.space_id
-			WHERE p.post_id = $1 AND s.owner_id = $2
-		`, postID, ownerID).Scan(&isDeleted); err != nil {
+			WHERE p.post_id = $1 AND s.owner_id = $2 AND p.space_id = $3
+		`, postID, ownerID, spaceID).Scan(&isDeleted); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		if !isDeleted {

@@ -7,7 +7,7 @@ import (
 )
 
 func (h *Handlers) GetSpaceLink(c *gin.Context) {
-	resp, err := h.Module.Links.Get(c, c.Param("spaceID"))
+	resp, err := h.Module.Links.Get(c)
 	respondJSON(c, resp, err)
 }
 
@@ -32,7 +32,7 @@ func (h *Handlers) RotateSpaceLink(c *gin.Context) {
 }
 
 func (h *Handlers) DeleteSpaceLink(c *gin.Context) {
-	respondStatus(c, h.Module.Links.Delete(c, c.Param("spaceID")))
+	respondStatus(c, h.Module.Links.Delete(c))
 }
 
 func (h *Handlers) SpaceLinkLogin(c *gin.Context) {

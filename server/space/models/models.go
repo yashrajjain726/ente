@@ -50,9 +50,8 @@ type ListPostsRequest struct {
 }
 
 type ListFeedRequest struct {
-	SpaceID string `form:"spaceId" binding:"required"`
-	Cursor  string `form:"cursor"`
-	Limit   int    `form:"limit"`
+	Cursor string `form:"cursor"`
+	Limit  int    `form:"limit"`
 }
 
 type ListPostLikersRequest struct {
@@ -65,40 +64,27 @@ type GetPostRequest struct {
 	ViewerSpaceID string `form:"viewerSpaceId"`
 }
 
-type SpaceUnreadStatusRequest struct {
-	SpaceID string `form:"spaceId" binding:"required"`
-}
+type SpaceUnreadStatusRequest struct{}
 
 type ListMessagesRequest struct {
-	SpaceID string `form:"spaceId" binding:"required"`
-	Cursor  string `form:"cursor"`
-	Limit   int    `form:"limit"`
+	Cursor string `form:"cursor"`
+	Limit  int    `form:"limit"`
 }
 
 type ListMessageThreadRequest struct {
-	ViewerSpaceID string `form:"viewerSpaceId" binding:"required"`
-	Cursor        string `form:"cursor"`
-	Limit         int    `form:"limit"`
+	Cursor string `form:"cursor"`
+	Limit  int    `form:"limit"`
 }
 
-type ListSpaceFriendsRequest struct {
-	SpaceID string `form:"spaceId"`
-}
+type ListSpaceFriendsRequest struct{}
 
-type ListFriendRequestsRequest struct {
-	SpaceID string `form:"spaceId" binding:"required"`
-}
+type ListFriendRequestsRequest struct{}
 
-type DeleteFriendRequestRequest struct {
-	SpaceID string `form:"spaceId" binding:"required"`
-}
+type DeleteFriendRequestRequest struct{}
 
-type ListFriendSharesRequest struct {
-	SpaceID string `form:"spaceId" binding:"required"`
-}
+type ListFriendSharesRequest struct{}
 
 type FriendRelationshipRequest struct {
-	SpaceID       string `form:"spaceId" binding:"required"`
 	TargetSpaceID string `form:"targetSpaceId" binding:"required"`
 }
 
@@ -116,7 +102,6 @@ type PresignUploadRequest struct {
 	Size       int64   `json:"size" binding:"required"`
 	ContentMD5 string  `json:"contentMD5" binding:"required"`
 	Purpose    *string `json:"purpose,omitempty"`
-	SpaceID    *string `json:"spaceId,omitempty"`
 }
 
 type PresignUploadResponse struct {
@@ -158,7 +143,6 @@ type SpaceActorResponse struct {
 }
 
 type SpaceLinkCreateRequest struct {
-	SpaceID             string `json:"spaceId"`
 	AuthKey             string `json:"authKey"`
 	KeyVersion          int    `json:"keyVersion"`
 	LinkWrappedSpaceKey string `json:"linkWrappedSpaceKey"`
@@ -193,19 +177,16 @@ type SpaceLinkLoginResponse struct {
 type AddFriendPayload struct {
 	TargetSpaceID                 string `json:"targetSpaceId,omitempty"`
 	TargetUsername                string `json:"targetUsername,omitempty"`
-	RequesterSpaceID              string `json:"requesterSpaceId"`
 	RequesterFriendSealedSpaceKey string `json:"requesterFriendSealedSpaceKey"`
 	RequesterKeyVersion           int    `json:"requesterKeyVersion"`
 }
 
 type ConfirmFriendRequestPayload struct {
-	SpaceID                    string `json:"spaceId"`
 	TargetFriendSealedSpaceKey string `json:"targetFriendSealedSpaceKey"`
 	TargetKeyVersion           int    `json:"targetKeyVersion"`
 }
 
 type FriendTargetPayload struct {
-	SpaceID        string  `json:"spaceId"`
 	TargetUsername *string `json:"targetUsername,omitempty"`
 	TargetSpaceID  *string `json:"targetSpaceId,omitempty"`
 }
@@ -233,7 +214,6 @@ type FriendRelationshipResponse struct {
 }
 
 type UpdateSpaceProfileRequest struct {
-	SpaceID          string                `json:"spaceId"`
 	KeyVersion       int                   `json:"keyVersion"`
 	EncryptedProfile string                `json:"encryptedProfile"`
 	Avatar           *ProfileAvatarPayload `json:"avatar,omitempty"`
@@ -283,7 +263,6 @@ type SpaceSlugAvailabilityResponse struct {
 }
 
 type RotateSpaceKeyRequest struct {
-	SpaceID             string `json:"spaceId"`
 	KeyVersion          int    `json:"keyVersion"`
 	RootWrappedSpaceKey string `json:"rootWrappedSpaceKey"`
 	WrappedPrevKey      string `json:"wrappedPrevKey"`
@@ -303,7 +282,6 @@ type SpaceFriendResponse struct {
 }
 
 type RefreshFriendSharesRequest struct {
-	SpaceID    string               `json:"spaceId"`
 	KeyVersion int                  `json:"keyVersion"`
 	Shares     []ShareUpdatePayload `json:"shares"`
 }
@@ -314,7 +292,6 @@ type ShareUpdatePayload struct {
 }
 
 type CreatePostRequest struct {
-	SpaceID          string              `json:"spaceId"`
 	EncryptedPostKey string              `json:"encryptedPostKey"`
 	KeyVersion       int                 `json:"keyVersion"`
 	CaptionCipher    *string             `json:"captionCipher,omitempty"`
@@ -326,8 +303,7 @@ type CreatePostResponse struct {
 }
 
 type LikePostRequest struct {
-	SpaceID string `json:"spaceId"`
-	Like    bool   `json:"like"`
+	Like bool `json:"like"`
 }
 
 type LikePostResponse struct {
@@ -345,12 +321,10 @@ type PostLikerResponse struct {
 }
 
 type UpdatePostCaptionRequest struct {
-	SpaceID       string  `json:"spaceId"`
 	CaptionCipher *string `json:"captionCipher,omitempty"`
 }
 
 type CreateMessageRequest struct {
-	SpaceID                      string `json:"spaceId,omitempty"`
 	MessageID                    string `json:"messageId,omitempty"`
 	MessageCipher                string `json:"messageCipher"`
 	SenderEncryptedMessageKey    string `json:"senderEncryptedMessageKey"`
@@ -359,13 +333,10 @@ type CreateMessageRequest struct {
 }
 
 type LikeMessageRequest struct {
-	SpaceID string `json:"spaceId"`
-	Like    bool   `json:"like"`
+	Like bool `json:"like"`
 }
 
-type DeleteMessageRequest struct {
-	SpaceID string `form:"spaceId" binding:"required"`
-}
+type DeleteMessageRequest struct{}
 
 type LikeMessageResponse struct {
 	Liked bool `json:"liked"`
@@ -458,7 +429,6 @@ type SpaceUnreadStatusResponse struct {
 }
 
 type MarkNotificationsReadRequest struct {
-	SpaceID       string `json:"spaceId"`
 	FriendSpaceID string `json:"friendSpaceId"`
 }
 

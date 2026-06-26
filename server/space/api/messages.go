@@ -12,7 +12,7 @@ func (h *Handlers) CreateMessage(c *gin.Context) {
 		respondJSON(c, nil, ente.ErrBadRequest)
 		return
 	}
-	resp, err := h.Module.Messages.Create(c, c.Param("spaceID"), req)
+	resp, err := h.Module.Messages.Create(c, c.Param("friendSpaceID"), req)
 	respondJSON(c, resp, err)
 }
 
@@ -27,12 +27,7 @@ func (h *Handlers) ToggleMessageLike(c *gin.Context) {
 }
 
 func (h *Handlers) DeleteMessage(c *gin.Context) {
-	var req models.DeleteMessageRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
-		return
-	}
-	err := h.Module.Messages.Delete(c, c.Param("messageID"), req)
+	err := h.Module.Messages.Delete(c, c.Param("messageID"), models.DeleteMessageRequest{})
 	respondJSON(c, nil, err)
 }
 
@@ -62,6 +57,6 @@ func (h *Handlers) ListMessageThread(c *gin.Context) {
 		respondJSON(c, nil, ente.ErrBadRequest)
 		return
 	}
-	resp, err := h.Module.Messages.ListThread(c, c.Param("spaceID"), req)
+	resp, err := h.Module.Messages.ListThread(c, c.Param("friendSpaceID"), req)
 	respondJSON(c, resp, err)
 }

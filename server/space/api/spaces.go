@@ -56,7 +56,7 @@ func (h *Handlers) UpdateSpaceSlug(c *gin.Context) {
 		respondJSON(c, nil, ente.ErrBadRequest)
 		return
 	}
-	resp, err := h.Module.Spaces.UpdateSlug(c, c.Param("spaceID"), req)
+	resp, err := h.Module.Spaces.UpdateSlug(c, req)
 	respondJSON(c, resp, err)
 }
 

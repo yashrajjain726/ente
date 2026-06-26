@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
-	"strconv"
 	"testing"
 
 	"github.com/ente-io/museum/ente"
@@ -140,11 +139,8 @@ func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
 	space, err := testCreateSpace(ctx, repos, aliceID, "alice", "alice-space-key-v1", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile-v1")
 	require.NoError(t, err)
-	ginCtx := newPublicSpaceContext()
-	ginCtx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(aliceID, 10))
 
-	resp, err := module.Spaces.RotateKey(ginCtx, models.RotateSpaceKeyRequest{
-		SpaceID:             space.SpaceID,
+	resp, err := module.Spaces.RotateKey(newSelectedSpaceControllerContext(aliceID, space), models.RotateSpaceKeyRequest{
 		KeyVersion:          space.CurrentVersion + 1,
 		RootWrappedSpaceKey: "YWxpY2Utc3BhY2Uta2V5LXYy",
 		WrappedPrevKey:      "d3JhcHBlZC1wcmV2LWtleQ==",
@@ -163,11 +159,8 @@ func TestUpdateProfileRejectsStaleKeyVersion(t *testing.T) {
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
 	space, err := testCreateSpace(ctx, repos, aliceID, "alice", "alice-space-key-v1", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile-v1")
 	require.NoError(t, err)
-	ginCtx := newPublicSpaceContext()
-	ginCtx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(aliceID, 10))
 
-	resp, err := module.Spaces.UpdateProfile(ginCtx, models.UpdateSpaceProfileRequest{
-		SpaceID:          space.SpaceID,
+	resp, err := module.Spaces.UpdateProfile(newSelectedSpaceControllerContext(aliceID, space), models.UpdateSpaceProfileRequest{
 		KeyVersion:       space.CurrentVersion + 1,
 		EncryptedProfile: "YWxpY2UtcHJvZmlsZS12Mg==",
 	})

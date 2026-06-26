@@ -25,12 +25,12 @@ type PostsController struct {
 }
 
 func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest) (*models.CreatePostResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
+	userID, space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.EncryptedPostKey) == "" || len(req.Objects) == 0 {
-		return nil, ente.NewBadRequestWithMessage("spaceId, encryptedPostKey and objects are required")
+	if strings.TrimSpace(req.EncryptedPostKey) == "" || len(req.Objects) == 0 {
+		return nil, ente.NewBadRequestWithMessage("encryptedPostKey and objects are required")
 	}
 	if len(req.Objects) > maxSpacePostObjects {
 		return nil, ente.NewBadRequestWithMessage("too many post objects")
@@ -43,10 +43,6 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 		return nil, err
 	}
 	captionCipher, err := decodeOptionalEncodedSpacePointerField("captionCipher", req.CaptionCipher, maxSpaceCaptionCipherEncodedBytes, maxSpaceCaptionCipherDecodedBytes)
-	if err != nil {
-		return nil, err
-	}
-	space, err := c.auth.requireSpaceOwner(ctx, userID, req.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +164,7 @@ func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*
 }
 
 func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest) (*models.FeedPage, error) {
-	_, viewerSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
+	_, viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +212,7 @@ func (c *PostsController) Get(ctx *gin.Context, postID string, req models.GetPos
 }
 
 func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req models.UpdatePostCaptionRequest) (*models.PostResponse, error) {
-	userID, viewerSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
+	userID, viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +235,7 @@ func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req mod
 }
 
 func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models.LikePostRequest) (*models.LikePostResponse, error) {
-	userID, actorSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
+	userID, actorSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +316,7 @@ func (c *PostsController) ListLikers(ctx *gin.Context, postID string, req models
 }
 
 func (c *PostsController) Delete(ctx *gin.Context, postID string) error {
-	userID, err := c.auth.requireUser(ctx)
+	userID, space, err := selectedSpace(ctx)
 	if err != nil {
 		return err
 	}
@@ -328,6 +324,6 @@ func (c *PostsController) Delete(ctx *gin.Context, postID string) error {
 	if err != nil || id <= 0 {
 		return ente.NewBadRequestWithMessage("invalid postID")
 	}
-	_, err = c.PostsRepo.DeletePost(ctx, id, userID)
+	_, err = c.PostsRepo.DeletePost(ctx, id, userID, space.SpaceID)
 	return err
 }

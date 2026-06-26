@@ -22,6 +22,13 @@ type viewerAuth struct {
 	Link    *spacerepo.SpaceLinkSessionRecord
 }
 
+type selectedSpaceAuth struct {
+	UserID int64
+	Space  *spacerepo.SpaceRecord
+}
+
+const selectedSpaceAuthKey = "space.selectedSpaceAuth"
+
 type authDeps struct {
 	UserAuthRepo *baserepo.UserAuthRepository
 	LinksRepo    *spacerepo.LinksRepository
@@ -111,6 +118,22 @@ func (a authDeps) requireSelectedSpace(c *gin.Context, rawSpaceID string) (int64
 		return 0, nil, err
 	}
 	return userID, space, nil
+}
+
+func setSelectedSpace(c *gin.Context, userID int64, space *spacerepo.SpaceRecord) {
+	c.Set(selectedSpaceAuthKey, selectedSpaceAuth{UserID: userID, Space: space})
+}
+
+func selectedSpace(c *gin.Context) (int64, *spacerepo.SpaceRecord, error) {
+	value, ok := c.Get(selectedSpaceAuthKey)
+	if !ok {
+		return 0, nil, ente.NewBadRequestWithMessage("selected space is required")
+	}
+	selected, ok := value.(selectedSpaceAuth)
+	if !ok || selected.UserID <= 0 || selected.Space == nil {
+		return 0, nil, ente.NewBadRequestWithMessage("selected space is invalid")
+	}
+	return selected.UserID, selected.Space, nil
 }
 
 func (a authDeps) requireSpaceOwner(ctx context.Context, ownerID int64, spaceID string) (*spacerepo.SpaceRecord, error) {

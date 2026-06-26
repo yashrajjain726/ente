@@ -24,12 +24,8 @@ type LinksController struct {
 	auth       authDeps
 }
 
-func (c *LinksController) Get(ctx *gin.Context, spaceID string) (*models.SpaceLinkStatusResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
-	if err != nil {
-		return nil, err
-	}
-	space, err := c.auth.requireSpaceOwner(ctx, userID, strings.TrimSpace(spaceID))
+func (c *LinksController) Get(ctx *gin.Context) (*models.SpaceLinkStatusResponse, error) {
+	_, space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -57,12 +53,12 @@ func (c *LinksController) Rotate(ctx *gin.Context, req models.SpaceLinkCreateReq
 }
 
 func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreateRequest, rotate bool) (*models.SpaceLinkStatusResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
+	_, space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.AuthKey) == "" || strings.TrimSpace(req.LinkWrappedSpaceKey) == "" || strings.TrimSpace(req.EncryptedAccessKey) == "" || req.KeyVersion <= 0 {
-		return nil, ente.NewBadRequestWithMessage("spaceId, authKey, linkWrappedSpaceKey, encryptedAccessKey and keyVersion are required")
+	if strings.TrimSpace(req.AuthKey) == "" || strings.TrimSpace(req.LinkWrappedSpaceKey) == "" || strings.TrimSpace(req.EncryptedAccessKey) == "" || req.KeyVersion <= 0 {
+		return nil, ente.NewBadRequestWithMessage("authKey, linkWrappedSpaceKey, encryptedAccessKey and keyVersion are required")
 	}
 	if len(strings.TrimSpace(req.AuthKey)) > maxSpaceEncryptedKeyEncodedBytes {
 		return nil, ente.NewBadRequestWithMessage("authKey is too large")
@@ -72,10 +68,6 @@ func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreate
 		return nil, err
 	}
 	encryptedAccessKey, err := decodeEncodedSpaceField("encryptedAccessKey", req.EncryptedAccessKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
-	if err != nil {
-		return nil, err
-	}
-	space, err := c.auth.requireSpaceOwner(ctx, userID, req.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -127,12 +119,8 @@ func linkStatusResponse(link *repo.SpaceLinkRecord) *models.SpaceLinkStatusRespo
 	}
 }
 
-func (c *LinksController) Delete(ctx *gin.Context, spaceID string) error {
-	userID, err := c.auth.requireUser(ctx)
-	if err != nil {
-		return err
-	}
-	space, err := c.auth.requireSpaceOwner(ctx, userID, strings.TrimSpace(spaceID))
+func (c *LinksController) Delete(ctx *gin.Context) error {
+	_, space, err := selectedSpace(ctx)
 	if err != nil {
 		return err
 	}

@@ -117,12 +117,12 @@ func (c *SpacesController) GetProfile(ctx *gin.Context, req models.GetSpaceProfi
 }
 
 func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpaceProfileRequest) (*models.UpdateSpaceProfileResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
+	userID, current, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.EncryptedProfile) == "" || req.KeyVersion <= 0 {
-		return nil, ente.NewBadRequestWithMessage("spaceId, keyVersion and encryptedProfile are required")
+	if strings.TrimSpace(req.EncryptedProfile) == "" || req.KeyVersion <= 0 {
+		return nil, ente.NewBadRequestWithMessage("keyVersion and encryptedProfile are required")
 	}
 	encryptedProfile, err := decodeEncodedSpaceField("encryptedProfile", req.EncryptedProfile, maxSpaceEncryptedProfileEncodedBytes, maxSpaceEncryptedProfileDecodedBytes)
 	if err != nil {
@@ -134,11 +134,7 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 	if req.RemoveCover && req.Cover != nil {
 		return nil, ente.NewBadRequestWithMessage("cover and removeCover cannot both be set")
 	}
-	spaceID := strings.TrimSpace(req.SpaceID)
-	current, err := c.auth.requireSpaceOwner(ctx, userID, spaceID)
-	if err != nil {
-		return nil, err
-	}
+	spaceID := current.SpaceID
 	if req.KeyVersion != current.CurrentVersion {
 		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
 	}
@@ -183,15 +179,15 @@ func (c *SpacesController) profileAssetUpdate(ctx *gin.Context, spaceID, assetNa
 	}, nil
 }
 
-func (c *SpacesController) UpdateSlug(ctx *gin.Context, spaceID string, req models.UpdateSpaceSlugRequest) (*models.SpaceLookupResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
+func (c *SpacesController) UpdateSlug(ctx *gin.Context, req models.UpdateSpaceSlugRequest) (*models.SpaceLookupResponse, error) {
+	userID, selected, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(req.SpaceSlug) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceSlug is required")
 	}
-	space, err := c.SpacesRepo.UpdateSlug(ctx, userID, strings.TrimSpace(spaceID), req.SpaceSlug)
+	space, err := c.SpacesRepo.UpdateSlug(ctx, userID, selected.SpaceID, req.SpaceSlug)
 	if err != nil {
 		return nil, err
 	}
@@ -234,12 +230,12 @@ func (c *SpacesController) SlugAvailability(ctx *gin.Context, spaceSlug string) 
 }
 
 func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKeyRequest) (*models.SpaceKeyResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
+	userID, current, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.SpaceID) == "" || strings.TrimSpace(req.RootWrappedSpaceKey) == "" || strings.TrimSpace(req.WrappedPrevKey) == "" || strings.TrimSpace(req.EncryptedProfile) == "" || req.KeyVersion <= 0 {
-		return nil, ente.NewBadRequestWithMessage("spaceId, keyVersion, rootWrappedSpaceKey, wrappedPrevKey and encryptedProfile are required")
+	if strings.TrimSpace(req.RootWrappedSpaceKey) == "" || strings.TrimSpace(req.WrappedPrevKey) == "" || strings.TrimSpace(req.EncryptedProfile) == "" || req.KeyVersion <= 0 {
+		return nil, ente.NewBadRequestWithMessage("keyVersion, rootWrappedSpaceKey, wrappedPrevKey and encryptedProfile are required")
 	}
 	rootWrappedSpaceKey, err := decodeEncodedSpaceField("rootWrappedSpaceKey", req.RootWrappedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
 	if err != nil {
@@ -253,14 +249,10 @@ func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKey
 	if err != nil {
 		return nil, err
 	}
-	current, err := c.auth.requireSpaceOwner(ctx, userID, req.SpaceID)
-	if err != nil {
-		return nil, err
-	}
 	if req.KeyVersion != current.CurrentVersion {
 		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
 	}
-	space, err := c.SpacesRepo.RotateKey(ctx, userID, req.SpaceID, req.KeyVersion, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile)
+	space, err := c.SpacesRepo.RotateKey(ctx, userID, current.SpaceID, req.KeyVersion, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")

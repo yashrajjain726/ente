@@ -82,3 +82,9 @@ func newSpaceControllerContext(userID int64) *gin.Context {
 	ctx.Request.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
 	return ctx
 }
+
+func newSelectedSpaceControllerContext(userID int64, space *spacerepo.SpaceRecord) *gin.Context {
+	ctx := newSpaceControllerContext(userID)
+	setSelectedSpace(ctx, userID, space)
+	return ctx
+}

@@ -20,7 +20,7 @@ func TestPostLikeRejectsOwnPost(t *testing.T) {
 	postID, err := testCreatePost(ctx, repos, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
 
-	_, err = controller.ToggleLike(newSpaceControllerContext(aliceID), strconv.FormatInt(postID, 10), models.LikePostRequest{SpaceID: aliceSpace.SpaceID, Like: true})
+	_, err = controller.ToggleLike(newSelectedSpaceControllerContext(aliceID, aliceSpace), strconv.FormatInt(postID, 10), models.LikePostRequest{Like: true})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot like your own post")
 }
@@ -31,8 +31,7 @@ func TestCreatePostRequiresAssetMetadataCipher(t *testing.T) {
 	aliceSpace, err := testCreateSpace(ctx, repos, aliceID, "alice_metadata_post", "alice-space-key", "alice-metadata-post-public", "alice-metadata-post-secret", "alice-metadata-post-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 
-	_, err = controller.Create(newSpaceControllerContext(aliceID), models.CreatePostRequest{
-		SpaceID:          aliceSpace.SpaceID,
+	_, err = controller.Create(newSelectedSpaceControllerContext(aliceID, aliceSpace), models.CreatePostRequest{
 		EncryptedPostKey: "cG9zdC1rZXk=",
 		KeyVersion:       aliceSpace.CurrentVersion,
 		Objects: []models.PostObjectPayload{{

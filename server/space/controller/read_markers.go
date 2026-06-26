@@ -19,7 +19,7 @@ type ReadMarkersController struct {
 }
 
 func (c *ReadMarkersController) GetUnreadStatus(ctx *gin.Context, req models.SpaceUnreadStatusRequest) (*models.SpaceUnreadStatusResponse, error) {
-	_, viewerSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
+	_, viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (c *ReadMarkersController) MarkNotificationsRead(ctx *gin.Context, req mode
 	if strings.TrimSpace(req.FriendSpaceID) == "" {
 		return nil, ente.NewBadRequestWithMessage("friendSpaceId is required")
 	}
-	userID, viewerSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
+	userID, viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -50,5 +50,5 @@ func (c *ReadMarkersController) MarkNotificationsRead(ctx *gin.Context, req mode
 	if err := c.ReadMarkersRepo.UpsertNotificationReadMarker(ctx, viewerSpace.SpaceID, req.FriendSpaceID, readAt); err != nil {
 		return nil, err
 	}
-	return c.GetUnreadStatus(ctx, models.SpaceUnreadStatusRequest{SpaceID: viewerSpace.SpaceID})
+	return c.GetUnreadStatus(ctx, models.SpaceUnreadStatusRequest{})
 }

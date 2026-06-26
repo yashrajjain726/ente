@@ -29,6 +29,17 @@ func (h *Handlers) RequireSpaceBrowserSession() gin.HandlerFunc {
 	}
 }
 
+func (h *Handlers) RequireSelectedSpace() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if err := h.Module.RequireSelectedSpace(c, c.Param("spaceID")); err != nil {
+			respondJSON(c, nil, err)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 func (h *Handlers) CreateBrowserSession(c *gin.Context) {
 	var req models.SpaceBrowserSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

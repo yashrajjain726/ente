@@ -3,6 +3,7 @@ package controller
 import (
 	baserepo "github.com/ente-io/museum/pkg/repo"
 	"github.com/ente-io/museum/space/repo"
+	"github.com/gin-gonic/gin"
 )
 
 type Module struct {
@@ -18,6 +19,7 @@ type Module struct {
 	Cleanup    *CleanupController
 	UserAuth   *baserepo.UserAuthRepository
 	UserTokens UserTokenTerminator
+	auth       authDeps
 }
 
 type UserTokenTerminator interface {
@@ -48,5 +50,15 @@ func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, em
 		EntityKeys: &EntityKeysController{EntityKeysRepo: repos.EntityKeys, auth: authDeps},
 		Cleanup:    &CleanupController{AssetsRepo: repos.Assets},
 		UserAuth:   userAuthRepo,
+		auth:       authDeps,
 	}
+}
+
+func (m *Module) RequireSelectedSpace(c *gin.Context, rawSpaceID string) error {
+	userID, space, err := m.auth.requireSelectedSpace(c, rawSpaceID)
+	if err != nil {
+		return err
+	}
+	setSelectedSpace(c, userID, space)
+	return nil
 }

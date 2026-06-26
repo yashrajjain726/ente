@@ -39,7 +39,7 @@ type AssetsController struct {
 }
 
 func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUploadRequest) (*models.PresignUploadResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
+	_, space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -61,23 +61,11 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	var spaceID sql.NullString
 	switch purpose {
 	case uploadPurposePost:
-		if req.SpaceID == nil || strings.TrimSpace(*req.SpaceID) == "" {
-			return nil, ente.NewBadRequestWithMessage("spaceId is required for post uploads")
-		}
-		spaceID.String = strings.TrimSpace(*req.SpaceID)
+		spaceID.String = space.SpaceID
 		spaceID.Valid = true
-		if _, err := c.auth.requireSpaceOwner(ctx, userID, spaceID.String); err != nil {
-			return nil, err
-		}
 	case uploadPurposeAvatar, uploadPurposeCover:
-		if req.SpaceID == nil || strings.TrimSpace(*req.SpaceID) == "" {
-			return nil, ente.NewBadRequestWithMessage("spaceId is required for profile image uploads")
-		}
-		spaceID.String = strings.TrimSpace(*req.SpaceID)
+		spaceID.String = space.SpaceID
 		spaceID.Valid = true
-		if _, err := c.auth.requireSpaceOwner(ctx, userID, spaceID.String); err != nil {
-			return nil, err
-		}
 	default:
 		return nil, ente.NewBadRequestWithMessage("invalid upload purpose")
 	}

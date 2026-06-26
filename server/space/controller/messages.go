@@ -35,7 +35,7 @@ type MessagesController struct {
 }
 
 func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req models.CreateMessageRequest) (*models.MessageResponse, error) {
-	userID, senderSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
+	userID, senderSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req 
 }
 
 func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req models.CreateMessageRequest) (*models.MessageResponse, error) {
-	userID, senderSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
+	userID, senderSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 }
 
 func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesRequest) (*models.MessageConversationPage, error) {
-	_, viewerSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
+	_, viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesReque
 }
 
 func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, req models.ListMessageThreadRequest) (*models.MessagePage, error) {
-	userID, viewerSpace, err := c.auth.requireSelectedSpace(ctx, req.ViewerSpaceID)
+	userID, viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, 
 }
 
 func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req models.LikeMessageRequest) (*models.LikeMessageResponse, error) {
-	userID, actorSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
+	userID, actorSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 }
 
 func (c *MessagesController) Delete(ctx *gin.Context, messageID string, req models.DeleteMessageRequest) error {
-	userID, senderSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
+	userID, senderSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return err
 	}

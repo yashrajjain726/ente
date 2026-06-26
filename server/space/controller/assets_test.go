@@ -7,6 +7,7 @@ import (
 
 	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/space/models"
+	spacerepo "github.com/ente-io/museum/space/repo"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,7 @@ func (b testSpaceAssetBuckets) IsBucketActive(bucketID string) bool {
 
 func TestPresignUploadRejectsOversizedPost(t *testing.T) {
 	controller := &AssetsController{}
-	ctx := newSpaceControllerContext(1)
+	ctx := newSelectedSpaceControllerContext(1, &spacerepo.SpaceRecord{SpaceID: "space-1"})
 
 	_, err := controller.PresignUpload(ctx, models.PresignUploadRequest{
 		Size:       maxPostUploadBytes + 1,
@@ -32,7 +33,7 @@ func TestPresignUploadRejectsOversizedPost(t *testing.T) {
 
 func TestPresignUploadRejectsOversizedAvatar(t *testing.T) {
 	controller := &AssetsController{}
-	ctx := newSpaceControllerContext(1)
+	ctx := newSelectedSpaceControllerContext(1, &spacerepo.SpaceRecord{SpaceID: "space-1"})
 	purpose := uploadPurposeAvatar
 
 	_, err := controller.PresignUpload(ctx, models.PresignUploadRequest{
@@ -47,7 +48,7 @@ func TestPresignUploadRejectsOversizedAvatar(t *testing.T) {
 
 func TestPresignUploadRejectsOversizedCover(t *testing.T) {
 	controller := &AssetsController{}
-	ctx := newSpaceControllerContext(1)
+	ctx := newSelectedSpaceControllerContext(1, &spacerepo.SpaceRecord{SpaceID: "space-1"})
 	purpose := uploadPurposeCover
 
 	_, err := controller.PresignUpload(ctx, models.PresignUploadRequest{
@@ -129,10 +130,7 @@ func TestPresignUploadReturnsUnavailableWhenSpaceAssetBucketMissing(t *testing.T
 	t.Cleanup(func() {
 		viper.Set(spaceAssetsPrimaryBucketConfigKey, "")
 	})
-	spaceID := space.SpaceID
-
-	resp, err := module.Assets.PresignUpload(newSpaceControllerContext(aliceID), models.PresignUploadRequest{
-		SpaceID:    &spaceID,
+	resp, err := module.Assets.PresignUpload(newSelectedSpaceControllerContext(aliceID, space), models.PresignUploadRequest{
 		Size:       1,
 		ContentMD5: "XUFAKrxLKna5cZ2REBfFkg==",
 	})
