@@ -16,7 +16,6 @@ type Module struct {
 	Read       *ReadMarkersController
 	Sessions   *SessionsController
 	Cleanup    *CleanupController
-	UserAuth   *baserepo.UserAuthRepository
 	UserTokens UserTokenTerminator
 	auth       authDeps
 }
@@ -47,7 +46,6 @@ func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, em
 		Read:     &ReadMarkersController{ReadMarkersRepo: repos.Read, auth: authDeps},
 		Sessions: &SessionsController{SessionsRepo: repos.Sessions},
 		Cleanup:  &CleanupController{AssetsRepo: repos.Assets},
-		UserAuth: userAuthRepo,
 		auth:     authDeps,
 	}
 }

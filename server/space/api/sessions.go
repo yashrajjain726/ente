@@ -62,11 +62,6 @@ func (h *Handlers) CreateBrowserSession(c *gin.Context) {
 				respondJSON(c, nil, err)
 				return
 			}
-		} else if h.Module.UserAuth != nil {
-			if err := h.Module.UserAuth.RemoveToken(userID, token); err != nil {
-				respondJSON(c, nil, err)
-				return
-			}
 		}
 	}
 	respondJSON(c, created.Response, nil)
