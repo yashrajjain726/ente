@@ -12,11 +12,7 @@ import (
 func postRecordSelectSQL(viewerLikedExpr string) string {
 	return `
 		SELECT p.post_id, p.space_id, w.space_slug, w.owner_id,
-		       w.owner_id, w.space_id, w.space_slug, w.public_key,
-		       w.current_version, w.encrypted_profile, w_avatar.object_id,
-		       w_avatar.size, w.updated_at,
-		       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = w.space_id) AS author_friends,
-		       (SELECT COUNT(*) FROM space_posts ap WHERE ap.space_id = w.space_id AND ap.is_deleted = FALSE) AS author_posts,
+		       ` + spaceActorSelectColumns("w", "w_avatar", "author") + `,
 		       p.encrypted_post_key, p.caption_cipher,
 		       p.key_version, p.created_at,
 		       ` + viewerLikedExpr + ` AS viewer_liked`
@@ -89,7 +85,7 @@ func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerSpace
 		       EXISTS (SELECT 1 FROM space_messages m WHERE m.kind = 'post_like' AND m.reply_post_id = p.post_id AND m.sender_space_id = $2)`) + `
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
-			LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
+			` + spaceActorAvatarJoin("w", "w_avatar") + `
 			WHERE p.post_id = $1 AND p.is_deleted = FALSE
 		`
 	return scanPostRecord(r.DB.QueryRowContext(ctx, query, postID, viewerSpaceID))
@@ -105,7 +101,7 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 			       EXISTS (SELECT 1 FROM space_messages m WHERE m.kind = 'post_like' AND m.reply_post_id = p.post_id AND m.sender_space_id = $2)`) + `
 				FROM space_posts p
 				JOIN spaces w ON w.space_id = p.space_id
-				LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
+				` + spaceActorAvatarJoin("w", "w_avatar") + `
 				WHERE p.space_id = $1 AND p.is_deleted = FALSE`
 	if cursorCreatedAt, cursorPostID, ok := parsePostCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorPostID)
@@ -140,7 +136,7 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerSpaceID string, cu
 			       CASE WHEN p.space_id = $1 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_messages m WHERE m.kind = 'post_like' AND m.reply_post_id = p.post_id AND m.sender_space_id = $1) END`) + `
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
-			LEFT JOIN space_profile_assets w_avatar ON w_avatar.space_id = w.space_id AND w_avatar.asset_type = 'avatar'
+			` + spaceActorAvatarJoin("w", "w_avatar") + `
 			JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
 			WHERE p.is_deleted = FALSE
 			  AND (
@@ -319,15 +315,11 @@ func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, curs
 	}
 	args := []any{postID}
 	query := `
-		SELECT liker_space.owner_id, liker_space.space_id, liker_space.space_slug, liker_space.public_key,
-		       liker_space.current_version, liker_space.encrypted_profile, liker_avatar.object_id,
-		       liker_avatar.size, liker_space.updated_at,
-		       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = liker_space.space_id) AS liker_friends,
-		       (SELECT COUNT(*) FROM space_posts lp WHERE lp.space_id = liker_space.space_id AND lp.is_deleted = FALSE) AS liker_posts,
+		SELECT ` + spaceActorSelectColumns("liker_space", "liker_avatar", "liker") + `,
 		       m.created_at
 		FROM space_messages m
 		JOIN spaces liker_space ON liker_space.space_id = m.sender_space_id
-		LEFT JOIN space_profile_assets liker_avatar ON liker_avatar.space_id = liker_space.space_id AND liker_avatar.asset_type = 'avatar'
+		` + spaceActorAvatarJoin("liker_space", "liker_avatar") + `
 		WHERE m.kind = 'post_like' AND m.reply_post_id = $1`
 	if cursorCreatedAt, cursorActorSpaceID, ok := parsePostLikerCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorActorSpaceID)

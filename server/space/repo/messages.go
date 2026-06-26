@@ -11,7 +11,7 @@ import (
 	"github.com/lib/pq"
 )
 
-const spaceMessageSelectColumns = `
+var spaceMessageSelectColumns = `
 	m.message_id,
 	m.kind,
 	sender_space.owner_id AS sender_id,
@@ -41,35 +41,15 @@ const spaceMessageSelectColumns = `
 	COALESCE(quote_post.caption_cipher, '\x'::bytea) AS quote_caption_cipher,
 	COALESCE(quote_post.key_version, 0) AS quote_key_version,
 	quote_asset.object_key AS quote_object_key,
-	sender_space.owner_id,
-	sender_space.space_id,
-	sender_space.space_slug,
-	sender_space.public_key,
-	sender_space.current_version,
-	sender_space.encrypted_profile,
-	sender_avatar.object_id,
-	sender_avatar.size,
-	sender_space.updated_at,
-	(SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = sender_space.space_id) AS sender_friends,
-	(SELECT COUNT(*) FROM space_posts sp WHERE sp.space_id = sender_space.space_id AND sp.is_deleted = FALSE) AS sender_posts,
-	recipient_space.owner_id,
-	recipient_space.space_id,
-	recipient_space.space_slug,
-	recipient_space.public_key,
-	recipient_space.current_version,
-	recipient_space.encrypted_profile,
-	recipient_avatar.object_id,
-	recipient_avatar.size,
-	recipient_space.updated_at,
-	(SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = recipient_space.space_id) AS recipient_friends,
-	(SELECT COUNT(*) FROM space_posts rp WHERE rp.space_id = recipient_space.space_id AND rp.is_deleted = FALSE) AS recipient_posts
+` + spaceActorSelectColumns("sender_space", "sender_avatar", "sender") + `,
+` + spaceActorSelectColumns("recipient_space", "recipient_avatar", "recipient") + `
 `
 
-const spaceMessageJoins = `
+var spaceMessageJoins = `
 	JOIN spaces sender_space ON sender_space.space_id = m.sender_space_id
-	LEFT JOIN space_profile_assets sender_avatar ON sender_avatar.space_id = sender_space.space_id AND sender_avatar.asset_type = 'avatar'
+	` + spaceActorAvatarJoin("sender_space", "sender_avatar") + `
 	JOIN spaces recipient_space ON recipient_space.space_id = m.recipient_space_id
-	LEFT JOIN space_profile_assets recipient_avatar ON recipient_avatar.space_id = recipient_space.space_id AND recipient_avatar.asset_type = 'avatar'
+	` + spaceActorAvatarJoin("recipient_space", "recipient_avatar") + `
 	LEFT JOIN space_posts quote_post ON quote_post.post_id = m.reply_post_id AND quote_post.is_deleted = FALSE
 	LEFT JOIN LATERAL (
 		SELECT object_key

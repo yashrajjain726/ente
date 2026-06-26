@@ -2,6 +2,7 @@ package repo
 
 import (
 	"database/sql"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -118,6 +119,42 @@ func spaceActorScanDest(actor *SpaceActorRecord) []any {
 		&actor.Friends,
 		&actor.Posts,
 	}
+}
+
+func spaceActorSelectColumns(spaceAlias string, avatarAlias string, prefix string) string {
+	return strings.Join([]string{
+		fmt.Sprintf("%s.owner_id AS %s_owner_id", spaceAlias, prefix),
+		fmt.Sprintf("%s.space_id AS %s_space_id", spaceAlias, prefix),
+		fmt.Sprintf("%s.space_slug AS %s_space_slug", spaceAlias, prefix),
+		fmt.Sprintf("%s.public_key AS %s_public_key", spaceAlias, prefix),
+		fmt.Sprintf("%s.current_version AS %s_current_version", spaceAlias, prefix),
+		fmt.Sprintf("%s.encrypted_profile AS %s_encrypted_profile", spaceAlias, prefix),
+		fmt.Sprintf("%s.object_id AS %s_avatar_object_id", avatarAlias, prefix),
+		fmt.Sprintf("%s.size AS %s_avatar_size", avatarAlias, prefix),
+		fmt.Sprintf("%s.updated_at AS %s_updated_at", spaceAlias, prefix),
+		fmt.Sprintf("(SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = %s.space_id) AS %s_friends", spaceAlias, prefix),
+		fmt.Sprintf("(SELECT COUNT(*) FROM space_posts p WHERE p.space_id = %s.space_id AND p.is_deleted = FALSE) AS %s_posts", spaceAlias, prefix),
+	}, ",\n\t")
+}
+
+func spaceActorPublicSelectColumns(spaceAlias string, prefix string) string {
+	return strings.Join([]string{
+		fmt.Sprintf("%s.owner_id AS %s_owner_id", spaceAlias, prefix),
+		fmt.Sprintf("%s.space_id AS %s_space_id", spaceAlias, prefix),
+		fmt.Sprintf("%s.space_slug AS %s_space_slug", spaceAlias, prefix),
+		fmt.Sprintf("%s.public_key AS %s_public_key", spaceAlias, prefix),
+		fmt.Sprintf("%s.current_version AS %s_current_version", spaceAlias, prefix),
+		fmt.Sprintf("'\\x'::bytea AS %s_encrypted_profile", prefix),
+		fmt.Sprintf("NULL::text AS %s_avatar_object_id", prefix),
+		fmt.Sprintf("NULL::bigint AS %s_avatar_size", prefix),
+		fmt.Sprintf("%s.updated_at AS %s_updated_at", spaceAlias, prefix),
+		fmt.Sprintf("NULL::bigint AS %s_friends", prefix),
+		fmt.Sprintf("NULL::bigint AS %s_posts", prefix),
+	}, ",\n\t")
+}
+
+func spaceActorAvatarJoin(spaceAlias string, avatarAlias string) string {
+	return fmt.Sprintf("LEFT JOIN space_profile_assets %s ON %s.space_id = %s.space_id AND %s.asset_type = 'avatar'", avatarAlias, avatarAlias, spaceAlias, avatarAlias)
 }
 
 func wrapUnique(err error, message string) error {

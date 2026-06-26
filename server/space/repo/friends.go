@@ -223,7 +223,7 @@ func (r *FriendsRepository) CreateFriendRequest(ctx context.Context, requesterID
 }
 
 func (r *FriendsRepository) ListFriendRequestsForSpace(ctx context.Context, targetSpaceID string) ([]SpaceFriendRequestRecord, error) {
-	rows, err := r.DB.QueryContext(ctx, `
+	query := `
 		SELECT fr.request_id,
 		       requester_space.owner_id AS requester_id,
 		       fr.requester_space_id,
@@ -232,17 +232,7 @@ func (r *FriendsRepository) ListFriendRequestsForSpace(ctx context.Context, targ
 		       fr.requester_friend_sealed_space_key,
 		       fr.requester_key_version,
 		       fr.created_at,
-		       requester_space.owner_id,
-		       requester_space.space_id,
-		       requester_space.space_slug,
-		       requester_space.public_key,
-		       requester_space.current_version,
-		       '\x'::bytea AS encrypted_profile,
-		       NULL::TEXT AS avatar_object_id,
-		       NULL::BIGINT AS avatar_size,
-		       requester_space.updated_at,
-		       NULL::BIGINT AS friends,
-		       NULL::BIGINT AS posts
+		       ` + spaceActorPublicSelectColumns("requester_space", "requester") + `
 		FROM space_friend_requests fr
 		JOIN spaces requester_space ON requester_space.space_id = fr.requester_space_id
 		JOIN users requester_owner ON requester_owner.user_id = requester_space.owner_id AND requester_owner.encrypted_email IS NOT NULL
@@ -251,7 +241,8 @@ func (r *FriendsRepository) ListFriendRequestsForSpace(ctx context.Context, targ
 		  AND fr.is_deleted = FALSE
 		  AND fr.resolved_at IS NULL
 		ORDER BY fr.created_at DESC, fr.request_id DESC
-	`, targetSpaceID)
+	`
+	rows, err := r.DB.QueryContext(ctx, query, targetSpaceID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
@@ -547,27 +538,18 @@ func (r *FriendsRepository) ListSharesForFriendAndSpace(ctx context.Context, fri
 }
 
 func (r *FriendsRepository) ListFriendsForSpace(ctx context.Context, spaceID string) ([]SpaceFriendRecord, error) {
-	rows, err := r.DB.QueryContext(ctx, `
-		SELECT friend_space.owner_id,
-		       friend_space.space_id,
-		       friend_space.space_slug,
-		       friend_space.public_key,
-		       friend_space.current_version,
-		       friend_space.encrypted_profile,
-		       friend_avatar.object_id,
-		       friend_avatar.size,
-		       friend_space.updated_at,
-		       (SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = friend_space.space_id) AS friends,
-		       (SELECT COUNT(*) FROM space_posts p WHERE p.space_id = friend_space.space_id AND p.is_deleted = FALSE) AS posts,
+	query := `
+		SELECT ` + spaceActorSelectColumns("friend_space", "friend_avatar", "friend") + `,
 		       s.key_version,
 		       s.created_at
 		FROM space_friend_shares s
 		JOIN spaces friend_space ON friend_space.space_id = s.friend_space_id
-		LEFT JOIN space_profile_assets friend_avatar ON friend_avatar.space_id = friend_space.space_id AND friend_avatar.asset_type = 'avatar'
+		` + spaceActorAvatarJoin("friend_space", "friend_avatar") + `
 		JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
 		WHERE s.space_id = $1
 		ORDER BY lower(friend_space.space_slug) ASC
-	`, spaceID)
+	`
+	rows, err := r.DB.QueryContext(ctx, query, spaceID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
