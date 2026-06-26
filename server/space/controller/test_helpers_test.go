@@ -43,7 +43,11 @@ func testRotateKey(ctx context.Context, module *spacerepo.Module, _ int64, space
 }
 
 func testAddFriend(ctx context.Context, module *spacerepo.Module, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey string, targetKeyVersion int, requesterFriendSealedSpaceKey string, requesterKeyVersion int) error {
-	_, err := module.Friends.AddFriendWithCreated(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion, testSpaceBytes(requesterFriendSealedSpaceKey), requesterKeyVersion)
+	request, _, err := module.Friends.CreateFriendRequest(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(requesterFriendSealedSpaceKey), requesterKeyVersion)
+	if err != nil {
+		return err
+	}
+	_, _, err = module.Friends.ConfirmFriendRequest(ctx, targetSpaceID, request.RequestID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion)
 	return err
 }
 

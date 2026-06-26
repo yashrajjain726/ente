@@ -114,7 +114,11 @@ func testRotateKey(ctx context.Context, module *Module, _ int64, spaceID string,
 }
 
 func testAddFriend(ctx context.Context, module *Module, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey string, targetKeyVersion int, requesterFriendSealedSpaceKey string, requesterKeyVersion int) error {
-	_, err := module.Friends.AddFriendWithCreated(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion, testSpaceBytes(requesterFriendSealedSpaceKey), requesterKeyVersion)
+	request, _, err := module.Friends.CreateFriendRequest(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(requesterFriendSealedSpaceKey), requesterKeyVersion)
+	if err != nil {
+		return err
+	}
+	_, _, err = module.Friends.ConfirmFriendRequest(ctx, targetSpaceID, request.RequestID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion)
 	return err
 }
 
@@ -132,11 +136,23 @@ func testConfirmFriendRequest(ctx context.Context, module *Module, _ int64, targ
 }
 
 func testUpsertShare(ctx context.Context, module *Module, spaceID string, friendSpaceID string, friendSealedSpaceKey string, keyVersion int) error {
-	return module.Friends.UpsertShare(ctx, spaceID, friendSpaceID, testSpaceBytes(friendSealedSpaceKey), keyVersion)
+	return upsertFriendShare(ctx, module.Friends.DB, friendShareMutation{
+		SpaceID:              spaceID,
+		FriendSpaceID:        friendSpaceID,
+		FriendSealedSpaceKey: testSpaceBytes(friendSealedSpaceKey),
+		KeyVersion:           keyVersion,
+	})
 }
 
 func testUpdateShare(ctx context.Context, module *Module, spaceID string, friendSpaceID string, friendSealedSpaceKey string, keyVersion int) error {
-	return module.Friends.UpdateShare(ctx, spaceID, friendSpaceID, testSpaceBytes(friendSealedSpaceKey), keyVersion)
+	return module.Friends.UpdateShares(ctx, spaceID, []SpaceShareUpdateRecord{
+		{FriendSpaceID: friendSpaceID, FriendSealedSpaceKey: testSpaceBytes(friendSealedSpaceKey)},
+	}, keyVersion)
+}
+
+func deleteShareBySpaceAndFriend(ctx context.Context, module *Module, spaceID string, friendSpaceID string) error {
+	_, err := module.Friends.DB.ExecContext(ctx, `DELETE FROM space_friend_shares WHERE space_id = $1 AND friend_space_id = $2`, spaceID, friendSpaceID)
+	return err
 }
 
 func testUpsertLink(ctx context.Context, module *Module, spaceID string, authKeyHash []byte, keyVersion int, linkWrappedSpaceKey string, encryptedAccessKey string) (*SpaceLinkRecord, error) {
@@ -1079,12 +1095,12 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	err = testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", rotatedSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion)
 	require.NoError(t, err)
 
-	shares, err := module.Friends.ListSharesForFriend(ctx, bobID)
+	shares, err := module.Friends.ListSharesForFriendAndSpace(ctx, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Len(t, shares, 1)
 	require.Equal(t, testSpaceBytes("alice-share-key"), shares[0].FriendSealedSpaceKey)
 
-	aliceShares, err := module.Friends.ListSharesForFriend(ctx, aliceID)
+	aliceShares, err := module.Friends.ListSharesForFriendAndSpace(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Len(t, aliceShares, 1)
 	require.Equal(t, testSpaceBytes("bob-share-key"), aliceShares[0].FriendSealedSpaceKey)
@@ -1395,7 +1411,7 @@ func TestAddFriendRejectsSelfFriendship(t *testing.T) {
 	require.ErrorIs(t, err, ErrSelfFriendship)
 }
 
-func TestAddFriendIsIdempotentForExistingFriends(t *testing.T) {
+func TestCreateFriendRequestRejectsExistingFriends(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
 
@@ -1410,10 +1426,10 @@ func TestAddFriendIsIdempotentForExistingFriends(t *testing.T) {
 
 	err = testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key-v2", aliceSpace.CurrentVersion, "bob-share-key-v2", bobSpace.CurrentVersion)
 
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrAlreadyFriends)
 	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
-	require.Equal(t, testSpaceBytes("alice-share-key-v2"), share.FriendSealedSpaceKey)
+	require.Equal(t, testSpaceBytes("alice-share-key"), share.FriendSealedSpaceKey)
 }
 
 func TestDeleteFriendshipRemovesReciprocalShares(t *testing.T) {
@@ -1430,20 +1446,20 @@ func TestDeleteFriendshipRemovesReciprocalShares(t *testing.T) {
 	err = testAddFriend(ctx, module, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion)
 	require.NoError(t, err)
 
-	aliceShares, err := module.Friends.ListSharesForFriend(ctx, aliceID)
+	aliceShares, err := module.Friends.ListSharesForFriendAndSpace(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Len(t, aliceShares, 1)
-	bobShares, err := module.Friends.ListSharesForFriend(ctx, bobID)
+	bobShares, err := module.Friends.ListSharesForFriendAndSpace(ctx, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Len(t, bobShares, 1)
 
 	err = module.Friends.DeleteFriendship(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 
-	aliceShares, err = module.Friends.ListSharesForFriend(ctx, aliceID)
+	aliceShares, err = module.Friends.ListSharesForFriendAndSpace(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Empty(t, aliceShares)
-	bobShares, err = module.Friends.ListSharesForFriend(ctx, bobID)
+	bobShares, err = module.Friends.ListSharesForFriendAndSpace(ctx, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Empty(t, bobShares)
 	aliceFriends, err := module.Friends.ListFriendsForSpace(ctx, aliceSpace.SpaceID)
@@ -1484,7 +1500,7 @@ func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
 	require.Equal(t, testSpaceBytes("share-key-v2"), share.FriendSealedSpaceKey)
 	require.Equal(t, rotatedSpace.CurrentVersion, share.KeyVersion)
 
-	err = module.Friends.DeleteShareBySpaceAndFriend(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
+	err = deleteShareBySpaceAndFriend(ctx, module, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	err = testUpdateShare(ctx, module, aliceSpace.SpaceID, bobSpace.SpaceID, "stale-share-key", rotatedSpace.CurrentVersion)
 	require.ErrorIs(t, err, sql.ErrNoRows)

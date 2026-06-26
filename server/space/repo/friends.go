@@ -26,71 +26,6 @@ type friendShareExecer interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
-func (r *FriendsRepository) AddFriendWithCreated(ctx context.Context, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey []byte, targetKeyVersion int, requesterFriendSealedSpaceKey []byte, requesterKeyVersion int) (bool, error) {
-	tx, err := r.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return false, stacktrace.Propagate(err, "")
-	}
-	defer tx.Rollback()
-
-	var requesterOwnerID int64
-	var requesterCurrentVersion int
-	if err := tx.QueryRowContext(ctx, `
-		SELECT owner_id, current_version
-		FROM spaces
-		WHERE space_id = $1
-		FOR UPDATE
-	`, requesterSpaceID).Scan(&requesterOwnerID, &requesterCurrentVersion); err != nil {
-		return false, stacktrace.Propagate(err, "")
-	}
-	if requesterOwnerID != requesterID || requesterCurrentVersion != requesterKeyVersion {
-		return false, sql.ErrNoRows
-	}
-
-	var targetOwnerID int64
-	var targetCurrentVersion int
-	if err := tx.QueryRowContext(ctx, `
-		SELECT owner_id, current_version
-		FROM spaces
-		WHERE space_id = $1
-		FOR UPDATE
-	`, targetSpaceID).Scan(&targetOwnerID, &targetCurrentVersion); err != nil {
-		return false, stacktrace.Propagate(err, "")
-	}
-	if targetOwnerID == requesterID {
-		return false, ErrSelfFriendship
-	}
-	if targetCurrentVersion != targetKeyVersion {
-		return false, sql.ErrNoRows
-	}
-
-	alreadyFriends, err := areMutualFriendsTx(ctx, tx, requesterSpaceID, targetSpaceID)
-	if err != nil {
-		return false, err
-	}
-	if err := upsertMutualFriendSharesTx(ctx, tx,
-		friendShareMutation{
-			SpaceID:              targetSpaceID,
-			FriendSpaceID:        requesterSpaceID,
-			FriendSealedSpaceKey: targetFriendSealedSpaceKey,
-			KeyVersion:           targetKeyVersion,
-		},
-		friendShareMutation{
-			SpaceID:              requesterSpaceID,
-			FriendSpaceID:        targetSpaceID,
-			FriendSealedSpaceKey: requesterFriendSealedSpaceKey,
-			KeyVersion:           requesterKeyVersion,
-		},
-	); err != nil {
-		return false, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return false, stacktrace.Propagate(err, "")
-	}
-	return !alreadyFriends, nil
-}
-
 func areMutualFriendsTx(ctx context.Context, tx *sql.Tx, firstSpaceID string, secondSpaceID string) (bool, error) {
 	var alreadyFriends bool
 	if err := tx.QueryRowContext(ctx, `
@@ -377,21 +312,6 @@ func (r *FriendsRepository) DeleteFriendRequest(ctx context.Context, targetSpace
 	return nil
 }
 
-func (r *FriendsRepository) UpsertShare(ctx context.Context, spaceID string, friendSpaceID string, friendSealedSpaceKey []byte, keyVersion int) error {
-	return upsertFriendShare(ctx, r.DB, friendShareMutation{
-		SpaceID:              spaceID,
-		FriendSpaceID:        friendSpaceID,
-		FriendSealedSpaceKey: friendSealedSpaceKey,
-		KeyVersion:           keyVersion,
-	})
-}
-
-func (r *FriendsRepository) UpdateShare(ctx context.Context, spaceID string, friendSpaceID string, friendSealedSpaceKey []byte, keyVersion int) error {
-	return r.UpdateShares(ctx, spaceID, []SpaceShareUpdateRecord{
-		{FriendSpaceID: friendSpaceID, FriendSealedSpaceKey: friendSealedSpaceKey},
-	}, keyVersion)
-}
-
 func (r *FriendsRepository) UpdateShares(ctx context.Context, spaceID string, shares []SpaceShareUpdateRecord, keyVersion int) error {
 	if len(shares) == 0 {
 		return nil
@@ -471,11 +391,6 @@ func (r *FriendsRepository) DeleteFriendship(ctx context.Context, actorSpaceID s
 	return stacktrace.Propagate(tx.Commit(), "")
 }
 
-func (r *FriendsRepository) DeleteShareBySpaceAndFriend(ctx context.Context, spaceID string, friendSpaceID string) error {
-	_, err := r.DB.ExecContext(ctx, `DELETE FROM space_friend_shares WHERE space_id = $1 AND friend_space_id = $2`, spaceID, friendSpaceID)
-	return stacktrace.Propagate(err, "")
-}
-
 func (r *FriendsRepository) GetShareForFriendAndSpace(ctx context.Context, friendSpaceID string, spaceID string) (*SpaceShareRecord, error) {
 	return scanShareRecord(r.DB.QueryRowContext(ctx, `
 		SELECT s.space_id, friend_space.owner_id, w.owner_id, w.space_slug, s.friend_sealed_space_key, s.key_version, s.created_at, w.public_key
@@ -485,31 +400,6 @@ func (r *FriendsRepository) GetShareForFriendAndSpace(ctx context.Context, frien
 		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
 		WHERE s.friend_space_id = $1 AND s.space_id = $2
 	`, friendSpaceID, spaceID))
-}
-
-func (r *FriendsRepository) ListSharesForFriend(ctx context.Context, friendID int64) ([]SpaceShareRecord, error) {
-	rows, err := r.DB.QueryContext(ctx, `
-		SELECT s.space_id, friend_space.owner_id, w.owner_id, w.space_slug, s.friend_sealed_space_key, s.key_version, s.created_at, w.public_key
-		FROM space_friend_shares s
-		JOIN spaces w ON w.space_id = s.space_id
-		JOIN spaces friend_space ON friend_space.space_id = s.friend_space_id
-		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
-		WHERE friend_space.owner_id = $1
-		ORDER BY s.created_at ASC
-	`, friendID)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	defer rows.Close()
-	var out []SpaceShareRecord
-	for rows.Next() {
-		rec, err := scanShareRecord(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, *rec)
-	}
-	return out, stacktrace.Propagate(rows.Err(), "")
 }
 
 func (r *FriendsRepository) ListSharesForFriendAndSpace(ctx context.Context, friendSpaceID string) ([]SpaceShareRecord, error) {
