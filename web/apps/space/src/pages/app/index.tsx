@@ -100,7 +100,7 @@ const Page: React.FC = () => {
         setIsFeedLoading(true);
         setIsFeedLoadingMore(false);
         setIsFriendsLoading(true);
-        void loadCurrentFeedPage()
+        void loadCurrentFeedPage(spaceId)
             .then((feed) => {
                 if (cancelled) return;
 
@@ -117,7 +117,7 @@ const Page: React.FC = () => {
                 }
             });
 
-        void loadCurrentUnreadStatus()
+        void loadCurrentUnreadStatus(spaceId)
             .then((unreadStatus) => {
                 if (!cancelled) {
                     setHasUnreadMessages(unreadStatus.messagesUnread);
@@ -149,11 +149,12 @@ const Page: React.FC = () => {
     ]);
 
     const loadMoreFeedItems = React.useCallback(async () => {
-        if (!feedNextCursor || isFeedLoadingMore) return;
+        const spaceId = profile?.spaceId;
+        if (!spaceId || !feedNextCursor || isFeedLoadingMore) return;
 
         setIsFeedLoadingMore(true);
         try {
-            const feed = await loadCurrentFeedPage(feedNextCursor);
+            const feed = await loadCurrentFeedPage(spaceId, feedNextCursor);
             setFeedItems((currentItems) => {
                 const existingPostIds = new Set(
                     currentItems.map((item) => item.postId),
@@ -171,11 +172,14 @@ const Page: React.FC = () => {
         } finally {
             setIsFeedLoadingMore(false);
         }
-    }, [feedNextCursor, isFeedLoadingMore]);
+    }, [feedNextCursor, isFeedLoadingMore, profile?.spaceId]);
 
     const setFeedPostLiked = React.useCallback(
         async (postId: number, liked: boolean) => {
-            await setCurrentPostLiked(postId, liked);
+            const spaceId = profile?.spaceId;
+            if (!spaceId) throw new Error("Missing space.");
+
+            await setCurrentPostLiked(spaceId, postId, liked);
             setFeedItems((currentItems) =>
                 currentItems.map((item) =>
                     item.postId == postId
@@ -184,7 +188,7 @@ const Page: React.FC = () => {
                 ),
             );
         },
-        [],
+        [profile?.spaceId],
     );
 
     if (
@@ -305,7 +309,14 @@ const Page: React.FC = () => {
                         ? () => void router.push(spaceRoutes.profile)
                         : undefined
                 }
-                onReplyToPost={replyToCurrentPost}
+                onReplyToPost={
+                    profile?.spaceId
+                        ? (
+                              (spaceId) => (postId: number, text: string) =>
+                                  replyToCurrentPost(spaceId, postId, text)
+                          )(profile.spaceId)
+                        : undefined
+                }
                 onSetPostLiked={setFeedPostLiked}
                 profileLink={
                     profile

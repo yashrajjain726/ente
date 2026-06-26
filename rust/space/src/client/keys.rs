@@ -19,8 +19,12 @@ impl AccountSpaceCtx {
     pub async fn list_space_key_versions(
         &self,
         space_id: &str,
+        viewer_space_id: Option<&str>,
     ) -> Result<Vec<SpaceKeyVersionResponse>> {
-        let query = vec![("spaceId", space_id.to_owned())];
+        let mut query = vec![("spaceId", space_id.to_owned())];
+        if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
+            query.push(("viewerSpaceId", value.to_owned()));
+        }
         self.client()
             .get_json("/space/versions", &query)
             .await
@@ -44,7 +48,26 @@ impl AccountSpaceCtx {
             .resolve_space_access(space_id)
             .await?
             .ok_or_else(|| SpaceError::InvalidInput(format!("no access to space {space_id}")))?;
-        let versions = self.list_space_key_versions(space_id).await?;
+        let versions = self.list_space_key_versions(space_id, None).await?;
+        build_space_key_history_map(access.key_version, &access.space_key, &versions)
+    }
+
+    pub async fn build_space_key_history_for_space_for_viewer(
+        &self,
+        space_id: &str,
+        viewer_space_id: Option<&str>,
+    ) -> Result<BTreeMap<i32, Vec<u8>>> {
+        let access = match viewer_space_id.filter(|value| !value.trim().is_empty()) {
+            Some(viewer_space_id) => {
+                self.resolve_space_access_for(viewer_space_id, space_id)
+                    .await?
+            }
+            None => self.resolve_space_access(space_id).await?,
+        }
+        .ok_or_else(|| SpaceError::InvalidInput(format!("no access to space {space_id}")))?;
+        let versions = self
+            .list_space_key_versions(space_id, viewer_space_id)
+            .await?;
         build_space_key_history_map(access.key_version, &access.space_key, &versions)
     }
 
@@ -60,7 +83,10 @@ impl AccountSpaceCtx {
                 SpaceError::InvalidInput(format!("space {space_id} is not owned by the account"))
             })?;
         let current_profile = if profile.is_none() {
-            Some(self.get_space_profile_decrypted(space_id, None).await?)
+            Some(
+                self.get_space_profile_decrypted(space_id, None, None)
+                    .await?,
+            )
         } else {
             None
         };

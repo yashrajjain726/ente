@@ -207,7 +207,7 @@ const avatarURLForRemoteAvatar = async (
     if (!avatar?.objectID) return null;
     return await cachedSpaceMediaBlobURL(
         spaceProfileMediaCacheKey(spaceId, "avatar", avatar.objectID),
-        () => ctx.download_space_avatar(spaceId, avatar.objectID),
+        () => ctx.download_space_avatar(spaceId, spaceId, avatar.objectID),
     );
 };
 
@@ -219,7 +219,7 @@ const coverURLForRemoteCover = async (
     if (!cover?.objectID) return null;
     return await cachedSpaceMediaBlobURL(
         spaceProfileMediaCacheKey(spaceId, "cover", cover.objectID),
-        () => ctx.download_space_cover(spaceId, cover.objectID),
+        () => ctx.download_space_cover(spaceId, spaceId, cover.objectID),
     );
 };
 
@@ -255,6 +255,7 @@ export const loadExistingSpaceProfile = async () => {
     if (!space) return null;
 
     const spaceProfile = (await ctx.get_space_profile(
+        space.spaceId,
         space.spaceId,
     )) as DecryptedSpaceProfile;
     return profileFromDecryptedSpaceProfile(spaceProfile);

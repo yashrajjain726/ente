@@ -198,14 +198,18 @@ impl AccountSpaceCtx {
     pub async fn get_profile_asset_url(
         &self,
         space_id: &str,
+        viewer_space_id: Option<&str>,
         asset_type: &str,
         object_id: &str,
     ) -> Result<AssetDownloadResponse> {
-        let query = vec![
+        let mut query = vec![
             ("spaceId", space_id.to_owned()),
             ("assetType", asset_type.to_owned()),
             ("objectID", object_id.to_owned()),
         ];
+        if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
+            query.push(("viewerSpaceId", value.to_owned()));
+        }
         self.client()
             .get_json("/space/assets/redirect", &query)
             .await
@@ -215,12 +219,13 @@ impl AccountSpaceCtx {
     pub async fn download_profile_asset(
         &self,
         space_id: &str,
+        viewer_space_id: Option<&str>,
         asset_type: &str,
         object_id: &str,
         key: &[u8],
     ) -> Result<Vec<u8>> {
         let download = self
-            .get_profile_asset_url(space_id, asset_type, object_id)
+            .get_profile_asset_url(space_id, viewer_space_id, asset_type, object_id)
             .await?;
         let encrypted = self
             .client()
@@ -233,12 +238,16 @@ impl AccountSpaceCtx {
     pub async fn get_asset_url(
         &self,
         space_id: &str,
+        viewer_space_id: Option<&str>,
         object_key: &str,
     ) -> Result<AssetDownloadResponse> {
-        let query = vec![
+        let mut query = vec![
             ("spaceId", space_id.to_owned()),
             ("objectKey", object_key.to_owned()),
         ];
+        if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
+            query.push(("viewerSpaceId", value.to_owned()));
+        }
         self.client()
             .get_json("/space/assets/redirect", &query)
             .await
@@ -248,9 +257,12 @@ impl AccountSpaceCtx {
     pub async fn download_encrypted_asset(
         &self,
         space_id: &str,
+        viewer_space_id: Option<&str>,
         object_key: &str,
     ) -> Result<Vec<u8>> {
-        let download = self.get_asset_url(space_id, object_key).await?;
+        let download = self
+            .get_asset_url(space_id, viewer_space_id, object_key)
+            .await?;
         self.client()
             .object_store()
             .get_bytes(&download.url)
@@ -261,10 +273,13 @@ impl AccountSpaceCtx {
     pub async fn download_decrypted_asset(
         &self,
         space_id: &str,
+        viewer_space_id: Option<&str>,
         object_key: &str,
         key: &[u8],
     ) -> Result<Vec<u8>> {
-        let encrypted = self.download_encrypted_asset(space_id, object_key).await?;
+        let encrypted = self
+            .download_encrypted_asset(space_id, viewer_space_id, object_key)
+            .await?;
         crate::crypto::decrypt_asset_payload(key, &encrypted)
     }
 }

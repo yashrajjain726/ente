@@ -23,7 +23,7 @@ func (c *SpacesController) List(ctx *gin.Context, _ models.ListSpacesRequest) ([
 	if err != nil {
 		return nil, err
 	}
-	spaces, err := c.SpacesRepo.ListSpacesByOwner(ctx.Request.Context(), userID)
+	spaces, err := c.SpacesRepo.ListSpacesByOwner(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (c *SpacesController) Create(ctx *gin.Context, req models.CreateSpaceReques
 	if err != nil {
 		return nil, err
 	}
-	space, err := c.SpacesRepo.CreateSpace(ctx.Request.Context(), userID, req.SpaceSlug, rootWrappedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile)
+	space, err := c.SpacesRepo.CreateSpace(ctx, userID, req.SpaceSlug, rootWrappedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile)
 	if err != nil {
 		return nil, err
 	}
@@ -66,21 +66,21 @@ func (c *SpacesController) Create(ctx *gin.Context, req models.CreateSpaceReques
 }
 
 func (c *SpacesController) GetProfile(ctx *gin.Context, req models.GetSpaceProfileRequest) (*models.SpaceProfileResponse, error) {
-	viewer, err := c.auth.resolveViewer(ctx)
+	viewer, err := c.auth.resolveViewer(ctx, req.ViewerSpaceID)
 	if err != nil {
 		return nil, err
 	}
-	space, err := c.SpacesRepo.GetSpaceByID(ctx.Request.Context(), strings.TrimSpace(req.SpaceID))
+	space, err := c.SpacesRepo.GetSpaceByID(ctx, strings.TrimSpace(req.SpaceID))
 	if err != nil {
 		return nil, err
 	}
-	if err := c.auth.canViewSpace(ctx.Request.Context(), viewer, space); err != nil {
+	if err := c.auth.canViewSpace(ctx, viewer, space); err != nil {
 		return nil, err
 	}
 	friendsCount := int64(0)
 	if c.auth.FriendsRepo != nil {
 		var err error
-		friendsCount, err = c.auth.FriendsRepo.CountFriendsForSpace(ctx.Request.Context(), space.SpaceID)
+		friendsCount, err = c.auth.FriendsRepo.CountFriendsForSpace(ctx, space.SpaceID)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +90,7 @@ func (c *SpacesController) GetProfile(ctx *gin.Context, req models.GetSpaceProfi
 			return nil, ente.NewBadRequestWithMessage("invalid version")
 		}
 		if *req.Version != space.CurrentVersion {
-			version, err := c.SpacesRepo.GetVersion(ctx.Request.Context(), space.SpaceID, *req.Version)
+			version, err := c.SpacesRepo.GetVersion(ctx, space.SpaceID, *req.Version)
 			if err != nil {
 				return nil, err
 			}
@@ -135,7 +135,7 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 		return nil, ente.NewBadRequestWithMessage("cover and removeCover cannot both be set")
 	}
 	spaceID := strings.TrimSpace(req.SpaceID)
-	current, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, spaceID)
+	current, err := c.auth.requireSpaceOwner(ctx, userID, spaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 	if err != nil {
 		return nil, err
 	}
-	space, err := c.SpacesRepo.UpdateProfile(ctx.Request.Context(), userID, spaceID, req.KeyVersion, encryptedProfile, avatar, cover, req.RemoveAvatar, req.RemoveCover)
+	space, err := c.SpacesRepo.UpdateProfile(ctx, userID, spaceID, req.KeyVersion, encryptedProfile, avatar, cover, req.RemoveAvatar, req.RemoveCover)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
@@ -191,11 +191,11 @@ func (c *SpacesController) UpdateSlug(ctx *gin.Context, spaceID string, req mode
 	if strings.TrimSpace(req.SpaceSlug) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceSlug is required")
 	}
-	space, err := c.SpacesRepo.UpdateSlug(ctx.Request.Context(), userID, strings.TrimSpace(spaceID), req.SpaceSlug)
+	space, err := c.SpacesRepo.UpdateSlug(ctx, userID, strings.TrimSpace(spaceID), req.SpaceSlug)
 	if err != nil {
 		return nil, err
 	}
-	publicKey, err := c.SpacesRepo.GetOwnerPublicKey(ctx.Request.Context(), space.OwnerID)
+	publicKey, err := c.SpacesRepo.GetOwnerPublicKey(ctx, space.OwnerID)
 	if err != nil {
 		return nil, err
 	}
@@ -203,11 +203,11 @@ func (c *SpacesController) UpdateSlug(ctx *gin.Context, spaceID string, req mode
 }
 
 func (c *SpacesController) LookupBySlug(ctx *gin.Context, spaceSlug string) (*models.SpaceLookupResponse, error) {
-	space, err := c.SpacesRepo.GetActiveSpaceBySlug(ctx.Request.Context(), spaceSlug)
+	space, err := c.SpacesRepo.GetActiveSpaceBySlug(ctx, spaceSlug)
 	if err != nil {
 		return nil, err
 	}
-	publicKey, err := c.SpacesRepo.GetOwnerPublicKey(ctx.Request.Context(), space.OwnerID)
+	publicKey, err := c.SpacesRepo.GetOwnerPublicKey(ctx, space.OwnerID)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func (c *SpacesController) SlugAvailability(ctx *gin.Context, spaceSlug string) 
 	if err != nil {
 		return &models.SpaceSlugAvailabilityResponse{Available: false}, nil
 	}
-	if _, err := c.SpacesRepo.GetSpaceBySlug(ctx.Request.Context(), normalizedSlug); err != nil {
+	if _, err := c.SpacesRepo.GetSpaceBySlug(ctx, normalizedSlug); err != nil {
 		if stacktrace.RootCause(err) == sql.ErrNoRows {
 			return &models.SpaceSlugAvailabilityResponse{Available: true}, nil
 		}
@@ -253,14 +253,14 @@ func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKey
 	if err != nil {
 		return nil, err
 	}
-	current, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, req.SpaceID)
+	current, err := c.auth.requireSpaceOwner(ctx, userID, req.SpaceID)
 	if err != nil {
 		return nil, err
 	}
 	if req.KeyVersion != current.CurrentVersion {
 		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
 	}
-	space, err := c.SpacesRepo.RotateKey(ctx.Request.Context(), userID, req.SpaceID, req.KeyVersion, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile)
+	space, err := c.SpacesRepo.RotateKey(ctx, userID, req.SpaceID, req.KeyVersion, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
@@ -271,18 +271,18 @@ func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKey
 }
 
 func (c *SpacesController) ListVersions(ctx *gin.Context, req models.GetSpaceProfileRequest) ([]models.SpaceKeyVersionResponse, error) {
-	viewer, err := c.auth.resolveViewer(ctx)
+	viewer, err := c.auth.resolveViewer(ctx, req.ViewerSpaceID)
 	if err != nil {
 		return nil, err
 	}
-	space, err := c.SpacesRepo.GetSpaceByID(ctx.Request.Context(), strings.TrimSpace(req.SpaceID))
+	space, err := c.SpacesRepo.GetSpaceByID(ctx, strings.TrimSpace(req.SpaceID))
 	if err != nil {
 		return nil, err
 	}
-	if err := c.auth.canViewSpace(ctx.Request.Context(), viewer, space); err != nil {
+	if err := c.auth.canViewSpace(ctx, viewer, space); err != nil {
 		return nil, err
 	}
-	versions, err := c.SpacesRepo.ListVersions(ctx.Request.Context(), space.SpaceID)
+	versions, err := c.SpacesRepo.ListVersions(ctx, space.SpaceID)
 	if err != nil {
 		return nil, err
 	}

@@ -35,22 +35,22 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 	if err != nil {
 		return nil, err
 	}
-	requesterSpace, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, strings.TrimSpace(req.RequesterSpaceID))
+	requesterSpace, err := c.auth.requireSpaceOwner(ctx, userID, strings.TrimSpace(req.RequesterSpaceID))
 	if err != nil {
 		return nil, err
 	}
 	var targetSpace *repo.SpaceRecord
 	switch {
 	case strings.TrimSpace(req.TargetSpaceID) != "":
-		targetSpace, err = c.SpacesRepo.GetSpaceByID(ctx.Request.Context(), strings.TrimSpace(req.TargetSpaceID))
+		targetSpace, err = c.SpacesRepo.GetSpaceByID(ctx, strings.TrimSpace(req.TargetSpaceID))
 	case strings.TrimSpace(req.TargetUsername) != "":
-		targetSpace, err = c.SpacesRepo.GetSpaceBySlug(ctx.Request.Context(), strings.TrimSpace(req.TargetUsername))
+		targetSpace, err = c.SpacesRepo.GetSpaceBySlug(ctx, strings.TrimSpace(req.TargetUsername))
 	}
 	if err != nil {
 		return nil, err
 	}
 	request, created, err := c.FriendsRepo.CreateFriendRequest(
-		ctx.Request.Context(),
+		ctx,
 		userID,
 		requesterSpace.SpaceID,
 		targetSpace.SpaceID,
@@ -75,16 +75,12 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 	return &models.FriendStatusResponse{Status: "requested"}, nil
 }
 
-func (c *FriendsController) ListRequests(ctx *gin.Context) ([]models.SpaceFriendRequestResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
+func (c *FriendsController) ListRequests(ctx *gin.Context, req models.ListFriendRequestsRequest) ([]models.SpaceFriendRequestResponse, error) {
+	userID, space, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
 	if err != nil {
 		return nil, err
 	}
-	space, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
-	if err != nil {
-		return nil, err
-	}
-	requests, err := c.FriendsRepo.ListFriendRequestsForSpace(ctx.Request.Context(), userID, space.SpaceID)
+	requests, err := c.FriendsRepo.ListFriendRequestsForSpace(ctx, userID, space.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +96,7 @@ func (c *FriendsController) ListRequests(ctx *gin.Context) ([]models.SpaceFriend
 }
 
 func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestIDValue string, req models.ConfirmFriendRequestPayload) (*models.FriendStatusResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
+	userID, targetSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -115,12 +111,8 @@ func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestIDValue stri
 	if err != nil {
 		return nil, err
 	}
-	targetSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
-	if err != nil {
-		return nil, err
-	}
 	requesterID, created, err := c.FriendsRepo.ConfirmFriendRequest(
-		ctx.Request.Context(),
+		ctx,
 		userID,
 		targetSpace.SpaceID,
 		requestID,
@@ -139,8 +131,8 @@ func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestIDValue stri
 	return &models.FriendStatusResponse{Status: "friend"}, nil
 }
 
-func (c *FriendsController) DeleteRequest(ctx *gin.Context, requestIDValue string) error {
-	userID, err := c.auth.requireUser(ctx)
+func (c *FriendsController) DeleteRequest(ctx *gin.Context, requestIDValue string, req models.DeleteFriendRequestRequest) error {
+	userID, targetSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
 	if err != nil {
 		return err
 	}
@@ -148,7 +140,7 @@ func (c *FriendsController) DeleteRequest(ctx *gin.Context, requestIDValue strin
 	if err != nil || requestID <= 0 {
 		return ente.ErrBadRequest
 	}
-	if err := c.FriendsRepo.DeleteFriendRequest(ctx.Request.Context(), userID, requestID); err != nil {
+	if err := c.FriendsRepo.DeleteFriendRequest(ctx, userID, targetSpace.SpaceID, requestID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return ente.ErrNotFound
 		}
@@ -158,27 +150,23 @@ func (c *FriendsController) DeleteRequest(ctx *gin.Context, requestIDValue strin
 }
 
 func (c *FriendsController) Unfriend(ctx *gin.Context, req models.FriendTargetPayload) error {
-	userID, err := c.auth.requireUser(ctx)
-	if err != nil {
-		return err
-	}
-	actorSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	userID, actorSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
 	if err != nil {
 		return err
 	}
 	var space *repo.SpaceRecord
 	switch {
 	case req.TargetSpaceID != nil && strings.TrimSpace(*req.TargetSpaceID) != "":
-		space, err = c.SpacesRepo.GetSpaceByID(ctx.Request.Context(), strings.TrimSpace(*req.TargetSpaceID))
+		space, err = c.SpacesRepo.GetSpaceByID(ctx, strings.TrimSpace(*req.TargetSpaceID))
 	case req.TargetUsername != nil && strings.TrimSpace(*req.TargetUsername) != "":
-		space, err = c.SpacesRepo.GetSpaceBySlug(ctx.Request.Context(), strings.TrimSpace(*req.TargetUsername))
+		space, err = c.SpacesRepo.GetSpaceBySlug(ctx, strings.TrimSpace(*req.TargetUsername))
 	default:
 		return ente.NewBadRequestWithMessage("targetUsername or targetSpaceId is required")
 	}
 	if err != nil {
 		return err
 	}
-	return c.FriendsRepo.DeleteFriendship(ctx.Request.Context(), userID, actorSpace.SpaceID, space.SpaceID)
+	return c.FriendsRepo.DeleteFriendship(ctx, userID, actorSpace.SpaceID, space.SpaceID)
 }
 
 func (c *FriendsController) ListFriends(ctx *gin.Context, req models.ListSpaceFriendsRequest) ([]models.SpaceFriendResponse, error) {
@@ -186,11 +174,11 @@ func (c *FriendsController) ListFriends(ctx *gin.Context, req models.ListSpaceFr
 	if err != nil {
 		return nil, err
 	}
-	space, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, req.SpaceID)
+	space, err := c.auth.requireSpaceOwner(ctx, userID, req.SpaceID)
 	if err != nil {
 		return nil, err
 	}
-	friends, err := c.FriendsRepo.ListFriendsForSpace(ctx.Request.Context(), space.SpaceID)
+	friends, err := c.FriendsRepo.ListFriendsForSpace(ctx, space.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +194,7 @@ func (c *FriendsController) ListFriends(ctx *gin.Context, req models.ListSpaceFr
 }
 
 func (c *FriendsController) Relationship(ctx *gin.Context, req models.FriendRelationshipRequest) (*models.FriendRelationshipResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
+	userID, viewerSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -214,15 +202,11 @@ func (c *FriendsController) Relationship(ctx *gin.Context, req models.FriendRela
 	if targetSpaceID == "" {
 		return nil, ente.NewBadRequestWithMessage("targetSpaceId is required")
 	}
-	targetSpace, err := c.SpacesRepo.GetSpaceByID(ctx.Request.Context(), targetSpaceID)
+	targetSpace, err := c.SpacesRepo.GetSpaceByID(ctx, targetSpaceID)
 	if err != nil {
 		return nil, err
 	}
-	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
-	if err != nil {
-		return nil, err
-	}
-	relationship, err := c.FriendsRepo.GetRelationship(ctx.Request.Context(), userID, viewerSpace.SpaceID, targetSpace.OwnerID, targetSpace.SpaceID)
+	relationship, err := c.FriendsRepo.GetRelationship(ctx, userID, viewerSpace.SpaceID, targetSpace.OwnerID, targetSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +218,7 @@ func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFr
 	if err != nil {
 		return err
 	}
-	space, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, req.SpaceID)
+	space, err := c.auth.requireSpaceOwner(ctx, userID, req.SpaceID)
 	if err != nil {
 		return err
 	}
@@ -258,7 +242,7 @@ func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFr
 			FriendSealedSpaceKey: friendSealedSpaceKey,
 		})
 	}
-	if err := c.FriendsRepo.UpdateShares(ctx.Request.Context(), space.SpaceID, updates, req.KeyVersion); err != nil {
+	if err := c.FriendsRepo.UpdateShares(ctx, space.SpaceID, updates, req.KeyVersion); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return ente.NewBadRequestWithMessage("keyVersion does not match current space version or friend share does not exist")
 		}
@@ -267,12 +251,12 @@ func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFr
 	return nil
 }
 
-func (c *FriendsController) ListShares(ctx *gin.Context) ([]models.FriendShareResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
+func (c *FriendsController) ListShares(ctx *gin.Context, req models.ListFriendSharesRequest) ([]models.FriendShareResponse, error) {
+	userID, space, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
 	if err != nil {
 		return nil, err
 	}
-	shares, err := c.FriendsRepo.ListSharesForFriend(ctx.Request.Context(), userID)
+	shares, err := c.FriendsRepo.ListSharesForFriendAndSpace(ctx, userID, space.SpaceID)
 	if err != nil {
 		return nil, err
 	}

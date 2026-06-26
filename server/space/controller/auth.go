@@ -38,19 +38,19 @@ func (a authDeps) requireUser(c *gin.Context) (int64, error) {
 	return userID, nil
 }
 
-func (a authDeps) resolveViewer(c *gin.Context) (*viewerAuth, error) {
+func (a authDeps) resolveViewer(c *gin.Context, rawViewerSpaceID string) (*viewerAuth, error) {
+	viewerSpaceID := strings.TrimSpace(rawViewerSpaceID)
 	token := auth.GetToken(c)
 	if token != "" && a.UserAuthRepo != nil {
 		userID, expired, err := a.UserAuthRepo.GetUserIDWithToken(token, auth.GetApp(c))
 		if err == nil && !expired && userID > 0 {
 			viewer := &viewerAuth{UserID: userID}
-			if a.SpacesRepo != nil {
-				space, err := a.SpacesRepo.GetDefaultSpaceByOwner(c.Request.Context(), userID)
-				if err == nil {
-					viewer.SpaceID = space.SpaceID
-				} else if !errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+			if viewerSpaceID != "" {
+				space, err := a.requireSpaceOwner(c, userID, viewerSpaceID)
+				if err != nil {
 					return nil, err
 				}
+				viewer.SpaceID = space.SpaceID
 			}
 			return viewer, nil
 		}
@@ -59,6 +59,9 @@ func (a authDeps) resolveViewer(c *gin.Context) (*viewerAuth, error) {
 		}
 	}
 	if token != "" && a.LinksRepo != nil {
+		if viewerSpaceID != "" {
+			return nil, ente.ErrPermissionDenied
+		}
 		sum := sha256.Sum256([]byte(token))
 		session, err := a.LinksRepo.GetSession(c, sum[:])
 		if err != nil {
@@ -79,13 +82,12 @@ func (a authDeps) resolveViewer(c *gin.Context) (*viewerAuth, error) {
 			return nil, err
 		}
 		viewer := &viewerAuth{UserID: session.UserID}
-		if a.SpacesRepo != nil {
-			space, err := a.SpacesRepo.GetDefaultSpaceByOwner(c.Request.Context(), session.UserID)
-			if err == nil {
-				viewer.SpaceID = space.SpaceID
-			} else if !errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
+		if viewerSpaceID != "" {
+			space, err := a.requireSpaceOwner(c, session.UserID, viewerSpaceID)
+			if err != nil {
 				return nil, err
 			}
+			viewer.SpaceID = space.SpaceID
 		}
 		return viewer, nil
 	}
@@ -95,6 +97,22 @@ func (a authDeps) resolveViewer(c *gin.Context) (*viewerAuth, error) {
 	return nil, ente.ErrAuthenticationRequired
 }
 
+func (a authDeps) requireSelectedSpace(c *gin.Context, rawSpaceID string) (int64, *spacerepo.SpaceRecord, error) {
+	userID, err := a.requireUser(c)
+	if err != nil {
+		return 0, nil, err
+	}
+	spaceID := strings.TrimSpace(rawSpaceID)
+	if spaceID == "" {
+		return 0, nil, ente.NewBadRequestWithMessage("spaceId is required")
+	}
+	space, err := a.requireSpaceOwner(c, userID, spaceID)
+	if err != nil {
+		return 0, nil, err
+	}
+	return userID, space, nil
+}
+
 func (a authDeps) requireSpaceOwner(ctx context.Context, ownerID int64, spaceID string) (*spacerepo.SpaceRecord, error) {
 	space, err := a.SpacesRepo.GetSpaceByID(ctx, spaceID)
 	if err != nil {
@@ -102,17 +120,6 @@ func (a authDeps) requireSpaceOwner(ctx context.Context, ownerID int64, spaceID 
 	}
 	if space.OwnerID != ownerID {
 		return nil, ente.ErrPermissionDenied
-	}
-	return space, nil
-}
-
-func (a authDeps) requireDefaultSpace(ctx context.Context, ownerID int64) (*spacerepo.SpaceRecord, error) {
-	space, err := a.SpacesRepo.GetDefaultSpaceByOwner(ctx, ownerID)
-	if err != nil {
-		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
-			return nil, ente.NewBadRequestWithMessage("space is missing")
-		}
-		return nil, err
 	}
 	return space, nil
 }

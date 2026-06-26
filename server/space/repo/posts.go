@@ -364,7 +364,7 @@ func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, curs
 	return out, nextCursor, nil
 }
 
-func (r *PostsRepository) UpdateCaption(ctx context.Context, postID, ownerID int64, captionCipher []byte) error {
+func (r *PostsRepository) UpdateCaption(ctx context.Context, postID, ownerID int64, spaceID string, captionCipher []byte) error {
 	caption := []byte{}
 	if captionCipher != nil {
 		caption = captionCipher
@@ -376,8 +376,9 @@ func (r *PostsRepository) UpdateCaption(ctx context.Context, postID, ownerID int
 		WHERE p.post_id = $2
 		  AND p.space_id = s.space_id
 		  AND s.owner_id = $3
+		  AND p.space_id = $4
 		  AND p.is_deleted = FALSE
-	`, caption, postID, ownerID)
+	`, caption, postID, ownerID, spaceID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}

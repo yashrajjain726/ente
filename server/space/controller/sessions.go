@@ -34,7 +34,7 @@ func (c *SessionsController) CreateBrowserSession(ctx *gin.Context, userID int64
 	}
 	sessionHash := sha256.Sum256([]byte(sessionToken))
 	expiresAt := timeutil.NDaysFromNow(spaceBrowserSessionDurationDays)
-	if err := c.SessionsRepo.CreateBrowserSession(ctx.Request.Context(), sessionHash[:], userID, sessionWrapKey, expiresAt); err != nil {
+	if err := c.SessionsRepo.CreateBrowserSession(ctx, sessionHash[:], userID, sessionWrapKey, expiresAt); err != nil {
 		return nil, err
 	}
 	return &CreatedBrowserSession{
@@ -61,7 +61,7 @@ func validateBrowserSession(ctx *gin.Context, sessionsRepo *repo.SessionsReposit
 		return nil, ente.ErrAuthenticationRequired
 	}
 	sessionHash := sha256.Sum256([]byte(sessionToken))
-	session, err := sessionsRepo.GetBrowserSession(ctx.Request.Context(), sessionHash[:])
+	session, err := sessionsRepo.GetBrowserSession(ctx, sessionHash[:])
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.ErrAuthenticationRequired
@@ -69,10 +69,10 @@ func validateBrowserSession(ctx *gin.Context, sessionsRepo *repo.SessionsReposit
 		return nil, err
 	}
 	if session.ExpiresAt <= timeutil.Microseconds() {
-		_ = sessionsRepo.DeleteBrowserSession(ctx.Request.Context(), sessionHash[:])
+		_ = sessionsRepo.DeleteBrowserSession(ctx, sessionHash[:])
 		return nil, ente.ErrAuthenticationRequired
 	}
-	if err := sessionsRepo.TouchBrowserSession(ctx.Request.Context(), sessionHash[:]); err != nil {
+	if err := sessionsRepo.TouchBrowserSession(ctx, sessionHash[:]); err != nil {
 		return nil, err
 	}
 	return session, nil
@@ -83,5 +83,5 @@ func (c *SessionsController) RevokeBrowserSession(ctx *gin.Context, sessionToken
 		return nil
 	}
 	sessionHash := sha256.Sum256([]byte(sessionToken))
-	return c.SessionsRepo.DeleteBrowserSession(ctx.Request.Context(), sessionHash[:])
+	return c.SessionsRepo.DeleteBrowserSession(ctx, sessionHash[:])
 }

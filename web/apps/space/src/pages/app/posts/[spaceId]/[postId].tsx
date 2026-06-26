@@ -77,7 +77,12 @@ const Page: React.FC = () => {
     }, [profile, profileLoadStatus, router]);
 
     React.useEffect(() => {
-        if (profileLoadStatus != "ready" || !profile || !spaceId || !postId) {
+        if (
+            profileLoadStatus != "ready" ||
+            !profile?.spaceId ||
+            !spaceId ||
+            !postId
+        ) {
             return;
         }
 
@@ -86,7 +91,7 @@ const Page: React.FC = () => {
         setPostLoadError(undefined);
         setIsPostLoading(true);
 
-        void loadCurrentSpacePost(spaceId, postId)
+        void loadCurrentSpacePost(spaceId, postId, profile.spaceId)
             .then((nextPost) => {
                 if (cancelled) return;
                 if (!nextPost) {
@@ -106,7 +111,7 @@ const Page: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, [postRouteKey, profile, profileLoadStatus, spaceId, postId]);
+    }, [postRouteKey, profile?.spaceId, profileLoadStatus, spaceId, postId]);
 
     const ownerProfileRoute = React.useCallback(() => {
         const ownerSpaceId = post?.spaceId ?? spaceId;
@@ -139,6 +144,15 @@ const Page: React.FC = () => {
             />
         );
     }
+    const actorSpaceId = profile.spaceId;
+    if (!actorSpaceId) {
+        return (
+            <SpaceRouteFallback
+                background="#FFFFFF"
+                message={postLoadError || profileLoadError}
+            />
+        );
+    }
 
     return (
         <>
@@ -148,8 +162,15 @@ const Page: React.FC = () => {
                 postActionMode={isOwnPost ? "hidden" : "like-only"}
                 onClose={closePost}
                 onOpenProfile={() => void router.push(ownerProfileRoute())}
-                onReplyToPost={isOwnPost ? undefined : replyToCurrentPost}
-                onSetPostLiked={setCurrentPostLiked}
+                onReplyToPost={
+                    isOwnPost
+                        ? undefined
+                        : (nextPostId, text) =>
+                              replyToCurrentPost(actorSpaceId, nextPostId, text)
+                }
+                onSetPostLiked={(nextPostId, liked) =>
+                    setCurrentPostLiked(actorSpaceId, nextPostId, liked)
+                }
             />
         </>
     );

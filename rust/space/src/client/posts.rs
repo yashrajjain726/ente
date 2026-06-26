@@ -67,10 +67,14 @@ impl AccountSpaceCtx {
     pub async fn list_posts(
         &self,
         space_id: &str,
+        viewer_space_id: Option<&str>,
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<PostPage> {
         let mut query = vec![("spaceId", space_id.to_owned())];
+        if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
+            query.push(("viewerSpaceId", value.to_owned()));
+        }
         if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
             query.push(("cursor", value));
         }
@@ -83,8 +87,13 @@ impl AccountSpaceCtx {
             .map_err(Into::into)
     }
 
-    pub async fn list_feed(&self, cursor: Option<String>, limit: Option<i32>) -> Result<FeedPage> {
-        let mut query = Vec::new();
+    pub async fn list_feed(
+        &self,
+        space_id: &str,
+        cursor: Option<String>,
+        limit: Option<i32>,
+    ) -> Result<FeedPage> {
+        let mut query = vec![("spaceId", space_id.to_owned())];
         if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
             query.push(("cursor", value));
         }
@@ -97,18 +106,24 @@ impl AccountSpaceCtx {
             .map_err(Into::into)
     }
 
-    pub async fn unread_status(&self) -> Result<SpaceUnreadStatusResponse> {
+    pub async fn unread_status(&self, space_id: &str) -> Result<SpaceUnreadStatusResponse> {
+        let query = vec![("spaceId", space_id.to_owned())];
         self.client()
-            .get_json("/space/unread", &[])
+            .get_json("/space/unread", &query)
             .await
             .map_err(Into::into)
     }
 
     pub async fn mark_notifications_read(
         &self,
+        space_id: impl Into<String>,
         friend_space_id: impl Into<String>,
     ) -> Result<SpaceUnreadStatusResponse> {
+        let space_id = space_id.into();
         let friend_space_id = friend_space_id.into();
+        if space_id.trim().is_empty() {
+            return Err(SpaceError::InvalidInput("space id is required".into()));
+        }
         if friend_space_id.trim().is_empty() {
             return Err(SpaceError::InvalidInput(
                 "friend space id is required".into(),
@@ -117,27 +132,58 @@ impl AccountSpaceCtx {
         self.client()
             .post_json(
                 "/space/messages/read",
-                &MarkNotificationsReadRequest { friend_space_id },
+                &MarkNotificationsReadRequest {
+                    space_id,
+                    friend_space_id,
+                },
             )
             .await
             .map_err(Into::into)
     }
 
-    pub async fn get_post(&self, post_id: i64) -> Result<PostResponse> {
+    pub async fn get_post(
+        &self,
+        post_id: i64,
+        viewer_space_id: Option<&str>,
+    ) -> Result<PostResponse> {
         let path = format!("/space/posts/{post_id}");
-        self.client().get_json(&path, &[]).await.map_err(Into::into)
-    }
-
-    pub async fn fetch_post_decrypted(&self, post_id: i64) -> Result<DecryptedPost> {
-        let post = self.get_post(post_id).await?;
-        self.decrypt_post_for_space(&post.space_id, &post).await
-    }
-
-    pub async fn download_post_asset(&self, post_id: i64, object_key: &str) -> Result<Vec<u8>> {
-        let post = self.get_post(post_id).await?;
-        let decrypted = self.decrypt_post_for_space(&post.space_id, &post).await?;
-        self.download_decrypted_asset(&post.space_id, object_key, &decrypted.post_key)
+        let mut query = Vec::new();
+        if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
+            query.push(("viewerSpaceId", value.to_owned()));
+        }
+        self.client()
+            .get_json(&path, &query)
             .await
+            .map_err(Into::into)
+    }
+
+    pub async fn fetch_post_decrypted(
+        &self,
+        post_id: i64,
+        viewer_space_id: Option<&str>,
+    ) -> Result<DecryptedPost> {
+        let post = self.get_post(post_id, viewer_space_id).await?;
+        self.decrypt_post_for_viewer(&post.space_id, viewer_space_id, &post)
+            .await
+    }
+
+    pub async fn download_post_asset(
+        &self,
+        post_id: i64,
+        viewer_space_id: Option<&str>,
+        object_key: &str,
+    ) -> Result<Vec<u8>> {
+        let post = self.get_post(post_id, viewer_space_id).await?;
+        let decrypted = self
+            .decrypt_post_for_viewer(&post.space_id, viewer_space_id, &post)
+            .await?;
+        self.download_decrypted_asset(
+            &post.space_id,
+            viewer_space_id,
+            object_key,
+            &decrypted.post_key,
+        )
+        .await
     }
 
     pub async fn download_post_asset_with_key(
@@ -146,12 +192,19 @@ impl AccountSpaceCtx {
         post_id: i64,
         encrypted_post_key: &str,
         key_version: i32,
+        viewer_space_id: Option<&str>,
         object_key: &str,
     ) -> Result<Vec<u8>> {
         let post_key = self
-            .decrypt_post_key_fields(space_id, post_id, encrypted_post_key, key_version)
+            .decrypt_post_key_fields(
+                space_id,
+                viewer_space_id,
+                post_id,
+                encrypted_post_key,
+                key_version,
+            )
             .await?;
-        self.download_decrypted_asset(space_id, object_key, &post_key)
+        self.download_decrypted_asset(space_id, viewer_space_id, object_key, &post_key)
             .await
     }
 
@@ -167,10 +220,12 @@ impl AccountSpaceCtx {
             }
         }
 
-        let friends_records = self.list_friend_shares().await?;
-        let mut friends = Vec::with_capacity(friends_records.len());
-        for record in &friends_records {
-            friends.push(self.decrypt_friend_share(record).await?);
+        let mut friends = Vec::new();
+        for (space_id, _) in &owned {
+            let friends_records = self.list_friend_shares(space_id).await?;
+            for record in &friends_records {
+                friends.push(self.decrypt_friend_share(space_id, record).await?);
+            }
         }
 
         Ok(HydratedKeys { owned, friends })
@@ -184,12 +239,13 @@ impl AccountSpaceCtx {
     pub async fn decrypt_post_key_fields(
         &self,
         space_id: &str,
+        viewer_space_id: Option<&str>,
         post_id: i64,
         encrypted_post_key: &str,
         key_version: i32,
     ) -> Result<Vec<u8>> {
         let space_key = self
-            .resolve_space_key_for_version(space_id, Some(key_version))
+            .resolve_space_key_for_version_for_viewer(space_id, viewer_space_id, Some(key_version))
             .await?
             .ok_or_else(|| {
                 SpaceError::InvalidInput(format!("missing space key for post {post_id}"))
@@ -201,6 +257,7 @@ impl AccountSpaceCtx {
     pub async fn decrypt_post_caption_fields(
         &self,
         space_id: &str,
+        viewer_space_id: Option<&str>,
         post_id: i64,
         encrypted_post_key: &str,
         key_version: i32,
@@ -210,7 +267,13 @@ impl AccountSpaceCtx {
             return Ok(None);
         }
         let post_key = self
-            .decrypt_post_key_fields(space_id, post_id, encrypted_post_key, key_version)
+            .decrypt_post_key_fields(
+                space_id,
+                viewer_space_id,
+                post_id,
+                encrypted_post_key,
+                key_version,
+            )
             .await?;
         let packed = decode_b64(caption_cipher)?;
         Ok(Some(decrypt_secretbox_payload(&post_key, &packed)?))
@@ -253,8 +316,21 @@ impl AccountSpaceCtx {
         space_id: &str,
         post: &PostResponse,
     ) -> Result<DecryptedPost> {
+        self.decrypt_post_for_viewer(space_id, None, post).await
+    }
+
+    pub async fn decrypt_post_for_viewer(
+        &self,
+        space_id: &str,
+        viewer_space_id: Option<&str>,
+        post: &PostResponse,
+    ) -> Result<DecryptedPost> {
         let space_key = self
-            .resolve_space_key_for_version(space_id, Some(post.key_version))
+            .resolve_space_key_for_version_for_viewer(
+                space_id,
+                viewer_space_id,
+                Some(post.key_version),
+            )
             .await?
             .ok_or_else(|| {
                 SpaceError::InvalidInput(format!(
@@ -294,11 +370,13 @@ impl AccountSpaceCtx {
 
     pub async fn update_post_caption(
         &self,
+        space_id: &str,
         post_id: i64,
         post_key: &[u8],
         caption_plaintext: Option<&[u8]>,
     ) -> Result<()> {
         let request = UpdatePostCaptionRequest {
+            space_id: space_id.to_owned(),
             caption_cipher: match caption_plaintext {
                 Some(value) => Some(encode_b64(&encrypt_secretbox_payload(post_key, value)?)),
                 None => None,
@@ -319,9 +397,17 @@ impl AccountSpaceCtx {
             .map_err(Into::into)
     }
 
-    pub async fn like_post(&self, post_id: i64, like: bool) -> Result<LikePostResponse> {
+    pub async fn like_post(
+        &self,
+        space_id: &str,
+        post_id: i64,
+        like: bool,
+    ) -> Result<LikePostResponse> {
         let path = format!("/space/posts/{post_id}/like");
-        let request = LikePostRequest { like };
+        let request = LikePostRequest {
+            space_id: space_id.to_owned(),
+            like,
+        };
         self.client()
             .post_json(&path, &request)
             .await
@@ -331,10 +417,14 @@ impl AccountSpaceCtx {
     pub async fn list_post_likers(
         &self,
         post_id: i64,
+        viewer_space_id: Option<&str>,
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<ListPostLikersResponse> {
         let mut query = Vec::new();
+        if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
+            query.push(("viewerSpaceId", value.to_owned()));
+        }
         if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
             query.push(("cursor", value));
         }

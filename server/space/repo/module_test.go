@@ -81,12 +81,12 @@ func testCreatePost(ctx context.Context, module *Module, ownerID int64, spaceID 
 	return module.Posts.CreatePost(ctx, ownerID, spaceID, testSpaceBytes(encryptedPostKey), caption, keyVersion, objects)
 }
 
-func testUpdateCaption(ctx context.Context, module *Module, postID int64, ownerID int64, captionCipher *string) error {
+func testUpdateCaption(ctx context.Context, module *Module, postID int64, ownerID int64, spaceID string, captionCipher *string) error {
 	var caption []byte
 	if captionCipher != nil {
 		caption = testSpaceBytes(*captionCipher)
 	}
-	return module.Posts.UpdateCaption(ctx, postID, ownerID, caption)
+	return module.Posts.UpdateCaption(ctx, postID, ownerID, spaceID, caption)
 }
 
 func testCreateEntityKey(ctx context.Context, module *Module, userID int64, keyType string, encryptedKey string) error {
@@ -722,7 +722,7 @@ func TestDeleteFriendRequestClearsUnread(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, aliceUnread)
 
-	require.NoError(t, module.Friends.DeleteFriendRequest(ctx, aliceID, request.RequestID))
+	require.NoError(t, module.Friends.DeleteFriendRequest(ctx, aliceID, aliceSpace.SpaceID, request.RequestID))
 	aliceUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.False(t, aliceUnread)
@@ -759,7 +759,7 @@ func TestFriendRequestsStayOutOfMessageConversations(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, notificationsUnread)
 
-	require.NoError(t, module.Friends.DeleteFriendRequest(ctx, aliceID, request.RequestID))
+	require.NoError(t, module.Friends.DeleteFriendRequest(ctx, aliceID, aliceSpace.SpaceID, request.RequestID))
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Empty(t, conversations)
@@ -1087,7 +1087,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	_, err = module.Posts.GetPost(ctx, postID, bobID, bobSpace.SpaceID)
 	require.Error(t, err)
 
-	err = testUpdateCaption(ctx, module, postID, aliceID, ptr("edited-caption"))
+	err = testUpdateCaption(ctx, module, postID, aliceID, aliceSpace.SpaceID, ptr("edited-caption"))
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
 	ok, err = module.Assets.AssetBelongsToSpace(ctx, aliceSpace.SpaceID, "space/alice/post1/full")

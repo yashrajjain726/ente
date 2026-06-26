@@ -27,7 +27,12 @@ func (h *Handlers) ToggleMessageLike(c *gin.Context) {
 }
 
 func (h *Handlers) DeleteMessage(c *gin.Context) {
-	err := h.Module.Messages.Delete(c, c.Param("messageID"))
+	var req models.DeleteMessageRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		respondJSON(c, nil, ente.ErrBadRequest)
+		return
+	}
+	err := h.Module.Messages.Delete(c, c.Param("messageID"), req)
 	respondJSON(c, nil, err)
 }
 

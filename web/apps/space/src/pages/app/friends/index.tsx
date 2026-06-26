@@ -61,12 +61,18 @@ const Page: React.FC = () => {
                     spaceUsername: profile.username,
                 })}
                 onUnfriend={async (friendID) => {
+                    const actorSpaceId = profile.spaceId;
+                    if (!actorSpaceId) return;
+
                     const friend = friends.find(
                         (candidate) => candidate.id == friendID,
                     );
                     if (!friend?.spaceId) return;
 
-                    await removeCurrentSpaceFriend(friend.spaceId);
+                    await removeCurrentSpaceFriend(
+                        actorSpaceId,
+                        friend.spaceId,
+                    );
                     setFriends((currentFriends) =>
                         currentFriends.filter(
                             (candidate) => candidate.id != friendID,

@@ -65,7 +65,7 @@ const Page: React.FC = () => {
         let cancelled = false;
         setIsPostsLoading(true);
         void Promise.all([
-            loadCurrentSpaceProfilePostsPage(spaceId),
+            loadCurrentSpaceProfilePostsPage(spaceId, spaceId),
             loadCurrentSpaceFriendsCount(spaceId),
         ])
             .then(([page, nextFriendsCount]) => {
@@ -99,6 +99,15 @@ const Page: React.FC = () => {
     }, [isInitialPostsLoading]);
 
     if (profileLoadStatus != "ready" || !profile) {
+        return (
+            <SpaceRouteFallback
+                background={profileBackground}
+                message={profileLoadError}
+            />
+        );
+    }
+    const actorSpaceId = profile.spaceId;
+    if (!actorSpaceId) {
         return (
             <SpaceRouteFallback
                 background={profileBackground}
@@ -193,7 +202,9 @@ const Page: React.FC = () => {
                 }
                 onOpenSettings={() => void router.push(spaceRoutes.settings)}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
-                onSetPostLiked={setCurrentPostLiked}
+                onSetPostLiked={(postId, liked) =>
+                    setCurrentPostLiked(actorSpaceId, postId, liked)
+                }
                 profileLink={spaceInviteURL({
                     spaceUsername: profile.username,
                 })}

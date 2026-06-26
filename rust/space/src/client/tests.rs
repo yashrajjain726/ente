@@ -366,6 +366,10 @@ async fn account_space_key_resolution_is_cached_within_context() {
     let shares = server
         .mock("GET", "/space/friends/shares")
         .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::UrlEncoded(
+            "spaceId".into(),
+            "space_owner_main".into(),
+        ))
         .with_status(200)
         .with_body(
             json!([{
@@ -750,7 +754,13 @@ async fn account_download_profile_avatar_uses_object_id_redirect() {
         .await;
 
     let bytes = ctx
-        .download_profile_asset("space_owner_main", "avatar", "avatar-object", &space_key)
+        .download_profile_asset(
+            "space_owner_main",
+            None,
+            "avatar",
+            "avatar-object",
+            &space_key,
+        )
         .await
         .expect("avatar asset should download and decrypt");
 
@@ -1175,7 +1185,7 @@ async fn get_space_profile_decrypted_loads_and_decrypts_profile() {
         .await;
 
     let decrypted = ctx
-        .get_space_profile_decrypted("space_owner_main", None)
+        .get_space_profile_decrypted("space_owner_main", None, None)
         .await
         .expect("profile should decrypt");
 
@@ -1237,7 +1247,7 @@ async fn add_friend_from_link_creates_friend_request() {
     );
 
     let response = ctx
-        .add_friend_from_link(&link)
+        .add_friend_from_link("space_viewer_main", &link)
         .await
         .expect("friend request should be sent");
 
@@ -1261,7 +1271,8 @@ async fn space_status_mutations_accept_empty_server_responses() {
         .mock("POST", "/space/friends/unfriend")
         .match_header("x-space-session-token", "space-session-token")
         .match_body(Matcher::JsonString(
-            json!({"targetSpaceId": "space_owner_main"}).to_string(),
+            json!({"spaceId": "space_viewer_main", "targetSpaceId": "space_owner_main"})
+                .to_string(),
         ))
         .with_status(200)
         .create_async()
@@ -1270,7 +1281,7 @@ async fn space_status_mutations_accept_empty_server_responses() {
         .mock("POST", "/space/friends/unfriend")
         .match_header("x-space-session-token", "space-session-token")
         .match_body(Matcher::JsonString(
-            json!({"targetUsername": "owner"}).to_string(),
+            json!({"spaceId": "space_viewer_main", "targetUsername": "owner"}).to_string(),
         ))
         .with_status(200)
         .create_async()
@@ -1279,10 +1290,10 @@ async fn space_status_mutations_accept_empty_server_responses() {
     ctx.delete_post(42)
         .await
         .expect("delete post should accept empty response");
-    ctx.unfriend_by_space("space_owner_main")
+    ctx.unfriend_by_space("space_viewer_main", "space_owner_main")
         .await
         .expect("unfriend by space should accept empty response");
-    ctx.unfriend_by_username("owner")
+    ctx.unfriend_by_username("space_viewer_main", "owner")
         .await
         .expect("unfriend by username should accept empty response");
 
@@ -1298,14 +1309,22 @@ async fn update_post_caption_uses_caption_endpoint() {
     let update = server
         .mock("POST", "/space/posts/42/caption")
         .match_header("x-space-session-token", "space-session-token")
-        .match_body(Matcher::Regex("\"captionCipher\":\"[^\"]+\"".into()))
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
+            Matcher::Regex("\"captionCipher\":\"[^\"]+\"".into()),
+        ]))
         .with_status(200)
         .create_async()
         .await;
 
-    ctx.update_post_caption(42, &generate_key(), Some(b"updated caption"))
-        .await
-        .expect("caption update should succeed");
+    ctx.update_post_caption(
+        "space_owner_main",
+        42,
+        &generate_key(),
+        Some(b"updated caption".as_slice()),
+    )
+    .await
+    .expect("caption update should succeed");
 
     update.assert_async().await;
 }
@@ -1317,14 +1336,16 @@ async fn like_post_uses_post_like_endpoint() {
     let like = server
         .mock("POST", "/space/posts/42/like")
         .match_header("x-space-session-token", "space-session-token")
-        .match_body(Matcher::JsonString(json!({"like": true}).to_string()))
+        .match_body(Matcher::JsonString(
+            json!({"spaceId": "space_owner_main", "like": true}).to_string(),
+        ))
         .with_status(200)
         .with_body(json!({"liked": true}).to_string())
         .create_async()
         .await;
 
     let response = ctx
-        .like_post(42, true)
+        .like_post("space_owner_main", 42, true)
         .await
         .expect("post like should succeed");
 
@@ -1339,6 +1360,10 @@ async fn unread_methods_use_read_marker_endpoints() {
     let status = server
         .mock("GET", "/space/unread")
         .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::UrlEncoded(
+            "spaceId".into(),
+            "space_owner_main".into(),
+        ))
         .with_status(200)
         .with_body(json!({"notificationsUnread": false}).to_string())
         .create_async()
@@ -1347,7 +1372,7 @@ async fn unread_methods_use_read_marker_endpoints() {
         .mock("POST", "/space/messages/read")
         .match_header("x-space-session-token", "space-session-token")
         .match_body(Matcher::JsonString(
-            json!({"friendSpaceId": "space_friend"}).to_string(),
+            json!({"spaceId": "space_owner_main", "friendSpaceId": "space_friend"}).to_string(),
         ))
         .with_status(200)
         .with_body(json!({"notificationsUnread": false}).to_string())
@@ -1355,12 +1380,12 @@ async fn unread_methods_use_read_marker_endpoints() {
         .await;
 
     let unread = ctx
-        .unread_status()
+        .unread_status("space_owner_main")
         .await
         .expect("unread status should load");
     assert!(!unread.notifications_unread);
     assert!(
-        !ctx.mark_notifications_read("space_friend")
+        !ctx.mark_notifications_read("space_owner_main", "space_friend")
             .await
             .expect("notifications read")
             .notifications_unread
@@ -1375,22 +1400,8 @@ async fn message_actions_use_message_endpoints() {
     let mut server = Server::new_async().await;
     let space_root_key = generate_key();
     let ctx = test_account_ctx_with_space_root_key(&server.url(), space_root_key.clone());
-    let space_key = generate_key();
     let (friend_public_key, _) = generate_keypair().expect("valid friend keypair");
 
-    let spaces = server
-        .mock("GET", "/space")
-        .match_header("x-space-session-token", "space-session-token")
-        .with_status(200)
-        .with_body(owned_space_response(
-            &space_root_key,
-            &space_key,
-            "space_owner_main",
-            "owner-main",
-            3,
-        ))
-        .create_async()
-        .await;
     let friends = server
         .mock("GET", "/space/friends")
         .match_header("x-space-session-token", "space-session-token")
@@ -1418,6 +1429,7 @@ async fn message_actions_use_message_endpoints() {
         .mock("POST", "/space/messages/space_friend")
         .match_header("x-space-session-token", "space-session-token")
         .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"spaceId\":\"space_owner_main\"".into()),
             Matcher::Regex("\"replyMessageId\":\"wmsg_parent\"".into()),
             Matcher::Regex("\"messageCipher\":\"[^\"]+\"".into()),
             Matcher::Regex("\"senderEncryptedMessageKey\":\"[^\"]+\"".into()),
@@ -1456,7 +1468,9 @@ async fn message_actions_use_message_endpoints() {
     let like = server
         .mock("POST", "/space/message/wmsg_reply/like")
         .match_header("x-space-session-token", "space-session-token")
-        .match_body(Matcher::JsonString(json!({"like": true}).to_string()))
+        .match_body(Matcher::JsonString(
+            json!({"spaceId": "space_owner_main", "like": true}).to_string(),
+        ))
         .with_status(200)
         .with_body(json!({"liked": true}).to_string())
         .create_async()
@@ -1464,25 +1478,28 @@ async fn message_actions_use_message_endpoints() {
     let delete = server
         .mock("DELETE", "/space/message/wmsg_reply")
         .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::UrlEncoded(
+            "spaceId".into(),
+            "space_owner_main".into(),
+        ))
         .with_status(200)
         .create_async()
         .await;
 
     let created = ctx
-        .reply_to_message("space_friend", "wmsg_parent", "hello")
+        .reply_to_message("space_owner_main", "space_friend", "wmsg_parent", "hello")
         .await
         .expect("message reply should be sent");
     let liked = ctx
-        .like_message("wmsg_reply", true)
+        .like_message("space_owner_main", "wmsg_reply", true)
         .await
         .expect("message like should be sent");
-    ctx.delete_message("wmsg_reply")
+    ctx.delete_message("space_owner_main", "wmsg_reply")
         .await
         .expect("message delete should be sent");
 
     assert_eq!(created.reply_message_id.as_deref(), Some("wmsg_parent"));
     assert!(liked.liked);
-    spaces.assert_async().await;
     friends.assert_async().await;
     reply.assert_async().await;
     like.assert_async().await;
@@ -1539,6 +1556,7 @@ async fn list_post_likers_uses_post_likes_endpoint() {
         .mock("GET", "/space/posts/42/likes")
         .match_header("x-space-session-token", "space-session-token")
         .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("viewerSpaceId".into(), "space_owner_main".into()),
             Matcher::UrlEncoded("cursor".into(), "3000:7".into()),
             Matcher::UrlEncoded("limit".into(), "5".into()),
         ]))
@@ -1560,7 +1578,12 @@ async fn list_post_likers_uses_post_likes_endpoint() {
         .await;
 
     let response = ctx
-        .list_post_likers(42, Some("3000:7".to_owned()), Some(5))
+        .list_post_likers(
+            42,
+            Some("space_owner_main"),
+            Some("3000:7".to_owned()),
+            Some(5),
+        )
         .await
         .expect("likers should load");
 
@@ -1616,17 +1639,17 @@ async fn get_relationship_uses_relationship_endpoint() {
     let relationship = server
         .mock("GET", "/space/friends/relationship")
         .match_header("x-space-session-token", "space-session-token")
-        .match_query(Matcher::UrlEncoded(
-            "targetSpaceId".into(),
-            "space_friend".into(),
-        ))
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("spaceId".into(), "space_owner_main".into()),
+            Matcher::UrlEncoded("targetSpaceId".into(), "space_friend".into()),
+        ]))
         .with_status(200)
         .with_body(json!({"relationship": "friend"}).to_string())
         .create_async()
         .await;
 
     let response = ctx
-        .get_relationship("space_friend")
+        .get_relationship("space_owner_main", "space_friend")
         .await
         .expect("relationship should load");
 
@@ -1943,6 +1966,7 @@ async fn list_feed_uses_space_feed_endpoint() {
         .mock("GET", "/space/feed")
         .match_header("x-space-session-token", "space-session-token")
         .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("spaceId".into(), "space_owner_main".into()),
             Matcher::UrlEncoded("cursor".into(), "cursor-1".into()),
             Matcher::UrlEncoded("limit".into(), "5".into()),
         ]))
@@ -1951,8 +1975,8 @@ async fn list_feed_uses_space_feed_endpoint() {
             json!({
                 "items": [{
                     "postId": 42,
-                    "spaceId": "space_owner_gallery",
-                    "spaceSlug": "owner-gallery",
+                    "spaceId": "space_owner_main",
+                    "spaceSlug": "owner-main",
                     "author": {
                         "spaceId": "space_owner_gallery",
                         "spaceSlug": "owner-gallery"
@@ -1972,7 +1996,7 @@ async fn list_feed_uses_space_feed_endpoint() {
         .await;
 
     let page = ctx
-        .list_feed(Some("cursor-1".to_owned()), Some(5))
+        .list_feed("space_owner_main", Some("cursor-1".to_owned()), Some(5))
         .await
         .expect("feed page should load");
 
@@ -1991,6 +2015,7 @@ async fn list_posts_uses_space_posts_page_endpoint() {
         .match_header("x-space-session-token", "space-session-token")
         .match_query(Matcher::AllOf(vec![
             Matcher::UrlEncoded("spaceId".into(), "space_owner_gallery".into()),
+            Matcher::UrlEncoded("viewerSpaceId".into(), "space_owner_main".into()),
             Matcher::UrlEncoded("cursor".into(), "42".into()),
             Matcher::UrlEncoded("limit".into(), "5".into()),
         ]))
@@ -1999,8 +2024,8 @@ async fn list_posts_uses_space_posts_page_endpoint() {
             json!({
                 "items": [{
                     "postId": 41,
-                    "spaceId": "space_owner_gallery",
-                    "spaceSlug": "owner-gallery",
+                    "spaceId": "space_owner_main",
+                    "spaceSlug": "owner-main",
                     "author": {
                         "spaceId": "space_owner_gallery",
                         "spaceSlug": "owner-gallery"
@@ -2020,7 +2045,12 @@ async fn list_posts_uses_space_posts_page_endpoint() {
         .await;
 
     let page = ctx
-        .list_posts("space_owner_gallery", Some("42".to_owned()), Some(5))
+        .list_posts(
+            "space_owner_gallery",
+            Some("space_owner_main"),
+            Some("42".to_owned()),
+            Some(5),
+        )
         .await
         .expect("post page should load");
 
@@ -2081,7 +2111,7 @@ async fn fetch_post_decrypted_uses_post_by_id_endpoint() {
             .await;
 
     let decrypted = ctx
-        .fetch_post_decrypted(42)
+        .fetch_post_decrypted(42, None)
         .await
         .expect("post should decrypt");
 
@@ -2105,24 +2135,28 @@ async fn hydrate_space_keys_loads_owned_and_friends_spaces() {
         .expect("sealed space share");
 
     let owned = server
-            .mock("GET", "/space")
-            .match_header("x-space-session-token", "space-session-token")
-            .with_status(200)
-            .with_body(
-                json!([{
-                    "spaceId": "space_owner_gallery",
-                    "spaceSlug": "owner-gallery",
-                    "rootWrappedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &owned_space_key).expect("owned wrap")),
-                    "encryptedProfile": "",
-                    "keyVersion": 1
-                }])
-                .to_string(),
-            )
-            .create_async()
-            .await;
+        .mock("GET", "/space")
+        .match_header("x-space-session-token", "space-session-token")
+        .with_status(200)
+        .with_body(
+            json!([{
+                "spaceId": "space_owner_main",
+                "spaceSlug": "owner-main",
+                "rootWrappedSpaceKey": encode_b64(&encrypt_secretbox_payload(&space_root_key, &owned_space_key).expect("owned wrap")),
+                "encryptedProfile": "",
+                "keyVersion": 1
+            }])
+            .to_string(),
+        )
+        .create_async()
+        .await;
     let shares = server
         .mock("GET", "/space/friends/shares")
         .match_header("x-space-session-token", "space-session-token")
+        .match_query(Matcher::UrlEncoded(
+            "spaceId".into(),
+            "space_owner_main".into(),
+        ))
         .with_status(200)
         .with_body(
             json!([{
@@ -2144,7 +2178,7 @@ async fn hydrate_space_keys_loads_owned_and_friends_spaces() {
         .expect("space keys should hydrate");
 
     assert_eq!(hydrated.owned.len(), 1);
-    assert_eq!(hydrated.owned[0].0, "space_owner_gallery");
+    assert_eq!(hydrated.owned[0].0, "space_owner_main");
     assert_eq!(hydrated.owned[0].1, owned_space_key);
     assert_eq!(hydrated.friends.len(), 1);
     assert_eq!(hydrated.friends[0].space_id, "space_shared_gallery");

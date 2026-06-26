@@ -39,7 +39,7 @@ func (c *EntityKeysController) CreateKey(ctx *gin.Context, req models.SpaceEntit
 	if err != nil {
 		return err
 	}
-	return c.EntityKeysRepo.CreateKey(ctx.Request.Context(), userID, keyType, encryptedKey)
+	return c.EntityKeysRepo.CreateKey(ctx, userID, keyType, encryptedKey)
 }
 
 func (c *EntityKeysController) EnsureKey(ctx *gin.Context, req models.SpaceEntityKeyRequest) (*models.SpaceEntityKeyResponse, error) {
@@ -55,7 +55,7 @@ func (c *EntityKeysController) EnsureKey(ctx *gin.Context, req models.SpaceEntit
 	if err != nil {
 		return nil, err
 	}
-	rec, err := c.EntityKeysRepo.EnsureKey(ctx.Request.Context(), userID, keyType, encryptedKey)
+	rec, err := c.EntityKeysRepo.EnsureKey(ctx, userID, keyType, encryptedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (c *EntityKeysController) GetKey(ctx *gin.Context, req models.GetSpaceEntit
 	if err != nil {
 		return nil, err
 	}
-	rec, err := c.EntityKeysRepo.GetKey(ctx.Request.Context(), userID, keyType)
+	rec, err := c.EntityKeysRepo.GetKey(ctx, userID, keyType)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, err

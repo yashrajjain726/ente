@@ -7,7 +7,12 @@ import (
 )
 
 func (h *Handlers) GetUnreadStatus(c *gin.Context) {
-	resp, err := h.Module.Read.GetUnreadStatus(c)
+	var req models.SpaceUnreadStatusRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		respondJSON(c, nil, ente.ErrBadRequest)
+		return
+	}
+	resp, err := h.Module.Read.GetUnreadStatus(c, req)
 	respondJSON(c, resp, err)
 }
 

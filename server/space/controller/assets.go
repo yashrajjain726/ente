@@ -66,7 +66,7 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 		}
 		spaceID.String = strings.TrimSpace(*req.SpaceID)
 		spaceID.Valid = true
-		if _, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, spaceID.String); err != nil {
+		if _, err := c.auth.requireSpaceOwner(ctx, userID, spaceID.String); err != nil {
 			return nil, err
 		}
 	case uploadPurposeAvatar, uploadPurposeCover:
@@ -75,7 +75,7 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 		}
 		spaceID.String = strings.TrimSpace(*req.SpaceID)
 		spaceID.Valid = true
-		if _, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, spaceID.String); err != nil {
+		if _, err := c.auth.requireSpaceOwner(ctx, userID, spaceID.String); err != nil {
 			return nil, err
 		}
 	default:
@@ -109,7 +109,7 @@ func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUpl
 	if err != nil {
 		return nil, err
 	}
-	err = c.AssetsRepo.AddTempObject(ctx.Request.Context(), spacerepo.SpaceTempObjectRecord{
+	err = c.AssetsRepo.AddTempObject(ctx, spacerepo.SpaceTempObjectRecord{
 		ObjectKey:    objectKey,
 		SpaceID:      spaceID,
 		Purpose:      purpose,
@@ -167,7 +167,7 @@ func verifyStagedUpload(ctx *gin.Context, assetsRepo *spacerepo.AssetsRepository
 	if objectKey == "" {
 		return nil, ente.NewBadRequestWithMessage("objectKey is required")
 	}
-	rec, err := assetsRepo.GetTempObject(ctx.Request.Context(), objectKey, purpose, spaceID)
+	rec, err := assetsRepo.GetTempObject(ctx, objectKey, purpose, spaceID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("staged space upload not found")
@@ -192,15 +192,15 @@ func verifyStagedUpload(ctx *gin.Context, assetsRepo *spacerepo.AssetsRepository
 }
 
 func (c *AssetsController) Redirect(ctx *gin.Context, req models.AssetRedirectRequest) (*models.AssetDownloadResponse, error) {
-	viewer, err := c.auth.resolveViewer(ctx)
+	viewer, err := c.auth.resolveViewer(ctx, req.ViewerSpaceID)
 	if err != nil {
 		return nil, err
 	}
-	space, err := c.SpacesRepo.GetSpaceByID(ctx.Request.Context(), req.SpaceID)
+	space, err := c.SpacesRepo.GetSpaceByID(ctx, req.SpaceID)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.auth.canViewSpace(ctx.Request.Context(), viewer, space); err != nil {
+	if err := c.auth.canViewSpace(ctx, viewer, space); err != nil {
 		return nil, err
 	}
 	objectKey := strings.TrimSpace(req.ObjectKey)
@@ -212,9 +212,9 @@ func (c *AssetsController) Redirect(ctx *gin.Context, req models.AssetRedirectRe
 			return nil, ente.NewBadRequestWithMessage("objectKey or assetType and objectID are required")
 		}
 		objectKey = spacerepo.ProfileAssetObjectKey(space.SpaceID, assetType, objectID)
-		bucketID, err = c.AssetsRepo.GetProfileAssetBucketID(ctx.Request.Context(), space.SpaceID, assetType, objectID)
+		bucketID, err = c.AssetsRepo.GetProfileAssetBucketID(ctx, space.SpaceID, assetType, objectID)
 	} else {
-		bucketID, err = c.AssetsRepo.GetAssetBucketID(ctx.Request.Context(), space.SpaceID, objectKey)
+		bucketID, err = c.AssetsRepo.GetAssetBucketID(ctx, space.SpaceID, objectKey)
 	}
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {

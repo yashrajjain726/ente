@@ -93,9 +93,9 @@ pub struct AccountSpaceCtx {
     space_root_key: Vec<u8>,
     user_id: Option<i64>,
     space_root_key_cache: Mutex<Option<Option<Vec<u8>>>>,
-    space_identity_cache: Mutex<Option<SpaceIdentity>>,
+    space_identity_cache: Mutex<BTreeMap<String, SpaceIdentity>>,
     owned_spaces_cache: Mutex<Option<Vec<SpaceKeyResponse>>>,
-    friend_shares_cache: Mutex<Option<Vec<DecryptedFriendShare>>>,
+    friend_shares_cache: Mutex<BTreeMap<String, Vec<DecryptedFriendShare>>>,
 }
 
 pub struct SpaceLinkCtx {
@@ -124,9 +124,9 @@ impl AccountSpaceCtx {
             space_root_key: input.space_root_key,
             user_id: input.user_id,
             space_root_key_cache: Mutex::new(None),
-            space_identity_cache: Mutex::new(None),
+            space_identity_cache: Mutex::new(BTreeMap::new()),
             owned_spaces_cache: Mutex::new(None),
-            friend_shares_cache: Mutex::new(None),
+            friend_shares_cache: Mutex::new(BTreeMap::new()),
         })
     }
 
@@ -166,9 +166,10 @@ impl AccountSpaceCtx {
         Ok(spaces)
     }
 
-    pub async fn list_friend_shares(&self) -> Result<Vec<FriendShareResponse>> {
+    pub async fn list_friend_shares(&self, space_id: &str) -> Result<Vec<FriendShareResponse>> {
+        let query = vec![("spaceId", space_id.to_owned())];
         self.client
-            .get_json("/space/friends/shares", &[])
+            .get_json("/space/friends/shares", &query)
             .await
             .map_err(Into::into)
     }
@@ -186,26 +187,37 @@ impl AccountSpaceCtx {
         })
     }
 
-    pub(crate) async fn default_space_identity(&self) -> Result<SpaceIdentity> {
-        if let Some(value) = cache_lock(&self.space_identity_cache, "space identity")?.clone() {
+    pub(crate) async fn space_identity_for(&self, space_id: &str) -> Result<SpaceIdentity> {
+        let space_id = space_id.trim();
+        if space_id.is_empty() {
+            return Err(SpaceError::InvalidInput("space id is required".into()));
+        }
+        if let Some(value) = cache_lock(&self.space_identity_cache, "space identity")?
+            .get(space_id)
+            .cloned()
+        {
             return Ok(value);
         }
         let space = self
             .list_owned_spaces_cached()
             .await?
             .into_iter()
-            .next()
-            .ok_or_else(|| SpaceError::InvalidInput("no owned space is available".into()))?;
+            .find(|value| value.space_id == space_id)
+            .ok_or_else(|| {
+                SpaceError::InvalidInput(format!("space {space_id} is not owned by the account"))
+            })?;
         let identity = self.decrypt_space_identity(&space)?;
-        *cache_lock(&self.space_identity_cache, "space identity")? = Some(identity.clone());
+        cache_lock(&self.space_identity_cache, "space identity")?
+            .insert(space.space_id.clone(), identity.clone());
         Ok(identity)
     }
 
     pub async fn decrypt_friend_share(
         &self,
+        space_id: &str,
         share: &FriendShareResponse,
     ) -> Result<DecryptedFriendShare> {
-        let identity = self.default_space_identity().await?;
+        let identity = self.space_identity_for(space_id).await?;
         let ciphertext = decode_b64(&share.friend_sealed_space_key)?;
         if ciphertext.is_empty() {
             return Err(SpaceError::MissingFriendSealedSpaceKey);
@@ -220,17 +232,26 @@ impl AccountSpaceCtx {
         })
     }
 
-    pub(crate) async fn default_profile_space_access(&self) -> Result<(SpaceKeyResponse, Vec<u8>)> {
+    pub(crate) async fn profile_space_access(
+        &self,
+        space_id: &str,
+    ) -> Result<(SpaceKeyResponse, Vec<u8>)> {
         let space_root_key = self
             .get_space_root_key()
             .await?
             .ok_or_else(|| SpaceError::InvalidInput("space root key is missing".into()))?;
+        let space_id = space_id.trim();
+        if space_id.is_empty() {
+            return Err(SpaceError::InvalidInput("space id is required".into()));
+        }
         let space = self
             .list_owned_spaces()
             .await?
             .into_iter()
-            .next()
-            .ok_or_else(|| SpaceError::InvalidInput("no owned space is available".into()))?;
+            .find(|value| value.space_id == space_id)
+            .ok_or_else(|| {
+                SpaceError::InvalidInput(format!("space {space_id} is not owned by the account"))
+            })?;
         let packed = decode_b64(&space.root_wrapped_space_key)?;
         let space_key = decrypt_secretbox_payload(&space_root_key, &packed)?;
         Ok((space, space_key))
@@ -288,10 +309,13 @@ impl AccountSpaceCtx {
             encrypted_profile: encrypted_profile.clone(),
             key_version: response.key_version,
         })?;
-        *cache_lock(&self.space_identity_cache, "space identity")? = Some(SpaceIdentity {
-            public_key,
-            secret_key,
-        });
+        cache_lock(&self.space_identity_cache, "space identity")?.insert(
+            response.space_id.clone(),
+            SpaceIdentity {
+                public_key,
+                secret_key,
+            },
+        );
         Ok(CreatedSpace {
             space_id: response.space_id,
             space_slug: response.space_slug,
@@ -359,7 +383,7 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
     ) -> Result<Option<ResolvedSpaceAccess>> {
-        let shares = self.list_decrypted_friend_shares_cached().await?;
+        let shares = self.list_all_decrypted_friend_shares().await?;
         let Some(share) = shares.into_iter().find(|value| value.space_id == space_id) else {
             return Ok(None);
         };
@@ -379,6 +403,35 @@ impl AccountSpaceCtx {
         self.resolve_shared_space_access(space_id).await
     }
 
+    pub(crate) async fn resolve_shared_space_access_for(
+        &self,
+        viewer_space_id: &str,
+        space_id: &str,
+    ) -> Result<Option<ResolvedSpaceAccess>> {
+        let shares = self
+            .list_decrypted_friend_shares_cached(viewer_space_id)
+            .await?;
+        let Some(share) = shares.into_iter().find(|value| value.space_id == space_id) else {
+            return Ok(None);
+        };
+        Ok(Some(ResolvedSpaceAccess {
+            space_key: share.space_key,
+            key_version: share.key_version,
+        }))
+    }
+
+    pub(crate) async fn resolve_space_access_for(
+        &self,
+        viewer_space_id: &str,
+        space_id: &str,
+    ) -> Result<Option<ResolvedSpaceAccess>> {
+        if let Some(access) = self.resolve_owned_space_access(space_id).await? {
+            return Ok(Some(access));
+        }
+        self.resolve_shared_space_access_for(viewer_space_id, space_id)
+            .await
+    }
+
     pub(crate) async fn resolve_space_key_for_version(
         &self,
         space_id: &str,
@@ -393,6 +446,33 @@ impl AccountSpaceCtx {
             return Ok(Some(access.space_key));
         }
         let history = self.build_space_key_history_for_space(space_id).await?;
+        Ok(history.get(&target_version).cloned())
+    }
+
+    pub async fn resolve_space_key_for_version_for_viewer(
+        &self,
+        space_id: &str,
+        viewer_space_id: Option<&str>,
+        version: Option<i32>,
+    ) -> Result<Option<Vec<u8>>> {
+        let access = match viewer_space_id.filter(|value| !value.trim().is_empty()) {
+            Some(viewer_space_id) => {
+                self.resolve_space_access_for(viewer_space_id, space_id)
+                    .await?
+            }
+            None => self.resolve_space_access(space_id).await?,
+        };
+        let access = match access {
+            Some(value) => value,
+            None => return Ok(None),
+        };
+        let target_version = version.unwrap_or(access.key_version);
+        if target_version == access.key_version {
+            return Ok(Some(access.space_key));
+        }
+        let history = self
+            .build_space_key_history_for_space_for_viewer(space_id, viewer_space_id)
+            .await?;
         Ok(history.get(&target_version).cloned())
     }
 
@@ -416,17 +496,40 @@ impl AccountSpaceCtx {
 
     pub(crate) async fn list_decrypted_friend_shares_cached(
         &self,
+        space_id: &str,
     ) -> Result<Vec<DecryptedFriendShare>> {
-        if let Some(value) = cache_lock(&self.friend_shares_cache, "friend shares")?.clone() {
+        let space_id = space_id.trim();
+        if space_id.is_empty() {
+            return Err(SpaceError::InvalidInput("space id is required".into()));
+        }
+        if let Some(value) = cache_lock(&self.friend_shares_cache, "friend shares")?
+            .get(space_id)
+            .cloned()
+        {
             return Ok(value);
         }
-        let shares = self.list_friend_shares().await?;
+        let shares = self.list_friend_shares(space_id).await?;
         let mut value = Vec::with_capacity(shares.len());
         for share in shares {
-            value.push(self.decrypt_friend_share(&share).await?);
+            value.push(self.decrypt_friend_share(space_id, &share).await?);
         }
-        *cache_lock(&self.friend_shares_cache, "friend shares")? = Some(value.clone());
+        cache_lock(&self.friend_shares_cache, "friend shares")?
+            .insert(space_id.to_owned(), value.clone());
         Ok(value)
+    }
+
+    pub(crate) async fn list_all_decrypted_friend_shares(
+        &self,
+    ) -> Result<Vec<DecryptedFriendShare>> {
+        let spaces = self.list_owned_spaces_cached().await?;
+        let mut all = Vec::new();
+        for space in spaces {
+            all.extend(
+                self.list_decrypted_friend_shares_cached(&space.space_id)
+                    .await?,
+            );
+        }
+        Ok(all)
     }
 
     pub(crate) fn clear_owned_space_cache(&self) -> Result<()> {
@@ -458,7 +561,7 @@ impl AccountSpaceCtx {
     }
 
     pub(crate) fn clear_friend_share_cache(&self) -> Result<()> {
-        *cache_lock(&self.friend_shares_cache, "friend shares")? = None;
+        cache_lock(&self.friend_shares_cache, "friend shares")?.clear();
         Ok(())
     }
 }

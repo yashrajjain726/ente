@@ -26,7 +26,12 @@ func (h *Handlers) Unfriend(c *gin.Context) {
 }
 
 func (h *Handlers) ListFriendRequests(c *gin.Context) {
-	resp, err := h.Module.Friends.ListRequests(c)
+	var req models.ListFriendRequestsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		respondJSON(c, nil, ente.ErrBadRequest)
+		return
+	}
+	resp, err := h.Module.Friends.ListRequests(c, req)
 	respondJSON(c, resp, err)
 }
 
@@ -41,7 +46,12 @@ func (h *Handlers) ConfirmFriendRequest(c *gin.Context) {
 }
 
 func (h *Handlers) DeleteFriendRequest(c *gin.Context) {
-	respondStatus(c, h.Module.Friends.DeleteRequest(c, c.Param("requestID")))
+	var req models.DeleteFriendRequestRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		respondJSON(c, nil, ente.ErrBadRequest)
+		return
+	}
+	respondStatus(c, h.Module.Friends.DeleteRequest(c, c.Param("requestID"), req))
 }
 
 func (h *Handlers) ListSpaceFriends(c *gin.Context) {
@@ -74,6 +84,11 @@ func (h *Handlers) RefreshFriendShares(c *gin.Context) {
 }
 
 func (h *Handlers) ListFriendShares(c *gin.Context) {
-	resp, err := h.Module.Friends.ListShares(c)
+	var req models.ListFriendSharesRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		respondJSON(c, nil, ente.ErrBadRequest)
+		return
+	}
+	resp, err := h.Module.Friends.ListShares(c, req)
 	respondJSON(c, resp, err)
 }

@@ -107,7 +107,8 @@ const Page: React.FC = () => {
     }, [profile?.spaceId, setFriends]);
 
     useEffect(() => {
-        if (!selectedFriendSpaceId) {
+        const viewerSpaceId = profile?.spaceId;
+        if (!viewerSpaceId || !selectedFriendSpaceId) {
             setIsProfileLoading(false);
             setIsPostsLoading(false);
             setLoadedProfileSpaceId(undefined);
@@ -122,7 +123,7 @@ const Page: React.FC = () => {
         setPosts([]);
         setIsProfileLoading(true);
         setIsPostsLoading(true);
-        void loadCurrentSpaceProfile(selectedFriendSpaceId)
+        void loadCurrentSpaceProfile(selectedFriendSpaceId, viewerSpaceId)
             .then((nextProfile) => {
                 if (cancelled) return;
                 setSelectedProfile(nextProfile);
@@ -136,7 +137,10 @@ const Page: React.FC = () => {
                     setIsProfileLoading(false);
                 }
             });
-        void loadCurrentSpaceProfilePostsPage(selectedFriendSpaceId)
+        void loadCurrentSpaceProfilePostsPage(
+            selectedFriendSpaceId,
+            viewerSpaceId,
+        )
             .then((page) => {
                 if (!cancelled) setPosts(page.items);
             })
@@ -153,7 +157,7 @@ const Page: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, [selectedFriendSpaceId]);
+    }, [profile?.spaceId, selectedFriendSpaceId]);
 
     const goBack = () => {
         if (typeof window != "undefined" && window.history.length > 1) {
@@ -169,6 +173,15 @@ const Page: React.FC = () => {
         !profile ||
         !selectedFriend
     ) {
+        return (
+            <SpaceRouteFallback
+                background={friendsBackground}
+                message={profileLoadError}
+            />
+        );
+    }
+    const actorSpaceId = profile.spaceId;
+    if (!actorSpaceId) {
         return (
             <SpaceRouteFallback
                 background={friendsBackground}
@@ -213,8 +226,12 @@ const Page: React.FC = () => {
                 }}
                 onBack={goBack}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
-                onReplyToPost={replyToCurrentPost}
-                onSetPostLiked={setCurrentPostLiked}
+                onReplyToPost={(postId, text) =>
+                    replyToCurrentPost(actorSpaceId, postId, text)
+                }
+                onSetPostLiked={(postId, liked) =>
+                    setCurrentPostLiked(actorSpaceId, postId, liked)
+                }
                 showPostLoadingIndicator={false}
             />
         </>

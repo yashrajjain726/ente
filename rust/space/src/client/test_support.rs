@@ -43,11 +43,15 @@ pub(crate) fn test_account_ctx_with_space_root_key(
         client_version: None,
     })
     .expect("account space ctx should open");
-    *cache_lock(&ctx.space_identity_cache, "space identity").expect("space identity cache") =
-        Some(SpaceIdentity {
-            public_key,
-            secret_key,
-        });
+    cache_lock(&ctx.space_identity_cache, "space identity")
+        .expect("space identity cache")
+        .insert(
+            "space_owner_main".to_owned(),
+            SpaceIdentity {
+                public_key,
+                secret_key,
+            },
+        );
     ctx
 }
 
@@ -55,7 +59,8 @@ pub(crate) fn test_account_ctx_with_space_root_key(
 pub(crate) fn test_public_key(ctx: &AccountSpaceCtx) -> Vec<u8> {
     cache_lock(&ctx.space_identity_cache, "space identity")
         .expect("space identity cache")
-        .as_ref()
+        .values()
+        .next()
         .expect("test identity")
         .public_key
         .clone()

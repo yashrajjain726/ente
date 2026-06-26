@@ -29,11 +29,11 @@ func (c *LinksController) Get(ctx *gin.Context, spaceID string) (*models.SpaceLi
 	if err != nil {
 		return nil, err
 	}
-	space, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, strings.TrimSpace(spaceID))
+	space, err := c.auth.requireSpaceOwner(ctx, userID, strings.TrimSpace(spaceID))
 	if err != nil {
 		return nil, err
 	}
-	link, err := c.LinksRepo.GetLink(ctx.Request.Context(), space.SpaceID)
+	link, err := c.LinksRepo.GetLink(ctx, space.SpaceID)
 	if err != nil {
 		if !errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, err
@@ -75,7 +75,7 @@ func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreate
 	if err != nil {
 		return nil, err
 	}
-	space, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, req.SpaceID)
+	space, err := c.auth.requireSpaceOwner(ctx, userID, req.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,9 +89,9 @@ func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreate
 	sum := sha256.Sum256(authKeyBytes)
 	var link *repo.SpaceLinkRecord
 	if rotate {
-		link, err = c.LinksRepo.RotateLink(ctx.Request.Context(), space.SpaceID, sum[:], req.KeyVersion, linkWrappedSpaceKey, encryptedAccessKey)
+		link, err = c.LinksRepo.RotateLink(ctx, space.SpaceID, sum[:], req.KeyVersion, linkWrappedSpaceKey, encryptedAccessKey)
 	} else {
-		link, err = c.LinksRepo.UpsertLink(ctx.Request.Context(), space.SpaceID, sum[:], req.KeyVersion, linkWrappedSpaceKey, encryptedAccessKey)
+		link, err = c.LinksRepo.UpsertLink(ctx, space.SpaceID, sum[:], req.KeyVersion, linkWrappedSpaceKey, encryptedAccessKey)
 	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -101,7 +101,7 @@ func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreate
 			if rotate {
 				return nil, ente.NewBadRequestWithMessage("active space link already exists; rotate it instead")
 			}
-			existing, getErr := c.LinksRepo.GetLink(ctx.Request.Context(), space.SpaceID)
+			existing, getErr := c.LinksRepo.GetLink(ctx, space.SpaceID)
 			if getErr != nil {
 				return nil, getErr
 			}
@@ -132,11 +132,11 @@ func (c *LinksController) Delete(ctx *gin.Context, spaceID string) error {
 	if err != nil {
 		return err
 	}
-	space, err := c.auth.requireSpaceOwner(ctx.Request.Context(), userID, strings.TrimSpace(spaceID))
+	space, err := c.auth.requireSpaceOwner(ctx, userID, strings.TrimSpace(spaceID))
 	if err != nil {
 		return err
 	}
-	return c.LinksRepo.DeleteLink(ctx.Request.Context(), space.SpaceID)
+	return c.LinksRepo.DeleteLink(ctx, space.SpaceID)
 }
 
 func (c *LinksController) Login(ctx *gin.Context, req models.SpaceLinkLoginRequest) (*models.SpaceLinkLoginResponse, error) {
@@ -151,16 +151,16 @@ func (c *LinksController) Login(ctx *gin.Context, req models.SpaceLinkLoginReque
 		return nil, ente.NewBadRequestWithMessage("invalid authKey encoding")
 	}
 	sum := sha256.Sum256(authKeyBytes)
-	link, err := c.LinksRepo.GetLinkByAuthHash(ctx.Request.Context(), strings.TrimSpace(req.SpaceID), sum[:])
+	link, err := c.LinksRepo.GetLinkByAuthHash(ctx, strings.TrimSpace(req.SpaceID), sum[:])
 	if err != nil {
 		return nil, err
 	}
 	sessionToken := auth.GenerateURLSafeRandomString(32)
 	sessionHash := sha256.Sum256([]byte(sessionToken))
-	if err := c.LinksRepo.CreateSession(ctx.Request.Context(), sessionHash[:], link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.MicrosecondsAfterMinutes(spaceLinkSessionDurationMinutes)); err != nil {
+	if err := c.LinksRepo.CreateSession(ctx, sessionHash[:], link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.MicrosecondsAfterMinutes(spaceLinkSessionDurationMinutes)); err != nil {
 		return nil, err
 	}
-	publicKey, err := c.SpacesRepo.GetOwnerPublicKey(ctx.Request.Context(), link.OwnerID)
+	publicKey, err := c.SpacesRepo.GetOwnerPublicKey(ctx, link.OwnerID)
 	if err != nil {
 		return nil, err
 	}

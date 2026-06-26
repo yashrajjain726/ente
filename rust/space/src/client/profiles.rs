@@ -20,9 +20,13 @@ impl AccountSpaceCtx {
     pub async fn get_space_profile_raw(
         &self,
         space_id: &str,
+        viewer_space_id: Option<&str>,
         version: Option<i32>,
     ) -> Result<SpaceProfileResponse> {
         let mut query = vec![("spaceId", space_id.to_owned())];
+        if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
+            query.push(("viewerSpaceId", value.to_owned()));
+        }
         if let Some(value) = version {
             query.push(("version", value.to_string()));
         }
@@ -35,11 +39,18 @@ impl AccountSpaceCtx {
     pub async fn get_space_profile_decrypted(
         &self,
         space_id: &str,
+        viewer_space_id: Option<&str>,
         version: Option<i32>,
     ) -> Result<DecryptedSpaceProfile> {
-        let profile = self.get_space_profile_raw(space_id, version).await?;
+        let profile = self
+            .get_space_profile_raw(space_id, viewer_space_id, version)
+            .await?;
         let space_key = self
-            .resolve_space_key_for_version(space_id, Some(profile.version))
+            .resolve_space_key_for_version_for_viewer(
+                space_id,
+                viewer_space_id,
+                Some(profile.version),
+            )
             .await?
             .ok_or_else(|| {
                 SpaceError::InvalidInput(format!(

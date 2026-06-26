@@ -117,6 +117,7 @@ pub struct CreatePostResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LikePostRequest {
+    pub space_id: String,
     pub like: bool,
 }
 
@@ -128,6 +129,7 @@ pub struct LikePostResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MarkNotificationsReadRequest {
+    pub space_id: String,
     pub friend_space_id: String,
 }
 
@@ -140,6 +142,7 @@ pub struct SpaceUnreadStatusResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LikeMessageRequest {
+    pub space_id: String,
     pub like: bool,
 }
 
@@ -151,6 +154,7 @@ pub struct LikeMessageResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateMessageRequest {
+    pub space_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message_id: Option<String>,
     pub message_cipher: String,
@@ -263,6 +267,7 @@ pub struct MessageConversationPage {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePostCaptionRequest {
+    pub space_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub caption_cipher: Option<String>,
 }
@@ -532,6 +537,7 @@ pub struct AddFriendPayload {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfirmFriendRequestPayload {
+    pub space_id: String,
     pub target_friend_sealed_space_key: String,
     pub target_key_version: i32,
 }
@@ -551,6 +557,7 @@ pub struct FriendRelationshipResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FriendTargetPayload {
+    pub space_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_username: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -525,6 +525,7 @@ async fn account_message_to_js(
 
 async fn message_response_quote_to_js(
     ctx: &AccountSpaceCtx,
+    viewer_space_id: Option<&str>,
     quote: ente_space::transport::MessageQuoteResponse,
 ) -> Result<MessageQuoteJs, WasmSpaceError> {
     let caption = if !quote.caption_cipher.trim().is_empty()
@@ -534,6 +535,7 @@ async fn message_response_quote_to_js(
         optional_utf8_field(
             ctx.decrypt_post_caption_fields(
                 &quote.space_id,
+                viewer_space_id,
                 quote.post_id,
                 &quote.encrypted_post_key,
                 quote.key_version,
@@ -564,17 +566,18 @@ async fn message_response_quote_to_js(
 
 async fn account_message_response_to_js(
     ctx: &AccountSpaceCtx,
+    viewer_space_id: &str,
     message: MessageResponse,
 ) -> Result<MessageJs, WasmSpaceError> {
     if message.kind != "post_like" {
-        let decrypted = ctx.decrypt_message(&message).await?;
+        let decrypted = ctx.decrypt_message(viewer_space_id, &message).await?;
         return account_message_to_js(ctx, message, decrypted).await;
     }
 
     let sender = account_actor_to_js(ctx, message.sender).await?;
     let recipient = account_actor_to_js(ctx, message.recipient).await?;
     let quote = match message.quote {
-        Some(quote) => Some(message_response_quote_to_js(ctx, quote).await?),
+        Some(quote) => Some(message_response_quote_to_js(ctx, Some(viewer_space_id), quote).await?),
         None => None,
     };
     Ok(MessageJs {
@@ -596,10 +599,11 @@ async fn account_message_response_to_js(
 
 async fn message_conversation_activity_to_js(
     ctx: &AccountSpaceCtx,
+    viewer_space_id: &str,
     activity: MessageConversationActivity,
 ) -> Result<MessageConversationActivityJs, WasmSpaceError> {
     let message = match activity.message {
-        Some(message) => Some(account_message_response_to_js(ctx, message).await?),
+        Some(message) => Some(account_message_response_to_js(ctx, viewer_space_id, message).await?),
         None => None,
     };
     Ok(MessageConversationActivityJs {
@@ -700,10 +704,14 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Fetch and decrypt a space profile.
-    pub async fn get_space_profile(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
+    pub async fn get_space_profile(
+        &self,
+        space_id: String,
+        viewer_space_id: Option<String>,
+    ) -> Result<JsValue, WasmSpaceError> {
         swb::to_value(&profile_to_js(
             self.inner
-                .get_space_profile_decrypted(&space_id, None)
+                .get_space_profile_decrypted(&space_id, viewer_space_id.as_deref(), None)
                 .await?,
         )?)
         .map_err(Into::into)
@@ -810,9 +818,16 @@ impl SpaceAccountCtxHandle {
     /// Return whether the target space is self, friend, or neither.
     pub async fn get_relationship(
         &self,
+        space_id: String,
         target_space_id: String,
     ) -> Result<JsValue, WasmSpaceError> {
-        swb::to_value(&self.inner.get_relationship(&target_space_id).await?).map_err(Into::into)
+        swb::to_value(
+            &self
+                .inner
+                .get_relationship(&space_id, &target_space_id)
+                .await?,
+        )
+        .map_err(Into::into)
     }
 
     /// Create a shareable space link.
@@ -847,6 +862,7 @@ impl SpaceAccountCtxHandle {
     /// Join a space link as a friend.
     pub async fn join_space_link(
         &self,
+        space_id: String,
         space_username: String,
         access_key: String,
     ) -> Result<JsValue, WasmSpaceError> {
@@ -859,18 +875,19 @@ impl SpaceAccountCtxHandle {
             client_version: self.client_version.clone(),
         })
         .await?;
-        swb::to_value(&self.inner.add_friend_from_link(&link).await?).map_err(Into::into)
+        swb::to_value(&self.inner.add_friend_from_link(&space_id, &link).await?).map_err(Into::into)
     }
 
     /// Request to add a public username as a friend.
     pub async fn request_friend_by_username(
         &self,
+        space_id: String,
         space_username: String,
     ) -> Result<JsValue, WasmSpaceError> {
         swb::to_value(
             &self
                 .inner
-                .request_friend_by_username(&space_username)
+                .request_friend_by_username(&space_id, &space_username)
                 .await?,
         )
         .map_err(Into::into)
@@ -879,10 +896,11 @@ impl SpaceAccountCtxHandle {
     /// List the current account feed with captions decrypted.
     pub async fn list_feed(
         &self,
+        space_id: String,
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<JsValue, WasmSpaceError> {
-        let page = self.inner.list_feed(cursor, limit).await?;
+        let page = self.inner.list_feed(&space_id, cursor, limit).await?;
         swb::to_value(
             &account_post_page_to_js(
                 &self.inner,
@@ -912,30 +930,39 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Return whether the current account has unread notification activity.
-    pub async fn unread_status(&self) -> Result<JsValue, WasmSpaceError> {
-        swb::to_value(&self.inner.unread_status().await?).map_err(Into::into)
+    pub async fn unread_status(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
+        swb::to_value(&self.inner.unread_status(&space_id).await?).map_err(Into::into)
     }
 
     /// Mark notification activity for one friend as read.
     pub async fn mark_notifications_read(
         &self,
+        space_id: String,
         friend_space_id: String,
     ) -> Result<JsValue, WasmSpaceError> {
-        swb::to_value(&self.inner.mark_notifications_read(friend_space_id).await?)
-            .map_err(Into::into)
+        swb::to_value(
+            &self
+                .inner
+                .mark_notifications_read(space_id, friend_space_id)
+                .await?,
+        )
+        .map_err(Into::into)
     }
 
     /// List posts on a space with captions decrypted.
     pub async fn list_posts(
         &self,
         space_id: String,
+        viewer_space_id: Option<String>,
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<JsValue, WasmSpaceError> {
         swb::to_value(
             &account_post_page_to_js(
                 &self.inner,
-                self.inner.list_posts(&space_id, cursor, limit).await?,
+                self.inner
+                    .list_posts(&space_id, viewer_space_id.as_deref(), cursor, limit)
+                    .await?,
             )
             .await?,
         )
@@ -943,11 +970,18 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Fetch one post with its caption decrypted.
-    pub async fn get_post(&self, post_id: i64) -> Result<JsValue, WasmSpaceError> {
-        let post = self.inner.get_post(post_id).await?;
+    pub async fn get_post(
+        &self,
+        post_id: i64,
+        viewer_space_id: Option<String>,
+    ) -> Result<JsValue, WasmSpaceError> {
+        let post = self
+            .inner
+            .get_post(post_id, viewer_space_id.as_deref())
+            .await?;
         let decrypted = self
             .inner
-            .decrypt_post_for_space(&post.space_id, &post)
+            .decrypt_post_for_viewer(&post.space_id, viewer_space_id.as_deref(), &post)
             .await?;
         swb::to_value(&account_post_to_js(&self.inner, post, decrypted).await?).map_err(Into::into)
     }
@@ -985,10 +1019,10 @@ impl SpaceAccountCtxHandle {
                 Some(&post_key),
             )
             .await?;
-        let post = self.inner.get_post(post_id).await?;
+        let post = self.inner.get_post(post_id, Some(&space_id)).await?;
         let decrypted = self
             .inner
-            .decrypt_post_for_space(&post.space_id, &post)
+            .decrypt_post_for_viewer(&post.space_id, Some(&space_id), &post)
             .await?;
         swb::to_value(&account_post_to_js(&self.inner, post, decrypted).await?).map_err(Into::into)
     }
@@ -997,10 +1031,11 @@ impl SpaceAccountCtxHandle {
     pub async fn download_post_asset(
         &self,
         post_id: i64,
+        viewer_space_id: Option<String>,
         object_key: String,
     ) -> Result<Vec<u8>, WasmSpaceError> {
         self.inner
-            .download_post_asset(post_id, &object_key)
+            .download_post_asset(post_id, viewer_space_id.as_deref(), &object_key)
             .await
             .map_err(Into::into)
     }
@@ -1012,6 +1047,7 @@ impl SpaceAccountCtxHandle {
         post_id: i64,
         encrypted_post_key: String,
         key_version: i32,
+        viewer_space_id: Option<String>,
         object_key: String,
     ) -> Result<Vec<u8>, WasmSpaceError> {
         self.inner
@@ -1020,6 +1056,7 @@ impl SpaceAccountCtxHandle {
                 post_id,
                 &encrypted_post_key,
                 key_version,
+                viewer_space_id.as_deref(),
                 &object_key,
             )
             .await
@@ -1030,17 +1067,24 @@ impl SpaceAccountCtxHandle {
     pub async fn download_space_avatar(
         &self,
         space_id: String,
+        viewer_space_id: Option<String>,
         object_id: String,
     ) -> Result<Vec<u8>, WasmSpaceError> {
         let space_key = self
             .inner
-            .resolve_space_key(&space_id)
+            .resolve_space_key_for_version_for_viewer(&space_id, viewer_space_id.as_deref(), None)
             .await?
             .ok_or_else(|| {
                 CoreSpaceError::InvalidInput(format!("no space key available for {space_id}"))
             })?;
         self.inner
-            .download_profile_asset(&space_id, "avatar", &object_id, &space_key)
+            .download_profile_asset(
+                &space_id,
+                viewer_space_id.as_deref(),
+                "avatar",
+                &object_id,
+                &space_key,
+            )
             .await
             .map_err(Into::into)
     }
@@ -1049,34 +1093,50 @@ impl SpaceAccountCtxHandle {
     pub async fn download_space_cover(
         &self,
         space_id: String,
+        viewer_space_id: Option<String>,
         object_id: String,
     ) -> Result<Vec<u8>, WasmSpaceError> {
         let space_key = self
             .inner
-            .resolve_space_key(&space_id)
+            .resolve_space_key_for_version_for_viewer(&space_id, viewer_space_id.as_deref(), None)
             .await?
             .ok_or_else(|| {
                 CoreSpaceError::InvalidInput(format!("no space key available for {space_id}"))
             })?;
         self.inner
-            .download_profile_asset(&space_id, "cover", &object_id, &space_key)
+            .download_profile_asset(
+                &space_id,
+                viewer_space_id.as_deref(),
+                "cover",
+                &object_id,
+                &space_key,
+            )
             .await
             .map_err(Into::into)
     }
 
     /// Like or unlike a post.
-    pub async fn like_post(&self, post_id: i64, like: bool) -> Result<JsValue, WasmSpaceError> {
-        swb::to_value(&self.inner.like_post(post_id, like).await?).map_err(Into::into)
+    pub async fn like_post(
+        &self,
+        space_id: String,
+        post_id: i64,
+        like: bool,
+    ) -> Result<JsValue, WasmSpaceError> {
+        swb::to_value(&self.inner.like_post(&space_id, post_id, like).await?).map_err(Into::into)
     }
 
     /// List people who liked a post.
     pub async fn list_post_likers(
         &self,
         post_id: i64,
+        viewer_space_id: Option<String>,
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<JsValue, WasmSpaceError> {
-        let page = self.inner.list_post_likers(post_id, cursor, limit).await?;
+        let page = self
+            .inner
+            .list_post_likers(post_id, viewer_space_id.as_deref(), cursor, limit)
+            .await?;
         let mut likers = Vec::with_capacity(page.likers.len());
         for liker in page.likers {
             likers.push(PostLikerJs {
@@ -1094,11 +1154,18 @@ impl SpaceAccountCtxHandle {
     /// Send a regular 1:1 message to a friend space.
     pub async fn send_message(
         &self,
+        sender_space_id: String,
         space_id: String,
         text: String,
     ) -> Result<JsValue, WasmSpaceError> {
-        let message = self.inner.send_message(&space_id, &text).await?;
-        let decrypted = self.inner.decrypt_message(&message).await?;
+        let message = self
+            .inner
+            .send_message(&sender_space_id, &space_id, &text)
+            .await?;
+        let decrypted = self
+            .inner
+            .decrypt_message(&sender_space_id, &message)
+            .await?;
         swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
             .map_err(Into::into)
     }
@@ -1106,15 +1173,19 @@ impl SpaceAccountCtxHandle {
     /// Send a 1:1 reply to an existing message.
     pub async fn reply_to_message(
         &self,
+        sender_space_id: String,
         space_id: String,
         message_id: String,
         text: String,
     ) -> Result<JsValue, WasmSpaceError> {
         let message = self
             .inner
-            .reply_to_message(&space_id, &message_id, &text)
+            .reply_to_message(&sender_space_id, &space_id, &message_id, &text)
             .await?;
-        let decrypted = self.inner.decrypt_message(&message).await?;
+        let decrypted = self
+            .inner
+            .decrypt_message(&sender_space_id, &message)
+            .await?;
         swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
             .map_err(Into::into)
     }
@@ -1122,11 +1193,18 @@ impl SpaceAccountCtxHandle {
     /// Send a private post reply message to the post owner.
     pub async fn reply_to_post(
         &self,
+        sender_space_id: String,
         post_id: i64,
         text: String,
     ) -> Result<JsValue, WasmSpaceError> {
-        let message = self.inner.reply_to_post(post_id, &text).await?;
-        let decrypted = self.inner.decrypt_message(&message).await?;
+        let message = self
+            .inner
+            .reply_to_post(&sender_space_id, post_id, &text)
+            .await?;
+        let decrypted = self
+            .inner
+            .decrypt_message(&sender_space_id, &message)
+            .await?;
         swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
             .map_err(Into::into)
     }
@@ -1134,16 +1212,27 @@ impl SpaceAccountCtxHandle {
     /// Like or unlike a message.
     pub async fn like_message(
         &self,
+        space_id: String,
         message_id: String,
         like: bool,
     ) -> Result<JsValue, WasmSpaceError> {
-        swb::to_value(&self.inner.like_message(&message_id, like).await?).map_err(Into::into)
+        swb::to_value(
+            &self
+                .inner
+                .like_message(&space_id, &message_id, like)
+                .await?,
+        )
+        .map_err(Into::into)
     }
 
     /// Delete a message sent by the current account.
-    pub async fn delete_message(&self, message_id: String) -> Result<(), WasmSpaceError> {
+    pub async fn delete_message(
+        &self,
+        space_id: String,
+        message_id: String,
+    ) -> Result<(), WasmSpaceError> {
         self.inner
-            .delete_message(&message_id)
+            .delete_message(&space_id, &message_id)
             .await
             .map_err(Into::into)
     }
@@ -1151,10 +1240,14 @@ impl SpaceAccountCtxHandle {
     /// List 1:1 message conversations with decrypted latest activity messages.
     pub async fn list_message_conversations(
         &self,
+        space_id: String,
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<JsValue, WasmSpaceError> {
-        let page = self.inner.list_message_conversations(cursor, limit).await?;
+        let page = self
+            .inner
+            .list_message_conversations(&space_id, cursor, limit)
+            .await?;
         let mut items = Vec::with_capacity(page.items.len());
         for conversation in page.items {
             let friend = account_actor_to_js(&self.inner, conversation.friend).await?;
@@ -1162,6 +1255,7 @@ impl SpaceAccountCtxHandle {
                 friend,
                 latest_activity: message_conversation_activity_to_js(
                     &self.inner,
+                    &space_id,
                     conversation.latest_activity,
                 )
                 .await?,
@@ -1180,17 +1274,20 @@ impl SpaceAccountCtxHandle {
     /// List a 1:1 message thread with decrypted messages.
     pub async fn list_message_thread(
         &self,
+        viewer_space_id: String,
         space_id: String,
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<JsValue, WasmSpaceError> {
         let page = self
             .inner
-            .list_message_thread(&space_id, cursor, limit)
+            .list_message_thread(&viewer_space_id, &space_id, cursor, limit)
             .await?;
         let mut items = Vec::with_capacity(page.items.len());
         for message in page.items {
-            items.push(account_message_response_to_js(&self.inner, message).await?);
+            items.push(
+                account_message_response_to_js(&self.inner, &viewer_space_id, message).await?,
+            );
         }
         swb::to_value(&MessagePageJs {
             items,
@@ -1202,16 +1299,18 @@ impl SpaceAccountCtxHandle {
     /// Update a post caption.
     pub async fn update_post_caption(
         &self,
+        space_id: String,
         post_id: i64,
         caption: Option<String>,
     ) -> Result<(), WasmSpaceError> {
-        let post = self.inner.get_post(post_id).await?;
+        let post = self.inner.get_post(post_id, Some(&space_id)).await?;
         let decrypted_post = self
             .inner
-            .decrypt_post_for_space(&post.space_id, &post)
+            .decrypt_post_for_viewer(&post.space_id, Some(&space_id), &post)
             .await?;
         self.inner
             .update_post_caption(
+                &space_id,
                 post_id,
                 &decrypted_post.post_key,
                 caption.as_ref().map(|value| value.as_bytes()),
@@ -1240,8 +1339,8 @@ impl SpaceAccountCtxHandle {
     }
 
     /// List incoming friend requests for the current account.
-    pub async fn list_friend_requests(&self) -> Result<JsValue, WasmSpaceError> {
-        let requests = self.inner.list_friend_requests().await?;
+    pub async fn list_friend_requests(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
+        let requests = self.inner.list_friend_requests(&space_id).await?;
         let mut items = Vec::with_capacity(requests.len());
         for request in requests {
             items.push(FriendRequestJs {
@@ -1254,29 +1353,47 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Confirm an incoming friend request.
-    pub async fn confirm_friend_request(&self, request_id: i64) -> Result<JsValue, WasmSpaceError> {
-        swb::to_value(&self.inner.confirm_friend_request(request_id).await?).map_err(Into::into)
+    pub async fn confirm_friend_request(
+        &self,
+        space_id: String,
+        request_id: i64,
+    ) -> Result<JsValue, WasmSpaceError> {
+        swb::to_value(
+            &self
+                .inner
+                .confirm_friend_request(&space_id, request_id)
+                .await?,
+        )
+        .map_err(Into::into)
     }
 
     /// Delete an incoming friend request.
-    pub async fn delete_friend_request(&self, request_id: i64) -> Result<(), WasmSpaceError> {
+    pub async fn delete_friend_request(
+        &self,
+        space_id: String,
+        request_id: i64,
+    ) -> Result<(), WasmSpaceError> {
         self.inner
-            .delete_friend_request(request_id)
+            .delete_friend_request(&space_id, request_id)
             .await
             .map_err(Into::into)
     }
 
     /// Remove a friend by their space ID.
-    pub async fn remove_friend_by_space(&self, space_id: String) -> Result<(), WasmSpaceError> {
+    pub async fn remove_friend_by_space(
+        &self,
+        actor_space_id: String,
+        space_id: String,
+    ) -> Result<(), WasmSpaceError> {
         self.inner
-            .unfriend_by_space(&space_id)
+            .unfriend_by_space(&actor_space_id, &space_id)
             .await
             .map_err(Into::into)
     }
 
     /// List friend shares available to the current account.
-    pub async fn list_friend_shares(&self) -> Result<JsValue, WasmSpaceError> {
-        swb::to_value(&self.inner.list_friend_shares().await?).map_err(Into::into)
+    pub async fn list_friend_shares(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
+        swb::to_value(&self.inner.list_friend_shares(&space_id).await?).map_err(Into::into)
     }
 
     /// Refresh friend shares for a rotated space key.

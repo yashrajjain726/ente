@@ -369,7 +369,7 @@ func (r *FriendsRepository) ConfirmFriendRequest(ctx context.Context, targetID i
 	return requesterOwnerID, !alreadyFriends, nil
 }
 
-func (r *FriendsRepository) DeleteFriendRequest(ctx context.Context, targetID int64, requestID int64) error {
+func (r *FriendsRepository) DeleteFriendRequest(ctx context.Context, targetID int64, targetSpaceID string, requestID int64) error {
 	res, err := r.DB.ExecContext(ctx, `
 		UPDATE space_friend_requests
 		SET is_deleted = TRUE
@@ -377,9 +377,10 @@ func (r *FriendsRepository) DeleteFriendRequest(ctx context.Context, targetID in
 		WHERE space_friend_requests.request_id = $1
 		  AND space_friend_requests.target_space_id = target_space.space_id
 		  AND target_space.owner_id = $2
-		  AND is_deleted = FALSE
-		  AND resolved_at IS NULL
-	`, requestID, targetID)
+		  AND space_friend_requests.target_space_id = $3
+		  AND space_friend_requests.is_deleted = FALSE
+		  AND space_friend_requests.resolved_at IS NULL
+	`, requestID, targetID, targetSpaceID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -512,6 +513,32 @@ func (r *FriendsRepository) ListSharesForFriend(ctx context.Context, friendID in
 		WHERE friend_space.owner_id = $1
 		ORDER BY s.created_at ASC
 	`, friendID)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	defer rows.Close()
+	var out []SpaceShareRecord
+	for rows.Next() {
+		rec, err := scanShareRecord(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *rec)
+	}
+	return out, stacktrace.Propagate(rows.Err(), "")
+}
+
+func (r *FriendsRepository) ListSharesForFriendAndSpace(ctx context.Context, friendID int64, friendSpaceID string) ([]SpaceShareRecord, error) {
+	rows, err := r.DB.QueryContext(ctx, `
+		SELECT s.space_id, friend_space.owner_id, w.owner_id, w.space_slug, s.friend_sealed_space_key, s.key_version, s.created_at, w.public_key
+		FROM space_friend_shares s
+		JOIN spaces w ON w.space_id = s.space_id
+		JOIN spaces friend_space ON friend_space.space_id = s.friend_space_id
+		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
+		WHERE friend_space.owner_id = $1
+		  AND s.friend_space_id = $2
+		ORDER BY s.created_at ASC
+	`, friendID, friendSpaceID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

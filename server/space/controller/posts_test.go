@@ -20,7 +20,7 @@ func TestPostLikeRejectsOwnPost(t *testing.T) {
 	postID, err := testCreatePost(ctx, repos, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
 
-	_, err = controller.ToggleLike(newSpaceControllerContext(aliceID), strconv.FormatInt(postID, 10), models.LikePostRequest{Like: true})
+	_, err = controller.ToggleLike(newSpaceControllerContext(aliceID), strconv.FormatInt(postID, 10), models.LikePostRequest{SpaceID: aliceSpace.SpaceID, Like: true})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot like your own post")
 }

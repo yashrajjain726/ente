@@ -18,16 +18,12 @@ type ReadMarkersController struct {
 	auth            authDeps
 }
 
-func (c *ReadMarkersController) GetUnreadStatus(ctx *gin.Context) (*models.SpaceUnreadStatusResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
+func (c *ReadMarkersController) GetUnreadStatus(ctx *gin.Context, req models.SpaceUnreadStatusRequest) (*models.SpaceUnreadStatusResponse, error) {
+	_, viewerSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
 	if err != nil {
 		return nil, err
 	}
-	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
-	if err != nil {
-		return nil, err
-	}
-	notificationsUnread, err := c.MessagesRepo.HasUnreadNotifications(ctx.Request.Context(), viewerSpace.SpaceID)
+	notificationsUnread, err := c.MessagesRepo.HasUnreadNotifications(ctx, viewerSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -37,26 +33,22 @@ func (c *ReadMarkersController) GetUnreadStatus(ctx *gin.Context) (*models.Space
 }
 
 func (c *ReadMarkersController) MarkNotificationsRead(ctx *gin.Context, req models.MarkNotificationsReadRequest) (*models.SpaceUnreadStatusResponse, error) {
-	userID, err := c.auth.requireUser(ctx)
-	if err != nil {
-		return nil, err
-	}
 	if strings.TrimSpace(req.FriendSpaceID) == "" {
 		return nil, ente.NewBadRequestWithMessage("friendSpaceId is required")
 	}
-	viewerSpace, err := c.auth.requireDefaultSpace(ctx.Request.Context(), userID)
+	userID, viewerSpace, err := c.auth.requireSelectedSpace(ctx, req.SpaceID)
 	if err != nil {
 		return nil, err
 	}
-	readAt, err := c.MessagesRepo.GetLatestConversationActivityAt(ctx.Request.Context(), userID, viewerSpace.SpaceID, req.FriendSpaceID)
+	readAt, err := c.MessagesRepo.GetLatestConversationActivityAt(ctx, userID, viewerSpace.SpaceID, req.FriendSpaceID)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.ErrPermissionDenied
 		}
 		return nil, err
 	}
-	if err := c.ReadMarkersRepo.UpsertNotificationReadMarker(ctx.Request.Context(), viewerSpace.SpaceID, req.FriendSpaceID, readAt); err != nil {
+	if err := c.ReadMarkersRepo.UpsertNotificationReadMarker(ctx, viewerSpace.SpaceID, req.FriendSpaceID, readAt); err != nil {
 		return nil, err
 	}
-	return c.GetUnreadStatus(ctx)
+	return c.GetUnreadStatus(ctx, models.SpaceUnreadStatusRequest{SpaceID: viewerSpace.SpaceID})
 }

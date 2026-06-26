@@ -1,10 +1,11 @@
 package models
 
 type AssetRedirectRequest struct {
-	SpaceID   string `form:"spaceId" binding:"required"`
-	ObjectKey string `form:"objectKey"`
-	AssetType string `form:"assetType"`
-	ObjectID  string `form:"objectID"`
+	SpaceID       string `form:"spaceId" binding:"required"`
+	ViewerSpaceID string `form:"viewerSpaceId"`
+	ObjectKey     string `form:"objectKey"`
+	AssetType     string `form:"assetType"`
+	ObjectID      string `form:"objectID"`
 }
 
 type ListSpacesRequest struct{}
@@ -36,41 +37,68 @@ type SpaceEntityKeyResponse struct {
 }
 
 type GetSpaceProfileRequest struct {
-	SpaceID string `form:"spaceId" binding:"required"`
-	Version *int   `form:"version"`
+	SpaceID       string `form:"spaceId" binding:"required"`
+	ViewerSpaceID string `form:"viewerSpaceId"`
+	Version       *int   `form:"version"`
 }
 
 type ListPostsRequest struct {
+	SpaceID       string `form:"spaceId" binding:"required"`
+	ViewerSpaceID string `form:"viewerSpaceId"`
+	Cursor        string `form:"cursor"`
+	Limit         int    `form:"limit"`
+}
+
+type ListFeedRequest struct {
 	SpaceID string `form:"spaceId" binding:"required"`
 	Cursor  string `form:"cursor"`
 	Limit   int    `form:"limit"`
 }
 
-type ListFeedRequest struct {
-	Cursor string `form:"cursor"`
-	Limit  int    `form:"limit"`
+type ListPostLikersRequest struct {
+	ViewerSpaceID string `form:"viewerSpaceId"`
+	Cursor        string `form:"cursor"`
+	Limit         int    `form:"limit"`
 }
 
-type ListPostLikersRequest struct {
-	Cursor string `form:"cursor"`
-	Limit  int    `form:"limit"`
+type GetPostRequest struct {
+	ViewerSpaceID string `form:"viewerSpaceId"`
+}
+
+type SpaceUnreadStatusRequest struct {
+	SpaceID string `form:"spaceId" binding:"required"`
 }
 
 type ListMessagesRequest struct {
-	Cursor string `form:"cursor"`
-	Limit  int    `form:"limit"`
+	SpaceID string `form:"spaceId" binding:"required"`
+	Cursor  string `form:"cursor"`
+	Limit   int    `form:"limit"`
 }
 
 type ListMessageThreadRequest struct {
-	Cursor string `form:"cursor"`
-	Limit  int    `form:"limit"`
+	ViewerSpaceID string `form:"viewerSpaceId" binding:"required"`
+	Cursor        string `form:"cursor"`
+	Limit         int    `form:"limit"`
 }
 
 type ListSpaceFriendsRequest struct {
 	SpaceID string `form:"spaceId"`
 }
 
+type ListFriendRequestsRequest struct {
+	SpaceID string `form:"spaceId" binding:"required"`
+}
+
+type DeleteFriendRequestRequest struct {
+	SpaceID string `form:"spaceId" binding:"required"`
+}
+
+type ListFriendSharesRequest struct {
+	SpaceID string `form:"spaceId" binding:"required"`
+}
+
 type FriendRelationshipRequest struct {
+	SpaceID       string `form:"spaceId" binding:"required"`
 	TargetSpaceID string `form:"targetSpaceId" binding:"required"`
 }
 
@@ -171,11 +199,13 @@ type AddFriendPayload struct {
 }
 
 type ConfirmFriendRequestPayload struct {
+	SpaceID                    string `json:"spaceId"`
 	TargetFriendSealedSpaceKey string `json:"targetFriendSealedSpaceKey"`
 	TargetKeyVersion           int    `json:"targetKeyVersion"`
 }
 
 type FriendTargetPayload struct {
+	SpaceID        string  `json:"spaceId"`
 	TargetUsername *string `json:"targetUsername,omitempty"`
 	TargetSpaceID  *string `json:"targetSpaceId,omitempty"`
 }
@@ -296,7 +326,8 @@ type CreatePostResponse struct {
 }
 
 type LikePostRequest struct {
-	Like bool `json:"like"`
+	SpaceID string `json:"spaceId"`
+	Like    bool   `json:"like"`
 }
 
 type LikePostResponse struct {
@@ -314,10 +345,12 @@ type PostLikerResponse struct {
 }
 
 type UpdatePostCaptionRequest struct {
+	SpaceID       string  `json:"spaceId"`
 	CaptionCipher *string `json:"captionCipher,omitempty"`
 }
 
 type CreateMessageRequest struct {
+	SpaceID                      string `json:"spaceId,omitempty"`
 	MessageID                    string `json:"messageId,omitempty"`
 	MessageCipher                string `json:"messageCipher"`
 	SenderEncryptedMessageKey    string `json:"senderEncryptedMessageKey"`
@@ -326,7 +359,12 @@ type CreateMessageRequest struct {
 }
 
 type LikeMessageRequest struct {
-	Like bool `json:"like"`
+	SpaceID string `json:"spaceId"`
+	Like    bool   `json:"like"`
+}
+
+type DeleteMessageRequest struct {
+	SpaceID string `form:"spaceId" binding:"required"`
 }
 
 type LikeMessageResponse struct {
@@ -420,6 +458,7 @@ type SpaceUnreadStatusResponse struct {
 }
 
 type MarkNotificationsReadRequest struct {
+	SpaceID       string `json:"spaceId"`
 	FriendSpaceID string `json:"friendSpaceId"`
 }
 

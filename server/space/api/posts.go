@@ -37,7 +37,12 @@ func (h *Handlers) ListPosts(c *gin.Context) {
 }
 
 func (h *Handlers) GetPost(c *gin.Context) {
-	resp, err := h.Module.Posts.Get(c, c.Param("postID"))
+	var req models.GetPostRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		respondJSON(c, nil, ente.ErrBadRequest)
+		return
+	}
+	resp, err := h.Module.Posts.Get(c, c.Param("postID"), req)
 	respondJSON(c, resp, err)
 }
 

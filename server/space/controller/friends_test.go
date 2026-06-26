@@ -29,15 +29,15 @@ func TestFriendRelationshipReportsSelfFriendAndEmpty(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, testAddFriend(ctx, repos, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion))
 
-	resp, err := friends.Relationship(newSpaceControllerContext(aliceID), models.FriendRelationshipRequest{TargetSpaceID: aliceSpace.SpaceID})
+	resp, err := friends.Relationship(newSpaceControllerContext(aliceID), models.FriendRelationshipRequest{SpaceID: aliceSpace.SpaceID, TargetSpaceID: aliceSpace.SpaceID})
 	require.NoError(t, err)
 	require.Equal(t, "self", resp.Relationship)
 
-	resp, err = friends.Relationship(newSpaceControllerContext(aliceID), models.FriendRelationshipRequest{TargetSpaceID: bobSpace.SpaceID})
+	resp, err = friends.Relationship(newSpaceControllerContext(aliceID), models.FriendRelationshipRequest{SpaceID: aliceSpace.SpaceID, TargetSpaceID: bobSpace.SpaceID})
 	require.NoError(t, err)
 	require.Equal(t, "friend", resp.Relationship)
 
-	resp, err = friends.Relationship(newSpaceControllerContext(aliceID), models.FriendRelationshipRequest{TargetSpaceID: charlieSpace.SpaceID})
+	resp, err = friends.Relationship(newSpaceControllerContext(aliceID), models.FriendRelationshipRequest{SpaceID: aliceSpace.SpaceID, TargetSpaceID: charlieSpace.SpaceID})
 	require.NoError(t, err)
 	require.Empty(t, resp.Relationship)
 }
@@ -70,7 +70,7 @@ func TestUnfriendBySpaceIDRemovesReciprocalShares(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, testAddFriend(ctx, repos, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion))
 
-	err = friends.Unfriend(newSpaceControllerContext(aliceID), models.FriendTargetPayload{TargetSpaceID: &bobSpace.SpaceID})
+	err = friends.Unfriend(newSpaceControllerContext(aliceID), models.FriendTargetPayload{SpaceID: aliceSpace.SpaceID, TargetSpaceID: &bobSpace.SpaceID})
 
 	require.NoError(t, err)
 	aliceShares, err := repos.Friends.ListSharesForFriend(ctx, aliceID)
@@ -92,7 +92,7 @@ func TestUnfriendByUsernameRemovesReciprocalShares(t *testing.T) {
 	require.NoError(t, testAddFriend(ctx, repos, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "bob-share-key", bobSpace.CurrentVersion, "alice-share-key", aliceSpace.CurrentVersion))
 
 	targetUsername := "bob_unfriend_username"
-	err = friends.Unfriend(newSpaceControllerContext(aliceID), models.FriendTargetPayload{TargetUsername: &targetUsername})
+	err = friends.Unfriend(newSpaceControllerContext(aliceID), models.FriendTargetPayload{SpaceID: aliceSpace.SpaceID, TargetUsername: &targetUsername})
 
 	require.NoError(t, err)
 	aliceShares, err := repos.Friends.ListSharesForFriend(ctx, aliceID)
