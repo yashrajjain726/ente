@@ -39,8 +39,12 @@ func (c *SpacesController) Create(ctx *gin.Context, req models.CreateSpaceReques
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.SpaceSlug) == "" || strings.TrimSpace(req.RootWrappedSpaceKey) == "" || strings.TrimSpace(req.PublicKey) == "" || strings.TrimSpace(req.EncryptedSecretKey) == "" {
-		return nil, ente.NewBadRequestWithMessage("spaceSlug, rootWrappedSpaceKey and space identity keys are required")
+	normalizedSlug, err := validateSpaceSlug(req.SpaceSlug)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(req.RootWrappedSpaceKey) == "" || strings.TrimSpace(req.PublicKey) == "" || strings.TrimSpace(req.EncryptedSecretKey) == "" {
+		return nil, ente.NewBadRequestWithMessage("rootWrappedSpaceKey and space identity keys are required")
 	}
 	rootWrappedSpaceKey, err := decodeEncodedSpaceField("rootWrappedSpaceKey", req.RootWrappedSpaceKey, maxSpaceEncryptedKeyEncodedBytes, maxSpaceEncryptedKeyDecodedBytes)
 	if err != nil {
@@ -58,7 +62,7 @@ func (c *SpacesController) Create(ctx *gin.Context, req models.CreateSpaceReques
 	if err != nil {
 		return nil, err
 	}
-	space, err := c.SpacesRepo.CreateSpace(ctx, userID, req.SpaceSlug, rootWrappedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile)
+	space, err := c.SpacesRepo.CreateSpace(ctx, userID, normalizedSlug, rootWrappedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile)
 	if err != nil {
 		return nil, err
 	}
@@ -184,10 +188,11 @@ func (c *SpacesController) UpdateSlug(ctx *gin.Context, req models.UpdateSpaceSl
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(req.SpaceSlug) == "" {
-		return nil, ente.NewBadRequestWithMessage("spaceSlug is required")
+	normalizedSlug, err := validateSpaceSlug(req.SpaceSlug)
+	if err != nil {
+		return nil, err
 	}
-	space, err := c.SpacesRepo.UpdateSlug(ctx, selected.SpaceID, req.SpaceSlug)
+	space, err := c.SpacesRepo.UpdateSlug(ctx, selected.SpaceID, normalizedSlug)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +221,7 @@ func (c *SpacesController) LookupBySlug(ctx *gin.Context, spaceSlug string) (*mo
 }
 
 func (c *SpacesController) SlugAvailability(ctx *gin.Context, spaceSlug string) (*models.SpaceSlugAvailabilityResponse, error) {
-	normalizedSlug, err := repo.ValidateSpaceSlug(spaceSlug)
+	normalizedSlug, err := validateSpaceSlug(spaceSlug)
 	if err != nil {
 		return &models.SpaceSlugAvailabilityResponse{Available: false}, nil
 	}

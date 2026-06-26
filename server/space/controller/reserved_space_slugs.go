@@ -1,4 +1,4 @@
-package repo
+package controller
 
 var reservedSpaceSlugList = []string{
 	"2fa",

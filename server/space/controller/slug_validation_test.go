@@ -1,4 +1,4 @@
-package repo
+package controller
 
 import (
 	"strings"
@@ -20,7 +20,7 @@ func TestValidateSpaceSlugMatchesClientRules(t *testing.T) {
 		{name: "thirty chars", input: strings.Repeat("a", 30), normalized: strings.Repeat("a", 30)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			normalized, err := ValidateSpaceSlug(tc.input)
+			normalized, err := validateSpaceSlug(tc.input)
 			require.NoError(t, err)
 			require.Equal(t, tc.normalized, normalized)
 		})
@@ -46,7 +46,7 @@ func TestValidateSpaceSlugRejectsInvalidClientSlugs(t *testing.T) {
 		{name: "unicode confusable", input: "paypa\u217C", message: "spaceSlug can only contain"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := ValidateSpaceSlug(tc.input)
+			_, err := validateSpaceSlug(tc.input)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), tc.message)
 		})
@@ -135,7 +135,7 @@ func TestValidateSpaceSlugRejectsReservedSlugs(t *testing.T) {
 		"ente-user",
 	} {
 		t.Run(slug, func(t *testing.T) {
-			_, err := ValidateSpaceSlug(slug)
+			_, err := validateSpaceSlug(slug)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "spaceSlug is reserved")
 		})
@@ -259,7 +259,7 @@ func TestValidateSpaceSlugRejectsPhishingSlugs(t *testing.T) {
 		"support.ente",
 	} {
 		t.Run(slug, func(t *testing.T) {
-			_, err := ValidateSpaceSlug(slug)
+			_, err := validateSpaceSlug(slug)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "spaceSlug is reserved")
 		})

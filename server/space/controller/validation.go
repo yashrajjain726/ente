@@ -2,12 +2,15 @@ package controller
 
 import (
 	"encoding/base64"
+	"regexp"
 	"strings"
 
 	"github.com/ente-io/museum/ente"
 )
 
 const (
+	minSpaceSlugLength                   = 3
+	maxSpaceSlugLength                   = 30
 	maxSpaceEncryptedProfileEncodedBytes = 32 * 1024
 	maxSpaceEncryptedProfileDecodedBytes = 24 * 1024
 	maxSpaceEncryptedKeyEncodedBytes     = 4 * 1024
@@ -21,6 +24,48 @@ const (
 	maxSpaceObjectKeyBytes               = 512
 	maxSpaceLinkSessionTokenBytes        = 256
 )
+
+var spaceSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._]*$`)
+var reservedSpaceSlugs = newReservedSpaceSlugSet()
+
+func normalizeSlug(input string) string {
+	return strings.ToLower(strings.TrimSpace(input))
+}
+
+func newReservedSpaceSlugSet() map[string]struct{} {
+	slugs := make(map[string]struct{}, len(reservedSpaceSlugList))
+	for _, slug := range reservedSpaceSlugList {
+		slugs[slug] = struct{}{}
+	}
+	return slugs
+}
+
+func validateSpaceSlug(input string) (string, error) {
+	slug := normalizeSlug(input)
+	if slug == "" {
+		return "", ente.NewBadRequestWithMessage("spaceSlug is required")
+	}
+	if len(slug) < minSpaceSlugLength || len(slug) > maxSpaceSlugLength {
+		return "", ente.NewBadRequestWithMessage("spaceSlug must be 3-30 characters")
+	}
+	if isReservedSpaceSlug(slug) {
+		return "", ente.NewBadRequestWithMessage("spaceSlug is reserved")
+	}
+	if !spaceSlugPattern.MatchString(slug) {
+		return "", ente.NewBadRequestWithMessage("spaceSlug can only contain lowercase letters, numbers, dots, or underscores, and must start with a letter or number")
+	}
+	return slug, nil
+}
+
+func isReservedSpaceSlug(slug string) bool {
+	if _, ok := reservedSpaceSlugs[slug]; ok {
+		return true
+	}
+	if strings.HasPrefix(slug, "ente") {
+		return true
+	}
+	return strings.HasSuffix(slug, ".ente") || strings.HasSuffix(slug, "-ente") || strings.HasSuffix(slug, "_ente")
+}
 
 func decodeEncodedSpaceField(field string, value string, maxEncodedBytes int, maxDecodedBytes int) ([]byte, error) {
 	trimmed := strings.TrimSpace(value)
