@@ -20,20 +20,6 @@ type SpaceBrowserSessionBootstrapResponse struct {
 	SessionWrapKey string `json:"sessionWrapKey"`
 }
 
-type SpaceEntityKeyRequest struct {
-	Type         string `json:"type" binding:"required"`
-	EncryptedKey string `json:"encryptedKey" binding:"required"`
-}
-
-type GetSpaceEntityKeyRequest struct {
-	Type string `form:"type" binding:"required"`
-}
-
-type SpaceEntityKeyResponse struct {
-	Type         string `json:"type"`
-	EncryptedKey string `json:"encryptedKey"`
-}
-
 type GetSpaceProfileRequest struct {
 	SpaceID       string `form:"spaceId" binding:"required"`
 	ViewerSpaceID string `form:"viewerSpaceId"`

@@ -72,20 +72,6 @@ CREATE TRIGGER update_space_browser_sessions_updated_at
     FOR EACH ROW
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
 
-CREATE TABLE IF NOT EXISTS space_entity_keys (
-    user_id       BIGINT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    key_type      TEXT   NOT NULL,
-    encrypted_key BYTEA  NOT NULL,
-    created_at    BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    updated_at    BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    PRIMARY KEY (user_id, key_type)
-);
-
-CREATE TRIGGER update_space_entity_keys_updated_at
-    BEFORE UPDATE ON space_entity_keys
-    FOR EACH ROW
-EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
-
 CREATE TABLE IF NOT EXISTS space_key_versions (
     space_id             TEXT    NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     version             INTEGER NOT NULL,

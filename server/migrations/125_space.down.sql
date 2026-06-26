@@ -22,9 +22,6 @@ DROP TABLE IF EXISTS space_posts;
 
 DROP TABLE IF EXISTS space_key_versions;
 
-DROP TRIGGER IF EXISTS update_space_entity_keys_updated_at ON space_entity_keys;
-DROP TABLE IF EXISTS space_entity_keys;
-
 DROP TRIGGER IF EXISTS update_space_browser_sessions_updated_at ON space_browser_sessions;
 DROP TABLE IF EXISTS space_browser_sessions;
 

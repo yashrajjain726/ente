@@ -210,9 +210,6 @@ func deleteSpaceRowsTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs [
 		return err
 	}
 	spaceIDArray := pq.Array(spaceIDs)
-	if _, err := tx.ExecContext(ctx, `DELETE FROM space_entity_keys WHERE user_id = $1`, userID); err != nil {
-		return stacktrace.Propagate(err, "failed to delete space entity keys")
-	}
 	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM space_messages
 		WHERE sender_space_id = ANY($1)

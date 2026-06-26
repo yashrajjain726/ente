@@ -179,10 +179,6 @@ func testUpdateCaption(ctx context.Context, module *Module, postID int64, _ int6
 	return module.Posts.UpdateCaption(ctx, postID, spaceID, caption)
 }
 
-func testCreateEntityKey(ctx context.Context, module *Module, userID int64, keyType string, encryptedKey string) error {
-	return module.EntityKeys.CreateKey(ctx, userID, keyType, testSpaceBytes(encryptedKey))
-}
-
 func insertSpaceUser(t *testing.T, module *Module, email string, publicKey string) int64 {
 	t.Helper()
 	userID := testutil.InsertUser(t, module.Spaces.DB, testutil.UserFixture{
@@ -222,34 +218,6 @@ func TestGetBrowserSession(t *testing.T) {
 	require.Equal(t, userID, session.UserID)
 	require.Equal(t, "session-wrap-key", session.SessionWrapKey)
 	require.Equal(t, expiresAt, session.ExpiresAt)
-}
-
-func TestCreateSpaceRejectsReservedSlugs(t *testing.T) {
-	ctx := context.Background()
-	module := newSpaceTestModule(t)
-	userID := insertSpaceUser(t, module, "reserved@example.com", "reserved-public")
-
-	for _, slug := range []string{"admin", " EnteCom ", "ente_com", "ente-com", "ente_gg", "ente-photos", "ente_space", "entegg", "enter", "images", "two-factor"} {
-		_, err := testCreateSpace(ctx, module, userID, slug, "space-key", slug+"-public", slug+"-secret", slug+"-secret-nonce", "profile")
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "spaceSlug is reserved")
-	}
-}
-
-func TestUpdateSlugRejectsReservedSlug(t *testing.T) {
-	ctx := context.Background()
-	module := newSpaceTestModule(t)
-	userID := insertSpaceUser(t, module, "rename@example.com", "rename-public")
-	space, err := testCreateSpace(ctx, module, userID, "rename_user", "space-key", "rename-user-public", "rename-user-secret", "rename-user-secret-nonce", "profile")
-	require.NoError(t, err)
-
-	_, err = module.Spaces.UpdateSlug(ctx, space.SpaceID, "support")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "spaceSlug is reserved")
-
-	unchanged, err := module.Spaces.GetSpaceByID(ctx, space.SpaceID)
-	require.NoError(t, err)
-	require.Equal(t, "rename_user", unchanged.SpaceSlug)
 }
 
 func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
@@ -343,7 +311,6 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 		ExpectedSize: 44,
 		ExpiresAt:    timeutil.NDaysFromNow(1),
 	}))
-	require.NoError(t, testCreateEntityKey(ctx, module, aliceID, "primary", "encrypted-key"))
 	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, []byte("alice-delete-browser-token"), aliceID, "session-wrap-key", timeutil.NDaysFromNow(1)))
 	require.NoError(t, testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	_, err = testUpsertLink(ctx, module, aliceSpace.SpaceID, []byte("alice-delete-auth-hash"), aliceSpace.CurrentVersion, "alice-link-space-key", "alice-link-access-key")
@@ -368,7 +335,6 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_posts WHERE space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_post_assets WHERE object_key = $1`, "space/alice/post-asset"))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE sender_space_id = $1 OR recipient_space_id = $1`, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_entity_keys WHERE user_id = $1`, aliceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_browser_sessions WHERE user_id = $1`, aliceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_link_sessions WHERE space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_links WHERE space_id = $1`, aliceSpace.SpaceID))

@@ -12,7 +12,9 @@ use crate::crypto::{
     seal_with_public_key, space_link_access_key_material,
 };
 use crate::models::{MessageQuote, OpenSpaceLinkCtxInput};
-use crate::transport::{ProfileAvatarPayload, ProfileCoverPayload, SpaceActorResponse};
+use crate::transport::{
+    EntityKeyPayload, ProfileAvatarPayload, ProfileCoverPayload, SpaceActorResponse,
+};
 
 use mockito::{Matcher, Server};
 use serde_json::json;
@@ -69,6 +71,52 @@ async fn get_or_create_space_root_key_returns_context_space_root_key() {
         .expect("space root key should load");
 
     assert_eq!(space_root, expected_space_root);
+}
+
+#[tokio::test]
+async fn ensure_entity_key_uses_generic_split_key_endpoint() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let header = vec![1u8; 24];
+    let encrypted_key = vec![2u8; 48];
+    let mut combined = header.clone();
+    combined.extend_from_slice(&encrypted_key);
+    let ensure = server
+        .mock("POST", "/user-entity/key/ensure")
+        .match_body(Matcher::JsonString(
+            json!({
+                "type": "space",
+                "encryptedKey": encode_b64(&encrypted_key),
+                "header": encode_b64(&header),
+            })
+            .to_string(),
+        ))
+        .with_status(200)
+        .with_body(
+            json!({
+                "userID": 1,
+                "type": "space",
+                "encryptedKey": encode_b64(&encrypted_key),
+                "header": encode_b64(&header),
+                "createdAt": 123,
+            })
+            .to_string(),
+        )
+        .create_async()
+        .await;
+
+    let payload = ctx
+        .ensure_entity_key(
+            "space",
+            &EntityKeyPayload {
+                encrypted_key: encode_b64(&combined),
+            },
+        )
+        .await
+        .expect("entity key");
+
+    assert_eq!(payload.encrypted_key, encode_b64(&combined));
+    ensure.assert_async().await;
 }
 
 #[tokio::test]

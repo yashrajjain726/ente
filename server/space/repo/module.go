@@ -7,15 +7,14 @@ import (
 )
 
 type Module struct {
-	Spaces     *SpacesRepository
-	Posts      *PostsRepository
-	Friends    *FriendsRepository
-	Messages   *MessagesRepository
-	Links      *LinksRepository
-	Assets     *AssetsRepository
-	Read       *ReadMarkersRepository
-	Sessions   *SessionsRepository
-	EntityKeys *EntityKeysRepository
+	Spaces   *SpacesRepository
+	Posts    *PostsRepository
+	Friends  *FriendsRepository
+	Messages *MessagesRepository
+	Links    *LinksRepository
+	Assets   *AssetsRepository
+	Read     *ReadMarkersRepository
+	Sessions *SessionsRepository
 }
 
 type SpacesRepository struct {
@@ -48,10 +47,6 @@ type ReadMarkersRepository struct {
 }
 
 type SessionsRepository struct {
-	DB *sql.DB
-}
-
-type EntityKeysRepository struct {
 	DB *sql.DB
 }
 
@@ -286,23 +281,15 @@ type SpaceBrowserSessionRecord struct {
 	LastUsedAt     int64
 }
 
-type SpaceEntityKeyRecord struct {
-	UserID       int64
-	KeyType      string
-	EncryptedKey []byte
-	CreatedAt    int64
-}
-
 func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {
 	return &Module{
-		Spaces:     &SpacesRepository{DB: db},
-		Posts:      &PostsRepository{DB: db},
-		Friends:    &FriendsRepository{DB: db},
-		Messages:   &MessagesRepository{DB: db},
-		Links:      &LinksRepository{DB: db},
-		Assets:     &AssetsRepository{DB: db, S3Config: s3Config},
-		Read:       &ReadMarkersRepository{DB: db},
-		Sessions:   &SessionsRepository{DB: db},
-		EntityKeys: &EntityKeysRepository{DB: db},
+		Spaces:   &SpacesRepository{DB: db},
+		Posts:    &PostsRepository{DB: db},
+		Friends:  &FriendsRepository{DB: db},
+		Messages: &MessagesRepository{DB: db},
+		Links:    &LinksRepository{DB: db},
+		Assets:   &AssetsRepository{DB: db, S3Config: s3Config},
+		Read:     &ReadMarkersRepository{DB: db},
+		Sessions: &SessionsRepository{DB: db},
 	}
 }

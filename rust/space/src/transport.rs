@@ -16,6 +16,7 @@ pub struct EntityKeyResponse {
     #[serde(rename = "type")]
     pub key_type: String,
     pub encrypted_key: String,
+    pub header: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -24,6 +25,7 @@ pub struct CreateEntityKeyRequest {
     #[serde(rename = "type")]
     pub key_type: String,
     pub encrypted_key: String,
+    pub header: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
