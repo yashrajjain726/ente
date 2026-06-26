@@ -506,42 +506,6 @@ func (r *MessagesRepository) ListLatestChatSummaries(ctx context.Context, viewer
 	return out, stacktrace.Propagate(rows.Err(), "")
 }
 
-func (r *MessagesRepository) GetLatestConversationActivityAt(ctx context.Context, viewerSpaceID string, friendSpaceID string) (int64, error) {
-	summaries, err := r.ListLatestChatSummaries(ctx, viewerSpaceID, []string{friendSpaceID})
-	if err != nil {
-		return 0, err
-	}
-	summary, ok := summaries[strings.TrimSpace(friendSpaceID)]
-	if !ok {
-		return 0, nil
-	}
-	return summary.LatestActivity.CreatedAt, nil
-}
-
-func (r *MessagesRepository) HasUnreadNotifications(ctx context.Context, viewerSpaceID string) (bool, error) {
-	var exists bool
-	if err := r.DB.QueryRowContext(ctx, currentFriendSummaryRowsSQL+`
-		SELECT EXISTS (
-			SELECT 1
-			FROM conversation_rows c
-			WHERE c.notification_unread
-			LIMIT 1
-			) OR EXISTS (
-				SELECT 1
-				FROM space_friend_requests fr
-				JOIN spaces requester_space ON requester_space.space_id = fr.requester_space_id
-				JOIN users requester_owner ON requester_owner.user_id = requester_space.owner_id AND requester_owner.encrypted_email IS NOT NULL
-				WHERE fr.target_space_id = $1
-				  AND fr.is_deleted = FALSE
-				  AND fr.resolved_at IS NULL
-				LIMIT 1
-			)
-	`, strings.TrimSpace(viewerSpaceID)).Scan(&exists); err != nil {
-		return false, stacktrace.Propagate(err, "")
-	}
-	return exists, nil
-}
-
 func sprintfSpaceMessageColumns(viewerPlaceholder string) string {
 	return strings.TrimSpace(strings.ReplaceAll(spaceMessageSelectColumns, "%s", viewerPlaceholder))
 }

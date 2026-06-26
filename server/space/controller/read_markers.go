@@ -14,7 +14,6 @@ import (
 
 type ReadMarkersController struct {
 	ReadMarkersRepo *repo.ReadMarkersRepository
-	MessagesRepo    *repo.MessagesRepository
 	auth            authDeps
 }
 
@@ -23,7 +22,7 @@ func (c *ReadMarkersController) GetUnreadStatus(ctx *gin.Context) (*models.Space
 	if err != nil {
 		return nil, err
 	}
-	notificationsUnread, err := c.MessagesRepo.HasUnreadNotifications(ctx, viewerSpace.SpaceID)
+	notificationsUnread, err := c.ReadMarkersRepo.HasUnreadNotifications(ctx, viewerSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +39,7 @@ func (c *ReadMarkersController) MarkNotificationsRead(ctx *gin.Context, req mode
 	if err != nil {
 		return nil, err
 	}
-	readAt, err := c.MessagesRepo.GetLatestConversationActivityAt(ctx, viewerSpace.SpaceID, req.FriendSpaceID)
+	readAt, err := c.ReadMarkersRepo.GetLatestConversationActivityAt(ctx, viewerSpace.SpaceID, req.FriendSpaceID)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.ErrPermissionDenied

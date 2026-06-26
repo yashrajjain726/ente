@@ -45,7 +45,7 @@ func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, em
 		Messages:   &MessagesController{MessagesRepo: repos.Messages, PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, ReadMarkersRepo: repos.Read, EmailNotifier: emailNotifier, auth: authDeps},
 		Links:      &LinksController{LinksRepo: repos.Links, SpacesRepo: repos.Spaces, auth: authDeps},
 		Assets:     &AssetsController{AssetsRepo: repos.Assets, SpacesRepo: repos.Spaces, auth: authDeps},
-		Read:       &ReadMarkersController{ReadMarkersRepo: repos.Read, MessagesRepo: repos.Messages, auth: authDeps},
+		Read:       &ReadMarkersController{ReadMarkersRepo: repos.Read, auth: authDeps},
 		Sessions:   &SessionsController{SessionsRepo: repos.Sessions},
 		EntityKeys: &EntityKeysController{EntityKeysRepo: repos.EntityKeys, auth: authDeps},
 		Cleanup:    &CleanupController{AssetsRepo: repos.Assets},
