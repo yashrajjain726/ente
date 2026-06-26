@@ -39,10 +39,7 @@ type AssetsController struct {
 }
 
 func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUploadRequest) (*models.PresignUploadResponse, error) {
-	space, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	space := mustSelectedSpace(ctx)
 	purpose := uploadPurposePost
 	if req.Purpose != nil && strings.TrimSpace(*req.Purpose) != "" {
 		purpose = strings.TrimSpace(*req.Purpose)

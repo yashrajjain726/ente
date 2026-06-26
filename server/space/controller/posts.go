@@ -24,10 +24,7 @@ type PostsController struct {
 }
 
 func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest) (*models.CreatePostResponse, error) {
-	space, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	space := mustSelectedSpace(ctx)
 	if strings.TrimSpace(req.EncryptedPostKey) == "" || len(req.Objects) == 0 {
 		return nil, ente.NewBadRequestWithMessage("encryptedPostKey and objects are required")
 	}
@@ -161,10 +158,7 @@ func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*
 }
 
 func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest) (*models.FeedPage, error) {
-	viewerSpace, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	viewerSpace := mustSelectedSpace(ctx)
 	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx, viewerSpace.SpaceID, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
@@ -203,10 +197,7 @@ func (c *PostsController) Get(ctx *gin.Context, postID int64, req models.GetPost
 }
 
 func (c *PostsController) UpdateCaption(ctx *gin.Context, postID int64, req models.UpdatePostCaptionRequest) (*models.PostResponse, error) {
-	viewerSpace, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	viewerSpace := mustSelectedSpace(ctx)
 	captionCipher, err := decodeOptionalEncodedSpacePointerField("captionCipher", req.CaptionCipher, maxSpaceCaptionCipherEncodedBytes, maxSpaceCaptionCipherDecodedBytes)
 	if err != nil {
 		return nil, err
@@ -222,10 +213,7 @@ func (c *PostsController) UpdateCaption(ctx *gin.Context, postID int64, req mode
 }
 
 func (c *PostsController) ToggleLike(ctx *gin.Context, postID int64, req models.LikePostRequest) (*models.LikePostResponse, error) {
-	actorSpace, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	actorSpace := mustSelectedSpace(ctx)
 	post, err := c.PostsRepo.GetPost(ctx, postID, actorSpace.SpaceID)
 	if err != nil {
 		return nil, err
@@ -293,10 +281,7 @@ func (c *PostsController) ListLikers(ctx *gin.Context, postID int64, req models.
 }
 
 func (c *PostsController) Delete(ctx *gin.Context, postID int64) error {
-	space, err := selectedSpace(ctx)
-	if err != nil {
-		return err
-	}
-	_, err = c.PostsRepo.DeletePost(ctx, postID, space.SpaceID)
+	space := mustSelectedSpace(ctx)
+	_, err := c.PostsRepo.DeletePost(ctx, postID, space.SpaceID)
 	return err
 }

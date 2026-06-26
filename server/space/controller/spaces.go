@@ -121,10 +121,7 @@ func (c *SpacesController) GetProfile(ctx *gin.Context, req models.GetSpaceProfi
 }
 
 func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpaceProfileRequest) (*models.UpdateSpaceProfileResponse, error) {
-	current, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	current := mustSelectedSpace(ctx)
 	if strings.TrimSpace(req.EncryptedProfile) == "" || req.KeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("keyVersion and encryptedProfile are required")
 	}
@@ -184,10 +181,7 @@ func (c *SpacesController) profileAssetUpdate(ctx *gin.Context, spaceID, assetNa
 }
 
 func (c *SpacesController) UpdateSlug(ctx *gin.Context, req models.UpdateSpaceSlugRequest) (*models.SpaceLookupResponse, error) {
-	selected, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	selected := mustSelectedSpace(ctx)
 	normalizedSlug, err := validateSpaceSlug(req.SpaceSlug)
 	if err != nil {
 		return nil, err
@@ -235,10 +229,7 @@ func (c *SpacesController) SlugAvailability(ctx *gin.Context, spaceSlug string) 
 }
 
 func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKeyRequest) (*models.SpaceKeyResponse, error) {
-	current, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	current := mustSelectedSpace(ctx)
 	if strings.TrimSpace(req.RootWrappedSpaceKey) == "" || strings.TrimSpace(req.WrappedPrevKey) == "" || strings.TrimSpace(req.EncryptedProfile) == "" || req.KeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("keyVersion, rootWrappedSpaceKey, wrappedPrevKey and encryptedProfile are required")
 	}

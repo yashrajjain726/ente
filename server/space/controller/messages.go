@@ -35,10 +35,7 @@ type MessagesController struct {
 }
 
 func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req models.CreateMessageRequest) (*models.MessageResponse, error) {
-	senderSpace, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	senderSpace := mustSelectedSpace(ctx)
 	messageCipher, senderEncryptedMessageKey, recipientEncryptedMessageKey, err := decodeCreateMessageRequest(req)
 	if err != nil {
 		return nil, err
@@ -72,10 +69,7 @@ func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req 
 }
 
 func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID int64, req models.CreateMessageRequest) (*models.MessageResponse, error) {
-	senderSpace, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	senderSpace := mustSelectedSpace(ctx)
 	messageCipher, senderEncryptedMessageKey, recipientEncryptedMessageKey, err := decodeCreateMessageRequest(req)
 	if err != nil {
 		return nil, err
@@ -125,10 +119,7 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID int64, req mod
 }
 
 func (c *MessagesController) ListConversations(ctx *gin.Context) (*models.ConversationsResponse, error) {
-	viewerSpace, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	viewerSpace := mustSelectedSpace(ctx)
 	friends, err := c.FriendsRepo.ListFriendsForSpace(ctx, viewerSpace.SpaceID)
 	if err != nil {
 		return nil, err
@@ -176,10 +167,7 @@ func (c *MessagesController) ListConversations(ctx *gin.Context) (*models.Conver
 }
 
 func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, req models.ListMessageThreadRequest) (*models.MessagePage, error) {
-	viewerSpace, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	viewerSpace := mustSelectedSpace(ctx)
 	if strings.TrimSpace(targetSpaceID) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceId is required")
 	}
@@ -202,10 +190,7 @@ func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, 
 }
 
 func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req models.LikeMessageRequest) (*models.LikeMessageResponse, error) {
-	actorSpace, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	actorSpace := mustSelectedSpace(ctx)
 	messageID = strings.TrimSpace(messageID)
 	if messageID == "" {
 		return nil, ente.NewBadRequestWithMessage("messageId is required")
@@ -237,10 +222,7 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 }
 
 func (c *MessagesController) Delete(ctx *gin.Context, messageID string) error {
-	senderSpace, err := selectedSpace(ctx)
-	if err != nil {
-		return err
-	}
+	senderSpace := mustSelectedSpace(ctx)
 	messageID = strings.TrimSpace(messageID)
 	if messageID == "" {
 		return ente.NewBadRequestWithMessage("messageId is required")

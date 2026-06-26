@@ -25,10 +25,7 @@ type LinksController struct {
 }
 
 func (c *LinksController) Get(ctx *gin.Context) (*models.SpaceLinkStatusResponse, error) {
-	space, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	space := mustSelectedSpace(ctx)
 	link, err := c.LinksRepo.GetLink(ctx, space.SpaceID)
 	if err != nil {
 		if !errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
@@ -53,10 +50,7 @@ func (c *LinksController) Rotate(ctx *gin.Context, req models.SpaceLinkCreateReq
 }
 
 func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreateRequest, rotate bool) (*models.SpaceLinkStatusResponse, error) {
-	space, err := selectedSpace(ctx)
-	if err != nil {
-		return nil, err
-	}
+	space := mustSelectedSpace(ctx)
 	if strings.TrimSpace(req.AuthKey) == "" || strings.TrimSpace(req.LinkWrappedSpaceKey) == "" || strings.TrimSpace(req.EncryptedAccessKey) == "" || req.KeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("authKey, linkWrappedSpaceKey, encryptedAccessKey and keyVersion are required")
 	}
@@ -120,10 +114,7 @@ func linkStatusResponse(link *repo.SpaceLinkRecord) *models.SpaceLinkStatusRespo
 }
 
 func (c *LinksController) Delete(ctx *gin.Context) error {
-	space, err := selectedSpace(ctx)
-	if err != nil {
-		return err
-	}
+	space := mustSelectedSpace(ctx)
 	return c.LinksRepo.DeleteLink(ctx, space.SpaceID)
 }
 
