@@ -100,7 +100,6 @@ impl AccountSpaceCtx {
         let next_space_key = generate_key();
         let space_root_key = self.get_or_create_space_root_key().await?;
         let request = RotateSpaceKeyRequest {
-            space_id: space_id.to_owned(),
             key_version: current.key_version,
             root_wrapped_space_key: encode_b64(&encrypt_secretbox_payload(
                 &space_root_key,
@@ -115,9 +114,10 @@ impl AccountSpaceCtx {
                 &next_profile,
             )?),
         };
+        let path = format!("/spaces/{space_id}/rotate");
         let response = self
             .client()
-            .post_json::<SpaceKeyResponse, _>("/space/rotate", &request)
+            .post_json::<SpaceKeyResponse, _>(&path, &request)
             .await?;
         self.clear_owned_space_cache()?;
         Ok(CreatedSpace {

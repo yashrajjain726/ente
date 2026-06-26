@@ -64,8 +64,6 @@ pub struct PresignUploadRequest {
     pub content_md5: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub space_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,7 +98,6 @@ pub struct PostObjectPayload {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreatePostRequest {
-    pub space_id: String,
     pub encrypted_post_key: String,
     pub key_version: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -117,7 +114,6 @@ pub struct CreatePostResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LikePostRequest {
-    pub space_id: String,
     pub like: bool,
 }
 
@@ -129,7 +125,6 @@ pub struct LikePostResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MarkNotificationsReadRequest {
-    pub space_id: String,
     pub friend_space_id: String,
 }
 
@@ -142,7 +137,6 @@ pub struct SpaceUnreadStatusResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LikeMessageRequest {
-    pub space_id: String,
     pub like: bool,
 }
 
@@ -154,7 +148,6 @@ pub struct LikeMessageResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateMessageRequest {
-    pub space_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message_id: Option<String>,
     pub message_cipher: String,
@@ -267,7 +260,6 @@ pub struct MessageConversationPage {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePostCaptionRequest {
-    pub space_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub caption_cipher: Option<String>,
 }
@@ -343,7 +335,6 @@ pub type ProfileCoverResponse = ProfileAvatarResponse;
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSpaceProfileRequest {
-    pub space_id: String,
     pub key_version: i32,
     pub encrypted_profile: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -387,7 +378,6 @@ pub struct SpaceProfileResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RotateSpaceKeyRequest {
-    pub space_id: String,
     pub root_wrapped_space_key: String,
     pub key_version: i32,
     pub wrapped_prev_key: String,
@@ -431,7 +421,6 @@ mod tests {
     #[test]
     fn profile_asset_payloads_serialize_object_id_for_avatar_and_cover() {
         let request = UpdateSpaceProfileRequest {
-            space_id: "space_owner_main".to_owned(),
             key_version: 3,
             encrypted_profile: "encrypted-profile".to_owned(),
             avatar: Some(ProfileAvatarPayload {
@@ -529,7 +518,6 @@ pub struct AddFriendPayload {
     pub target_space_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_username: Option<String>,
-    pub requester_space_id: String,
     pub requester_friend_sealed_space_key: String,
     pub requester_key_version: i32,
 }
@@ -537,7 +525,6 @@ pub struct AddFriendPayload {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfirmFriendRequestPayload {
-    pub space_id: String,
     pub target_friend_sealed_space_key: String,
     pub target_key_version: i32,
 }
@@ -557,7 +544,6 @@ pub struct FriendRelationshipResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FriendTargetPayload {
-    pub space_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_username: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -591,7 +577,6 @@ pub struct ShareUpdatePayload {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RefreshFriendSharesRequest {
-    pub space_id: String,
     pub key_version: i32,
     pub shares: Vec<ShareUpdatePayload>,
 }
@@ -636,7 +621,6 @@ pub struct SpaceLinkStatusResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceLinkCreateRequest {
-    pub space_id: String,
     pub auth_key: String,
     pub key_version: i32,
     pub link_wrapped_space_key: String,

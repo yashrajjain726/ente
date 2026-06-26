@@ -106,7 +106,7 @@ export const createSpaceBrowserSession = async (
     authToken: string,
 ) => {
     const sessionWrapKey = await generateKey();
-    const res = await fetch(await apiURL("/space/sessions"), {
+    const res = await fetch(await apiURL("/account/space/sessions"), {
         method: "POST",
         headers: {
             ...spaceBootstrapAuthHeaders(authToken),
@@ -158,7 +158,7 @@ const restoreSpaceBrowserSession = async () => {
     const persisted = savedPersistedSession();
     if (!persisted) return false;
 
-    const res = await fetch(await apiURL("/space/sessions/bootstrap"), {
+    const res = await fetch(await apiURL("/account/space/sessions/bootstrap"), {
         method: "POST",
         headers: {
             ...publicRequestHeaders(),
@@ -192,7 +192,7 @@ export const getOrCreateSpaceRootKey = async (
 ) => {
     const candidate = await generateKey();
     const encryptedKey = await encryptSpaceRootEntityKey(candidate, masterKey);
-    const res = await fetch(await apiURL("/space/entity-key/ensure"), {
+        const res = await fetch(await apiURL("/account/space/entity-key/ensure"), {
         method: "POST",
         headers: {
             ...spaceBootstrapAuthHeaders(authToken),
@@ -209,7 +209,7 @@ export const revokeSpaceBrowserSession = async () => {
     const sessionToken = savedSpaceSessionToken();
     try {
         if (!sessionToken) return;
-        const res = await fetch(await apiURL("/space/sessions/current"), {
+        const res = await fetch(await apiURL("/account/space/sessions/current"), {
             method: "DELETE",
             headers: {
                 ...publicRequestHeaders(),

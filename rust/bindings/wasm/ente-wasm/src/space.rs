@@ -1320,8 +1320,11 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Delete a post.
-    pub async fn delete_post(&self, post_id: i64) -> Result<(), WasmSpaceError> {
-        self.inner.delete_post(post_id).await.map_err(Into::into)
+    pub async fn delete_post(&self, space_id: String, post_id: i64) -> Result<(), WasmSpaceError> {
+        self.inner
+            .delete_post(&space_id, post_id)
+            .await
+            .map_err(Into::into)
     }
 
     /// List friends for a space.

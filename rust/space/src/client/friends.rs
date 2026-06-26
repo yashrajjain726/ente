@@ -38,12 +38,12 @@ impl AccountSpaceCtx {
         let payload = AddFriendPayload {
             target_space_id: Some(target_space_id.to_owned()),
             target_username: None,
-            requester_space_id: requester_space.space_id,
             requester_friend_sealed_space_key: encode_b64(&requester_share),
             requester_key_version: requester_space.key_version,
         };
+        let path = format!("/spaces/{}/friends/add", requester_space.space_id);
         self.client()
-            .post_json("/space/friends/add", &payload)
+            .post_json(&path, &payload)
             .await
             .map_err(Into::into)
     }
@@ -74,11 +74,8 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
     ) -> Result<Vec<SpaceFriendRequestResponse>> {
-        let query = vec![("spaceId", space_id.to_owned())];
-        self.client()
-            .get_json("/space/friends/requests", &query)
-            .await
-            .map_err(Into::into)
+        let path = format!("/spaces/{space_id}/friends/requests");
+        self.client().get_json(&path, &[]).await.map_err(Into::into)
     }
 
     pub async fn confirm_friend_request(
@@ -106,11 +103,13 @@ impl AccountSpaceCtx {
         let (target_space, target_space_key) = self.profile_space_access(space_id).await?;
         let target_share = seal_with_public_key(&target_space_key, &requester_public_key)?;
         let payload = ConfirmFriendRequestPayload {
-            space_id: target_space.space_id,
             target_friend_sealed_space_key: encode_b64(&target_share),
             target_key_version: target_space.key_version,
         };
-        let path = format!("/space/friends/requests/{request_id}/confirm");
+        let path = format!(
+            "/spaces/{}/friends/requests/{request_id}/confirm",
+            target_space.space_id
+        );
         let response = self.client().post_json(&path, &payload).await?;
         self.clear_friend_share_cache()?;
         Ok(response)
@@ -122,46 +121,38 @@ impl AccountSpaceCtx {
                 "friend request id is required".into(),
             ));
         }
-        let path = format!("/space/friends/requests/{request_id}");
-        let query = vec![("spaceId", space_id.to_owned())];
+        let path = format!("/spaces/{space_id}/friends/requests/{request_id}");
         self.client()
-            .delete_empty(&path, &query)
+            .delete_empty(&path, &[])
             .await
             .map_err(Into::into)
     }
 
     pub async fn unfriend_by_space(&self, actor_space_id: &str, space_id: &str) -> Result<()> {
         let request = FriendTargetPayload {
-            space_id: actor_space_id.to_owned(),
             target_username: None,
             target_space_id: Some(space_id.to_owned()),
         };
-        self.client()
-            .post_empty("/space/friends/unfriend", &request)
-            .await?;
+        let path = format!("/spaces/{actor_space_id}/friends/unfriend");
+        self.client().post_empty(&path, &request).await?;
         self.clear_friend_share_cache()?;
         Ok(())
     }
 
     pub async fn unfriend_by_username(&self, actor_space_id: &str, username: &str) -> Result<()> {
         let request = FriendTargetPayload {
-            space_id: actor_space_id.to_owned(),
             target_username: Some(username.to_owned()),
             target_space_id: None,
         };
-        self.client()
-            .post_empty("/space/friends/unfriend", &request)
-            .await?;
+        let path = format!("/spaces/{actor_space_id}/friends/unfriend");
+        self.client().post_empty(&path, &request).await?;
         self.clear_friend_share_cache()?;
         Ok(())
     }
 
     pub async fn list_space_friends(&self, space_id: &str) -> Result<Vec<SpaceFriendResponse>> {
-        let query = vec![("spaceId", space_id.to_owned())];
-        self.client()
-            .get_json("/space/friends", &query)
-            .await
-            .map_err(Into::into)
+        let path = format!("/spaces/{space_id}/friends");
+        self.client().get_json(&path, &[]).await.map_err(Into::into)
     }
 
     pub async fn get_relationship(
@@ -169,12 +160,10 @@ impl AccountSpaceCtx {
         space_id: &str,
         target_space_id: &str,
     ) -> Result<FriendRelationshipResponse> {
-        let query = vec![
-            ("spaceId", space_id.to_owned()),
-            ("targetSpaceId", target_space_id.to_owned()),
-        ];
+        let query = vec![("targetSpaceId", target_space_id.to_owned())];
+        let path = format!("/spaces/{space_id}/friends/relationship");
         self.client()
-            .get_json("/space/friends/relationship", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }
@@ -203,14 +192,12 @@ impl AccountSpaceCtx {
             return Ok(0);
         }
         let payload = RefreshFriendSharesRequest {
-            space_id: space_id.to_owned(),
             key_version: access.key_version,
             shares: updates,
         };
         let updated = payload.shares.len();
-        self.client()
-            .post_empty("/space/friends/shares/refresh", &payload)
-            .await?;
+        let path = format!("/spaces/{space_id}/friends/shares/refresh");
+        self.client().post_empty(&path, &payload).await?;
         self.clear_friend_share_cache()?;
         Ok(updated)
     }

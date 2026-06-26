@@ -48,7 +48,6 @@ impl AccountSpaceCtx {
             None => None,
         };
         let request = CreatePostRequest {
-            space_id: space_id.to_owned(),
             encrypted_post_key: encode_b64(&encrypt_secretbox_payload(
                 &access.space_key,
                 &post_key_bytes,
@@ -57,9 +56,10 @@ impl AccountSpaceCtx {
             caption_cipher,
             objects: objects.to_vec(),
         };
+        let path = format!("/spaces/{space_id}/posts");
         let response = self
             .client()
-            .post_json::<CreatePostResponse, _>("/space/posts", &request)
+            .post_json::<CreatePostResponse, _>(&path, &request)
             .await?;
         Ok((response.post_id, post_key_bytes))
     }
@@ -93,25 +93,23 @@ impl AccountSpaceCtx {
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<FeedPage> {
-        let mut query = vec![("spaceId", space_id.to_owned())];
+        let mut query = Vec::new();
         if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
             query.push(("cursor", value));
         }
         if let Some(value) = limit {
             query.push(("limit", value.to_string()));
         }
+        let path = format!("/spaces/{space_id}/feed");
         self.client()
-            .get_json("/space/feed", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }
 
     pub async fn unread_status(&self, space_id: &str) -> Result<SpaceUnreadStatusResponse> {
-        let query = vec![("spaceId", space_id.to_owned())];
-        self.client()
-            .get_json("/space/unread", &query)
-            .await
-            .map_err(Into::into)
+        let path = format!("/spaces/{space_id}/unread");
+        self.client().get_json(&path, &[]).await.map_err(Into::into)
     }
 
     pub async fn mark_notifications_read(
@@ -129,14 +127,9 @@ impl AccountSpaceCtx {
                 "friend space id is required".into(),
             ));
         }
+        let path = format!("/spaces/{space_id}/messages/read");
         self.client()
-            .post_json(
-                "/space/messages/read",
-                &MarkNotificationsReadRequest {
-                    space_id,
-                    friend_space_id,
-                },
-            )
+            .post_json(&path, &MarkNotificationsReadRequest { friend_space_id })
             .await
             .map_err(Into::into)
     }
@@ -376,21 +369,20 @@ impl AccountSpaceCtx {
         caption_plaintext: Option<&[u8]>,
     ) -> Result<()> {
         let request = UpdatePostCaptionRequest {
-            space_id: space_id.to_owned(),
             caption_cipher: match caption_plaintext {
                 Some(value) => Some(encode_b64(&encrypt_secretbox_payload(post_key, value)?)),
                 None => None,
             },
         };
-        let path = format!("/space/posts/{post_id}/caption");
+        let path = format!("/spaces/{space_id}/posts/{post_id}/caption");
         self.client()
             .post_empty(&path, &request)
             .await
             .map_err(Into::into)
     }
 
-    pub async fn delete_post(&self, post_id: i64) -> Result<()> {
-        let path = format!("/space/posts/{post_id}");
+    pub async fn delete_post(&self, space_id: &str, post_id: i64) -> Result<()> {
+        let path = format!("/spaces/{space_id}/posts/{post_id}");
         self.client()
             .delete_empty(&path, &[])
             .await
@@ -403,11 +395,8 @@ impl AccountSpaceCtx {
         post_id: i64,
         like: bool,
     ) -> Result<LikePostResponse> {
-        let path = format!("/space/posts/{post_id}/like");
-        let request = LikePostRequest {
-            space_id: space_id.to_owned(),
-            like,
-        };
+        let path = format!("/spaces/{space_id}/posts/{post_id}/like");
+        let request = LikePostRequest { like };
         self.client()
             .post_json(&path, &request)
             .await

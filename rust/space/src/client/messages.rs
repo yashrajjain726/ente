@@ -28,15 +28,16 @@ impl AccountSpaceCtx {
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<MessageConversationPage> {
-        let mut query = vec![("spaceId", space_id.to_owned())];
+        let mut query = Vec::new();
         if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
             query.push(("cursor", value));
         }
         if let Some(value) = limit {
             query.push(("limit", value.to_string()));
         }
+        let path = format!("/spaces/{space_id}/messages");
         self.client()
-            .get_json("/space/messages", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }
@@ -48,14 +49,14 @@ impl AccountSpaceCtx {
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<MessagePage> {
-        let mut query = vec![("viewerSpaceId", viewer_space_id.to_owned())];
+        let mut query = Vec::new();
         if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
             query.push(("cursor", value));
         }
         if let Some(value) = limit {
             query.push(("limit", value.to_string()));
         }
-        let path = format!("/space/messages/{space_id}");
+        let path = format!("/spaces/{viewer_space_id}/messages/{space_id}");
         self.client()
             .get_json(&path, &query)
             .await
@@ -80,7 +81,7 @@ impl AccountSpaceCtx {
         let request = self
             .message_request_for_payload(sender_space_id, &friend.public_key, &payload, None)
             .await?;
-        let path = format!("/space/messages/{space_id}");
+        let path = format!("/spaces/{sender_space_id}/messages/{space_id}");
         self.client()
             .post_json(&path, &request)
             .await
@@ -115,7 +116,7 @@ impl AccountSpaceCtx {
                 Some(reply_message_id),
             )
             .await?;
-        let path = format!("/space/messages/{space_id}");
+        let path = format!("/spaces/{sender_space_id}/messages/{space_id}");
         self.client()
             .post_json(&path, &request)
             .await
@@ -171,7 +172,7 @@ impl AccountSpaceCtx {
         let request = self
             .message_request_for_payload(sender_space_id, &post.author.public_key, &payload, None)
             .await?;
-        let path = format!("/space/posts/{post_id}/reply");
+        let path = format!("/spaces/{sender_space_id}/posts/{post_id}/reply");
         self.client()
             .post_json(&path, &request)
             .await
@@ -210,11 +211,8 @@ impl AccountSpaceCtx {
         if message_id.is_empty() {
             return Err(SpaceError::InvalidInput("message id is required".into()));
         }
-        let request = LikeMessageRequest {
-            space_id: space_id.to_owned(),
-            like,
-        };
-        let path = format!("/space/message/{message_id}/like");
+        let request = LikeMessageRequest { like };
+        let path = format!("/spaces/{space_id}/message/{message_id}/like");
         self.client()
             .post_json(&path, &request)
             .await
@@ -226,10 +224,9 @@ impl AccountSpaceCtx {
         if message_id.is_empty() {
             return Err(SpaceError::InvalidInput("message id is required".into()));
         }
-        let path = format!("/space/message/{message_id}");
-        let query = vec![("spaceId", space_id.to_owned())];
+        let path = format!("/spaces/{space_id}/message/{message_id}");
         self.client()
-            .delete_empty(&path, &query)
+            .delete_empty(&path, &[])
             .await
             .map_err(Into::into)
     }
@@ -263,7 +260,6 @@ impl AccountSpaceCtx {
         let sender_key = seal_with_public_key(&message_key, &identity.public_key)?;
         let recipient_key = seal_with_public_key(&message_key, &recipient_public_key)?;
         Ok(CreateMessageRequest {
-            space_id: sender_space_id.to_owned(),
             message_id: None,
             message_cipher: encode_b64(&encrypt_secretbox_payload(&message_key, &plaintext)?),
             sender_encrypted_message_key: encode_b64(&sender_key),

@@ -1308,10 +1308,10 @@ export const markCurrentMessagesRead = async (
     }
 };
 
-export const deleteCurrentPost = async (postId: number) => {
+export const deleteCurrentPost = async (spaceId: string, postId: number) => {
     const ctx = await ensureCurrentSpaceContext();
     try {
-        await ctx.delete_post(BigInt(postId));
+        await ctx.delete_post(spaceId, BigInt(postId));
     } finally {
         releaseCurrentSpaceContext(ctx);
     }

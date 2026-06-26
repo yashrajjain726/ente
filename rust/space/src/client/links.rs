@@ -18,7 +18,7 @@ use ente_core::crypto::{decode_b64, encode_b64};
 
 impl AccountSpaceCtx {
     pub async fn get_space_link_status(&self, space_id: &str) -> Result<SpaceLinkStatusResponse> {
-        let path = format!("/space/links/{space_id}");
+        let path = format!("/spaces/{space_id}/links");
         self.client().get_json(&path, &[]).await.map_err(Into::into)
     }
 
@@ -30,8 +30,8 @@ impl AccountSpaceCtx {
                 SpaceError::InvalidInput(format!("space {space_id} is not owned by the account"))
             })?;
         let access_key = generate_space_link_access_key()?;
-        self.write_space_link(space_id, access, access_key, "/space/links")
-            .await
+        let path = format!("/spaces/{space_id}/links");
+        self.write_space_link(access, access_key, &path).await
     }
 
     pub async fn rotate_space_link(&self, space_id: &str) -> Result<CreatedSpaceLink> {
@@ -42,13 +42,12 @@ impl AccountSpaceCtx {
                 SpaceError::InvalidInput(format!("space {space_id} is not owned by the account"))
             })?;
         let access_key = generate_space_link_access_key()?;
-        self.write_space_link(space_id, access, access_key, "/space/links/rotate")
-            .await
+        let path = format!("/spaces/{space_id}/links/rotate");
+        self.write_space_link(access, access_key, &path).await
     }
 
     async fn write_space_link(
         &self,
-        space_id: &str,
         access: ResolvedOwnedSpaceAccess,
         access_key: String,
         path: &str,
@@ -57,7 +56,6 @@ impl AccountSpaceCtx {
         let auth_key = derive_space_link_auth_key(&access_key_material)?;
         let wrap_key = derive_space_link_wrap_key(&access_key_material)?;
         let request = SpaceLinkCreateRequest {
-            space_id: space_id.to_owned(),
             auth_key: encode_b64(&auth_key),
             key_version: access.key_version,
             link_wrapped_space_key: encode_b64(&encrypt_secretbox_payload(
@@ -99,7 +97,7 @@ impl AccountSpaceCtx {
     }
 
     pub async fn delete_space_link(&self, space_id: &str) -> Result<()> {
-        let path = format!("/space/links/{space_id}");
+        let path = format!("/spaces/{space_id}/links");
         self.client().delete_empty(&path, &[]).await?;
         Ok(())
     }

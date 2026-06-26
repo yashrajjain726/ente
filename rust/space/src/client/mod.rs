@@ -159,7 +159,7 @@ impl AccountSpaceCtx {
         }
         let spaces: Vec<SpaceKeyResponse> = self
             .client
-            .get_json("/space", &[])
+            .get_json("/account/space", &[])
             .await
             .map_err(SpaceError::from)?;
         *cache_lock(&self.owned_spaces_cache, "owned spaces")? = Some(spaces.clone());
@@ -167,11 +167,8 @@ impl AccountSpaceCtx {
     }
 
     pub async fn list_friend_shares(&self, space_id: &str) -> Result<Vec<FriendShareResponse>> {
-        let query = vec![("spaceId", space_id.to_owned())];
-        self.client
-            .get_json("/space/friends/shares", &query)
-            .await
-            .map_err(Into::into)
+        let path = format!("/spaces/{space_id}/friends/shares");
+        self.client.get_json(&path, &[]).await.map_err(Into::into)
     }
 
     pub(crate) fn decrypt_space_identity(&self, space: &SpaceKeyResponse) -> Result<SpaceIdentity> {
@@ -298,7 +295,7 @@ impl AccountSpaceCtx {
         };
         let response = self
             .client
-            .post_json::<SpaceKeyResponse, _>("/space", &request)
+            .post_json::<SpaceKeyResponse, _>("/account/space", &request)
             .await?;
         self.cache_created_owned_space(SpaceKeyResponse {
             space_id: response.space_id.clone(),
@@ -336,7 +333,7 @@ impl AccountSpaceCtx {
         space_id: &str,
         space_slug: &str,
     ) -> Result<SpaceLookupResponse> {
-        let path = format!("/space/{space_id}/slug");
+        let path = format!("/spaces/{space_id}/slug");
         let request = UpdateSpaceSlugRequest {
             space_slug: space_slug.to_owned(),
         };

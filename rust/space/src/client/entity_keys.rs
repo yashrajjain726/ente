@@ -2,7 +2,7 @@
 //!
 //! Entity keys are small wrapped keys the server stores per account under a
 //! string type tag (for example the Space root key). These methods read and
-//! write them through the `/space/entity-key` endpoints; the payload is opaque
+//! write them through the `/account/space/entity-key` endpoints; the payload is opaque
 //! ciphertext to this layer.
 
 use super::AccountSpaceCtx;
@@ -15,7 +15,7 @@ impl AccountSpaceCtx {
         let query = vec![("type", key_type.to_owned())];
         let payload = self
             .client()
-            .get_json_optional::<EntityKeyResponse>("/space/entity-key", &query)
+            .get_json_optional::<EntityKeyResponse>("/account/space/entity-key", &query)
             .await?;
         Ok(payload.map(|value| EntityKeyPayload {
             encrypted_key: value.encrypted_key,
@@ -33,7 +33,7 @@ impl AccountSpaceCtx {
         };
         match self
             .client()
-            .post_empty("/space/entity-key", &request)
+            .post_empty("/account/space/entity-key", &request)
             .await
         {
             Ok(_) => Ok(()),
@@ -53,7 +53,7 @@ impl AccountSpaceCtx {
         };
         let response = self
             .client()
-            .post_json::<EntityKeyResponse, _>("/space/entity-key/ensure", &request)
+            .post_json::<EntityKeyResponse, _>("/account/space/entity-key/ensure", &request)
             .await?;
         Ok(EntityKeyPayload {
             encrypted_key: response.encrypted_key,

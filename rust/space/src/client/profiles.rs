@@ -88,7 +88,6 @@ impl AccountSpaceCtx {
                 SpaceError::InvalidInput(format!("space {space_id} is not owned by the account"))
             })?;
         let request = UpdateSpaceProfileRequest {
-            space_id: space_id.to_owned(),
             key_version: space_key.key_version,
             encrypted_profile: encode_b64(&encrypt_secretbox_payload(
                 &space_key.space_key,
@@ -99,9 +98,10 @@ impl AccountSpaceCtx {
             remove_avatar,
             remove_cover,
         };
+        let path = format!("/spaces/{space_id}/profile");
         let response = self
             .client()
-            .post_json("/space/profile", &request)
+            .post_json(&path, &request)
             .await
             .map_err(SpaceError::from)?;
         self.update_cached_owned_space_profile(space_id, request.encrypted_profile)?;

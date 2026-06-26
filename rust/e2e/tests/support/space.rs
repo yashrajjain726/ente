@@ -13,7 +13,7 @@ struct SpaceBrowserSessionResponse {
 
 pub async fn open_ctx(endpoint: &str, account: &TestAccount) -> AccountSpaceCtx {
     let session = reqwest::Client::new()
-        .post(format!("{endpoint}/space/sessions"))
+        .post(format!("{endpoint}/account/space/sessions"))
         .header("X-Auth-Token", &account.auth_token)
         .header("X-Client-Package", App::Photos.client_package())
         .json(&serde_json::json!({ "sessionWrapKey": "space-e2e-session-wrap-key" }))

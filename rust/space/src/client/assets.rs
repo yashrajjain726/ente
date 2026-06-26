@@ -34,10 +34,10 @@ impl AccountSpaceCtx {
             size: size as i64,
             content_md5: content_md5.to_owned(),
             purpose: None,
-            space_id: Some(space_id.to_owned()),
         };
+        let path = format!("/spaces/{space_id}/uploads/presign");
         self.client()
-            .post_json("/space/uploads/presign", &request)
+            .post_json(&path, &request)
             .await
             .map_err(Into::into)
     }
@@ -53,10 +53,10 @@ impl AccountSpaceCtx {
             size: size as i64,
             content_md5: content_md5.to_owned(),
             purpose: Some(UPLOAD_PURPOSE_AVATAR.to_owned()),
-            space_id: Some(space_id.to_owned()),
         };
+        let path = format!("/spaces/{space_id}/uploads/presign");
         self.client()
-            .post_json("/space/uploads/presign", &request)
+            .post_json(&path, &request)
             .await
             .map_err(Into::into)
     }
@@ -72,10 +72,10 @@ impl AccountSpaceCtx {
             size: size as i64,
             content_md5: content_md5.to_owned(),
             purpose: Some(UPLOAD_PURPOSE_COVER.to_owned()),
-            space_id: Some(space_id.to_owned()),
         };
+        let path = format!("/spaces/{space_id}/uploads/presign");
         self.client()
-            .post_json("/space/uploads/presign", &request)
+            .post_json(&path, &request)
             .await
             .map_err(Into::into)
     }

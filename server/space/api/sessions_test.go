@@ -47,8 +47,8 @@ func setupSpaceSessionAPITest(t *testing.T) (*Handlers, *spacerepo.Module, int64
 func TestCreateSpaceBrowserSessionReturnsToken(t *testing.T) {
 	handlers, repos, userID := setupSpaceSessionAPITest(t)
 	router := gin.New()
-	router.POST("/space/sessions", handlers.CreateBrowserSession)
-	req := httptest.NewRequest(http.MethodPost, "/space/sessions", bytes.NewBufferString(`{"sessionWrapKey":"session-wrap-key"}`))
+	router.POST("/account/space/sessions", handlers.CreateBrowserSession)
+	req := httptest.NewRequest(http.MethodPost, "/account/space/sessions", bytes.NewBufferString(`{"sessionWrapKey":"session-wrap-key"}`))
 	req.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
 	recorder := httptest.NewRecorder()
 
@@ -77,7 +77,7 @@ func TestRegisteredTokenSessionRoutesAllowEntityKeyEnsureBeforeBrowserSession(t 
 
 	ensureReq := httptest.NewRequest(
 		http.MethodPost,
-		"/space/entity-key/ensure",
+		"/account/space/entity-key/ensure",
 		bytes.NewBufferString(`{"type":"space","encryptedKey":"`+testEncodedSpaceEntityKey(72)+`"}`),
 	)
 	ensureReq.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
@@ -88,7 +88,7 @@ func TestRegisteredTokenSessionRoutesAllowEntityKeyEnsureBeforeBrowserSession(t 
 	require.Equal(t, http.StatusOK, ensureRecorder.Code)
 	require.JSONEq(t, `{"type":"space","encryptedKey":"`+testEncodedSpaceEntityKey(72)+`"}`, ensureRecorder.Body.String())
 
-	getReq := httptest.NewRequest(http.MethodGet, "/space/entity-key?type=space", nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/account/space/entity-key?type=space", nil)
 	getReq.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
 	getRecorder := httptest.NewRecorder()
 
@@ -100,11 +100,11 @@ func TestRegisteredTokenSessionRoutesAllowEntityKeyEnsureBeforeBrowserSession(t 
 func TestSpaceEntityKeyRejectsSplitFormatPayload(t *testing.T) {
 	handlers, repos, userID := setupSpaceSessionAPITest(t)
 	router := gin.New()
-	router.POST("/space/entity-key", handlers.CreateSpaceEntityKey)
-	router.POST("/space/entity-key/ensure", handlers.EnsureSpaceEntityKey)
+	router.POST("/account/space/entity-key", handlers.CreateSpaceEntityKey)
+	router.POST("/account/space/entity-key/ensure", handlers.EnsureSpaceEntityKey)
 
 	body := `{"type":"space","encryptedKey":"` + testEncodedSpaceEntityKey(48) + `","header":"` + testEncodedSpaceEntityKey(24) + `"}`
-	for _, path := range []string{"/space/entity-key", "/space/entity-key/ensure"} {
+	for _, path := range []string{"/account/space/entity-key", "/account/space/entity-key/ensure"} {
 		req := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(body))
 		req.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
 		recorder := httptest.NewRecorder()
@@ -165,8 +165,8 @@ func TestBootstrapBrowserSessionAcceptsHeader(t *testing.T) {
 	tokenHash := sha256.Sum256([]byte(token))
 	require.NoError(t, repos.Sessions.CreateBrowserSession(context.Background(), tokenHash[:], userID, "session-wrap-key", timeutil.NDaysFromNow(1)))
 	router := gin.New()
-	router.POST("/space/sessions/bootstrap", handlers.BootstrapBrowserSession)
-	req := httptest.NewRequest(http.MethodPost, "/space/sessions/bootstrap", nil)
+	router.POST("/account/space/sessions/bootstrap", handlers.BootstrapBrowserSession)
+	req := httptest.NewRequest(http.MethodPost, "/account/space/sessions/bootstrap", nil)
 	req.Header.Set(controller.SpaceBrowserSessionTokenHeader, token)
 	recorder := httptest.NewRecorder()
 
@@ -182,8 +182,8 @@ func TestDeleteBrowserSessionRevokesHeaderSession(t *testing.T) {
 	tokenHash := sha256.Sum256([]byte(token))
 	require.NoError(t, repos.Sessions.CreateBrowserSession(context.Background(), tokenHash[:], userID, "session-wrap-key", timeutil.NDaysFromNow(1)))
 	router := gin.New()
-	router.DELETE("/space/sessions/current", handlers.DeleteBrowserSession)
-	req := httptest.NewRequest(http.MethodDelete, "/space/sessions/current", nil)
+	router.DELETE("/account/space/sessions/current", handlers.DeleteBrowserSession)
+	req := httptest.NewRequest(http.MethodDelete, "/account/space/sessions/current", nil)
 	req.Header.Set(controller.SpaceBrowserSessionTokenHeader, token)
 	recorder := httptest.NewRecorder()
 
