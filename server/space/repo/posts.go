@@ -37,7 +37,7 @@ func scanPostRecords(rows *sql.Rows) ([]SpacePostRecord, error) {
 	return out, nil
 }
 
-func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID string, encryptedPostKey []byte, captionCipher []byte, keyVersion int, objects []SpacePostAssetRecord) (int64, error) {
+func (r *PostsRepository) CreatePost(ctx context.Context, spaceID string, encryptedPostKey []byte, captionCipher []byte, keyVersion int, objects []SpacePostAssetRecord) (int64, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, stacktrace.Propagate(err, "")
@@ -47,9 +47,9 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID
 	if err := tx.QueryRowContext(ctx, `
 		SELECT current_version
 		FROM spaces
-		WHERE owner_id = $1 AND space_id = $2
+		WHERE space_id = $1
 		FOR UPDATE
-	`, ownerID, spaceID).Scan(&currentVersion); err != nil {
+	`, spaceID).Scan(&currentVersion); err != nil {
 		return 0, stacktrace.Propagate(err, "")
 	}
 	if currentVersion != keyVersion {
@@ -84,7 +84,7 @@ func (r *PostsRepository) CreatePost(ctx context.Context, ownerID int64, spaceID
 	return postID, nil
 }
 
-func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID int64, viewerSpaceID string) (*SpacePostRecord, error) {
+func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerSpaceID string) (*SpacePostRecord, error) {
 	query := postRecordSelectSQL(`
 		       EXISTS (SELECT 1 FROM space_messages m WHERE m.kind = 'post_like' AND m.reply_post_id = p.post_id AND m.sender_space_id = $2)`) + `
 			FROM space_posts p
@@ -95,7 +95,7 @@ func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerID in
 	return scanPostRecord(r.DB.QueryRowContext(ctx, query, postID, viewerSpaceID))
 }
 
-func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, viewerID int64, viewerSpaceID string, cursor string, limit int) ([]SpacePostRecord, string, error) {
+func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, viewerSpaceID string, cursor string, limit int) ([]SpacePostRecord, string, error) {
 	limit = optionalInt(limit, 50)
 	if limit > 100 {
 		limit = 100
@@ -193,22 +193,19 @@ func (r *PostsRepository) ListAssetsByPostIDs(ctx context.Context, postIDs []int
 	return result, stacktrace.Propagate(rows.Err(), "")
 }
 
-func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64, spaceID string) ([]string, error) {
+func (r *PostsRepository) DeletePost(ctx context.Context, postID int64, spaceID string) ([]string, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
 	res, err := tx.ExecContext(ctx, `
-		UPDATE space_posts p
+		UPDATE space_posts
 		SET is_deleted = TRUE
-		FROM spaces s
-		WHERE p.post_id = $1
-		  AND p.space_id = s.space_id
-		  AND s.owner_id = $2
-		  AND p.space_id = $3
-		  AND p.is_deleted = FALSE
-	`, postID, ownerID, spaceID)
+		WHERE post_id = $1
+		  AND space_id = $2
+		  AND is_deleted = FALSE
+	`, postID, spaceID)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
@@ -219,11 +216,10 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID, ownerID int64,
 	if affected == 0 {
 		var isDeleted bool
 		if err := tx.QueryRowContext(ctx, `
-			SELECT p.is_deleted
-			FROM space_posts p
-			JOIN spaces s ON s.space_id = p.space_id
-			WHERE p.post_id = $1 AND s.owner_id = $2 AND p.space_id = $3
-		`, postID, ownerID, spaceID).Scan(&isDeleted); err != nil {
+			SELECT is_deleted
+			FROM space_posts
+			WHERE post_id = $1 AND space_id = $2
+		`, postID, spaceID).Scan(&isDeleted); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		if !isDeleted {
@@ -365,21 +361,18 @@ func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, curs
 	return out, nextCursor, nil
 }
 
-func (r *PostsRepository) UpdateCaption(ctx context.Context, postID, ownerID int64, spaceID string, captionCipher []byte) error {
+func (r *PostsRepository) UpdateCaption(ctx context.Context, postID int64, spaceID string, captionCipher []byte) error {
 	caption := []byte{}
 	if captionCipher != nil {
 		caption = captionCipher
 	}
 	res, err := r.DB.ExecContext(ctx, `
-		UPDATE space_posts p
+		UPDATE space_posts
 		SET caption_cipher = $1
-		FROM spaces s
-		WHERE p.post_id = $2
-		  AND p.space_id = s.space_id
-		  AND s.owner_id = $3
-		  AND p.space_id = $4
-		  AND p.is_deleted = FALSE
-	`, caption, postID, ownerID, spaceID)
+		WHERE post_id = $2
+		  AND space_id = $3
+		  AND is_deleted = FALSE
+	`, caption, postID, spaceID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}

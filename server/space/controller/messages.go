@@ -35,7 +35,7 @@ type MessagesController struct {
 }
 
 func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req models.CreateMessageRequest) (*models.MessageResponse, error) {
-	userID, senderSpace, err := selectedSpace(ctx)
+	senderSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -43,20 +43,18 @@ func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req 
 	if err != nil {
 		return nil, err
 	}
-	recipientSpace, err := c.requireFriendMessageTarget(ctx, userID, senderSpace.SpaceID, targetSpaceID)
+	recipientSpace, err := c.requireFriendMessageTarget(ctx, senderSpace, targetSpaceID)
 	if err != nil {
 		return nil, err
 	}
-	replyMessageID, err := c.validateReplyMessage(ctx, userID, req.ReplyMessageID, senderSpace.SpaceID, recipientSpace.SpaceID)
+	replyMessageID, err := c.validateReplyMessage(ctx, req.ReplyMessageID, senderSpace.SpaceID, recipientSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
 	message, err := c.MessagesRepo.CreateMessage(ctx, repo.CreateSpaceMessageRecord{
 		MessageID:                    req.MessageID,
 		Kind:                         spaceMessageKindRegular,
-		SenderID:                     userID,
 		SenderSpaceID:                senderSpace.SpaceID,
-		RecipientID:                  recipientSpace.OwnerID,
 		RecipientSpaceID:             recipientSpace.SpaceID,
 		MessageCipher:                messageCipher,
 		SenderEncryptedMessageKey:    senderEncryptedMessageKey,
@@ -70,7 +68,7 @@ func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req 
 }
 
 func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req models.CreateMessageRequest) (*models.MessageResponse, error) {
-	userID, senderSpace, err := selectedSpace(ctx)
+	senderSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +83,7 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 	if err != nil || id <= 0 {
 		return nil, ente.NewBadRequestWithMessage("invalid postID")
 	}
-	post, err := c.PostsRepo.GetPost(ctx, id, userID, senderSpace.SpaceID)
+	post, err := c.PostsRepo.GetPost(ctx, id, senderSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -93,22 +91,20 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 	if err != nil {
 		return nil, err
 	}
-	if err := c.auth.canViewSpace(ctx, &viewerAuth{UserID: userID, SpaceID: senderSpace.SpaceID}, space); err != nil {
+	if err := c.auth.canViewSpace(ctx, &viewerAuth{UserID: senderSpace.OwnerID, SpaceID: senderSpace.SpaceID}, space); err != nil {
 		return nil, err
 	}
-	if space.OwnerID == userID {
+	if space.OwnerID == senderSpace.OwnerID {
 		return nil, ente.NewBadRequestWithMessage("cannot reply to your own post")
 	}
-	recipientSpace, err := c.requireFriendMessageTarget(ctx, userID, senderSpace.SpaceID, space.SpaceID)
+	recipientSpace, err := c.requireFriendMessageTarget(ctx, senderSpace, space.SpaceID)
 	if err != nil {
 		return nil, err
 	}
 	message, err := c.MessagesRepo.CreateMessage(ctx, repo.CreateSpaceMessageRecord{
 		MessageID:                    req.MessageID,
 		Kind:                         spaceMessageKindPostReply,
-		SenderID:                     userID,
 		SenderSpaceID:                senderSpace.SpaceID,
-		RecipientID:                  recipientSpace.OwnerID,
 		RecipientSpaceID:             recipientSpace.SpaceID,
 		MessageCipher:                messageCipher,
 		SenderEncryptedMessageKey:    senderEncryptedMessageKey,
@@ -125,7 +121,7 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID string, req mo
 }
 
 func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesRequest) (*models.MessageConversationPage, error) {
-	_, viewerSpace, err := selectedSpace(ctx)
+	viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +143,7 @@ func (c *MessagesController) List(ctx *gin.Context, req models.ListMessagesReque
 }
 
 func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, req models.ListMessageThreadRequest) (*models.MessagePage, error) {
-	userID, viewerSpace, err := selectedSpace(ctx)
+	viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +157,7 @@ func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, 
 	if err := c.auth.requireActiveSpaceOwner(ctx, targetSpace); err != nil {
 		return nil, err
 	}
-	messages, nextCursor, err := c.MessagesRepo.ListThread(ctx, userID, viewerSpace.SpaceID, strings.TrimSpace(targetSpaceID), req.Cursor, req.Limit)
+	messages, nextCursor, err := c.MessagesRepo.ListThread(ctx, viewerSpace.SpaceID, strings.TrimSpace(targetSpaceID), req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +169,7 @@ func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, 
 }
 
 func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req models.LikeMessageRequest) (*models.LikeMessageResponse, error) {
-	userID, actorSpace, err := selectedSpace(ctx)
+	actorSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +177,7 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 	if messageID == "" {
 		return nil, ente.NewBadRequestWithMessage("messageId is required")
 	}
-	message, err := c.MessagesRepo.GetMessage(ctx, messageID, userID, actorSpace.SpaceID)
+	message, err := c.MessagesRepo.GetMessage(ctx, messageID, actorSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +191,7 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 		return nil, ente.NewBadRequestWithMessage("only the recipient can like a message")
 	}
 	otherSpaceID := message.SenderSpaceID
-	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx, userID, actorSpace.SpaceID, otherSpaceID); err != nil {
+	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx, actorSpace.SpaceID, otherSpaceID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.ErrPermissionDenied
 		}
@@ -208,7 +204,7 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 }
 
 func (c *MessagesController) Delete(ctx *gin.Context, messageID string, req models.DeleteMessageRequest) error {
-	userID, senderSpace, err := selectedSpace(ctx)
+	senderSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return err
 	}
@@ -216,17 +212,17 @@ func (c *MessagesController) Delete(ctx *gin.Context, messageID string, req mode
 	if messageID == "" {
 		return ente.NewBadRequestWithMessage("messageId is required")
 	}
-	message, err := c.MessagesRepo.GetMessage(ctx, messageID, userID, senderSpace.SpaceID)
+	message, err := c.MessagesRepo.GetMessage(ctx, messageID, senderSpace.SpaceID)
 	if err != nil {
 		return err
 	}
-	if message.SenderID != userID || message.SenderSpaceID != senderSpace.SpaceID {
+	if message.SenderSpaceID != senderSpace.SpaceID {
 		return ente.ErrPermissionDenied
 	}
 	if message.Kind == spaceMessageKindPostLike {
 		return ente.NewBadRequestWithMessage("cannot delete a post like")
 	}
-	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx, userID, senderSpace.SpaceID, message.RecipientSpaceID); err != nil {
+	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx, senderSpace.SpaceID, message.RecipientSpaceID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return ente.ErrPermissionDenied
 		}
@@ -235,12 +231,11 @@ func (c *MessagesController) Delete(ctx *gin.Context, messageID string, req mode
 	if message.IsDeleted {
 		return nil
 	}
-	return c.MessagesRepo.DeleteMessage(ctx, messageID, userID, senderSpace.SpaceID)
+	return c.MessagesRepo.DeleteMessage(ctx, messageID, senderSpace.SpaceID)
 }
 
-func (c *MessagesController) requireFriendMessageTarget(ctx *gin.Context, userID int64, senderSpaceID string, targetSpaceID string) (*repo.SpaceRecord, error) {
-	senderSpaceID = strings.TrimSpace(senderSpaceID)
-	if senderSpaceID == "" {
+func (c *MessagesController) requireFriendMessageTarget(ctx *gin.Context, senderSpace *repo.SpaceRecord, targetSpaceID string) (*repo.SpaceRecord, error) {
+	if senderSpace == nil || strings.TrimSpace(senderSpace.SpaceID) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceId is required")
 	}
 	targetSpaceID = strings.TrimSpace(targetSpaceID)
@@ -251,10 +246,10 @@ func (c *MessagesController) requireFriendMessageTarget(ctx *gin.Context, userID
 	if err != nil {
 		return nil, err
 	}
-	if recipientSpace.OwnerID == userID {
+	if recipientSpace.OwnerID == senderSpace.OwnerID {
 		return nil, ente.NewBadRequestWithMessage("cannot message your own space")
 	}
-	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx, userID, senderSpaceID, recipientSpace.SpaceID); err != nil {
+	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx, senderSpace.SpaceID, recipientSpace.SpaceID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.ErrPermissionDenied
 		}
@@ -263,12 +258,12 @@ func (c *MessagesController) requireFriendMessageTarget(ctx *gin.Context, userID
 	return recipientSpace, nil
 }
 
-func (c *MessagesController) validateReplyMessage(ctx *gin.Context, userID int64, replyMessageID, senderSpaceID, recipientSpaceID string) (sql.NullString, error) {
+func (c *MessagesController) validateReplyMessage(ctx *gin.Context, replyMessageID, senderSpaceID, recipientSpaceID string) (sql.NullString, error) {
 	replyMessageID = strings.TrimSpace(replyMessageID)
 	if replyMessageID == "" {
 		return sql.NullString{}, nil
 	}
-	parent, err := c.MessagesRepo.GetMessage(ctx, replyMessageID, userID, senderSpaceID)
+	parent, err := c.MessagesRepo.GetMessage(ctx, replyMessageID, senderSpaceID)
 	if err != nil {
 		return sql.NullString{}, err
 	}

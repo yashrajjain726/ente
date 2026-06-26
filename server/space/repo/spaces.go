@@ -134,7 +134,7 @@ func (r *SpacesRepository) GetOwnerPublicKey(ctx context.Context, ownerID int64)
 	return publicKey, stacktrace.Propagate(err, "")
 }
 
-func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spaceID string, keyVersion int, encryptedProfile []byte, avatar *ProfileAssetUpdate, cover *ProfileAssetUpdate, removeAvatar bool, removeCover bool) (*SpaceRecord, error) {
+func (r *SpacesRepository) UpdateProfile(ctx context.Context, spaceID string, keyVersion int, encryptedProfile []byte, avatar *ProfileAssetUpdate, cover *ProfileAssetUpdate, removeAvatar bool, removeCover bool) (*SpaceRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -144,9 +144,9 @@ func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spa
 	if err := tx.QueryRowContext(ctx, `
 		SELECT current_version
 		FROM spaces
-		WHERE owner_id = $1 AND space_id = $2
+		WHERE space_id = $1
 		FOR UPDATE
-	`, ownerID, spaceID).Scan(&currentVersion); err != nil {
+	`, spaceID).Scan(&currentVersion); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	if currentVersion != keyVersion {
@@ -159,8 +159,8 @@ func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spa
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE spaces
 		SET encrypted_profile = $1
-		WHERE owner_id = $2 AND space_id = $3
-	`, encryptedProfile, ownerID, spaceID); err != nil {
+		WHERE space_id = $2
+	`, encryptedProfile, spaceID); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	if err := updateProfileAssetTx(ctx, tx, spaceID, ProfileAssetTypeAvatar, avatar, removeAvatar, previousAssets[ProfileAssetTypeAvatar]); err != nil {
@@ -180,8 +180,8 @@ func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spa
 		SELECT `+spaceRecordSelectColumns+`
 		FROM spaces s
 		`+spaceRecordProfileAssetJoins+`
-		WHERE s.owner_id = $1 AND s.space_id = $2
-	`, ownerID, spaceID))
+		WHERE s.space_id = $1
+	`, spaceID))
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func (r *SpacesRepository) UpdateProfile(ctx context.Context, ownerID int64, spa
 	return rec, nil
 }
 
-func (r *SpacesRepository) UpdateSlug(ctx context.Context, ownerID int64, spaceID, spaceSlug string) (*SpaceRecord, error) {
+func (r *SpacesRepository) UpdateSlug(ctx context.Context, spaceID, spaceSlug string) (*SpaceRecord, error) {
 	normalizedSpaceSlug, err := validateSpaceSlug(spaceSlug)
 	if err != nil {
 		return nil, err
@@ -200,14 +200,14 @@ func (r *SpacesRepository) UpdateSlug(ctx context.Context, ownerID int64, spaceI
 		WITH updated AS (
 			UPDATE spaces
 			SET space_slug = $1
-			WHERE owner_id = $2 AND space_id = $3
+			WHERE space_id = $2
 			RETURNING space_id
 		)
 		SELECT `+spaceRecordSelectColumns+`
 		FROM spaces s
 		JOIN updated u ON u.space_id = s.space_id
 		`+spaceRecordProfileAssetJoins+`
-	`, normalizedSpaceSlug, ownerID, spaceID))
+	`, normalizedSpaceSlug, spaceID))
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "duplicate key value") {
 			return nil, wrapUnique(err, "space slug already exists")
@@ -217,22 +217,22 @@ func (r *SpacesRepository) UpdateSlug(ctx context.Context, ownerID int64, spaceI
 	return rec, nil
 }
 
-func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID string, keyVersion int, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile []byte) (*SpaceRecord, error) {
+func (r *SpacesRepository) RotateKey(ctx context.Context, spaceID string, keyVersion int, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile []byte) (*SpaceRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
 	var lockedSpaceID string
-	if err := tx.QueryRowContext(ctx, `SELECT space_id FROM spaces WHERE owner_id = $1 AND space_id = $2 FOR UPDATE`, ownerID, spaceID).Scan(&lockedSpaceID); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT space_id FROM spaces WHERE space_id = $1 FOR UPDATE`, spaceID).Scan(&lockedSpaceID); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	current, err := scanSpaceRecord(tx.QueryRowContext(ctx, `
 		SELECT `+spaceRecordSelectColumns+`
 		FROM spaces s
 		`+spaceRecordProfileAssetJoins+`
-		WHERE s.owner_id = $1 AND s.space_id = $2
-	`, ownerID, spaceID))
+		WHERE s.space_id = $1
+	`, spaceID))
 	if err != nil {
 		return nil, err
 	}
@@ -249,8 +249,8 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE spaces
 		SET root_wrapped_space_key = $1, encrypted_profile = $2, current_version = $3
-		WHERE owner_id = $4 AND space_id = $5
-	`, rootWrappedSpaceKey, encryptedProfile, newVersion, ownerID, spaceID); err != nil {
+		WHERE space_id = $4
+	`, rootWrappedSpaceKey, encryptedProfile, newVersion, spaceID); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	if err := deleteLinkTx(ctx, tx, spaceID); err != nil {
@@ -260,8 +260,8 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, ownerID int64, spaceID
 		SELECT `+spaceRecordSelectColumns+`
 		FROM spaces s
 		`+spaceRecordProfileAssetJoins+`
-		WHERE s.owner_id = $1 AND s.space_id = $2
-	`, ownerID, spaceID))
+		WHERE s.space_id = $1
+	`, spaceID))
 	if err != nil {
 		return nil, err
 	}

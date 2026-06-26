@@ -39,7 +39,7 @@ type AssetsController struct {
 }
 
 func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUploadRequest) (*models.PresignUploadResponse, error) {
-	_, space, err := selectedSpace(ctx)
+	space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}

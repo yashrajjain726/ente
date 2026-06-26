@@ -194,9 +194,7 @@ type SpaceMessageConversationPostRecord struct {
 type CreateSpaceMessageRecord struct {
 	MessageID                    string
 	Kind                         string
-	SenderID                     int64
 	SenderSpaceID                string
-	RecipientID                  int64
 	RecipientSpaceID             string
 	MessageCipher                []byte
 	SenderEncryptedMessageKey    []byte

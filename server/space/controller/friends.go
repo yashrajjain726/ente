@@ -21,7 +21,7 @@ type FriendsController struct {
 }
 
 func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (*models.FriendStatusResponse, error) {
-	userID, requesterSpace, err := selectedSpace(ctx)
+	requesterSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 	}
 	request, created, err := c.FriendsRepo.CreateFriendRequest(
 		ctx,
-		userID,
+		requesterSpace.OwnerID,
 		requesterSpace.SpaceID,
 		targetSpace.SpaceID,
 		requesterFriendSealedSpaceKey,
@@ -71,11 +71,11 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 }
 
 func (c *FriendsController) ListRequests(ctx *gin.Context, req models.ListFriendRequestsRequest) ([]models.SpaceFriendRequestResponse, error) {
-	userID, space, err := selectedSpace(ctx)
+	space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
-	requests, err := c.FriendsRepo.ListFriendRequestsForSpace(ctx, userID, space.SpaceID)
+	requests, err := c.FriendsRepo.ListFriendRequestsForSpace(ctx, space.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (c *FriendsController) ListRequests(ctx *gin.Context, req models.ListFriend
 }
 
 func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestIDValue string, req models.ConfirmFriendRequestPayload) (*models.FriendStatusResponse, error) {
-	userID, targetSpace, err := selectedSpace(ctx)
+	targetSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,6 @@ func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestIDValue stri
 	}
 	requesterID, created, err := c.FriendsRepo.ConfirmFriendRequest(
 		ctx,
-		userID,
 		targetSpace.SpaceID,
 		requestID,
 		targetFriendSealedSpaceKey,
@@ -127,7 +126,7 @@ func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestIDValue stri
 }
 
 func (c *FriendsController) DeleteRequest(ctx *gin.Context, requestIDValue string, req models.DeleteFriendRequestRequest) error {
-	userID, targetSpace, err := selectedSpace(ctx)
+	targetSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return err
 	}
@@ -135,7 +134,7 @@ func (c *FriendsController) DeleteRequest(ctx *gin.Context, requestIDValue strin
 	if err != nil || requestID <= 0 {
 		return ente.ErrBadRequest
 	}
-	if err := c.FriendsRepo.DeleteFriendRequest(ctx, userID, targetSpace.SpaceID, requestID); err != nil {
+	if err := c.FriendsRepo.DeleteFriendRequest(ctx, targetSpace.SpaceID, requestID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return ente.ErrNotFound
 		}
@@ -145,7 +144,7 @@ func (c *FriendsController) DeleteRequest(ctx *gin.Context, requestIDValue strin
 }
 
 func (c *FriendsController) Unfriend(ctx *gin.Context, req models.FriendTargetPayload) error {
-	userID, actorSpace, err := selectedSpace(ctx)
+	actorSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return err
 	}
@@ -161,11 +160,11 @@ func (c *FriendsController) Unfriend(ctx *gin.Context, req models.FriendTargetPa
 	if err != nil {
 		return err
 	}
-	return c.FriendsRepo.DeleteFriendship(ctx, userID, actorSpace.SpaceID, space.SpaceID)
+	return c.FriendsRepo.DeleteFriendship(ctx, actorSpace.SpaceID, space.SpaceID)
 }
 
 func (c *FriendsController) ListFriends(ctx *gin.Context, req models.ListSpaceFriendsRequest) ([]models.SpaceFriendResponse, error) {
-	_, space, err := selectedSpace(ctx)
+	space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +184,7 @@ func (c *FriendsController) ListFriends(ctx *gin.Context, req models.ListSpaceFr
 }
 
 func (c *FriendsController) Relationship(ctx *gin.Context, req models.FriendRelationshipRequest) (*models.FriendRelationshipResponse, error) {
-	userID, viewerSpace, err := selectedSpace(ctx)
+	viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +196,10 @@ func (c *FriendsController) Relationship(ctx *gin.Context, req models.FriendRela
 	if err != nil {
 		return nil, err
 	}
-	relationship, err := c.FriendsRepo.GetRelationship(ctx, userID, viewerSpace.SpaceID, targetSpace.OwnerID, targetSpace.SpaceID)
+	if viewerSpace.OwnerID == targetSpace.OwnerID {
+		return &models.FriendRelationshipResponse{Relationship: "self"}, nil
+	}
+	relationship, err := c.FriendsRepo.GetRelationship(ctx, viewerSpace.SpaceID, targetSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +207,7 @@ func (c *FriendsController) Relationship(ctx *gin.Context, req models.FriendRela
 }
 
 func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFriendSharesRequest) error {
-	_, space, err := selectedSpace(ctx)
+	space, err := selectedSpace(ctx)
 	if err != nil {
 		return err
 	}
@@ -239,11 +241,11 @@ func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFr
 }
 
 func (c *FriendsController) ListShares(ctx *gin.Context, req models.ListFriendSharesRequest) ([]models.FriendShareResponse, error) {
-	userID, space, err := selectedSpace(ctx)
+	space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
-	shares, err := c.FriendsRepo.ListSharesForFriendAndSpace(ctx, userID, space.SpaceID)
+	shares, err := c.FriendsRepo.ListSharesForFriendAndSpace(ctx, space.SpaceID)
 	if err != nil {
 		return nil, err
 	}

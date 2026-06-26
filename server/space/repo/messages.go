@@ -108,41 +108,39 @@ func (r *MessagesRepository) CreateMessage(ctx context.Context, input CreateSpac
 	`, messageID, input.SenderSpaceID, input.RecipientSpaceID, input.Kind, input.MessageCipher, input.SenderEncryptedMessageKey, input.RecipientEncryptedMessageKey, replyPostID, replyMessageID); err != nil {
 		return nil, wrapUnique(err, "message already exists")
 	}
-	return r.GetMessage(ctx, messageID, input.SenderID, input.SenderSpaceID)
+	return r.GetMessage(ctx, messageID, input.SenderSpaceID)
 }
 
-func (r *MessagesRepository) GetMessage(ctx context.Context, messageID string, viewerID int64, viewerSpaceID string) (*SpaceMessageRecord, error) {
-	query := `
-		SELECT ` + sprintfSpaceMessageColumns("$3") + `
-		FROM space_messages m
-		` + spaceMessageJoins + `
-		WHERE m.message_id = $1
-		  AND (m.sender_space_id = $3 OR m.recipient_space_id = $3)
-		  AND (sender_space.owner_id = $2 OR recipient_space.owner_id = $2)
-	`
-	return scanMessageRecord(r.DB.QueryRowContext(ctx, query, messageID, viewerID, viewerSpaceID))
-}
-
-func (r *MessagesRepository) ListThread(ctx context.Context, viewerID int64, viewerSpaceID string, otherSpaceID string, cursor string, limit int) ([]SpaceMessageRecord, string, error) {
-	limit = optionalInt(limit, 50)
-	if limit > 100 {
-		limit = 100
-	}
-	args := []any{viewerID, viewerSpaceID, otherSpaceID}
+func (r *MessagesRepository) GetMessage(ctx context.Context, messageID string, viewerSpaceID string) (*SpaceMessageRecord, error) {
 	query := `
 		SELECT ` + sprintfSpaceMessageColumns("$2") + `
 		FROM space_messages m
 		` + spaceMessageJoins + `
+		WHERE m.message_id = $1
+		  AND (m.sender_space_id = $2 OR m.recipient_space_id = $2)
+	`
+	return scanMessageRecord(r.DB.QueryRowContext(ctx, query, messageID, viewerSpaceID))
+}
+
+func (r *MessagesRepository) ListThread(ctx context.Context, viewerSpaceID string, otherSpaceID string, cursor string, limit int) ([]SpaceMessageRecord, string, error) {
+	limit = optionalInt(limit, 50)
+	if limit > 100 {
+		limit = 100
+	}
+	args := []any{viewerSpaceID, otherSpaceID}
+	query := `
+		SELECT ` + sprintfSpaceMessageColumns("$1") + `
+		FROM space_messages m
+		` + spaceMessageJoins + `
 		WHERE (
-			(m.sender_space_id = $2 AND m.recipient_space_id = $3)
+			(m.sender_space_id = $1 AND m.recipient_space_id = $2)
 			OR
-			(m.recipient_space_id = $2 AND m.sender_space_id = $3)
+			(m.recipient_space_id = $1 AND m.sender_space_id = $2)
 		)
-	  AND (sender_space.owner_id = $1 OR recipient_space.owner_id = $1)
 	  AND m.is_deleted = FALSE`
 	if cursorCreatedAt, cursorMessageID, ok := parseMessageCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorMessageID)
-		query += ` AND (m.created_at, m.message_id) < ($4, $5)`
+		query += ` AND (m.created_at, m.message_id) < ($3, $4)`
 	}
 	args = append(args, limit+1)
 	query += ` ORDER BY m.created_at DESC, m.message_id DESC LIMIT $` + strconv.Itoa(len(args))
@@ -192,23 +190,20 @@ func (r *MessagesRepository) SetLike(ctx context.Context, messageID string, acto
 	return stacktrace.Propagate(err, "")
 }
 
-func (r *MessagesRepository) DeleteMessage(ctx context.Context, messageID string, senderID int64, senderSpaceID string) error {
+func (r *MessagesRepository) DeleteMessage(ctx context.Context, messageID string, senderSpaceID string) error {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
 	res, err := tx.ExecContext(ctx, `
-		UPDATE space_messages m
+		UPDATE space_messages
 		SET is_deleted = TRUE
-		FROM spaces sender_space
-		WHERE m.message_id = $1
-		  AND m.sender_space_id = sender_space.space_id
-		  AND sender_space.owner_id = $2
-		  AND m.sender_space_id = $3
-		  AND m.kind <> 'post_like'
-		  AND m.is_deleted = FALSE
-	`, messageID, senderID, senderSpaceID)
+		WHERE message_id = $1
+		  AND sender_space_id = $2
+		  AND kind <> 'post_like'
+		  AND is_deleted = FALSE
+	`, messageID, senderSpaceID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -531,7 +526,7 @@ func (r *MessagesRepository) ListConversations(ctx context.Context, viewerSpaceI
 	return out, nextCursor, nil
 }
 
-func (r *MessagesRepository) GetLatestConversationActivityAt(ctx context.Context, viewerID int64, viewerSpaceID string, friendSpaceID string) (int64, error) {
+func (r *MessagesRepository) GetLatestConversationActivityAt(ctx context.Context, viewerSpaceID string, friendSpaceID string) (int64, error) {
 	var activityCreatedAt int64
 	if err := r.DB.QueryRowContext(ctx, `
 		WITH activity_candidates AS (

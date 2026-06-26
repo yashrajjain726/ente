@@ -25,7 +25,7 @@ type LinksController struct {
 }
 
 func (c *LinksController) Get(ctx *gin.Context) (*models.SpaceLinkStatusResponse, error) {
-	_, space, err := selectedSpace(ctx)
+	space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (c *LinksController) Rotate(ctx *gin.Context, req models.SpaceLinkCreateReq
 }
 
 func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreateRequest, rotate bool) (*models.SpaceLinkStatusResponse, error) {
-	_, space, err := selectedSpace(ctx)
+	space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func linkStatusResponse(link *repo.SpaceLinkRecord) *models.SpaceLinkStatusRespo
 }
 
 func (c *LinksController) Delete(ctx *gin.Context) error {
-	_, space, err := selectedSpace(ctx)
+	space, err := selectedSpace(ctx)
 	if err != nil {
 		return err
 	}

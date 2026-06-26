@@ -25,7 +25,7 @@ type PostsController struct {
 }
 
 func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest) (*models.CreatePostResponse, error) {
-	userID, space, err := selectedSpace(ctx)
+	space, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest)
 			MetadataCipher: metadataCipher,
 		})
 	}
-	postID, err := c.PostsRepo.CreatePost(ctx, userID, space.SpaceID, encryptedPostKey, captionCipher, req.KeyVersion, assets)
+	postID, err := c.PostsRepo.CreatePost(ctx, space.SpaceID, encryptedPostKey, captionCipher, req.KeyVersion, assets)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
@@ -143,13 +143,11 @@ func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*
 	if err := c.auth.canViewSpace(ctx, viewer, space); err != nil {
 		return nil, err
 	}
-	viewerID := int64(0)
 	viewerSpaceID := ""
 	if viewer != nil {
-		viewerID = viewer.UserID
 		viewerSpaceID = viewer.SpaceID
 	}
-	posts, nextCursor, err := c.PostsRepo.ListPostsBySpace(ctx, space.SpaceID, viewerID, viewerSpaceID, req.Cursor, req.Limit)
+	posts, nextCursor, err := c.PostsRepo.ListPostsBySpace(ctx, space.SpaceID, viewerSpaceID, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +162,7 @@ func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*
 }
 
 func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest) (*models.FeedPage, error) {
-	_, viewerSpace, err := selectedSpace(ctx)
+	viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -191,13 +189,11 @@ func (c *PostsController) Get(ctx *gin.Context, postID string, req models.GetPos
 	if err != nil {
 		return nil, err
 	}
-	viewerID := int64(0)
 	viewerSpaceID := ""
 	if viewer != nil {
-		viewerID = viewer.UserID
 		viewerSpaceID = viewer.SpaceID
 	}
-	post, err := c.PostsRepo.GetPost(ctx, id, viewerID, viewerSpaceID)
+	post, err := c.PostsRepo.GetPost(ctx, id, viewerSpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +208,7 @@ func (c *PostsController) Get(ctx *gin.Context, postID string, req models.GetPos
 }
 
 func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req models.UpdatePostCaptionRequest) (*models.PostResponse, error) {
-	userID, viewerSpace, err := selectedSpace(ctx)
+	viewerSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -224,10 +220,10 @@ func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req mod
 	if err != nil {
 		return nil, err
 	}
-	if err := c.PostsRepo.UpdateCaption(ctx, id, userID, viewerSpace.SpaceID, captionCipher); err != nil {
+	if err := c.PostsRepo.UpdateCaption(ctx, id, viewerSpace.SpaceID, captionCipher); err != nil {
 		return nil, err
 	}
-	post, err := c.PostsRepo.GetPost(ctx, id, userID, viewerSpace.SpaceID)
+	post, err := c.PostsRepo.GetPost(ctx, id, viewerSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +231,7 @@ func (c *PostsController) UpdateCaption(ctx *gin.Context, postID string, req mod
 }
 
 func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models.LikePostRequest) (*models.LikePostResponse, error) {
-	userID, actorSpace, err := selectedSpace(ctx)
+	actorSpace, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +239,7 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models
 	if err != nil || id <= 0 {
 		return nil, ente.NewBadRequestWithMessage("invalid postID")
 	}
-	post, err := c.PostsRepo.GetPost(ctx, id, userID, actorSpace.SpaceID)
+	post, err := c.PostsRepo.GetPost(ctx, id, actorSpace.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -251,10 +247,10 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID string, req models
 	if err != nil {
 		return nil, err
 	}
-	if space.OwnerID == userID {
+	if space.OwnerID == actorSpace.OwnerID {
 		return nil, ente.NewBadRequestWithMessage("cannot like your own post")
 	}
-	if err := c.auth.canViewSpace(ctx, &viewerAuth{UserID: userID, SpaceID: actorSpace.SpaceID}, space); err != nil {
+	if err := c.auth.canViewSpace(ctx, &viewerAuth{UserID: actorSpace.OwnerID, SpaceID: actorSpace.SpaceID}, space); err != nil {
 		return nil, err
 	}
 	created, err := c.PostsRepo.SetLikeWithCreated(ctx, id, actorSpace.SpaceID, req.Like)
@@ -276,13 +272,11 @@ func (c *PostsController) ListLikers(ctx *gin.Context, postID string, req models
 	if err != nil {
 		return nil, err
 	}
-	viewerID := int64(0)
 	viewerSpaceID := ""
 	if viewer != nil {
-		viewerID = viewer.UserID
 		viewerSpaceID = viewer.SpaceID
 	}
-	post, err := c.PostsRepo.GetPost(ctx, id, viewerID, viewerSpaceID)
+	post, err := c.PostsRepo.GetPost(ctx, id, viewerSpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +310,7 @@ func (c *PostsController) ListLikers(ctx *gin.Context, postID string, req models
 }
 
 func (c *PostsController) Delete(ctx *gin.Context, postID string) error {
-	userID, space, err := selectedSpace(ctx)
+	space, err := selectedSpace(ctx)
 	if err != nil {
 		return err
 	}
@@ -324,6 +318,6 @@ func (c *PostsController) Delete(ctx *gin.Context, postID string) error {
 	if err != nil || id <= 0 {
 		return ente.NewBadRequestWithMessage("invalid postID")
 	}
-	_, err = c.PostsRepo.DeletePost(ctx, id, userID, space.SpaceID)
+	_, err = c.PostsRepo.DeletePost(ctx, id, space.SpaceID)
 	return err
 }

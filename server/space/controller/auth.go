@@ -23,8 +23,7 @@ type viewerAuth struct {
 }
 
 type selectedSpaceAuth struct {
-	UserID int64
-	Space  *spacerepo.SpaceRecord
+	Space *spacerepo.SpaceRecord
 }
 
 const selectedSpaceAuthKey = "space.selectedSpaceAuth"
@@ -104,36 +103,36 @@ func (a authDeps) resolveViewer(c *gin.Context, rawViewerSpaceID string) (*viewe
 	return nil, ente.ErrAuthenticationRequired
 }
 
-func (a authDeps) requireSelectedSpace(c *gin.Context, rawSpaceID string) (int64, *spacerepo.SpaceRecord, error) {
+func (a authDeps) requireSelectedSpace(c *gin.Context, rawSpaceID string) (*spacerepo.SpaceRecord, error) {
 	userID, err := a.requireUser(c)
 	if err != nil {
-		return 0, nil, err
+		return nil, err
 	}
 	spaceID := strings.TrimSpace(rawSpaceID)
 	if spaceID == "" {
-		return 0, nil, ente.NewBadRequestWithMessage("spaceId is required")
+		return nil, ente.NewBadRequestWithMessage("spaceId is required")
 	}
 	space, err := a.requireSpaceOwner(c, userID, spaceID)
 	if err != nil {
-		return 0, nil, err
+		return nil, err
 	}
-	return userID, space, nil
+	return space, nil
 }
 
-func setSelectedSpace(c *gin.Context, userID int64, space *spacerepo.SpaceRecord) {
-	c.Set(selectedSpaceAuthKey, selectedSpaceAuth{UserID: userID, Space: space})
+func setSelectedSpace(c *gin.Context, space *spacerepo.SpaceRecord) {
+	c.Set(selectedSpaceAuthKey, selectedSpaceAuth{Space: space})
 }
 
-func selectedSpace(c *gin.Context) (int64, *spacerepo.SpaceRecord, error) {
+func selectedSpace(c *gin.Context) (*spacerepo.SpaceRecord, error) {
 	value, ok := c.Get(selectedSpaceAuthKey)
 	if !ok {
-		return 0, nil, ente.NewBadRequestWithMessage("selected space is required")
+		return nil, ente.NewBadRequestWithMessage("selected space is required")
 	}
 	selected, ok := value.(selectedSpaceAuth)
-	if !ok || selected.UserID <= 0 || selected.Space == nil {
-		return 0, nil, ente.NewBadRequestWithMessage("selected space is invalid")
+	if !ok || selected.Space == nil || strings.TrimSpace(selected.Space.SpaceID) == "" {
+		return nil, ente.NewBadRequestWithMessage("selected space is invalid")
 	}
-	return selected.UserID, selected.Space, nil
+	return selected.Space, nil
 }
 
 func (a authDeps) requireSpaceOwner(ctx context.Context, ownerID int64, spaceID string) (*spacerepo.SpaceRecord, error) {
@@ -161,7 +160,7 @@ func (a authDeps) canViewSpace(ctx context.Context, viewer *viewerAuth, space *s
 		if strings.TrimSpace(viewer.SpaceID) == "" {
 			return ente.ErrPermissionDenied
 		}
-		_, err := a.FriendsRepo.GetShareForFriendAndSpace(ctx, viewer.UserID, viewer.SpaceID, space.SpaceID)
+		_, err := a.FriendsRepo.GetShareForFriendAndSpace(ctx, viewer.SpaceID, space.SpaceID)
 		if err != nil {
 			if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 				return ente.ErrPermissionDenied

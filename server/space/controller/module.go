@@ -55,10 +55,10 @@ func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, em
 }
 
 func (m *Module) RequireSelectedSpace(c *gin.Context, rawSpaceID string) error {
-	userID, space, err := m.auth.requireSelectedSpace(c, rawSpaceID)
+	space, err := m.auth.requireSelectedSpace(c, rawSpaceID)
 	if err != nil {
 		return err
 	}
-	setSelectedSpace(c, userID, space)
+	setSelectedSpace(c, space)
 	return nil
 }

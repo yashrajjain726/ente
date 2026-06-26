@@ -117,7 +117,7 @@ func (c *SpacesController) GetProfile(ctx *gin.Context, req models.GetSpaceProfi
 }
 
 func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpaceProfileRequest) (*models.UpdateSpaceProfileResponse, error) {
-	userID, current, err := selectedSpace(ctx)
+	current, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 	if err != nil {
 		return nil, err
 	}
-	space, err := c.SpacesRepo.UpdateProfile(ctx, userID, spaceID, req.KeyVersion, encryptedProfile, avatar, cover, req.RemoveAvatar, req.RemoveCover)
+	space, err := c.SpacesRepo.UpdateProfile(ctx, spaceID, req.KeyVersion, encryptedProfile, avatar, cover, req.RemoveAvatar, req.RemoveCover)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
@@ -180,14 +180,14 @@ func (c *SpacesController) profileAssetUpdate(ctx *gin.Context, spaceID, assetNa
 }
 
 func (c *SpacesController) UpdateSlug(ctx *gin.Context, req models.UpdateSpaceSlugRequest) (*models.SpaceLookupResponse, error) {
-	userID, selected, err := selectedSpace(ctx)
+	selected, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(req.SpaceSlug) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceSlug is required")
 	}
-	space, err := c.SpacesRepo.UpdateSlug(ctx, userID, selected.SpaceID, req.SpaceSlug)
+	space, err := c.SpacesRepo.UpdateSlug(ctx, selected.SpaceID, req.SpaceSlug)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +230,7 @@ func (c *SpacesController) SlugAvailability(ctx *gin.Context, spaceSlug string) 
 }
 
 func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKeyRequest) (*models.SpaceKeyResponse, error) {
-	userID, current, err := selectedSpace(ctx)
+	current, err := selectedSpace(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +252,7 @@ func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKey
 	if req.KeyVersion != current.CurrentVersion {
 		return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")
 	}
-	space, err := c.SpacesRepo.RotateKey(ctx, userID, current.SpaceID, req.KeyVersion, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile)
+	space, err := c.SpacesRepo.RotateKey(ctx, current.SpaceID, req.KeyVersion, rootWrappedSpaceKey, wrappedPrevKey, encryptedProfile)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.NewBadRequestWithMessage("keyVersion does not match current space version")

@@ -31,12 +31,12 @@ func testCreateSpace(ctx context.Context, module *Module, ownerID int64, spaceSl
 	return module.Spaces.CreateSpace(ctx, ownerID, spaceSlug, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(publicKey), testSpaceBytes(encryptedSecretKey), testSpaceBytes(encryptedProfile))
 }
 
-func testUpdateProfile(ctx context.Context, module *Module, ownerID int64, spaceID string, keyVersion int, encryptedProfile string, avatar *ProfileAssetUpdate, cover *ProfileAssetUpdate, removeAvatar bool, removeCover bool) (*SpaceRecord, error) {
-	return module.Spaces.UpdateProfile(ctx, ownerID, spaceID, keyVersion, testSpaceBytes(encryptedProfile), avatar, cover, removeAvatar, removeCover)
+func testUpdateProfile(ctx context.Context, module *Module, _ int64, spaceID string, keyVersion int, encryptedProfile string, avatar *ProfileAssetUpdate, cover *ProfileAssetUpdate, removeAvatar bool, removeCover bool) (*SpaceRecord, error) {
+	return module.Spaces.UpdateProfile(ctx, spaceID, keyVersion, testSpaceBytes(encryptedProfile), avatar, cover, removeAvatar, removeCover)
 }
 
-func testRotateKey(ctx context.Context, module *Module, ownerID int64, spaceID string, keyVersion int, rootWrappedSpaceKey string, wrappedPrevKey string, encryptedProfile string) (*SpaceRecord, error) {
-	return module.Spaces.RotateKey(ctx, ownerID, spaceID, keyVersion, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile))
+func testRotateKey(ctx context.Context, module *Module, _ int64, spaceID string, keyVersion int, rootWrappedSpaceKey string, wrappedPrevKey string, encryptedProfile string) (*SpaceRecord, error) {
+	return module.Spaces.RotateKey(ctx, spaceID, keyVersion, testSpaceBytes(rootWrappedSpaceKey), testSpaceBytes(wrappedPrevKey), testSpaceBytes(encryptedProfile))
 }
 
 func testAddFriend(ctx context.Context, module *Module, requesterID int64, requesterSpaceID string, targetSpaceID string, targetFriendSealedSpaceKey string, targetKeyVersion int, requesterFriendSealedSpaceKey string, requesterKeyVersion int) error {
@@ -53,8 +53,8 @@ func testCreateFriendRequest(ctx context.Context, module *Module, requesterID in
 	return module.Friends.CreateFriendRequest(ctx, requesterID, requesterSpaceID, targetSpaceID, testSpaceBytes(requesterFriendSealedSpaceKey), requesterKeyVersion)
 }
 
-func testConfirmFriendRequest(ctx context.Context, module *Module, targetID int64, targetSpaceID string, requestID int64, targetFriendSealedSpaceKey string, targetKeyVersion int) (int64, bool, error) {
-	return module.Friends.ConfirmFriendRequest(ctx, targetID, targetSpaceID, requestID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion)
+func testConfirmFriendRequest(ctx context.Context, module *Module, _ int64, targetSpaceID string, requestID int64, targetFriendSealedSpaceKey string, targetKeyVersion int) (int64, bool, error) {
+	return module.Friends.ConfirmFriendRequest(ctx, targetSpaceID, requestID, testSpaceBytes(targetFriendSealedSpaceKey), targetKeyVersion)
 }
 
 func testUpsertShare(ctx context.Context, module *Module, spaceID string, friendSpaceID string, friendSealedSpaceKey string, keyVersion int) error {
@@ -73,20 +73,20 @@ func testRotateLink(ctx context.Context, module *Module, spaceID string, authKey
 	return module.Links.RotateLink(ctx, spaceID, authKeyHash, keyVersion, testSpaceBytes(linkWrappedSpaceKey), testSpaceBytes(encryptedAccessKey))
 }
 
-func testCreatePost(ctx context.Context, module *Module, ownerID int64, spaceID string, encryptedPostKey string, captionCipher *string, keyVersion int, objects []SpacePostAssetRecord) (int64, error) {
+func testCreatePost(ctx context.Context, module *Module, _ int64, spaceID string, encryptedPostKey string, captionCipher *string, keyVersion int, objects []SpacePostAssetRecord) (int64, error) {
 	var caption []byte
 	if captionCipher != nil {
 		caption = testSpaceBytes(*captionCipher)
 	}
-	return module.Posts.CreatePost(ctx, ownerID, spaceID, testSpaceBytes(encryptedPostKey), caption, keyVersion, objects)
+	return module.Posts.CreatePost(ctx, spaceID, testSpaceBytes(encryptedPostKey), caption, keyVersion, objects)
 }
 
-func testUpdateCaption(ctx context.Context, module *Module, postID int64, ownerID int64, spaceID string, captionCipher *string) error {
+func testUpdateCaption(ctx context.Context, module *Module, postID int64, _ int64, spaceID string, captionCipher *string) error {
 	var caption []byte
 	if captionCipher != nil {
 		caption = testSpaceBytes(*captionCipher)
 	}
-	return module.Posts.UpdateCaption(ctx, postID, ownerID, spaceID, caption)
+	return module.Posts.UpdateCaption(ctx, postID, spaceID, caption)
 }
 
 func testCreateEntityKey(ctx context.Context, module *Module, userID int64, keyType string, encryptedKey string) error {
@@ -153,7 +153,7 @@ func TestUpdateSlugRejectsReservedSlug(t *testing.T) {
 	space, err := testCreateSpace(ctx, module, userID, "rename_user", "space-key", "rename-user-public", "rename-user-secret", "rename-user-secret-nonce", "profile")
 	require.NoError(t, err)
 
-	_, err = module.Spaces.UpdateSlug(ctx, userID, space.SpaceID, "support")
+	_, err = module.Spaces.UpdateSlug(ctx, space.SpaceID, "support")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "spaceSlug is reserved")
 
@@ -190,9 +190,7 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 	require.NoError(t, testSetPostLike(ctx, module, postID, bobSpace.SpaceID, true))
 	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("sender-key"),
@@ -263,9 +261,7 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 	require.NoError(t, module.Links.CreateSession(ctx, []byte("alice-delete-link-token"), aliceSpace.SpaceID, []byte("alice-delete-auth-hash"), aliceSpace.CurrentVersion, timeutil.NDaysFromNow(1)))
 	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("sender-key"),
@@ -311,9 +307,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 
 	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("sender-key"),
@@ -327,20 +321,18 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 
 	require.NoError(t, module.Messages.SetLike(ctx, message.MessageID, aliceSpace.SpaceID, true))
 	setMessageLikeCreatedAt(t, module, 1500, message.MessageID, aliceSpace.SpaceID)
-	likedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, aliceID, aliceSpace.SpaceID)
+	likedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.True(t, likedMessage.Liked)
 	require.True(t, likedMessage.ViewerLiked)
-	bobViewedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, bobID, bobSpace.SpaceID)
+	bobViewedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.True(t, bobViewedMessage.Liked)
 	require.False(t, bobViewedMessage.ViewerLiked)
 
 	reply, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     aliceID,
 		SenderSpaceID:                aliceSpace.SpaceID,
-		RecipientID:                  bobID,
 		RecipientSpaceID:             bobSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("reply-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("reply-sender-key"),
@@ -352,7 +344,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	setMessageCreatedAt(t, module, 1000, message.MessageID)
 	setMessageCreatedAt(t, module, 2000, reply.MessageID)
 
-	aliceThread, nextCursor, err := module.Messages.ListThread(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
+	aliceThread, nextCursor, err := module.Messages.ListThread(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Empty(t, nextCursor)
 	require.Len(t, aliceThread, 2)
@@ -369,14 +361,14 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	require.Equal(t, "message", conversations[0].LatestActivity.Type)
 	require.Equal(t, reply.MessageID, conversations[0].LatestActivity.Message.MessageID)
 
-	require.NoError(t, module.Messages.DeleteMessage(ctx, message.MessageID, bobID, bobSpace.SpaceID))
-	deletedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, bobID, bobSpace.SpaceID)
+	require.NoError(t, module.Messages.DeleteMessage(ctx, message.MessageID, bobSpace.SpaceID))
+	deletedMessage, err := module.Messages.GetMessage(ctx, message.MessageID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.True(t, deletedMessage.IsDeleted)
 	require.Empty(t, deletedMessage.MessageCipher)
 	require.Empty(t, deletedMessage.EncryptedMessageKey)
 	require.False(t, deletedMessage.Liked)
-	aliceThread, nextCursor, err = module.Messages.ListThread(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
+	aliceThread, nextCursor, err = module.Messages.ListThread(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Empty(t, nextCursor)
 	require.Len(t, aliceThread, 1)
@@ -385,9 +377,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 
 	_, err = module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("sender-key"),
@@ -418,9 +408,7 @@ func TestSpaceMessagesUseProfileAssetAvatars(t *testing.T) {
 
 	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("sender-key"),
@@ -429,7 +417,7 @@ func TestSpaceMessagesUseProfileAssetAvatars(t *testing.T) {
 	require.NoError(t, err)
 	setMessageCreatedAt(t, module, 1000, message.MessageID)
 
-	thread, nextCursor, err := module.Messages.ListThread(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
+	thread, nextCursor, err := module.Messages.ListThread(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Empty(t, nextCursor)
 	require.Len(t, thread, 1)
@@ -476,9 +464,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 
 	bobMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("bob-message-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("bob-message-sender-key"),
@@ -494,9 +480,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 
 	aliceMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     aliceID,
 		SenderSpaceID:                aliceSpace.SpaceID,
-		RecipientID:                  bobID,
 		RecipientSpaceID:             bobSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("alice-message-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("alice-message-sender-key"),
@@ -534,9 +518,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 
 	postReply, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "post_reply",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("post-reply-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("post-reply-sender-key"),
@@ -557,9 +539,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.NoError(t, err)
 	replyOnly, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "post_reply",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("reply-only-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("reply-only-sender-key"),
@@ -576,7 +556,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Equal(t, replyOnly.MessageID, conversations[0].LatestActivity.Message.MessageID)
 	require.Equal(t, replyOnlyPostID, conversations[0].LatestActivity.Post.PostID)
 
-	deletedReplyOnlyPostKeys, err := module.Posts.DeletePost(ctx, replyOnlyPostID, aliceID, aliceSpace.SpaceID)
+	deletedReplyOnlyPostKeys, err := module.Posts.DeletePost(ctx, replyOnlyPostID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Empty(t, deletedReplyOnlyPostKeys)
 
@@ -589,14 +569,14 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Equal(t, replyOnlyPostID, conversations[0].LatestActivity.Post.PostID)
 	require.True(t, conversations[0].LatestActivity.Post.IsDeleted)
 	require.False(t, conversations[0].LatestActivity.Post.ObjectKey.Valid)
-	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(5500), latestActivityAt)
 	notificationsUnread, err := module.Messages.HasUnreadNotifications(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.True(t, notificationsUnread)
 
-	require.NoError(t, module.Friends.DeleteFriendship(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID))
+	require.NoError(t, module.Friends.DeleteFriendship(ctx, bobSpace.SpaceID, aliceSpace.SpaceID))
 
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -632,11 +612,11 @@ func TestCurrentFriendsWithoutMessagesAppearAsEmptyConversations(t *testing.T) {
 	require.Zero(t, conversations[0].UnreadCount)
 	require.False(t, conversations[0].NotificationUnread)
 
-	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(1000), latestActivityAt)
 
-	require.NoError(t, module.Friends.DeleteFriendship(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID))
+	require.NoError(t, module.Friends.DeleteFriendship(ctx, aliceSpace.SpaceID, bobSpace.SpaceID))
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Empty(t, conversations)
@@ -668,19 +648,19 @@ func TestConfirmFriendRequestCreatesFriendshipAndNotifiesRequester(t *testing.T)
 	require.True(t, created)
 	require.Equal(t, bobID, requesterID)
 
-	aliceShare, err := module.Friends.GetShareForFriendAndSpace(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	aliceShare, err := module.Friends.GetShareForFriendAndSpace(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, testSpaceBytes("bob-share-key"), aliceShare.FriendSealedSpaceKey)
-	bobShare, err := module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
+	bobShare, err := module.Friends.GetShareForFriendAndSpace(ctx, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, testSpaceBytes("alice-share-key"), bobShare.FriendSealedSpaceKey)
-	requests, err := module.Friends.ListFriendRequestsForSpace(ctx, aliceID, aliceSpace.SpaceID)
+	requests, err := module.Friends.ListFriendRequestsForSpace(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Empty(t, requests)
 	aliceUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.False(t, aliceUnread)
-	bobRequests, err := module.Friends.ListFriendRequestsForSpace(ctx, bobID, bobSpace.SpaceID)
+	bobRequests, err := module.Friends.ListFriendRequestsForSpace(ctx, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Empty(t, bobRequests)
 	bobUnread, err := module.Messages.HasUnreadNotifications(ctx, bobSpace.SpaceID)
@@ -722,11 +702,11 @@ func TestDeleteFriendRequestClearsUnread(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, aliceUnread)
 
-	require.NoError(t, module.Friends.DeleteFriendRequest(ctx, aliceID, aliceSpace.SpaceID, request.RequestID))
+	require.NoError(t, module.Friends.DeleteFriendRequest(ctx, aliceSpace.SpaceID, request.RequestID))
 	aliceUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.False(t, aliceUnread)
-	requests, err := module.Friends.ListFriendRequestsForSpace(ctx, aliceID, aliceSpace.SpaceID)
+	requests, err := module.Friends.ListFriendRequestsForSpace(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Empty(t, requests)
 }
@@ -750,7 +730,7 @@ func TestFriendRequestsStayOutOfMessageConversations(t *testing.T) {
 	conversations, _, err := module.Messages.ListConversations(ctx, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Empty(t, conversations)
-	requests, err := module.Friends.ListFriendRequestsForSpace(ctx, aliceID, aliceSpace.SpaceID)
+	requests, err := module.Friends.ListFriendRequestsForSpace(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	require.Equal(t, request.RequestID, requests[0].RequestID)
@@ -759,7 +739,7 @@ func TestFriendRequestsStayOutOfMessageConversations(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, notificationsUnread)
 
-	require.NoError(t, module.Friends.DeleteFriendRequest(ctx, aliceID, aliceSpace.SpaceID, request.RequestID))
+	require.NoError(t, module.Friends.DeleteFriendRequest(ctx, aliceSpace.SpaceID, request.RequestID))
 	conversations, _, err = module.Messages.ListConversations(ctx, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Empty(t, conversations)
@@ -782,9 +762,7 @@ func TestSpaceMessageConversationPreviewUsesLatestActivityWithSeparateUnreadStat
 
 	aliceOldMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     aliceID,
 		SenderSpaceID:                aliceSpace.SpaceID,
-		RecipientID:                  bobID,
 		RecipientSpaceID:             bobSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("alice-old-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("alice-old-sender-key"),
@@ -794,9 +772,7 @@ func TestSpaceMessageConversationPreviewUsesLatestActivityWithSeparateUnreadStat
 	setMessageCreatedAt(t, module, 1000, aliceOldMessage.MessageID)
 	bobNewMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("bob-new-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("bob-new-sender-key"),
@@ -816,7 +792,7 @@ func TestSpaceMessageConversationPreviewUsesLatestActivityWithSeparateUnreadStat
 	require.Equal(t, aliceOldMessage.MessageID, conversations[0].LatestActivity.Message.MessageID)
 	require.Equal(t, int64(3000), conversations[0].SortCreatedAt)
 
-	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(3000), latestActivityAt)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
@@ -843,9 +819,7 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 
 	aliceMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     aliceID,
 		SenderSpaceID:                aliceSpace.SpaceID,
-		RecipientID:                  bobID,
 		RecipientSpaceID:             bobSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("alice-message-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("alice-message-sender-key"),
@@ -880,7 +854,7 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 	require.Equal(t, int64(2), conversations[0].UnreadCount)
 	require.True(t, conversations[0].NotificationUnread)
 
-	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(3000), latestActivityAt)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
@@ -902,15 +876,13 @@ func TestPostLikeUnreadCountSuppression(t *testing.T) {
 	require.Equal(t, int64(1), conversations[0].UnreadCount)
 	require.True(t, conversations[0].NotificationUnread)
 
-	latestActivityAt, err = module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	latestActivityAt, err = module.Messages.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(5000), latestActivityAt)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
 	secondAliceMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     aliceID,
 		SenderSpaceID:                aliceSpace.SpaceID,
-		RecipientID:                  bobID,
 		RecipientSpaceID:             bobSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("second-alice-message-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("second-alice-message-sender-key"),
@@ -1035,7 +1007,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	post, err := module.Posts.GetPost(ctx, postID, bobID, bobSpace.SpaceID)
+	post, err := module.Posts.GetPost(ctx, postID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, "alice", post.Author.SpaceSlug)
 
@@ -1070,7 +1042,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.True(t, referenced)
 	require.NoError(t, tx.Rollback())
 
-	deletedKeys, err := module.Posts.DeletePost(ctx, postID, aliceID, aliceSpace.SpaceID)
+	deletedKeys, err := module.Posts.DeletePost(ctx, postID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{"space/alice/post1/full", "space/alice/post1/thumb"}, deletedKeys)
 	requireQueuedTempObject(t, module, "space/alice/post1/full", TempObjectPurposePost, "b2-eu-cen")
@@ -1080,11 +1052,11 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, likeCount)
 
-	deletedKeys, err = module.Posts.DeletePost(ctx, postID, aliceID, aliceSpace.SpaceID)
+	deletedKeys, err = module.Posts.DeletePost(ctx, postID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Empty(t, deletedKeys)
 
-	_, err = module.Posts.GetPost(ctx, postID, bobID, bobSpace.SpaceID)
+	_, err = module.Posts.GetPost(ctx, postID, bobSpace.SpaceID)
 	require.Error(t, err)
 
 	err = testUpdateCaption(ctx, module, postID, aliceID, aliceSpace.SpaceID, ptr("edited-caption"))
@@ -1267,12 +1239,12 @@ func TestAddFriendCreatesReciprocalShares(t *testing.T) {
 	err = testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion)
 	require.NoError(t, err)
 
-	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
+	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, testSpaceBytes("alice-share-key"), share.FriendSealedSpaceKey)
 	require.Equal(t, aliceSpace.CurrentVersion, share.KeyVersion)
 
-	reciprocalShare, err := module.Friends.GetShareForFriendAndSpace(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	reciprocalShare, err := module.Friends.GetShareForFriendAndSpace(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, testSpaceBytes("bob-share-key"), reciprocalShare.FriendSealedSpaceKey)
 	require.Equal(t, bobSpace.CurrentVersion, reciprocalShare.KeyVersion)
@@ -1308,7 +1280,7 @@ func TestAddFriendIsIdempotentForExistingFriends(t *testing.T) {
 	err = testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key-v2", aliceSpace.CurrentVersion, "bob-share-key-v2", bobSpace.CurrentVersion)
 
 	require.NoError(t, err)
-	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
+	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, testSpaceBytes("alice-share-key-v2"), share.FriendSealedSpaceKey)
 }
@@ -1334,7 +1306,7 @@ func TestDeleteFriendshipRemovesReciprocalShares(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, bobShares, 1)
 
-	err = module.Friends.DeleteFriendship(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	err = module.Friends.DeleteFriendship(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 
 	aliceShares, err = module.Friends.ListSharesForFriend(ctx, aliceID)
@@ -1349,11 +1321,11 @@ func TestDeleteFriendshipRemovesReciprocalShares(t *testing.T) {
 	bobFriends, err := module.Friends.ListFriendsForSpace(ctx, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Empty(t, bobFriends)
-	relationship, err := module.Friends.GetRelationship(ctx, aliceID, aliceSpace.SpaceID, bobID, bobSpace.SpaceID)
+	relationship, err := module.Friends.GetRelationship(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Empty(t, relationship)
 
-	err = module.Friends.DeleteFriendship(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	err = module.Friends.DeleteFriendship(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 }
 
@@ -1376,7 +1348,7 @@ func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
 
 	err = testUpdateShare(ctx, module, aliceSpace.SpaceID, bobSpace.SpaceID, "share-key-v2", rotatedSpace.CurrentVersion)
 	require.NoError(t, err)
-	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
+	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, testSpaceBytes("share-key-v2"), share.FriendSealedSpaceKey)
 	require.Equal(t, rotatedSpace.CurrentVersion, share.KeyVersion)
@@ -1386,7 +1358,7 @@ func TestUpdateShareOnlyRefreshesExistingShares(t *testing.T) {
 	err = testUpdateShare(ctx, module, aliceSpace.SpaceID, bobSpace.SpaceID, "stale-share-key", rotatedSpace.CurrentVersion)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
-	_, err = module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
+	_, err = module.Friends.GetShareForFriendAndSpace(ctx, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 }
 
@@ -1404,7 +1376,7 @@ func TestCreatePostRejectsStaleKeyVersion(t *testing.T) {
 	require.Zero(t, postID)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
-	posts, next, err := module.Posts.ListPostsBySpace(ctx, space.SpaceID, aliceID, space.SpaceID, "", 20)
+	posts, next, err := module.Posts.ListPostsBySpace(ctx, space.SpaceID, space.SpaceID, "", 20)
 	require.NoError(t, err)
 	require.Empty(t, next)
 	require.Empty(t, posts)
@@ -1472,9 +1444,9 @@ func TestAddFriendRejectsStaleKeyVersion(t *testing.T) {
 	err = testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "stale-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
-	_, err = module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
+	_, err = module.Friends.GetShareForFriendAndSpace(ctx, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.ErrorIs(t, err, sql.ErrNoRows)
-	_, err = module.Friends.GetShareForFriendAndSpace(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	_, err = module.Friends.GetShareForFriendAndSpace(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 }
 
@@ -1496,7 +1468,7 @@ func TestUpdateShareRejectsStaleKeyVersion(t *testing.T) {
 	err = testUpdateShare(ctx, module, aliceSpace.SpaceID, bobSpace.SpaceID, "stale-share-key", aliceSpace.CurrentVersion)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
-	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobID, bobSpace.SpaceID, aliceSpace.SpaceID)
+	share, err := module.Friends.GetShareForFriendAndSpace(ctx, bobSpace.SpaceID, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, testSpaceBytes("share-key-v1"), share.FriendSealedSpaceKey)
 	require.Equal(t, aliceSpace.CurrentVersion, share.KeyVersion)
@@ -1711,14 +1683,14 @@ func TestListPostsBySpacePaginates(t *testing.T) {
 	require.NoError(t, err)
 	setPostCreatedAt(t, module, 1000, first, second, third)
 
-	page, nextCursor, err := module.Posts.ListPostsBySpace(ctx, space.SpaceID, aliceID, space.SpaceID, "", 2)
+	page, nextCursor, err := module.Posts.ListPostsBySpace(ctx, space.SpaceID, space.SpaceID, "", 2)
 	require.NoError(t, err)
 	require.Len(t, page, 2)
 	require.Equal(t, third, page[0].PostID)
 	require.Equal(t, second, page[1].PostID)
 	require.Equal(t, "1000:"+strconv.FormatInt(second, 10), nextCursor)
 
-	page, nextCursor, err = module.Posts.ListPostsBySpace(ctx, space.SpaceID, aliceID, space.SpaceID, nextCursor, 2)
+	page, nextCursor, err = module.Posts.ListPostsBySpace(ctx, space.SpaceID, space.SpaceID, nextCursor, 2)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, first, page[0].PostID)
@@ -1742,13 +1714,13 @@ func TestListPostsBySpaceCursorUsesCreatedAtSortOrder(t *testing.T) {
 	setPostCreatedAt(t, module, 2000, second)
 	setPostCreatedAt(t, module, 1000, third)
 
-	page, nextCursor, err := module.Posts.ListPostsBySpace(ctx, space.SpaceID, aliceID, space.SpaceID, "", 1)
+	page, nextCursor, err := module.Posts.ListPostsBySpace(ctx, space.SpaceID, space.SpaceID, "", 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, first, page[0].PostID)
 	require.Equal(t, "3000:"+strconv.FormatInt(first, 10), nextCursor)
 
-	page, nextCursor, err = module.Posts.ListPostsBySpace(ctx, space.SpaceID, aliceID, space.SpaceID, nextCursor, 1)
+	page, nextCursor, err = module.Posts.ListPostsBySpace(ctx, space.SpaceID, space.SpaceID, nextCursor, 1)
 	require.NoError(t, err)
 	require.Len(t, page, 1)
 	require.Equal(t, second, page[0].PostID)
@@ -1828,9 +1800,7 @@ func TestSpaceReadMarkersDriveNotificationState(t *testing.T) {
 
 	incoming, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("incoming-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("incoming-sender-key"),
@@ -1858,9 +1828,7 @@ func TestSpaceReadMarkersDriveNotificationState(t *testing.T) {
 
 	outgoing, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     aliceID,
 		SenderSpaceID:                aliceSpace.SpaceID,
-		RecipientID:                  bobID,
 		RecipientSpaceID:             bobSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("outgoing-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("outgoing-sender-key"),
@@ -1896,9 +1864,7 @@ func TestSpaceNotificationReadMarkersArePerFriend(t *testing.T) {
 
 	bobMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("bob-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("bob-sender-key"),
@@ -1908,9 +1874,7 @@ func TestSpaceNotificationReadMarkersArePerFriend(t *testing.T) {
 	setMessageCreatedAt(t, module, 1000, bobMessage.MessageID)
 	aliceMessageToBob, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     aliceID,
 		SenderSpaceID:                aliceSpace.SpaceID,
-		RecipientID:                  bobID,
 		RecipientSpaceID:             bobSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("alice-bob-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("alice-bob-sender-key"),
@@ -1922,9 +1886,7 @@ func TestSpaceNotificationReadMarkersArePerFriend(t *testing.T) {
 	setMessageLikeCreatedAt(t, module, 1002, aliceMessageToBob.MessageID, bobSpace.SpaceID)
 	charlieMessage, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     charlieID,
 		SenderSpaceID:                charlieSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("charlie-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("charlie-sender-key"),
@@ -1956,7 +1918,7 @@ func TestSpaceNotificationReadMarkersArePerFriend(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, notificationsUnread)
 
-	bobLatestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	bobLatestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(1002), bobLatestActivityAt)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, bobLatestActivityAt))
@@ -1990,9 +1952,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 
 	incoming, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("incoming-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("incoming-sender-key"),
@@ -2002,9 +1962,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	setMessageCreatedAt(t, module, 1000, incoming.MessageID)
 	outgoing, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
-		SenderID:                     aliceID,
 		SenderSpaceID:                aliceSpace.SpaceID,
-		RecipientID:                  bobID,
 		RecipientSpaceID:             bobSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("outgoing-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("outgoing-sender-key"),
@@ -2025,7 +1983,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	require.NoError(t, err)
 	require.True(t, notificationsUnread)
 
-	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	latestActivityAt, err := module.Messages.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(2000), latestActivityAt)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
@@ -2054,7 +2012,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	notificationsUnread, err = module.Messages.HasUnreadNotifications(ctx, aliceSpace.SpaceID)
 	require.NoError(t, err)
 	require.False(t, notificationsUnread)
-	latestActivityAt, err = module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	latestActivityAt, err = module.Messages.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(2500), latestActivityAt)
 
@@ -2071,9 +2029,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	setPostLikeCreatedAt(t, module, 3000, alicePostID, bobSpace.SpaceID)
 	outgoingPostReply, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "post_reply",
-		SenderID:                     aliceID,
 		SenderSpaceID:                aliceSpace.SpaceID,
-		RecipientID:                  bobID,
 		RecipientSpaceID:             bobSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("outgoing-post-reply-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("outgoing-post-reply-sender-key"),
@@ -2112,11 +2068,11 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	require.False(t, conversations[0].Unread)
 	require.Equal(t, int64(0), conversations[0].UnreadCount)
 	require.True(t, conversations[0].NotificationUnread)
-	latestActivityAt, err = module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	latestActivityAt, err = module.Messages.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(4500), latestActivityAt)
 
-	thread, _, err := module.Messages.ListThread(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
+	thread, _, err := module.Messages.ListThread(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(thread), 3)
 	require.Equal(t, "post_like", thread[0].Kind)
@@ -2133,9 +2089,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 
 	incomingPostReply, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "post_reply",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("incoming-post-reply-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("incoming-post-reply-sender-key"),
@@ -2146,9 +2100,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	setMessageCreatedAt(t, module, 5000, incomingPostReply.MessageID)
 	secondIncomingPostReply, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "post_reply",
-		SenderID:                     bobID,
 		SenderSpaceID:                bobSpace.SpaceID,
-		RecipientID:                  aliceID,
 		RecipientSpaceID:             aliceSpace.SpaceID,
 		MessageCipher:                testSpaceBytes("second-incoming-post-reply-cipher"),
 		SenderEncryptedMessageKey:    testSpaceBytes("second-incoming-post-reply-sender-key"),
@@ -2184,7 +2136,7 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	require.NoError(t, err)
 	require.True(t, notificationsUnread)
 
-	latestActivityAt, err = module.Messages.GetLatestConversationActivityAt(ctx, aliceID, aliceSpace.SpaceID, bobSpace.SpaceID)
+	latestActivityAt, err = module.Messages.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(6000), latestActivityAt)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, latestActivityAt))
