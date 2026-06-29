@@ -6,15 +6,14 @@
 //! messages (including replies to a post), and decrypt, like, and delete them.
 
 use super::{
-    AccountSpaceCtx, MESSAGE_KIND_POST_REPLY, MESSAGE_KIND_REGULAR, decrypt_post_object_metadata,
-    optional_utf8, validate_message_payload,
+    AccountSpaceCtx, MESSAGE_KIND_POST_REPLY, MESSAGE_KIND_REGULAR, validate_message_payload,
 };
 use crate::crypto::{
     decrypt_secretbox_payload, encrypt_secretbox_payload, generate_key, open_with_keypair,
     seal_with_public_key,
 };
 use crate::error::{Result, SpaceError};
-use crate::models::{DecryptedMessage, MessagePayload, MessageQuote};
+use crate::models::{DecryptedMessage, MessagePayload};
 use crate::transport::{
     ConversationsResponse, CreateMessageRequest, LikeMessageResponse, MessagePage, MessageResponse,
     SpaceActorResponse,
@@ -61,7 +60,6 @@ impl AccountSpaceCtx {
             version: 1,
             kind: MESSAGE_KIND_REGULAR.to_owned(),
             text: text.to_owned(),
-            quote: None,
         };
         let request = self
             .message_request_for_payload(sender_space_id, &friend.public_key, &payload, None)
@@ -91,7 +89,6 @@ impl AccountSpaceCtx {
             version: 1,
             kind: MESSAGE_KIND_REGULAR.to_owned(),
             text: text.to_owned(),
-            quote: None,
         };
         let request = self
             .message_request_for_payload(
@@ -132,30 +129,10 @@ impl AccountSpaceCtx {
                 "post author public key is missing".into(),
             ));
         }
-        let decrypted = self
-            .decrypt_post_for_viewer(&post.space_id, Some(sender_space_id), &post)
-            .await?;
-        let caption = optional_utf8(decrypted.caption_plaintext, "caption")?;
-        let object = post.objects.first();
-        let object_metadata = object
-            .map(|value| decrypt_post_object_metadata(&decrypted.post_key, value))
-            .transpose()?
-            .flatten();
         let payload = MessagePayload {
             version: 1,
             kind: MESSAGE_KIND_POST_REPLY.to_owned(),
             text: text.to_owned(),
-            quote: Some(MessageQuote {
-                post_id,
-                space_id: post.space_id.clone(),
-                encrypted_post_key: Some(post.encrypted_post_key.clone()),
-                key_version: Some(post.key_version),
-                caption,
-                object_key: object.map(|value| value.object_key.clone()),
-                width: object_metadata.as_ref().and_then(|value| value.width),
-                height: object_metadata.as_ref().and_then(|value| value.height),
-                media_type: object_metadata.and_then(|value| value.media_type),
-            }),
         };
         let request = self
             .message_request_for_payload(sender_space_id, &post.author.public_key, &payload, None)

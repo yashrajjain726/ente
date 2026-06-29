@@ -108,18 +108,6 @@ type SpaceMessageKindResponse =
     | "post_reply"
     | "regular";
 
-interface SpaceMessageQuoteResponse {
-    caption?: string;
-    encryptedPostKey?: string;
-    height?: number;
-    keyVersion?: number;
-    mediaType?: string;
-    objectKey?: string;
-    postId: number;
-    spaceId: string;
-    width?: number;
-}
-
 interface SpaceMessageResponse {
     createdAt: string;
     id?: string;
@@ -127,7 +115,6 @@ interface SpaceMessageResponse {
     kind: SpaceMessageKindResponse;
     liked?: boolean;
     messageId: string;
-    quote?: SpaceMessageQuoteResponse;
     recipientSpaceId: string;
     replyMessageId?: string;
     replyPostId?: number;
@@ -324,7 +311,9 @@ interface SpaceFriendRequestContext {
 }
 
 interface SpaceConversationsContext {
-    list_conversations: (spaceId: string) => Promise<SpaceConversationsResponse>;
+    list_conversations: (
+        spaceId: string,
+    ) => Promise<SpaceConversationsResponse>;
 }
 
 const timestampMsFromSpaceDate = (value: string) => {
@@ -513,34 +502,6 @@ const cacheAccountPostAssetURL = async (
     await rememberCachedSpaceMediaBlobURL(key, blob);
 };
 
-const accountPostAssetURLFromQuote = (
-    ctx: SpaceAccountCtxHandle,
-    quote: SpaceMessageQuoteResponse,
-    viewerSpaceId?: string,
-) => {
-    if (
-        !quote.objectKey ||
-        !quote.encryptedPostKey ||
-        typeof quote.keyVersion != "number"
-    ) {
-        return undefined;
-    }
-
-    return cachedSpaceMediaBlobURL(
-        spacePostMediaCacheKey(quote.spaceId, quote.objectKey),
-        () =>
-            ctx.download_post_asset_with_key(
-                quote.spaceId,
-                BigInt(quote.postId),
-                quote.encryptedPostKey!,
-                quote.keyVersion!,
-                viewerSpaceId ?? null,
-                quote.objectKey!,
-            ),
-        quote.mediaType,
-    );
-};
-
 const firstObject = (post: { objects?: SpacePostObject[] }) =>
     post.objects?.find((object) => object.objectKey.trim()) ?? null;
 
@@ -637,43 +598,6 @@ const profilePostPageFromPage = (
     nextCursor: page.nextCursor || undefined,
 });
 
-const messageQuoteFromSpaceQuote = async (
-    ctx: SpaceAccountCtxHandle,
-    quote: SpaceMessageQuoteResponse | undefined,
-    includeImage: boolean,
-    viewerSpaceId?: string,
-): Promise<SpaceMessageQuote | undefined> => {
-    if (!quote) return undefined;
-
-    const spaceQuote: SpaceMessageQuote = {
-        caption: quote.caption,
-        height: quote.height,
-        mediaType: quote.mediaType,
-        objectKey: quote.objectKey,
-        postId: quote.postId,
-        spaceId: quote.spaceId,
-        width: quote.width,
-    };
-    if (!includeImage || !quote.objectKey) return spaceQuote;
-
-    try {
-        const imageUrl = await accountPostAssetURLFromQuote(
-            ctx,
-            quote,
-            viewerSpaceId,
-        );
-        if (!imageUrl) {
-            spaceQuote.isUnavailable = true;
-            return spaceQuote;
-        }
-        spaceQuote.imageUrl = imageUrl;
-    } catch (error) {
-        console.warn("Failed to load quoted post image", error);
-        spaceQuote.isUnavailable = true;
-    }
-    return spaceQuote;
-};
-
 const messageQuoteFromPostResponse = async (
     ctx: SpaceAccountCtxHandle,
     post: SpacePostResponse,
@@ -751,12 +675,6 @@ const messageQuoteFromSpaceMessage = async (
     includeImage: boolean,
     viewerSpaceId?: string,
 ): Promise<SpaceMessageQuote | undefined> =>
-    (await messageQuoteFromSpaceQuote(
-        ctx,
-        message.quote,
-        includeImage,
-        viewerSpaceId,
-    )) ??
     messageQuoteFromReplyPost(ctx, message, includeImage, viewerSpaceId);
 
 const messageFromSpaceMessage = async (
@@ -1258,8 +1176,9 @@ export const loadCurrentMessageConversations = async (
 ): Promise<SpaceMessageConversationList> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
-        const response = await (ctx as unknown as SpaceConversationsContext)
-            .list_conversations(spaceId);
+        const response = await (
+            ctx as unknown as SpaceConversationsContext
+        ).list_conversations(spaceId);
         const summaries = response.chatSummaries ?? {};
         const friendItems = await Promise.all(
             (response.friends ?? []).map(async (conversation) => {

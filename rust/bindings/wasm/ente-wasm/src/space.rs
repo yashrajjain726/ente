@@ -171,27 +171,12 @@ struct PostPageJs {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct MessageQuoteJs {
-    post_id: i64,
-    space_id: String,
-    encrypted_post_key: Option<String>,
-    key_version: Option<i32>,
-    caption: Option<String>,
-    object_key: Option<String>,
-    width: Option<i32>,
-    height: Option<i32>,
-    media_type: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
 struct MessageJs {
     message_id: String,
     kind: String,
     sender_space_id: String,
     recipient_space_id: String,
     text: String,
-    quote: Option<MessageQuoteJs>,
     reply_post_id: Option<i64>,
     reply_message_id: Option<String>,
     liked: bool,
@@ -467,24 +452,12 @@ async fn account_message_to_js(
     message: MessageResponse,
     decrypted: DecryptedMessage,
 ) -> Result<MessageJs, WasmSpaceError> {
-    let quote = decrypted.payload.quote.map(|quote| MessageQuoteJs {
-        post_id: quote.post_id,
-        space_id: quote.space_id,
-        encrypted_post_key: quote.encrypted_post_key,
-        key_version: quote.key_version,
-        caption: quote.caption,
-        object_key: quote.object_key,
-        width: quote.width,
-        height: quote.height,
-        media_type: quote.media_type,
-    });
     Ok(MessageJs {
         message_id: message.message_id,
         kind: message.kind,
         sender_space_id: message.sender_space_id,
         recipient_space_id: message.recipient_space_id,
         text: decrypted.payload.text,
-        quote,
         reply_post_id: message.reply_post_id,
         reply_message_id: message.reply_message_id,
         liked: message.liked,
@@ -511,7 +484,6 @@ async fn account_message_response_to_js(
         sender_space_id: message.sender_space_id,
         recipient_space_id: message.recipient_space_id,
         text: message.text,
-        quote: None,
         reply_post_id: message.reply_post_id,
         reply_message_id: message.reply_message_id,
         liked: message.liked,

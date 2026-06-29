@@ -14,7 +14,7 @@ pub use client::{
 pub use error::{Result, SpaceError};
 pub use models::{
     CreatedSpace, CreatedSpaceLink, DecryptedFriendShare, DecryptedMessage, DecryptedPost,
-    DecryptedSpaceProfile, FeedItem, FeedPage, HydratedKeys, MessagePayload, MessageQuote,
+    DecryptedSpaceProfile, FeedItem, FeedPage, HydratedKeys, MessagePayload,
     OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostObjectMetadata,
 };
 pub use transport::{

@@ -11,7 +11,7 @@ use crate::crypto::{
     derive_space_link_auth_key, derive_space_link_wrap_key, encrypt_asset_payload,
     seal_with_public_key, space_link_access_key_material,
 };
-use crate::models::{MessageQuote, OpenSpaceLinkCtxInput};
+use crate::models::OpenSpaceLinkCtxInput;
 use crate::transport::{
     EntityKeyPayload, ProfileAvatarPayload, ProfileCoverPayload, SpaceActorResponse,
 };
@@ -1515,7 +1515,6 @@ fn message_payload_limits_reject_oversized_text_and_payload() {
         version: 1,
         kind: MESSAGE_KIND_REGULAR.to_owned(),
         text: "hello".to_owned(),
-        quote: None,
     };
     let valid_plaintext = serde_json::to_vec(&valid).expect("valid payload json");
     validate_message_payload(&valid, valid_plaintext.len())
@@ -1530,23 +1529,7 @@ fn message_payload_limits_reject_oversized_text_and_payload() {
         .expect_err("long message text should be rejected");
     assert!(err.to_string().contains("characters or fewer"));
 
-    let oversized_payload = MessagePayload {
-        text: "ok".to_owned(),
-        quote: Some(MessageQuote {
-            post_id: 1,
-            space_id: "space_owner_main".to_owned(),
-            encrypted_post_key: None,
-            key_version: None,
-            caption: Some("a".repeat(MAX_SPACE_MESSAGE_PAYLOAD_BYTES)),
-            object_key: None,
-            width: None,
-            height: None,
-            media_type: None,
-        }),
-        ..valid
-    };
-    let plaintext = serde_json::to_vec(&oversized_payload).expect("large payload json");
-    let err = validate_message_payload(&oversized_payload, plaintext.len())
+    let err = validate_message_payload(&valid, MAX_SPACE_MESSAGE_PAYLOAD_BYTES + 1)
         .expect_err("large serialized payload should be rejected");
     assert!(err.to_string().contains("payload must be"));
 }

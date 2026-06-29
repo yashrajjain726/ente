@@ -638,15 +638,6 @@ fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
     }
 }
 
-fn optional_utf8(bytes: Option<Vec<u8>>, field: &str) -> Result<Option<String>> {
-    bytes
-        .map(|value| {
-            String::from_utf8(value)
-                .map_err(|err| SpaceError::InvalidInput(format!("invalid {field} utf8: {err}")))
-        })
-        .transpose()
-}
-
 pub(super) fn build_http_client(
     base_url: &str,
     auth_token: Option<String>,
