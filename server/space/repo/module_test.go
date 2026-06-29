@@ -1192,10 +1192,6 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.Len(t, assets[postID], 2)
 	require.Equal(t, "b2-eu-cen", assets[postID][0].BucketID)
 
-	ok, err := module.Assets.AssetBelongsToSpace(ctx, aliceSpace.SpaceID, "space/alice/post1/full")
-	require.NoError(t, err)
-	require.True(t, ok)
-
 	bucketID, err := module.Assets.GetAssetBucketID(ctx, aliceSpace.SpaceID, "space/alice/post1/full")
 	require.NoError(t, err)
 	require.Equal(t, "b2-eu-cen", bucketID)
@@ -1203,10 +1199,6 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	bucketID, err = module.Assets.GetAssetBucketID(ctx, aliceSpace.SpaceID, ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeAvatar, "avatar.jpg"))
 	require.NoError(t, err)
 	require.Equal(t, "b2-eu-cen", bucketID)
-
-	spaceForObject, err := module.Assets.GetSpaceForObjectKey(ctx, "space/alice/post1/full")
-	require.NoError(t, err)
-	require.Equal(t, aliceSpace.SpaceID, spaceForObject.SpaceID)
 
 	tx, err := module.Assets.DB.BeginTx(ctx, nil)
 	require.NoError(t, err)
@@ -1231,11 +1223,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	err = testUpdateCaption(ctx, module, postID, aliceID, aliceSpace.SpaceID, ptr("edited-caption"))
 	require.ErrorIs(t, err, sql.ErrNoRows)
 
-	ok, err = module.Assets.AssetBelongsToSpace(ctx, aliceSpace.SpaceID, "space/alice/post1/full")
-	require.NoError(t, err)
-	require.False(t, ok)
-
-	_, err = module.Assets.GetSpaceForObjectKey(ctx, "space/alice/post1/full")
+	_, err = module.Assets.GetAssetBucketID(ctx, aliceSpace.SpaceID, "space/alice/post1/full")
 	require.Error(t, err)
 
 	tx, err = module.Assets.DB.BeginTx(ctx, nil)
