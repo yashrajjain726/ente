@@ -637,9 +637,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Equal(t, replyOnly.MessageID, conversations[0].LatestActivity.MessageID.String)
 	require.Equal(t, replyOnlyPostID, conversations[0].LatestActivity.PostID.Int64)
 
-	deletedReplyOnlyPostKeys, err := module.Posts.DeletePost(ctx, replyOnlyPostID, aliceSpace.SpaceID)
-	require.NoError(t, err)
-	require.Empty(t, deletedReplyOnlyPostKeys)
+	require.NoError(t, module.Posts.DeletePost(ctx, replyOnlyPostID, aliceSpace.SpaceID))
 
 	conversations, _, err = listTestConversations(ctx, module, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -1217,9 +1215,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.True(t, referenced)
 	require.NoError(t, tx.Rollback())
 
-	deletedKeys, err := module.Posts.DeletePost(ctx, postID, aliceSpace.SpaceID)
-	require.NoError(t, err)
-	require.ElementsMatch(t, []string{"space/alice/post1/full", "space/alice/post1/thumb"}, deletedKeys)
+	require.NoError(t, module.Posts.DeletePost(ctx, postID, aliceSpace.SpaceID))
 	requireQueuedTempObject(t, module, "space/alice/post1/full", TempObjectPurposePost, "b2-eu-cen")
 	requireQueuedTempObject(t, module, "space/alice/post1/thumb", TempObjectPurposePost, "b2-eu-cen")
 	var likeCount int
@@ -1227,9 +1223,7 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, likeCount)
 
-	deletedKeys, err = module.Posts.DeletePost(ctx, postID, aliceSpace.SpaceID)
-	require.NoError(t, err)
-	require.Empty(t, deletedKeys)
+	require.NoError(t, module.Posts.DeletePost(ctx, postID, aliceSpace.SpaceID))
 
 	_, err = module.Posts.GetPost(ctx, postID, bobSpace.SpaceID)
 	require.Error(t, err)

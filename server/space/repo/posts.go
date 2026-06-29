@@ -208,10 +208,10 @@ func (r *PostsRepository) ListAssetsByPostIDs(ctx context.Context, postIDs []int
 	return result, stacktrace.Propagate(rows.Err(), "")
 }
 
-func (r *PostsRepository) DeletePost(ctx context.Context, postID int64, spaceID string) ([]string, error) {
+func (r *PostsRepository) DeletePost(ctx context.Context, postID int64, spaceID string) error {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
 	res, err := tx.ExecContext(ctx, `
@@ -222,11 +222,11 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID int64, spaceID 
 		  AND is_deleted = FALSE
 	`, postID, spaceID)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	affected, err := res.RowsAffected()
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	if affected == 0 {
 		var isDeleted bool
@@ -235,18 +235,18 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID int64, spaceID 
 			FROM space_posts
 			WHERE post_id = $1 AND space_id = $2
 		`, postID, spaceID).Scan(&isDeleted); err != nil {
-			return nil, stacktrace.Propagate(err, "")
+			return stacktrace.Propagate(err, "")
 		}
 		if !isDeleted {
-			return nil, sql.ErrNoRows
+			return sql.ErrNoRows
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID); err != nil {
-			return nil, stacktrace.Propagate(err, "")
+			return stacktrace.Propagate(err, "")
 		}
 		if err := tx.Commit(); err != nil {
-			return nil, stacktrace.Propagate(err, "")
+			return stacktrace.Propagate(err, "")
 		}
-		return nil, nil
+		return nil
 	}
 	rows, err := tx.QueryContext(ctx, `
 		SELECT a.object_key, a.bucket_id, COALESCE(a.size, 1), p.space_id
@@ -255,44 +255,36 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID int64, spaceID 
 		WHERE a.post_id = $1
 	`, postID)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return stacktrace.Propagate(err, "")
 	}
-	type cleanupObject struct {
-		key string
-		rec SpaceTempObjectRecord
-	}
-	var cleanupObjects []cleanupObject
+	var cleanupObjects []SpaceTempObjectRecord
 	for rows.Next() {
-		var key string
 		var rec SpaceTempObjectRecord
-		if err := rows.Scan(&key, &rec.BucketID, &rec.ExpectedSize, &rec.SpaceID.String); err != nil {
+		if err := rows.Scan(&rec.ObjectKey, &rec.BucketID, &rec.ExpectedSize, &rec.SpaceID.String); err != nil {
 			rows.Close()
-			return nil, stacktrace.Propagate(err, "")
+			return stacktrace.Propagate(err, "")
 		}
-		rec.ObjectKey = key
 		rec.SpaceID.Valid = rec.SpaceID.String != ""
 		rec.Purpose = TempObjectPurposePost
-		cleanupObjects = append(cleanupObjects, cleanupObject{key: key, rec: rec})
+		cleanupObjects = append(cleanupObjects, rec)
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
-		return nil, stacktrace.Propagate(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	rows.Close()
-	keys := make([]string, 0, len(cleanupObjects))
 	for _, object := range cleanupObjects {
-		if err := QueueObjectCleanupTx(ctx, tx, object.rec); err != nil {
-			return nil, err
+		if err := QueueObjectCleanupTx(ctx, tx, object); err != nil {
+			return err
 		}
-		keys = append(keys, object.key)
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID); err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return stacktrace.Propagate(err, "")
 	}
-	return keys, nil
+	return nil
 }
 
 func (r *PostsRepository) SetLikeWithCreated(ctx context.Context, postID int64, actorSpaceID string, like bool) (bool, error) {

@@ -232,6 +232,5 @@ func (c *PostsController) SetLike(ctx context.Context, actorSpace *repo.SpaceRec
 }
 
 func (c *PostsController) Delete(ctx context.Context, space *repo.SpaceRecord, postID int64) error {
-	_, err := c.PostsRepo.DeletePost(ctx, postID, space.SpaceID)
-	return err
+	return c.PostsRepo.DeletePost(ctx, postID, space.SpaceID)
 }
