@@ -368,7 +368,7 @@ async fn space_link_download_post_asset_with_key_skips_post_fetch() {
     );
 
     let bytes = ctx
-        .download_post_asset_with_key(42, &encrypted_post_key, 1, object_key)
+        .download_post_asset_with_key(&encrypted_post_key, 1, object_key)
         .await
         .expect("asset should decrypt");
 

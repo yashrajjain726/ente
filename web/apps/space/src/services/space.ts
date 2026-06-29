@@ -462,7 +462,6 @@ const accountPostAssetURLFromAsset = (
         () =>
             ctx.download_post_asset_with_key(
                 asset.spaceId,
-                BigInt(asset.postId),
                 asset.encryptedPostKey,
                 asset.keyVersion,
                 viewerSpaceId ?? null,

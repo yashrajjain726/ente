@@ -185,20 +185,13 @@ impl AccountSpaceCtx {
     pub async fn download_post_asset_with_key(
         &self,
         space_id: &str,
-        post_id: i64,
         encrypted_post_key: &str,
         key_version: i32,
         viewer_space_id: Option<&str>,
         object_key: &str,
     ) -> Result<Vec<u8>> {
         let post_key = self
-            .decrypt_post_key_fields(
-                space_id,
-                viewer_space_id,
-                post_id,
-                encrypted_post_key,
-                key_version,
-            )
+            .decrypt_post_key_fields(space_id, viewer_space_id, encrypted_post_key, key_version)
             .await?;
         self.download_decrypted_asset(space_id, viewer_space_id, object_key, &post_key)
             .await
@@ -236,43 +229,15 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
         viewer_space_id: Option<&str>,
-        post_id: i64,
         encrypted_post_key: &str,
         key_version: i32,
     ) -> Result<Vec<u8>> {
         let space_key = self
             .resolve_space_key_for_version_for_viewer(space_id, viewer_space_id, Some(key_version))
             .await?
-            .ok_or_else(|| {
-                SpaceError::InvalidInput(format!("missing space key for post {post_id}"))
-            })?;
+            .ok_or_else(|| SpaceError::InvalidInput("missing space key for post".into()))?;
         let packed = decode_b64(encrypted_post_key)?;
         decrypt_secretbox_payload(&space_key, &packed)
-    }
-
-    pub async fn decrypt_post_caption_fields(
-        &self,
-        space_id: &str,
-        viewer_space_id: Option<&str>,
-        post_id: i64,
-        encrypted_post_key: &str,
-        key_version: i32,
-        caption_cipher: &str,
-    ) -> Result<Option<Vec<u8>>> {
-        if caption_cipher.trim().is_empty() {
-            return Ok(None);
-        }
-        let post_key = self
-            .decrypt_post_key_fields(
-                space_id,
-                viewer_space_id,
-                post_id,
-                encrypted_post_key,
-                key_version,
-            )
-            .await?;
-        let packed = decode_b64(caption_cipher)?;
-        Ok(Some(decrypt_secretbox_payload(&post_key, &packed)?))
     }
 
     pub fn decrypt_post(&self, space_key: &[u8], post: &PostResponse) -> Result<DecryptedPost> {
@@ -287,16 +252,6 @@ impl AccountSpaceCtx {
             post_key,
             caption_plaintext,
         })
-    }
-
-    pub fn decrypt_blur_hash(
-        &self,
-        post_key: &[u8],
-        object: &PostObjectPayload,
-    ) -> Result<Option<String>> {
-        Ok(self
-            .decrypt_post_object_metadata(post_key, object)?
-            .and_then(|metadata| metadata.blur_hash))
     }
 
     pub fn decrypt_post_object_metadata(

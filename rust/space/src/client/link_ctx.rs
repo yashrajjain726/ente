@@ -160,22 +160,19 @@ impl SpaceLinkCtx {
 
     pub async fn decrypt_post_key_fields(
         &self,
-        post_id: i64,
         encrypted_post_key: &str,
         key_version: i32,
     ) -> Result<Vec<u8>> {
         let space_key = self
             .resolve_space_key_for_version(Some(key_version))
             .await?
-            .ok_or_else(|| {
-                SpaceError::InvalidInput(format!("missing space key for post {post_id}"))
-            })?;
+            .ok_or_else(|| SpaceError::InvalidInput("missing space key for post".into()))?;
         let packed = decode_b64(encrypted_post_key)?;
         decrypt_secretbox_payload(&space_key, &packed)
     }
 
     pub async fn decrypt_post_key(&self, post: &PostResponse) -> Result<Vec<u8>> {
-        self.decrypt_post_key_fields(post.post_id, &post.encrypted_post_key, post.key_version)
+        self.decrypt_post_key_fields(&post.encrypted_post_key, post.key_version)
             .await
     }
 
@@ -226,13 +223,12 @@ impl SpaceLinkCtx {
 
     pub async fn download_post_asset_with_key(
         &self,
-        post_id: i64,
         encrypted_post_key: &str,
         key_version: i32,
         object_key: &str,
     ) -> Result<Vec<u8>> {
         let post_key = self
-            .decrypt_post_key_fields(post_id, encrypted_post_key, key_version)
+            .decrypt_post_key_fields(encrypted_post_key, key_version)
             .await?;
         self.download_decrypted_asset(object_key, &post_key).await
     }

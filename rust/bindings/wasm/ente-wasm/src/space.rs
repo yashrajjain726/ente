@@ -913,7 +913,6 @@ impl SpaceAccountCtxHandle {
     pub async fn download_post_asset_with_key(
         &self,
         space_id: String,
-        post_id: i64,
         encrypted_post_key: String,
         key_version: i32,
         viewer_space_id: Option<String>,
@@ -922,7 +921,6 @@ impl SpaceAccountCtxHandle {
         self.inner
             .download_post_asset_with_key(
                 &space_id,
-                post_id,
                 &encrypted_post_key,
                 key_version,
                 viewer_space_id.as_deref(),
@@ -1303,13 +1301,12 @@ impl SpaceLinkCtxHandle {
     /// Download and decrypt one object from an already fetched public space post.
     pub async fn download_post_asset_with_key(
         &self,
-        post_id: i64,
         encrypted_post_key: String,
         key_version: i32,
         object_key: String,
     ) -> Result<Vec<u8>, WasmSpaceError> {
         self.inner
-            .download_post_asset_with_key(post_id, &encrypted_post_key, key_version, &object_key)
+            .download_post_asset_with_key(&encrypted_post_key, key_version, &object_key)
             .await
             .map_err(Into::into)
     }
