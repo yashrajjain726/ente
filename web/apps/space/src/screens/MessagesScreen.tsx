@@ -477,7 +477,7 @@ const ConversationListItem: React.FC<{
                     />
                     {unreadCount > 0 && !isFriendRequest && (
                         <Box
-                            aria-label={`${unreadCount} unread message${unreadCount == 1 ? "" : "s"}`}
+                            aria-label={`${unreadCount} unread update${unreadCount == 1 ? "" : "s"}`}
                             component="span"
                             sx={{
                                 alignItems: "center",

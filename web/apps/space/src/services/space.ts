@@ -750,15 +750,15 @@ const messageActivityFromSpaceActivity = async (
     };
 };
 
-export const isChatUnreadMessageActivity = (activity: SpaceMessageActivity) =>
-    activity.type == "message" || activity.type == "post_reply";
-
 export const isPassiveAutoReadMessageActivity = (
     activity: SpaceMessageActivity,
 ) =>
     activity.type == "friend_added" ||
     activity.type == "message_like" ||
     activity.type == "post_like";
+
+const isConversationBadgeActivity = (activity: SpaceMessageActivity) =>
+    activity.type != "friend_added";
 
 export const joinSpaceInvite = async ({
     spaceUsername,
@@ -1203,7 +1203,7 @@ export const loadCurrentMessageConversations = async (
                       )
                     : [];
                 const unreadCount = unreadActivities.filter(
-                    isChatUnreadMessageActivity,
+                    isConversationBadgeActivity,
                 ).length;
                 return {
                     friend,
