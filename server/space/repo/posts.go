@@ -332,52 +332,6 @@ func (r *PostsRepository) SetLikeWithCreated(ctx context.Context, postID int64, 
 	return affected > 0, nil
 }
 
-func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, cursor string, limit int) ([]SpacePostLikerRecord, string, error) {
-	limit = optionalInt(limit, 50)
-	if limit > 100 {
-		limit = 100
-	}
-	args := []any{postID}
-	query := `
-		SELECT ` + spaceActorSelectColumns("liker_space", "liker_avatar", "liker") + `,
-		       m.created_at
-		FROM space_messages m
-		JOIN spaces liker_space ON liker_space.space_id = m.sender_space_id
-		` + spaceActorAvatarJoin("liker_space", "liker_avatar") + `
-		WHERE m.kind = 'post_like'
-		  AND m.reply_post_id = $1`
-	if cursorCreatedAt, cursorActorSpaceID, ok := parsePostLikerCursor(cursor); ok {
-		args = append(args, cursorCreatedAt, cursorActorSpaceID)
-		query += ` AND (m.created_at, m.sender_space_id) < ($2, $3)`
-	}
-	args = append(args, limit+1)
-	query += ` ORDER BY m.created_at DESC, m.sender_space_id DESC LIMIT $` + strconv.Itoa(len(args))
-	rows, err := r.DB.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, "", stacktrace.Propagate(err, "")
-	}
-	defer rows.Close()
-	out := make([]SpacePostLikerRecord, 0, limit+1)
-	for rows.Next() {
-		var rec SpacePostLikerRecord
-		dest := spaceActorScanDest(&rec.Actor)
-		dest = append(dest, &rec.CreatedAt)
-		if err := rows.Scan(dest...); err != nil {
-			return nil, "", stacktrace.Propagate(err, "")
-		}
-		out = append(out, rec)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, "", stacktrace.Propagate(err, "")
-	}
-	nextCursor := ""
-	if len(out) > limit {
-		nextCursor = formatPostLikerCursor(out[limit-1])
-		out = out[:limit]
-	}
-	return out, nextCursor, nil
-}
-
 func (r *PostsRepository) UpdateCaption(ctx context.Context, postID int64, spaceID string, captionCipher []byte) error {
 	caption := []byte{}
 	if captionCipher != nil {
@@ -432,26 +386,6 @@ func parsePostCursor(cursor string) (int64, int64, bool) {
 
 func formatPostCursor(post SpacePostRecord) string {
 	return strconv.FormatInt(post.CreatedAt, 10) + ":" + strconv.FormatInt(post.PostID, 10)
-}
-
-func parsePostLikerCursor(cursor string) (int64, string, bool) {
-	createdAtText, actorSpaceID, ok := strings.Cut(strings.TrimSpace(cursor), ":")
-	if !ok {
-		return 0, "", false
-	}
-	createdAt, err := strconv.ParseInt(createdAtText, 10, 64)
-	if err != nil || createdAt <= 0 {
-		return 0, "", false
-	}
-	actorSpaceID = strings.TrimSpace(actorSpaceID)
-	if actorSpaceID == "" {
-		return 0, "", false
-	}
-	return createdAt, actorSpaceID, true
-}
-
-func formatPostLikerCursor(liker SpacePostLikerRecord) string {
-	return strconv.FormatInt(liker.CreatedAt, 10) + ":" + liker.Actor.SpaceID
 }
 
 func inClause(format string, ids []int64, offset int) (string, []any) {

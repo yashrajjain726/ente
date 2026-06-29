@@ -2324,39 +2324,6 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	require.False(t, notificationsUnread)
 }
 
-func TestListPostLikersPaginates(t *testing.T) {
-	ctx := context.Background()
-	module := newSpaceTestModule(t)
-
-	aliceID := insertSpaceUser(t, module, "alice@example.com", "alice-public")
-	bobID := insertSpaceUser(t, module, "bob@example.com", "bob-public")
-	charlieID := insertSpaceUser(t, module, "charlie@example.com", "charlie-public")
-	aliceSpace, err := testCreateSpace(ctx, module, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
-	require.NoError(t, err)
-	bobSpace, err := testCreateSpace(ctx, module, bobID, "bob", "bob-space-key", "bob-public", "bob-secret", "bob-secret-nonce", "bob-profile")
-	require.NoError(t, err)
-	charlieSpace, err := testCreateSpace(ctx, module, charlieID, "charlie", "charlie-space-key", "charlie-public", "charlie-secret", "charlie-secret-nonce", "charlie-profile")
-	require.NoError(t, err)
-	postID, err := testCreatePost(ctx, module, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
-	require.NoError(t, err)
-	require.NoError(t, testSetPostLike(ctx, module, postID, bobSpace.SpaceID, true))
-	require.NoError(t, testSetPostLike(ctx, module, postID, charlieSpace.SpaceID, true))
-	setPostLikeCreatedAt(t, module, 3000, postID, bobSpace.SpaceID)
-	setPostLikeCreatedAt(t, module, 2000, postID, charlieSpace.SpaceID)
-
-	page, nextCursor, err := module.Posts.ListPostLikers(ctx, postID, "", 1)
-	require.NoError(t, err)
-	require.Len(t, page, 1)
-	require.Equal(t, bobSpace.SpaceID, page[0].Actor.SpaceID)
-	require.Equal(t, "3000:"+bobSpace.SpaceID, nextCursor)
-
-	page, nextCursor, err = module.Posts.ListPostLikers(ctx, postID, nextCursor, 1)
-	require.NoError(t, err)
-	require.Len(t, page, 1)
-	require.Equal(t, charlieSpace.SpaceID, page[0].Actor.SpaceID)
-	require.Empty(t, nextCursor)
-}
-
 func ptr(value string) *string {
 	return &value
 }

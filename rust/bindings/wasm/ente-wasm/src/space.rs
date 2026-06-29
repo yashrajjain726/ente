@@ -171,20 +171,6 @@ struct PostPageJs {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct PostLikerJs {
-    actor: ActorJs,
-    created_at: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct PostLikerPageJs {
-    likers: Vec<PostLikerJs>,
-    next_cursor: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
 struct MessageQuoteJs {
     post_id: i64,
     space_id: String,
@@ -1049,39 +1035,6 @@ impl SpaceAccountCtxHandle {
         swb::to_value(&self.inner.like_post(&space_id, post_id, like).await?).map_err(Into::into)
     }
 
-    /// List people who liked a post.
-    pub async fn list_post_likers(
-        &self,
-        space_id: String,
-        post_id: i64,
-        viewer_space_id: Option<String>,
-        cursor: Option<String>,
-        limit: Option<i32>,
-    ) -> Result<JsValue, WasmSpaceError> {
-        let page = self
-            .inner
-            .list_post_likers(
-                &space_id,
-                post_id,
-                viewer_space_id.as_deref(),
-                cursor,
-                limit,
-            )
-            .await?;
-        let mut likers = Vec::with_capacity(page.likers.len());
-        for liker in page.likers {
-            likers.push(PostLikerJs {
-                actor: account_actor_to_js(&self.inner, liker.actor).await?,
-                created_at: liker.created_at,
-            });
-        }
-        swb::to_value(&PostLikerPageJs {
-            likers,
-            next_cursor: page.next_cursor,
-        })
-        .map_err(Into::into)
-    }
-
     /// Send a regular 1:1 message to a friend space.
     pub async fn send_message(
         &self,
@@ -1419,27 +1372,5 @@ impl SpaceLinkCtxHandle {
             .download_profile_asset("cover", &object_id)
             .await
             .map_err(Into::into)
-    }
-
-    /// List people who liked a post.
-    pub async fn list_post_likers(
-        &self,
-        post_id: i64,
-        cursor: Option<String>,
-        limit: Option<i32>,
-    ) -> Result<JsValue, WasmSpaceError> {
-        let page = self.inner.list_post_likers(post_id, cursor, limit).await?;
-        let mut likers = Vec::with_capacity(page.likers.len());
-        for liker in page.likers {
-            likers.push(PostLikerJs {
-                actor: link_actor_to_js(&self.inner, liker.actor).await?,
-                created_at: liker.created_at,
-            });
-        }
-        swb::to_value(&PostLikerPageJs {
-            likers,
-            next_cursor: page.next_cursor,
-        })
-        .map_err(Into::into)
     }
 }

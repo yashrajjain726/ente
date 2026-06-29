@@ -536,21 +536,6 @@ pub struct FriendShareResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PostLikerResponse {
-    pub actor: SpaceActorResponse,
-    pub created_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ListPostLikersResponse {
-    pub likers: Vec<PostLikerResponse>,
-    #[serde(default)]
-    pub next_cursor: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SpaceLinkStatusResponse {
     pub space_id: String,
     pub space_slug: String,

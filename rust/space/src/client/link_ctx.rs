@@ -20,8 +20,8 @@ use std::collections::BTreeMap;
 
 use crate::models::{DecryptedPost, DecryptedSpaceProfile, OpenSpaceLinkCtxInput};
 use crate::transport::{
-    ListPostLikersResponse, PostPage, PostResponse, SpaceActorResponse, SpaceKeyVersionResponse,
-    SpaceLinkLoginRequest, SpaceLinkLoginResponse, SpaceLookupResponse, SpaceProfileResponse,
+    PostPage, PostResponse, SpaceActorResponse, SpaceKeyVersionResponse, SpaceLinkLoginRequest,
+    SpaceLinkLoginResponse, SpaceLookupResponse, SpaceProfileResponse,
 };
 use ente_core::{
     crypto::{decode_b64, encode_b64},
@@ -235,26 +235,6 @@ impl SpaceLinkCtx {
             .decrypt_post_key_fields(post_id, encrypted_post_key, key_version)
             .await?;
         self.download_decrypted_asset(object_key, &post_key).await
-    }
-
-    pub async fn list_post_likers(
-        &self,
-        post_id: i64,
-        cursor: Option<String>,
-        limit: Option<i32>,
-    ) -> Result<ListPostLikersResponse> {
-        let mut query = Vec::new();
-        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
-            query.push(("cursor", value));
-        }
-        if let Some(value) = limit {
-            query.push(("limit", value.to_string()));
-        }
-        let path = format!("/spaces/{}/posts/{post_id}/likes", self.space_id);
-        self.client
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
     }
 
     pub async fn list_space_key_versions(&self) -> Result<Vec<SpaceKeyVersionResponse>> {

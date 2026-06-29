@@ -231,51 +231,6 @@ func (c *PostsController) SetLike(ctx context.Context, actorSpace *repo.SpaceRec
 	return &models.LikePostResponse{Liked: like}, nil
 }
 
-func (c *PostsController) ListLikers(ctx *gin.Context, postID int64, req models.ListPostLikersRequest) (*models.ListPostLikersResponse, error) {
-	viewer, err := c.auth.resolveViewer(ctx, req.ViewerSpaceID)
-	if err != nil {
-		return nil, err
-	}
-	viewerSpaceID := ""
-	if viewer != nil {
-		viewerSpaceID = viewer.SpaceID
-	}
-	post, err := c.PostsRepo.GetPost(ctx, postID, viewerSpaceID)
-	if err != nil {
-		return nil, err
-	}
-	if strings.TrimSpace(req.SpaceID) != "" && post.SpaceID != strings.TrimSpace(req.SpaceID) {
-		return nil, ente.ErrNotFound
-	}
-	space, err := c.SpacesRepo.GetSpaceByID(ctx, post.SpaceID)
-	if err != nil {
-		return nil, err
-	}
-	if err := c.auth.canViewSpace(ctx, viewer, space); err != nil {
-		return nil, err
-	}
-	likers, nextCursor, err := c.PostsRepo.ListPostLikers(ctx, postID, req.Cursor, req.Limit)
-	if err != nil {
-		return nil, err
-	}
-	resp := make([]models.PostLikerResponse, 0, len(likers))
-	actors := make([]repo.SpaceActorRecord, 0, len(likers))
-	for _, liker := range likers {
-		actors = append(actors, liker.Actor)
-	}
-	visible, err := actorVisibility(ctx, c.auth, viewer, actors...)
-	if err != nil {
-		return nil, err
-	}
-	for _, liker := range likers {
-		resp = append(resp, models.PostLikerResponse{
-			Actor:     toActorResponse(liker.Actor, visibleActor(visible, liker.Actor)),
-			CreatedAt: formatMicros(liker.CreatedAt),
-		})
-	}
-	return &models.ListPostLikersResponse{Likers: resp, NextCursor: nextCursor}, nil
-}
-
 func (c *PostsController) Delete(ctx context.Context, space *repo.SpaceRecord, postID int64) error {
 	_, err := c.PostsRepo.DeletePost(ctx, postID, space.SpaceID)
 	return err

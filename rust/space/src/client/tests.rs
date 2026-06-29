@@ -1552,51 +1552,6 @@ fn message_payload_limits_reject_oversized_text_and_payload() {
 }
 
 #[tokio::test]
-async fn list_post_likers_uses_post_likes_endpoint() {
-    let mut server = Server::new_async().await;
-    let ctx = test_account_ctx(&server.url());
-    let likers = server
-        .mock("GET", "/spaces/space_owner_main/posts/42/likes")
-        .match_header("x-space-session-token", "space-session-token")
-        .match_query(Matcher::AllOf(vec![
-            Matcher::UrlEncoded("viewerSpaceId".into(), "space_owner_main".into()),
-            Matcher::UrlEncoded("cursor".into(), "3000:7".into()),
-            Matcher::UrlEncoded("limit".into(), "5".into()),
-        ]))
-        .with_status(200)
-        .with_body(
-            json!({
-                "likers": [{
-                    "actor": {
-                        "spaceId": "space_liker",
-                        "spaceSlug": "liker"
-                    },
-                    "createdAt": "2026-04-16T00:00:00Z"
-                }],
-                "nextCursor": "2000:8"
-            })
-            .to_string(),
-        )
-        .create_async()
-        .await;
-
-    let response = ctx
-        .list_post_likers(
-            "space_owner_main",
-            42,
-            Some("space_owner_main"),
-            Some("3000:7".to_owned()),
-            Some(5),
-        )
-        .await
-        .expect("likers should load");
-
-    assert_eq!(response.likers[0].actor.space_id, "space_liker");
-    assert_eq!(response.next_cursor, "2000:8");
-    likers.assert_async().await;
-}
-
-#[tokio::test]
 async fn list_space_friends_uses_space_friends_endpoint() {
     let mut server = Server::new_async().await;
     let ctx = test_account_ctx(&server.url());
@@ -1655,35 +1610,6 @@ async fn get_relationship_uses_relationship_endpoint() {
 
     assert_eq!(response.relationship, "friend");
     relationship.assert_async().await;
-}
-
-#[tokio::test]
-async fn space_link_list_post_likers_uses_session_token() {
-    let mut server = Server::new_async().await;
-    let ctx = space_link_ctx_for_test(
-        &server.url(),
-        "link-session-token",
-        "space_owner_main",
-        "owner-main",
-        Vec::new(),
-        generate_key(),
-        1,
-    );
-    let likers = server
-        .mock("GET", "/spaces/space_owner_main/posts/42/likes")
-        .match_header("x-auth-token", "link-session-token")
-        .with_status(200)
-        .with_body(json!({"likers": [], "nextCursor": ""}).to_string())
-        .create_async()
-        .await;
-
-    let response = ctx
-        .list_post_likers(42, None, None)
-        .await
-        .expect("link likers should load");
-
-    assert!(response.likers.is_empty());
-    likers.assert_async().await;
 }
 
 #[tokio::test]

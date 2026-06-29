@@ -38,13 +38,6 @@ type ListFeedRequest struct {
 	Limit  int    `form:"limit"`
 }
 
-type ListPostLikersRequest struct {
-	SpaceID       string `form:"spaceId"`
-	ViewerSpaceID string `form:"viewerSpaceId"`
-	Cursor        string `form:"cursor"`
-	Limit         int    `form:"limit"`
-}
-
 type GetPostRequest struct {
 	SpaceID       string `form:"spaceId"`
 	ViewerSpaceID string `form:"viewerSpaceId"`
@@ -273,16 +266,6 @@ type CreatePostResponse struct {
 
 type LikePostResponse struct {
 	Liked bool `json:"liked"`
-}
-
-type ListPostLikersResponse struct {
-	Likers     []PostLikerResponse `json:"likers"`
-	NextCursor string              `json:"nextCursor,omitempty"`
-}
-
-type PostLikerResponse struct {
-	Actor     SpaceActorResponse `json:"actor"`
-	CreatedAt string             `json:"createdAt"`
 }
 
 type UpdatePostCaptionRequest struct {

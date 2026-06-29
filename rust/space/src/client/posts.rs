@@ -14,9 +14,8 @@ use crate::crypto::{decrypt_secretbox_payload, encrypt_secretbox_payload, genera
 use crate::error::{Result, SpaceError};
 use crate::models::{DecryptedPost, FeedItem, FeedPage, HydratedKeys, PostObjectMetadata};
 use crate::transport::{
-    CreatePostRequest, CreatePostResponse, LikePostResponse, ListPostLikersResponse,
-    PostObjectPayload, PostPage, PostResponse, SpaceActorResponse, SpaceUnreadStatusResponse,
-    UpdatePostCaptionRequest,
+    CreatePostRequest, CreatePostResponse, LikePostResponse, PostObjectPayload, PostPage,
+    PostResponse, SpaceActorResponse, SpaceUnreadStatusResponse, UpdatePostCaptionRequest,
 };
 use ente_core::crypto::{decode_b64, encode_b64};
 
@@ -411,30 +410,5 @@ impl AccountSpaceCtx {
                 .await
                 .map_err(Into::into)
         }
-    }
-
-    pub async fn list_post_likers(
-        &self,
-        space_id: &str,
-        post_id: i64,
-        viewer_space_id: Option<&str>,
-        cursor: Option<String>,
-        limit: Option<i32>,
-    ) -> Result<ListPostLikersResponse> {
-        let mut query = Vec::new();
-        if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
-            query.push(("viewerSpaceId", value.to_owned()));
-        }
-        if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
-            query.push(("cursor", value));
-        }
-        if let Some(value) = limit {
-            query.push(("limit", value.to_string()));
-        }
-        let path = format!("/spaces/{space_id}/posts/{post_id}/likes");
-        self.client()
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
     }
 }

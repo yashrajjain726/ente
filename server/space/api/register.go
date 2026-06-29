@@ -46,7 +46,6 @@ func Register(privateAPI, publicAPI gin.IRouter, handlers *Handlers) {
 	publicAPI.GET("/spaces/:spaceID/assets/redirect", handlers.AssetRedirect)
 	publicAPI.GET("/spaces/:spaceID/posts", handlers.ListPosts)
 	publicAPI.GET("/spaces/:spaceID/posts/:postID", handlers.GetPost)
-	publicAPI.GET("/spaces/:spaceID/posts/:postID/likes", handlers.ListPostLikers)
 	publicAPI.GET("/spaces/:spaceID/versions", handlers.ListSpaceKeyVersions)
 	publicAPI.GET("/space/public/by-slug/:spaceSlug", handlers.LookupSpaceBySlug)
 	publicAPI.GET("/space/public/slug-availability/:spaceSlug", handlers.SpaceSlugAvailability)

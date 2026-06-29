@@ -119,11 +119,6 @@ type SpaceTempObjectRecord struct {
 	CreatedAt    int64
 }
 
-type SpacePostLikerRecord struct {
-	Actor     SpaceActorRecord
-	CreatedAt int64
-}
-
 type SpaceMessageRecord struct {
 	MessageID           string
 	Kind                string

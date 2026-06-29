@@ -93,20 +93,6 @@ func (h *Handlers) setPostLike(c *gin.Context, like bool) {
 	respondJSON(c, resp, err)
 }
 
-func (h *Handlers) ListPostLikers(c *gin.Context) {
-	var req models.ListPostLikersRequest
-	if !bindQuery(c, &req) {
-		return
-	}
-	req.SpaceID = c.Param("spaceID")
-	postID, ok := positiveInt64Param(c, "postID")
-	if !ok {
-		return
-	}
-	resp, err := h.Module.Posts.ListLikers(c, postID, req)
-	respondJSON(c, resp, err)
-}
-
 func (h *Handlers) DeletePost(c *gin.Context) {
 	space, ok := selectedSpace(h, c)
 	if !ok {
