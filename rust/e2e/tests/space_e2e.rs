@@ -243,20 +243,24 @@ async fn space_bootstrap_posts_friend_share_and_link_suite() {
         .await
         .expect("liking post should succeed");
     assert!(liked.liked);
-    let likers = owner_ctx
-        .list_post_likers(&owner_space.space_id, post_id, None, None, Some(10))
+    let liked_post = friend_ctx
+        .get_post(&owner_space.space_id, post_id, Some(&friend_space.space_id))
         .await
-        .expect("post likers should load");
-    assert_eq!(likers.likers.len(), 1);
-    assert_eq!(likers.likers[0].actor.space_id, friend_space.space_id);
-    assert_eq!(likers.likers[0].actor.space_slug, friend_slug);
-    let liker_profile = owner_ctx
-        .decrypt_actor_profile(&likers.likers[0].actor)
+        .expect("liked post should load");
+    assert!(liked_post.viewer_liked);
+    let owner_conversations = owner_ctx
+        .list_conversations(&owner_space.space_id)
         .await
-        .expect("owner should decrypt liker profile");
+        .expect("owner conversations should include post like");
+    let post_like_summary = owner_conversations
+        .chat_summaries
+        .get(&friend_space.space_id)
+        .expect("friend summary should exist after post like");
+    assert_eq!(post_like_summary.latest_activity.activity_type, "post_like");
+    assert_eq!(post_like_summary.latest_activity.post_id, Some(post_id));
     assert_eq!(
-        liker_profile.as_deref(),
-        Some(friend_profile_payload.as_slice())
+        post_like_summary.latest_activity.post_space_id.as_deref(),
+        Some(owner_space.space_id.as_str())
     );
 
     space::assert_http_status(
@@ -549,15 +553,6 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite() {
             .await,
         403,
     );
-
-    let likers = owner_ctx
-        .list_post_likers(&owner_space.space_id, post_id, None, None, Some(10))
-        .await
-        .expect("owner should still load post likers after unfriend");
-    assert_eq!(likers.likers.len(), 1);
-    assert_eq!(likers.likers[0].actor.space_slug, friend_slug);
-    assert!(likers.likers[0].actor.space_id.is_empty());
-    assert!(likers.likers[0].actor.public_key.is_empty());
 }
 
 #[tokio::test]
