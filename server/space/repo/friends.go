@@ -443,7 +443,7 @@ func (r *FriendsRepository) DeleteFriendship(ctx context.Context, actorSpaceID s
 
 func (r *FriendsRepository) GetShareForFriendAndSpace(ctx context.Context, friendSpaceID string, spaceID string) (*SpaceShareRecord, error) {
 	return scanShareRecord(r.DB.QueryRowContext(ctx, `
-		SELECT s.space_id, w.space_slug, s.friend_sealed_space_key, s.key_version, s.created_at, w.public_key
+		SELECT s.space_id, w.space_slug, s.friend_sealed_space_key, s.key_version, s.created_at
 		FROM space_friend_shares s
 		JOIN spaces w ON w.space_id = s.space_id
 		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
@@ -453,7 +453,7 @@ func (r *FriendsRepository) GetShareForFriendAndSpace(ctx context.Context, frien
 
 func (r *FriendsRepository) ListSharesForFriendAndSpace(ctx context.Context, friendSpaceID string) ([]SpaceShareRecord, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT s.space_id, w.space_slug, s.friend_sealed_space_key, s.key_version, s.created_at, w.public_key
+		SELECT s.space_id, w.space_slug, s.friend_sealed_space_key, s.key_version, s.created_at
 		FROM space_friend_shares s
 		JOIN spaces w ON w.space_id = s.space_id
 		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
@@ -589,7 +589,7 @@ func (r *FriendsRepository) GetRelationship(ctx context.Context, viewerSpaceID s
 
 func scanShareRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceShareRecord, error) {
 	var rec SpaceShareRecord
-	if err := scanner.Scan(&rec.SpaceID, &rec.SpaceSlug, &rec.FriendSealedSpaceKey, &rec.KeyVersion, &rec.CreatedAt, &rec.PublicKey); err != nil {
+	if err := scanner.Scan(&rec.SpaceID, &rec.SpaceSlug, &rec.FriendSealedSpaceKey, &rec.KeyVersion, &rec.CreatedAt); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil

@@ -181,7 +181,6 @@ type SpaceShareRecord struct {
 	FriendSealedSpaceKey []byte
 	KeyVersion           int
 	CreatedAt            int64
-	PublicKey            []byte
 }
 
 type SpaceShareUpdateRecord struct {
