@@ -21,12 +21,13 @@ impl AccountSpaceCtx {
         space_id: &str,
         viewer_space_id: Option<&str>,
     ) -> Result<Vec<SpaceKeyVersionResponse>> {
-        let mut query = vec![("spaceId", space_id.to_owned())];
+        let mut query = Vec::new();
         if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
             query.push(("viewerSpaceId", value.to_owned()));
         }
+        let path = format!("/spaces/{space_id}/versions");
         self.client()
-            .get_json("/space/versions", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }

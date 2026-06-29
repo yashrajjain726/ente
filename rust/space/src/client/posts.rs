@@ -14,9 +14,9 @@ use crate::crypto::{decrypt_secretbox_payload, encrypt_secretbox_payload, genera
 use crate::error::{Result, SpaceError};
 use crate::models::{DecryptedPost, FeedItem, FeedPage, HydratedKeys, PostObjectMetadata};
 use crate::transport::{
-    CreatePostRequest, CreatePostResponse, LikePostRequest, LikePostResponse,
-    ListPostLikersResponse, MarkNotificationsReadRequest, PostObjectPayload, PostPage,
-    PostResponse, SpaceActorResponse, SpaceUnreadStatusResponse, UpdatePostCaptionRequest,
+    CreatePostRequest, CreatePostResponse, LikePostResponse, ListPostLikersResponse,
+    PostObjectPayload, PostPage, PostResponse, SpaceActorResponse, SpaceUnreadStatusResponse,
+    UpdatePostCaptionRequest,
 };
 use ente_core::crypto::{decode_b64, encode_b64};
 
@@ -71,7 +71,7 @@ impl AccountSpaceCtx {
         cursor: Option<String>,
         limit: Option<i32>,
     ) -> Result<PostPage> {
-        let mut query = vec![("spaceId", space_id.to_owned())];
+        let mut query = Vec::new();
         if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
             query.push(("viewerSpaceId", value.to_owned()));
         }
@@ -81,8 +81,9 @@ impl AccountSpaceCtx {
         if let Some(value) = limit {
             query.push(("limit", value.to_string()));
         }
+        let path = format!("/spaces/{space_id}/posts");
         self.client()
-            .get_json("/space/posts", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }
@@ -127,19 +128,20 @@ impl AccountSpaceCtx {
                 "friend space id is required".into(),
             ));
         }
-        let path = format!("/spaces/{space_id}/messages/read");
+        let path = format!("/spaces/{space_id}/friends/{friend_space_id}/read");
         self.client()
-            .post_json(&path, &MarkNotificationsReadRequest { friend_space_id })
+            .post_json(&path, &serde_json::json!({}))
             .await
             .map_err(Into::into)
     }
 
     pub async fn get_post(
         &self,
+        space_id: &str,
         post_id: i64,
         viewer_space_id: Option<&str>,
     ) -> Result<PostResponse> {
-        let path = format!("/space/posts/{post_id}");
+        let path = format!("/spaces/{space_id}/posts/{post_id}");
         let mut query = Vec::new();
         if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
             query.push(("viewerSpaceId", value.to_owned()));
@@ -152,21 +154,23 @@ impl AccountSpaceCtx {
 
     pub async fn fetch_post_decrypted(
         &self,
+        space_id: &str,
         post_id: i64,
         viewer_space_id: Option<&str>,
     ) -> Result<DecryptedPost> {
-        let post = self.get_post(post_id, viewer_space_id).await?;
+        let post = self.get_post(space_id, post_id, viewer_space_id).await?;
         self.decrypt_post_for_viewer(&post.space_id, viewer_space_id, &post)
             .await
     }
 
     pub async fn download_post_asset(
         &self,
+        space_id: &str,
         post_id: i64,
         viewer_space_id: Option<&str>,
         object_key: &str,
     ) -> Result<Vec<u8>> {
-        let post = self.get_post(post_id, viewer_space_id).await?;
+        let post = self.get_post(space_id, post_id, viewer_space_id).await?;
         let decrypted = self
             .decrypt_post_for_viewer(&post.space_id, viewer_space_id, &post)
             .await?;
@@ -396,15 +400,22 @@ impl AccountSpaceCtx {
         like: bool,
     ) -> Result<LikePostResponse> {
         let path = format!("/spaces/{space_id}/posts/{post_id}/like");
-        let request = LikePostRequest { like };
-        self.client()
-            .post_json(&path, &request)
-            .await
-            .map_err(Into::into)
+        if like {
+            self.client()
+                .put_json(&path, &serde_json::json!({}))
+                .await
+                .map_err(Into::into)
+        } else {
+            self.client()
+                .delete_json(&path, &[])
+                .await
+                .map_err(Into::into)
+        }
     }
 
     pub async fn list_post_likers(
         &self,
+        space_id: &str,
         post_id: i64,
         viewer_space_id: Option<&str>,
         cursor: Option<String>,
@@ -420,7 +431,7 @@ impl AccountSpaceCtx {
         if let Some(value) = limit {
             query.push(("limit", value.to_string()));
         }
-        let path = format!("/space/posts/{post_id}/likes");
+        let path = format!("/spaces/{space_id}/posts/{post_id}/likes");
         self.client()
             .get_json(&path, &query)
             .await

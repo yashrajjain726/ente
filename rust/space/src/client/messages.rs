@@ -16,8 +16,8 @@ use crate::crypto::{
 use crate::error::{Result, SpaceError};
 use crate::models::{DecryptedMessage, MessagePayload, MessageQuote};
 use crate::transport::{
-    ConversationsResponse, CreateMessageRequest, LikeMessageRequest, LikeMessageResponse,
-    MessagePage, MessageResponse, SpaceActorResponse,
+    ConversationsResponse, CreateMessageRequest, LikeMessageResponse, MessagePage, MessageResponse,
+    SpaceActorResponse,
 };
 use ente_core::crypto::{decode_b64, encode_b64};
 
@@ -41,7 +41,7 @@ impl AccountSpaceCtx {
         if let Some(value) = limit {
             query.push(("limit", value.to_string()));
         }
-        let path = format!("/spaces/{viewer_space_id}/messages/{space_id}");
+        let path = format!("/spaces/{viewer_space_id}/friends/{space_id}/messages");
         self.client()
             .get_json(&path, &query)
             .await
@@ -66,7 +66,7 @@ impl AccountSpaceCtx {
         let request = self
             .message_request_for_payload(sender_space_id, &friend.public_key, &payload, None)
             .await?;
-        let path = format!("/spaces/{sender_space_id}/messages/{space_id}");
+        let path = format!("/spaces/{sender_space_id}/friends/{space_id}/messages");
         self.client()
             .post_json(&path, &request)
             .await
@@ -101,7 +101,7 @@ impl AccountSpaceCtx {
                 Some(reply_message_id),
             )
             .await?;
-        let path = format!("/spaces/{sender_space_id}/messages/{space_id}");
+        let path = format!("/spaces/{sender_space_id}/friends/{space_id}/messages");
         self.client()
             .post_json(&path, &request)
             .await
@@ -111,10 +111,13 @@ impl AccountSpaceCtx {
     pub async fn reply_to_post(
         &self,
         sender_space_id: &str,
+        post_space_id: &str,
         post_id: i64,
         text: &str,
     ) -> Result<MessageResponse> {
-        let post = self.get_post(post_id, Some(sender_space_id)).await?;
+        let post = self
+            .get_post(post_space_id, post_id, Some(sender_space_id))
+            .await?;
         if self
             .resolve_owned_space_access(&post.space_id)
             .await?
@@ -196,12 +199,18 @@ impl AccountSpaceCtx {
         if message_id.is_empty() {
             return Err(SpaceError::InvalidInput("message id is required".into()));
         }
-        let request = LikeMessageRequest { like };
-        let path = format!("/spaces/{space_id}/message/{message_id}/like");
-        self.client()
-            .post_json(&path, &request)
-            .await
-            .map_err(Into::into)
+        let path = format!("/spaces/{space_id}/messages/{message_id}/like");
+        if like {
+            self.client()
+                .put_json(&path, &serde_json::json!({}))
+                .await
+                .map_err(Into::into)
+        } else {
+            self.client()
+                .delete_json(&path, &[])
+                .await
+                .map_err(Into::into)
+        }
     }
 
     pub async fn delete_message(&self, space_id: &str, message_id: &str) -> Result<()> {
@@ -209,7 +218,7 @@ impl AccountSpaceCtx {
         if message_id.is_empty() {
             return Err(SpaceError::InvalidInput("message id is required".into()));
         }
-        let path = format!("/spaces/{space_id}/message/{message_id}");
+        let path = format!("/spaces/{space_id}/messages/{message_id}");
         self.client()
             .delete_empty(&path, &[])
             .await

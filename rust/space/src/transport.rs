@@ -113,33 +113,15 @@ pub struct CreatePostResponse {
     pub post_id: i64,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LikePostRequest {
-    pub like: bool,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LikePostResponse {
     pub liked: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MarkNotificationsReadRequest {
-    pub friend_space_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceUnreadStatusResponse {
     pub notifications_unread: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LikeMessageRequest {
-    pub like: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -221,21 +203,11 @@ pub struct MessageConversationActivity {
     #[serde(default)]
     pub outgoing: bool,
     #[serde(default)]
-    pub message: Option<MessageResponse>,
+    pub message_id: Option<String>,
     #[serde(default)]
-    pub post: Option<MessageConversationPost>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MessageConversationPost {
-    pub post_id: i64,
-    pub space_id: String,
-    pub space_slug: String,
+    pub post_id: Option<i64>,
     #[serde(default)]
-    pub is_deleted: bool,
-    #[serde(default)]
-    pub objects: Vec<PostObjectPayload>,
+    pub post_space_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -306,10 +278,6 @@ pub struct SpaceActorResponse {
     pub encrypted_profile: String,
     #[serde(default)]
     pub avatar: Option<ProfileAvatarResponse>,
-    #[serde(default)]
-    pub friends: Option<i64>,
-    #[serde(default)]
-    pub posts: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -476,7 +444,7 @@ mod tests {
     }
 
     #[test]
-    fn conversations_response_deserializes_minimal_embedded_actors() {
+    fn conversations_response_deserializes_thin_activity() {
         let response: ConversationsResponse = serde_json::from_str(
             r#"{
                 "friends":[{"friend":{"spaceId":"space_friend","spaceSlug":"friend-main"},"createdAt":"2026-05-25T00:00:00Z"}],
@@ -487,15 +455,7 @@ mod tests {
                         "id":"message:msg_1",
                         "type":"message",
                         "createdAt":"2026-05-25T00:00:00Z",
-                        "message":{
-                            "messageId":"msg_1",
-                            "kind":"regular",
-                            "sender":{"spaceSlug":"owner-main"},
-                            "recipient":{"spaceSlug":"friend-main"},
-                            "text":"hello",
-                            "createdAt":"2026-05-25T00:00:00Z",
-                            "updatedAt":"2026-05-25T00:00:00Z"
-                        }
+                        "messageId":"msg_1"
                         }
                     }
                 }
@@ -505,15 +465,9 @@ mod tests {
 
         let friend = &response.friends[0];
         assert_eq!(friend.friend.space_slug, "friend-main");
-        let message = response.chat_summaries["space_friend"]
-            .latest_activity
-            .message
-            .as_ref()
-            .expect("latest activity message should be preserved");
-        assert_eq!(message.sender.space_slug, "owner-main");
-        assert_eq!(message.sender.public_key, "");
-        assert_eq!(message.recipient.space_slug, "friend-main");
-        assert_eq!(message.recipient.space_id, "");
+        let activity = &response.chat_summaries["space_friend"].latest_activity;
+        assert_eq!(activity.message_id.as_deref(), Some("msg_1"));
+        assert_eq!(activity.post_id, None);
     }
 }
 

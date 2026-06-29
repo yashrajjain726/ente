@@ -203,15 +203,15 @@ impl AccountSpaceCtx {
         object_id: &str,
     ) -> Result<AssetDownloadResponse> {
         let mut query = vec![
-            ("spaceId", space_id.to_owned()),
             ("assetType", asset_type.to_owned()),
             ("objectID", object_id.to_owned()),
         ];
         if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
             query.push(("viewerSpaceId", value.to_owned()));
         }
+        let path = format!("/spaces/{space_id}/assets/redirect");
         self.client()
-            .get_json("/space/assets/redirect", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }
@@ -241,15 +241,13 @@ impl AccountSpaceCtx {
         viewer_space_id: Option<&str>,
         object_key: &str,
     ) -> Result<AssetDownloadResponse> {
-        let mut query = vec![
-            ("spaceId", space_id.to_owned()),
-            ("objectKey", object_key.to_owned()),
-        ];
+        let mut query = vec![("objectKey", object_key.to_owned())];
         if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
             query.push(("viewerSpaceId", value.to_owned()));
         }
+        let path = format!("/spaces/{space_id}/assets/redirect");
         self.client()
-            .get_json("/space/assets/redirect", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }

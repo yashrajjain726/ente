@@ -275,12 +275,8 @@ async fn space_link_decrypt_post_key_uses_post_version() {
             .expect("wrapped previous key"),
     );
     let versions = server
-        .mock("GET", "/space/versions")
+        .mock("GET", "/spaces/space_owner_gallery/versions")
         .match_header("x-auth-token", "link-token")
-        .match_query(Matcher::UrlEncoded(
-            "spaceId".into(),
-            "space_owner_gallery".into(),
-        ))
         .with_status(200)
         .with_body(
             json!([{
@@ -342,12 +338,9 @@ async fn space_link_download_post_asset_with_key_skips_post_fetch() {
         encrypt_asset_payload(&post_key, b"post-image").expect("asset encryption");
 
     let redirect = server
-        .mock("GET", "/space/assets/redirect")
+        .mock("GET", "/spaces/space_owner_gallery/assets/redirect")
         .match_header("x-auth-token", "link-token")
-        .match_query(Matcher::AllOf(vec![
-            Matcher::UrlEncoded("spaceId".into(), "space_owner_gallery".into()),
-            Matcher::UrlEncoded("objectKey".into(), object_key.into()),
-        ]))
+        .match_query(Matcher::UrlEncoded("objectKey".into(), object_key.into()))
         .with_status(200)
         .with_body(
             json!({
@@ -769,10 +762,9 @@ async fn account_download_profile_avatar_uses_object_id_redirect() {
     let encrypted_asset =
         encrypt_asset_payload(&space_key, b"avatar-image").expect("asset encryption");
     let redirect = server
-        .mock("GET", "/space/assets/redirect")
+        .mock("GET", "/spaces/space_owner_main/assets/redirect")
         .match_header("x-space-session-token", "space-session-token")
         .match_query(Matcher::AllOf(vec![
-            Matcher::UrlEncoded("spaceId".into(), "space_owner_main".into()),
             Matcher::UrlEncoded("assetType".into(), "avatar".into()),
             Matcher::UrlEncoded("objectID".into(), "avatar-object".into()),
         ]))
@@ -816,10 +808,9 @@ async fn space_link_download_profile_cover_uses_object_id_redirect() {
     let encrypted_asset =
         encrypt_asset_payload(&space_key, b"cover-image").expect("asset encryption");
     let redirect = server
-        .mock("GET", "/space/assets/redirect")
+        .mock("GET", "/spaces/space_owner_gallery/assets/redirect")
         .match_header("x-auth-token", "link-token")
         .match_query(Matcher::AllOf(vec![
-            Matcher::UrlEncoded("spaceId".into(), "space_owner_gallery".into()),
             Matcher::UrlEncoded("assetType".into(), "cover".into()),
             Matcher::UrlEncoded("objectID".into(), "cover-object".into()),
         ]))
@@ -1188,12 +1179,8 @@ async fn get_space_profile_decrypted_loads_and_decrypts_profile() {
     let encrypted_profile =
         encode_b64(&encrypt_secretbox_payload(&space_key, b"profile-json").expect("profile wrap"));
     let profile = server
-        .mock("GET", "/space/profile")
+        .mock("GET", "/spaces/space_owner_main/profile")
         .match_header("x-space-session-token", "space-session-token")
-        .match_query(Matcher::UrlEncoded(
-            "spaceId".into(),
-            "space_owner_main".into(),
-        ))
         .with_status(200)
         .with_body(
             json!({
@@ -1369,9 +1356,8 @@ async fn like_post_uses_post_like_endpoint() {
     let mut server = Server::new_async().await;
     let ctx = test_account_ctx(&server.url());
     let like = server
-        .mock("POST", "/spaces/space_owner_main/posts/42/like")
+        .mock("PUT", "/spaces/space_owner_main/posts/42/like")
         .match_header("x-space-session-token", "space-session-token")
-        .match_body(Matcher::JsonString(json!({"like": true}).to_string()))
         .with_status(200)
         .with_body(json!({"liked": true}).to_string())
         .create_async()
@@ -1398,11 +1384,8 @@ async fn unread_methods_use_read_marker_endpoints() {
         .create_async()
         .await;
     let notifications_read = server
-        .mock("POST", "/spaces/space_owner_main/messages/read")
+        .mock("POST", "/spaces/space_owner_main/friends/space_friend/read")
         .match_header("x-space-session-token", "space-session-token")
-        .match_body(Matcher::JsonString(
-            json!({"friendSpaceId": "space_friend"}).to_string(),
-        ))
         .with_status(200)
         .with_body(json!({"notificationsUnread": false}).to_string())
         .create_async()
@@ -1451,7 +1434,10 @@ async fn message_actions_use_message_endpoints() {
         .create_async()
         .await;
     let reply = server
-        .mock("POST", "/spaces/space_owner_main/messages/space_friend")
+        .mock(
+            "POST",
+            "/spaces/space_owner_main/friends/space_friend/messages",
+        )
         .match_header("x-space-session-token", "space-session-token")
         .match_body(Matcher::AllOf(vec![
             Matcher::Regex("\"replyMessageId\":\"wmsg_parent\"".into()),
@@ -1490,15 +1476,14 @@ async fn message_actions_use_message_endpoints() {
         .create_async()
         .await;
     let like = server
-        .mock("POST", "/spaces/space_owner_main/message/wmsg_reply/like")
+        .mock("PUT", "/spaces/space_owner_main/messages/wmsg_reply/like")
         .match_header("x-space-session-token", "space-session-token")
-        .match_body(Matcher::JsonString(json!({"like": true}).to_string()))
         .with_status(200)
         .with_body(json!({"liked": true}).to_string())
         .create_async()
         .await;
     let delete = server
-        .mock("DELETE", "/spaces/space_owner_main/message/wmsg_reply")
+        .mock("DELETE", "/spaces/space_owner_main/messages/wmsg_reply")
         .match_header("x-space-session-token", "space-session-token")
         .with_status(200)
         .create_async()
@@ -1571,7 +1556,7 @@ async fn list_post_likers_uses_post_likes_endpoint() {
     let mut server = Server::new_async().await;
     let ctx = test_account_ctx(&server.url());
     let likers = server
-        .mock("GET", "/space/posts/42/likes")
+        .mock("GET", "/spaces/space_owner_main/posts/42/likes")
         .match_header("x-space-session-token", "space-session-token")
         .match_query(Matcher::AllOf(vec![
             Matcher::UrlEncoded("viewerSpaceId".into(), "space_owner_main".into()),
@@ -1597,6 +1582,7 @@ async fn list_post_likers_uses_post_likes_endpoint() {
 
     let response = ctx
         .list_post_likers(
+            "space_owner_main",
             42,
             Some("space_owner_main"),
             Some("3000:7".to_owned()),
@@ -1684,7 +1670,7 @@ async fn space_link_list_post_likers_uses_session_token() {
         1,
     );
     let likers = server
-        .mock("GET", "/space/posts/42/likes")
+        .mock("GET", "/spaces/space_owner_main/posts/42/likes")
         .match_header("x-auth-token", "link-session-token")
         .with_status(200)
         .with_body(json!({"likers": [], "nextCursor": ""}).to_string())
@@ -2017,10 +2003,9 @@ async fn list_posts_uses_space_posts_page_endpoint() {
     let mut server = Server::new_async().await;
     let ctx = test_account_ctx(&server.url());
     let posts = server
-        .mock("GET", "/space/posts")
+        .mock("GET", "/spaces/space_owner_gallery/posts")
         .match_header("x-space-session-token", "space-session-token")
         .match_query(Matcher::AllOf(vec![
-            Matcher::UrlEncoded("spaceId".into(), "space_owner_gallery".into()),
             Matcher::UrlEncoded("viewerSpaceId".into(), "space_owner_main".into()),
             Matcher::UrlEncoded("cursor".into(), "42".into()),
             Matcher::UrlEncoded("limit".into(), "5".into()),
@@ -2092,7 +2077,7 @@ async fn fetch_post_decrypted_uses_post_by_id_endpoint() {
             .create_async()
             .await;
     let post = server
-            .mock("GET", "/space/posts/42")
+            .mock("GET", "/spaces/space_owner_gallery/posts/42")
             .match_header("x-space-session-token", "space-session-token")
             .with_status(200)
             .with_body(
@@ -2117,7 +2102,7 @@ async fn fetch_post_decrypted_uses_post_by_id_endpoint() {
             .await;
 
     let decrypted = ctx
-        .fetch_post_decrypted(42, None)
+        .fetch_post_decrypted("space_owner_gallery", 42, None)
         .await
         .expect("post should decrypt");
 

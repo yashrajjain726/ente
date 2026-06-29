@@ -8,9 +8,9 @@ use ente_core::{
 };
 use ente_space::{
     AccountSpaceCtx, CreatedSpace, CreatedSpaceLink, DecryptedMessage, DecryptedPost,
-    DecryptedSpaceProfile, MessageConversationActivity, MessageConversationPost, MessageResponse,
-    OpenAccountSpaceCtxInput, OpenSpaceLinkCtxInput, PostResponse, ProfileAvatarResponse,
-    ProfileCoverResponse, SpaceActorResponse, SpaceError as CoreSpaceError, SpaceLinkCtx,
+    DecryptedSpaceProfile, MessageConversationActivity, MessageResponse, OpenAccountSpaceCtxInput,
+    OpenSpaceLinkCtxInput, PostResponse, ProfileAvatarResponse, ProfileCoverResponse,
+    SpaceActorResponse, SpaceError as CoreSpaceError, SpaceLinkCtx,
 };
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen as swb;
@@ -145,8 +145,6 @@ struct ActorJs {
     key_version: i32,
     profile: Option<String>,
     avatar: Option<ProfileAvatarResponse>,
-    friends: Option<i64>,
-    posts: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -232,18 +230,9 @@ struct MessageConversationActivityJs {
     activity_type: String,
     created_at: String,
     outgoing: bool,
-    message: Option<MessageJs>,
-    post: Option<MessageConversationPostJs>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct MessageConversationPostJs {
-    post_id: i64,
-    space_id: String,
-    space_slug: String,
-    is_deleted: bool,
-    objects: Vec<PostObjectJs>,
+    message_id: Option<String>,
+    post_id: Option<i64>,
+    post_space_id: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -364,8 +353,6 @@ fn actor_to_js(
         key_version: actor.key_version,
         profile: optional_utf8_field(profile, "actor profile")?,
         avatar: actor.avatar,
-        friends: actor.friends,
-        posts: actor.posts,
     })
 }
 
@@ -571,7 +558,7 @@ async fn account_message_response_to_js(
     viewer_space_id: &str,
     message: MessageResponse,
 ) -> Result<MessageJs, WasmSpaceError> {
-    if message.kind != "post_like" {
+    if message.kind != "post_like" && message.kind != "friend_added" {
         let decrypted = ctx.decrypt_message(viewer_space_id, &message).await?;
         return account_message_to_js(ctx, message, decrypted).await;
     }
@@ -599,38 +586,18 @@ async fn account_message_response_to_js(
     })
 }
 
-async fn message_conversation_activity_to_js(
-    ctx: &AccountSpaceCtx,
-    viewer_space_id: &str,
+fn message_conversation_activity_to_js(
     activity: MessageConversationActivity,
-) -> Result<MessageConversationActivityJs, WasmSpaceError> {
-    let message = match activity.message {
-        Some(message) => Some(account_message_response_to_js(ctx, viewer_space_id, message).await?),
-        None => None,
-    };
-    Ok(MessageConversationActivityJs {
+) -> MessageConversationActivityJs {
+    MessageConversationActivityJs {
         id: activity.id,
         activity_type: activity.activity_type,
         created_at: activity.created_at,
         outgoing: activity.outgoing,
-        message,
-        post: activity
-            .post
-            .map(message_conversation_post_to_js)
-            .transpose()?,
-    })
-}
-
-fn message_conversation_post_to_js(
-    post: MessageConversationPost,
-) -> Result<MessageConversationPostJs, WasmSpaceError> {
-    Ok(MessageConversationPostJs {
-        post_id: post.post_id,
-        space_id: post.space_id,
-        space_slug: post.space_slug,
-        is_deleted: post.is_deleted,
-        objects: post_objects_to_js(None, post.objects)?,
-    })
+        message_id: activity.message_id,
+        post_id: activity.post_id,
+        post_space_id: activity.post_space_id,
+    }
 }
 
 /// Open an authenticated space context for web.
@@ -974,12 +941,13 @@ impl SpaceAccountCtxHandle {
     /// Fetch one post with its caption decrypted.
     pub async fn get_post(
         &self,
+        space_id: String,
         post_id: i64,
         viewer_space_id: Option<String>,
     ) -> Result<JsValue, WasmSpaceError> {
         let post = self
             .inner
-            .get_post(post_id, viewer_space_id.as_deref())
+            .get_post(&space_id, post_id, viewer_space_id.as_deref())
             .await?;
         let decrypted = self
             .inner
@@ -1021,7 +989,10 @@ impl SpaceAccountCtxHandle {
                 Some(&post_key),
             )
             .await?;
-        let post = self.inner.get_post(post_id, Some(&space_id)).await?;
+        let post = self
+            .inner
+            .get_post(&space_id, post_id, Some(&space_id))
+            .await?;
         let decrypted = self
             .inner
             .decrypt_post_for_viewer(&post.space_id, Some(&space_id), &post)
@@ -1032,12 +1003,13 @@ impl SpaceAccountCtxHandle {
     /// Download and decrypt one object from a space post.
     pub async fn download_post_asset(
         &self,
+        space_id: String,
         post_id: i64,
         viewer_space_id: Option<String>,
         object_key: String,
     ) -> Result<Vec<u8>, WasmSpaceError> {
         self.inner
-            .download_post_asset(post_id, viewer_space_id.as_deref(), &object_key)
+            .download_post_asset(&space_id, post_id, viewer_space_id.as_deref(), &object_key)
             .await
             .map_err(Into::into)
     }
@@ -1130,6 +1102,7 @@ impl SpaceAccountCtxHandle {
     /// List people who liked a post.
     pub async fn list_post_likers(
         &self,
+        space_id: String,
         post_id: i64,
         viewer_space_id: Option<String>,
         cursor: Option<String>,
@@ -1137,7 +1110,13 @@ impl SpaceAccountCtxHandle {
     ) -> Result<JsValue, WasmSpaceError> {
         let page = self
             .inner
-            .list_post_likers(post_id, viewer_space_id.as_deref(), cursor, limit)
+            .list_post_likers(
+                &space_id,
+                post_id,
+                viewer_space_id.as_deref(),
+                cursor,
+                limit,
+            )
             .await?;
         let mut likers = Vec::with_capacity(page.likers.len());
         for liker in page.likers {
@@ -1196,12 +1175,13 @@ impl SpaceAccountCtxHandle {
     pub async fn reply_to_post(
         &self,
         sender_space_id: String,
+        post_space_id: String,
         post_id: i64,
         text: String,
     ) -> Result<JsValue, WasmSpaceError> {
         let message = self
             .inner
-            .reply_to_post(&sender_space_id, post_id, &text)
+            .reply_to_post(&sender_space_id, &post_space_id, post_id, &text)
             .await?;
         let decrypted = self
             .inner
@@ -1265,12 +1245,7 @@ impl SpaceAccountCtxHandle {
             chat_summaries.insert(
                 friend_space_id,
                 ConversationChatSummaryJs {
-                    latest_activity: message_conversation_activity_to_js(
-                        &self.inner,
-                        &space_id,
-                        summary.latest_activity,
-                    )
-                    .await?,
+                    latest_activity: message_conversation_activity_to_js(summary.latest_activity),
                     unread: summary.unread,
                     unread_count: summary.unread_count,
                     notification_unread: summary.notification_unread,
@@ -1318,7 +1293,10 @@ impl SpaceAccountCtxHandle {
         post_id: i64,
         caption: Option<String>,
     ) -> Result<(), WasmSpaceError> {
-        let post = self.inner.get_post(post_id, Some(&space_id)).await?;
+        let post = self
+            .inner
+            .get_post(&space_id, post_id, Some(&space_id))
+            .await?;
         let decrypted_post = self
             .inner
             .decrypt_post_for_viewer(&post.space_id, Some(&space_id), &post)

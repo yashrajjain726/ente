@@ -122,7 +122,7 @@ async fn space_bootstrap_posts_friend_share_and_link_suite() {
         .await
         .expect("post creation should succeed");
     let owner_post = owner_ctx
-        .fetch_post_decrypted(post_id)
+        .fetch_post_decrypted(&owner_space.space_id, post_id, None)
         .await
         .expect("owner should decrypt post");
     assert_eq!(
@@ -148,7 +148,12 @@ async fn space_bootstrap_posts_friend_share_and_link_suite() {
         owner_feed_decrypted.caption_plaintext.as_deref(),
         Some(br#"{"caption":"hello world"}"#.as_slice())
     );
-    space::assert_http_status(owner_ctx.like_post(post_id, true).await, 400);
+    space::assert_http_status(
+        owner_ctx
+            .like_post(&owner_space.space_id, post_id, true)
+            .await,
+        400,
+    );
 
     space::assert_http_status(
         friend_ctx
@@ -234,12 +239,12 @@ async fn space_bootstrap_posts_friend_share_and_link_suite() {
     );
 
     let liked = friend_ctx
-        .like_post(post_id, true)
+        .like_post(&friend_space.space_id, post_id, true)
         .await
         .expect("liking post should succeed");
     assert!(liked.liked);
     let likers = owner_ctx
-        .list_post_likers(post_id, None, Some(10))
+        .list_post_likers(&owner_space.space_id, post_id, None, None, Some(10))
         .await
         .expect("post likers should load");
     assert_eq!(likers.likers.len(), 1);
@@ -254,7 +259,12 @@ async fn space_bootstrap_posts_friend_share_and_link_suite() {
         Some(friend_profile_payload.as_slice())
     );
 
-    space::assert_http_status(outsider_ctx.fetch_post_decrypted(post_id).await, 403);
+    space::assert_http_status(
+        outsider_ctx
+            .fetch_post_decrypted(&owner_space.space_id, post_id, None)
+            .await,
+        403,
+    );
 
     let link_profile = link_ctx
         .get_space_profile_decrypted(None)
@@ -387,7 +397,7 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite() {
         .expect("friend feed should load before unfriend");
     assert!(feed.items.iter().any(|item| item.post_id == post_id));
     friend_ctx
-        .like_post(post_id, true)
+        .like_post(&friend_space.space_id, post_id, true)
         .await
         .expect("friend should like owner post before unfriend");
     let direct_message = friend_ctx
@@ -516,12 +526,32 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite() {
             .await,
         403,
     );
-    space::assert_http_status(friend_ctx.fetch_post_decrypted(post_id).await, 403);
-    space::assert_http_status(friend_ctx.like_post(post_id, true).await, 403);
-    space::assert_http_status(friend_ctx.reply_to_post(post_id, "should fail").await, 403);
+    space::assert_http_status(
+        friend_ctx
+            .fetch_post_decrypted(&owner_space.space_id, post_id, Some(&friend_space.space_id))
+            .await,
+        403,
+    );
+    space::assert_http_status(
+        friend_ctx
+            .like_post(&friend_space.space_id, post_id, true)
+            .await,
+        403,
+    );
+    space::assert_http_status(
+        friend_ctx
+            .reply_to_post(
+                &friend_space.space_id,
+                &owner_space.space_id,
+                post_id,
+                "should fail",
+            )
+            .await,
+        403,
+    );
 
     let likers = owner_ctx
-        .list_post_likers(post_id, None, Some(10))
+        .list_post_likers(&owner_space.space_id, post_id, None, None, Some(10))
         .await
         .expect("owner should still load post likers after unfriend");
     assert_eq!(likers.likers.len(), 1);

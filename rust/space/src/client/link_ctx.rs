@@ -110,12 +110,13 @@ impl SpaceLinkCtx {
         &self,
         version: Option<i32>,
     ) -> Result<SpaceProfileResponse> {
-        let mut query = vec![("spaceId", self.space_id.clone())];
+        let mut query = Vec::new();
         if let Some(value) = version {
             query.push(("version", value.to_string()));
         }
+        let path = format!("/spaces/{}/profile", self.space_id);
         self.client
-            .get_json("/space/profile", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }
@@ -138,21 +139,22 @@ impl SpaceLinkCtx {
     }
 
     pub async fn list_posts(&self, cursor: Option<String>, limit: Option<i32>) -> Result<PostPage> {
-        let mut query = vec![("spaceId", self.space_id.clone())];
+        let mut query = Vec::new();
         if let Some(value) = cursor.filter(|value| !value.trim().is_empty()) {
             query.push(("cursor", value));
         }
         if let Some(value) = limit {
             query.push(("limit", value.to_string()));
         }
+        let path = format!("/spaces/{}/posts", self.space_id);
         self.client
-            .get_json("/space/posts", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }
 
     pub async fn get_post(&self, post_id: i64) -> Result<PostResponse> {
-        let path = format!("/space/posts/{post_id}");
+        let path = format!("/spaces/{}/posts/{post_id}", self.space_id);
         self.client.get_json(&path, &[]).await.map_err(Into::into)
     }
 
@@ -248,7 +250,7 @@ impl SpaceLinkCtx {
         if let Some(value) = limit {
             query.push(("limit", value.to_string()));
         }
-        let path = format!("/space/posts/{post_id}/likes");
+        let path = format!("/spaces/{}/posts/{post_id}/likes", self.space_id);
         self.client
             .get_json(&path, &query)
             .await
@@ -256,9 +258,10 @@ impl SpaceLinkCtx {
     }
 
     pub async fn list_space_key_versions(&self) -> Result<Vec<SpaceKeyVersionResponse>> {
-        let query = vec![("spaceId", self.space_id.clone())];
+        let query = Vec::new();
+        let path = format!("/spaces/{}/versions", self.space_id);
         self.client
-            .get_json("/space/versions", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }
@@ -271,12 +274,10 @@ impl SpaceLinkCtx {
     }
 
     pub async fn get_asset_url(&self, object_key: &str) -> Result<AssetDownloadResponse> {
-        let query = vec![
-            ("spaceId", self.space_id.clone()),
-            ("objectKey", object_key.to_owned()),
-        ];
+        let query = vec![("objectKey", object_key.to_owned())];
+        let path = format!("/spaces/{}/assets/redirect", self.space_id);
         self.client
-            .get_json("/space/assets/redirect", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }
@@ -287,12 +288,12 @@ impl SpaceLinkCtx {
         object_id: &str,
     ) -> Result<AssetDownloadResponse> {
         let query = vec![
-            ("spaceId", self.space_id.clone()),
             ("assetType", asset_type.to_owned()),
             ("objectID", object_id.to_owned()),
         ];
+        let path = format!("/spaces/{}/assets/redirect", self.space_id);
         self.client
-            .get_json("/space/assets/redirect", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }

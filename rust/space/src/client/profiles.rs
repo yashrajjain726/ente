@@ -23,15 +23,16 @@ impl AccountSpaceCtx {
         viewer_space_id: Option<&str>,
         version: Option<i32>,
     ) -> Result<SpaceProfileResponse> {
-        let mut query = vec![("spaceId", space_id.to_owned())];
+        let mut query = Vec::new();
         if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
             query.push(("viewerSpaceId", value.to_owned()));
         }
         if let Some(value) = version {
             query.push(("version", value.to_string()));
         }
+        let path = format!("/spaces/{space_id}/profile");
         self.client()
-            .get_json("/space/profile", &query)
+            .get_json(&path, &query)
             .await
             .map_err(Into::into)
     }
