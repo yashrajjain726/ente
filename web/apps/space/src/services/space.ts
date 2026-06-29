@@ -215,15 +215,10 @@ interface PublicSpaceIdentityResponse {
 export type SpaceMessageKind = SpaceMessageKindResponse;
 
 export interface SpaceMessageQuote {
-    caption?: string;
-    height?: number;
     imageUrl?: string;
     isUnavailable?: boolean;
-    mediaType?: string;
-    objectKey?: string;
     postId: number;
     spaceId: string;
-    width?: number;
 }
 
 export interface SpaceMessage {
@@ -245,15 +240,10 @@ export interface SpaceMessage {
 export type SpaceMessageActivityType = SpaceMessageConversationActivityType;
 
 export interface SpaceMessageActivityPost {
-    height?: number;
     imageUrl?: string;
     isDeleted?: boolean;
-    mediaType?: string;
-    objectKey?: string;
     postId: number;
     spaceId: string;
-    spaceSlug: string;
-    width?: number;
 }
 
 export interface SpaceMessageActivity {
@@ -606,13 +596,8 @@ const messageQuoteFromPostResponse = async (
 ): Promise<SpaceMessageQuote> => {
     const object = firstObject(post);
     const quote: SpaceMessageQuote = {
-        caption: post.caption,
-        height: object?.height,
-        mediaType: object?.mediaType,
-        objectKey: object?.objectKey,
         postId: post.postId,
         spaceId: post.spaceId,
-        width: object?.width,
     };
     if (!includeImage || !object) return quote;
 
@@ -719,11 +704,7 @@ const messageActivityPostFromActivity = (
     if (typeof activity.postId != "number" || !activity.postSpaceId) {
         return undefined;
     }
-    return {
-        postId: activity.postId,
-        spaceId: activity.postSpaceId,
-        spaceSlug: "",
-    };
+    return { postId: activity.postId, spaceId: activity.postSpaceId };
 };
 
 export const loadCurrentMessageActivityPostPreview = async (
@@ -737,14 +718,7 @@ export const loadCurrentMessageActivityPostPreview = async (
         viewerSpaceId,
     );
     if (!loadedPost) return post;
-    return {
-        ...post,
-        height: loadedPost.height,
-        imageUrl: loadedPost.imageUrl,
-        mediaType: loadedPost.imageAsset?.mediaType,
-        objectKey: loadedPost.imageAsset?.objectKey,
-        width: loadedPost.width,
-    };
+    return { ...post, imageUrl: loadedPost.imageUrl };
 };
 
 const messageActivityFromSpaceActivity = async (
