@@ -142,11 +142,13 @@ func (c *MessagesController) ListConversations(ctx context.Context, viewerSpace 
 	}
 	chatSummaries := make(map[string]models.ConversationChatSummaryResponse, len(summaries))
 	for friendSpaceID, summary := range summaries {
+		unreadActivities := make([]models.MessageConversationActivityResponse, 0, len(summary.UnreadActivities))
+		for _, activity := range summary.UnreadActivities {
+			unreadActivities = append(unreadActivities, toUnreadMessageConversationActivityResponse(activity))
+		}
 		chatSummaries[friendSpaceID] = models.ConversationChatSummaryResponse{
-			LatestActivity:     toMessageConversationActivityResponse(summary.LatestActivity),
-			Unread:             summary.Unread,
-			UnreadCount:        summary.UnreadCount,
-			NotificationUnread: summary.NotificationUnread,
+			LatestActivity:   toMessageConversationActivityResponse(summary.LatestActivity),
+			UnreadActivities: unreadActivities,
 		}
 	}
 	requestResponses := make([]models.SpaceFriendRequestResponse, 0, len(pendingRequests))
@@ -383,5 +385,16 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 			resp.PostSpaceID = activity.PostSpaceID.String
 		}
 	}
+	return resp
+}
+
+func toUnreadMessageConversationActivityResponse(activity repo.SpaceMessageConversationActivityRecord) models.MessageConversationActivityResponse {
+	resp := toMessageConversationActivityResponse(activity)
+	resp.Kind = ""
+	resp.SenderSpaceID = ""
+	resp.RecipientSpaceID = ""
+	resp.MessageCipher = ""
+	resp.EncryptedMessageKey = ""
+	resp.ReplyMessageID = nil
 	return resp
 }

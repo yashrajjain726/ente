@@ -138,9 +138,7 @@ interface SpaceFriendRequestResponse {
 
 interface SpaceConversationChatSummaryResponse {
     latestActivity: SpaceMessageConversationActivity;
-    notificationUnread?: boolean;
-    unread?: boolean;
-    unreadCount?: number;
+    unreadActivities?: SpaceMessageConversationActivity[];
 }
 
 type SpaceConversationChatSummaries =
@@ -277,6 +275,7 @@ export interface SpaceMessageConversation {
     notificationUnread: boolean;
     unread: boolean;
     unreadCount: number;
+    unreadActivities: SpaceMessageActivity[];
 }
 
 export interface SpaceMessageConversationList {
@@ -751,6 +750,16 @@ const messageActivityFromSpaceActivity = async (
     };
 };
 
+export const isChatUnreadMessageActivity = (activity: SpaceMessageActivity) =>
+    activity.type == "message" || activity.type == "post_reply";
+
+export const isPassiveAutoReadMessageActivity = (
+    activity: SpaceMessageActivity,
+) =>
+    activity.type == "friend_added" ||
+    activity.type == "message_like" ||
+    activity.type == "post_like";
+
 export const joinSpaceInvite = async ({
     spaceUsername,
 }: PendingSpaceInvite): Promise<"friend" | "requested"> => {
@@ -1182,6 +1191,20 @@ export const loadCurrentMessageConversations = async (
                     summaries,
                     friendSpaceID,
                 );
+                const unreadActivities = summary
+                    ? await Promise.all(
+                          (summary.unreadActivities ?? []).map((activity) =>
+                              messageActivityFromSpaceActivity(
+                                  ctx,
+                                  activity,
+                                  spaceId,
+                              ),
+                          ),
+                      )
+                    : [];
+                const unreadCount = unreadActivities.filter(
+                    isChatUnreadMessageActivity,
+                ).length;
                 return {
                     friend,
                     latestActivity: summary
@@ -1198,9 +1221,10 @@ export const loadCurrentMessageConversations = async (
                               outgoing: false,
                               type: "empty" as const,
                           },
-                    notificationUnread: Boolean(summary?.notificationUnread),
-                    unread: Boolean(summary?.unread),
-                    unreadCount: summary?.unreadCount ?? 0,
+                    notificationUnread: unreadActivities.length > 0,
+                    unread: unreadCount > 0,
+                    unreadActivities,
+                    unreadCount,
                 };
             }),
         );
@@ -1215,6 +1239,7 @@ export const loadCurrentMessageConversations = async (
                 },
                 notificationUnread: true,
                 unread: true,
+                unreadActivities: [],
                 unreadCount: 1,
             }),
         );

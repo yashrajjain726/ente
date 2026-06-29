@@ -205,11 +205,7 @@ pub struct MessageConversationActivity {
 pub struct ConversationChatSummaryResponse {
     pub latest_activity: MessageConversationActivity,
     #[serde(default)]
-    pub unread: bool,
-    #[serde(default)]
-    pub unread_count: i64,
-    #[serde(default)]
-    pub notification_unread: bool,
+    pub unread_activities: Vec<MessageConversationActivity>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

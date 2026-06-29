@@ -43,23 +43,57 @@ func spaceMessageSelectColumns(viewerPlaceholder string) string {
 	return strings.TrimSpace(fmt.Sprintf(spaceMessageBaseSelectColumns, viewerPlaceholder, encryptedMessageKeySQL))
 }
 
-const peerThreadKeySQL = `CASE
-	WHEN $1 < cp.friend_space_id THEN $1 || ':' || cp.friend_space_id
-	ELSE cp.friend_space_id || ':' || $1
-END`
-
 const selectedThreadKeySQL = `CASE WHEN $1 < $2 THEN $1 || ':' || $2 ELSE $2 || ':' || $1 END`
 
-const latestPeerActivitySQL = `
-WITH peer_messages AS (
+const inputConversationPeersSQL = `
+WITH conversation_peers AS (
+	SELECT DISTINCT input_friend.friend_space_id
+	FROM unnest($2::text[]) AS input_friend(friend_space_id)
+	WHERE input_friend.friend_space_id <> ''
+)`
+
+const currentFriendConversationPeersSQL = `
+WITH conversation_peers AS (
+	SELECT DISTINCT s.friend_space_id
+	FROM space_friend_shares s
+	JOIN spaces friend_space ON friend_space.space_id = s.friend_space_id
+	JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
+	WHERE s.space_id = $1
+)`
+
+const conversationActivityRowsSQL = `,
+peer_messages AS (
 	SELECT m.*
 	FROM space_messages m
-	WHERE m.thread_key = ` + peerThreadKeySQL + `
-	  AND m.is_deleted = FALSE
+	JOIN conversation_peers cp
+	  ON (
+	      (m.sender_space_id = $1 AND m.recipient_space_id = cp.friend_space_id)
+	      OR (m.recipient_space_id = $1 AND m.sender_space_id = cp.friend_space_id)
+	  )
+	WHERE m.is_deleted = FALSE
 )
-SELECT *
+SELECT
+	friend_space_id,
+	activity_type,
+	activity_id,
+	activity_created_at,
+	is_outgoing,
+	message_id,
+	post_id,
+	post_space_id,
+	message_kind,
+	sender_space_id,
+	recipient_space_id,
+	message_cipher,
+	encrypted_message_key,
+	reply_message_id,
+	notification_created_at
 FROM (
 	SELECT
+		CASE
+			WHEN m.sender_space_id = $1 THEN m.recipient_space_id
+			ELSE m.sender_space_id
+		END AS friend_space_id,
 		CASE
 			WHEN m.kind = 'post_like' THEN 'post_like'
 			WHEN m.kind = 'friend_added' THEN 'friend_added'
@@ -86,7 +120,7 @@ FROM (
 		END AS encrypted_message_key,
 		m.reply_message_id,
 		CASE
-			WHEN m.recipient_space_id = $1 AND m.kind IN ('regular', 'post_reply', 'post_like') THEN m.created_at
+			WHEN m.recipient_space_id = $1 AND m.kind IN ('regular', 'post_reply', 'post_like', 'friend_added') THEN m.created_at
 			ELSE NULL::bigint
 		END AS notification_created_at,
 		(m.sender_space_id = $1) AS is_outgoing
@@ -96,6 +130,10 @@ FROM (
 	UNION ALL
 
 	SELECT
+		CASE
+			WHEN m.sender_space_id = $1 THEN m.recipient_space_id
+			ELSE m.sender_space_id
+		END AS friend_space_id,
 		'message_like' AS activity_type,
 		'message_like:' || m.message_id || ':' || m.recipient_space_id AS activity_id,
 		m.recipient_liked_at AS activity_created_at,
@@ -103,8 +141,8 @@ FROM (
 		NULL::bigint AS post_id,
 		NULL::text AS post_space_id,
 		NULL::text AS message_kind,
-		NULL::text AS sender_space_id,
-		NULL::text AS recipient_space_id,
+		m.sender_space_id,
+		m.recipient_space_id,
 		NULL::bytea AS message_cipher,
 		NULL::bytea AS encrypted_message_key,
 		NULL::text AS reply_message_id,
@@ -113,126 +151,12 @@ FROM (
 	FROM peer_messages m
 	WHERE m.kind IN ('regular', 'post_reply')
 	  AND m.recipient_liked_at IS NOT NULL
-) activity
-ORDER BY activity_created_at DESC, activity_id DESC
-LIMIT 1`
+) activity`
 
-const peerUnreadCountSQL = `
-SELECT COUNT(*) AS unread_count
-FROM space_messages m
-WHERE m.thread_key = ` + peerThreadKeySQL + `
-  AND m.sender_space_id = cp.friend_space_id
-  AND m.recipient_space_id = $1
-  AND m.kind IN ('regular', 'post_reply')
-  AND m.is_deleted = FALSE
-  AND m.created_at > COALESCE(nrm.read_at, 0)`
+const chatSummaryActivityRowsSQL = inputConversationPeersSQL + conversationActivityRowsSQL + `
+ORDER BY friend_space_id, activity_created_at DESC, activity_id DESC`
 
-const peerNotificationUnreadSQL = `
-SELECT EXISTS (
-	SELECT 1
-	FROM space_messages m
-	WHERE m.thread_key = ` + peerThreadKeySQL + `
-	  AND m.is_deleted = FALSE
-	  AND (
-	      (
-	          m.sender_space_id = cp.friend_space_id
-	          AND m.recipient_space_id = $1
-	          AND m.kind IN ('regular', 'post_reply', 'post_like')
-	          AND m.created_at > COALESCE(nrm.read_at, 0)
-	      ) OR (
-	          m.sender_space_id = $1
-	          AND m.recipient_space_id = cp.friend_space_id
-	          AND m.kind IN ('regular', 'post_reply')
-	          AND m.recipient_liked_at IS NOT NULL
-	          AND m.recipient_liked_at > COALESCE(nrm.read_at, 0)
-	      )
-	  )
-	LIMIT 1
-) AS notification_unread`
-
-const chatSummaryRowsSQL = `
-WITH conversation_peers AS (
-	SELECT DISTINCT input_friend.friend_space_id
-	FROM unnest($2::text[]) AS input_friend(friend_space_id)
-	WHERE input_friend.friend_space_id <> ''
-),
-conversation_rows AS (
-	SELECT
-		cp.friend_space_id,
-		latest_activity.activity_type,
-		latest_activity.activity_id,
-		latest_activity.activity_created_at,
-		latest_activity.message_id,
-		latest_activity.post_id,
-		latest_activity.post_space_id,
-		latest_activity.message_kind,
-		latest_activity.sender_space_id,
-		latest_activity.recipient_space_id,
-		latest_activity.message_cipher,
-		latest_activity.encrypted_message_key,
-		latest_activity.reply_message_id,
-		latest_activity.notification_created_at,
-		latest_activity.is_outgoing,
-		COALESCE(unread_state.unread_count, 0) AS unread_count,
-		COALESCE(notification_state.notification_unread, FALSE) AS notification_unread
-	FROM conversation_peers cp
-	LEFT JOIN space_notification_read_markers nrm
-	  ON nrm.viewer_space_id = $1
-	 AND nrm.friend_space_id = cp.friend_space_id
-	LEFT JOIN LATERAL (
-` + latestPeerActivitySQL + `
-	) latest_activity ON TRUE
-	LEFT JOIN LATERAL (
-` + peerUnreadCountSQL + `
-	) unread_state ON TRUE
-	LEFT JOIN LATERAL (
-` + peerNotificationUnreadSQL + `
-	) notification_state ON TRUE
-	WHERE latest_activity.activity_id IS NOT NULL
-)`
-
-const currentFriendSummaryRowsSQL = `
-WITH conversation_peers AS (
-	SELECT DISTINCT s.friend_space_id
-	FROM space_friend_shares s
-	JOIN spaces friend_space ON friend_space.space_id = s.friend_space_id
-	JOIN users friend_owner ON friend_owner.user_id = friend_space.owner_id AND friend_owner.encrypted_email IS NOT NULL
-	WHERE s.space_id = $1
-),
-conversation_rows AS (
-	SELECT
-		cp.friend_space_id,
-		latest_activity.activity_type,
-		latest_activity.activity_id,
-		latest_activity.activity_created_at,
-		latest_activity.message_id,
-		latest_activity.post_id,
-		latest_activity.post_space_id,
-		latest_activity.message_kind,
-		latest_activity.sender_space_id,
-		latest_activity.recipient_space_id,
-		latest_activity.message_cipher,
-		latest_activity.encrypted_message_key,
-		latest_activity.reply_message_id,
-		latest_activity.notification_created_at,
-		latest_activity.is_outgoing,
-		COALESCE(unread_state.unread_count, 0) AS unread_count,
-		COALESCE(notification_state.notification_unread, FALSE) AS notification_unread
-	FROM conversation_peers cp
-	LEFT JOIN space_notification_read_markers nrm
-	  ON nrm.viewer_space_id = $1
-	 AND nrm.friend_space_id = cp.friend_space_id
-	LEFT JOIN LATERAL (
-` + latestPeerActivitySQL + `
-	) latest_activity ON TRUE
-	LEFT JOIN LATERAL (
-` + peerUnreadCountSQL + `
-	) unread_state ON TRUE
-	LEFT JOIN LATERAL (
-` + peerNotificationUnreadSQL + `
-	) notification_state ON TRUE
-	WHERE latest_activity.activity_id IS NOT NULL
-)`
+const currentFriendActivityRowsSQL = currentFriendConversationPeersSQL + conversationActivityRowsSQL
 
 func (r *MessagesRepository) CreateMessage(ctx context.Context, input CreateSpaceMessageRecord) (*SpaceMessageRecord, error) {
 	messageID := strings.TrimSpace(input.MessageID)
@@ -387,37 +311,55 @@ func (r *MessagesRepository) ListLatestChatSummaries(ctx context.Context, viewer
 	if len(cleanFriendSpaceIDs) == 0 {
 		return out, nil
 	}
-	rows, err := r.DB.QueryContext(ctx, chatSummaryRowsSQL+`
-		SELECT
-			c.friend_space_id,
-			c.activity_type,
-			c.activity_id,
-			c.activity_created_at,
-			c.is_outgoing,
-			(c.unread_count > 0) AS unread,
-			c.unread_count,
-			c.notification_unread,
-			c.message_id,
-			c.post_id,
-			c.post_space_id,
-			c.message_kind,
-			c.sender_space_id,
-			c.recipient_space_id,
-			c.message_cipher,
-			c.encrypted_message_key,
-			c.reply_message_id
-		FROM conversation_rows c
-	`, strings.TrimSpace(viewerSpaceID), pq.Array(cleanFriendSpaceIDs))
+	readMarkers, err := r.listNotificationReadMarkers(ctx, viewerSpaceID, cleanFriendSpaceIDs)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := r.DB.QueryContext(ctx, chatSummaryActivityRowsSQL, strings.TrimSpace(viewerSpaceID), pq.Array(cleanFriendSpaceIDs))
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer rows.Close()
 	for rows.Next() {
-		summary, err := scanConversationChatSummaryRecord(rows)
+		friendSpaceID, activity, notificationCreatedAt, err := scanConversationActivityRow(rows)
 		if err != nil {
 			return nil, err
 		}
-		out[summary.FriendSpaceID] = *summary
+		summary := out[friendSpaceID]
+		if summary.FriendSpaceID == "" {
+			summary.FriendSpaceID = friendSpaceID
+			summary.LatestActivity = activity
+		}
+		if notificationCreatedAt.Valid && notificationCreatedAt.Int64 > readMarkers[friendSpaceID] {
+			summary.UnreadActivities = append(summary.UnreadActivities, activity)
+		}
+		out[friendSpaceID] = summary
+	}
+	if err := rows.Err(); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return out, nil
+}
+
+func (r *MessagesRepository) listNotificationReadMarkers(ctx context.Context, viewerSpaceID string, friendSpaceIDs []string) (map[string]int64, error) {
+	out := make(map[string]int64, len(friendSpaceIDs))
+	rows, err := r.DB.QueryContext(ctx, `
+		SELECT friend_space_id, read_at
+		FROM space_notification_read_markers
+		WHERE viewer_space_id = $1
+		  AND friend_space_id = ANY($2)
+	`, strings.TrimSpace(viewerSpaceID), pq.Array(friendSpaceIDs))
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var friendSpaceID string
+		var readAt int64
+		if err := rows.Scan(&friendSpaceID, &readAt); err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		out[friendSpaceID] = readAt
 	}
 	return out, stacktrace.Propagate(rows.Err(), "")
 }
@@ -446,31 +388,35 @@ func scanMessageRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceMess
 	return &rec, nil
 }
 
-func scanConversationChatSummaryRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceConversationChatSummaryRecord, error) {
-	var rec SpaceConversationChatSummaryRecord
-	dest := []any{
-		&rec.FriendSpaceID,
-		&rec.LatestActivity.Type,
-		&rec.LatestActivity.ID,
-		&rec.LatestActivity.CreatedAt,
-		&rec.LatestActivity.Outgoing,
-		&rec.Unread,
-		&rec.UnreadCount,
-		&rec.NotificationUnread,
-		&rec.LatestActivity.MessageID,
-		&rec.LatestActivity.PostID,
-		&rec.LatestActivity.PostSpaceID,
-		&rec.LatestActivity.Kind,
-		&rec.LatestActivity.SenderSpaceID,
-		&rec.LatestActivity.RecipientSpaceID,
-		&rec.LatestActivity.MessageCipher,
-		&rec.LatestActivity.EncryptedMessageKey,
-		&rec.LatestActivity.ReplyMessageID,
-	}
+func scanConversationActivityRow(scanner interface{ Scan(dest ...any) error }) (string, SpaceMessageConversationActivityRecord, sql.NullInt64, error) {
+	var friendSpaceID string
+	var activity SpaceMessageConversationActivityRecord
+	var notificationCreatedAt sql.NullInt64
+	dest := []any{&friendSpaceID}
+	dest = append(dest, conversationActivityScanDest(&activity)...)
+	dest = append(dest, &notificationCreatedAt)
 	if err := scanner.Scan(dest...); err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return "", SpaceMessageConversationActivityRecord{}, sql.NullInt64{}, stacktrace.Propagate(err, "")
 	}
-	return &rec, nil
+	return friendSpaceID, activity, notificationCreatedAt, nil
+}
+
+func conversationActivityScanDest(activity *SpaceMessageConversationActivityRecord) []any {
+	return []any{
+		&activity.Type,
+		&activity.ID,
+		&activity.CreatedAt,
+		&activity.Outgoing,
+		&activity.MessageID,
+		&activity.PostID,
+		&activity.PostSpaceID,
+		&activity.Kind,
+		&activity.SenderSpaceID,
+		&activity.RecipientSpaceID,
+		&activity.MessageCipher,
+		&activity.EncryptedMessageKey,
+		&activity.ReplyMessageID,
+	}
 }
 
 func parseMessageCursor(cursor string) (int64, string, bool) {

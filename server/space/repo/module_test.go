@@ -27,6 +27,7 @@ func newSpaceTestModule(t *testing.T) *Module {
 type SpaceMessageConversationRecord struct {
 	Friend             SpaceActorRecord
 	LatestActivity     SpaceMessageConversationActivityRecord
+	UnreadActivities   []SpaceMessageConversationActivityRecord
 	Unread             bool
 	UnreadCount        int64
 	NotificationUnread bool
@@ -55,9 +56,10 @@ func listTestConversations(ctx context.Context, module *Module, viewerSpaceID st
 		}
 		if ok {
 			conversation.LatestActivity = summary.LatestActivity
-			conversation.Unread = summary.Unread
-			conversation.UnreadCount = summary.UnreadCount
-			conversation.NotificationUnread = summary.NotificationUnread
+			conversation.UnreadActivities = summary.UnreadActivities
+			conversation.UnreadCount = countChatUnreadActivities(summary.UnreadActivities)
+			conversation.Unread = conversation.UnreadCount > 0
+			conversation.NotificationUnread = len(summary.UnreadActivities) > 0
 		} else {
 			conversation.LatestActivity = SpaceMessageConversationActivityRecord{
 				ID:        "empty:" + friend.Friend.SpaceID,
@@ -95,6 +97,16 @@ func listTestConversations(ctx context.Context, module *Module, viewerSpaceID st
 		conversations = conversations[:limit]
 	}
 	return conversations, nextCursor, nil
+}
+
+func countChatUnreadActivities(activities []SpaceMessageConversationActivityRecord) int64 {
+	var count int64
+	for _, activity := range activities {
+		if activity.Type == "message" || activity.Type == "post_reply" {
+			count++
+		}
+	}
+	return count
 }
 
 func testSpaceBytes(value string) []byte {
@@ -142,10 +154,10 @@ func testAddFriend(ctx context.Context, module *Module, requesterID int64, reque
 		return sql.ErrNoRows
 	}
 	_, err = module.Read.DB.ExecContext(ctx, `
-		UPDATE space_notification_read_markers
-		SET read_at = 1
-		WHERE (viewer_space_id = $1 AND friend_space_id = $2)
-		   OR (viewer_space_id = $2 AND friend_space_id = $1)
+		INSERT INTO space_notification_read_markers (viewer_space_id, friend_space_id, read_at)
+		VALUES ($1, $2, 1), ($2, $1, 1)
+		ON CONFLICT (viewer_space_id, friend_space_id) DO UPDATE
+		SET read_at = EXCLUDED.read_at
 	`, requesterSpaceID, targetSpaceID)
 	return err
 }
@@ -733,23 +745,19 @@ func TestLatestChatSummariesUseCurrentFriendActivities(t *testing.T) {
 	require.Len(t, summaries, 2)
 	charlieSummary := summaries[charlieSpace.SpaceID]
 	require.Equal(t, "friend_added", charlieSummary.LatestActivity.Type)
-	require.False(t, charlieSummary.Unread)
-	require.False(t, charlieSummary.NotificationUnread)
+	require.Empty(t, charlieSummary.UnreadActivities)
 	bobSummary := summaries[bobSpace.SpaceID]
 	require.Equal(t, "post_like", bobSummary.LatestActivity.Type)
 	require.True(t, bobSummary.LatestActivity.PostID.Valid)
 	require.Equal(t, postID, bobSummary.LatestActivity.PostID.Int64)
-	require.True(t, bobSummary.Unread)
-	require.Equal(t, int64(1), bobSummary.UnreadCount)
-	require.True(t, bobSummary.NotificationUnread)
+	require.Len(t, bobSummary.UnreadActivities, 2)
+	require.Equal(t, int64(1), countChatUnreadActivities(bobSummary.UnreadActivities))
 
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, 3000))
 	summaries, err = module.Messages.ListLatestChatSummaries(ctx, aliceSpace.SpaceID, []string{bobSpace.SpaceID, charlieSpace.SpaceID})
 	require.NoError(t, err)
 	bobSummary = summaries[bobSpace.SpaceID]
-	require.False(t, bobSummary.Unread)
-	require.Zero(t, bobSummary.UnreadCount)
-	require.False(t, bobSummary.NotificationUnread)
+	require.Empty(t, bobSummary.UnreadActivities)
 	require.Equal(t, "post_like", bobSummary.LatestActivity.Type)
 
 	require.NoError(t, module.Friends.DeleteFriendship(ctx, aliceSpace.SpaceID, bobSpace.SpaceID))
@@ -798,7 +806,7 @@ func TestConfirmFriendRequestCreatesFriendshipAndNotifiesRequester(t *testing.T)
 	require.Empty(t, bobRequests)
 	bobUnread, err := module.Read.HasUnreadNotifications(ctx, bobSpace.SpaceID)
 	require.NoError(t, err)
-	require.False(t, bobUnread)
+	require.True(t, bobUnread)
 	aliceConversations, _, err := listTestConversations(ctx, module, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
 	require.Len(t, aliceConversations, 1)
@@ -812,9 +820,10 @@ func TestConfirmFriendRequestCreatesFriendshipAndNotifiesRequester(t *testing.T)
 	require.Len(t, bobConversations, 1)
 	require.Equal(t, aliceSpace.SpaceID, bobConversations[0].Friend.SpaceID)
 	require.Equal(t, "friend_added", bobConversations[0].LatestActivity.Type)
-	require.False(t, bobConversations[0].NotificationUnread)
+	require.True(t, bobConversations[0].NotificationUnread)
 	require.False(t, bobConversations[0].Unread)
 	require.Zero(t, bobConversations[0].UnreadCount)
+	require.Len(t, bobConversations[0].UnreadActivities, 1)
 }
 
 func TestReciprocalFriendRequestAutoConfirms(t *testing.T) {
@@ -854,7 +863,7 @@ func TestReciprocalFriendRequestAutoConfirms(t *testing.T) {
 	require.False(t, aliceUnread)
 	bobUnread, err := module.Read.HasUnreadNotifications(ctx, bobSpace.SpaceID)
 	require.NoError(t, err)
-	require.False(t, bobUnread)
+	require.True(t, bobUnread)
 }
 
 func TestDeleteFriendRequestClearsUnread(t *testing.T) {

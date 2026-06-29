@@ -7,6 +7,7 @@ import {
     confirmCurrentFriendRequest,
     deleteCurrentFriendRequest,
     deleteCurrentMessage,
+    isPassiveAutoReadMessageActivity,
     loadCurrentMessageActivityPostPreview,
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
@@ -215,6 +216,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                               ...conversation,
                               notificationUnread: false,
                               unread: false,
+                              unreadActivities: [],
                               unreadCount: 0,
                           }
                         : conversation,
@@ -250,7 +252,10 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
             const passiveUnreadConversationIds = items
                 .filter(
                     (conversation) =>
-                        conversation.notificationUnread && !conversation.unread,
+                        conversation.unreadActivities.length == 1 &&
+                        isPassiveAutoReadMessageActivity(
+                            conversation.unreadActivities[0]!,
+                        ),
                 )
                 .map(conversationId);
             setNewConversationIds(unreadConversationIds);

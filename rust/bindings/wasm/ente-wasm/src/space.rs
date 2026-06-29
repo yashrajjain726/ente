@@ -225,9 +225,7 @@ struct PostObjectJs {
 #[serde(rename_all = "camelCase")]
 struct ConversationChatSummaryJs {
     latest_activity: MessageConversationActivityJs,
-    unread: bool,
-    unread_count: i64,
-    notification_unread: bool,
+    unread_activities: Vec<MessageConversationActivityJs>,
 }
 
 #[derive(Serialize)]
@@ -1140,6 +1138,12 @@ impl SpaceAccountCtxHandle {
 
         let mut chat_summaries = BTreeMap::new();
         for (friend_space_id, summary) in response.chat_summaries {
+            let mut unread_activities = Vec::with_capacity(summary.unread_activities.len());
+            for activity in summary.unread_activities {
+                unread_activities.push(
+                    message_conversation_activity_to_js(&self.inner, &space_id, activity).await?,
+                );
+            }
             chat_summaries.insert(
                 friend_space_id,
                 ConversationChatSummaryJs {
@@ -1149,9 +1153,7 @@ impl SpaceAccountCtxHandle {
                         summary.latest_activity,
                     )
                     .await?,
-                    unread: summary.unread,
-                    unread_count: summary.unread_count,
-                    notification_unread: summary.notification_unread,
+                    unread_activities,
                 },
             );
         }

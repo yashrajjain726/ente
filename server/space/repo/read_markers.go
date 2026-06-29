@@ -42,9 +42,9 @@ func (r *ReadMarkersRepository) GetLatestConversationActivityAt(ctx context.Cont
 		return 0, nil
 	}
 	var readAt int64
-	if err := r.DB.QueryRowContext(ctx, chatSummaryRowsSQL+`
-		SELECT c.activity_created_at
-		FROM conversation_rows c
+	if err := r.DB.QueryRowContext(ctx, `
+		SELECT activity_created_at
+		FROM (`+chatSummaryActivityRowsSQL+`) activity
 		LIMIT 1
 	`, viewerSpaceID, pq.Array([]string{friendSpaceID})).Scan(&readAt); err != nil {
 		if err == sql.ErrNoRows {
@@ -57,11 +57,14 @@ func (r *ReadMarkersRepository) GetLatestConversationActivityAt(ctx context.Cont
 
 func (r *ReadMarkersRepository) HasUnreadNotifications(ctx context.Context, viewerSpaceID string) (bool, error) {
 	var exists bool
-	if err := r.DB.QueryRowContext(ctx, currentFriendSummaryRowsSQL+`
+	if err := r.DB.QueryRowContext(ctx, `
 		SELECT EXISTS (
 			SELECT 1
-			FROM conversation_rows c
-			WHERE c.notification_unread
+			FROM (`+currentFriendActivityRowsSQL+`) activity
+			LEFT JOIN space_notification_read_markers nrm
+			  ON nrm.viewer_space_id = $1
+			 AND nrm.friend_space_id = activity.friend_space_id
+			WHERE activity.notification_created_at > COALESCE(nrm.read_at, 0)
 			LIMIT 1
 			) OR EXISTS (
 				SELECT 1

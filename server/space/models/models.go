@@ -323,10 +323,8 @@ type MessageConversationActivityResponse struct {
 }
 
 type ConversationChatSummaryResponse struct {
-	LatestActivity     MessageConversationActivityResponse `json:"latestActivity"`
-	Unread             bool                                `json:"unread"`
-	UnreadCount        int64                               `json:"unreadCount"`
-	NotificationUnread bool                                `json:"notificationUnread"`
+	LatestActivity   MessageConversationActivityResponse   `json:"latestActivity"`
+	UnreadActivities []MessageConversationActivityResponse `json:"unreadActivities"`
 }
 
 type ConversationsResponse struct {

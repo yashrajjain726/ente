@@ -135,11 +135,9 @@ type SpaceMessageRecord struct {
 }
 
 type SpaceConversationChatSummaryRecord struct {
-	FriendSpaceID      string
-	LatestActivity     SpaceMessageConversationActivityRecord
-	Unread             bool
-	UnreadCount        int64
-	NotificationUnread bool
+	FriendSpaceID    string
+	LatestActivity   SpaceMessageConversationActivityRecord
+	UnreadActivities []SpaceMessageConversationActivityRecord
 }
 
 type SpaceMessageConversationActivityRecord struct {

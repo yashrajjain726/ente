@@ -80,9 +80,6 @@ func insertFriendAddedActivityTx(ctx context.Context, tx *sql.Tx, senderSpaceID 
 	if err := upsertNotificationReadMarker(ctx, tx, senderSpaceID, recipientSpaceID, createdAt); err != nil {
 		return 0, err
 	}
-	if err := upsertNotificationReadMarker(ctx, tx, recipientSpaceID, senderSpaceID, createdAt); err != nil {
-		return 0, err
-	}
 	return createdAt, nil
 }
 
