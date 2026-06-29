@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/ente-io/museum/space/models"
+	spacerepo "github.com/ente-io/museum/space/repo"
 	"github.com/ente-io/stacktrace"
 	"github.com/gin-gonic/gin"
 )
@@ -33,26 +34,18 @@ func (h *Handlers) GetSpaceProfile(c *gin.Context) {
 	respondJSON(c, resp, err)
 }
 
-func (h *Handlers) UpdateSpaceProfile(c *gin.Context) {
+func (h *Handlers) UpdateSpaceProfile(c *gin.Context, space *spacerepo.SpaceRecord) {
 	var req models.UpdateSpaceProfileRequest
 	if !bindJSON(c, &req) {
-		return
-	}
-	space, ok := selectedSpace(h, c)
-	if !ok {
 		return
 	}
 	resp, err := h.Module.Spaces.UpdateProfile(c, space, req)
 	respondJSON(c, resp, err)
 }
 
-func (h *Handlers) UpdateSpaceSlug(c *gin.Context) {
+func (h *Handlers) UpdateSpaceSlug(c *gin.Context, space *spacerepo.SpaceRecord) {
 	var req models.UpdateSpaceSlugRequest
 	if !bindJSON(c, &req) {
-		return
-	}
-	space, ok := selectedSpace(h, c)
-	if !ok {
 		return
 	}
 	resp, err := h.Module.Spaces.UpdateSlug(c, space, req)
@@ -73,13 +66,9 @@ func (h *Handlers) SpaceSlugAvailability(c *gin.Context) {
 	respondJSON(c, resp, err)
 }
 
-func (h *Handlers) RotateSpaceKey(c *gin.Context) {
+func (h *Handlers) RotateSpaceKey(c *gin.Context, space *spacerepo.SpaceRecord) {
 	var req models.RotateSpaceKeyRequest
 	if !bindJSON(c, &req) {
-		return
-	}
-	space, ok := selectedSpace(h, c)
-	if !ok {
 		return
 	}
 	resp, err := h.Module.Spaces.RotateKey(c, space, req)

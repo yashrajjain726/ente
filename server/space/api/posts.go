@@ -2,29 +2,22 @@ package api
 
 import (
 	"github.com/ente-io/museum/space/models"
+	spacerepo "github.com/ente-io/museum/space/repo"
 	"github.com/gin-gonic/gin"
 )
 
-func (h *Handlers) CreatePost(c *gin.Context) {
+func (h *Handlers) CreatePost(c *gin.Context, space *spacerepo.SpaceRecord) {
 	var req models.CreatePostRequest
 	if !bindJSON(c, &req) {
-		return
-	}
-	space, ok := selectedSpace(h, c)
-	if !ok {
 		return
 	}
 	resp, err := h.Module.Posts.Create(c, space, req)
 	respondJSON(c, resp, err)
 }
 
-func (h *Handlers) ListFeed(c *gin.Context) {
+func (h *Handlers) ListFeed(c *gin.Context, space *spacerepo.SpaceRecord) {
 	var req models.ListFeedRequest
 	if !bindQuery(c, &req) {
-		return
-	}
-	space, ok := selectedSpace(h, c)
-	if !ok {
 		return
 	}
 	resp, err := h.Module.Posts.ListFeed(c, space, req)
@@ -55,13 +48,9 @@ func (h *Handlers) GetPost(c *gin.Context) {
 	respondJSON(c, resp, err)
 }
 
-func (h *Handlers) UpdatePostCaption(c *gin.Context) {
+func (h *Handlers) UpdatePostCaption(c *gin.Context, space *spacerepo.SpaceRecord) {
 	var req models.UpdatePostCaptionRequest
 	if !bindJSON(c, &req) {
-		return
-	}
-	space, ok := selectedSpace(h, c)
-	if !ok {
 		return
 	}
 	postID, ok := positiveInt64Param(c, "postID")
@@ -72,19 +61,15 @@ func (h *Handlers) UpdatePostCaption(c *gin.Context) {
 	respondJSON(c, resp, err)
 }
 
-func (h *Handlers) LikePost(c *gin.Context) {
-	h.setPostLike(c, true)
+func (h *Handlers) LikePost(c *gin.Context, space *spacerepo.SpaceRecord) {
+	h.setPostLike(c, space, true)
 }
 
-func (h *Handlers) UnlikePost(c *gin.Context) {
-	h.setPostLike(c, false)
+func (h *Handlers) UnlikePost(c *gin.Context, space *spacerepo.SpaceRecord) {
+	h.setPostLike(c, space, false)
 }
 
-func (h *Handlers) setPostLike(c *gin.Context, like bool) {
-	space, ok := selectedSpace(h, c)
-	if !ok {
-		return
-	}
+func (h *Handlers) setPostLike(c *gin.Context, space *spacerepo.SpaceRecord, like bool) {
 	postID, ok := positiveInt64Param(c, "postID")
 	if !ok {
 		return
@@ -93,11 +78,7 @@ func (h *Handlers) setPostLike(c *gin.Context, like bool) {
 	respondJSON(c, resp, err)
 }
 
-func (h *Handlers) DeletePost(c *gin.Context) {
-	space, ok := selectedSpace(h, c)
-	if !ok {
-		return
-	}
+func (h *Handlers) DeletePost(c *gin.Context, space *spacerepo.SpaceRecord) {
 	postID, ok := positiveInt64Param(c, "postID")
 	if !ok {
 		return

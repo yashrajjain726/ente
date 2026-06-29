@@ -2,16 +2,13 @@ package api
 
 import (
 	"github.com/ente-io/museum/space/models"
+	spacerepo "github.com/ente-io/museum/space/repo"
 	"github.com/gin-gonic/gin"
 )
 
-func (h *Handlers) PresignUpload(c *gin.Context) {
+func (h *Handlers) PresignUpload(c *gin.Context, space *spacerepo.SpaceRecord) {
 	var req models.PresignUploadRequest
 	if !bindJSON(c, &req) {
-		return
-	}
-	space, ok := selectedSpace(h, c)
-	if !ok {
 		return
 	}
 	resp, err := h.Module.Assets.PresignUpload(c, space, req)

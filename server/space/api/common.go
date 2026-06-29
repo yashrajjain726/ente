@@ -57,13 +57,17 @@ func stringParam(c *gin.Context, name string) (string, bool) {
 	return value, true
 }
 
-func selectedSpace(h *Handlers, c *gin.Context) (*spacerepo.SpaceRecord, bool) {
-	space, err := h.Module.SelectedSpace(c)
-	if err != nil {
-		respondJSON(c, nil, err)
-		return nil, false
+type selectedSpaceHandler func(*gin.Context, *spacerepo.SpaceRecord)
+
+func (h *Handlers) withSelectedSpace(fn selectedSpaceHandler) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		space, err := h.Module.SelectedSpace(c)
+		if err != nil {
+			respondJSON(c, nil, err)
+			return
+		}
+		fn(c, space)
 	}
-	return space, true
 }
 
 func bindJSON(c *gin.Context, req any) bool {
