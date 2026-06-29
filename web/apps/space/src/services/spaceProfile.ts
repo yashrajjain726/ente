@@ -121,7 +121,6 @@ const currentSpaceContextConfig = async () => {
             clientVersion: isDesktop ? desktopAppVersion : undefined,
             spaceRootKeyB64,
             spaceSessionToken,
-            userId: user.id,
         },
     };
 };

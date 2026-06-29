@@ -36,7 +36,6 @@ pub async fn open_ctx(endpoint: &str, account: &TestAccount) -> AccountSpaceCtx 
         master_key: account.master_key.clone(),
         public_key: account.public_key.clone(),
         private_key_source: PrivateKeySource::Plain(account.secret_key.clone()),
-        user_id: Some(account.user_id),
         user_agent: Some("ente-e2e".to_string()),
         client_package: Some(App::Photos.client_package().to_string()),
         client_version: Some("ente-e2e".to_string()),

@@ -9,7 +9,6 @@ pub struct OpenAccountSpaceCtxInput {
     pub base_url: String,
     pub space_session_token: Option<String>,
     pub space_root_key: Vec<u8>,
-    pub user_id: Option<i64>,
     pub user_agent: Option<String>,
     pub client_package: Option<String>,
     pub client_version: Option<String>,

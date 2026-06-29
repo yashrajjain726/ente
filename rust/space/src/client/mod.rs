@@ -91,7 +91,6 @@ pub(crate) struct SpaceIdentity {
 pub struct AccountSpaceCtx {
     client: HttpClient,
     space_root_key: Vec<u8>,
-    user_id: Option<i64>,
     space_root_key_cache: Mutex<Option<Option<Vec<u8>>>>,
     space_identity_cache: Mutex<BTreeMap<String, SpaceIdentity>>,
     owned_spaces_cache: Mutex<Option<Vec<SpaceKeyResponse>>>,
@@ -122,7 +121,6 @@ impl AccountSpaceCtx {
         Ok(Self {
             client,
             space_root_key: input.space_root_key,
-            user_id: input.user_id,
             space_root_key_cache: Mutex::new(None),
             space_identity_cache: Mutex::new(BTreeMap::new()),
             owned_spaces_cache: Mutex::new(None),
@@ -132,10 +130,6 @@ impl AccountSpaceCtx {
 
     pub fn client(&self) -> &HttpClient {
         &self.client
-    }
-
-    pub fn user_id(&self) -> Option<i64> {
-        self.user_id
     }
 
     pub fn space_root_key(&self) -> &[u8] {
