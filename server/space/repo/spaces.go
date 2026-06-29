@@ -68,17 +68,6 @@ func (r *SpacesRepository) ListSpacesByOwner(ctx context.Context, ownerID int64)
 	return spaces, stacktrace.Propagate(rows.Err(), "")
 }
 
-func (r *SpacesRepository) GetDefaultSpaceByOwner(ctx context.Context, ownerID int64) (*SpaceRecord, error) {
-	return scanSpaceRecord(r.DB.QueryRowContext(ctx, `
-		SELECT `+spaceRecordSelectColumns+`
-		FROM spaces s
-		`+spaceRecordProfileAssetJoins+`
-		WHERE s.owner_id = $1
-		ORDER BY s.created_at ASC
-		LIMIT 1
-	`, ownerID))
-}
-
 func (r *SpacesRepository) GetSpaceByID(ctx context.Context, spaceID string) (*SpaceRecord, error) {
 	return scanSpaceRecord(r.DB.QueryRowContext(ctx, `
 		SELECT `+spaceRecordSelectColumns+`

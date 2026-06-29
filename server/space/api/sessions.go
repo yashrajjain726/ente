@@ -42,8 +42,7 @@ func (h *Handlers) RequireSelectedSpace() gin.HandlerFunc {
 
 func (h *Handlers) CreateBrowserSession(c *gin.Context) {
 	var req models.SpaceBrowserSessionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	if !bindJSON(c, &req) {
 		return
 	}
 	userID := auth.GetUserID(c.Request.Header)

@@ -350,7 +350,7 @@ type PostObjectPayload struct {
 	ObjectKey      string `json:"objectKey" binding:"required"`
 	Size           int64  `json:"size,omitempty" binding:"omitempty,gt=0"`
 	Position       int    `json:"position,omitempty" binding:"gte=0"`
-	MetadataCipher string `json:"metadataCipher,omitempty" binding:"required"`
+	MetadataCipher string `json:"metadataCipher" binding:"required"`
 }
 
 type PostResponse struct {

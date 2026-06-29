@@ -220,7 +220,9 @@ func (r *MessagesRepository) CreateMessage(ctx context.Context, input CreateSpac
 	if input.ReplyMessageID.Valid {
 		replyMessageID = input.ReplyMessageID.String
 	}
-	if _, err := r.DB.ExecContext(ctx, `
+	var createdAt int64
+	var updatedAt int64
+	if err := r.DB.QueryRowContext(ctx, `
 		INSERT INTO space_messages (
 			message_id,
 			sender_space_id,
@@ -233,10 +235,22 @@ func (r *MessagesRepository) CreateMessage(ctx context.Context, input CreateSpac
 			reply_message_id
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, messageID, input.SenderSpaceID, input.RecipientSpaceID, input.Kind, input.MessageCipher, input.SenderEncryptedMessageKey, input.RecipientEncryptedMessageKey, replyPostID, replyMessageID); err != nil {
+		RETURNING created_at, updated_at
+	`, messageID, input.SenderSpaceID, input.RecipientSpaceID, input.Kind, input.MessageCipher, input.SenderEncryptedMessageKey, input.RecipientEncryptedMessageKey, replyPostID, replyMessageID).Scan(&createdAt, &updatedAt); err != nil {
 		return nil, wrapUnique(err, "message already exists")
 	}
-	return r.GetMessage(ctx, messageID, input.SenderSpaceID)
+	return &SpaceMessageRecord{
+		MessageID:           messageID,
+		Kind:                input.Kind,
+		SenderSpaceID:       input.SenderSpaceID,
+		RecipientSpaceID:    input.RecipientSpaceID,
+		MessageCipher:       input.MessageCipher,
+		EncryptedMessageKey: input.SenderEncryptedMessageKey,
+		ReplyPostID:         input.ReplyPostID,
+		ReplyMessageID:      input.ReplyMessageID,
+		CreatedAt:           createdAt,
+		UpdatedAt:           updatedAt,
+	}, nil
 }
 
 func (r *MessagesRepository) GetMessage(ctx context.Context, messageID string, viewerSpaceID string) (*SpaceMessageRecord, error) {
@@ -313,12 +327,7 @@ func (r *MessagesRepository) SetLike(ctx context.Context, messageID string, acto
 }
 
 func (r *MessagesRepository) DeleteMessage(ctx context.Context, messageID string, senderSpaceID string) error {
-	tx, err := r.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `
+	res, err := r.DB.ExecContext(ctx, `
 		UPDATE space_messages
 		SET is_deleted = TRUE
 		WHERE message_id = $1
@@ -335,9 +344,6 @@ func (r *MessagesRepository) DeleteMessage(ctx context.Context, messageID string
 	}
 	if affected == 0 {
 		return sql.ErrNoRows
-	}
-	if err := tx.Commit(); err != nil {
-		return stacktrace.Propagate(err, "")
 	}
 	return nil
 }
