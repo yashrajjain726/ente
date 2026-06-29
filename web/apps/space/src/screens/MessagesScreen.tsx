@@ -1108,6 +1108,7 @@ const MessageBubble: React.FC<{
     const isSyntheticPostLike = message.kind == "post_like";
     const isFriendAdded = message.kind == "friend_added";
     const isPostReply = message.kind == "post_reply";
+    const isSystemMessage = isSyntheticPostLike || isFriendAdded;
     const hasMessageReply = Boolean(message.replyMessageId);
     const actionLabel = isFriendAdded
         ? "You are now friends"
@@ -1124,7 +1125,7 @@ const MessageBubble: React.FC<{
                 ? "You replied"
                 : "Replied to you"
             : undefined;
-    const hasBodyBubble = !isSyntheticPostLike && !isFriendAdded;
+    const hasBodyBubble = !isSystemMessage;
     const longPressTimerRef = React.useRef<number | undefined>(undefined);
     const longPressStartRef = React.useRef<
         { x: number; y: number } | undefined
@@ -1145,24 +1146,24 @@ const MessageBubble: React.FC<{
 
     const openActions = React.useCallback(
         (bubbleElement: HTMLElement, source: MessageActionsOpenSource) => {
-            if (isSyntheticPostLike) return;
+            if (isSystemMessage) return;
             clearLongPressTimer();
             longPressStartRef.current = undefined;
             window.getSelection()?.removeAllRanges();
             onOpenActions(message, bubbleElement, source);
         },
-        [clearLongPressTimer, isSyntheticPostLike, message, onOpenActions],
+        [clearLongPressTimer, isSystemMessage, message, onOpenActions],
     );
 
     const handleContextMenu = (event: React.MouseEvent<HTMLElement>) => {
-        if (isSyntheticPostLike) return;
+        if (isSystemMessage) return;
         event.preventDefault();
         event.stopPropagation();
         openActions(event.currentTarget, "contextmenu");
     };
 
     const handleTouchStart = (event: React.TouchEvent<HTMLElement>) => {
-        if (isSyntheticPostLike) {
+        if (isSystemMessage) {
             cancelLongPress();
             return;
         }

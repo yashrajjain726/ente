@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -11,29 +12,29 @@ import (
 	"github.com/lib/pq"
 )
 
-var spaceMessageSelectColumns = `
+const spaceMessageBaseSelectColumns = `
 	m.message_id,
 	m.kind,
 	m.sender_space_id,
 	m.recipient_space_id,
 	COALESCE(m.message_cipher, '\x'::bytea),
-	CASE
-		WHEN m.sender_space_id = %s THEN COALESCE(m.sender_encrypted_message_key, '\x'::bytea)
-		ELSE COALESCE(m.recipient_encrypted_message_key, '\x'::bytea)
-	END AS encrypted_message_key,
+	%[2]s AS encrypted_message_key,
 	m.reply_post_id,
 	m.reply_message_id,
 	(m.recipient_liked_at IS NOT NULL) AS liked,
-	(m.recipient_liked_at IS NOT NULL AND m.recipient_space_id = %s) AS viewer_liked,
+	(m.recipient_liked_at IS NOT NULL AND m.recipient_space_id = %[1]s) AS viewer_liked,
 	m.is_deleted,
 	m.created_at,
 	m.updated_at,
 	CASE
-		WHEN m.kind = 'post_like' AND m.sender_space_id = %s THEN 'You liked a post'
+		WHEN m.kind = 'post_like' AND m.sender_space_id = %[1]s THEN 'You liked a post'
 		WHEN m.kind = 'post_like' THEN 'Liked your post'
 		WHEN m.kind = 'friend_added' THEN 'You are now friends'
 		ELSE ''
 	END AS text,
+`
+
+var spaceMessageQuoteSelectColumns = `
 	quote_post.post_id AS quote_post_id,
 	COALESCE(quote_post.space_id, '') AS quote_space_id,
 	COALESCE(quote_post.encrypted_post_key, '\x'::bytea) AS quote_encrypted_post_key,
@@ -43,6 +44,18 @@ var spaceMessageSelectColumns = `
 ` + spaceActorSelectColumns("sender_space", "sender_avatar", "sender") + `,
 ` + spaceActorSelectColumns("recipient_space", "recipient_avatar", "recipient") + `
 `
+
+func spaceMessageSelectColumns(viewerPlaceholder string) string {
+	encryptedMessageKeySQL := `
+		CASE
+			WHEN m.sender_space_id = ` + viewerPlaceholder + ` THEN COALESCE(m.sender_encrypted_message_key, '\x'::bytea)
+			ELSE COALESCE(m.recipient_encrypted_message_key, '\x'::bytea)
+		END`
+	return strings.TrimSpace(
+		fmt.Sprintf(spaceMessageBaseSelectColumns, viewerPlaceholder, encryptedMessageKeySQL) + `
+` + spaceMessageQuoteSelectColumns,
+	)
+}
 
 var spaceMessageJoins = `
 	JOIN spaces sender_space ON sender_space.space_id = m.sender_space_id
@@ -257,7 +270,7 @@ func (r *MessagesRepository) CreateMessage(ctx context.Context, input CreateSpac
 
 func (r *MessagesRepository) GetMessage(ctx context.Context, messageID string, viewerSpaceID string) (*SpaceMessageRecord, error) {
 	query := `
-		SELECT ` + sprintfSpaceMessageColumns("$2") + `
+		SELECT ` + spaceMessageSelectColumns("$2") + `
 		FROM space_messages m
 		` + spaceMessageJoins + `
 		WHERE m.message_id = $1
@@ -273,7 +286,7 @@ func (r *MessagesRepository) ListThread(ctx context.Context, viewerSpaceID strin
 	}
 	args := []any{viewerSpaceID, otherSpaceID}
 	query := `
-		SELECT ` + sprintfSpaceMessageColumns("$1") + `
+		SELECT ` + spaceMessageSelectColumns("$1") + `
 		FROM space_messages m
 		` + spaceMessageJoins + `
 		WHERE m.thread_key = ` + selectedThreadKeySQL + `
@@ -399,10 +412,6 @@ func (r *MessagesRepository) ListLatestChatSummaries(ctx context.Context, viewer
 		out[summary.FriendSpaceID] = *summary
 	}
 	return out, stacktrace.Propagate(rows.Err(), "")
-}
-
-func sprintfSpaceMessageColumns(viewerPlaceholder string) string {
-	return strings.TrimSpace(strings.ReplaceAll(spaceMessageSelectColumns, "%s", viewerPlaceholder))
 }
 
 func scanMessageRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceMessageRecord, error) {
