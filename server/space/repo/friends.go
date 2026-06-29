@@ -232,10 +232,6 @@ func (r *FriendsRepository) CreateFriendRequest(ctx context.Context, requesterID
 func (r *FriendsRepository) ListFriendRequestsForSpace(ctx context.Context, targetSpaceID string) ([]SpaceFriendRequestRecord, error) {
 	query := `
 		SELECT fr.request_id,
-		       fr.requester_space_id,
-		       fr.target_space_id,
-		       fr.requester_friend_sealed_space_key,
-		       fr.requester_key_version,
 		       fr.created_at,
 		       ` + spaceActorPublicSelectColumns("requester_space", "requester") + `
 		FROM space_friend_requests fr
@@ -255,10 +251,6 @@ func (r *FriendsRepository) ListFriendRequestsForSpace(ctx context.Context, targ
 		var rec SpaceFriendRequestRecord
 		dest := []any{
 			&rec.RequestID,
-			&rec.RequesterSpaceID,
-			&rec.TargetSpaceID,
-			&rec.RequesterFriendSealedSpaceKey,
-			&rec.RequesterKeyVersion,
 			&rec.CreatedAt,
 		}
 		dest = append(dest, spaceActorScanDest(&rec.Requester)...)
