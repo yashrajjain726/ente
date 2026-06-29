@@ -10,7 +10,6 @@ import {
     loadCurrentMessageActivityPostPreview,
     loadCurrentMessageConversations,
     loadCurrentMessageThread,
-    loadCurrentSpaceFriends,
     loadCurrentSpaceProfile,
     markCurrentMessagesRead,
     replyToCurrentMessage,
@@ -106,19 +105,13 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     selectedSpaceId,
 }) => {
     const router = useSpaceRouter();
-    const {
-        friends,
-        profile,
-        profileLoadError,
-        profileLoadStatus,
-        setFriends,
-    } = useSpaceAppState();
+    const { profile, profileLoadError, profileLoadStatus, setFriends } =
+        useSpaceAppState();
     const [conversations, setConversations] = React.useState<
         SpaceMessageConversation[]
     >([]);
     const [isConversationsLoading, setIsConversationsLoading] =
         React.useState(true);
-    const [isFriendsLoading, setIsFriendsLoading] = React.useState(true);
     const [isThreadLoading, setIsThreadLoading] = React.useState(false);
     const [messages, setMessages] = React.useState<SpaceMessage[]>([]);
     const [selectedFriendProfile, setSelectedFriendProfile] =
@@ -144,14 +137,24 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 : undefined,
         [conversations, selectedSpaceId],
     );
+    const conversationFriends = React.useMemo(
+        () =>
+            conversations
+                .filter(
+                    (conversation) =>
+                        !isFriendRequestConversation(conversation),
+                )
+                .map((conversation) => conversation.friend),
+        [conversations],
+    );
     const selectedFriendFromFriends = React.useMemo(
         () =>
             selectedSpaceId
-                ? friends.find(
+                ? conversationFriends.find(
                       (friend) => friendSpaceId(friend) == selectedSpaceId,
                   )
                 : undefined,
-        [friends, selectedSpaceId],
+        [conversationFriends, selectedSpaceId],
     );
     const selectedLoadedFriendProfile =
         selectedFriendProfile &&
@@ -175,7 +178,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     const selectedFriendUsername = selectedFriend?.username;
     const isSelectedFriendCurrent = Boolean(
         selectedFriendSpaceId &&
-        friends.some((friend) => {
+        conversationFriends.some((friend) => {
             const currentFriendSpaceId = friendSpaceId(friend);
             return (
                 currentFriendSpaceId == selectedFriendSpaceId ||
@@ -186,10 +189,12 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         }),
     );
     const isThreadRecipientLoading =
-        Boolean(selectedFriend) && isFriendsLoading && !isSelectedFriendCurrent;
+        Boolean(selectedFriend) &&
+        isConversationsLoading &&
+        !isSelectedFriendCurrent;
     const isThreadReadOnly =
         Boolean(selectedFriend) &&
-        !isFriendsLoading &&
+        !isConversationsLoading &&
         !isSelectedFriendCurrent;
 
     const markConversationRead = React.useCallback(
@@ -247,6 +252,14 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                 .map(conversationId);
             setNewConversationIds(unreadConversationIds);
             setConversations(items);
+            setFriends(
+                items
+                    .filter(
+                        (conversation) =>
+                            !isFriendRequestConversation(conversation),
+                    )
+                    .map((conversation) => conversation.friend),
+            );
             if (passiveUnreadConversationIds.length > 0) {
                 void Promise.all(
                     passiveUnreadConversationIds.map((spaceId) =>
@@ -266,7 +279,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         } finally {
             setIsConversationsLoading(false);
         }
-    }, [profile?.spaceId]);
+    }, [profile?.spaceId, setFriends]);
 
     const openConversation = React.useCallback(
         (conversation: SpaceMessageConversation) => {
@@ -373,30 +386,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     }, [profile, refreshConversations]);
 
     React.useEffect(() => {
-        if (!profile?.spaceId) {
-            setIsFriendsLoading(false);
-            return;
-        }
-
-        let cancelled = false;
-        setIsFriendsLoading(true);
-        void loadCurrentSpaceFriends(profile.spaceId)
-            .then((nextFriends) => {
-                if (!cancelled) setFriends(nextFriends);
-            })
-            .catch((error: unknown) =>
-                console.error("Failed to load space friends", error),
-            )
-            .finally(() => {
-                if (!cancelled) setIsFriendsLoading(false);
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [profile?.spaceId, setFriends]);
-
-    React.useEffect(() => {
         if (!selectedSpaceId || !selectedConversation) return;
         if (markedReadSpaceIdRef.current == selectedSpaceId) return;
 
@@ -407,7 +396,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     const shouldLoadSelectedFriendProfile = Boolean(
         selectedSpaceId &&
         !isConversationsLoading &&
-        !isFriendsLoading &&
         !selectedConversation &&
         !selectedFriendFromFriends,
     );
@@ -445,7 +433,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         if (
             !selectedSpaceId ||
             isConversationsLoading ||
-            isFriendsLoading ||
             selectedConversation ||
             selectedFriendFromFriends ||
             selectedLoadedFriendProfile ||
@@ -458,7 +445,6 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         void router.replace(spaceRoutes.messages);
     }, [
         isConversationsLoading,
-        isFriendsLoading,
         router,
         selectedConversation,
         selectedFriendFromFriends,
@@ -556,7 +542,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
             <SpacePageMeta themeColor={messagesBackground} />
             <MessagesScreen
                 conversations={conversations}
-                friendsCount={friends.length}
+                friendsCount={conversationFriends.length}
                 isConversationsLoading={isConversationsLoading}
                 isThreadLoading={isThreadLoading}
                 isThreadReadOnly={isThreadReadOnly}
