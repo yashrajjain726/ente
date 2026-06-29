@@ -60,10 +60,8 @@ type SpaceRecord struct {
 	EncryptedProfile    []byte
 	CurrentVersion      int
 	AvatarObjectID      sql.NullString
-	AvatarBucketID      sql.NullString
 	AvatarSize          sql.NullInt64
 	CoverObjectID       sql.NullString
-	CoverBucketID       sql.NullString
 	CoverSize           sql.NullInt64
 	CreatedAt           int64
 	UpdatedAt           int64

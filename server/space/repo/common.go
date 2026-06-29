@@ -38,10 +38,8 @@ const spaceRecordSelectColumns = `
 	s.public_key,
 	s.encrypted_secret_key,
 	avatar.object_id AS avatar_object_id,
-	avatar.bucket_id AS avatar_bucket_id,
 	avatar.size AS avatar_size,
 	cover.object_id AS cover_object_id,
-	cover.bucket_id AS cover_bucket_id,
 	cover.size AS cover_size,
 	s.created_at,
 	s.updated_at

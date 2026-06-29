@@ -1108,7 +1108,9 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, testSpaceBytes("alice-profile-v2"), updatedSpace.EncryptedProfile)
 	require.Equal(t, "avatar.jpg", updatedSpace.AvatarObjectID.String)
-	require.Equal(t, "b2-eu-cen", updatedSpace.AvatarBucketID.String)
+	avatarBucketID, err := module.Assets.GetProfileAssetBucketID(ctx, aliceSpace.SpaceID, ProfileAssetTypeAvatar, "avatar.jpg")
+	require.NoError(t, err)
+	require.Equal(t, "b2-eu-cen", avatarBucketID)
 
 	rotatedSpace, err := testRotateKey(ctx, module, aliceID, aliceSpace.SpaceID, updatedSpace.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v3")
 	require.NoError(t, err)
