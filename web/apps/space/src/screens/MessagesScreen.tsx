@@ -218,11 +218,7 @@ const ConversationPreviewLine: React.FC<{
         whiteSpace: "nowrap",
     };
 
-    return (
-        <Box sx={previewLineSx}>
-            {conversationPreview(conversation)}
-        </Box>
-    );
+    return <Box sx={previewLineSx}>{conversationPreview(conversation)}</Box>;
 };
 
 const conversationId = (conversation: SpaceMessageConversation) =>
@@ -396,7 +392,12 @@ const ConversationListItem: React.FC<{
     const postThumbnailUrl = (activityPost ?? post)?.imageUrl;
     const unreadCount = conversation.unreadCount;
     React.useEffect(() => {
-        if (!post || post.isDeleted || post.imageUrl || activityPost?.imageUrl) {
+        if (
+            !post ||
+            post.isDeleted ||
+            post.imageUrl ||
+            activityPost?.imageUrl
+        ) {
             return;
         }
         onLoadActivityPost?.(post);
@@ -924,6 +925,26 @@ const MessageActionLabel: React.FC<{
     </Box>
 );
 
+const FriendAddedSystemMessage: React.FC = () => (
+    <Box
+        sx={{
+            alignSelf: "center",
+            bgcolor: lightSurface,
+            borderRadius: "999px",
+            color: textSecondary,
+            fontFamily: '"Inter Variable", Inter, sans-serif',
+            fontSize: 12,
+            fontWeight: 600,
+            lineHeight: "16px",
+            px: "10px",
+            py: "5px",
+            textAlign: "center",
+        }}
+    >
+        You are now friends
+    </Box>
+);
+
 const QuoteFrame: React.FC<{
     children: React.ReactNode;
     isOwn: boolean;
@@ -1110,9 +1131,7 @@ const MessageBubble: React.FC<{
     const isPostReply = message.kind == "post_reply";
     const isSystemMessage = isSyntheticPostLike || isFriendAdded;
     const hasMessageReply = Boolean(message.replyMessageId);
-    const actionLabel = isFriendAdded
-        ? "You are now friends"
-        : isSyntheticPostLike
+    const actionLabel = isSyntheticPostLike
         ? isOwn
             ? "You liked their post"
             : "Liked your post"
@@ -1126,6 +1145,11 @@ const MessageBubble: React.FC<{
                 : "Replied to you"
             : undefined;
     const hasBodyBubble = !isSystemMessage;
+    const rowAlignItems = isFriendAdded
+        ? "center"
+        : isOwn
+          ? "flex-end"
+          : "flex-start";
     const longPressTimerRef = React.useRef<number | undefined>(undefined);
     const longPressStartRef = React.useRef<
         { x: number; y: number } | undefined
@@ -1216,7 +1240,7 @@ const MessageBubble: React.FC<{
         <Box
             component="li"
             sx={{
-                alignItems: isOwn ? "flex-end" : "flex-start",
+                alignItems: rowAlignItems,
                 display: "flex",
                 flexDirection: "column",
                 listStyle: "none",
@@ -1228,119 +1252,127 @@ const MessageBubble: React.FC<{
                 zIndex: isHighlighted ? 3 : message.liked ? 1 : "auto",
             }}
         >
-            <Box
-                sx={{
-                    alignItems: isOwn ? "flex-end" : "flex-start",
-                    display: "flex",
-                    flexDirection: "column",
-                    maxWidth: "min(calc(100vw - 72px), 360px)",
-                    position: "relative",
-                    width: "fit-content",
-                }}
-            >
-                {actionLabel && (
-                    <MessageActionLabel
-                        icon={isSyntheticPostLike ? "like" : "reply"}
-                        isOwn={isOwn}
-                        label={actionLabel}
-                    />
-                )}
-                {hasMessageReply && (
-                    <MessageReplyPreview
-                        isOwn={isOwn}
-                        parentMessage={parentMessage}
-                        profile={profile}
-                    />
-                )}
-                {(isPostReply || isSyntheticPostLike) && (
-                    <PostQuotePreview
-                        isOwn={isOwn}
-                        mb={hasBodyBubble ? "8px" : "0"}
-                        message={message}
-                        onOpenQuotePost={onOpenQuotePost}
-                    />
-                )}
-                {hasBodyBubble && (
-                    <Box
-                        data-message-bubble
-                        onContextMenu={handleContextMenu}
-                        onTouchCancel={cancelLongPress}
-                        onTouchEnd={handleTouchEnd}
-                        onTouchMove={handleTouchMove}
-                        onTouchStart={handleTouchStart}
-                        sx={{
-                            bgcolor: isOwn ? outgoingBubble : incomingBubble,
-                            borderRadius: bubbleBorderRadius,
-                            color: isOwn
-                                ? outgoingMessageText
-                                : incomingMessageText,
-                            cursor: "context-menu",
-                            display: "block",
-                            maxWidth: "100%",
-                            minWidth: 0,
-                            ml: 0,
-                            overflow: "visible",
-                            position: "relative",
-                            px: "16px",
-                            py: "14px",
-                            textAlign: "left",
-                            touchAction: "pan-y",
-                            userSelect: "none",
-                            WebkitTouchCallout: "none",
-                            WebkitUserSelect: "none",
-                            width: "fit-content",
-                            "& *": {
-                                userSelect: "none",
-                                WebkitTouchCallout: "none",
-                                WebkitUserSelect: "none",
-                            },
-                            "&:hover": {
+            {isFriendAdded ? (
+                <FriendAddedSystemMessage />
+            ) : (
+                <Box
+                    sx={{
+                        alignItems: isOwn ? "flex-end" : "flex-start",
+                        display: "flex",
+                        flexDirection: "column",
+                        maxWidth: "min(calc(100vw - 72px), 360px)",
+                        position: "relative",
+                        width: "fit-content",
+                    }}
+                >
+                    {actionLabel && (
+                        <MessageActionLabel
+                            icon={isSyntheticPostLike ? "like" : "reply"}
+                            isOwn={isOwn}
+                            label={actionLabel}
+                        />
+                    )}
+                    {hasMessageReply && (
+                        <MessageReplyPreview
+                            isOwn={isOwn}
+                            parentMessage={parentMessage}
+                            profile={profile}
+                        />
+                    )}
+                    {(isPostReply || isSyntheticPostLike) && (
+                        <PostQuotePreview
+                            isOwn={isOwn}
+                            mb={hasBodyBubble ? "8px" : "0"}
+                            message={message}
+                            onOpenQuotePost={onOpenQuotePost}
+                        />
+                    )}
+                    {hasBodyBubble && (
+                        <Box
+                            data-message-bubble
+                            onContextMenu={handleContextMenu}
+                            onTouchCancel={cancelLongPress}
+                            onTouchEnd={handleTouchEnd}
+                            onTouchMove={handleTouchMove}
+                            onTouchStart={handleTouchStart}
+                            sx={{
                                 bgcolor: isOwn
                                     ? outgoingBubble
-                                    : lightSurfaceHover,
-                            },
-                        }}
-                    >
-                        <Box
-                            sx={{
+                                    : incomingBubble,
+                                borderRadius: bubbleBorderRadius,
                                 color: isOwn
                                     ? outgoingMessageText
                                     : incomingMessageText,
-                                fontFamily:
-                                    '"Inter Variable", Inter, sans-serif',
-                                fontSize: 14,
-                                fontWeight: 600,
-                                lineHeight: "21px",
-                                overflowWrap: "anywhere",
-                                whiteSpace: "pre-wrap",
+                                cursor: "context-menu",
+                                display: "block",
+                                maxWidth: "100%",
+                                minWidth: 0,
+                                ml: 0,
+                                overflow: "visible",
+                                position: "relative",
+                                px: "16px",
+                                py: "14px",
+                                textAlign: "left",
+                                touchAction: "pan-y",
+                                userSelect: "none",
+                                WebkitTouchCallout: "none",
+                                WebkitUserSelect: "none",
+                                width: "fit-content",
+                                "& *": {
+                                    userSelect: "none",
+                                    WebkitTouchCallout: "none",
+                                    WebkitUserSelect: "none",
+                                },
+                                "&:hover": {
+                                    bgcolor: isOwn
+                                        ? outgoingBubble
+                                        : lightSurfaceHover,
+                                },
                             }}
                         >
-                            {message.text}
-                        </Box>
-                        {message.liked && (
                             <Box
-                                component="span"
-                                role="img"
-                                aria-label="Liked"
                                 sx={{
-                                    alignItems: "center",
-                                    bottom: -5,
-                                    color: green,
-                                    display: "inline-flex",
-                                    justifyContent: "center",
-                                    lineHeight: 0,
-                                    pointerEvents: "none",
-                                    position: "absolute",
-                                    zIndex: 2,
-                                    ...(isOwn ? { left: -2 } : { right: -2 }),
+                                    color: isOwn
+                                        ? outgoingMessageText
+                                        : incomingMessageText,
+                                    fontFamily:
+                                        '"Inter Variable", Inter, sans-serif',
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    lineHeight: "21px",
+                                    overflowWrap: "anywhere",
+                                    whiteSpace: "pre-wrap",
                                 }}
                             >
-                                <MessageLikeHeartIcon />
+                                {message.text}
                             </Box>
-                        )}
-                    </Box>
-                )}
-            </Box>
+                            {message.liked && (
+                                <Box
+                                    component="span"
+                                    role="img"
+                                    aria-label="Liked"
+                                    sx={{
+                                        alignItems: "center",
+                                        bottom: -5,
+                                        color: green,
+                                        display: "inline-flex",
+                                        justifyContent: "center",
+                                        lineHeight: 0,
+                                        pointerEvents: "none",
+                                        position: "absolute",
+                                        zIndex: 2,
+                                        ...(isOwn
+                                            ? { left: -2 }
+                                            : { right: -2 }),
+                                    }}
+                                >
+                                    <MessageLikeHeartIcon />
+                                </Box>
+                            )}
+                        </Box>
+                    )}
+                </Box>
+            )}
         </Box>
     );
 };
@@ -1852,33 +1884,48 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     }
                                     sx={{
                                         appearance: "none",
+                                        alignItems: "center",
                                         bgcolor: "transparent",
                                         border: 0,
                                         color: "inherit",
                                         cursor: canInteract
                                             ? "pointer"
                                             : "default",
-                                        display: "block",
+                                        display: "flex",
                                         fontFamily:
                                             '"Inter Variable", Inter, sans-serif',
                                         fontSize: 18,
                                         fontWeight: 700,
+                                        gap: "8px",
+                                        justifyContent: "center",
                                         lineHeight: "24px",
                                         m: 0,
                                         maxWidth: "100%",
                                         minWidth: 0,
                                         overflow: "hidden",
                                         p: 0,
-                                        textOverflow: "ellipsis",
                                         whiteSpace: "nowrap",
                                         "&:focus-visible": {
-                                            borderRadius: "4px",
+                                            borderRadius: "18px",
                                             outline: `2px solid ${green}`,
                                             outlineOffset: 3,
                                         },
                                     }}
                                 >
-                                    {firstNameFrom(selectedName)}
+                                    <Avatar
+                                        avatarUrl={selectedFriend.avatarUrl}
+                                        size={28}
+                                    />
+                                    <Box
+                                        component="span"
+                                        sx={{
+                                            minWidth: 0,
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                        }}
+                                    >
+                                        {firstNameFrom(selectedName)}
+                                    </Box>
                                 </Box>
                             </Box>
                         ) : (
