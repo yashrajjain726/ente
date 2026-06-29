@@ -2,10 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use ente_core::{
-    crypto::{decode_b64, encode_b64},
-    http::Error as HttpError,
-};
+use ente_core::{crypto::decode_b64, http::Error as HttpError};
 use ente_space::{
     AccountSpaceCtx, CreatedSpace, CreatedSpaceLink, DecryptedMessage, DecryptedPost,
     DecryptedSpaceProfile, MessageConversationActivity, MessageResponse, OpenAccountSpaceCtxInput,
@@ -106,10 +103,6 @@ struct OpenSpaceLinkCtxJsInput {
 struct CreatedSpaceJs {
     space_id: String,
     space_slug: String,
-    key_version: i32,
-    space_key_b64: String,
-    root_wrapped_space_key: String,
-    encrypted_profile: String,
 }
 
 #[derive(Serialize)]
@@ -282,10 +275,6 @@ fn created_space_to_js(value: CreatedSpace) -> CreatedSpaceJs {
     CreatedSpaceJs {
         space_id: value.space_id,
         space_slug: value.space_slug,
-        key_version: value.key_version,
-        space_key_b64: encode_b64(&value.space_key),
-        root_wrapped_space_key: value.root_wrapped_space_key,
-        encrypted_profile: value.encrypted_profile,
     }
 }
 
