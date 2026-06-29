@@ -28,11 +28,6 @@ pub struct CreateEntityKeyRequest {
     pub header: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StatusResponse {
-    pub status: String,
-}
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSpaceRequest {
@@ -573,11 +568,6 @@ pub struct SpaceLinkLoginResponse {
     pub public_key: String,
     pub key_version: i32,
     pub link_wrapped_space_key: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdatedCountResponse {
-    pub updated: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
