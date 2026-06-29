@@ -142,8 +142,12 @@ interface SpaceConversationChatSummaryResponse {
     unreadCount?: number;
 }
 
+type SpaceConversationChatSummaries =
+    | Record<string, SpaceConversationChatSummaryResponse>
+    | Map<string, SpaceConversationChatSummaryResponse>;
+
 interface SpaceConversationsResponse {
-    chatSummaries?: Record<string, SpaceConversationChatSummaryResponse>;
+    chatSummaries?: SpaceConversationChatSummaries;
     friends?: SpaceFriend[];
     pendingRequests?: SpaceFriendRequestResponse[];
 }
@@ -333,6 +337,14 @@ const placeholderMessageActor = (spaceId: string): FriendProfile => ({
 });
 
 const friendSpaceId = (friend: FriendProfile) => friend.spaceId || friend.id;
+
+const conversationSummaryForFriend = (
+    summaries: SpaceConversationChatSummaries | undefined,
+    friendSpaceID: string,
+) =>
+    summaries instanceof Map
+        ? summaries.get(friendSpaceID)
+        : summaries?.[friendSpaceID];
 
 const messageActorForSpace = (
     spaceId: string,
@@ -1152,17 +1164,21 @@ export const loadCurrentMessageConversations = async (
         const response = await (
             ctx as unknown as SpaceConversationsContext
         ).list_conversations(spaceId);
-        const summaries = response.chatSummaries ?? {};
+        const summaries = response.chatSummaries;
         const friendItems = await Promise.all(
             (response.friends ?? []).map(async (conversation) => {
                 const friend = actorProfile(conversation.friend);
+                const friendSpaceID = friendSpaceId(friend);
                 friend.avatarUrl = await accountAvatarURL(
                     ctx,
-                    conversation.friend.spaceId,
+                    friendSpaceID,
                     conversation.friend.avatar,
                     spaceId,
                 );
-                const summary = summaries[conversation.friend.spaceId];
+                const summary = conversationSummaryForFriend(
+                    summaries,
+                    friendSpaceID,
+                );
                 return {
                     friend,
                     latestActivity: summary
@@ -1175,7 +1191,7 @@ export const loadCurrentMessageConversations = async (
                               createdAtMs: timestampMsFromSpaceDate(
                                   conversation.createdAt,
                               ),
-                              id: `empty:${conversation.friend.spaceId}`,
+                              id: `empty:${friendSpaceID}`,
                               outgoing: false,
                               type: "empty" as const,
                           },
