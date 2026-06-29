@@ -379,9 +379,9 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 	if activity.PostID.Valid {
 		postID := activity.PostID.Int64
 		resp.PostID = &postID
-	}
-	if activity.PostSpaceID.Valid {
-		resp.PostSpaceID = activity.PostSpaceID.String
+		if activity.PostSpaceID.Valid {
+			resp.PostSpaceID = activity.PostSpaceID.String
+		}
 	}
 	return resp
 }

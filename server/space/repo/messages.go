@@ -74,18 +74,17 @@ FROM (
 		END AS activity_id,
 		m.created_at AS activity_created_at,
 		CASE WHEN m.kind = 'post_like' THEN NULL::text ELSE m.message_id END AS message_id,
-		CASE WHEN m.kind IN ('post_reply', 'post_like') THEN m.reply_post_id ELSE NULL::bigint END AS post_id,
-		CASE WHEN m.kind IN ('post_reply', 'post_like') THEN m.recipient_space_id ELSE NULL::text END AS post_space_id,
-		CASE WHEN m.kind IN ('regular', 'post_reply') THEN m.kind ELSE NULL::text END AS message_kind,
-		CASE WHEN m.kind IN ('regular', 'post_reply') THEN m.sender_space_id ELSE NULL::text END AS sender_space_id,
-		CASE WHEN m.kind IN ('regular', 'post_reply') THEN m.recipient_space_id ELSE NULL::text END AS recipient_space_id,
-		CASE WHEN m.kind IN ('regular', 'post_reply') THEN COALESCE(m.message_cipher, '\x'::bytea) ELSE NULL::bytea END AS message_cipher,
+		m.reply_post_id AS post_id,
+		m.recipient_space_id AS post_space_id,
+		m.kind AS message_kind,
+		m.sender_space_id,
+		m.recipient_space_id,
+		m.message_cipher,
 		CASE
-			WHEN m.kind IN ('regular', 'post_reply') AND m.sender_space_id = $1 THEN COALESCE(m.sender_encrypted_message_key, '\x'::bytea)
-			WHEN m.kind IN ('regular', 'post_reply') THEN COALESCE(m.recipient_encrypted_message_key, '\x'::bytea)
-			ELSE NULL::bytea
+			WHEN m.sender_space_id = $1 THEN m.sender_encrypted_message_key
+			ELSE m.recipient_encrypted_message_key
 		END AS encrypted_message_key,
-		CASE WHEN m.kind IN ('regular', 'post_reply') THEN m.reply_message_id ELSE NULL::text END AS reply_message_id,
+		m.reply_message_id,
 		CASE
 			WHEN m.recipient_space_id = $1 AND m.kind IN ('regular', 'post_reply', 'post_like') THEN m.created_at
 			ELSE NULL::bigint
