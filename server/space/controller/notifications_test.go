@@ -103,13 +103,13 @@ func TestPostLikeSendsEmailOnce(t *testing.T) {
 	postID, err := testCreatePost(ctx, repos, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
 
-	resp, err := posts.ToggleLike(newSelectedSpaceControllerContext(bobID, bobSpace), postID, models.LikePostRequest{Like: true})
+	resp, err := posts.SetLike(ctx, bobSpace, postID, true)
 	require.NoError(t, err)
 	require.True(t, resp.Liked)
 	email := requireSpaceEmail(t, notifier)
 	require.Equal(t, recordedSpaceEmail{event: "post_liked", actorSlug: bobSpace.SpaceSlug, recipients: []int64{aliceID}}, email)
 
-	_, err = posts.ToggleLike(newSelectedSpaceControllerContext(bobID, bobSpace), postID, models.LikePostRequest{Like: true})
+	_, err = posts.SetLike(ctx, bobSpace, postID, true)
 	require.NoError(t, err)
 	requireNoSpaceEmail(t, notifier)
 }
@@ -124,7 +124,7 @@ func TestPostReplySendsEmail(t *testing.T) {
 	postID, err := testCreatePost(ctx, repos, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
 
-	_, err = messages.ReplyToPost(newSelectedSpaceControllerContext(bobID, bobSpace), postID, models.CreateMessageRequest{
+	_, err = messages.ReplyToPost(ctx, bobSpace, postID, models.CreateMessageRequest{
 		MessageCipher:                spaceTestB64("reply-cipher"),
 		SenderEncryptedMessageKey:    spaceTestB64("reply-sender-key"),
 		RecipientEncryptedMessageKey: spaceTestB64("reply-recipient-key"),
@@ -150,22 +150,22 @@ func TestAddFriendSendsEmailOnce(t *testing.T) {
 		RequesterKeyVersion:           bobSpace.CurrentVersion,
 	}
 
-	resp, err := friends.Add(newSelectedSpaceControllerContext(bobID, bobSpace), req)
+	resp, err := friends.Add(ctx, bobSpace, req)
 	require.NoError(t, err)
 	require.Equal(t, "requested", resp.Status)
 	email := requireSpaceEmail(t, notifier)
 	require.Equal(t, recordedSpaceEmail{event: "friend_requested", actorSlug: bobSpace.SpaceSlug, recipients: []int64{aliceID}}, email)
 
-	_, err = friends.Add(newSelectedSpaceControllerContext(bobID, bobSpace), req)
+	_, err = friends.Add(ctx, bobSpace, req)
 	require.NoError(t, err)
 	requireNoSpaceEmail(t, notifier)
 
-	requests, err := friends.ListRequests(newSelectedSpaceControllerContext(aliceID, aliceSpace))
+	requests, err := friends.ListRequests(ctx, aliceSpace)
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	require.Equal(t, bobSpace.SpaceSlug, requests[0].Requester.SpaceSlug)
 
-	resp, err = friends.ConfirmRequest(newSelectedSpaceControllerContext(aliceID, aliceSpace), requests[0].RequestID, models.ConfirmFriendRequestPayload{
+	resp, err = friends.ConfirmRequest(ctx, aliceSpace, requests[0].RequestID, models.ConfirmFriendRequestPayload{
 		TargetFriendSealedSpaceKey: base64.StdEncoding.EncodeToString([]byte("alice-target-key")),
 		TargetKeyVersion:           aliceSpace.CurrentVersion,
 	})

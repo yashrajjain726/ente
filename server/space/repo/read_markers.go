@@ -9,13 +9,21 @@ import (
 	"github.com/lib/pq"
 )
 
+type notificationReadMarkerExecer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 func (r *ReadMarkersRepository) UpsertNotificationReadMarker(ctx context.Context, viewerSpaceID string, friendSpaceID string, readAt int64) error {
+	return upsertNotificationReadMarker(ctx, r.DB, viewerSpaceID, friendSpaceID, readAt)
+}
+
+func upsertNotificationReadMarker(ctx context.Context, execer notificationReadMarkerExecer, viewerSpaceID string, friendSpaceID string, readAt int64) error {
 	viewerSpaceID = strings.TrimSpace(viewerSpaceID)
 	friendSpaceID = strings.TrimSpace(friendSpaceID)
 	if viewerSpaceID == "" || friendSpaceID == "" || readAt <= 0 {
 		return nil
 	}
-	_, err := r.DB.ExecContext(ctx, `
+	_, err := execer.ExecContext(ctx, `
 		INSERT INTO space_notification_read_markers (viewer_space_id, friend_space_id, read_at)
 		VALUES ($1, $2, $3)
 		ON CONFLICT (viewer_space_id, friend_space_id) DO UPDATE
@@ -61,8 +69,6 @@ func (r *ReadMarkersRepository) HasUnreadNotifications(ctx context.Context, view
 				JOIN spaces requester_space ON requester_space.space_id = fr.requester_space_id
 				JOIN users requester_owner ON requester_owner.user_id = requester_space.owner_id AND requester_owner.encrypted_email IS NOT NULL
 				WHERE fr.target_space_id = $1
-				  AND fr.is_deleted = FALSE
-				  AND fr.resolved_at IS NULL
 				LIMIT 1
 			)
 	`, strings.TrimSpace(viewerSpaceID)).Scan(&exists); err != nil {

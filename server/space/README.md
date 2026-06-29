@@ -1,6 +1,6 @@
 # Space Module
 
-This module is the top-level home for space functionality in `ente3/server`.
+This module is the top-level home for space functionality in `server`.
 
 ## Layout
 
@@ -16,7 +16,8 @@ The space root key bootstrap remains on the existing `/user-entity/key` endpoint
 
 ## Routes
 
-Canonical space routes are mounted under `/space/*`.
+Selected private Space routes are mounted under `/spaces/:spaceID/*`.
+Public Space reads also use `/spaces/:spaceID/*`; legacy `/space/*` remains only for public slug lookup and link-session bootstrap endpoints.
 
 ## Local env overrides
 

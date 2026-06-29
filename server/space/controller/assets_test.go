@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"testing"
@@ -20,9 +21,10 @@ func (b testSpaceAssetBuckets) IsBucketActive(bucketID string) bool {
 
 func TestPresignUploadRejectsOversizedPost(t *testing.T) {
 	controller := &AssetsController{}
-	ctx := newSelectedSpaceControllerContext(1, &spacerepo.SpaceRecord{SpaceID: "space-1"})
+	ctx := context.Background()
+	space := &spacerepo.SpaceRecord{SpaceID: "space-1"}
 
-	_, err := controller.PresignUpload(ctx, models.PresignUploadRequest{
+	_, err := controller.PresignUpload(ctx, space, models.PresignUploadRequest{
 		Size:       maxPostUploadBytes + 1,
 		ContentMD5: "XUFAKrxLKna5cZ2REBfFkg==",
 	})
@@ -33,10 +35,11 @@ func TestPresignUploadRejectsOversizedPost(t *testing.T) {
 
 func TestPresignUploadRejectsOversizedAvatar(t *testing.T) {
 	controller := &AssetsController{}
-	ctx := newSelectedSpaceControllerContext(1, &spacerepo.SpaceRecord{SpaceID: "space-1"})
+	ctx := context.Background()
+	space := &spacerepo.SpaceRecord{SpaceID: "space-1"}
 	purpose := uploadPurposeAvatar
 
-	_, err := controller.PresignUpload(ctx, models.PresignUploadRequest{
+	_, err := controller.PresignUpload(ctx, space, models.PresignUploadRequest{
 		Size:       maxAvatarUploadBytes + 1,
 		ContentMD5: "XUFAKrxLKna5cZ2REBfFkg==",
 		Purpose:    &purpose,
@@ -48,10 +51,11 @@ func TestPresignUploadRejectsOversizedAvatar(t *testing.T) {
 
 func TestPresignUploadRejectsOversizedCover(t *testing.T) {
 	controller := &AssetsController{}
-	ctx := newSelectedSpaceControllerContext(1, &spacerepo.SpaceRecord{SpaceID: "space-1"})
+	ctx := context.Background()
+	space := &spacerepo.SpaceRecord{SpaceID: "space-1"}
 	purpose := uploadPurposeCover
 
-	_, err := controller.PresignUpload(ctx, models.PresignUploadRequest{
+	_, err := controller.PresignUpload(ctx, space, models.PresignUploadRequest{
 		Size:       maxCoverUploadBytes + 1,
 		ContentMD5: "XUFAKrxLKna5cZ2REBfFkg==",
 		Purpose:    &purpose,
@@ -130,7 +134,7 @@ func TestPresignUploadReturnsUnavailableWhenSpaceAssetBucketMissing(t *testing.T
 	t.Cleanup(func() {
 		viper.Set(spaceAssetsPrimaryBucketConfigKey, "")
 	})
-	resp, err := module.Assets.PresignUpload(newSelectedSpaceControllerContext(aliceID, space), models.PresignUploadRequest{
+	resp, err := module.Assets.PresignUpload(ctx, space, models.PresignUploadRequest{
 		Size:       1,
 		ContentMD5: "XUFAKrxLKna5cZ2REBfFkg==",
 	})

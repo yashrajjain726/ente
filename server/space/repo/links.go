@@ -29,15 +29,14 @@ func (r *LinksRepository) writeLink(ctx context.Context, spaceID string, authKey
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
-	var ownerID int64
 	var spaceSlug string
 	var currentVersion int
 	if err := tx.QueryRowContext(ctx, `
-		SELECT owner_id, space_slug, current_version
+		SELECT space_slug, current_version
 		FROM spaces
 		WHERE space_id = $1
 		FOR UPDATE
-	`, spaceID).Scan(&ownerID, &spaceSlug, &currentVersion); err != nil {
+	`, spaceID).Scan(&spaceSlug, &currentVersion); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	if currentVersion != keyVersion {
@@ -57,10 +56,10 @@ func (r *LinksRepository) writeLink(ctx context.Context, spaceID string, authKey
 			return nil, ErrLinkAuthKeyReused
 		}
 		return scanLinkRecord(tx.QueryRowContext(ctx, `
-			SELECT l.space_id, $2::text, $3::bigint, $2::text, l.auth_key_hash, l.key_version, l.link_wrapped_space_key, l.encrypted_access_key, l.active, l.created_at, l.updated_at
+			SELECT l.space_id, $2::text, $2::text, l.auth_key_hash, l.key_version, l.link_wrapped_space_key, l.encrypted_access_key, l.active, l.created_at, l.updated_at
 			FROM space_links l
 			WHERE l.space_id = $1 AND l.active = TRUE
-		`, spaceID, spaceSlug, ownerID))
+		`, spaceID, spaceSlug))
 	}
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, stacktrace.Propagate(err, "")
@@ -98,8 +97,8 @@ func (r *LinksRepository) writeLink(ctx context.Context, spaceID string, authKey
 	link, err := scanLinkRecord(tx.QueryRowContext(ctx, `
 		INSERT INTO space_links (space_id, auth_key_hash, key_version, link_wrapped_space_key, encrypted_access_key, active)
 		VALUES ($1, $2, $3, $4, $5, TRUE)
-		RETURNING space_id, $6::text, $7::bigint, $6::text, auth_key_hash, key_version, link_wrapped_space_key, encrypted_access_key, active, created_at, updated_at
-	`, spaceID, authKeyHash, keyVersion, linkWrappedSpaceKey, encryptedAccessKey, spaceSlug, ownerID))
+		RETURNING space_id, $6::text, $6::text, auth_key_hash, key_version, link_wrapped_space_key, encrypted_access_key, active, created_at, updated_at
+	`, spaceID, authKeyHash, keyVersion, linkWrappedSpaceKey, encryptedAccessKey, spaceSlug))
 	if err != nil {
 		if isUniqueViolationFor(err, "uq_space_links_active_space") {
 			return nil, ErrActiveLinkAlreadyExists
@@ -117,7 +116,7 @@ func (r *LinksRepository) writeLink(ctx context.Context, spaceID string, authKey
 
 func (r *LinksRepository) GetLink(ctx context.Context, spaceID string) (*SpaceLinkRecord, error) {
 	return scanLinkRecord(r.DB.QueryRowContext(ctx, `
-		SELECT l.space_id, w.space_slug, w.owner_id, w.space_slug, l.auth_key_hash, l.key_version, l.link_wrapped_space_key, l.encrypted_access_key, l.active, l.created_at, l.updated_at
+		SELECT l.space_id, w.space_slug, w.space_slug, l.auth_key_hash, l.key_version, l.link_wrapped_space_key, l.encrypted_access_key, l.active, l.created_at, l.updated_at
 		FROM space_links l
 		JOIN spaces w ON w.space_id = l.space_id
 		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
@@ -149,7 +148,7 @@ func deleteLinkTx(ctx context.Context, tx *sql.Tx, spaceID string) error {
 
 func (r *LinksRepository) GetLinkByAuthHash(ctx context.Context, spaceID string, authHash []byte) (*SpaceLinkRecord, error) {
 	return scanLinkRecord(r.DB.QueryRowContext(ctx, `
-		SELECT l.space_id, w.space_slug, w.owner_id, w.space_slug, l.auth_key_hash, l.key_version, l.link_wrapped_space_key, l.encrypted_access_key, l.active, l.created_at, l.updated_at
+		SELECT l.space_id, w.space_slug, w.space_slug, l.auth_key_hash, l.key_version, l.link_wrapped_space_key, l.encrypted_access_key, l.active, l.created_at, l.updated_at
 		FROM space_links l
 		JOIN spaces w ON w.space_id = l.space_id
 		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
@@ -184,8 +183,8 @@ func (r *LinksRepository) CreateSession(ctx context.Context, tokenHash []byte, s
 
 func (r *LinksRepository) GetSession(ctx context.Context, tokenHash []byte) (*SpaceLinkSessionRecord, error) {
 	row := r.DB.QueryRowContext(ctx, `
-		SELECT s.token_hash, s.space_id, w.owner_id, s.auth_key_hash, s.key_version, s.expires_at, s.created_at,
-		       w.space_slug, w.space_slug, l.link_wrapped_space_key
+		SELECT s.token_hash, s.space_id, s.auth_key_hash, s.key_version, s.expires_at, s.created_at,
+		       w.space_slug, l.link_wrapped_space_key
 		FROM space_link_sessions s
 		JOIN spaces w ON w.space_id = s.space_id
 		JOIN users u ON u.user_id = w.owner_id AND u.encrypted_email IS NOT NULL
@@ -195,7 +194,7 @@ func (r *LinksRepository) GetSession(ctx context.Context, tokenHash []byte) (*Sp
 		WHERE s.token_hash = $1 AND l.active = TRUE
 	`, tokenHash)
 	var rec SpaceLinkSessionRecord
-	if err := row.Scan(&rec.TokenHash, &rec.SpaceID, &rec.OwnerID, &rec.AuthKeyHash, &rec.KeyVersion, &rec.ExpiresAt, &rec.CreatedAt, &rec.SpaceSlug, &rec.OwnerSlug, &rec.LinkWrappedSpaceKey); err != nil {
+	if err := row.Scan(&rec.TokenHash, &rec.SpaceID, &rec.AuthKeyHash, &rec.KeyVersion, &rec.ExpiresAt, &rec.CreatedAt, &rec.SpaceSlug, &rec.LinkWrappedSpaceKey); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil
@@ -218,7 +217,7 @@ func (r *LinksRepository) DeleteSession(ctx context.Context, tokenHash []byte) e
 
 func scanLinkRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceLinkRecord, error) {
 	var rec SpaceLinkRecord
-	if err := scanner.Scan(&rec.SpaceID, &rec.SpaceSlug, &rec.OwnerID, &rec.OwnerSlug, &rec.AuthKeyHash, &rec.KeyVersion, &rec.LinkWrappedSpaceKey, &rec.EncryptedAccessKey, &rec.Active, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
+	if err := scanner.Scan(&rec.SpaceID, &rec.SpaceSlug, &rec.OwnerSlug, &rec.AuthKeyHash, &rec.KeyVersion, &rec.LinkWrappedSpaceKey, &rec.EncryptedAccessKey, &rec.Active, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	return &rec, nil

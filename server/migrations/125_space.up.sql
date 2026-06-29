@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS space_notification_read_markers (
     read_at        BIGINT NOT NULL DEFAULT 0,
     created_at     BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     updated_at     BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    PRIMARY KEY (viewer_space_id, friend_space_id)
+    PRIMARY KEY (viewer_space_id, friend_space_id),
+    CONSTRAINT chk_space_notification_read_markers_distinct CHECK (viewer_space_id <> friend_space_id)
 );
 
 CREATE TRIGGER update_space_notification_read_markers_updated_at
@@ -114,7 +115,10 @@ CREATE TABLE IF NOT EXISTS space_post_assets (
     position             INTEGER NOT NULL DEFAULT 0,
     metadata_cipher      BYTEA  NOT NULL,
     created_at           BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
-    CONSTRAINT uq_space_post_assets_object_key UNIQUE (object_key)
+    CONSTRAINT uq_space_post_assets_object_key UNIQUE (object_key),
+    CONSTRAINT chk_space_post_assets_object_key CHECK (object_key <> ''),
+    CONSTRAINT chk_space_post_assets_bucket_id CHECK (bucket_id <> ''),
+    CONSTRAINT chk_space_post_assets_position CHECK (position >= 0)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_space_post_assets_position
@@ -146,7 +150,8 @@ CREATE TABLE IF NOT EXISTS space_friend_shares (
     key_version          INTEGER NOT NULL DEFAULT 1,
     created_at           BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
     updated_at           BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
-    PRIMARY KEY (space_id, friend_space_id)
+    PRIMARY KEY (space_id, friend_space_id),
+    CONSTRAINT chk_space_friend_shares_distinct CHECK (space_id <> friend_space_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_space_friend_shares_friend_space
@@ -163,20 +168,22 @@ CREATE TABLE IF NOT EXISTS space_friend_requests (
     target_space_id              TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     requester_friend_sealed_space_key BYTEA NOT NULL,
     requester_key_version        INTEGER NOT NULL DEFAULT 1,
-    is_deleted                   BOOLEAN NOT NULL DEFAULT FALSE,
-    resolved_at                  BIGINT,
     created_at                   BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     updated_at                   BIGINT NOT NULL DEFAULT now_utc_micro_seconds(),
     CONSTRAINT chk_space_friend_requests_distinct_spaces CHECK (requester_space_id <> target_space_id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_space_friend_requests_active_pair
-    ON space_friend_requests (requester_space_id, target_space_id)
-    WHERE is_deleted = FALSE AND resolved_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_space_friend_requests_pair
+    ON space_friend_requests (requester_space_id, target_space_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_space_friend_requests_unordered_pair
+    ON space_friend_requests (
+        LEAST(requester_space_id, target_space_id),
+        GREATEST(requester_space_id, target_space_id)
+    );
 
 CREATE INDEX IF NOT EXISTS idx_space_friend_requests_target_created
-    ON space_friend_requests (target_space_id, created_at DESC)
-    WHERE is_deleted = FALSE AND resolved_at IS NULL;
+    ON space_friend_requests (target_space_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_space_friend_requests_requester_created
     ON space_friend_requests (requester_space_id, created_at DESC);
@@ -219,40 +226,30 @@ CREATE TABLE IF NOT EXISTS space_messages (
     created_at                      BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
     updated_at                      BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
     CONSTRAINT chk_space_messages_distinct_spaces CHECK (sender_space_id <> recipient_space_id),
-    CONSTRAINT chk_space_messages_kind CHECK (kind IN ('regular', 'post_reply', 'post_like')),
+    CONSTRAINT chk_space_messages_kind CHECK (kind IN ('regular', 'post_reply', 'post_like', 'friend_added')),
     CONSTRAINT chk_space_messages_regular_shape CHECK (kind <> 'regular' OR reply_post_id IS NULL),
-    CONSTRAINT chk_space_messages_post_like_shape CHECK (
-        kind <> 'post_like' OR (
-            reply_post_id IS NOT NULL
-            AND reply_message_id IS NULL
-            AND message_cipher IS NULL
-            AND sender_encrypted_message_key IS NULL
-            AND recipient_encrypted_message_key IS NULL
-            AND recipient_liked_at IS NULL
-            AND is_deleted = FALSE
-        )
-    ),
+    CONSTRAINT chk_space_messages_post_reply_shape CHECK (kind <> 'post_reply' OR (reply_post_id IS NOT NULL AND reply_message_id IS NULL)),
+    CONSTRAINT chk_space_messages_post_like_shape CHECK (kind <> 'post_like' OR (reply_post_id IS NOT NULL AND reply_message_id IS NULL AND recipient_liked_at IS NULL)),
+    CONSTRAINT chk_space_messages_friend_added_shape CHECK (kind <> 'friend_added' OR (reply_post_id IS NULL AND reply_message_id IS NULL AND recipient_liked_at IS NULL)),
     CONSTRAINT chk_space_messages_recipient_like CHECK (
-        recipient_liked_at IS NULL OR (kind <> 'post_like' AND is_deleted = FALSE)
+        recipient_liked_at IS NULL OR is_deleted = FALSE
     ),
     CONSTRAINT chk_space_messages_single_reply_target CHECK (reply_post_id IS NULL OR reply_message_id IS NULL),
-    CONSTRAINT chk_space_messages_cipher_on_delete CHECK (
+    CONSTRAINT chk_space_messages_cipher_shape CHECK (
         (
-            kind <> 'post_like'
-            AND
-            is_deleted = FALSE
+            kind IN ('regular', 'post_reply')
+            AND is_deleted = FALSE
             AND message_cipher IS NOT NULL
             AND sender_encrypted_message_key IS NOT NULL
             AND recipient_encrypted_message_key IS NOT NULL
         ) OR (
-            kind <> 'post_like'
-            AND
-            is_deleted = TRUE
+            kind IN ('regular', 'post_reply')
+            AND is_deleted = TRUE
             AND message_cipher IS NULL
             AND sender_encrypted_message_key IS NULL
             AND recipient_encrypted_message_key IS NULL
         ) OR (
-            kind = 'post_like'
+            kind IN ('post_like', 'friend_added')
             AND is_deleted = FALSE
             AND message_cipher IS NULL
             AND sender_encrypted_message_key IS NULL
@@ -276,13 +273,13 @@ CREATE INDEX IF NOT EXISTS idx_space_messages_reply_post
     ON space_messages (reply_post_id)
     WHERE reply_post_id IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_space_messages_reply_message
-    ON space_messages (reply_message_id)
-    WHERE reply_message_id IS NOT NULL;
-
 CREATE UNIQUE INDEX IF NOT EXISTS uq_space_messages_post_like
     ON space_messages (reply_post_id, sender_space_id)
     WHERE kind = 'post_like';
+
+CREATE INDEX IF NOT EXISTS idx_space_messages_reply_message
+    ON space_messages (reply_message_id)
+    WHERE reply_message_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_space_messages_sender_liked
     ON space_messages (sender_space_id, recipient_liked_at DESC, message_id DESC)

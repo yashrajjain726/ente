@@ -140,7 +140,7 @@ func TestRotateKeyRejectsStaleKeyVersion(t *testing.T) {
 	space, err := testCreateSpace(ctx, repos, aliceID, "alice", "alice-space-key-v1", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile-v1")
 	require.NoError(t, err)
 
-	resp, err := module.Spaces.RotateKey(newSelectedSpaceControllerContext(aliceID, space), models.RotateSpaceKeyRequest{
+	resp, err := module.Spaces.RotateKey(ctx, space, models.RotateSpaceKeyRequest{
 		KeyVersion:          space.CurrentVersion + 1,
 		RootWrappedSpaceKey: "YWxpY2Utc3BhY2Uta2V5LXYy",
 		WrappedPrevKey:      "d3JhcHBlZC1wcmV2LWtleQ==",
@@ -160,7 +160,7 @@ func TestUpdateProfileRejectsStaleKeyVersion(t *testing.T) {
 	space, err := testCreateSpace(ctx, repos, aliceID, "alice", "alice-space-key-v1", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile-v1")
 	require.NoError(t, err)
 
-	resp, err := module.Spaces.UpdateProfile(newSelectedSpaceControllerContext(aliceID, space), models.UpdateSpaceProfileRequest{
+	resp, err := module.Spaces.UpdateProfile(ctx, space, models.UpdateSpaceProfileRequest{
 		KeyVersion:       space.CurrentVersion + 1,
 		EncryptedProfile: "YWxpY2UtcHJvZmlsZS12Mg==",
 	})

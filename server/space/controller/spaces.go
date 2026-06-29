@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strings"
@@ -120,8 +121,7 @@ func (c *SpacesController) GetProfile(ctx *gin.Context, req models.GetSpaceProfi
 	}, nil
 }
 
-func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpaceProfileRequest) (*models.UpdateSpaceProfileResponse, error) {
-	current := mustSelectedSpace(ctx)
+func (c *SpacesController) UpdateProfile(ctx context.Context, current *repo.SpaceRecord, req models.UpdateSpaceProfileRequest) (*models.UpdateSpaceProfileResponse, error) {
 	if strings.TrimSpace(req.EncryptedProfile) == "" || req.KeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("keyVersion and encryptedProfile are required")
 	}
@@ -161,7 +161,7 @@ func (c *SpacesController) UpdateProfile(ctx *gin.Context, req models.UpdateSpac
 	}, nil
 }
 
-func (c *SpacesController) profileAssetUpdate(ctx *gin.Context, spaceID, assetName, assetType, purpose string, payload *models.ProfileAvatarPayload) (*repo.ProfileAssetUpdate, error) {
+func (c *SpacesController) profileAssetUpdate(ctx context.Context, spaceID, assetName, assetType, purpose string, payload *models.ProfileAvatarPayload) (*repo.ProfileAssetUpdate, error) {
 	if payload == nil {
 		return nil, nil
 	}
@@ -180,8 +180,7 @@ func (c *SpacesController) profileAssetUpdate(ctx *gin.Context, spaceID, assetNa
 	}, nil
 }
 
-func (c *SpacesController) UpdateSlug(ctx *gin.Context, req models.UpdateSpaceSlugRequest) (*models.SpaceLookupResponse, error) {
-	selected := mustSelectedSpace(ctx)
+func (c *SpacesController) UpdateSlug(ctx context.Context, selected *repo.SpaceRecord, req models.UpdateSpaceSlugRequest) (*models.SpaceLookupResponse, error) {
 	normalizedSlug, err := validateSpaceSlug(req.SpaceSlug)
 	if err != nil {
 		return nil, err
@@ -190,11 +189,7 @@ func (c *SpacesController) UpdateSlug(ctx *gin.Context, req models.UpdateSpaceSl
 	if err != nil {
 		return nil, err
 	}
-	publicKey, err := c.SpacesRepo.GetOwnerPublicKey(ctx, space.OwnerID)
-	if err != nil {
-		return nil, err
-	}
-	return &models.SpaceLookupResponse{SpaceID: space.SpaceID, SpaceSlug: space.SpaceSlug, Owner: space.SpaceSlug, PublicKey: encodeSpaceField(publicKey)}, nil
+	return &models.SpaceLookupResponse{SpaceID: space.SpaceID, SpaceSlug: space.SpaceSlug, Owner: space.SpaceSlug, PublicKey: encodeSpaceField(space.PublicKey)}, nil
 }
 
 func (c *SpacesController) LookupBySlug(ctx *gin.Context, spaceSlug string) (*models.SpaceLookupResponse, error) {
@@ -202,15 +197,11 @@ func (c *SpacesController) LookupBySlug(ctx *gin.Context, spaceSlug string) (*mo
 	if err != nil {
 		return nil, err
 	}
-	publicKey, err := c.SpacesRepo.GetOwnerPublicKey(ctx, space.OwnerID)
-	if err != nil {
-		return nil, err
-	}
 	return &models.SpaceLookupResponse{
 		SpaceID:   space.SpaceID,
 		SpaceSlug: space.SpaceSlug,
 		Owner:     space.SpaceSlug,
-		PublicKey: encodeSpaceField(publicKey),
+		PublicKey: encodeSpaceField(space.PublicKey),
 	}, nil
 }
 
@@ -228,8 +219,7 @@ func (c *SpacesController) SlugAvailability(ctx *gin.Context, spaceSlug string) 
 	return &models.SpaceSlugAvailabilityResponse{Available: false}, nil
 }
 
-func (c *SpacesController) RotateKey(ctx *gin.Context, req models.RotateSpaceKeyRequest) (*models.SpaceKeyResponse, error) {
-	current := mustSelectedSpace(ctx)
+func (c *SpacesController) RotateKey(ctx context.Context, current *repo.SpaceRecord, req models.RotateSpaceKeyRequest) (*models.SpaceKeyResponse, error) {
 	if strings.TrimSpace(req.RootWrappedSpaceKey) == "" || strings.TrimSpace(req.WrappedPrevKey) == "" || strings.TrimSpace(req.EncryptedProfile) == "" || req.KeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("keyVersion, rootWrappedSpaceKey, wrappedPrevKey and encryptedProfile are required")
 	}

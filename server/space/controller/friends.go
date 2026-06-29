@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strings"
@@ -9,7 +10,6 @@ import (
 	"github.com/ente-io/museum/space/models"
 	"github.com/ente-io/museum/space/repo"
 	"github.com/ente-io/stacktrace"
-	"github.com/gin-gonic/gin"
 )
 
 type FriendsController struct {
@@ -19,8 +19,7 @@ type FriendsController struct {
 	auth          authDeps
 }
 
-func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (*models.FriendStatusResponse, error) {
-	requesterSpace := mustSelectedSpace(ctx)
+func (c *FriendsController) Add(ctx context.Context, requesterSpace *repo.SpaceRecord, req models.AddFriendPayload) (*models.FriendStatusResponse, error) {
 	if (strings.TrimSpace(req.TargetSpaceID) == "" && strings.TrimSpace(req.TargetUsername) == "") ||
 		strings.TrimSpace(req.RequesterFriendSealedSpaceKey) == "" ||
 		req.RequesterKeyVersion <= 0 {
@@ -40,7 +39,7 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 	if err != nil {
 		return nil, err
 	}
-	request, created, err := c.FriendsRepo.CreateFriendRequest(
+	request, created, becameFriends, err := c.FriendsRepo.CreateFriendRequest(
 		ctx,
 		requesterSpace.OwnerID,
 		requesterSpace.SpaceID,
@@ -60,14 +59,19 @@ func (c *FriendsController) Add(ctx *gin.Context, req models.AddFriendPayload) (
 		}
 		return nil, err
 	}
+	if becameFriends {
+		if c.EmailNotifier != nil {
+			go c.EmailNotifier.OnSpaceFriendAdded(requesterSpace.SpaceSlug, request.RequesterID)
+		}
+		return &models.FriendStatusResponse{Status: "friend"}, nil
+	}
 	if created && c.EmailNotifier != nil {
 		go c.EmailNotifier.OnSpaceFriendRequested(requesterSpace.SpaceSlug, request.TargetID)
 	}
 	return &models.FriendStatusResponse{Status: "requested"}, nil
 }
 
-func (c *FriendsController) ListRequests(ctx *gin.Context) ([]models.SpaceFriendRequestResponse, error) {
-	space := mustSelectedSpace(ctx)
+func (c *FriendsController) ListRequests(ctx context.Context, space *repo.SpaceRecord) ([]models.SpaceFriendRequestResponse, error) {
 	requests, err := c.FriendsRepo.ListFriendRequestsForSpace(ctx, space.SpaceID)
 	if err != nil {
 		return nil, err
@@ -83,8 +87,7 @@ func (c *FriendsController) ListRequests(ctx *gin.Context) ([]models.SpaceFriend
 	return resp, nil
 }
 
-func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestID int64, req models.ConfirmFriendRequestPayload) (*models.FriendStatusResponse, error) {
-	targetSpace := mustSelectedSpace(ctx)
+func (c *FriendsController) ConfirmRequest(ctx context.Context, targetSpace *repo.SpaceRecord, requestID int64, req models.ConfirmFriendRequestPayload) (*models.FriendStatusResponse, error) {
 	if strings.TrimSpace(req.TargetFriendSealedSpaceKey) == "" || req.TargetKeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("targetFriendSealedSpaceKey and targetKeyVersion are required")
 	}
@@ -111,8 +114,7 @@ func (c *FriendsController) ConfirmRequest(ctx *gin.Context, requestID int64, re
 	return &models.FriendStatusResponse{Status: "friend"}, nil
 }
 
-func (c *FriendsController) DeleteRequest(ctx *gin.Context, requestID int64) error {
-	targetSpace := mustSelectedSpace(ctx)
+func (c *FriendsController) DeleteRequest(ctx context.Context, targetSpace *repo.SpaceRecord, requestID int64) error {
 	if err := c.FriendsRepo.DeleteFriendRequest(ctx, targetSpace.SpaceID, requestID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return ente.ErrNotFound
@@ -122,8 +124,7 @@ func (c *FriendsController) DeleteRequest(ctx *gin.Context, requestID int64) err
 	return nil
 }
 
-func (c *FriendsController) Unfriend(ctx *gin.Context, req models.FriendTargetPayload) error {
-	actorSpace := mustSelectedSpace(ctx)
+func (c *FriendsController) Unfriend(ctx context.Context, actorSpace *repo.SpaceRecord, req models.FriendTargetPayload) error {
 	var space *repo.SpaceRecord
 	var err error
 	switch {
@@ -140,8 +141,7 @@ func (c *FriendsController) Unfriend(ctx *gin.Context, req models.FriendTargetPa
 	return c.FriendsRepo.DeleteFriendship(ctx, actorSpace.SpaceID, space.SpaceID)
 }
 
-func (c *FriendsController) ListFriends(ctx *gin.Context) ([]models.SpaceFriendResponse, error) {
-	space := mustSelectedSpace(ctx)
+func (c *FriendsController) ListFriends(ctx context.Context, space *repo.SpaceRecord) ([]models.SpaceFriendResponse, error) {
 	friends, err := c.FriendsRepo.ListFriendsForSpace(ctx, space.SpaceID)
 	if err != nil {
 		return nil, err
@@ -157,8 +157,7 @@ func (c *FriendsController) ListFriends(ctx *gin.Context) ([]models.SpaceFriendR
 	return resp, nil
 }
 
-func (c *FriendsController) Relationship(ctx *gin.Context, req models.FriendRelationshipRequest) (*models.FriendRelationshipResponse, error) {
-	viewerSpace := mustSelectedSpace(ctx)
+func (c *FriendsController) Relationship(ctx context.Context, viewerSpace *repo.SpaceRecord, req models.FriendRelationshipRequest) (*models.FriendRelationshipResponse, error) {
 	targetSpaceID := strings.TrimSpace(req.TargetSpaceID)
 	if targetSpaceID == "" {
 		return nil, ente.NewBadRequestWithMessage("targetSpaceId is required")
@@ -177,8 +176,7 @@ func (c *FriendsController) Relationship(ctx *gin.Context, req models.FriendRela
 	return &models.FriendRelationshipResponse{Relationship: relationship}, nil
 }
 
-func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFriendSharesRequest) error {
-	space := mustSelectedSpace(ctx)
+func (c *FriendsController) RefreshShares(ctx context.Context, space *repo.SpaceRecord, req models.RefreshFriendSharesRequest) error {
 	if req.KeyVersion <= 0 {
 		return ente.NewBadRequestWithMessage("keyVersion is required")
 	}
@@ -208,8 +206,7 @@ func (c *FriendsController) RefreshShares(ctx *gin.Context, req models.RefreshFr
 	return nil
 }
 
-func (c *FriendsController) ListShares(ctx *gin.Context) ([]models.FriendShareResponse, error) {
-	space := mustSelectedSpace(ctx)
+func (c *FriendsController) ListShares(ctx context.Context, space *repo.SpaceRecord) ([]models.FriendShareResponse, error) {
 	shares, err := c.FriendsRepo.ListSharesForFriendAndSpace(ctx, space.SpaceID)
 	if err != nil {
 		return nil, err

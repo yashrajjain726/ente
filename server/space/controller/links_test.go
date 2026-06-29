@@ -20,7 +20,7 @@ func TestCreateSpaceLinkReturnsExistingActiveLink(t *testing.T) {
 		authKey[i] = byte(i + 1)
 	}
 
-	resp, err := module.Links.Create(newSelectedSpaceControllerContext(aliceID, space), models.SpaceLinkCreateRequest{
+	resp, err := module.Links.Create(ctx, space, models.SpaceLinkCreateRequest{
 		AuthKey:             base64.StdEncoding.EncodeToString(authKey),
 		KeyVersion:          space.CurrentVersion,
 		LinkWrappedSpaceKey: base64.StdEncoding.EncodeToString([]byte("new-space-link-key")),

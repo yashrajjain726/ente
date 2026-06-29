@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"crypto/md5"
 	"database/sql"
 	"encoding/base64"
@@ -38,8 +39,7 @@ type AssetsController struct {
 	auth       authDeps
 }
 
-func (c *AssetsController) PresignUpload(ctx *gin.Context, req models.PresignUploadRequest) (*models.PresignUploadResponse, error) {
-	space := mustSelectedSpace(ctx)
+func (c *AssetsController) PresignUpload(ctx context.Context, space *spacerepo.SpaceRecord, req models.PresignUploadRequest) (*models.PresignUploadResponse, error) {
 	purpose := uploadPurposePost
 	if req.Purpose != nil && strings.TrimSpace(*req.Purpose) != "" {
 		purpose = strings.TrimSpace(*req.Purpose)
@@ -147,7 +147,7 @@ func maxUploadBytesForPurpose(purpose string) (int64, error) {
 	}
 }
 
-func verifyStagedUpload(ctx *gin.Context, assetsRepo *spacerepo.AssetsRepository, objectKey, purpose string, spaceID *string) (*spacerepo.SpaceTempObjectRecord, error) {
+func verifyStagedUpload(ctx context.Context, assetsRepo *spacerepo.AssetsRepository, objectKey, purpose string, spaceID *string) (*spacerepo.SpaceTempObjectRecord, error) {
 	objectKey = strings.TrimSpace(objectKey)
 	if objectKey == "" {
 		return nil, ente.NewBadRequestWithMessage("objectKey is required")

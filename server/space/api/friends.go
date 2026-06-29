@@ -1,82 +1,112 @@
 package api
 
 import (
-	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/space/models"
 	"github.com/gin-gonic/gin"
 )
 
 func (h *Handlers) AddFriend(c *gin.Context) {
 	var req models.AddFriendPayload
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	if !bindJSON(c, &req) {
 		return
 	}
-	resp, err := h.Module.Friends.Add(c, req)
+	space, ok := selectedSpace(h, c)
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Friends.Add(c, space, req)
 	respondJSON(c, resp, err)
 }
 
 func (h *Handlers) Unfriend(c *gin.Context) {
 	var req models.FriendTargetPayload
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	if !bindJSON(c, &req) {
 		return
 	}
-	respondStatus(c, h.Module.Friends.Unfriend(c, req))
+	space, ok := selectedSpace(h, c)
+	if !ok {
+		return
+	}
+	respondStatus(c, h.Module.Friends.Unfriend(c, space, req))
 }
 
 func (h *Handlers) ListFriendRequests(c *gin.Context) {
-	resp, err := h.Module.Friends.ListRequests(c)
+	space, ok := selectedSpace(h, c)
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Friends.ListRequests(c, space)
 	respondJSON(c, resp, err)
 }
 
 func (h *Handlers) ConfirmFriendRequest(c *gin.Context) {
 	var req models.ConfirmFriendRequestPayload
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	if !bindJSON(c, &req) {
+		return
+	}
+	space, ok := selectedSpace(h, c)
+	if !ok {
 		return
 	}
 	requestID, ok := positiveInt64Param(c, "requestID")
 	if !ok {
 		return
 	}
-	resp, err := h.Module.Friends.ConfirmRequest(c, requestID, req)
+	resp, err := h.Module.Friends.ConfirmRequest(c, space, requestID, req)
 	respondJSON(c, resp, err)
 }
 
 func (h *Handlers) DeleteFriendRequest(c *gin.Context) {
+	space, ok := selectedSpace(h, c)
+	if !ok {
+		return
+	}
 	requestID, ok := positiveInt64Param(c, "requestID")
 	if !ok {
 		return
 	}
-	respondStatus(c, h.Module.Friends.DeleteRequest(c, requestID))
+	respondStatus(c, h.Module.Friends.DeleteRequest(c, space, requestID))
 }
 
 func (h *Handlers) ListSpaceFriends(c *gin.Context) {
-	resp, err := h.Module.Friends.ListFriends(c)
+	space, ok := selectedSpace(h, c)
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Friends.ListFriends(c, space)
 	respondJSON(c, resp, err)
 }
 
 func (h *Handlers) FriendRelationship(c *gin.Context) {
 	var req models.FriendRelationshipRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	if !bindQuery(c, &req) {
 		return
 	}
-	resp, err := h.Module.Friends.Relationship(c, req)
+	space, ok := selectedSpace(h, c)
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Friends.Relationship(c, space, req)
 	respondJSON(c, resp, err)
 }
 
 func (h *Handlers) RefreshFriendShares(c *gin.Context) {
 	var req models.RefreshFriendSharesRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	if !bindJSON(c, &req) {
 		return
 	}
-	respondStatus(c, h.Module.Friends.RefreshShares(c, req))
+	space, ok := selectedSpace(h, c)
+	if !ok {
+		return
+	}
+	respondStatus(c, h.Module.Friends.RefreshShares(c, space, req))
 }
 
 func (h *Handlers) ListFriendShares(c *gin.Context) {
-	resp, err := h.Module.Friends.ListShares(c)
+	space, ok := selectedSpace(h, c)
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Friends.ListShares(c, space)
 	respondJSON(c, resp, err)
 }

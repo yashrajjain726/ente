@@ -69,14 +69,6 @@ func toActorResponse(actor spacerepo.SpaceActorRecord, includePrivate bool) mode
 	resp.KeyVersion = actor.KeyVersion
 	resp.EncryptedProfile = encodeSpaceField(actor.EncryptedProfile)
 	resp.Avatar = toActorAvatarResponse(actor)
-	if actor.Friends.Valid {
-		friends := actor.Friends.Int64
-		resp.Friends = &friends
-	}
-	if actor.Posts.Valid {
-		posts := actor.Posts.Int64
-		resp.Posts = &posts
-	}
 	return resp
 }
 

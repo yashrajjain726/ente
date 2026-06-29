@@ -119,18 +119,6 @@ func (r *SpacesRepository) IsOwnerActive(ctx context.Context, ownerID int64) (bo
 	return active, stacktrace.Propagate(err, "")
 }
 
-func (r *SpacesRepository) GetOwnerPublicKey(ctx context.Context, ownerID int64) ([]byte, error) {
-	var publicKey []byte
-	err := r.DB.QueryRowContext(ctx, `
-		SELECT public_key
-		FROM spaces
-		WHERE owner_id = $1
-		ORDER BY created_at ASC
-		LIMIT 1
-	`, ownerID).Scan(&publicKey)
-	return publicKey, stacktrace.Propagate(err, "")
-}
-
 func (r *SpacesRepository) UpdateProfile(ctx context.Context, spaceID string, keyVersion int, encryptedProfile []byte, avatar *ProfileAssetUpdate, cover *ProfileAssetUpdate, removeAvatar bool, removeCover bool) (*SpaceRecord, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {

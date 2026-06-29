@@ -58,7 +58,6 @@ const spaceRecordProfileAssetJoins = `
 
 func spaceActorScanDest(actor *SpaceActorRecord) []any {
 	return []any{
-		&actor.UserID,
 		&actor.SpaceID,
 		&actor.SpaceSlug,
 		&actor.PublicKey,
@@ -67,14 +66,11 @@ func spaceActorScanDest(actor *SpaceActorRecord) []any {
 		&actor.AvatarObjectID,
 		&actor.AvatarSize,
 		&actor.UpdatedAt,
-		&actor.Friends,
-		&actor.Posts,
 	}
 }
 
 func spaceActorSelectColumns(spaceAlias string, avatarAlias string, prefix string) string {
 	return strings.Join([]string{
-		fmt.Sprintf("%s.owner_id AS %s_owner_id", spaceAlias, prefix),
 		fmt.Sprintf("%s.space_id AS %s_space_id", spaceAlias, prefix),
 		fmt.Sprintf("%s.space_slug AS %s_space_slug", spaceAlias, prefix),
 		fmt.Sprintf("%s.public_key AS %s_public_key", spaceAlias, prefix),
@@ -83,14 +79,11 @@ func spaceActorSelectColumns(spaceAlias string, avatarAlias string, prefix strin
 		fmt.Sprintf("%s.object_id AS %s_avatar_object_id", avatarAlias, prefix),
 		fmt.Sprintf("%s.size AS %s_avatar_size", avatarAlias, prefix),
 		fmt.Sprintf("%s.updated_at AS %s_updated_at", spaceAlias, prefix),
-		fmt.Sprintf("(SELECT COUNT(*) FROM space_friend_shares fs WHERE fs.space_id = %s.space_id) AS %s_friends", spaceAlias, prefix),
-		fmt.Sprintf("(SELECT COUNT(*) FROM space_posts p WHERE p.space_id = %s.space_id AND p.is_deleted = FALSE) AS %s_posts", spaceAlias, prefix),
 	}, ",\n\t")
 }
 
 func spaceActorPublicSelectColumns(spaceAlias string, prefix string) string {
 	return strings.Join([]string{
-		fmt.Sprintf("%s.owner_id AS %s_owner_id", spaceAlias, prefix),
 		fmt.Sprintf("%s.space_id AS %s_space_id", spaceAlias, prefix),
 		fmt.Sprintf("%s.space_slug AS %s_space_slug", spaceAlias, prefix),
 		fmt.Sprintf("%s.public_key AS %s_public_key", spaceAlias, prefix),
@@ -99,8 +92,6 @@ func spaceActorPublicSelectColumns(spaceAlias string, prefix string) string {
 		fmt.Sprintf("NULL::text AS %s_avatar_object_id", prefix),
 		fmt.Sprintf("NULL::bigint AS %s_avatar_size", prefix),
 		fmt.Sprintf("%s.updated_at AS %s_updated_at", spaceAlias, prefix),
-		fmt.Sprintf("NULL::bigint AS %s_friends", prefix),
-		fmt.Sprintf("NULL::bigint AS %s_posts", prefix),
 	}, ",\n\t")
 }
 

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strings"
@@ -9,13 +10,13 @@ import (
 	"github.com/ente-io/museum/space/models"
 	"github.com/ente-io/museum/space/repo"
 	"github.com/ente-io/stacktrace"
-	"github.com/gin-gonic/gin"
 )
 
 const (
-	spaceMessageKindRegular   = "regular"
-	spaceMessageKindPostReply = "post_reply"
-	spaceMessageKindPostLike  = "post_like"
+	spaceMessageKindRegular     = "regular"
+	spaceMessageKindPostReply   = "post_reply"
+	spaceMessageKindPostLike    = "post_like"
+	spaceMessageKindFriendAdded = "friend_added"
 
 	maxSpaceMessageCipherEncodedBytes = 8 * 1024
 	maxSpaceMessageCipherDecodedBytes = 6 * 1024
@@ -34,8 +35,7 @@ type MessagesController struct {
 	auth            authDeps
 }
 
-func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req models.CreateMessageRequest) (*models.MessageResponse, error) {
-	senderSpace := mustSelectedSpace(ctx)
+func (c *MessagesController) Create(ctx context.Context, senderSpace *repo.SpaceRecord, targetSpaceID string, req models.CreateMessageRequest) (*models.MessageResponse, error) {
 	messageCipher, senderEncryptedMessageKey, recipientEncryptedMessageKey, err := decodeCreateMessageRequest(req)
 	if err != nil {
 		return nil, err
@@ -68,8 +68,7 @@ func (c *MessagesController) Create(ctx *gin.Context, targetSpaceID string, req 
 	return toMessageResponse(*message), nil
 }
 
-func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID int64, req models.CreateMessageRequest) (*models.MessageResponse, error) {
-	senderSpace := mustSelectedSpace(ctx)
+func (c *MessagesController) ReplyToPost(ctx context.Context, senderSpace *repo.SpaceRecord, postID int64, req models.CreateMessageRequest) (*models.MessageResponse, error) {
 	messageCipher, senderEncryptedMessageKey, recipientEncryptedMessageKey, err := decodeCreateMessageRequest(req)
 	if err != nil {
 		return nil, err
@@ -118,8 +117,7 @@ func (c *MessagesController) ReplyToPost(ctx *gin.Context, postID int64, req mod
 	return toMessageResponse(*message), nil
 }
 
-func (c *MessagesController) ListConversations(ctx *gin.Context) (*models.ConversationsResponse, error) {
-	viewerSpace := mustSelectedSpace(ctx)
+func (c *MessagesController) ListConversations(ctx context.Context, viewerSpace *repo.SpaceRecord) (*models.ConversationsResponse, error) {
 	friends, err := c.FriendsRepo.ListFriendsForSpace(ctx, viewerSpace.SpaceID)
 	if err != nil {
 		return nil, err
@@ -166,8 +164,7 @@ func (c *MessagesController) ListConversations(ctx *gin.Context) (*models.Conver
 	}, nil
 }
 
-func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, req models.ListMessageThreadRequest) (*models.MessagePage, error) {
-	viewerSpace := mustSelectedSpace(ctx)
+func (c *MessagesController) ListThread(ctx context.Context, viewerSpace *repo.SpaceRecord, targetSpaceID string, req models.ListMessageThreadRequest) (*models.MessagePage, error) {
 	if strings.TrimSpace(targetSpaceID) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceId is required")
 	}
@@ -189,8 +186,7 @@ func (c *MessagesController) ListThread(ctx *gin.Context, targetSpaceID string, 
 	return &models.MessagePage{Items: items, NextCursor: nextCursor}, nil
 }
 
-func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req models.LikeMessageRequest) (*models.LikeMessageResponse, error) {
-	actorSpace := mustSelectedSpace(ctx)
+func (c *MessagesController) SetLike(ctx context.Context, actorSpace *repo.SpaceRecord, messageID string, like bool) (*models.LikeMessageResponse, error) {
 	messageID = strings.TrimSpace(messageID)
 	if messageID == "" {
 		return nil, ente.NewBadRequestWithMessage("messageId is required")
@@ -202,8 +198,8 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 	if message.IsDeleted {
 		return nil, ente.NewBadRequestWithMessage("cannot like a deleted message")
 	}
-	if message.Kind == spaceMessageKindPostLike {
-		return nil, ente.NewBadRequestWithMessage("cannot like a post like")
+	if message.Kind != spaceMessageKindRegular && message.Kind != spaceMessageKindPostReply {
+		return nil, ente.NewBadRequestWithMessage("cannot like this message")
 	}
 	if message.RecipientSpaceID != actorSpace.SpaceID {
 		return nil, ente.NewBadRequestWithMessage("only the recipient can like a message")
@@ -215,14 +211,13 @@ func (c *MessagesController) ToggleLike(ctx *gin.Context, messageID string, req 
 		}
 		return nil, err
 	}
-	if err := c.MessagesRepo.SetLike(ctx, messageID, actorSpace.SpaceID, req.Like); err != nil {
+	if err := c.MessagesRepo.SetLike(ctx, messageID, actorSpace.SpaceID, like); err != nil {
 		return nil, err
 	}
-	return &models.LikeMessageResponse{Liked: req.Like}, nil
+	return &models.LikeMessageResponse{Liked: like}, nil
 }
 
-func (c *MessagesController) Delete(ctx *gin.Context, messageID string) error {
-	senderSpace := mustSelectedSpace(ctx)
+func (c *MessagesController) Delete(ctx context.Context, senderSpace *repo.SpaceRecord, messageID string) error {
 	messageID = strings.TrimSpace(messageID)
 	if messageID == "" {
 		return ente.NewBadRequestWithMessage("messageId is required")
@@ -234,8 +229,8 @@ func (c *MessagesController) Delete(ctx *gin.Context, messageID string) error {
 	if message.SenderSpaceID != senderSpace.SpaceID {
 		return ente.ErrPermissionDenied
 	}
-	if message.Kind == spaceMessageKindPostLike {
-		return ente.NewBadRequestWithMessage("cannot delete a post like")
+	if message.Kind != spaceMessageKindRegular && message.Kind != spaceMessageKindPostReply {
+		return ente.NewBadRequestWithMessage("cannot delete this message")
 	}
 	if _, err := c.FriendsRepo.GetShareForFriendAndSpace(ctx, senderSpace.SpaceID, message.RecipientSpaceID); err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
@@ -249,7 +244,7 @@ func (c *MessagesController) Delete(ctx *gin.Context, messageID string) error {
 	return c.MessagesRepo.DeleteMessage(ctx, messageID, senderSpace.SpaceID)
 }
 
-func (c *MessagesController) requireFriendMessageTarget(ctx *gin.Context, senderSpace *repo.SpaceRecord, targetSpaceID string) (*repo.SpaceRecord, error) {
+func (c *MessagesController) requireFriendMessageTarget(ctx context.Context, senderSpace *repo.SpaceRecord, targetSpaceID string) (*repo.SpaceRecord, error) {
 	if senderSpace == nil || strings.TrimSpace(senderSpace.SpaceID) == "" {
 		return nil, ente.NewBadRequestWithMessage("spaceId is required")
 	}
@@ -273,7 +268,7 @@ func (c *MessagesController) requireFriendMessageTarget(ctx *gin.Context, sender
 	return recipientSpace, nil
 }
 
-func (c *MessagesController) validateReplyMessage(ctx *gin.Context, replyMessageID, senderSpaceID, recipientSpaceID string) (sql.NullString, error) {
+func (c *MessagesController) validateReplyMessage(ctx context.Context, replyMessageID, senderSpaceID, recipientSpaceID string) (sql.NullString, error) {
 	replyMessageID = strings.TrimSpace(replyMessageID)
 	if replyMessageID == "" {
 		return sql.NullString{}, nil
@@ -370,27 +365,16 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 		CreatedAt: formatMicros(activity.CreatedAt),
 		Outgoing:  activity.Outgoing,
 	}
-	if activity.Message != nil {
-		resp.Message = toMessageResponse(*activity.Message)
+	if activity.MessageID.Valid {
+		messageID := activity.MessageID.String
+		resp.MessageID = &messageID
 	}
-	if activity.Post != nil {
-		resp.Post = &models.MessageConversationPostResponse{
-			PostID:    activity.Post.PostID,
-			SpaceID:   activity.Post.SpaceID,
-			SpaceSlug: activity.Post.SpaceSlug,
-			IsDeleted: activity.Post.IsDeleted,
-		}
-		if activity.Post.ObjectKey.Valid {
-			resp.Post.Objects = []models.PostObjectPayload{
-				toPostObjectPayload(repo.SpacePostAssetRecord{
-					PostID:         activity.Post.PostID,
-					ObjectKey:      activity.Post.ObjectKey.String,
-					Size:           activity.Post.ObjectSize,
-					Position:       int(activity.Post.ObjectPosition.Int64),
-					MetadataCipher: activity.Post.ObjectMetadataCipher,
-				}),
-			}
-		}
+	if activity.PostID.Valid {
+		postID := activity.PostID.Int64
+		resp.PostID = &postID
+	}
+	if activity.PostSpaceID.Valid {
+		resp.PostSpaceID = activity.PostSpaceID.String
 	}
 	return resp
 }

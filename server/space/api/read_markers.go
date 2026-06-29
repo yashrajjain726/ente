@@ -1,22 +1,25 @@
 package api
 
-import (
-	"github.com/ente-io/museum/ente"
-	"github.com/ente-io/museum/space/models"
-	"github.com/gin-gonic/gin"
-)
+import "github.com/gin-gonic/gin"
 
 func (h *Handlers) GetUnreadStatus(c *gin.Context) {
-	resp, err := h.Module.Read.GetUnreadStatus(c)
+	space, ok := selectedSpace(h, c)
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Read.GetUnreadStatus(c, space)
 	respondJSON(c, resp, err)
 }
 
 func (h *Handlers) MarkNotificationsRead(c *gin.Context) {
-	var req models.MarkNotificationsReadRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	space, ok := selectedSpace(h, c)
+	if !ok {
 		return
 	}
-	resp, err := h.Module.Read.MarkNotificationsRead(c, req)
+	friendSpaceID, ok := stringParam(c, "friendSpaceID")
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Read.MarkNotificationsRead(c, space, friendSpaceID)
 	respondJSON(c, resp, err)
 }

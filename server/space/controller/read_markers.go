@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strings"
@@ -9,7 +10,6 @@ import (
 	"github.com/ente-io/museum/space/models"
 	"github.com/ente-io/museum/space/repo"
 	"github.com/ente-io/stacktrace"
-	"github.com/gin-gonic/gin"
 )
 
 type ReadMarkersController struct {
@@ -17,8 +17,7 @@ type ReadMarkersController struct {
 	auth            authDeps
 }
 
-func (c *ReadMarkersController) GetUnreadStatus(ctx *gin.Context) (*models.SpaceUnreadStatusResponse, error) {
-	viewerSpace := mustSelectedSpace(ctx)
+func (c *ReadMarkersController) GetUnreadStatus(ctx context.Context, viewerSpace *repo.SpaceRecord) (*models.SpaceUnreadStatusResponse, error) {
 	notificationsUnread, err := c.ReadMarkersRepo.HasUnreadNotifications(ctx, viewerSpace.SpaceID)
 	if err != nil {
 		return nil, err
@@ -28,20 +27,19 @@ func (c *ReadMarkersController) GetUnreadStatus(ctx *gin.Context) (*models.Space
 	}, nil
 }
 
-func (c *ReadMarkersController) MarkNotificationsRead(ctx *gin.Context, req models.MarkNotificationsReadRequest) (*models.SpaceUnreadStatusResponse, error) {
-	if strings.TrimSpace(req.FriendSpaceID) == "" {
+func (c *ReadMarkersController) MarkNotificationsRead(ctx context.Context, viewerSpace *repo.SpaceRecord, friendSpaceID string) (*models.SpaceUnreadStatusResponse, error) {
+	if strings.TrimSpace(friendSpaceID) == "" {
 		return nil, ente.NewBadRequestWithMessage("friendSpaceId is required")
 	}
-	viewerSpace := mustSelectedSpace(ctx)
-	readAt, err := c.ReadMarkersRepo.GetLatestConversationActivityAt(ctx, viewerSpace.SpaceID, req.FriendSpaceID)
+	readAt, err := c.ReadMarkersRepo.GetLatestConversationActivityAt(ctx, viewerSpace.SpaceID, friendSpaceID)
 	if err != nil {
 		if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
 			return nil, ente.ErrPermissionDenied
 		}
 		return nil, err
 	}
-	if err := c.ReadMarkersRepo.UpsertNotificationReadMarker(ctx, viewerSpace.SpaceID, req.FriendSpaceID, readAt); err != nil {
+	if err := c.ReadMarkersRepo.UpsertNotificationReadMarker(ctx, viewerSpace.SpaceID, friendSpaceID, readAt); err != nil {
 		return nil, err
 	}
-	return c.GetUnreadStatus(ctx)
+	return c.GetUnreadStatus(ctx, viewerSpace)
 }

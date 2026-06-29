@@ -39,7 +39,7 @@ func TestMessageReplyValidation(t *testing.T) {
 	bobMessage := createRepoMessage(t, repos, bobID, bobSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
 	charlieMessage := createRepoMessage(t, repos, charlieID, charlieSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
 
-	_, err := controller.Create(newSelectedSpaceControllerContext(aliceID, aliceSpace), bobSpace.SpaceID, models.CreateMessageRequest{
+	_, err := controller.Create(ctx, aliceSpace, bobSpace.SpaceID, models.CreateMessageRequest{
 		MessageCipher:                spaceTestB64("reply-cipher"),
 		SenderEncryptedMessageKey:    spaceTestB64("reply-sender-key"),
 		RecipientEncryptedMessageKey: spaceTestB64("reply-recipient-key"),
@@ -47,7 +47,7 @@ func TestMessageReplyValidation(t *testing.T) {
 	})
 	require.Error(t, err)
 
-	reply, err := controller.Create(newSelectedSpaceControllerContext(aliceID, aliceSpace), bobSpace.SpaceID, models.CreateMessageRequest{
+	reply, err := controller.Create(ctx, aliceSpace, bobSpace.SpaceID, models.CreateMessageRequest{
 		MessageCipher:                spaceTestB64("reply-cipher"),
 		SenderEncryptedMessageKey:    spaceTestB64("reply-sender-key"),
 		RecipientEncryptedMessageKey: spaceTestB64("reply-recipient-key"),
@@ -58,7 +58,7 @@ func TestMessageReplyValidation(t *testing.T) {
 	require.Equal(t, bobMessage.MessageID, *reply.ReplyMessageID)
 
 	require.NoError(t, repos.Messages.DeleteMessage(ctx, bobMessage.MessageID, bobSpace.SpaceID))
-	_, err = controller.Create(newSelectedSpaceControllerContext(aliceID, aliceSpace), bobSpace.SpaceID, models.CreateMessageRequest{
+	_, err = controller.Create(ctx, aliceSpace, bobSpace.SpaceID, models.CreateMessageRequest{
 		MessageCipher:                spaceTestB64("reply-after-delete-cipher"),
 		SenderEncryptedMessageKey:    spaceTestB64("reply-after-delete-sender-key"),
 		RecipientEncryptedMessageKey: spaceTestB64("reply-after-delete-recipient-key"),
@@ -76,7 +76,7 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	message := createRepoMessage(t, repos, bobID, bobSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
 	messageToDelete := createRepoMessage(t, repos, bobID, bobSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
 
-	liked, err := controller.ToggleLike(newSelectedSpaceControllerContext(aliceID, aliceSpace), message.MessageID, models.LikeMessageRequest{Like: true})
+	liked, err := controller.SetLike(ctx, aliceSpace, message.MessageID, true)
 	require.NoError(t, err)
 	require.True(t, liked.Liked)
 	viewed, err := repos.Messages.GetMessage(ctx, message.MessageID, aliceSpace.SpaceID)
@@ -84,20 +84,20 @@ func TestMessageLikeAndDeleteAccess(t *testing.T) {
 	require.True(t, viewed.Liked)
 	require.True(t, viewed.ViewerLiked)
 
-	require.NoError(t, controller.Delete(newSelectedSpaceControllerContext(bobID, bobSpace), messageToDelete.MessageID))
-	_, err = controller.ToggleLike(newSelectedSpaceControllerContext(aliceID, aliceSpace), messageToDelete.MessageID, models.LikeMessageRequest{Like: true})
+	require.NoError(t, controller.Delete(ctx, bobSpace, messageToDelete.MessageID))
+	_, err = controller.SetLike(ctx, aliceSpace, messageToDelete.MessageID, true)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot like a deleted message")
 
 	require.NoError(t, repos.Friends.DeleteFriendship(ctx, aliceSpace.SpaceID, bobSpace.SpaceID))
-	_, err = controller.ToggleLike(newSelectedSpaceControllerContext(aliceID, aliceSpace), message.MessageID, models.LikeMessageRequest{Like: false})
+	_, err = controller.SetLike(ctx, aliceSpace, message.MessageID, false)
 	require.True(t, errors.Is(err, ente.ErrPermissionDenied))
 	thread, _, err := repos.Messages.ListThread(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
 	require.NoError(t, err)
-	require.Len(t, thread, 1)
+	require.Len(t, thread, 2)
 
-	require.Error(t, controller.Delete(newSelectedSpaceControllerContext(aliceID, aliceSpace), message.MessageID))
-	err = controller.Delete(newSelectedSpaceControllerContext(bobID, bobSpace), message.MessageID)
+	require.Error(t, controller.Delete(ctx, aliceSpace, message.MessageID))
+	err = controller.Delete(ctx, bobSpace, message.MessageID)
 	require.True(t, errors.Is(err, ente.ErrPermissionDenied))
 }
 
@@ -108,14 +108,14 @@ func TestListThreadHidesDeletedTargetOwner(t *testing.T) {
 	require.NoError(t, testAddFriend(ctx, repos, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
 	createRepoMessage(t, repos, bobID, bobSpace.SpaceID, aliceID, aliceSpace.SpaceID, "")
 
-	page, err := controller.ListThread(newSelectedSpaceControllerContext(aliceID, aliceSpace), bobSpace.SpaceID, models.ListMessageThreadRequest{})
+	page, err := controller.ListThread(ctx, aliceSpace, bobSpace.SpaceID, models.ListMessageThreadRequest{})
 	require.NoError(t, err)
-	require.Len(t, page.Items, 1)
+	require.Len(t, page.Items, 2)
 
 	_, err = repos.Spaces.DB.Exec(`UPDATE users SET encrypted_email = NULL WHERE user_id = $1`, bobID)
 	require.NoError(t, err)
 
-	page, err = controller.ListThread(newSelectedSpaceControllerContext(aliceID, aliceSpace), bobSpace.SpaceID, models.ListMessageThreadRequest{})
+	page, err = controller.ListThread(ctx, aliceSpace, bobSpace.SpaceID, models.ListMessageThreadRequest{})
 	require.Nil(t, page)
 	require.True(t, errors.Is(err, ente.ErrNotFound))
 }

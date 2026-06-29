@@ -23,8 +23,7 @@ type PostsController struct {
 	auth          authDeps
 }
 
-func (c *PostsController) Create(ctx *gin.Context, req models.CreatePostRequest) (*models.CreatePostResponse, error) {
-	space := mustSelectedSpace(ctx)
+func (c *PostsController) Create(ctx context.Context, space *repo.SpaceRecord, req models.CreatePostRequest) (*models.CreatePostResponse, error) {
 	if strings.TrimSpace(req.EncryptedPostKey) == "" || len(req.Objects) == 0 {
 		return nil, ente.NewBadRequestWithMessage("encryptedPostKey and objects are required")
 	}
@@ -85,16 +84,10 @@ func (c *PostsController) notifyFriendsOfNewPost(spaceID, spaceSlug string) {
 		return
 	}
 	go func() {
-		friends, err := c.FriendsRepo.ListFriendsForSpace(context.Background(), spaceID)
+		recipientUserIDs, err := c.FriendsRepo.ListFriendOwnerIDsForSpace(context.Background(), spaceID)
 		if err != nil {
 			log.WithField("space_id", spaceID).WithError(err).Error("Failed to list friends for space post email")
 			return
-		}
-		recipientUserIDs := make([]int64, 0, len(friends))
-		for _, friend := range friends {
-			if friend.Friend.UserID > 0 {
-				recipientUserIDs = append(recipientUserIDs, friend.Friend.UserID)
-			}
 		}
 		if len(recipientUserIDs) == 0 {
 			return
@@ -157,8 +150,7 @@ func (c *PostsController) List(ctx *gin.Context, req models.ListPostsRequest) (*
 	}, nil
 }
 
-func (c *PostsController) ListFeed(ctx *gin.Context, req models.ListFeedRequest) (*models.FeedPage, error) {
-	viewerSpace := mustSelectedSpace(ctx)
+func (c *PostsController) ListFeed(ctx context.Context, viewerSpace *repo.SpaceRecord, req models.ListFeedRequest) (*models.FeedPage, error) {
 	posts, nextCursor, err := c.PostsRepo.ListFeed(ctx, viewerSpace.SpaceID, req.Cursor, req.Limit)
 	if err != nil {
 		return nil, err
@@ -186,6 +178,9 @@ func (c *PostsController) Get(ctx *gin.Context, postID int64, req models.GetPost
 	if err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(req.SpaceID) != "" && post.SpaceID != strings.TrimSpace(req.SpaceID) {
+		return nil, ente.ErrNotFound
+	}
 	space, err := c.SpacesRepo.GetSpaceByID(ctx, post.SpaceID)
 	if err != nil {
 		return nil, err
@@ -196,8 +191,7 @@ func (c *PostsController) Get(ctx *gin.Context, postID int64, req models.GetPost
 	return c.postResponse(ctx, post, true)
 }
 
-func (c *PostsController) UpdateCaption(ctx *gin.Context, postID int64, req models.UpdatePostCaptionRequest) (*models.PostResponse, error) {
-	viewerSpace := mustSelectedSpace(ctx)
+func (c *PostsController) UpdateCaption(ctx context.Context, viewerSpace *repo.SpaceRecord, postID int64, req models.UpdatePostCaptionRequest) (*models.PostResponse, error) {
 	captionCipher, err := decodeOptionalEncodedSpacePointerField("captionCipher", req.CaptionCipher, maxSpaceCaptionCipherEncodedBytes, maxSpaceCaptionCipherDecodedBytes)
 	if err != nil {
 		return nil, err
@@ -212,8 +206,7 @@ func (c *PostsController) UpdateCaption(ctx *gin.Context, postID int64, req mode
 	return c.postResponse(ctx, post, true)
 }
 
-func (c *PostsController) ToggleLike(ctx *gin.Context, postID int64, req models.LikePostRequest) (*models.LikePostResponse, error) {
-	actorSpace := mustSelectedSpace(ctx)
+func (c *PostsController) SetLike(ctx context.Context, actorSpace *repo.SpaceRecord, postID int64, like bool) (*models.LikePostResponse, error) {
 	post, err := c.PostsRepo.GetPost(ctx, postID, actorSpace.SpaceID)
 	if err != nil {
 		return nil, err
@@ -228,14 +221,14 @@ func (c *PostsController) ToggleLike(ctx *gin.Context, postID int64, req models.
 	if err := c.auth.canViewSpace(ctx, &viewerAuth{UserID: actorSpace.OwnerID, SpaceID: actorSpace.SpaceID}, space); err != nil {
 		return nil, err
 	}
-	created, err := c.PostsRepo.SetLikeWithCreated(ctx, postID, actorSpace.SpaceID, req.Like)
+	created, err := c.PostsRepo.SetLikeWithCreated(ctx, postID, actorSpace.SpaceID, like)
 	if err != nil {
 		return nil, err
 	}
-	if req.Like && created && c.EmailNotifier != nil {
+	if like && created && c.EmailNotifier != nil {
 		go c.EmailNotifier.OnSpacePostLiked(actorSpace.SpaceSlug, post.OwnerID)
 	}
-	return &models.LikePostResponse{Liked: req.Like}, nil
+	return &models.LikePostResponse{Liked: like}, nil
 }
 
 func (c *PostsController) ListLikers(ctx *gin.Context, postID int64, req models.ListPostLikersRequest) (*models.ListPostLikersResponse, error) {
@@ -250,6 +243,9 @@ func (c *PostsController) ListLikers(ctx *gin.Context, postID int64, req models.
 	post, err := c.PostsRepo.GetPost(ctx, postID, viewerSpaceID)
 	if err != nil {
 		return nil, err
+	}
+	if strings.TrimSpace(req.SpaceID) != "" && post.SpaceID != strings.TrimSpace(req.SpaceID) {
+		return nil, ente.ErrNotFound
 	}
 	space, err := c.SpacesRepo.GetSpaceByID(ctx, post.SpaceID)
 	if err != nil {
@@ -280,8 +276,7 @@ func (c *PostsController) ListLikers(ctx *gin.Context, postID int64, req models.
 	return &models.ListPostLikersResponse{Likers: resp, NextCursor: nextCursor}, nil
 }
 
-func (c *PostsController) Delete(ctx *gin.Context, postID int64) error {
-	space := mustSelectedSpace(ctx)
+func (c *PostsController) Delete(ctx context.Context, space *repo.SpaceRecord, postID int64) error {
 	_, err := c.PostsRepo.DeletePost(ctx, postID, space.SpaceID)
 	return err
 }

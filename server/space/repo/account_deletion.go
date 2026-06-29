@@ -92,14 +92,7 @@ func resetSpaceAccessTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs 
 	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM space_messages
 		WHERE kind = 'post_like'
-		  AND (
-		      sender_space_id = ANY($1)
-		      OR reply_post_id IN (
-		       SELECT post_id
-		       FROM space_posts
-		       WHERE space_id = ANY($1)
-		      )
-		  )
+		  AND (sender_space_id = ANY($1) OR recipient_space_id = ANY($1))
 	`, spaceIDArray); err != nil {
 		return stacktrace.Propagate(err, "failed to delete space post likes")
 	}

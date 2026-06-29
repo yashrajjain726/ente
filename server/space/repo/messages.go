@@ -14,9 +14,7 @@ import (
 var spaceMessageSelectColumns = `
 	m.message_id,
 	m.kind,
-	sender_space.owner_id AS sender_id,
 	m.sender_space_id,
-	recipient_space.owner_id AS recipient_id,
 	m.recipient_space_id,
 	COALESCE(m.message_cipher, '\x'::bytea),
 	CASE
@@ -33,6 +31,7 @@ var spaceMessageSelectColumns = `
 	CASE
 		WHEN m.kind = 'post_like' AND m.sender_space_id = %s THEN 'You liked a post'
 		WHEN m.kind = 'post_like' THEN 'Liked your post'
+		WHEN m.kind = 'friend_added' THEN 'You are now friends'
 		ELSE ''
 	END AS text,
 	quote_post.post_id AS quote_post_id,
@@ -60,29 +59,46 @@ var spaceMessageJoins = `
 	) quote_asset ON TRUE
 `
 
+const peerThreadKeySQL = `CASE
+	WHEN $1 < cp.friend_space_id THEN $1 || ':' || cp.friend_space_id
+	ELSE cp.friend_space_id || ':' || $1
+END`
+
+const selectedThreadKeySQL = `CASE WHEN $1 < $2 THEN $1 || ':' || $2 ELSE $2 || ':' || $1 END`
+
 const latestPeerActivitySQL = `
+WITH peer_messages AS (
+	SELECT m.*
+	FROM space_messages m
+	WHERE m.thread_key = ` + peerThreadKeySQL + `
+	  AND m.is_deleted = FALSE
+)
 SELECT *
 FROM (
 	SELECT
-		CASE WHEN m.kind = 'post_like' THEN 'post_like' ELSE 'message' END AS activity_type,
-		CASE WHEN m.kind = 'post_like' THEN m.message_id ELSE 'message:' || m.message_id END AS activity_id,
+		CASE
+			WHEN m.kind = 'post_like' THEN 'post_like'
+			WHEN m.kind = 'friend_added' THEN 'friend_added'
+			WHEN m.kind = 'post_reply' AND m.recipient_space_id = $1 THEN 'post_reply'
+			ELSE 'message'
+		END AS activity_type,
+		CASE
+			WHEN m.kind = 'post_like' THEN 'post_like:' || m.reply_post_id || ':' || m.sender_space_id
+			WHEN m.kind = 'friend_added' THEN 'friend_added:' || m.message_id
+			WHEN m.kind = 'post_reply' AND m.recipient_space_id = $1 THEN 'post_reply:' || m.message_id
+			ELSE 'message:' || m.message_id
+		END AS activity_id,
 		m.created_at AS activity_created_at,
 		CASE WHEN m.kind = 'post_like' THEN NULL::text ELSE m.message_id END AS message_id,
 		CASE WHEN m.kind IN ('post_reply', 'post_like') THEN m.reply_post_id ELSE NULL::bigint END AS post_id,
+		CASE WHEN m.kind IN ('post_reply', 'post_like') THEN m.recipient_space_id ELSE NULL::text END AS post_space_id,
 		CASE
-			WHEN m.kind = 'post_like' AND m.recipient_space_id = $1 THEN m.created_at
-			WHEN m.kind <> 'post_like' AND m.recipient_space_id = $1 THEN m.created_at
+			WHEN m.recipient_space_id = $1 AND m.kind IN ('regular', 'post_reply', 'post_like') THEN m.created_at
 			ELSE NULL::bigint
 		END AS notification_created_at,
 		(m.sender_space_id = $1) AS is_outgoing
-	FROM space_messages m
-	WHERE (
-	    (m.sender_space_id = $1 AND m.recipient_space_id = cp.friend_space_id)
-	    OR (m.sender_space_id = cp.friend_space_id AND m.recipient_space_id = $1)
-	)
-	  AND m.is_deleted = FALSE
-	  AND NOT (m.kind = 'post_reply' AND m.recipient_space_id = $1)
-	  AND (m.kind <> 'post_like' OR m.reply_post_id IS NOT NULL)
+	FROM peer_messages m
+	WHERE m.kind IN ('regular', 'post_reply', 'post_like', 'friend_added')
 
 	UNION ALL
 
@@ -92,100 +108,46 @@ FROM (
 		m.recipient_liked_at AS activity_created_at,
 		m.message_id,
 		NULL::bigint AS post_id,
+		NULL::text AS post_space_id,
 		CASE WHEN m.sender_space_id = $1 THEN m.recipient_liked_at ELSE NULL::bigint END AS notification_created_at,
 		(m.recipient_space_id = $1) AS is_outgoing
-	FROM space_messages m
-	WHERE (
-	    (m.sender_space_id = $1 AND m.recipient_space_id = cp.friend_space_id)
-	    OR (m.sender_space_id = cp.friend_space_id AND m.recipient_space_id = $1)
-	)
-	  AND m.kind <> 'post_like'
-	  AND m.is_deleted = FALSE
+	FROM peer_messages m
+	WHERE m.kind IN ('regular', 'post_reply')
 	  AND m.recipient_liked_at IS NOT NULL
-
-	UNION ALL
-
-	SELECT
-		'post_reply' AS activity_type,
-		'post_reply:' || m.message_id AS activity_id,
-		m.created_at AS activity_created_at,
-		m.message_id,
-		m.reply_post_id AS post_id,
-		m.created_at AS notification_created_at,
-		FALSE AS is_outgoing
-	FROM space_messages m
-	WHERE m.sender_space_id = cp.friend_space_id
-	  AND m.recipient_space_id = $1
-	  AND m.kind = 'post_reply'
-	  AND m.is_deleted = FALSE
-	  AND m.reply_post_id IS NOT NULL
 ) activity
 ORDER BY activity_created_at DESC, activity_id DESC
 LIMIT 1`
 
 const peerUnreadCountSQL = `
 SELECT COUNT(*) AS unread_count
-FROM (
-	SELECT m.created_at AS readable_created_at
-	FROM space_messages m
-	WHERE m.sender_space_id = cp.friend_space_id
-	  AND m.recipient_space_id = $1
-	  AND m.kind = 'regular'
-	  AND m.is_deleted = FALSE
-
-	UNION ALL
-
-	SELECT m.created_at AS readable_created_at
-	FROM space_messages m
-	WHERE m.sender_space_id = cp.friend_space_id
-	  AND m.recipient_space_id = $1
-	  AND m.kind = 'post_reply'
-	  AND m.is_deleted = FALSE
-	  AND m.reply_post_id IS NOT NULL
-) readable
-WHERE readable.readable_created_at > COALESCE(nrm.read_at, 0)`
+FROM space_messages m
+WHERE m.thread_key = ` + peerThreadKeySQL + `
+  AND m.sender_space_id = cp.friend_space_id
+  AND m.recipient_space_id = $1
+  AND m.kind IN ('regular', 'post_reply')
+  AND m.is_deleted = FALSE
+  AND m.created_at > COALESCE(nrm.read_at, 0)`
 
 const peerNotificationUnreadSQL = `
 SELECT EXISTS (
 	SELECT 1
-	FROM (
-		SELECT m.created_at AS notification_created_at
-		FROM space_messages m
-		WHERE m.sender_space_id = cp.friend_space_id
-		  AND m.recipient_space_id = $1
-		  AND m.kind = 'regular'
-		  AND m.is_deleted = FALSE
-
-		UNION ALL
-
-		SELECT m.recipient_liked_at AS notification_created_at
-		FROM space_messages m
-		WHERE m.sender_space_id = $1
-		  AND m.recipient_space_id = cp.friend_space_id
-		  AND m.kind <> 'post_like'
-		  AND m.is_deleted = FALSE
-		  AND m.recipient_liked_at IS NOT NULL
-
-		UNION ALL
-
-		SELECT m.created_at AS notification_created_at
-		FROM space_messages m
-		WHERE m.sender_space_id = cp.friend_space_id
-		  AND m.recipient_space_id = $1
-		  AND m.kind = 'post_like'
-		  AND m.reply_post_id IS NOT NULL
-
-		UNION ALL
-
-		SELECT m.created_at AS notification_created_at
-		FROM space_messages m
-		WHERE m.sender_space_id = cp.friend_space_id
-		  AND m.recipient_space_id = $1
-		  AND m.kind = 'post_reply'
-		  AND m.is_deleted = FALSE
-		  AND m.reply_post_id IS NOT NULL
-	) notification
-	WHERE notification.notification_created_at > COALESCE(nrm.read_at, 0)
+	FROM space_messages m
+	WHERE m.thread_key = ` + peerThreadKeySQL + `
+	  AND m.is_deleted = FALSE
+	  AND (
+	      (
+	          m.sender_space_id = cp.friend_space_id
+	          AND m.recipient_space_id = $1
+	          AND m.kind IN ('regular', 'post_reply', 'post_like')
+	          AND m.created_at > COALESCE(nrm.read_at, 0)
+	      ) OR (
+	          m.sender_space_id = $1
+	          AND m.recipient_space_id = cp.friend_space_id
+	          AND m.kind IN ('regular', 'post_reply')
+	          AND m.recipient_liked_at IS NOT NULL
+	          AND m.recipient_liked_at > COALESCE(nrm.read_at, 0)
+	      )
+	  )
 	LIMIT 1
 ) AS notification_unread`
 
@@ -203,6 +165,7 @@ conversation_rows AS (
 		latest_activity.activity_created_at,
 		latest_activity.message_id,
 		latest_activity.post_id,
+		latest_activity.post_space_id,
 		latest_activity.notification_created_at,
 		latest_activity.is_outgoing,
 		COALESCE(unread_state.unread_count, 0) AS unread_count,
@@ -239,6 +202,7 @@ conversation_rows AS (
 		latest_activity.activity_created_at,
 		latest_activity.message_id,
 		latest_activity.post_id,
+		latest_activity.post_space_id,
 		latest_activity.notification_created_at,
 		latest_activity.is_outgoing,
 		COALESCE(unread_state.unread_count, 0) AS unread_count,
@@ -312,12 +276,8 @@ func (r *MessagesRepository) ListThread(ctx context.Context, viewerSpaceID strin
 		SELECT ` + sprintfSpaceMessageColumns("$1") + `
 		FROM space_messages m
 		` + spaceMessageJoins + `
-		WHERE (
-			(m.sender_space_id = $1 AND m.recipient_space_id = $2)
-			OR
-			(m.recipient_space_id = $1 AND m.sender_space_id = $2)
-		)
-	  AND m.is_deleted = FALSE`
+		WHERE m.thread_key = ` + selectedThreadKeySQL + `
+		  AND m.is_deleted = FALSE`
 	if cursorCreatedAt, cursorMessageID, ok := parseMessageCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorMessageID)
 		query += ` AND (m.created_at, m.message_id) < ($3, $4)`
@@ -355,7 +315,7 @@ func (r *MessagesRepository) SetLike(ctx context.Context, messageID string, acto
 			SET recipient_liked_at = COALESCE(recipient_liked_at, now_utc_micro_seconds())
 			WHERE message_id = $1
 			  AND recipient_space_id = $2
-			  AND kind <> 'post_like'
+			  AND kind IN ('regular', 'post_reply')
 			  AND is_deleted = FALSE
 		`, messageID, actorSpaceID)
 		return stacktrace.Propagate(err, "")
@@ -365,7 +325,7 @@ func (r *MessagesRepository) SetLike(ctx context.Context, messageID string, acto
 		SET recipient_liked_at = NULL
 		WHERE message_id = $1
 		  AND recipient_space_id = $2
-		  AND kind <> 'post_like'
+		  AND kind IN ('regular', 'post_reply')
 	`, messageID, actorSpaceID)
 	return stacktrace.Propagate(err, "")
 }
@@ -381,7 +341,7 @@ func (r *MessagesRepository) DeleteMessage(ctx context.Context, messageID string
 		SET is_deleted = TRUE
 		WHERE message_id = $1
 		  AND sender_space_id = $2
-		  AND kind <> 'post_like'
+		  AND kind IN ('regular', 'post_reply')
 		  AND is_deleted = FALSE
 	`, messageID, senderSpaceID)
 	if err != nil {
@@ -422,55 +382,10 @@ func (r *MessagesRepository) ListLatestChatSummaries(ctx context.Context, viewer
 			(c.unread_count > 0) AS unread,
 			c.unread_count,
 			c.notification_unread,
-			COALESCE(m.message_id, '') AS message_id,
-			COALESCE(m.kind, '') AS kind,
-			0 AS sender_id,
-			COALESCE(m.sender_space_id, '') AS sender_space_id,
-			0 AS recipient_id,
-			COALESCE(m.recipient_space_id, '') AS recipient_space_id,
-			COALESCE(m.message_cipher, '\x'::bytea) AS message_cipher,
-			CASE
-				WHEN m.message_id IS NULL THEN '\x'::bytea
-				WHEN m.sender_space_id = $1 THEN COALESCE(m.sender_encrypted_message_key, '\x'::bytea)
-				ELSE COALESCE(m.recipient_encrypted_message_key, '\x'::bytea)
-			END AS encrypted_message_key,
-			m.reply_post_id,
-			m.reply_message_id,
-			COALESCE(m.recipient_liked_at IS NOT NULL, FALSE) AS liked,
-			COALESCE(m.recipient_liked_at IS NOT NULL AND m.recipient_space_id = $1, FALSE) AS viewer_liked,
-			COALESCE(m.is_deleted, FALSE) AS is_deleted,
-			COALESCE(m.created_at, 0) AS message_created_at,
-			COALESCE(m.updated_at, 0) AS message_updated_at,
-			0 AS sender_owner_id,
-			COALESCE(m.sender_space_id, '') AS sender_space_id,
-			'' AS sender_space_slug,
-			'\x'::bytea AS sender_public_key,
-			0 AS sender_current_version,
-			'\x'::bytea AS sender_profile,
-			NULL::text AS sender_avatar_object_id,
-			NULL::bigint AS sender_avatar_size,
-			0 AS sender_updated_at,
-			NULL::bigint AS sender_friends,
-			NULL::bigint AS sender_posts,
-			0 AS recipient_owner_id,
-			COALESCE(m.recipient_space_id, '') AS recipient_space_id,
-			'' AS recipient_space_slug,
-			'\x'::bytea AS recipient_public_key,
-			0 AS recipient_current_version,
-			'\x'::bytea AS recipient_profile,
-			NULL::text AS recipient_avatar_object_id,
-			NULL::bigint AS recipient_avatar_size,
-			0 AS recipient_updated_at,
-			NULL::bigint AS recipient_friends,
-			NULL::bigint AS recipient_posts,
+			c.message_id,
 			c.post_id,
-			CASE WHEN c.post_id IS NULL THEN '' ELSE COALESCE(post_message.recipient_space_id, '') END AS post_space_id,
-			'' AS post_space_slug,
-			0 AS post_owner_id,
-			FALSE AS post_is_deleted
+			c.post_space_id
 		FROM conversation_rows c
-		LEFT JOIN space_messages m ON m.message_id = c.message_id
-		LEFT JOIN space_messages post_message ON post_message.message_id = COALESCE(c.message_id, c.activity_id)
 	`, strings.TrimSpace(viewerSpaceID), pq.Array(cleanFriendSpaceIDs))
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -495,9 +410,7 @@ func scanMessageRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceMess
 	dest := []any{
 		&rec.MessageID,
 		&rec.Kind,
-		&rec.SenderID,
 		&rec.SenderSpaceID,
-		&rec.RecipientID,
 		&rec.RecipientSpaceID,
 		&rec.MessageCipher,
 		&rec.EncryptedMessageKey,
@@ -534,9 +447,6 @@ func scanMessageRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceMess
 
 func scanConversationChatSummaryRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceConversationChatSummaryRecord, error) {
 	var rec SpaceConversationChatSummaryRecord
-	var message SpaceMessageRecord
-	var postID sql.NullInt64
-	var post SpaceMessageConversationPostRecord
 	dest := []any{
 		&rec.FriendSpaceID,
 		&rec.LatestActivity.Type,
@@ -546,40 +456,12 @@ func scanConversationChatSummaryRecord(scanner interface{ Scan(dest ...any) erro
 		&rec.Unread,
 		&rec.UnreadCount,
 		&rec.NotificationUnread,
-		&message.MessageID,
-		&message.Kind,
-		&message.SenderID,
-		&message.SenderSpaceID,
-		&message.RecipientID,
-		&message.RecipientSpaceID,
-		&message.MessageCipher,
-		&message.EncryptedMessageKey,
-		&message.ReplyPostID,
-		&message.ReplyMessageID,
-		&message.Liked,
-		&message.ViewerLiked,
-		&message.IsDeleted,
-		&message.CreatedAt,
-		&message.UpdatedAt,
+		&rec.LatestActivity.MessageID,
+		&rec.LatestActivity.PostID,
+		&rec.LatestActivity.PostSpaceID,
 	}
-	dest = append(dest, spaceActorScanDest(&message.Sender)...)
-	dest = append(dest, spaceActorScanDest(&message.Recipient)...)
-	dest = append(dest,
-		&postID,
-		&post.SpaceID,
-		&post.SpaceSlug,
-		&post.OwnerID,
-		&post.IsDeleted,
-	)
 	if err := scanner.Scan(dest...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
-	}
-	if message.MessageID != "" {
-		rec.LatestActivity.Message = &message
-	}
-	if postID.Valid {
-		post.PostID = postID.Int64
-		rec.LatestActivity.Post = &post
 	}
 	return &rec, nil
 }

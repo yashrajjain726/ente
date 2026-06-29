@@ -19,7 +19,7 @@ func TestPostLikeRejectsOwnPost(t *testing.T) {
 	postID, err := testCreatePost(ctx, repos, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
 
-	_, err = controller.ToggleLike(newSelectedSpaceControllerContext(aliceID, aliceSpace), postID, models.LikePostRequest{Like: true})
+	_, err = controller.SetLike(ctx, aliceSpace, postID, true)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot like your own post")
 }
@@ -30,7 +30,7 @@ func TestCreatePostRequiresAssetMetadataCipher(t *testing.T) {
 	aliceSpace, err := testCreateSpace(ctx, repos, aliceID, "alice_metadata_post", "alice-space-key", "alice-metadata-post-public", "alice-metadata-post-secret", "alice-metadata-post-secret-nonce", "alice-profile")
 	require.NoError(t, err)
 
-	_, err = controller.Create(newSelectedSpaceControllerContext(aliceID, aliceSpace), models.CreatePostRequest{
+	_, err = controller.Create(ctx, aliceSpace, models.CreatePostRequest{
 		EncryptedPostKey: "cG9zdC1rZXk=",
 		KeyVersion:       aliceSpace.CurrentVersion,
 		Objects: []models.PostObjectPayload{{
@@ -107,14 +107,15 @@ func TestListPostLikersUsesRequestPagination(t *testing.T) {
 	ginCtx := newPublicSpaceContext()
 	ginCtx.Request.Header.Set(SpaceBrowserSessionTokenHeader, "alice-list-likers-session")
 
-	page, err := controller.ListLikers(ginCtx, postID, models.ListPostLikersRequest{Limit: 1})
+	page, err := controller.ListLikers(ginCtx, postID, models.ListPostLikersRequest{SpaceID: aliceSpace.SpaceID, Limit: 1})
 	require.NoError(t, err)
 	require.Len(t, page.Likers, 1)
 	require.NotEmpty(t, page.NextCursor)
 
 	page, err = controller.ListLikers(ginCtx, postID, models.ListPostLikersRequest{
-		Cursor: page.NextCursor,
-		Limit:  1,
+		SpaceID: aliceSpace.SpaceID,
+		Cursor:  page.NextCursor,
+		Limit:   1,
 	})
 	require.NoError(t, err)
 	require.Len(t, page.Likers, 1)

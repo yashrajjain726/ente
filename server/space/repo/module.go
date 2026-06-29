@@ -127,9 +127,7 @@ type SpacePostLikerRecord struct {
 type SpaceMessageRecord struct {
 	MessageID           string
 	Kind                string
-	SenderID            int64
 	SenderSpaceID       string
-	RecipientID         int64
 	RecipientSpaceID    string
 	MessageCipher       []byte
 	EncryptedMessageKey []byte
@@ -164,24 +162,13 @@ type SpaceConversationChatSummaryRecord struct {
 }
 
 type SpaceMessageConversationActivityRecord struct {
-	ID        string
-	Type      string
-	CreatedAt int64
-	Outgoing  bool
-	Message   *SpaceMessageRecord
-	Post      *SpaceMessageConversationPostRecord
-}
-
-type SpaceMessageConversationPostRecord struct {
-	PostID               int64
-	SpaceID              string
-	SpaceSlug            string
-	OwnerID              int64
-	IsDeleted            bool
-	ObjectKey            sql.NullString
-	ObjectSize           sql.NullInt64
-	ObjectPosition       sql.NullInt64
-	ObjectMetadataCipher []byte
+	ID          string
+	Type        string
+	CreatedAt   int64
+	Outgoing    bool
+	MessageID   sql.NullString
+	PostID      sql.NullInt64
+	PostSpaceID sql.NullString
 }
 
 type CreateSpaceMessageRecord struct {
@@ -197,7 +184,6 @@ type CreateSpaceMessageRecord struct {
 }
 
 type SpaceActorRecord struct {
-	UserID           int64
 	SpaceID          string
 	SpaceSlug        string
 	PublicKey        []byte
@@ -206,14 +192,10 @@ type SpaceActorRecord struct {
 	AvatarObjectID   sql.NullString
 	AvatarSize       sql.NullInt64
 	UpdatedAt        int64
-	Friends          sql.NullInt64
-	Posts            sql.NullInt64
 }
 
 type SpaceShareRecord struct {
 	SpaceID              string
-	FriendID             int64
-	OwnerID              int64
 	SpaceSlug            string
 	FriendSealedSpaceKey []byte
 	KeyVersion           int
@@ -247,7 +229,6 @@ type SpaceFriendRequestRecord struct {
 type SpaceLinkRecord struct {
 	SpaceID             string
 	SpaceSlug           string
-	OwnerID             int64
 	OwnerSlug           string
 	AuthKeyHash         []byte
 	KeyVersion          int
@@ -261,13 +242,11 @@ type SpaceLinkRecord struct {
 type SpaceLinkSessionRecord struct {
 	TokenHash           []byte
 	SpaceID             string
-	OwnerID             int64
 	AuthKeyHash         []byte
 	KeyVersion          int
 	ExpiresAt           int64
 	CreatedAt           int64
 	SpaceSlug           string
-	OwnerSlug           string
 	LinkWrappedSpaceKey []byte
 }
 

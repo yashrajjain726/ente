@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
@@ -24,8 +25,7 @@ type LinksController struct {
 	auth       authDeps
 }
 
-func (c *LinksController) Get(ctx *gin.Context) (*models.SpaceLinkStatusResponse, error) {
-	space := mustSelectedSpace(ctx)
+func (c *LinksController) Get(ctx context.Context, space *repo.SpaceRecord) (*models.SpaceLinkStatusResponse, error) {
 	link, err := c.LinksRepo.GetLink(ctx, space.SpaceID)
 	if err != nil {
 		if !errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
@@ -41,16 +41,15 @@ func (c *LinksController) Get(ctx *gin.Context) (*models.SpaceLinkStatusResponse
 	return linkStatusResponse(link), nil
 }
 
-func (c *LinksController) Create(ctx *gin.Context, req models.SpaceLinkCreateRequest) (*models.SpaceLinkStatusResponse, error) {
-	return c.writeLink(ctx, req, false)
+func (c *LinksController) Create(ctx context.Context, space *repo.SpaceRecord, req models.SpaceLinkCreateRequest) (*models.SpaceLinkStatusResponse, error) {
+	return c.writeLink(ctx, space, req, false)
 }
 
-func (c *LinksController) Rotate(ctx *gin.Context, req models.SpaceLinkCreateRequest) (*models.SpaceLinkStatusResponse, error) {
-	return c.writeLink(ctx, req, true)
+func (c *LinksController) Rotate(ctx context.Context, space *repo.SpaceRecord, req models.SpaceLinkCreateRequest) (*models.SpaceLinkStatusResponse, error) {
+	return c.writeLink(ctx, space, req, true)
 }
 
-func (c *LinksController) writeLink(ctx *gin.Context, req models.SpaceLinkCreateRequest, rotate bool) (*models.SpaceLinkStatusResponse, error) {
-	space := mustSelectedSpace(ctx)
+func (c *LinksController) writeLink(ctx context.Context, space *repo.SpaceRecord, req models.SpaceLinkCreateRequest, rotate bool) (*models.SpaceLinkStatusResponse, error) {
 	if strings.TrimSpace(req.AuthKey) == "" || strings.TrimSpace(req.LinkWrappedSpaceKey) == "" || strings.TrimSpace(req.EncryptedAccessKey) == "" || req.KeyVersion <= 0 {
 		return nil, ente.NewBadRequestWithMessage("authKey, linkWrappedSpaceKey, encryptedAccessKey and keyVersion are required")
 	}
@@ -113,8 +112,7 @@ func linkStatusResponse(link *repo.SpaceLinkRecord) *models.SpaceLinkStatusRespo
 	}
 }
 
-func (c *LinksController) Delete(ctx *gin.Context) error {
-	space := mustSelectedSpace(ctx)
+func (c *LinksController) Delete(ctx context.Context, space *repo.SpaceRecord) error {
 	return c.LinksRepo.DeleteLink(ctx, space.SpaceID)
 }
 
@@ -139,7 +137,7 @@ func (c *LinksController) Login(ctx *gin.Context, req models.SpaceLinkLoginReque
 	if err := c.LinksRepo.CreateSession(ctx, sessionHash[:], link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.MicrosecondsAfterMinutes(spaceLinkSessionDurationMinutes)); err != nil {
 		return nil, err
 	}
-	publicKey, err := c.SpacesRepo.GetOwnerPublicKey(ctx, link.OwnerID)
+	space, err := c.SpacesRepo.GetSpaceByID(ctx, link.SpaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +146,7 @@ func (c *LinksController) Login(ctx *gin.Context, req models.SpaceLinkLoginReque
 		SpaceID:             link.SpaceID,
 		SpaceSlug:           link.SpaceSlug,
 		Owner:               link.OwnerSlug,
-		PublicKey:           encodeSpaceField(publicKey),
+		PublicKey:           encodeSpaceField(space.PublicKey),
 		KeyVersion:          link.KeyVersion,
 		LinkWrappedSpaceKey: encodeSpaceField(link.LinkWrappedSpaceKey),
 	}, nil

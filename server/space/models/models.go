@@ -1,7 +1,7 @@
 package models
 
 type AssetRedirectRequest struct {
-	SpaceID       string `form:"spaceId" binding:"required"`
+	SpaceID       string `form:"spaceId"`
 	ViewerSpaceID string `form:"viewerSpaceId"`
 	ObjectKey     string `form:"objectKey"`
 	AssetType     string `form:"assetType"`
@@ -21,13 +21,13 @@ type SpaceBrowserSessionBootstrapResponse struct {
 }
 
 type GetSpaceProfileRequest struct {
-	SpaceID       string `form:"spaceId" binding:"required"`
+	SpaceID       string `form:"spaceId"`
 	ViewerSpaceID string `form:"viewerSpaceId"`
 	Version       *int   `form:"version"`
 }
 
 type ListPostsRequest struct {
-	SpaceID       string `form:"spaceId" binding:"required"`
+	SpaceID       string `form:"spaceId"`
 	ViewerSpaceID string `form:"viewerSpaceId"`
 	Cursor        string `form:"cursor"`
 	Limit         int    `form:"limit"`
@@ -39,12 +39,14 @@ type ListFeedRequest struct {
 }
 
 type ListPostLikersRequest struct {
+	SpaceID       string `form:"spaceId"`
 	ViewerSpaceID string `form:"viewerSpaceId"`
 	Cursor        string `form:"cursor"`
 	Limit         int    `form:"limit"`
 }
 
 type GetPostRequest struct {
+	SpaceID       string `form:"spaceId"`
 	ViewerSpaceID string `form:"viewerSpaceId"`
 }
 
@@ -68,9 +70,9 @@ type SpaceKeyResponse struct {
 }
 
 type PresignUploadRequest struct {
-	Size       int64   `json:"size" binding:"required"`
+	Size       int64   `json:"size" binding:"required,gt=0"`
 	ContentMD5 string  `json:"contentMD5" binding:"required"`
-	Purpose    *string `json:"purpose,omitempty"`
+	Purpose    *string `json:"purpose,omitempty" binding:"omitempty,oneof=post avatar cover"`
 }
 
 type PresignUploadResponse struct {
@@ -87,8 +89,8 @@ type AssetDownloadResponse struct {
 }
 
 type ProfileAvatarPayload struct {
-	ObjectID string `json:"objectID"`
-	Size     int64  `json:"size,omitempty"`
+	ObjectID string `json:"objectID" binding:"required"`
+	Size     int64  `json:"size,omitempty" binding:"omitempty,gt=0"`
 }
 
 type ProfileAvatarResponse struct {
@@ -107,15 +109,13 @@ type SpaceActorResponse struct {
 	KeyVersion       int                    `json:"keyVersion,omitempty"`
 	EncryptedProfile string                 `json:"encryptedProfile,omitempty"`
 	Avatar           *ProfileAvatarResponse `json:"avatar,omitempty"`
-	Friends          *int64                 `json:"friends,omitempty"`
-	Posts            *int64                 `json:"posts,omitempty"`
 }
 
 type SpaceLinkCreateRequest struct {
-	AuthKey             string `json:"authKey"`
-	KeyVersion          int    `json:"keyVersion"`
-	LinkWrappedSpaceKey string `json:"linkWrappedSpaceKey"`
-	EncryptedAccessKey  string `json:"encryptedAccessKey"`
+	AuthKey             string `json:"authKey" binding:"required"`
+	KeyVersion          int    `json:"keyVersion" binding:"required,gt=0"`
+	LinkWrappedSpaceKey string `json:"linkWrappedSpaceKey" binding:"required"`
+	EncryptedAccessKey  string `json:"encryptedAccessKey" binding:"required"`
 }
 
 type SpaceLinkStatusResponse struct {
@@ -129,8 +129,8 @@ type SpaceLinkStatusResponse struct {
 }
 
 type SpaceLinkLoginRequest struct {
-	SpaceID string `json:"spaceId"`
-	AuthKey string `json:"authKey"`
+	SpaceID string `json:"spaceId" binding:"required"`
+	AuthKey string `json:"authKey" binding:"required"`
 }
 
 type SpaceLinkLoginResponse struct {
@@ -146,13 +146,13 @@ type SpaceLinkLoginResponse struct {
 type AddFriendPayload struct {
 	TargetSpaceID                 string `json:"targetSpaceId,omitempty"`
 	TargetUsername                string `json:"targetUsername,omitempty"`
-	RequesterFriendSealedSpaceKey string `json:"requesterFriendSealedSpaceKey"`
-	RequesterKeyVersion           int    `json:"requesterKeyVersion"`
+	RequesterFriendSealedSpaceKey string `json:"requesterFriendSealedSpaceKey" binding:"required"`
+	RequesterKeyVersion           int    `json:"requesterKeyVersion" binding:"required,gt=0"`
 }
 
 type ConfirmFriendRequestPayload struct {
-	TargetFriendSealedSpaceKey string `json:"targetFriendSealedSpaceKey"`
-	TargetKeyVersion           int    `json:"targetKeyVersion"`
+	TargetFriendSealedSpaceKey string `json:"targetFriendSealedSpaceKey" binding:"required"`
+	TargetKeyVersion           int    `json:"targetKeyVersion" binding:"required,gt=0"`
 }
 
 type FriendTargetPayload struct {
@@ -183,10 +183,10 @@ type FriendRelationshipResponse struct {
 }
 
 type UpdateSpaceProfileRequest struct {
-	KeyVersion       int                   `json:"keyVersion"`
-	EncryptedProfile string                `json:"encryptedProfile"`
-	Avatar           *ProfileAvatarPayload `json:"avatar,omitempty"`
-	Cover            *ProfileCoverPayload  `json:"cover,omitempty"`
+	KeyVersion       int                   `json:"keyVersion" binding:"required,gt=0"`
+	EncryptedProfile string                `json:"encryptedProfile" binding:"required"`
+	Avatar           *ProfileAvatarPayload `json:"avatar,omitempty" binding:"omitempty"`
+	Cover            *ProfileCoverPayload  `json:"cover,omitempty" binding:"omitempty"`
 	RemoveAvatar     bool                  `json:"removeAvatar,omitempty"`
 	RemoveCover      bool                  `json:"removeCover,omitempty"`
 }
@@ -198,10 +198,10 @@ type UpdateSpaceProfileResponse struct {
 }
 
 type CreateSpaceRequest struct {
-	SpaceSlug           string `json:"spaceSlug"`
-	RootWrappedSpaceKey string `json:"rootWrappedSpaceKey"`
-	PublicKey           string `json:"publicKey"`
-	EncryptedSecretKey  string `json:"encryptedSecretKey"`
+	SpaceSlug           string `json:"spaceSlug" binding:"required"`
+	RootWrappedSpaceKey string `json:"rootWrappedSpaceKey" binding:"required"`
+	PublicKey           string `json:"publicKey" binding:"required"`
+	EncryptedSecretKey  string `json:"encryptedSecretKey" binding:"required"`
 	EncryptedProfile    string `json:"encryptedProfile"`
 }
 
@@ -217,7 +217,7 @@ type SpaceProfileResponse struct {
 }
 
 type UpdateSpaceSlugRequest struct {
-	SpaceSlug string `json:"spaceSlug"`
+	SpaceSlug string `json:"spaceSlug" binding:"required"`
 }
 
 type SpaceLookupResponse struct {
@@ -232,10 +232,10 @@ type SpaceSlugAvailabilityResponse struct {
 }
 
 type RotateSpaceKeyRequest struct {
-	KeyVersion          int    `json:"keyVersion"`
-	RootWrappedSpaceKey string `json:"rootWrappedSpaceKey"`
-	WrappedPrevKey      string `json:"wrappedPrevKey"`
-	EncryptedProfile    string `json:"encryptedProfile"`
+	KeyVersion          int    `json:"keyVersion" binding:"required,gt=0"`
+	RootWrappedSpaceKey string `json:"rootWrappedSpaceKey" binding:"required"`
+	WrappedPrevKey      string `json:"wrappedPrevKey" binding:"required"`
+	EncryptedProfile    string `json:"encryptedProfile" binding:"required"`
 }
 
 type SpaceKeyVersionResponse struct {
@@ -251,28 +251,24 @@ type SpaceFriendResponse struct {
 }
 
 type RefreshFriendSharesRequest struct {
-	KeyVersion int                  `json:"keyVersion"`
-	Shares     []ShareUpdatePayload `json:"shares"`
+	KeyVersion int                  `json:"keyVersion" binding:"required,gt=0"`
+	Shares     []ShareUpdatePayload `json:"shares" binding:"required,min=1,dive"`
 }
 
 type ShareUpdatePayload struct {
-	FriendSpaceID        string `json:"friendSpaceId"`
-	FriendSealedSpaceKey string `json:"friendSealedSpaceKey"`
+	FriendSpaceID        string `json:"friendSpaceId" binding:"required"`
+	FriendSealedSpaceKey string `json:"friendSealedSpaceKey" binding:"required"`
 }
 
 type CreatePostRequest struct {
-	EncryptedPostKey string              `json:"encryptedPostKey"`
-	KeyVersion       int                 `json:"keyVersion"`
+	EncryptedPostKey string              `json:"encryptedPostKey" binding:"required"`
+	KeyVersion       int                 `json:"keyVersion" binding:"required,gt=0"`
 	CaptionCipher    *string             `json:"captionCipher,omitempty"`
-	Objects          []PostObjectPayload `json:"objects"`
+	Objects          []PostObjectPayload `json:"objects" binding:"required,min=1,max=10,dive"`
 }
 
 type CreatePostResponse struct {
 	PostID int64 `json:"postId"`
-}
-
-type LikePostRequest struct {
-	Like bool `json:"like"`
 }
 
 type LikePostResponse struct {
@@ -295,14 +291,10 @@ type UpdatePostCaptionRequest struct {
 
 type CreateMessageRequest struct {
 	MessageID                    string `json:"messageId,omitempty"`
-	MessageCipher                string `json:"messageCipher"`
-	SenderEncryptedMessageKey    string `json:"senderEncryptedMessageKey"`
-	RecipientEncryptedMessageKey string `json:"recipientEncryptedMessageKey"`
+	MessageCipher                string `json:"messageCipher" binding:"required"`
+	SenderEncryptedMessageKey    string `json:"senderEncryptedMessageKey" binding:"required"`
+	RecipientEncryptedMessageKey string `json:"recipientEncryptedMessageKey" binding:"required"`
 	ReplyMessageID               string `json:"replyMessageId,omitempty"`
-}
-
-type LikeMessageRequest struct {
-	Like bool `json:"like"`
 }
 
 type LikeMessageResponse struct {
@@ -342,20 +334,13 @@ type MessagePage struct {
 }
 
 type MessageConversationActivityResponse struct {
-	ID        string                           `json:"id"`
-	Type      string                           `json:"type"`
-	CreatedAt string                           `json:"createdAt"`
-	Outgoing  bool                             `json:"outgoing,omitempty"`
-	Message   *MessageResponse                 `json:"message,omitempty"`
-	Post      *MessageConversationPostResponse `json:"post,omitempty"`
-}
-
-type MessageConversationPostResponse struct {
-	PostID    int64               `json:"postId"`
-	SpaceID   string              `json:"spaceId"`
-	SpaceSlug string              `json:"spaceSlug"`
-	IsDeleted bool                `json:"isDeleted"`
-	Objects   []PostObjectPayload `json:"objects,omitempty"`
+	ID          string  `json:"id"`
+	Type        string  `json:"type"`
+	CreatedAt   string  `json:"createdAt"`
+	Outgoing    bool    `json:"outgoing,omitempty"`
+	MessageID   *string `json:"messageId,omitempty"`
+	PostID      *int64  `json:"postId,omitempty"`
+	PostSpaceID string  `json:"postSpaceId,omitempty"`
 }
 
 type ConversationChatSummaryResponse struct {
@@ -372,10 +357,10 @@ type ConversationsResponse struct {
 }
 
 type PostObjectPayload struct {
-	ObjectKey      string `json:"objectKey"`
-	Size           int64  `json:"size,omitempty"`
-	Position       int    `json:"position,omitempty"`
-	MetadataCipher string `json:"metadataCipher,omitempty"`
+	ObjectKey      string `json:"objectKey" binding:"required"`
+	Size           int64  `json:"size,omitempty" binding:"omitempty,gt=0"`
+	Position       int    `json:"position,omitempty" binding:"gte=0"`
+	MetadataCipher string `json:"metadataCipher,omitempty" binding:"required"`
 }
 
 type PostResponse struct {
@@ -393,10 +378,6 @@ type PostResponse struct {
 
 type SpaceUnreadStatusResponse struct {
 	NotificationsUnread bool `json:"notificationsUnread"`
-}
-
-type MarkNotificationsReadRequest struct {
-	FriendSpaceID string `json:"friendSpaceId"`
 }
 
 type PostPage struct {

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ente-io/museum/ente/base"
 	"github.com/ente-io/stacktrace"
 )
 
@@ -82,7 +83,13 @@ func (r *PostsRepository) CreatePost(ctx context.Context, spaceID string, encryp
 
 func (r *PostsRepository) GetPost(ctx context.Context, postID int64, viewerSpaceID string) (*SpacePostRecord, error) {
 	query := postRecordSelectSQL(`
-		       EXISTS (SELECT 1 FROM space_messages m WHERE m.kind = 'post_like' AND m.reply_post_id = p.post_id AND m.sender_space_id = $2)`) + `
+		       EXISTS (
+		           SELECT 1
+		           FROM space_messages m
+		           WHERE m.kind = 'post_like'
+		             AND m.reply_post_id = p.post_id
+		             AND m.sender_space_id = $2
+		       )`) + `
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
 			` + spaceActorAvatarJoin("w", "w_avatar") + `
@@ -98,7 +105,13 @@ func (r *PostsRepository) ListPostsBySpace(ctx context.Context, spaceID string, 
 	}
 	args := []any{spaceID, viewerSpaceID}
 	query := postRecordSelectSQL(`
-			       EXISTS (SELECT 1 FROM space_messages m WHERE m.kind = 'post_like' AND m.reply_post_id = p.post_id AND m.sender_space_id = $2)`) + `
+			       EXISTS (
+			           SELECT 1
+			           FROM space_messages m
+			           WHERE m.kind = 'post_like'
+			             AND m.reply_post_id = p.post_id
+			             AND m.sender_space_id = $2
+			       )`) + `
 				FROM space_posts p
 				JOIN spaces w ON w.space_id = p.space_id
 				` + spaceActorAvatarJoin("w", "w_avatar") + `
@@ -133,7 +146,13 @@ func (r *PostsRepository) ListFeed(ctx context.Context, viewerSpaceID string, cu
 	}
 	args := []any{viewerSpaceID}
 	query := postRecordSelectSQL(`
-			       CASE WHEN p.space_id = $1 THEN FALSE ELSE EXISTS (SELECT 1 FROM space_messages m WHERE m.kind = 'post_like' AND m.reply_post_id = p.post_id AND m.sender_space_id = $1) END`) + `
+			       CASE WHEN p.space_id = $1 THEN FALSE ELSE EXISTS (
+			           SELECT 1
+			           FROM space_messages m
+			           WHERE m.kind = 'post_like'
+			             AND m.reply_post_id = p.post_id
+			             AND m.sender_space_id = $1
+			       ) END`) + `
 			FROM space_posts p
 			JOIN spaces w ON w.space_id = p.space_id
 			` + spaceActorAvatarJoin("w", "w_avatar") + `
@@ -278,16 +297,21 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID int64, spaceID 
 
 func (r *PostsRepository) SetLikeWithCreated(ctx context.Context, postID int64, actorSpaceID string, like bool) (bool, error) {
 	if like {
-		messageID := "post_like:" + strconv.FormatInt(postID, 10) + ":" + strings.TrimSpace(actorSpaceID)
 		res, err := r.DB.ExecContext(ctx, `
-			INSERT INTO space_messages (message_id, sender_space_id, recipient_space_id, kind, reply_post_id)
-			SELECT $1, $2, p.space_id, 'post_like', p.post_id
+			INSERT INTO space_messages (
+				message_id,
+				sender_space_id,
+				recipient_space_id,
+				kind,
+				reply_post_id
+			)
+			SELECT $3, $2, p.space_id, 'post_like', p.post_id
 			FROM space_posts p
-			WHERE p.post_id = $3
+			WHERE p.post_id = $1
 			  AND p.space_id <> $2
 			  AND p.is_deleted = FALSE
-			ON CONFLICT DO NOTHING
-		`, messageID, actorSpaceID, postID)
+			ON CONFLICT (reply_post_id, sender_space_id) WHERE kind = 'post_like' DO NOTHING
+		`, postID, strings.TrimSpace(actorSpaceID), base.MustNewID("wmsg"))
 		if err != nil {
 			return false, stacktrace.Propagate(err, "")
 		}
@@ -297,7 +321,7 @@ func (r *PostsRepository) SetLikeWithCreated(ctx context.Context, postID int64, 
 		}
 		return affected > 0, nil
 	}
-	res, err := r.DB.ExecContext(ctx, `DELETE FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1 AND sender_space_id = $2`, postID, actorSpaceID)
+	res, err := r.DB.ExecContext(ctx, `DELETE FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1 AND sender_space_id = $2`, postID, strings.TrimSpace(actorSpaceID))
 	if err != nil {
 		return false, stacktrace.Propagate(err, "")
 	}
@@ -320,7 +344,8 @@ func (r *PostsRepository) ListPostLikers(ctx context.Context, postID int64, curs
 		FROM space_messages m
 		JOIN spaces liker_space ON liker_space.space_id = m.sender_space_id
 		` + spaceActorAvatarJoin("liker_space", "liker_avatar") + `
-		WHERE m.kind = 'post_like' AND m.reply_post_id = $1`
+		WHERE m.kind = 'post_like'
+		  AND m.reply_post_id = $1`
 	if cursorCreatedAt, cursorActorSpaceID, ok := parsePostLikerCursor(cursor); ok {
 		args = append(args, cursorCreatedAt, cursorActorSpaceID)
 		query += ` AND (m.created_at, m.sender_space_id) < ($2, $3)`

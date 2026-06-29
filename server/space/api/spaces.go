@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/ente-io/museum/ente"
 	"github.com/ente-io/museum/space/models"
 	"github.com/ente-io/stacktrace"
 	"github.com/gin-gonic/gin"
@@ -17,8 +16,7 @@ func (h *Handlers) ListSpaces(c *gin.Context) {
 
 func (h *Handlers) CreateSpace(c *gin.Context) {
 	var req models.CreateSpaceRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	if !bindJSON(c, &req) {
 		return
 	}
 	resp, err := h.Module.Spaces.Create(c, req)
@@ -27,31 +25,37 @@ func (h *Handlers) CreateSpace(c *gin.Context) {
 
 func (h *Handlers) GetSpaceProfile(c *gin.Context) {
 	var req models.GetSpaceProfileRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	if !bindQuery(c, &req) {
 		return
 	}
+	req.SpaceID = c.Param("spaceID")
 	resp, err := h.Module.Spaces.GetProfile(c, req)
 	respondJSON(c, resp, err)
 }
 
 func (h *Handlers) UpdateSpaceProfile(c *gin.Context) {
 	var req models.UpdateSpaceProfileRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	if !bindJSON(c, &req) {
 		return
 	}
-	resp, err := h.Module.Spaces.UpdateProfile(c, req)
+	space, ok := selectedSpace(h, c)
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Spaces.UpdateProfile(c, space, req)
 	respondJSON(c, resp, err)
 }
 
 func (h *Handlers) UpdateSpaceSlug(c *gin.Context) {
 	var req models.UpdateSpaceSlugRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	if !bindJSON(c, &req) {
 		return
 	}
-	resp, err := h.Module.Spaces.UpdateSlug(c, req)
+	space, ok := selectedSpace(h, c)
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Spaces.UpdateSlug(c, space, req)
 	respondJSON(c, resp, err)
 }
 
@@ -71,20 +75,23 @@ func (h *Handlers) SpaceSlugAvailability(c *gin.Context) {
 
 func (h *Handlers) RotateSpaceKey(c *gin.Context) {
 	var req models.RotateSpaceKeyRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	if !bindJSON(c, &req) {
 		return
 	}
-	resp, err := h.Module.Spaces.RotateKey(c, req)
+	space, ok := selectedSpace(h, c)
+	if !ok {
+		return
+	}
+	resp, err := h.Module.Spaces.RotateKey(c, space, req)
 	respondJSON(c, resp, err)
 }
 
 func (h *Handlers) ListSpaceKeyVersions(c *gin.Context) {
 	var req models.GetSpaceProfileRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		respondJSON(c, nil, ente.ErrBadRequest)
+	if !bindQuery(c, &req) {
 		return
 	}
+	req.SpaceID = c.Param("spaceID")
 	resp, err := h.Module.Spaces.ListVersions(c, req)
 	respondJSON(c, resp, err)
 }

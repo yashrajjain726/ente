@@ -58,3 +58,7 @@ func (m *Module) RequireSelectedSpace(c *gin.Context, rawSpaceID string) error {
 	setSelectedSpace(c, space)
 	return nil
 }
+
+func (m *Module) SelectedSpace(c *gin.Context) (*repo.SpaceRecord, error) {
+	return selectedSpace(c)
+}
