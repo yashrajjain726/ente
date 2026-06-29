@@ -143,13 +143,19 @@ type SpaceConversationChatSummaryRecord struct {
 }
 
 type SpaceMessageConversationActivityRecord struct {
-	ID          string
-	Type        string
-	CreatedAt   int64
-	Outgoing    bool
-	MessageID   sql.NullString
-	PostID      sql.NullInt64
-	PostSpaceID sql.NullString
+	ID                  string
+	Type                string
+	Kind                sql.NullString
+	CreatedAt           int64
+	Outgoing            bool
+	MessageID           sql.NullString
+	SenderSpaceID       sql.NullString
+	RecipientSpaceID    sql.NullString
+	MessageCipher       []byte
+	EncryptedMessageKey []byte
+	ReplyMessageID      sql.NullString
+	PostID              sql.NullInt64
+	PostSpaceID         sql.NullString
 }
 
 type CreateSpaceMessageRecord struct {

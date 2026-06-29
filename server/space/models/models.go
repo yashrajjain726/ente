@@ -307,13 +307,19 @@ type MessagePage struct {
 }
 
 type MessageConversationActivityResponse struct {
-	ID          string  `json:"id"`
-	Type        string  `json:"type"`
-	CreatedAt   string  `json:"createdAt"`
-	Outgoing    bool    `json:"outgoing,omitempty"`
-	MessageID   *string `json:"messageId,omitempty"`
-	PostID      *int64  `json:"postId,omitempty"`
-	PostSpaceID string  `json:"postSpaceId,omitempty"`
+	ID                  string  `json:"id"`
+	Type                string  `json:"type"`
+	Kind                string  `json:"kind,omitempty"`
+	CreatedAt           string  `json:"createdAt"`
+	Outgoing            bool    `json:"outgoing,omitempty"`
+	MessageID           *string `json:"messageId,omitempty"`
+	SenderSpaceID       string  `json:"senderSpaceId,omitempty"`
+	RecipientSpaceID    string  `json:"recipientSpaceId,omitempty"`
+	MessageCipher       string  `json:"messageCipher,omitempty"`
+	EncryptedMessageKey string  `json:"encryptedMessageKey,omitempty"`
+	ReplyMessageID      *string `json:"replyMessageId,omitempty"`
+	PostID              *int64  `json:"postId,omitempty"`
+	PostSpaceID         string  `json:"postSpaceId,omitempty"`
 }
 
 type ConversationChatSummaryResponse struct {

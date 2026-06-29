@@ -182,22 +182,31 @@ const isCurrentProfileActor = (
 const conversationPreview = (conversation: SpaceMessageConversation) => {
     const activity = conversation.latestActivity;
     if (activity.type == "empty") {
-        return "You are now friends";
+        return "You're now friends. Say hello!";
     }
     if (activity.type == "friend_request") {
         return "Friend request";
     }
     if (activity.type == "friend_added") {
-        return "You are now friends";
+        return "You're now friends. Say hello!";
     }
     if (activity.type == "post_like") {
         return activity.outgoing ? "You liked a post" : "Liked your post";
     }
+    const text = activity.text ? truncateMessageText(activity.text) : "";
     if (activity.type == "post_reply") {
+        if (text) {
+            return activity.outgoing
+                ? `You replied: ${text}`
+                : `Replied: ${text}`;
+        }
         return "Replied";
     }
     if (activity.type == "message_like") {
         return activity.outgoing ? "You liked a message" : "Liked a message";
+    }
+    if (text) {
+        return activity.outgoing ? `You: ${text}` : text;
     }
 
     return activity.outgoing ? "You sent a message" : "Message";
@@ -1475,6 +1484,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         },
         [activityPostsByKey, onLoadActivityPost],
     );
+    const visibleMessages = React.useMemo(
+        () => messages.filter((message) => message.kind != "friend_added"),
+        [messages],
+    );
     const messageByID = React.useMemo(
         () => new Map(messages.map((message) => [message.id, message])),
         [messages],
@@ -1720,10 +1733,10 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
         scrollThreadToBottom();
     }, [
         isThreadLoading,
-        messages.length,
         scheduleThreadBottomScroll,
         scrollThreadToBottom,
         selectedFriend,
+        visibleMessages.length,
     ]);
 
     React.useEffect(
@@ -1977,7 +1990,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     >
                                         <SpaceLoadingSpinner ariaLabel="Loading messages" />
                                     </Box>
-                                ) : messages.length == 0 ? (
+                                ) : visibleMessages.length == 0 ? (
                                     <Box
                                         sx={{
                                             alignItems: "center",
@@ -2002,7 +2015,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         >
                                             {isThreadReadOnly
                                                 ? "No messages"
-                                                : "You are now friends"}
+                                                : "Say hello!"}
                                         </Box>
                                     </Box>
                                 ) : (
@@ -2021,12 +2034,16 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 | SpaceMessage
                                                 | undefined;
 
-                                            return messages.map(
+                                            return visibleMessages.map(
                                                 (message, index) => {
                                                     const previousMessage =
-                                                        messages[index - 1];
+                                                        visibleMessages[
+                                                            index - 1
+                                                        ];
                                                     const nextMessage =
-                                                        messages[index + 1];
+                                                        visibleMessages[
+                                                            index + 1
+                                                        ];
                                                     const groupsWithPrevious =
                                                         bodyBubblesCanGroup(
                                                             previousMessage,

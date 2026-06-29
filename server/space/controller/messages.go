@@ -357,6 +357,25 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 		messageID := activity.MessageID.String
 		resp.MessageID = &messageID
 	}
+	if activity.Kind.Valid {
+		resp.Kind = activity.Kind.String
+	}
+	if activity.SenderSpaceID.Valid {
+		resp.SenderSpaceID = activity.SenderSpaceID.String
+	}
+	if activity.RecipientSpaceID.Valid {
+		resp.RecipientSpaceID = activity.RecipientSpaceID.String
+	}
+	if len(activity.MessageCipher) > 0 {
+		resp.MessageCipher = encodeSpaceField(activity.MessageCipher)
+	}
+	if len(activity.EncryptedMessageKey) > 0 {
+		resp.EncryptedMessageKey = encodeSpaceField(activity.EncryptedMessageKey)
+	}
+	if activity.ReplyMessageID.Valid {
+		replyMessageID := activity.ReplyMessageID.String
+		resp.ReplyMessageID = &replyMessageID
+	}
 	if activity.PostID.Valid {
 		postID := activity.PostID.Int64
 		resp.PostID = &postID

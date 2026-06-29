@@ -177,11 +177,23 @@ pub struct MessageConversationActivity {
     pub id: String,
     #[serde(rename = "type")]
     pub activity_type: String,
+    #[serde(default)]
+    pub kind: String,
     pub created_at: String,
     #[serde(default)]
     pub outgoing: bool,
     #[serde(default)]
     pub message_id: Option<String>,
+    #[serde(default)]
+    pub sender_space_id: String,
+    #[serde(default)]
+    pub recipient_space_id: String,
+    #[serde(default)]
+    pub message_cipher: String,
+    #[serde(default)]
+    pub encrypted_message_key: String,
+    #[serde(default)]
+    pub reply_message_id: Option<String>,
     #[serde(default)]
     pub post_id: Option<i64>,
     #[serde(default)]
@@ -361,10 +373,17 @@ mod tests {
     #[test]
     fn message_conversation_activity_deserializes_outgoing() {
         let activity: MessageConversationActivity = serde_json::from_str(
-            r#"{"id":"message:example","type":"message","createdAt":"2026-05-25T00:00:00Z","outgoing":true}"#,
+            r#"{"id":"message:example","type":"message","kind":"regular","createdAt":"2026-05-25T00:00:00Z","outgoing":true,"messageId":"message-1","senderSpaceId":"space-a","recipientSpaceId":"space-b","messageCipher":"cipher","encryptedMessageKey":"key","replyMessageId":"parent-1"}"#,
         )
         .expect("activity should deserialize");
         assert!(activity.outgoing);
+        assert_eq!(activity.kind, "regular");
+        assert_eq!(activity.message_id.as_deref(), Some("message-1"));
+        assert_eq!(activity.sender_space_id, "space-a");
+        assert_eq!(activity.recipient_space_id, "space-b");
+        assert_eq!(activity.message_cipher, "cipher");
+        assert_eq!(activity.encrypted_message_key, "key");
+        assert_eq!(activity.reply_message_id.as_deref(), Some("parent-1"));
     }
 
     #[test]

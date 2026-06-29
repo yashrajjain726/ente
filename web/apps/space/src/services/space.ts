@@ -93,6 +93,7 @@ interface SpaceMessageConversationActivity {
     outgoing?: boolean;
     postId?: number;
     postSpaceId?: string;
+    text?: string;
     type: SpaceMessageConversationActivityType;
 }
 
@@ -256,6 +257,7 @@ export interface SpaceMessageActivity {
     messageId?: string;
     outgoing: boolean;
     post?: SpaceMessageActivityPost;
+    text?: string;
     type: SpaceMessageActivityType;
 }
 
@@ -744,6 +746,7 @@ const messageActivityFromSpaceActivity = async (
         messageId: activity.messageId,
         outgoing: Boolean(activity.outgoing),
         post,
+        text: activity.text?.trim() || undefined,
         type: activity.type,
     };
 };

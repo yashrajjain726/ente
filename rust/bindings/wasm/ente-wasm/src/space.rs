@@ -194,6 +194,7 @@ struct MessageConversationActivityJs {
     created_at: String,
     outgoing: bool,
     message_id: Option<String>,
+    text: Option<String>,
     post_id: Option<i64>,
     post_space_id: Option<String>,
 }
@@ -482,18 +483,58 @@ async fn account_message_response_to_js(
     })
 }
 
-fn message_conversation_activity_to_js(
+async fn message_conversation_activity_text(
+    ctx: &AccountSpaceCtx,
+    viewer_space_id: &str,
+    activity: &MessageConversationActivity,
+) -> Result<Option<String>, WasmSpaceError> {
+    if activity.message_cipher.trim().is_empty()
+        || activity.encrypted_message_key.trim().is_empty()
+        || activity.message_id.is_none()
+    {
+        return Ok(None);
+    }
+
+    let message = MessageResponse {
+        message_id: activity.message_id.clone().unwrap_or_default(),
+        kind: if activity.kind.trim().is_empty() {
+            "regular".to_owned()
+        } else {
+            activity.kind.clone()
+        },
+        sender_space_id: activity.sender_space_id.clone(),
+        recipient_space_id: activity.recipient_space_id.clone(),
+        message_cipher: activity.message_cipher.clone(),
+        encrypted_message_key: activity.encrypted_message_key.clone(),
+        text: String::new(),
+        reply_post_id: activity.post_id,
+        reply_message_id: activity.reply_message_id.clone(),
+        liked: false,
+        viewer_liked: false,
+        is_deleted: false,
+        created_at: activity.created_at.clone(),
+        updated_at: activity.created_at.clone(),
+    };
+    let decrypted = ctx.decrypt_message(viewer_space_id, &message).await?;
+    Ok(Some(decrypted.payload.text))
+}
+
+async fn message_conversation_activity_to_js(
+    ctx: &AccountSpaceCtx,
+    viewer_space_id: &str,
     activity: MessageConversationActivity,
-) -> MessageConversationActivityJs {
-    MessageConversationActivityJs {
+) -> Result<MessageConversationActivityJs, WasmSpaceError> {
+    let text = message_conversation_activity_text(ctx, viewer_space_id, &activity).await?;
+    Ok(MessageConversationActivityJs {
         id: activity.id,
         activity_type: activity.activity_type,
         created_at: activity.created_at,
         outgoing: activity.outgoing,
         message_id: activity.message_id,
+        text,
         post_id: activity.post_id,
         post_space_id: activity.post_space_id,
-    }
+    })
 }
 
 /// Open an authenticated space context for web.
@@ -1102,7 +1143,12 @@ impl SpaceAccountCtxHandle {
             chat_summaries.insert(
                 friend_space_id,
                 ConversationChatSummaryJs {
-                    latest_activity: message_conversation_activity_to_js(summary.latest_activity),
+                    latest_activity: message_conversation_activity_to_js(
+                        &self.inner,
+                        &space_id,
+                        summary.latest_activity,
+                    )
+                    .await?,
                     unread: summary.unread,
                     unread_count: summary.unread_count,
                     notification_unread: summary.notification_unread,

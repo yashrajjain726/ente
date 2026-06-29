@@ -76,6 +76,16 @@ FROM (
 		CASE WHEN m.kind = 'post_like' THEN NULL::text ELSE m.message_id END AS message_id,
 		CASE WHEN m.kind IN ('post_reply', 'post_like') THEN m.reply_post_id ELSE NULL::bigint END AS post_id,
 		CASE WHEN m.kind IN ('post_reply', 'post_like') THEN m.recipient_space_id ELSE NULL::text END AS post_space_id,
+		CASE WHEN m.kind IN ('regular', 'post_reply') THEN m.kind ELSE NULL::text END AS message_kind,
+		CASE WHEN m.kind IN ('regular', 'post_reply') THEN m.sender_space_id ELSE NULL::text END AS sender_space_id,
+		CASE WHEN m.kind IN ('regular', 'post_reply') THEN m.recipient_space_id ELSE NULL::text END AS recipient_space_id,
+		CASE WHEN m.kind IN ('regular', 'post_reply') THEN COALESCE(m.message_cipher, '\x'::bytea) ELSE NULL::bytea END AS message_cipher,
+		CASE
+			WHEN m.kind IN ('regular', 'post_reply') AND m.sender_space_id = $1 THEN COALESCE(m.sender_encrypted_message_key, '\x'::bytea)
+			WHEN m.kind IN ('regular', 'post_reply') THEN COALESCE(m.recipient_encrypted_message_key, '\x'::bytea)
+			ELSE NULL::bytea
+		END AS encrypted_message_key,
+		CASE WHEN m.kind IN ('regular', 'post_reply') THEN m.reply_message_id ELSE NULL::text END AS reply_message_id,
 		CASE
 			WHEN m.recipient_space_id = $1 AND m.kind IN ('regular', 'post_reply', 'post_like') THEN m.created_at
 			ELSE NULL::bigint
@@ -93,6 +103,12 @@ FROM (
 		m.message_id,
 		NULL::bigint AS post_id,
 		NULL::text AS post_space_id,
+		NULL::text AS message_kind,
+		NULL::text AS sender_space_id,
+		NULL::text AS recipient_space_id,
+		NULL::bytea AS message_cipher,
+		NULL::bytea AS encrypted_message_key,
+		NULL::text AS reply_message_id,
 		CASE WHEN m.sender_space_id = $1 THEN m.recipient_liked_at ELSE NULL::bigint END AS notification_created_at,
 		(m.recipient_space_id = $1) AS is_outgoing
 	FROM peer_messages m
@@ -150,6 +166,12 @@ conversation_rows AS (
 		latest_activity.message_id,
 		latest_activity.post_id,
 		latest_activity.post_space_id,
+		latest_activity.message_kind,
+		latest_activity.sender_space_id,
+		latest_activity.recipient_space_id,
+		latest_activity.message_cipher,
+		latest_activity.encrypted_message_key,
+		latest_activity.reply_message_id,
 		latest_activity.notification_created_at,
 		latest_activity.is_outgoing,
 		COALESCE(unread_state.unread_count, 0) AS unread_count,
@@ -187,6 +209,12 @@ conversation_rows AS (
 		latest_activity.message_id,
 		latest_activity.post_id,
 		latest_activity.post_space_id,
+		latest_activity.message_kind,
+		latest_activity.sender_space_id,
+		latest_activity.recipient_space_id,
+		latest_activity.message_cipher,
+		latest_activity.encrypted_message_key,
+		latest_activity.reply_message_id,
 		latest_activity.notification_created_at,
 		latest_activity.is_outgoing,
 		COALESCE(unread_state.unread_count, 0) AS unread_count,
@@ -372,7 +400,13 @@ func (r *MessagesRepository) ListLatestChatSummaries(ctx context.Context, viewer
 			c.notification_unread,
 			c.message_id,
 			c.post_id,
-			c.post_space_id
+			c.post_space_id,
+			c.message_kind,
+			c.sender_space_id,
+			c.recipient_space_id,
+			c.message_cipher,
+			c.encrypted_message_key,
+			c.reply_message_id
 		FROM conversation_rows c
 	`, strings.TrimSpace(viewerSpaceID), pq.Array(cleanFriendSpaceIDs))
 	if err != nil {
@@ -427,6 +461,12 @@ func scanConversationChatSummaryRecord(scanner interface{ Scan(dest ...any) erro
 		&rec.LatestActivity.MessageID,
 		&rec.LatestActivity.PostID,
 		&rec.LatestActivity.PostSpaceID,
+		&rec.LatestActivity.Kind,
+		&rec.LatestActivity.SenderSpaceID,
+		&rec.LatestActivity.RecipientSpaceID,
+		&rec.LatestActivity.MessageCipher,
+		&rec.LatestActivity.EncryptedMessageKey,
+		&rec.LatestActivity.ReplyMessageID,
 	}
 	if err := scanner.Scan(dest...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
