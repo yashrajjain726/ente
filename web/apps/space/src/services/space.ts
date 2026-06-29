@@ -649,6 +649,91 @@ const messageQuoteFromSpaceQuote = async (
     return spaceQuote;
 };
 
+const messageQuoteFromPostResponse = async (
+    ctx: SpaceAccountCtxHandle,
+    post: SpacePostResponse,
+    includeImage: boolean,
+    viewerSpaceId?: string,
+): Promise<SpaceMessageQuote> => {
+    const object = firstObject(post);
+    const quote: SpaceMessageQuote = {
+        caption: post.caption,
+        height: object?.height,
+        mediaType: object?.mediaType,
+        objectKey: object?.objectKey,
+        postId: post.postId,
+        spaceId: post.spaceId,
+        width: object?.width,
+    };
+    if (!includeImage || !object) return quote;
+
+    try {
+        const imageUrl = await accountPostAssetURL(
+            ctx,
+            post,
+            object,
+            viewerSpaceId,
+        );
+        if (!imageUrl) {
+            quote.isUnavailable = true;
+            return quote;
+        }
+        quote.imageUrl = imageUrl;
+    } catch (error) {
+        console.warn("Failed to load quoted post image", error);
+        quote.isUnavailable = true;
+    }
+    return quote;
+};
+
+const messageQuoteFromReplyPost = async (
+    ctx: SpaceAccountCtxHandle,
+    message: SpaceMessageResponse,
+    includeImage: boolean,
+    viewerSpaceId?: string,
+): Promise<SpaceMessageQuote | undefined> => {
+    if (typeof message.replyPostId != "number" || !message.recipient.spaceId) {
+        return undefined;
+    }
+
+    const fallbackQuote: SpaceMessageQuote = {
+        postId: message.replyPostId,
+        spaceId: message.recipient.spaceId,
+    };
+    if (!includeImage) return fallbackQuote;
+
+    try {
+        const post = (await ctx.get_post(
+            message.recipient.spaceId,
+            BigInt(message.replyPostId),
+            viewerSpaceId ?? null,
+        )) as SpacePostResponse;
+        return await messageQuoteFromPostResponse(
+            ctx,
+            post,
+            includeImage,
+            viewerSpaceId,
+        );
+    } catch (error) {
+        console.warn("Failed to load quoted post", error);
+        return { ...fallbackQuote, isUnavailable: true };
+    }
+};
+
+const messageQuoteFromSpaceMessage = async (
+    ctx: SpaceAccountCtxHandle,
+    message: SpaceMessageResponse,
+    includeImage: boolean,
+    viewerSpaceId?: string,
+): Promise<SpaceMessageQuote | undefined> =>
+    (await messageQuoteFromSpaceQuote(
+        ctx,
+        message.quote,
+        includeImage,
+        viewerSpaceId,
+    )) ??
+    messageQuoteFromReplyPost(ctx, message, includeImage, viewerSpaceId);
+
 const messageFromSpaceMessage = async (
     ctx: SpaceAccountCtxHandle,
     message: SpaceMessageResponse,
@@ -670,9 +755,9 @@ const messageFromSpaceMessage = async (
             message.recipient.avatar,
             viewerSpaceId,
         ),
-        messageQuoteFromSpaceQuote(
+        messageQuoteFromSpaceMessage(
             ctx,
-            message.quote,
+            message,
             includeQuoteImage,
             viewerSpaceId,
         ),

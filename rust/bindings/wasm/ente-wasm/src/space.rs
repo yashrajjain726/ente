@@ -512,47 +512,6 @@ async fn account_message_to_js(
     })
 }
 
-async fn message_response_quote_to_js(
-    ctx: &AccountSpaceCtx,
-    viewer_space_id: Option<&str>,
-    quote: ente_space::transport::MessageQuoteResponse,
-) -> Result<MessageQuoteJs, WasmSpaceError> {
-    let caption = if !quote.caption_cipher.trim().is_empty()
-        && !quote.encrypted_post_key.trim().is_empty()
-        && quote.key_version > 0
-    {
-        optional_utf8_field(
-            ctx.decrypt_post_caption_fields(
-                &quote.space_id,
-                viewer_space_id,
-                quote.post_id,
-                &quote.encrypted_post_key,
-                quote.key_version,
-                &quote.caption_cipher,
-            )
-            .await
-            .ok()
-            .flatten(),
-            "caption",
-        )?
-    } else {
-        None
-    };
-
-    Ok(MessageQuoteJs {
-        post_id: quote.post_id,
-        space_id: quote.space_id,
-        encrypted_post_key: (!quote.encrypted_post_key.trim().is_empty())
-            .then_some(quote.encrypted_post_key),
-        key_version: (quote.key_version > 0).then_some(quote.key_version),
-        caption,
-        object_key: (!quote.object_key.trim().is_empty()).then_some(quote.object_key),
-        width: None,
-        height: None,
-        media_type: None,
-    })
-}
-
 async fn account_message_response_to_js(
     ctx: &AccountSpaceCtx,
     viewer_space_id: &str,
@@ -565,17 +524,13 @@ async fn account_message_response_to_js(
 
     let sender = account_actor_to_js(ctx, message.sender).await?;
     let recipient = account_actor_to_js(ctx, message.recipient).await?;
-    let quote = match message.quote {
-        Some(quote) => Some(message_response_quote_to_js(ctx, Some(viewer_space_id), quote).await?),
-        None => None,
-    };
     Ok(MessageJs {
         message_id: message.message_id,
         kind: message.kind,
         sender,
         recipient,
         text: message.text,
-        quote,
+        quote: None,
         reply_post_id: message.reply_post_id,
         reply_message_id: message.reply_message_id,
         liked: message.liked,

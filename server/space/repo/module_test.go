@@ -2251,15 +2251,16 @@ func TestUnreadNotificationsTrackReadableActivityWithoutChangingLatestPreview(t 
 	require.GreaterOrEqual(t, len(thread), 3)
 	require.Equal(t, "post_like", thread[0].Kind)
 	require.Equal(t, "You liked a post", thread[0].Text)
-	require.NotNil(t, thread[0].Quote)
-	require.Equal(t, bobPostID, thread[0].Quote.PostID)
-	require.Equal(t, "bob-post-object", thread[0].Quote.ObjectKey.String)
+	require.True(t, thread[0].ReplyPostID.Valid)
+	require.Equal(t, bobPostID, thread[0].ReplyPostID.Int64)
+	require.Equal(t, bobSpace.SpaceID, thread[0].RecipientSpaceID)
 	require.Equal(t, "post_reply", thread[1].Kind)
 	require.Equal(t, outgoingPostReply.MessageID, thread[1].MessageID)
 	require.Equal(t, "post_like", thread[2].Kind)
 	require.Equal(t, "Liked your post", thread[2].Text)
-	require.NotNil(t, thread[2].Quote)
-	require.Equal(t, alicePostID, thread[2].Quote.PostID)
+	require.True(t, thread[2].ReplyPostID.Valid)
+	require.Equal(t, alicePostID, thread[2].ReplyPostID.Int64)
+	require.Equal(t, aliceSpace.SpaceID, thread[2].RecipientSpaceID)
 
 	incomingPostReply, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "post_reply",

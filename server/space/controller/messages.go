@@ -335,18 +335,6 @@ func toMessageResponse(message repo.SpaceMessageRecord) *models.MessageResponse 
 		CreatedAt:           formatMicros(message.CreatedAt),
 		UpdatedAt:           formatMicros(message.UpdatedAt),
 	}
-	if message.Quote != nil {
-		resp.Quote = &models.MessageQuoteResponse{
-			PostID:           message.Quote.PostID,
-			SpaceID:          message.Quote.SpaceID,
-			EncryptedPostKey: encodeSpaceField(message.Quote.EncryptedPostKey),
-			CaptionCipher:    encodeSpaceField(message.Quote.CaptionCipher),
-			KeyVersion:       message.Quote.KeyVersion,
-		}
-		if message.Quote.ObjectKey.Valid {
-			resp.Quote.ObjectKey = message.Quote.ObjectKey.String
-		}
-	}
 	if message.ReplyPostID.Valid {
 		replyPostID := message.ReplyPostID.Int64
 		resp.ReplyPostID = &replyPostID

@@ -34,13 +34,7 @@ const spaceMessageBaseSelectColumns = `
 	END AS text,
 `
 
-var spaceMessageQuoteSelectColumns = `
-	quote_post.post_id AS quote_post_id,
-	COALESCE(quote_post.space_id, '') AS quote_space_id,
-	COALESCE(quote_post.encrypted_post_key, '\x'::bytea) AS quote_encrypted_post_key,
-	COALESCE(quote_post.caption_cipher, '\x'::bytea) AS quote_caption_cipher,
-	COALESCE(quote_post.key_version, 0) AS quote_key_version,
-	quote_asset.object_key AS quote_object_key,
+var spaceMessageActorSelectColumns = `
 ` + spaceActorSelectColumns("sender_space", "sender_avatar", "sender") + `,
 ` + spaceActorSelectColumns("recipient_space", "recipient_avatar", "recipient") + `
 `
@@ -53,7 +47,7 @@ func spaceMessageSelectColumns(viewerPlaceholder string) string {
 		END`
 	return strings.TrimSpace(
 		fmt.Sprintf(spaceMessageBaseSelectColumns, viewerPlaceholder, encryptedMessageKeySQL) + `
-` + spaceMessageQuoteSelectColumns,
+` + spaceMessageActorSelectColumns,
 	)
 }
 
@@ -62,14 +56,6 @@ var spaceMessageJoins = `
 	` + spaceActorAvatarJoin("sender_space", "sender_avatar") + `
 	JOIN spaces recipient_space ON recipient_space.space_id = m.recipient_space_id
 	` + spaceActorAvatarJoin("recipient_space", "recipient_avatar") + `
-	LEFT JOIN space_posts quote_post ON quote_post.post_id = m.reply_post_id AND quote_post.is_deleted = FALSE
-	LEFT JOIN LATERAL (
-		SELECT object_key
-		FROM space_post_assets
-		WHERE post_id = quote_post.post_id
-		ORDER BY position ASC, asset_id ASC
-		LIMIT 1
-	) quote_asset ON TRUE
 `
 
 const peerThreadKeySQL = `CASE
@@ -432,24 +418,10 @@ func scanMessageRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceMess
 		&rec.UpdatedAt,
 		&rec.Text,
 	}
-	var quote SpaceMessageQuoteRecord
-	var quotePostID sql.NullInt64
-	dest = append(dest,
-		&quotePostID,
-		&quote.SpaceID,
-		&quote.EncryptedPostKey,
-		&quote.CaptionCipher,
-		&quote.KeyVersion,
-		&quote.ObjectKey,
-	)
 	dest = append(dest, spaceActorScanDest(&rec.Sender)...)
 	dest = append(dest, spaceActorScanDest(&rec.Recipient)...)
 	if err := scanner.Scan(dest...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
-	}
-	if quotePostID.Valid {
-		quote.PostID = quotePostID.Int64
-		rec.Quote = &quote
 	}
 	return &rec, nil
 }

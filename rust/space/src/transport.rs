@@ -143,21 +143,6 @@ pub struct CreateMessageRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MessageQuoteResponse {
-    pub post_id: i64,
-    pub space_id: String,
-    #[serde(default)]
-    pub encrypted_post_key: String,
-    #[serde(default)]
-    pub caption_cipher: String,
-    #[serde(default)]
-    pub key_version: i32,
-    #[serde(default)]
-    pub object_key: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct MessageResponse {
     pub message_id: String,
     pub kind: String,
@@ -169,8 +154,6 @@ pub struct MessageResponse {
     pub encrypted_message_key: String,
     #[serde(default)]
     pub text: String,
-    #[serde(default)]
-    pub quote: Option<MessageQuoteResponse>,
     #[serde(default)]
     pub reply_post_id: Option<i64>,
     #[serde(default)]

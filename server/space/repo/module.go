@@ -137,20 +137,10 @@ type SpaceMessageRecord struct {
 	ViewerLiked         bool
 	IsDeleted           bool
 	Text                string
-	Quote               *SpaceMessageQuoteRecord
 	CreatedAt           int64
 	UpdatedAt           int64
 	Sender              SpaceActorRecord
 	Recipient           SpaceActorRecord
-}
-
-type SpaceMessageQuoteRecord struct {
-	PostID           int64
-	SpaceID          string
-	EncryptedPostKey []byte
-	CaptionCipher    []byte
-	KeyVersion       int
-	ObjectKey        sql.NullString
 }
 
 type SpaceConversationChatSummaryRecord struct {

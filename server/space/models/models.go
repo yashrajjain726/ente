@@ -302,30 +302,20 @@ type LikeMessageResponse struct {
 }
 
 type MessageResponse struct {
-	MessageID           string                `json:"messageId"`
-	Kind                string                `json:"kind"`
-	Sender              SpaceActorResponse    `json:"sender"`
-	Recipient           SpaceActorResponse    `json:"recipient"`
-	MessageCipher       string                `json:"messageCipher,omitempty"`
-	EncryptedMessageKey string                `json:"encryptedMessageKey,omitempty"`
-	Text                string                `json:"text,omitempty"`
-	Quote               *MessageQuoteResponse `json:"quote,omitempty"`
-	ReplyPostID         *int64                `json:"replyPostId,omitempty"`
-	ReplyMessageID      *string               `json:"replyMessageId,omitempty"`
-	Liked               bool                  `json:"liked"`
-	ViewerLiked         bool                  `json:"viewerLiked"`
-	IsDeleted           bool                  `json:"isDeleted"`
-	CreatedAt           string                `json:"createdAt"`
-	UpdatedAt           string                `json:"updatedAt"`
-}
-
-type MessageQuoteResponse struct {
-	PostID           int64  `json:"postId"`
-	SpaceID          string `json:"spaceId"`
-	EncryptedPostKey string `json:"encryptedPostKey,omitempty"`
-	CaptionCipher    string `json:"captionCipher,omitempty"`
-	KeyVersion       int    `json:"keyVersion,omitempty"`
-	ObjectKey        string `json:"objectKey,omitempty"`
+	MessageID           string             `json:"messageId"`
+	Kind                string             `json:"kind"`
+	Sender              SpaceActorResponse `json:"sender"`
+	Recipient           SpaceActorResponse `json:"recipient"`
+	MessageCipher       string             `json:"messageCipher,omitempty"`
+	EncryptedMessageKey string             `json:"encryptedMessageKey,omitempty"`
+	Text                string             `json:"text,omitempty"`
+	ReplyPostID         *int64             `json:"replyPostId,omitempty"`
+	ReplyMessageID      *string            `json:"replyMessageId,omitempty"`
+	Liked               bool               `json:"liked"`
+	ViewerLiked         bool               `json:"viewerLiked"`
+	IsDeleted           bool               `json:"isDeleted"`
+	CreatedAt           string             `json:"createdAt"`
+	UpdatedAt           string             `json:"updatedAt"`
 }
 
 type MessagePage struct {
