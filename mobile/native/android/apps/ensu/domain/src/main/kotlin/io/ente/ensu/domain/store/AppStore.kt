@@ -1,13 +1,10 @@
 package io.ente.ensu.domain.store
 
 import io.ente.ensu.domain.chat.ChatRepository
-import io.ente.ensu.domain.chat.ChatSyncRepository
 import io.ente.ensu.domain.device.ChatDeviceCapability
 import io.ente.ensu.domain.device.DeviceCapabilityProvider
-import io.ente.ensu.domain.device.UnknownDeviceCapabilityProvider
 import io.ente.ensu.domain.llm.LlmProvider
 import io.ente.ensu.domain.logging.LogRepository
-import io.ente.ensu.domain.logging.NoOpLogRepository
 import io.ente.ensu.domain.model.Attachment
 import io.ente.ensu.domain.model.ChatMessage
 import io.ente.ensu.domain.model.EnsuDefaults
@@ -25,21 +22,19 @@ import kotlinx.coroutines.launch
 class AppStore(
     private val sessionPreferences: SessionPreferences,
     private val chatRepository: ChatRepository,
-    private val chatSyncRepository: ChatSyncRepository? = null,
     private val llmProvider: LlmProvider,
-    private val deviceCapabilityProvider: DeviceCapabilityProvider = UnknownDeviceCapabilityProvider,
+    private val deviceCapabilityProvider: DeviceCapabilityProvider,
     val ensuDefaults: EnsuDefaults,
-    private val clock: () -> Long = { System.currentTimeMillis() },
-    private val logRepository: LogRepository = NoOpLogRepository
+    private val logRepository: LogRepository,
+    private val clock: () -> Long = { System.currentTimeMillis() }
 ) {
     private val _state = MutableStateFlow(AppState())
     val state: StateFlow<AppState> = _state.asStateFlow()
 
     private val messageStore = mutableMapOf<String, MutableList<ChatMessage>>()
-    private val attachmentActions = AttachmentStoreActions(_state, chatSyncRepository, messageStore)
+    private val attachmentActions = AttachmentStoreActions(_state, messageStore)
     private val modelSettingsActions =
         ModelSettingsActions(_state, sessionPreferences, llmProvider, logRepository, ensuDefaults)
-    private val syncActions = SyncStoreActions(_state, chatSyncRepository, logRepository)
     private val chatActions = ChatStoreActions(
         state = _state,
         sessionPreferences = sessionPreferences,
@@ -49,22 +44,12 @@ class AppStore(
         logRepository = logRepository,
         messageStore = messageStore,
         attachmentActions = attachmentActions,
-        syncActions = syncActions,
         modelSettingsActions = modelSettingsActions,
         ensuDefaults = ensuDefaults
     )
-    private val authActions = AuthStoreActions(_state, logRepository) {
-        syncActions.syncAfterLogin()
-    }
-
-    init {
-        syncActions.setReloadSessions { chatActions.loadSessionsFromDb() }
-    }
-
     fun bootstrap(scope: CoroutineScope) {
         chatActions.setScope(scope)
         attachmentActions.setScope(scope)
-        syncActions.setScope(scope)
         modelSettingsActions.setScope(scope)
         refreshDeviceCapability(scope)
         chatActions.bootstrap(scope)
@@ -191,18 +176,6 @@ class AppStore(
         _state.value = _state.value.copy(developerSettings = developerSettings)
         modelSettingsActions.hydratePersistedModelSettings(modelSettings)
     }
-
-    fun signIn(email: String) = authActions.signIn(email)
-
-    fun signOut() {
-        authActions.signOut()
-        chatActions.handleLogout()
-    }
-
-    fun syncNow(
-        onSuccess: (() -> Unit)? = null,
-        onError: ((String) -> Unit)? = null
-    ) = syncActions.syncNow(onSuccess, onError)
 
     fun cancelAttachmentDownload(attachmentId: String) =
         attachmentActions.cancelAttachmentDownload(attachmentId)

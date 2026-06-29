@@ -7,11 +7,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ente-io/museum/ente"
-	"github.com/ente-io/museum/pkg/controller/discord"
-	util "github.com/ente-io/museum/pkg/utils"
-	"github.com/ente-io/museum/pkg/utils/auth"
-	"github.com/ente-io/museum/pkg/utils/network"
+	"github.com/ente/museum/ente"
+	"github.com/ente/museum/pkg/controller/discord"
+	util "github.com/ente/museum/pkg/utils"
+	"github.com/ente/museum/pkg/utils/auth"
+	"github.com/ente/museum/pkg/utils/network"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -95,7 +95,7 @@ func (r *RateLimitMiddleware) APIRateLimitMiddleware(urlSanitizer func(_ *gin.Co
 				return
 			}
 			if limitContext.Reached {
-				msg := fmt.Sprintf("Global rate limit breached %s", requestPath)
+				msg := fmt.Sprintf("🌍 Global rate limit: %s", requestPath)
 				go r.discordCtrl.NotifyPotentialAbuse(msg)
 				log.Error(msg)
 				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "Rate limit breached, try later"})
@@ -113,7 +113,7 @@ func (r *RateLimitMiddleware) APIRateLimitMiddleware(urlSanitizer func(_ *gin.Co
 				return
 			}
 			if limitContext.Reached {
-				go r.discordCtrl.NotifyPotentialAbuse(fmt.Sprintf("Rate limit breached %s", requestPath))
+				go r.discordCtrl.NotifyPotentialAbuse(fmt.Sprintf("🌐 IP rate limit: %s", requestPath))
 				log.Error(fmt.Sprintf("Rate limit breached %s", key))
 				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "Rate limit breached, try later"})
 				return
@@ -143,7 +143,7 @@ func (r *RateLimitMiddleware) APIRateLimitForUserMiddleware(urlSanitizer func(_ 
 				return
 			}
 			if limitContext.Reached {
-				msg := fmt.Sprintf("Rate limit breached %d for path: %s", userID, requestPath)
+				msg := fmt.Sprintf("👤 User rate limit: %s user=%d", requestPath, userID)
 				go r.discordCtrl.NotifyPotentialAbuse(msg)
 				log.Error(msg)
 				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "Rate limit breached, try later"})

@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/ente-io/museum/space/models"
+	"github.com/ente/museum/space/models"
 	"github.com/stretchr/testify/require"
 )
 
