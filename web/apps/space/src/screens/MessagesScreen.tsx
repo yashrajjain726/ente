@@ -154,19 +154,6 @@ const Avatar: React.FC<{ avatarUrl?: string | null; size: number }> = ({
     </Box>
 );
 
-const messagePreview = (message: SpaceMessage) => {
-    if (message.kind == "post_like") {
-        return message.text;
-    }
-    if (message.kind == "post_reply") {
-        return message.text || "Replied to a post";
-    }
-    if (message.replyMessageId) {
-        return message.text || "Replied to a message";
-    }
-    return message.text;
-};
-
 const truncateMessageText = (text: string): string => {
     const lines = text.split("\n");
     const firstLine = lines[0] ?? text;
@@ -192,16 +179,16 @@ const isCurrentProfileActor = (
     return actor.username == profile.username;
 };
 
-const conversationPreview = (
-    conversation: SpaceMessageConversation,
-    profile: SetupProfile,
-) => {
+const conversationPreview = (conversation: SpaceMessageConversation) => {
     const activity = conversation.latestActivity;
     if (activity.type == "empty") {
         return "You are now friends";
     }
     if (activity.type == "friend_request") {
         return "Friend request";
+    }
+    if (activity.type == "friend_added") {
+        return "You are now friends";
     }
     if (activity.type == "post_like") {
         return activity.outgoing ? "You liked a post" : "Liked your post";
@@ -210,48 +197,15 @@ const conversationPreview = (
         return "Replied";
     }
     if (activity.type == "message_like") {
-        const text = activity.message?.text.trim();
-        return text
-            ? `${activity.outgoing ? "You liked" : "Liked"} "${truncateMessageText(text)}"`
-            : activity.outgoing
-              ? "You liked a message"
-              : "Liked a message";
+        return activity.outgoing ? "You liked a message" : "Liked a message";
     }
 
-    const message = activity.message;
-    if (!message) return "";
-    const preview = messagePreview(message);
-    return isCurrentProfileMessage(message, profile)
-        ? `You: ${preview}`
-        : preview;
-};
-
-const quotedConversationActivityPreview = (
-    activity: SpaceMessageConversation["latestActivity"],
-) => {
-    const text = activity.message?.text.trim();
-    if (!text) return undefined;
-    const previewText = truncateMessageText(text);
-
-    if (activity.type == "message_like") {
-        return {
-            prefix: activity.outgoing ? 'You liked "' : 'Liked "',
-            previewText,
-            suffix: '"',
-        };
-    }
-    if (activity.type == "post_reply") {
-        return { prefix: "", previewText, suffix: "" };
-    }
-    return undefined;
+    return activity.outgoing ? "You sent a message" : "Message";
 };
 
 const ConversationPreviewLine: React.FC<{
     conversation: SpaceMessageConversation;
-    profile: SetupProfile;
-}> = ({ conversation, profile }) => {
-    const activity = conversation.latestActivity;
-    const quotedPreview = quotedConversationActivityPreview(activity);
+}> = ({ conversation }) => {
     const previewLineSx = {
         color: textSecondary,
         fontFamily: '"Inter Variable", Inter, sans-serif',
@@ -264,33 +218,9 @@ const ConversationPreviewLine: React.FC<{
         whiteSpace: "nowrap",
     };
 
-    if (!quotedPreview) {
-        return (
-            <Box sx={previewLineSx}>
-                {conversationPreview(conversation, profile)}
-            </Box>
-        );
-    }
-
     return (
-        <Box sx={{ ...previewLineSx, alignItems: "baseline", display: "flex" }}>
-            <Box component="span" sx={{ flexShrink: 0 }}>
-                {quotedPreview.prefix}
-            </Box>
-            <Box
-                component="span"
-                sx={{
-                    minWidth: 0,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                }}
-            >
-                {quotedPreview.previewText}
-            </Box>
-            <Box component="span" sx={{ flexShrink: 0 }}>
-                {quotedPreview.suffix}
-            </Box>
+        <Box sx={previewLineSx}>
+            {conversationPreview(conversation)}
         </Box>
     );
 };
@@ -447,7 +377,6 @@ const ConversationListItem: React.FC<{
     ) => Promise<void>;
     onLoadActivityPost?: (post: SpaceMessageActivityPost) => void;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
-    profile: SetupProfile;
 }> = ({
     activityPost,
     conversation,
@@ -455,7 +384,6 @@ const ConversationListItem: React.FC<{
     onDeleteFriendRequest,
     onLoadActivityPost,
     onOpenThread,
-    profile,
 }) => {
     const name =
         conversation.friend.fullName.trim() || conversation.friend.username;
@@ -627,10 +555,7 @@ const ConversationListItem: React.FC<{
                             {timestampLabel}
                         </Box>
                     </Box>
-                    <ConversationPreviewLine
-                        conversation={conversation}
-                        profile={profile}
-                    />
+                    <ConversationPreviewLine conversation={conversation} />
                 </Box>
                 {postThumbnailUrl && (
                     <Box
@@ -708,7 +633,6 @@ const ConversationSection: React.FC<{
     ) => Promise<void>;
     onLoadActivityPost?: (post: SpaceMessageActivityPost) => void;
     onOpenThread: (conversation: SpaceMessageConversation) => void;
-    profile: SetupProfile;
     section: ConversationSection;
 }> = ({
     activityPostsByKey,
@@ -716,7 +640,6 @@ const ConversationSection: React.FC<{
     onDeleteFriendRequest,
     onLoadActivityPost,
     onOpenThread,
-    profile,
     section,
 }) => {
     if (section.items.length == 0) return null;
@@ -756,7 +679,6 @@ const ConversationSection: React.FC<{
                         onDeleteFriendRequest={onDeleteFriendRequest}
                         onLoadActivityPost={onLoadActivityPost}
                         onOpenThread={onOpenThread}
-                        profile={profile}
                     />
                 ))}
             </Box>
@@ -775,7 +697,7 @@ const bodyBubblesCanGroup = (
 ) => {
     if (!first || !second) return false;
     if (!sameMessageSender(first, second)) return false;
-    if (first.kind == "post_like") return false;
+    if (first.kind == "post_like" || first.kind == "friend_added") return false;
     if (second.kind != "regular" || second.replyMessageId) return false;
     if (
         !isSameLocalDate(
@@ -1184,9 +1106,12 @@ const MessageBubble: React.FC<{
         ? `20px ${groupsWithPrevious ? "6px" : "20px"} ${groupsWithNext ? "6px" : "20px"} 20px`
         : `${groupsWithPrevious ? "6px" : "20px"} 20px 20px ${groupsWithNext ? "6px" : "20px"}`;
     const isSyntheticPostLike = message.kind == "post_like";
+    const isFriendAdded = message.kind == "friend_added";
     const isPostReply = message.kind == "post_reply";
     const hasMessageReply = Boolean(message.replyMessageId);
-    const actionLabel = isSyntheticPostLike
+    const actionLabel = isFriendAdded
+        ? "You are now friends"
+        : isSyntheticPostLike
         ? isOwn
             ? "You liked their post"
             : "Liked your post"
@@ -1199,7 +1124,7 @@ const MessageBubble: React.FC<{
                 ? "You replied"
                 : "Replied to you"
             : undefined;
-    const hasBodyBubble = !isSyntheticPostLike;
+    const hasBodyBubble = !isSyntheticPostLike && !isFriendAdded;
     const longPressTimerRef = React.useRef<number | undefined>(undefined);
     const longPressStartRef = React.useRef<
         { x: number; y: number } | undefined
@@ -2572,7 +2497,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                 loadActivityPost
                                             }
                                             onOpenThread={onOpenThread}
-                                            profile={profile}
                                             section={section}
                                         />
                                     ))}

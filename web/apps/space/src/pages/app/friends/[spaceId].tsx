@@ -226,8 +226,8 @@ const Page: React.FC = () => {
                 }}
                 onBack={goBack}
                 onLoadPostImage={loadCurrentSpacePostAssetURL}
-                onReplyToPost={(postId, text) =>
-                    replyToCurrentPost(actorSpaceId, postId, text)
+                onReplyToPost={(postSpaceId, postId, text) =>
+                    replyToCurrentPost(actorSpaceId, postSpaceId, postId, text)
                 }
                 onSetPostLiked={(postId, liked) =>
                     setCurrentPostLiked(actorSpaceId, postId, liked)

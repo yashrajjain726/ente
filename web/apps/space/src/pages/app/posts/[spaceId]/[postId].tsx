@@ -52,6 +52,7 @@ const viewerPhotoFromPost = (post: SpacePost) => ({
     imageUrl: post.imageUrl ?? "",
     name: post.name,
     postId: post.postId,
+    spaceId: post.spaceId,
     timestampMs: post.timestampMs,
     viewerLiked: post.viewerLiked,
     width: post.width,
@@ -165,8 +166,13 @@ const Page: React.FC = () => {
                 onReplyToPost={
                     isOwnPost
                         ? undefined
-                        : (nextPostId, text) =>
-                              replyToCurrentPost(actorSpaceId, nextPostId, text)
+                        : (postSpaceId, nextPostId, text) =>
+                              replyToCurrentPost(
+                                  actorSpaceId,
+                                  postSpaceId,
+                                  nextPostId,
+                                  text,
+                              )
                 }
                 onSetPostLiked={(nextPostId, liked) =>
                     setCurrentPostLiked(actorSpaceId, nextPostId, liked)

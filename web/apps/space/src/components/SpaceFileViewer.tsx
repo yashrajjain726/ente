@@ -132,6 +132,7 @@ export interface SpaceViewerPhoto {
     imageUrl: string;
     name: string;
     postId?: number;
+    spaceId?: string;
     timestampMs: number;
     viewerLiked?: boolean;
     width?: number;
@@ -154,7 +155,11 @@ interface SpaceFileViewerProps {
         caption: string,
         edit: SpaceViewerDraftPostEdit,
     ) => Promise<void>;
-    onReplyToPost?: (postId: number, text: string) => Promise<void>;
+    onReplyToPost?: (
+        spaceId: string,
+        postId: number,
+        text: string,
+    ) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     onSwipeLeft?: () => void;
     onSwipeRight?: () => void;
@@ -397,7 +402,7 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         (!onPublishDraftPost && !canQueueDraftPostPublish);
     const isReplyActionRunning = replyActionPhase != null;
     const canReplyToPost = Boolean(
-        !isDraftPost && activePhoto.postId && onReplyToPost,
+        !isDraftPost && activePhoto.spaceId && activePhoto.postId && onReplyToPost,
     );
     const isReplyMode =
         canReplyToPost &&
@@ -548,12 +553,23 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
 
     const sendReply = () => {
         const text = replyText.trim();
-        if (!canSendReply || !activePhoto.postId || !onReplyToPost) return;
+        if (
+            !canSendReply ||
+            !activePhoto.spaceId ||
+            !activePhoto.postId ||
+            !onReplyToPost
+        ) {
+            return;
+        }
 
         setReplyActionPhase("busy");
         void (async () => {
             try {
-                await onReplyToPost(activePhoto.postId!, text);
+                await onReplyToPost(
+                    activePhoto.spaceId!,
+                    activePhoto.postId!,
+                    text,
+                );
                 setReplyText("");
                 setReplyActionPhase("done");
             } catch (error) {

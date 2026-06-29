@@ -314,8 +314,18 @@ const Page: React.FC = () => {
                 onReplyToPost={
                     profile?.spaceId
                         ? (
-                              (spaceId) => (postId: number, text: string) =>
-                                  replyToCurrentPost(spaceId, postId, text)
+                              (actorSpaceId) =>
+                              (
+                                  postSpaceId: string,
+                                  postId: number,
+                                  text: string,
+                              ) =>
+                                  replyToCurrentPost(
+                                      actorSpaceId,
+                                      postSpaceId,
+                                      postId,
+                                      text,
+                                  )
                           )(profile.spaceId)
                         : undefined
                 }

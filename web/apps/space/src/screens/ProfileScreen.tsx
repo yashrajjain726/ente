@@ -73,6 +73,7 @@ export interface ProfilePostItem {
     imageUrl?: string;
     name?: string;
     postId?: number;
+    spaceId?: string;
     timestampMs: number;
     thumbHash?: string;
     viewerLiked?: boolean;
@@ -533,7 +534,11 @@ interface ProfileScreenProps {
     onOpenProfilePhoto?: () => void;
     onOpenSettings?: () => void;
     onLoadPostImage?: (asset: SpacePostAsset) => Promise<string>;
-    onReplyToPost?: (postId: number, text: string) => Promise<void>;
+    onReplyToPost?: (
+        postSpaceId: string,
+        postId: number,
+        text: string,
+    ) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     postGroups?: ProfilePostGroup[];
     profile: SetupProfile;
@@ -789,6 +794,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     imageUrl,
                     name: displayName,
                     postId: item.postId,
+                    spaceId: item.spaceId,
                     timestampMs: item.timestampMs,
                     viewerLiked: item.viewerLiked,
                     width: dimensions.width,
@@ -815,6 +821,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             : ""),
                     name: displayName,
                     postId: item.postId,
+                    spaceId: item.spaceId,
                     timestampMs: item.timestampMs,
                     viewerLiked: item.viewerLiked,
                     width: dimensions.width,

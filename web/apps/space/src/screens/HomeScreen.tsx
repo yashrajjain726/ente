@@ -126,7 +126,11 @@ interface HomeScreenProps {
     onOpenFriend?: (friendID: string) => void;
     onOpenMessages?: () => void;
     onOpenProfile?: () => void;
-    onReplyToPost?: (postId: number, text: string) => Promise<void>;
+    onReplyToPost?: (
+        postSpaceId: string,
+        postId: number,
+        text: string,
+    ) => Promise<void>;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     profileLink?: string;
     profile: SetupProfile | null;
@@ -185,6 +189,7 @@ interface FeedItemProps {
     onOpenProfile?: () => void;
     onSetPostLiked?: (postId: number, liked: boolean) => Promise<void>;
     postId: number;
+    spaceId?: string;
     thumbHash?: string;
     timestampStatus?: FeedTimestampStatus;
     timestampMs: number;
@@ -655,6 +660,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
     onOpenProfile,
     onSetPostLiked,
     postId,
+    spaceId,
     thumbHash,
     timestampStatus,
     timestampMs,
@@ -745,6 +751,7 @@ const FeedItem: React.FC<FeedItemProps> = ({
                 imageUrl: displayImageUrl,
                 name,
                 postId,
+                spaceId,
                 timestampMs,
                 viewerLiked: isLiked,
                 width: photoDimensions.width,
@@ -1577,6 +1584,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onOpenProfile={onOpenProfile}
                 onSetPostLiked={onSetPostLiked}
                 postId={item.postId}
+                spaceId={item.spaceId}
                 thumbHash={item.thumbHash}
                 timestampStatus={timestampStatus}
                 timestampMs={item.timestampMs}
