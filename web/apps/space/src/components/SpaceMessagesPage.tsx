@@ -127,6 +127,9 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         undefined,
     );
     const markedReadSpaceIdRef = React.useRef<string | undefined>(undefined);
+    const previousSelectedSpaceIdRef = React.useRef<string | undefined>(
+        selectedSpaceId,
+    );
     const selectedConversation = React.useMemo(
         () =>
             selectedSpaceId
@@ -383,6 +386,34 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     React.useEffect(() => {
         if (!profile) return;
         void refreshConversations();
+    }, [profile, refreshConversations]);
+
+    React.useEffect(() => {
+        const previousSelectedSpaceId = previousSelectedSpaceIdRef.current;
+        previousSelectedSpaceIdRef.current = selectedSpaceId;
+
+        if (!profile || selectedSpaceId || !previousSelectedSpaceId) return;
+        void refreshConversations();
+    }, [profile, refreshConversations, selectedSpaceId]);
+
+    React.useEffect(() => {
+        if (!profile) return;
+
+        const refreshWhenVisible = () => {
+            if (document.visibilityState == "visible") {
+                void refreshConversations();
+            }
+        };
+
+        window.addEventListener("focus", refreshWhenVisible);
+        document.addEventListener("visibilitychange", refreshWhenVisible);
+        return () => {
+            window.removeEventListener("focus", refreshWhenVisible);
+            document.removeEventListener(
+                "visibilitychange",
+                refreshWhenVisible,
+            );
+        };
     }, [profile, refreshConversations]);
 
     React.useEffect(() => {
