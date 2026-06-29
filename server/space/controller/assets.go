@@ -55,18 +55,6 @@ func (c *AssetsController) PresignUpload(ctx context.Context, space *spacerepo.S
 	if err != nil {
 		return nil, err
 	}
-	var spaceID sql.NullString
-	switch purpose {
-	case uploadPurposePost:
-		spaceID.String = space.SpaceID
-		spaceID.Valid = true
-	case uploadPurposeAvatar, uploadPurposeCover:
-		spaceID.String = space.SpaceID
-		spaceID.Valid = true
-	default:
-		return nil, ente.NewBadRequestWithMessage("invalid upload purpose")
-	}
-
 	bucketID, err := resolveSpaceAssetsBucketID(c.AssetsRepo.S3Config)
 	if err != nil {
 		return nil, err
@@ -74,12 +62,12 @@ func (c *AssetsController) PresignUpload(ctx context.Context, space *spacerepo.S
 	bucket := c.AssetsRepo.S3Config.GetBucket(bucketID)
 	s3Client := c.AssetsRepo.S3Config.GetS3Client(bucketID)
 
-	keyPrefix := fmt.Sprintf("space/%s/posts", spaceID.String)
+	keyPrefix := fmt.Sprintf("space/%s/posts", space.SpaceID)
 	if purpose == uploadPurposeAvatar {
-		keyPrefix = fmt.Sprintf("space/%s/avatar", spaceID.String)
+		keyPrefix = fmt.Sprintf("space/%s/avatar", space.SpaceID)
 	}
 	if purpose == uploadPurposeCover {
-		keyPrefix = fmt.Sprintf("space/%s/cover", spaceID.String)
+		keyPrefix = fmt.Sprintf("space/%s/cover", space.SpaceID)
 	}
 	objectKey := fmt.Sprintf("%s/%s", keyPrefix, base.MustNewID("wo"))
 	input := &s3.PutObjectInput{
@@ -96,7 +84,7 @@ func (c *AssetsController) PresignUpload(ctx context.Context, space *spacerepo.S
 	}
 	err = c.AssetsRepo.AddTempObject(ctx, spacerepo.SpaceTempObjectRecord{
 		ObjectKey:    objectKey,
-		SpaceID:      spaceID,
+		SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
 		Purpose:      purpose,
 		BucketID:     bucketID,
 		ExpectedSize: req.Size,

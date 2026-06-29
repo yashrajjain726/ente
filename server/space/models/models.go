@@ -362,7 +362,3 @@ type FeedPage struct {
 	Items      []PostResponse `json:"items"`
 	NextCursor string         `json:"nextCursor,omitempty"`
 }
-
-type UpdatedCountResponse struct {
-	Updated int `json:"updated"`
-}

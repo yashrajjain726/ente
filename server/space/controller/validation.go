@@ -22,7 +22,6 @@ const (
 	maxSpacePostObjects                  = 10
 	maxSpaceFriendSharesPerRefresh       = 500
 	maxSpaceObjectKeyBytes               = 512
-	maxSpaceLinkSessionTokenBytes        = 256
 )
 
 var spaceSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._]*$`)

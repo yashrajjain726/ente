@@ -22,7 +22,6 @@ const spaceLinkSessionDurationMinutes = 60 * 24 * 30
 type LinksController struct {
 	LinksRepo  *repo.LinksRepository
 	SpacesRepo *repo.SpacesRepository
-	auth       authDeps
 }
 
 func (c *LinksController) Get(ctx context.Context, space *repo.SpaceRecord) (*models.SpaceLinkStatusResponse, error) {

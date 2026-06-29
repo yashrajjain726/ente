@@ -16,7 +16,6 @@ type FriendsController struct {
 	FriendsRepo   *repo.FriendsRepository
 	SpacesRepo    *repo.SpacesRepository
 	EmailNotifier SpaceEmailNotifier
-	auth          authDeps
 }
 
 func (c *FriendsController) Add(ctx context.Context, requesterSpace *repo.SpaceRecord, req models.AddFriendPayload) (*models.FriendStatusResponse, error) {

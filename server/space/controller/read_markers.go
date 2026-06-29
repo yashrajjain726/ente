@@ -14,7 +14,6 @@ import (
 
 type ReadMarkersController struct {
 	ReadMarkersRepo *repo.ReadMarkersRepository
-	auth            authDeps
 }
 
 func (c *ReadMarkersController) GetUnreadStatus(ctx context.Context, viewerSpace *repo.SpaceRecord) (*models.SpaceUnreadStatusResponse, error) {
