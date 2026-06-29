@@ -202,8 +202,8 @@ struct MessageQuoteJs {
 struct MessageJs {
     message_id: String,
     kind: String,
-    sender: ActorJs,
-    recipient: ActorJs,
+    sender_space_id: String,
+    recipient_space_id: String,
     text: String,
     quote: Option<MessageQuoteJs>,
     reply_post_id: Option<i64>,
@@ -478,12 +478,9 @@ async fn link_post_page_to_js(
 }
 
 async fn account_message_to_js(
-    ctx: &AccountSpaceCtx,
     message: MessageResponse,
     decrypted: DecryptedMessage,
 ) -> Result<MessageJs, WasmSpaceError> {
-    let sender = account_actor_to_js(ctx, message.sender).await?;
-    let recipient = account_actor_to_js(ctx, message.recipient).await?;
     let quote = decrypted.payload.quote.map(|quote| MessageQuoteJs {
         post_id: quote.post_id,
         space_id: quote.space_id,
@@ -498,8 +495,8 @@ async fn account_message_to_js(
     Ok(MessageJs {
         message_id: message.message_id,
         kind: message.kind,
-        sender,
-        recipient,
+        sender_space_id: message.sender_space_id,
+        recipient_space_id: message.recipient_space_id,
         text: decrypted.payload.text,
         quote,
         reply_post_id: message.reply_post_id,
@@ -519,16 +516,14 @@ async fn account_message_response_to_js(
 ) -> Result<MessageJs, WasmSpaceError> {
     if message.kind != "post_like" && message.kind != "friend_added" {
         let decrypted = ctx.decrypt_message(viewer_space_id, &message).await?;
-        return account_message_to_js(ctx, message, decrypted).await;
+        return account_message_to_js(message, decrypted).await;
     }
 
-    let sender = account_actor_to_js(ctx, message.sender).await?;
-    let recipient = account_actor_to_js(ctx, message.recipient).await?;
     Ok(MessageJs {
         message_id: message.message_id,
         kind: message.kind,
-        sender,
-        recipient,
+        sender_space_id: message.sender_space_id,
+        recipient_space_id: message.recipient_space_id,
         text: message.text,
         quote: None,
         reply_post_id: message.reply_post_id,
@@ -1102,8 +1097,7 @@ impl SpaceAccountCtxHandle {
             .inner
             .decrypt_message(&sender_space_id, &message)
             .await?;
-        swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
-            .map_err(Into::into)
+        swb::to_value(&account_message_to_js(message, decrypted).await?).map_err(Into::into)
     }
 
     /// Send a 1:1 reply to an existing message.
@@ -1122,8 +1116,7 @@ impl SpaceAccountCtxHandle {
             .inner
             .decrypt_message(&sender_space_id, &message)
             .await?;
-        swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
-            .map_err(Into::into)
+        swb::to_value(&account_message_to_js(message, decrypted).await?).map_err(Into::into)
     }
 
     /// Send a private post reply message to the post owner.
@@ -1142,8 +1135,7 @@ impl SpaceAccountCtxHandle {
             .inner
             .decrypt_message(&sender_space_id, &message)
             .await?;
-        swb::to_value(&account_message_to_js(&self.inner, message, decrypted).await?)
-            .map_err(Into::into)
+        swb::to_value(&account_message_to_js(message, decrypted).await?).map_err(Into::into)
     }
 
     /// Like or unlike a message.

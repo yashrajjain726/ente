@@ -128,10 +128,10 @@ interface SpaceMessageResponse {
     liked?: boolean;
     messageId: string;
     quote?: SpaceMessageQuoteResponse;
-    recipient: SpaceActor;
+    recipientSpaceId: string;
     replyMessageId?: string;
     replyPostId?: number;
-    sender: SpaceActor;
+    senderSpaceId: string;
     text: string;
     viewerLiked?: boolean;
     updatedAt: string;
@@ -283,6 +283,11 @@ export interface SpaceMessagePage {
     nextCursor?: string;
 }
 
+interface SpaceMessageHydrationActors {
+    friend: FriendProfile;
+    viewer: FriendProfile;
+}
+
 export interface SpaceMessageConversation {
     friend: FriendProfile;
     latestActivity: SpaceMessageActivity;
@@ -338,6 +343,26 @@ export const clearSpaceFriendsCache = () => {
 
 const cloneFriendProfiles = (friends: FriendProfile[]) =>
     friends.map((friend) => ({ ...friend }));
+
+const placeholderMessageActor = (spaceId: string): FriendProfile => ({
+    avatarUrl: null,
+    friendsCount: 0,
+    fullName: "",
+    id: spaceId,
+    spaceId,
+    username: "",
+});
+
+const friendSpaceId = (friend: FriendProfile) => friend.spaceId || friend.id;
+
+const messageActorForSpace = (
+    spaceId: string,
+    actors: SpaceMessageHydrationActors,
+) => {
+    if (spaceId == friendSpaceId(actors.viewer)) return { ...actors.viewer };
+    if (spaceId == friendSpaceId(actors.friend)) return { ...actors.friend };
+    return placeholderMessageActor(spaceId);
+};
 
 const actorProfile = (actor: SpaceActor): FriendProfile => {
     const payload = parseSpaceProfilePayload(actor.profile ?? "");
@@ -692,19 +717,19 @@ const messageQuoteFromReplyPost = async (
     includeImage: boolean,
     viewerSpaceId?: string,
 ): Promise<SpaceMessageQuote | undefined> => {
-    if (typeof message.replyPostId != "number" || !message.recipient.spaceId) {
+    if (typeof message.replyPostId != "number" || !message.recipientSpaceId) {
         return undefined;
     }
 
     const fallbackQuote: SpaceMessageQuote = {
         postId: message.replyPostId,
-        spaceId: message.recipient.spaceId,
+        spaceId: message.recipientSpaceId,
     };
     if (!includeImage) return fallbackQuote;
 
     try {
         const post = (await ctx.get_post(
-            message.recipient.spaceId,
+            message.recipientSpaceId,
             BigInt(message.replyPostId),
             viewerSpaceId ?? null,
         )) as SpacePostResponse;
@@ -739,31 +764,20 @@ const messageFromSpaceMessage = async (
     message: SpaceMessageResponse,
     includeQuoteImage: boolean,
     viewerSpaceId?: string,
+    actors?: SpaceMessageHydrationActors,
 ): Promise<SpaceMessage> => {
-    const sender = actorProfile(message.sender);
-    const recipient = actorProfile(message.recipient);
-    const [senderAvatarUrl, recipientAvatarUrl, quote] = await Promise.all([
-        accountAvatarURL(
-            ctx,
-            message.sender.spaceId,
-            message.sender.avatar,
-            viewerSpaceId,
-        ),
-        accountAvatarURL(
-            ctx,
-            message.recipient.spaceId,
-            message.recipient.avatar,
-            viewerSpaceId,
-        ),
-        messageQuoteFromSpaceMessage(
-            ctx,
-            message,
-            includeQuoteImage,
-            viewerSpaceId,
-        ),
-    ]);
-    sender.avatarUrl = senderAvatarUrl;
-    recipient.avatarUrl = recipientAvatarUrl;
+    const sender = actors
+        ? messageActorForSpace(message.senderSpaceId, actors)
+        : placeholderMessageActor(message.senderSpaceId);
+    const recipient = actors
+        ? messageActorForSpace(message.recipientSpaceId, actors)
+        : placeholderMessageActor(message.recipientSpaceId);
+    const quote = await messageQuoteFromSpaceMessage(
+        ctx,
+        message,
+        includeQuoteImage,
+        viewerSpaceId,
+    );
     return {
         createdAtMs: timestampMsFromSpaceDate(message.createdAt),
         id: message.messageId || message.id || message.createdAt,
@@ -1164,6 +1178,8 @@ export const sendCurrentMessage = async (
     senderSpaceId: string,
     spaceId: string,
     text: string,
+    sender: FriendProfile,
+    recipient: FriendProfile,
 ) => {
     const messageText = normalizeSpaceMessageText(text);
     const ctx = await ensureCurrentSpaceContext();
@@ -1177,6 +1193,7 @@ export const sendCurrentMessage = async (
             )) as SpaceMessageResponse,
             true,
             senderSpaceId,
+            { friend: recipient, viewer: sender },
         );
     } finally {
         releaseCurrentSpaceContext(ctx);
@@ -1188,6 +1205,8 @@ export const replyToCurrentMessage = async (
     spaceId: string,
     messageId: string,
     text: string,
+    sender: FriendProfile,
+    recipient: FriendProfile,
 ) => {
     const messageText = normalizeSpaceMessageText(text);
     const ctx = await ensureCurrentSpaceContext();
@@ -1202,6 +1221,7 @@ export const replyToCurrentMessage = async (
             )) as SpaceMessageResponse,
             true,
             senderSpaceId,
+            { friend: recipient, viewer: sender },
         );
     } finally {
         releaseCurrentSpaceContext(ctx);
@@ -1327,6 +1347,8 @@ export const deleteCurrentFriendRequest = async (
 export const loadCurrentMessageThread = async (
     viewerSpaceId: string,
     spaceId: string,
+    viewer: FriendProfile,
+    friend: FriendProfile,
 ): Promise<SpaceMessagePage> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
@@ -1339,7 +1361,10 @@ export const loadCurrentMessageThread = async (
         const items = (
             await Promise.all(
                 (page.items ?? []).map((message) =>
-                    messageFromSpaceMessage(ctx, message, true, viewerSpaceId),
+                    messageFromSpaceMessage(ctx, message, true, viewerSpaceId, {
+                        friend,
+                        viewer,
+                    }),
                 ),
             )
         ).reverse();

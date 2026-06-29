@@ -146,8 +146,8 @@ pub struct CreateMessageRequest {
 pub struct MessageResponse {
     pub message_id: String,
     pub kind: String,
-    pub sender: SpaceActorResponse,
-    pub recipient: SpaceActorResponse,
+    pub sender_space_id: String,
+    pub recipient_space_id: String,
     #[serde(default)]
     pub message_cipher: String,
     #[serde(default)]

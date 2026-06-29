@@ -31,12 +31,7 @@ const spaceMessageBaseSelectColumns = `
 		WHEN m.kind = 'post_like' THEN 'Liked your post'
 		WHEN m.kind = 'friend_added' THEN 'You are now friends'
 		ELSE ''
-	END AS text,
-`
-
-var spaceMessageActorSelectColumns = `
-` + spaceActorSelectColumns("sender_space", "sender_avatar", "sender") + `,
-` + spaceActorSelectColumns("recipient_space", "recipient_avatar", "recipient") + `
+	END AS text
 `
 
 func spaceMessageSelectColumns(viewerPlaceholder string) string {
@@ -45,18 +40,8 @@ func spaceMessageSelectColumns(viewerPlaceholder string) string {
 			WHEN m.sender_space_id = ` + viewerPlaceholder + ` THEN COALESCE(m.sender_encrypted_message_key, '\x'::bytea)
 			ELSE COALESCE(m.recipient_encrypted_message_key, '\x'::bytea)
 		END`
-	return strings.TrimSpace(
-		fmt.Sprintf(spaceMessageBaseSelectColumns, viewerPlaceholder, encryptedMessageKeySQL) + `
-` + spaceMessageActorSelectColumns,
-	)
+	return strings.TrimSpace(fmt.Sprintf(spaceMessageBaseSelectColumns, viewerPlaceholder, encryptedMessageKeySQL))
 }
-
-var spaceMessageJoins = `
-	JOIN spaces sender_space ON sender_space.space_id = m.sender_space_id
-	` + spaceActorAvatarJoin("sender_space", "sender_avatar") + `
-	JOIN spaces recipient_space ON recipient_space.space_id = m.recipient_space_id
-	` + spaceActorAvatarJoin("recipient_space", "recipient_avatar") + `
-`
 
 const peerThreadKeySQL = `CASE
 	WHEN $1 < cp.friend_space_id THEN $1 || ':' || cp.friend_space_id
@@ -258,7 +243,6 @@ func (r *MessagesRepository) GetMessage(ctx context.Context, messageID string, v
 	query := `
 		SELECT ` + spaceMessageSelectColumns("$2") + `
 		FROM space_messages m
-		` + spaceMessageJoins + `
 		WHERE m.message_id = $1
 		  AND (m.sender_space_id = $2 OR m.recipient_space_id = $2)
 	`
@@ -274,7 +258,6 @@ func (r *MessagesRepository) ListThread(ctx context.Context, viewerSpaceID strin
 	query := `
 		SELECT ` + spaceMessageSelectColumns("$1") + `
 		FROM space_messages m
-		` + spaceMessageJoins + `
 		WHERE m.thread_key = ` + selectedThreadKeySQL + `
 		  AND m.is_deleted = FALSE`
 	if cursorCreatedAt, cursorMessageID, ok := parseMessageCursor(cursor); ok {
@@ -418,8 +401,6 @@ func scanMessageRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceMess
 		&rec.UpdatedAt,
 		&rec.Text,
 	}
-	dest = append(dest, spaceActorScanDest(&rec.Sender)...)
-	dest = append(dest, spaceActorScanDest(&rec.Recipient)...)
 	if err := scanner.Scan(dest...); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

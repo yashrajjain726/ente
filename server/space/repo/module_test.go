@@ -436,7 +436,8 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	require.Equal(t, reply.MessageID, aliceThread[0].MessageID)
 	require.Equal(t, message.MessageID, aliceThread[0].ReplyMessageID.String)
 	require.Equal(t, testSpaceBytes("recipient-key"), aliceThread[1].EncryptedMessageKey)
-	require.Equal(t, bobSpace.SpaceID, aliceThread[1].Sender.SpaceID)
+	require.Equal(t, bobSpace.SpaceID, aliceThread[1].SenderSpaceID)
+	require.Equal(t, aliceSpace.SpaceID, aliceThread[1].RecipientSpaceID)
 
 	conversations, nextCursor, err := listTestConversations(ctx, module, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)
@@ -472,7 +473,7 @@ func TestSpaceMessagesThreadAndConversations(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestSpaceMessagesUseProfileAssetAvatars(t *testing.T) {
+func TestSpaceConversationsUseProfileAssetAvatars(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
 
@@ -506,10 +507,8 @@ func TestSpaceMessagesUseProfileAssetAvatars(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, nextCursor)
 	require.Len(t, thread, 2)
-	require.Equal(t, "bob-avatar-object-id", thread[0].Sender.AvatarObjectID.String)
-	require.EqualValues(t, 202, thread[0].Sender.AvatarSize.Int64)
-	require.Equal(t, "alice-avatar-object-id", thread[0].Recipient.AvatarObjectID.String)
-	require.EqualValues(t, 101, thread[0].Recipient.AvatarSize.Int64)
+	require.Equal(t, bobSpace.SpaceID, thread[0].SenderSpaceID)
+	require.Equal(t, aliceSpace.SpaceID, thread[0].RecipientSpaceID)
 
 	conversations, nextCursor, err := listTestConversations(ctx, module, aliceSpace.SpaceID, "", 10)
 	require.NoError(t, err)

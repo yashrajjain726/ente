@@ -324,8 +324,8 @@ func toMessageResponse(message repo.SpaceMessageRecord) *models.MessageResponse 
 	resp := &models.MessageResponse{
 		MessageID:           message.MessageID,
 		Kind:                message.Kind,
-		Sender:              toActorResponse(message.Sender, true),
-		Recipient:           toActorResponse(message.Recipient, true),
+		SenderSpaceID:       message.SenderSpaceID,
+		RecipientSpaceID:    message.RecipientSpaceID,
 		MessageCipher:       encodeSpaceField(message.MessageCipher),
 		EncryptedMessageKey: encodeSpaceField(message.EncryptedMessageKey),
 		Text:                message.Text,

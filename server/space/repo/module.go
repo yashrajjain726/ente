@@ -139,8 +139,6 @@ type SpaceMessageRecord struct {
 	Text                string
 	CreatedAt           int64
 	UpdatedAt           int64
-	Sender              SpaceActorRecord
-	Recipient           SpaceActorRecord
 }
 
 type SpaceConversationChatSummaryRecord struct {

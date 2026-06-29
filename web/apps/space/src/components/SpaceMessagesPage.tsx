@@ -472,7 +472,7 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         markedReadSpaceIdRef.current = undefined;
 
         const actorSpaceId = profile?.spaceId;
-        if (!actorSpaceId || !selectedSpaceId) {
+        if (!profile || !actorSpaceId || !selectedSpaceId) {
             selectedFriendSpaceIdRef.current = undefined;
             setMessages([]);
             setIsThreadLoading(false);
@@ -483,7 +483,14 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         selectedFriendSpaceIdRef.current = selectedSpaceId;
         setMessages([]);
         setIsThreadLoading(true);
-        void loadCurrentMessageThread(actorSpaceId, selectedSpaceId)
+        const viewer = currentProfileMessageActor(profile);
+        const friend = selectedFriend ?? placeholderFriend(selectedSpaceId);
+        void loadCurrentMessageThread(
+            actorSpaceId,
+            selectedSpaceId,
+            viewer,
+            friend,
+        )
             .then((page) => {
                 if (!cancelled) {
                     const loadedMessageIds = new Set(
@@ -507,7 +514,24 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         return () => {
             cancelled = true;
         };
-    }, [profile?.spaceId, selectedSpaceId]);
+    }, [
+        profile?.avatarObjectID,
+        profile?.avatarUpdatedAt,
+        profile?.avatarUrl,
+        profile?.fullName,
+        profile?.spaceId,
+        profile?.spaceSlug,
+        profile?.username,
+        selectedFriend?.avatarObjectID,
+        selectedFriend?.avatarUpdatedAt,
+        selectedFriend?.avatarUrl,
+        selectedFriend?.fullName,
+        selectedFriend?.id,
+        selectedFriend?.spaceId,
+        selectedFriend?.spaceSlug,
+        selectedFriend?.username,
+        selectedSpaceId,
+    ]);
 
     if (profileLoadStatus != "ready" || !profile) {
         return (
@@ -556,9 +580,12 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     loadCurrentMessageActivityPostPreview(post, actorSpaceId)
                 }
                 onSendMessage={async (spaceId, text) => {
+                    const sender = currentProfileMessageActor(profile);
+                    const recipient =
+                        selectedFriend ?? placeholderFriend(spaceId);
                     const optimisticMessage = createLocalMessage({
                         profile,
-                        recipient: selectedFriend ?? placeholderFriend(spaceId),
+                        recipient,
                         text,
                     });
                     appendMessageIfThreadIsCurrent(spaceId, optimisticMessage);
@@ -567,6 +594,8 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                             actorSpaceId,
                             spaceId,
                             text,
+                            sender,
+                            recipient,
                         );
                         replaceMessageIfThreadIsCurrent(
                             spaceId,
@@ -583,9 +612,12 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                     void refreshConversations();
                 }}
                 onReplyToMessage={async (spaceId, messageId, text) => {
+                    const sender = currentProfileMessageActor(profile);
+                    const recipient =
+                        selectedFriend ?? placeholderFriend(spaceId);
                     const optimisticMessage = createLocalMessage({
                         profile,
-                        recipient: selectedFriend ?? placeholderFriend(spaceId),
+                        recipient,
                         replyMessageId: messageId,
                         text,
                     });
@@ -596,6 +628,8 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
                             spaceId,
                             messageId,
                             text,
+                            sender,
+                            recipient,
                         );
                         replaceMessageIfThreadIsCurrent(
                             spaceId,
