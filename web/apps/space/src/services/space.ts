@@ -92,7 +92,6 @@ interface SpaceMessageConversationActivity {
     messageId?: string;
     outgoing?: boolean;
     postId?: number;
-    postDeleted?: boolean;
     postSpaceId?: string;
     text?: string;
     type: SpaceMessageConversationActivityType;
@@ -120,7 +119,6 @@ interface SpaceMessageResponse {
     recipientSpaceId: string;
     replyMessageId?: string;
     replyPostId?: number;
-    replyPostDeleted?: boolean;
     senderSpaceId: string;
     text: string;
     viewerLiked?: boolean;
@@ -648,9 +646,6 @@ const messageQuoteFromReplyPost = async (
         postId: message.replyPostId,
         spaceId: message.recipientSpaceId,
     };
-    if (message.replyPostDeleted) {
-        return { ...fallbackQuote, isUnavailable: true };
-    }
     if (!includeImage) return fallbackQuote;
 
     try {
@@ -721,11 +716,7 @@ const messageActivityPostFromActivity = (
     if (typeof activity.postId != "number" || !activity.postSpaceId) {
         return undefined;
     }
-    return {
-        isDeleted: Boolean(activity.postDeleted),
-        postId: activity.postId,
-        spaceId: activity.postSpaceId,
-    };
+    return { postId: activity.postId, spaceId: activity.postSpaceId };
 };
 
 export const loadCurrentMessageActivityPostPreview = async (

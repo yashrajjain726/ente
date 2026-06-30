@@ -20,13 +20,6 @@ const spaceMessageBaseSelectColumns = `
 	COALESCE(m.message_cipher, '\x'::bytea),
 	%[2]s AS encrypted_message_key,
 	m.reply_post_id,
-	(
-		m.reply_post_id IS NOT NULL
-		AND EXISTS (
-			SELECT 1 FROM space_posts p
-			WHERE p.post_id = m.reply_post_id AND p.is_deleted = TRUE
-		)
-	) AS reply_post_deleted,
 	m.reply_message_id,
 	(m.recipient_liked_at IS NOT NULL) AS liked,
 	(m.recipient_liked_at IS NOT NULL AND m.recipient_space_id = %[1]s) AS viewer_liked,
@@ -88,7 +81,6 @@ SELECT
 	message_id,
 	post_id,
 	post_space_id,
-	post_deleted,
 	message_kind,
 	sender_space_id,
 	recipient_space_id,
@@ -118,13 +110,6 @@ FROM (
 		CASE WHEN m.kind = 'post_like' THEN NULL::text ELSE m.message_id END AS message_id,
 		m.reply_post_id AS post_id,
 		m.recipient_space_id AS post_space_id,
-		(
-			m.reply_post_id IS NOT NULL
-			AND EXISTS (
-				SELECT 1 FROM space_posts p
-				WHERE p.post_id = m.reply_post_id AND p.is_deleted = TRUE
-			)
-		) AS post_deleted,
 		m.kind AS message_kind,
 		m.sender_space_id,
 		m.recipient_space_id,
@@ -155,7 +140,6 @@ FROM (
 		m.message_id,
 		NULL::bigint AS post_id,
 		NULL::text AS post_space_id,
-		FALSE AS post_deleted,
 		m.kind AS message_kind,
 		m.sender_space_id,
 		m.recipient_space_id,
@@ -393,7 +377,6 @@ func scanMessageRecord(scanner interface{ Scan(dest ...any) error }) (*SpaceMess
 		&rec.MessageCipher,
 		&rec.EncryptedMessageKey,
 		&rec.ReplyPostID,
-		&rec.ReplyPostDeleted,
 		&rec.ReplyMessageID,
 		&rec.Liked,
 		&rec.ViewerLiked,
@@ -430,7 +413,6 @@ func conversationActivityScanDest(activity *SpaceMessageConversationActivityReco
 		&activity.MessageID,
 		&activity.PostID,
 		&activity.PostSpaceID,
-		&activity.PostDeleted,
 		&activity.Kind,
 		&activity.SenderSpaceID,
 		&activity.RecipientSpaceID,

@@ -293,7 +293,6 @@ type MessageResponse struct {
 	EncryptedMessageKey string  `json:"encryptedMessageKey,omitempty"`
 	Text                string  `json:"text,omitempty"`
 	ReplyPostID         *int64  `json:"replyPostId,omitempty"`
-	ReplyPostDeleted    bool    `json:"replyPostDeleted,omitempty"`
 	ReplyMessageID      *string `json:"replyMessageId,omitempty"`
 	Liked               bool    `json:"liked"`
 	ViewerLiked         bool    `json:"viewerLiked"`
@@ -321,7 +320,6 @@ type MessageConversationActivityResponse struct {
 	ReplyMessageID      *string `json:"replyMessageId,omitempty"`
 	PostID              *int64  `json:"postId,omitempty"`
 	PostSpaceID         string  `json:"postSpaceId,omitempty"`
-	PostDeleted         bool    `json:"postDeleted,omitempty"`
 }
 
 type ConversationChatSummaryResponse struct {

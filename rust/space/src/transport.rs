@@ -152,8 +152,6 @@ pub struct MessageResponse {
     #[serde(default)]
     pub reply_post_id: Option<i64>,
     #[serde(default)]
-    pub reply_post_deleted: bool,
-    #[serde(default)]
     pub reply_message_id: Option<String>,
     #[serde(default)]
     pub liked: bool,
@@ -200,8 +198,6 @@ pub struct MessageConversationActivity {
     pub post_id: Option<i64>,
     #[serde(default)]
     pub post_space_id: Option<String>,
-    #[serde(default)]
-    pub post_deleted: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

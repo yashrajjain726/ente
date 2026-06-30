@@ -170,7 +170,6 @@ struct MessageJs {
     recipient_space_id: String,
     text: String,
     reply_post_id: Option<i64>,
-    reply_post_deleted: bool,
     reply_message_id: Option<String>,
     liked: bool,
     viewer_liked: bool,
@@ -198,7 +197,6 @@ struct MessageConversationActivityJs {
     text: Option<String>,
     post_id: Option<i64>,
     post_space_id: Option<String>,
-    post_deleted: bool,
 }
 
 #[derive(Serialize)]
@@ -448,7 +446,6 @@ async fn account_message_to_js(
         recipient_space_id: message.recipient_space_id,
         text: decrypted.payload.text,
         reply_post_id: message.reply_post_id,
-        reply_post_deleted: message.reply_post_deleted,
         reply_message_id: message.reply_message_id,
         liked: message.liked,
         viewer_liked: message.viewer_liked,
@@ -475,7 +472,6 @@ async fn account_message_response_to_js(
         recipient_space_id: message.recipient_space_id,
         text: message.text,
         reply_post_id: message.reply_post_id,
-        reply_post_deleted: message.reply_post_deleted,
         reply_message_id: message.reply_message_id,
         liked: message.liked,
         viewer_liked: message.viewer_liked,
@@ -510,7 +506,6 @@ async fn message_conversation_activity_text(
         encrypted_message_key: activity.encrypted_message_key.clone(),
         text: String::new(),
         reply_post_id: activity.post_id,
-        reply_post_deleted: activity.post_deleted,
         reply_message_id: activity.reply_message_id.clone(),
         liked: false,
         viewer_liked: false,
@@ -537,7 +532,6 @@ async fn message_conversation_activity_to_js(
         text,
         post_id: activity.post_id,
         post_space_id: activity.post_space_id,
-        post_deleted: activity.post_deleted,
     })
 }
 
