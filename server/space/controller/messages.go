@@ -340,6 +340,7 @@ func toMessageResponse(message repo.SpaceMessageRecord) *models.MessageResponse 
 	if message.ReplyPostID.Valid {
 		replyPostID := message.ReplyPostID.Int64
 		resp.ReplyPostID = &replyPostID
+		resp.ReplyPostDeleted = message.ReplyPostDeleted
 	}
 	if message.ReplyMessageID.Valid {
 		replyMessageID := message.ReplyMessageID.String
@@ -381,6 +382,7 @@ func toMessageConversationActivityResponse(activity repo.SpaceMessageConversatio
 	if activity.PostID.Valid {
 		postID := activity.PostID.Int64
 		resp.PostID = &postID
+		resp.PostDeleted = activity.PostDeleted
 		if activity.PostSpaceID.Valid {
 			resp.PostSpaceID = activity.PostSpaceID.String
 		}

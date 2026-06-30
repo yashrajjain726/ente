@@ -610,6 +610,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Equal(t, "post_like", conversations[0].LatestActivity.Type)
 	require.True(t, conversations[0].LatestActivity.PostID.Valid)
 	require.Equal(t, postID, conversations[0].LatestActivity.PostID.Int64)
+	require.False(t, conversations[0].LatestActivity.PostDeleted)
 
 	postReply, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "post_reply",
@@ -629,6 +630,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.True(t, conversations[0].LatestActivity.MessageID.Valid)
 	require.Equal(t, postReply.MessageID, conversations[0].LatestActivity.MessageID.String)
 	require.Equal(t, postID, conversations[0].LatestActivity.PostID.Int64)
+	require.False(t, conversations[0].LatestActivity.PostDeleted)
 
 	replyOnlyPostID, err := testCreatePost(ctx, module, aliceID, aliceSpace.SpaceID, "reply-only-post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
@@ -650,6 +652,7 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.True(t, conversations[0].LatestActivity.MessageID.Valid)
 	require.Equal(t, replyOnly.MessageID, conversations[0].LatestActivity.MessageID.String)
 	require.Equal(t, replyOnlyPostID, conversations[0].LatestActivity.PostID.Int64)
+	require.False(t, conversations[0].LatestActivity.PostDeleted)
 
 	require.NoError(t, module.Posts.DeletePost(ctx, replyOnlyPostID, aliceSpace.SpaceID))
 
@@ -660,6 +663,11 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Equal(t, replyOnly.MessageID, conversations[0].LatestActivity.MessageID.String)
 	require.True(t, conversations[0].LatestActivity.PostID.Valid)
 	require.Equal(t, replyOnlyPostID, conversations[0].LatestActivity.PostID.Int64)
+	require.True(t, conversations[0].LatestActivity.PostDeleted)
+	thread, _, err := module.Messages.ListThread(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
+	require.NoError(t, err)
+	require.Equal(t, replyOnly.MessageID, thread[0].MessageID)
+	require.True(t, thread[0].ReplyPostDeleted)
 	latestActivityAt, err := module.Read.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(5500), latestActivityAt)

@@ -1450,18 +1450,8 @@ async fn message_actions_use_message_endpoints() {
             json!({
                 "messageId": "wmsg_reply",
                 "kind": "regular",
-                "sender": {
-                    "spaceId": "space_owner_main",
-                    "spaceSlug": "owner-main",
-                    "publicKey": encode_b64(&test_public_key(&ctx)),
-                    "keyVersion": 3
-                },
-                "recipient": {
-                    "spaceId": "space_friend",
-                    "spaceSlug": "friend",
-                    "publicKey": encode_b64(&friend_public_key),
-                    "keyVersion": 2
-                },
+                "senderSpaceId": "space_owner_main",
+                "recipientSpaceId": "space_friend",
                 "messageCipher": "cipher",
                 "encryptedMessageKey": "key",
                 "replyMessageId": "wmsg_parent",

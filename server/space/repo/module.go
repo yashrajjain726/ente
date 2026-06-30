@@ -125,6 +125,7 @@ type SpaceMessageRecord struct {
 	MessageCipher       []byte
 	EncryptedMessageKey []byte
 	ReplyPostID         sql.NullInt64
+	ReplyPostDeleted    bool
 	ReplyMessageID      sql.NullString
 	Liked               bool
 	ViewerLiked         bool
@@ -154,6 +155,7 @@ type SpaceMessageConversationActivityRecord struct {
 	ReplyMessageID      sql.NullString
 	PostID              sql.NullInt64
 	PostSpaceID         sql.NullString
+	PostDeleted         bool
 }
 
 type CreateSpaceMessageRecord struct {
