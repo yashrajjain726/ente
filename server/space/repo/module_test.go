@@ -1228,9 +1228,12 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	var likeCount int
 	err = module.Posts.DB.QueryRow(`SELECT COUNT(*) FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID).Scan(&likeCount)
 	require.NoError(t, err)
-	require.Zero(t, likeCount)
+	require.Equal(t, 1, likeCount)
 
 	require.NoError(t, module.Posts.DeletePost(ctx, postID, aliceSpace.SpaceID))
+	err = module.Posts.DB.QueryRow(`SELECT COUNT(*) FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID).Scan(&likeCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, likeCount)
 
 	_, err = module.Posts.GetPost(ctx, postID, bobSpace.SpaceID)
 	require.Error(t, err)

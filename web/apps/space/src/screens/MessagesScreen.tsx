@@ -1088,7 +1088,7 @@ const PostQuotePreview: React.FC<{
                             px: "12px",
                         }}
                     >
-                        Deleted post
+                        Deleted
                     </Box>
                 ) : (
                     <Box
