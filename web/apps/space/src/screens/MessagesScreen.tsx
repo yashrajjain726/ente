@@ -51,6 +51,8 @@ const quoteRule = "#EEEEEE";
 const dangerColor = "#F63A3A";
 const composerHeight = 48;
 const composerMaxHeight = 112;
+const messageBubblePaddingX = "16px";
+const messageBubblePaddingY = "14px";
 const composerPadding = 14;
 const composerPaddingLeft = 18;
 const postQuoteThumbnailSize = 164;
@@ -986,10 +988,11 @@ const QuoteFrame: React.FC<{
 );
 
 const MessageReplyPreview: React.FC<{
+    borderRadius: string;
     isOwn: boolean;
     parentMessage?: SpaceMessage;
     profile: SetupProfile;
-}> = ({ isOwn, parentMessage, profile }) => {
+}> = ({ borderRadius, isOwn, parentMessage, profile }) => {
     const isDeleted = !parentMessage || parentMessage.isDeleted;
     const parentIsOwn = parentMessage
         ? isCurrentProfileMessage(parentMessage, profile)
@@ -1002,17 +1005,17 @@ const MessageReplyPreview: React.FC<{
                     bgcolor: parentIsOwn
                         ? outgoingQuoteBubble
                         : incomingQuoteBubble,
-                    borderRadius: "18px",
+                    borderRadius,
                     color: parentIsOwn ? outgoingQuoteText : incomingQuoteText,
                     fontFamily: '"Inter Variable", Inter, sans-serif',
                     fontSize: 13,
                     fontWeight: 600,
                     lineHeight: "19px",
-                    maxWidth: "min(calc(100vw - 104px), 280px)",
+                    maxWidth: "100%",
                     minWidth: 0,
                     overflowWrap: "anywhere",
-                    px: "14px",
-                    py: "10px",
+                    px: messageBubblePaddingX,
+                    py: messageBubblePaddingY,
                     whiteSpace: "pre-wrap",
                     width: "fit-content",
                 }}
@@ -1283,6 +1286,7 @@ const MessageBubble: React.FC<{
                     )}
                     {hasMessageReply && (
                         <MessageReplyPreview
+                            borderRadius={bubbleBorderRadius}
                             isOwn={isOwn}
                             parentMessage={parentMessage}
                             profile={profile}
@@ -1319,8 +1323,8 @@ const MessageBubble: React.FC<{
                                 ml: 0,
                                 overflow: "visible",
                                 position: "relative",
-                                px: "16px",
-                                py: "14px",
+                                px: messageBubblePaddingX,
+                                py: messageBubblePaddingY,
                                 textAlign: "left",
                                 touchAction: "pan-y",
                                 userSelect: "none",
@@ -1909,7 +1913,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                             '"Inter Variable", Inter, sans-serif',
                                         fontSize: 18,
                                         fontWeight: 700,
-                                        gap: "8px",
                                         justifyContent: "center",
                                         lineHeight: "24px",
                                         m: 0,
@@ -1925,10 +1928,6 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                         },
                                     }}
                                 >
-                                    <Avatar
-                                        avatarUrl={selectedFriend.avatarUrl}
-                                        size={28}
-                                    />
                                     <Box
                                         component="span"
                                         sx={{
