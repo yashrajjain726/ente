@@ -2251,7 +2251,8 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                                               replyingTo.sender.fullName.trim() ||
                                                                   replyingTo
                                                                       .sender
-                                                                      .username,
+                                                                      .username ||
+                                                                  selectedName,
                                                           )}
                                                 </Box>
                                                 <Box

@@ -387,37 +387,18 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
     }, [profile, profileLoadStatus, router]);
 
     React.useEffect(() => {
-        if (!profile) return;
+        if (!profile?.spaceId) return;
         void refreshConversations();
-    }, [profile, refreshConversations]);
+    }, [profile?.spaceId, refreshConversations]);
 
     React.useEffect(() => {
         const previousSelectedSpaceId = previousSelectedSpaceIdRef.current;
         previousSelectedSpaceIdRef.current = selectedSpaceId;
 
-        if (!profile || selectedSpaceId || !previousSelectedSpaceId) return;
+        if (!profile?.spaceId || selectedSpaceId || !previousSelectedSpaceId)
+            return;
         void refreshConversations();
-    }, [profile, refreshConversations, selectedSpaceId]);
-
-    React.useEffect(() => {
-        if (!profile) return;
-
-        const refreshWhenVisible = () => {
-            if (document.visibilityState == "visible") {
-                void refreshConversations();
-            }
-        };
-
-        window.addEventListener("focus", refreshWhenVisible);
-        document.addEventListener("visibilitychange", refreshWhenVisible);
-        return () => {
-            window.removeEventListener("focus", refreshWhenVisible);
-            document.removeEventListener(
-                "visibilitychange",
-                refreshWhenVisible,
-            );
-        };
-    }, [profile, refreshConversations]);
+    }, [profile?.spaceId, refreshConversations, selectedSpaceId]);
 
     React.useEffect(() => {
         if (!selectedSpaceId || !selectedConversation) return;
@@ -534,24 +515,10 @@ export const SpaceMessagesPage: React.FC<SpaceMessagesPageProps> = ({
         return () => {
             cancelled = true;
         };
-    }, [
-        profile?.avatarObjectID,
-        profile?.avatarUpdatedAt,
-        profile?.avatarUrl,
-        profile?.fullName,
-        profile?.spaceId,
-        profile?.spaceSlug,
-        profile?.username,
-        selectedFriend?.avatarObjectID,
-        selectedFriend?.avatarUpdatedAt,
-        selectedFriend?.avatarUrl,
-        selectedFriend?.fullName,
-        selectedFriend?.id,
-        selectedFriend?.spaceId,
-        selectedFriend?.spaceSlug,
-        selectedFriend?.username,
-        selectedSpaceId,
-    ]);
+        // This fetch is keyed by thread identity. Actor display hydration should
+        // not clear and refetch the open thread.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [profile?.spaceId, selectedFriendSpaceId, selectedSpaceId]);
 
     if (profileLoadStatus != "ready" || !profile) {
         return (
