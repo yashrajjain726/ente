@@ -25,6 +25,23 @@ func (m *Module) ResetUserAccess(ctx context.Context, userID int64) error {
 	return stacktrace.Propagate(tx.Commit(), "")
 }
 
+func (m *Module) ResetAccountDeletionAccess(ctx context.Context, userID int64) error {
+	tx, err := m.Spaces.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
+
+	spaceIDs, err := getOwnedSpaceIDsTx(ctx, tx, userID)
+	if err != nil {
+		return err
+	}
+	if err := resetAccountDeletionAccessTx(ctx, tx, userID, spaceIDs); err != nil {
+		return err
+	}
+	return stacktrace.Propagate(tx.Commit(), "")
+}
+
 func (m *Module) DeleteUserData(ctx context.Context, userID int64) error {
 	tx, err := m.Spaces.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -69,7 +86,7 @@ func getOwnedSpaceIDsTx(ctx context.Context, tx *sql.Tx, userID int64) ([]string
 	return spaceIDs, stacktrace.Propagate(rows.Err(), "")
 }
 
-func resetSpaceAccessTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs []string) error {
+func resetAccountDeletionAccessTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs []string) error {
 	spaceIDArray := pq.Array(spaceIDs)
 	if _, err := tx.ExecContext(ctx, `DELETE FROM space_browser_sessions WHERE user_id = $1`, userID); err != nil {
 		return stacktrace.Propagate(err, "failed to delete space browser sessions")
@@ -77,8 +94,13 @@ func resetSpaceAccessTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM space_link_sessions WHERE space_id = ANY($1)`, spaceIDArray); err != nil {
 		return stacktrace.Propagate(err, "failed to delete space link sessions")
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE space_links SET active = FALSE WHERE space_id = ANY($1) AND active = TRUE`, spaceIDArray); err != nil {
-		return stacktrace.Propagate(err, "failed to disable space links")
+	return nil
+}
+
+func resetSpaceAccessTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs []string) error {
+	spaceIDArray := pq.Array(spaceIDs)
+	if err := resetAccountDeletionAccessTx(ctx, tx, userID, spaceIDs); err != nil {
+		return err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM space_friend_shares WHERE space_id = ANY($1) OR friend_space_id = ANY($1)`, spaceIDArray); err != nil {
 		return stacktrace.Propagate(err, "failed to delete space friend shares")
@@ -88,21 +110,6 @@ func resetSpaceAccessTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs 
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM space_notification_read_markers WHERE viewer_space_id = ANY($1) OR friend_space_id = ANY($1)`, spaceIDArray); err != nil {
 		return stacktrace.Propagate(err, "failed to delete space notification read markers")
-	}
-	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM space_messages
-		WHERE kind = 'post_like'
-		  AND (sender_space_id = ANY($1) OR recipient_space_id = ANY($1))
-	`, spaceIDArray); err != nil {
-		return stacktrace.Propagate(err, "failed to delete space post likes")
-	}
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE space_messages
-		SET recipient_liked_at = NULL
-		WHERE recipient_liked_at IS NOT NULL
-		  AND (sender_space_id = ANY($1) OR recipient_space_id = ANY($1))
-	`, spaceIDArray); err != nil {
-		return stacktrace.Propagate(err, "failed to delete space message likes")
 	}
 	return nil
 }
