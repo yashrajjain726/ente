@@ -87,12 +87,8 @@ func getOwnedSpaceIDsTx(ctx context.Context, tx *sql.Tx, userID int64) ([]string
 }
 
 func resetAccountDeletionAccessTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs []string) error {
-	spaceIDArray := pq.Array(spaceIDs)
 	if _, err := tx.ExecContext(ctx, `DELETE FROM space_browser_sessions WHERE user_id = $1`, userID); err != nil {
 		return stacktrace.Propagate(err, "failed to delete space browser sessions")
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM space_link_sessions WHERE space_id = ANY($1)`, spaceIDArray); err != nil {
-		return stacktrace.Propagate(err, "failed to delete space link sessions")
 	}
 	return nil
 }
@@ -232,9 +228,6 @@ func deleteSpaceRowsTx(ctx context.Context, tx *sql.Tx, userID int64, spaceIDs [
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM space_key_versions WHERE space_id = ANY($1)`, spaceIDArray); err != nil {
 		return stacktrace.Propagate(err, "failed to delete space key versions")
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM space_links WHERE space_id = ANY($1)`, spaceIDArray); err != nil {
-		return stacktrace.Propagate(err, "failed to delete space links")
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM spaces WHERE owner_id = $1`, userID); err != nil {
 		return stacktrace.Propagate(err, "failed to delete spaces")

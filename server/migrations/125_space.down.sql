@@ -1,8 +1,3 @@
-DROP TABLE IF EXISTS space_link_sessions;
-
-DROP TRIGGER IF EXISTS update_space_links_updated_at ON space_links;
-DROP TABLE IF EXISTS space_links;
-
 DROP TRIGGER IF EXISTS update_space_friend_requests_updated_at ON space_friend_requests;
 DROP TABLE IF EXISTS space_friend_requests;
 

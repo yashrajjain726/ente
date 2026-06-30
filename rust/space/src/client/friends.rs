@@ -1,11 +1,11 @@
 //! Space friends.
 //!
 //! Friendship in Spaces is a mutual share of each owner's Space key, sealed to
-//! the other's public key. These methods send and accept friend requests (by
-//! username or from a public link), list and remove friends, query a
-//! relationship, and re-seal shares to friends after a Space key rotation.
+//! the other's public key. These methods send and accept friend requests by
+//! username, list and remove friends, query a relationship, and re-seal shares
+//! to friends after a Space key rotation.
 
-use super::{AccountSpaceCtx, SpaceLinkCtx};
+use super::AccountSpaceCtx;
 use crate::crypto::seal_with_public_key;
 use crate::error::{Result, SpaceError};
 use crate::transport::{
@@ -57,17 +57,6 @@ impl AccountSpaceCtx {
         let target_public_key = decode_b64(&target.public_key)?;
         self.request_friend_with_target(space_id, &target.space_id, &target_public_key)
             .await
-    }
-
-    pub async fn add_friend_from_link(
-        &self,
-        space_id: &str,
-        link: &SpaceLinkCtx,
-    ) -> Result<FriendStatusResponse> {
-        let response = self
-            .request_friend_with_target(space_id, link.space_id(), link.owner_public_key())
-            .await?;
-        Ok(response)
     }
 
     pub async fn list_friend_requests(

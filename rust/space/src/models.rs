@@ -15,16 +15,6 @@ pub struct OpenAccountSpaceCtxInput {
 }
 
 #[derive(Debug, Clone)]
-pub struct OpenSpaceLinkCtxInput {
-    pub base_url: String,
-    pub space_username: String,
-    pub access_key: String,
-    pub user_agent: Option<String>,
-    pub client_package: Option<String>,
-    pub client_version: Option<String>,
-}
-
-#[derive(Debug, Clone)]
 pub struct CreatedSpace {
     pub space_id: String,
     pub space_slug: String,
@@ -32,15 +22,6 @@ pub struct CreatedSpace {
     pub space_key: Vec<u8>,
     pub root_wrapped_space_key: String,
     pub encrypted_profile: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct CreatedSpaceLink {
-    pub access_key: String,
-    pub space_username: String,
-    pub space_id: String,
-    pub space_slug: String,
-    pub key_version: i32,
 }
 
 #[derive(Debug, Clone)]

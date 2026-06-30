@@ -298,38 +298,3 @@ CREATE TRIGGER update_space_messages_updated_at
     BEFORE UPDATE ON space_messages
     FOR EACH ROW
 EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
-
-CREATE TABLE IF NOT EXISTS space_links (
-    space_id                TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    auth_key_hash          BYTEA   NOT NULL UNIQUE,
-    key_version            INTEGER NOT NULL,
-    link_wrapped_space_key BYTEA   NOT NULL,
-    encrypted_access_key   BYTEA   NOT NULL,
-    active                 BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at             BIGINT  NOT NULL DEFAULT now_utc_micro_seconds(),
-    updated_at             BIGINT  NOT NULL DEFAULT now_utc_micro_seconds()
-);
-
-CREATE INDEX IF NOT EXISTS idx_space_links_active
-    ON space_links (active, updated_at DESC);
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_space_links_active_space
-    ON space_links (space_id)
-    WHERE active = TRUE;
-
-CREATE TRIGGER update_space_links_updated_at
-    BEFORE UPDATE ON space_links
-    FOR EACH ROW
-EXECUTE PROCEDURE trigger_updated_at_microseconds_column();
-
-CREATE TABLE IF NOT EXISTS space_link_sessions (
-    token_hash           BYTEA PRIMARY KEY,
-    space_id              TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
-    auth_key_hash        BYTEA   NOT NULL,
-    key_version          INTEGER NOT NULL,
-    expires_at           BIGINT NOT NULL,
-    created_at           BIGINT NOT NULL DEFAULT now_utc_micro_seconds()
-);
-
-CREATE INDEX IF NOT EXISTS idx_space_link_sessions_space
-    ON space_link_sessions (space_id, expires_at DESC);

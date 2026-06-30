@@ -544,47 +544,6 @@ pub struct FriendShareResponse {
     pub key_version: i32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SpaceLinkStatusResponse {
-    pub space_id: String,
-    pub space_slug: String,
-    pub key_version: i32,
-    pub active: bool,
-    pub encrypted_access_key: String,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SpaceLinkCreateRequest {
-    pub auth_key: String,
-    pub key_version: i32,
-    pub link_wrapped_space_key: String,
-    pub encrypted_access_key: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SpaceLinkLoginRequest {
-    pub space_id: String,
-    pub auth_key: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SpaceLinkLoginResponse {
-    pub session_token: String,
-    pub space_id: String,
-    pub space_slug: String,
-    pub owner: String,
-    #[serde(default)]
-    pub public_key: String,
-    pub key_version: i32,
-    pub link_wrapped_space_key: String,
-}
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSpaceSlugRequest {

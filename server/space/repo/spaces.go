@@ -223,9 +223,6 @@ func (r *SpacesRepository) RotateKey(ctx context.Context, spaceID string, keyVer
 	`, rootWrappedSpaceKey, encryptedProfile, newVersion, spaceID); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
-	if err := deleteLinkTx(ctx, tx, spaceID); err != nil {
-		return nil, err
-	}
 	rec, err := scanSpaceRecord(tx.QueryRowContext(ctx, `
 		SELECT `+spaceRecordSelectColumns+`
 		FROM spaces s
