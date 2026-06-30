@@ -1982,7 +1982,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({
                                     py: "12px",
                                 }}
                             >
-                                {isThreadLoading ? (
+                                {isThreadLoading || isThreadRecipientLoading ? (
                                     <Box
                                         sx={{
                                             alignItems: "center",
