@@ -198,14 +198,18 @@ const conversationPreview = (conversation: SpaceMessageConversation) => {
     const text = activity.text ? truncateMessageText(activity.text) : "";
     if (activity.type == "post_reply") {
         if (text) {
-            return activity.outgoing
-                ? `You replied: ${text}`
-                : `Replied: ${text}`;
+            return activity.outgoing ? `You: ${text}` : text;
         }
         return "Replied";
     }
     if (activity.type == "message_like") {
-        return activity.outgoing ? "You liked a message" : "Liked a message";
+        return text
+            ? activity.outgoing
+                ? `You liked "${text}"`
+                : `Liked "${text}"`
+            : activity.outgoing
+              ? "You liked a message"
+              : "Liked a message";
     }
     if (text) {
         return activity.outgoing ? `You: ${text}` : text;
@@ -1145,11 +1149,11 @@ const MessageBubble: React.FC<{
     const hasMessageReply = Boolean(message.replyMessageId);
     const actionLabel = isSyntheticPostLike
         ? isOwn
-            ? "You liked their post"
+            ? "You liked a post"
             : "Liked your post"
         : isPostReply
           ? isOwn
-              ? "You replied to their post"
+              ? "You replied to a post"
               : "Replied to your post"
           : hasMessageReply
             ? isOwn

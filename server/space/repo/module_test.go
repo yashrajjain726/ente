@@ -592,6 +592,8 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Equal(t, "message_like", conversations[0].LatestActivity.Type)
 	require.True(t, conversations[0].LatestActivity.Outgoing)
 	require.Equal(t, bobMessage.MessageID, conversations[0].LatestActivity.MessageID.String)
+	require.Equal(t, testSpaceBytes("bob-message-cipher"), conversations[0].LatestActivity.MessageCipher)
+	require.Equal(t, testSpaceBytes("bob-message-recipient-key"), conversations[0].LatestActivity.EncryptedMessageKey)
 
 	postID, err := testCreatePost(ctx, module, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
@@ -972,6 +974,8 @@ func TestSpaceMessageConversationPreviewUsesLatestActivityWithSeparateUnreadStat
 	require.True(t, conversations[0].NotificationUnread)
 	require.Equal(t, "message_like", conversations[0].LatestActivity.Type)
 	require.Equal(t, aliceOldMessage.MessageID, conversations[0].LatestActivity.MessageID.String)
+	require.Equal(t, testSpaceBytes("alice-old-cipher"), conversations[0].LatestActivity.MessageCipher)
+	require.Equal(t, testSpaceBytes("alice-old-sender-key"), conversations[0].LatestActivity.EncryptedMessageKey)
 	require.Equal(t, int64(3000), conversations[0].SortCreatedAt)
 
 	latestActivityAt, err := module.Read.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
