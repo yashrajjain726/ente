@@ -2,6 +2,7 @@ import {
     ArrowLeft02Icon,
     Cancel01Icon,
     FavouriteIcon,
+    ImageDelete02Icon,
     Navigation03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -1071,6 +1072,8 @@ const PostQuotePreview: React.FC<{
             >
                 {isUnavailable ? (
                     <Box
+                        role="img"
+                        aria-label="Deleted post"
                         sx={{
                             alignItems: "center",
                             bgcolor: incomingQuoteBubble,
@@ -1088,7 +1091,11 @@ const PostQuotePreview: React.FC<{
                             px: "12px",
                         }}
                     >
-                        Deleted
+                        <HugeiconsIcon
+                            icon={ImageDelete02Icon}
+                            size={28}
+                            strokeWidth={1.5}
+                        />
                     </Box>
                 ) : (
                     <Box
