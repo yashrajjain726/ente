@@ -1,5 +1,5 @@
+import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
-import "package:ente_ui/theme/ente_theme.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
@@ -211,13 +211,17 @@ class _ItemListViewState extends State<ItemListView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.folder_off, size: 64, color: Colors.grey),
+            Icon(
+              Icons.folder_off,
+              size: 64,
+              color: context.componentColors.textLight,
+            ),
             const SizedBox(height: 16),
             Text(
               context.l10n.noFilesFound,
-              style: getEnteTextTheme(
-                context,
-              ).body.copyWith(color: Colors.grey),
+              style: TextStyles.body.copyWith(
+                color: context.componentColors.textLight,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -315,8 +319,7 @@ class FileListViewHelpers {
     required String searchQuery,
     required VoidCallback onTap,
   }) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     return Container(
       margin: const EdgeInsets.all(16.0),
       child: Card(
@@ -328,7 +331,7 @@ class FileListViewHelpers {
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                Icon(Icons.search, color: colorScheme.primary700, size: 24),
+                Icon(Icons.search, color: colors.primary, size: 24),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -336,16 +339,13 @@ class FileListViewHelpers {
                     children: [
                       Text(
                         context.l10n.searchEverywhereTitle(searchQuery),
-                        style: textTheme.large.copyWith(
-                          fontWeight: FontWeight.w500,
-                          color: colorScheme.primary700,
-                        ),
+                        style: TextStyles.large.copyWith(color: colors.primary),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         context.l10n.searchEverywhereSubtitle,
-                        style: textTheme.body.copyWith(
-                          color: colorScheme.textMuted,
+                        style: TextStyles.body.copyWith(
+                          color: colors.textLight,
                         ),
                       ),
                     ],
@@ -353,7 +353,7 @@ class FileListViewHelpers {
                 ),
                 Icon(
                   Icons.arrow_forward_ios,
-                  color: colorScheme.textMuted,
+                  color: colors.textLight,
                   size: 16,
                 ),
               ],
