@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:ente_ui/theme/ente_theme.dart';
+import 'package:ente_components/ente_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:locker/extensions/collection_extension.dart';
@@ -48,6 +48,7 @@ mixin SearchMixin<T extends StatefulWidget> on State<T> {
   }
 
   Widget buildSearchAction() {
+    final colors = context.componentColors;
     if (_isSearchActive) {
       return Flexible(
         child: Container(
@@ -63,17 +64,13 @@ mixin SearchMixin<T extends StatefulWidget> on State<T> {
             onChanged: _onSearchChanged,
             decoration: InputDecoration(
               hintText: context.l10n.searchHint,
-              hintStyle: TextStyle(
-                color: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
-              ),
+              hintStyle: TextStyles.body.copyWith(color: colors.textLight),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20.0),
                 borderSide: BorderSide.none,
               ),
               filled: true,
-              fillColor: getEnteColorScheme(context).backdropBase,
+              fillColor: context.componentColors.fillLight,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16.0,
                 vertical: 8.0,
@@ -86,24 +83,13 @@ mixin SearchMixin<T extends StatefulWidget> on State<T> {
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          Theme.of(context).textTheme.bodyMedium?.color
-                                  ?.withValues(alpha: 0.6) ??
-                              Colors.grey,
+                          colors.textLight,
                         ),
                       ),
                     )
-                  : Icon(
-                      Icons.search,
-                      size: 20,
-                      color: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
-                    ),
+                  : Icon(Icons.search, size: 20, color: colors.textLight),
             ),
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(context).textTheme.bodyMedium?.color,
-            ),
+            style: TextStyles.body,
           ),
         ),
       );
@@ -327,6 +313,9 @@ mixin SearchMixin<T extends StatefulWidget> on State<T> {
   bool get isSearchActive => _isSearchActive;
   bool get isSearching => _isSearching;
   TextEditingController get searchController => _searchController;
+  FocusNode get searchFocusNode => _searchFocusNode;
+
+  void updateSearchQuery(String query) => _onSearchChanged(query);
 
   /// Programmatically activate search with a specific query
   void activateSearchWithQuery(String query) {
