@@ -1,5 +1,4 @@
 import "package:ente_components/ente_components.dart";
-import "package:ente_ui/theme/ente_theme.dart";
 import "package:flutter/cupertino.dart";
 import "package:locker/l10n/l10n.dart";
 
@@ -10,12 +9,12 @@ Future<DateTime?> showDatePickerSheet(
   DateTime? minDate,
   bool startWithTime = false,
 }) {
-  final colorScheme = getEnteColorScheme(context);
+  final colors = context.componentColors;
   return showBottomSheetComponent<DateTime?>(
     context: context,
     builder: (sheetContext) => Container(
       decoration: BoxDecoration(
-        color: colorScheme.backgroundElevated,
+        color: colors.fillLight,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
@@ -78,9 +77,9 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
     return Container(
-      color: colorScheme.backgroundElevated,
+      color: colors.fillLight,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -93,7 +92,7 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
                 _showTimePicker
                     ? context.l10n.selectTime
                     : context.l10n.selectDate,
-                style: TextStyle(color: colorScheme.textBase, fontSize: 16),
+                style: TextStyle(color: colors.textBase, fontSize: 16),
               ),
             ),
           ),
@@ -102,7 +101,7 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
           Container(
             height: 220,
             decoration: BoxDecoration(
-              color: colorScheme.backgroundElevated2,
+              color: colors.fillLight,
               borderRadius: BorderRadius.circular(12),
             ),
             child: CupertinoTheme(
@@ -110,7 +109,7 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
                 brightness: Brightness.dark,
                 textTheme: CupertinoTextThemeData(
                   dateTimePickerTextStyle: TextStyle(
-                    color: colorScheme.textBase,
+                    color: colors.textBase,
                     fontSize: 22,
                   ),
                 ),
@@ -175,7 +174,7 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
                     _showTimePicker
                         ? context.l10n.previous
                         : context.l10n.cancel,
-                    style: TextStyle(color: colorScheme.textBase, fontSize: 14),
+                    style: TextStyle(color: colors.textBase, fontSize: 14),
                   ),
                   onPressed: () {
                     if (_showTimePicker) {
@@ -195,7 +194,7 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
                   child: Text(
                     _showTimePicker ? context.l10n.done : context.l10n.next,
                     style: TextStyle(
-                      color: colorScheme.primary700,
+                      color: colors.primary,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),

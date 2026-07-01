@@ -7,7 +7,6 @@ import "package:ente_components/ente_components.dart";
 import 'package:ente_events/event_bus.dart';
 import "package:ente_events/models/trigger_logout_event.dart";
 import "package:ente_ui/components/alert_bottom_sheet.dart";
-import 'package:ente_ui/theme/ente_theme.dart';
 import 'package:ente_ui/utils/dialog_util.dart';
 import "package:ente_utils/email_util.dart";
 import 'package:flutter/material.dart';
@@ -38,39 +37,34 @@ import 'package:logging/logging.dart';
 class CustomLockerAppBar extends StatelessWidget
     implements PreferredSizeWidget {
   final GlobalKey<ScaffoldState> scaffoldKey;
-  final bool isSearchActive;
   final bool isSyncing;
   final TextEditingController searchController;
   final FocusNode searchFocusNode;
-  final VoidCallback onSearchFocused;
   final VoidCallback onClearSearch;
   final ValueChanged<String>? onSearchChanged;
 
   const CustomLockerAppBar({
     super.key,
     required this.scaffoldKey,
-    required this.isSearchActive,
     this.isSyncing = false,
     required this.searchController,
     required this.searchFocusNode,
-    required this.onSearchFocused,
     required this.onClearSearch,
     this.onSearchChanged,
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(156);
+  Size get preferredSize => const Size.fromHeight(140);
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
-    final hasQuery = searchController.text.isNotEmpty;
-    final showClearIcon = isSearchActive || hasQuery;
+    final colors = context.componentColors;
+    final hasQuery = searchController.text.trim().isNotEmpty;
+    final showClearIcon = searchFocusNode.hasFocus || hasQuery;
 
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.primary700,
+        color: colors.primary,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(20),
           bottomRight: Radius.circular(20),
@@ -90,11 +84,11 @@ class CustomLockerAppBar extends StatelessWidget
                       onTap: () {
                         scaffoldKey.currentState!.openDrawer();
                       },
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: HugeIcon(
                           icon: HugeIcons.strokeRoundedMenu01,
-                          color: Colors.white,
+                          color: colors.specialWhite,
                           strokeWidth: 2.25,
                         ),
                       ),
@@ -104,21 +98,21 @@ class CustomLockerAppBar extends StatelessWidget
                       ? Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const SizedBox(
+                            SizedBox(
                               width: 16,
                               height: 16,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
+                                  colors.specialWhite,
                                 ),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Text(
                               context.l10n.syncing,
-                              style: textTheme.body.copyWith(
-                                color: Colors.white,
+                              style: TextStyles.body.copyWith(
+                                color: colors.specialWhite,
                               ),
                             ),
                           ],
@@ -128,65 +122,47 @@ class CustomLockerAppBar extends StatelessWidget
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(100),
+              padding: const EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: 16,
+              ),
+              child: TextInputComponent(
+                controller: searchController,
+                focusNode: searchFocusNode,
+                hintText: context.l10n.searchHint,
+                onChanged: onSearchChanged,
+                autocorrect: false,
+                shouldUnfocusOnClearOrSubmit: true,
+                backgroundColor: colors.specialWhite,
+                textColor: Colors.black,
+                prefix: HugeIcon(
+                  icon: HugeIcons.strokeRoundedSearch01,
+                  color: colors.primary,
+                  size: 20,
+                  strokeWidth: 1.75,
                 ),
-                child: TextField(
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  controller: searchController,
-                  focusNode: searchFocusNode,
-                  onTap: onSearchFocused,
-                  cursorColor: colorScheme.primary700,
-                  onChanged: onSearchChanged,
-                  textAlignVertical: TextAlignVertical.center,
-                  decoration: InputDecoration(
-                    hintText: context.l10n.searchHint,
-                    hintStyle: textTheme.smallBold.copyWith(
-                      color: colorScheme.iconColor,
-                    ),
-                    border: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    prefixIcon: Padding(
-                      padding: const EdgeInsets.only(left: 16, right: 8),
-                      child: HugeIcon(
-                        icon: HugeIcons.strokeRoundedSearch01,
-                        color: colorScheme.primary700,
-                        size: 20,
-                        strokeWidth: 1.75,
-                      ),
-                    ),
-                    prefixIconConstraints: const BoxConstraints(
-                      minWidth: 44,
-                      minHeight: 24,
-                    ),
-                    suffixIcon: showClearIcon
-                        ? IconButton(
-                            onPressed: onClearSearch,
-                            splashRadius: 20,
-                            padding: const EdgeInsets.only(right: 16, left: 8),
-                            icon: HugeIcon(
-                              icon: HugeIcons.strokeRoundedCancel01,
-                              color: colorScheme.iconColor,
-                              size: 20,
-                            ),
-                          )
-                        : null,
-                    suffixIconConstraints: const BoxConstraints(
-                      minWidth: 44,
-                      minHeight: 44,
-                    ),
-                  ),
-                  style: TextStyle(color: colorScheme.iconColor),
-                ),
+                suffix: showClearIcon
+                    ? IconButton(
+                        onPressed: onClearSearch,
+                        splashRadius: 1,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 24,
+                          height: 24,
+                        ),
+                        visualDensity: const VisualDensity(
+                          horizontal: -1,
+                          vertical: -1,
+                        ),
+                        icon: HugeIcon(
+                          icon: HugeIcons.strokeRoundedCancel01,
+                          color: colors.textLighter,
+                          size: 20,
+                        ),
+                      )
+                    : null,
               ),
             ),
           ],
@@ -212,7 +188,6 @@ class _HomePageState extends UploaderPageState<HomePage>
     scaffoldKey: scaffoldKey,
   );
   final scaffoldKey = GlobalKey<ScaffoldState>();
-  final _searchFocusNode = FocusNode();
   final _selectedFiles = SelectedFiles();
   final _scrollController = ScrollController();
   bool _isLoading = true;
@@ -278,6 +253,8 @@ class _HomePageState extends UploaderPageState<HomePage>
   void initState() {
     super.initState();
 
+    searchFocusNode.addListener(_onSearchFocusChanged);
+
     _loadCollections();
 
     // Initialize sharing functionality to handle shared files
@@ -320,7 +297,7 @@ class _HomePageState extends UploaderPageState<HomePage>
 
   @override
   void dispose() {
-    _searchFocusNode.dispose();
+    searchFocusNode.removeListener(_onSearchFocusChanged);
     _scrollController.dispose();
     _displayedFilesNotifier.dispose();
     _deepLinkSubscription?.cancel();
@@ -584,29 +561,35 @@ class _HomePageState extends UploaderPageState<HomePage>
   }
 
   void _handleSearchChange(String query) {
-    // Trigger search by activating search with the current query
-    activateSearchWithQuery(query);
+    updateSearchQuery(query);
   }
 
-  void _handleSearchFocused() {
-    // Activate search when TextField is tapped/focused
-    if (!isSearchActive) {
+  void _onSearchFocusChanged() {
+    if (!mounted) return;
+    if (searchFocusNode.hasFocus && !isSearchActive) {
       activateSearchWithQuery('');
+      return;
     }
+    if (!searchFocusNode.hasFocus &&
+        isSearchActive &&
+        searchController.text.trim().isEmpty) {
+      dismissSearch();
+      return;
+    }
+    setState(() {});
   }
 
   void _handleClearSearch() {
     // Clear text and unfocus before dismissing search
     searchController.clear();
-    _searchFocusNode.unfocus();
+    searchFocusNode.unfocus();
 
     dismissSearch();
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final componentColors = context.componentColors;
+    final colors = context.componentColors;
     return UserDetailsStateWidget(
       child: ListenableBuilder(
         listenable: _selectedFiles,
@@ -639,10 +622,10 @@ class _HomePageState extends UploaderPageState<HomePage>
               onKeyEvent: handleKeyEvent,
               child: Scaffold(
                 key: scaffoldKey,
-                backgroundColor: colorScheme.backgroundBase,
+                backgroundColor: colors.backgroundBase,
                 drawer: Drawer(
                   width: 428,
-                  backgroundColor: componentColors.backgroundBase,
+                  backgroundColor: colors.backgroundBase,
                   child: _settingsPage,
                 ),
                 drawerEnableOpenDragGesture: false,
@@ -654,11 +637,9 @@ class _HomePageState extends UploaderPageState<HomePage>
                 },
                 appBar: CustomLockerAppBar(
                   scaffoldKey: scaffoldKey,
-                  isSearchActive: isSearchActive,
                   isSyncing: _isSyncing,
                   searchController: searchController,
-                  searchFocusNode: _searchFocusNode,
-                  onSearchFocused: _handleSearchFocused,
+                  searchFocusNode: searchFocusNode,
                   onClearSearch: _handleClearSearch,
                   onSearchChanged: _handleSearchChange,
                 ),
@@ -703,11 +684,11 @@ class _HomePageState extends UploaderPageState<HomePage>
                             tooltip: 'Add item',
                             onPressed: _openSavePage,
                             shape: const CircleBorder(),
-                            backgroundColor: colorScheme.primary700,
+                            backgroundColor: colors.primary,
                             elevation: 0,
-                            child: const HugeIcon(
+                            child: HugeIcon(
                               icon: HugeIcons.strokeRoundedPlusSign,
-                              color: Colors.white,
+                              color: colors.specialWhite,
                             ),
                           );
                         },
@@ -774,7 +755,7 @@ class _HomePageState extends UploaderPageState<HomePage>
                 padding: EdgeInsets.only(
                   left: 16.0,
                   right: 16.0,
-                  top: 32.0,
+                  top: 16.0,
                   bottom: scrollBottomPadding,
                 ),
                 child: Column(

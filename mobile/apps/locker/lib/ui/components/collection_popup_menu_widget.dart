@@ -1,4 +1,4 @@
-import "package:ente_ui/theme/ente_theme.dart";
+import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/l10n/l10n.dart";
@@ -20,27 +20,27 @@ class CollectionPopupMenuWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
 
     return PopupMenuButton<String>(
       onSelected: (value) => _handleMenuAction(context, value),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.strokeFaint),
+        side: BorderSide(color: colors.strokeFaint),
       ),
       padding: EdgeInsets.zero,
       menuPadding: EdgeInsets.zero,
-      color: colorScheme.backdropBase,
+      color: colors.fillLight,
       surfaceTintColor: Colors.transparent,
       elevation: 15,
       offset: const Offset(-24, 24),
-      shadowColor: Colors.black.withValues(alpha: 0.08),
+      shadowColor: colors.specialScrim.withValues(alpha: 0.08),
       constraints: const BoxConstraints(minWidth: 120),
       child:
           child ??
           HugeIcon(
             icon: HugeIcons.strokeRoundedMoreVertical,
-            color: colorScheme.textBase,
+            color: colors.textBase,
           ),
       itemBuilder: (BuildContext context) {
         return _buildPopupMenuItems(context);
@@ -49,7 +49,7 @@ class CollectionPopupMenuWidget extends StatelessWidget {
   }
 
   List<PopupMenuItem<String>> _buildPopupMenuItems(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
 
     final collectionViewType = getCollectionViewType(
       collection,
@@ -69,7 +69,7 @@ class CollectionPopupMenuWidget extends StatelessWidget {
           child: PopupMenuItemWidget(
             icon: HugeIcon(
               icon: HugeIcons.strokeRoundedEdit02,
-              color: colorScheme.textBase,
+              color: colors.textBase,
               size: 20,
             ),
             label: context.l10n.edit,
@@ -87,7 +87,7 @@ class CollectionPopupMenuWidget extends StatelessWidget {
           child: PopupMenuItemWidget(
             icon: HugeIcon(
               icon: HugeIcons.strokeRoundedDelete01,
-              color: colorScheme.warning500,
+              color: colors.warning,
               size: 20,
             ),
             label: context.l10n.delete,
@@ -109,7 +109,7 @@ class CollectionPopupMenuWidget extends StatelessWidget {
           child: PopupMenuItemWidget(
             icon: HugeIcon(
               icon: HugeIcons.strokeRoundedLogout02,
-              color: colorScheme.warning500,
+              color: colors.warning,
               size: 20,
             ),
             label: context.l10n.leaveCollection,

@@ -1,17 +1,18 @@
+import 'package:ente_components/ente_components.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 
+enum FileIconColorRole { warning, green, primary, neutral }
+
 class FileIconConfig {
   final dynamic icon;
-  final Color color;
-  final Color backgroundColor;
   final Set<String> extensions;
+  final FileIconColorRole colorRole;
 
   const FileIconConfig({
     required this.icon,
-    required this.color,
-    required this.backgroundColor,
     required this.extensions,
+    required this.colorRole,
   });
 }
 
@@ -21,34 +22,29 @@ class FileIconUtils {
     'pdf': FileIconConfig(
       extensions: {'.pdf'},
       icon: HugeIcons.strokeRoundedFile01,
-      color: Color.fromRGBO(246, 58, 58, 1),
-      backgroundColor: Color.fromRGBO(255, 58, 58, 0.06),
+      colorRole: FileIconColorRole.warning,
     ),
     'image': FileIconConfig(
       extensions: {'.jpg', '.png', '.heic'},
       icon: HugeIcons.strokeRoundedImage01,
-      color: Color.fromRGBO(8, 194, 37, 1),
-      backgroundColor: Color.fromRGBO(8, 194, 37, 0.06),
+      colorRole: FileIconColorRole.green,
     ),
     'presentation': FileIconConfig(
       extensions: {'.pptx'},
       icon: HugeIcons.strokeRoundedPresentation01,
-      color: Color.fromRGBO(16, 113, 255, 1),
-      backgroundColor: Color.fromRGBO(16, 113, 255, 0.06),
+      colorRole: FileIconColorRole.primary,
     ),
     'spreadsheet': FileIconConfig(
       extensions: {'.xlsx'},
       icon: HugeIcons.strokeRoundedTable01,
-      color: Color(0xFF388E3C),
-      backgroundColor: Color(0xFFE8F5E9),
+      colorRole: FileIconColorRole.green,
     ),
   };
 
   static const FileIconConfig _defaultConfig = FileIconConfig(
     extensions: {},
     icon: HugeIcons.strokeRoundedFile02,
-    color: Color(0xFF757575),
-    backgroundColor: Color(0xFFFAFAFA),
+    colorRole: FileIconColorRole.neutral,
   );
 
   static FileIconConfig _getFileConfig(String fileName) {
@@ -71,13 +67,21 @@ class FileIconUtils {
   }
 
   static Widget getFileIcon(
+    BuildContext context,
     String fileName, {
     bool showBackground = true,
     double size = 24,
+    Color? backgroundColor,
   }) {
+    final colors = context.componentColors;
     final config = _getFileConfig(fileName);
+    final foregroundColor = _foregroundColor(config.colorRole, colors);
 
-    final icon = HugeIcon(icon: config.icon, color: config.color, size: size);
+    final icon = HugeIcon(
+      icon: config.icon,
+      color: foregroundColor,
+      size: size,
+    );
 
     if (!showBackground) {
       return icon;
@@ -85,18 +89,45 @@ class FileIconUtils {
 
     return Container(
       decoration: BoxDecoration(
-        color: config.backgroundColor,
+        color: backgroundColor ?? _backgroundColor(config.colorRole, colors),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Padding(padding: const EdgeInsets.all(8.0), child: icon),
     );
   }
 
-  Color getFileIconColor(String fileName) {
-    return _getFileConfig(fileName).color;
+  static Color getFileIconColor(BuildContext context, String fileName) {
+    return _foregroundColor(
+      _getFileConfig(fileName).colorRole,
+      context.componentColors,
+    );
   }
 
-  Color getFileIconBackgroundColor(String fileName) {
-    return _getFileConfig(fileName).backgroundColor;
+  static Color getFileIconBackgroundColor(
+    BuildContext context,
+    String fileName,
+  ) {
+    return _backgroundColor(
+      _getFileConfig(fileName).colorRole,
+      context.componentColors,
+    );
+  }
+
+  static Color _foregroundColor(FileIconColorRole role, ColorTokens colors) {
+    return switch (role) {
+      FileIconColorRole.warning => colors.warning,
+      FileIconColorRole.green => colors.green,
+      FileIconColorRole.primary => colors.primary,
+      FileIconColorRole.neutral => colors.textLight,
+    };
+  }
+
+  static Color _backgroundColor(FileIconColorRole role, ColorTokens colors) {
+    return switch (role) {
+      FileIconColorRole.warning => colors.warningLight,
+      FileIconColorRole.green => colors.greenLight,
+      FileIconColorRole.primary => colors.primaryLight,
+      FileIconColorRole.neutral => colors.fillLight,
+    };
   }
 }

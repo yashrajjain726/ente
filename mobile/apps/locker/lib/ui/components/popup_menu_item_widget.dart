@@ -1,4 +1,4 @@
-import "package:ente_ui/theme/ente_theme.dart";
+import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
 
 class PopupMenuItemWidget extends StatelessWidget {
@@ -21,19 +21,16 @@ class PopupMenuItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: colorScheme.backdropBase,
+          color: colors.fillLight,
           border: !isLast
-              ? Border(
-                  bottom: BorderSide(color: colorScheme.strokeFaint, width: 1),
-                )
+              ? Border(bottom: BorderSide(color: colors.strokeFaint, width: 1))
               : null,
           borderRadius: BorderRadius.only(
             topLeft: isFirst ? const Radius.circular(15) : Radius.zero,
@@ -56,8 +53,8 @@ class PopupMenuItemWidget extends StatelessWidget {
               child: Text(
                 label,
                 style: isWarning
-                    ? textTheme.body.copyWith(color: colorScheme.warning500)
-                    : textTheme.body,
+                    ? TextStyles.body.copyWith(color: colors.warning)
+                    : TextStyles.body,
               ),
             ),
           ],
