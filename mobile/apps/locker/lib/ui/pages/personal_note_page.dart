@@ -316,6 +316,7 @@ class _PersonalNotePageState
     _titleFocusNode.canRequestFocus = isEditing;
 
     final colors = context.componentColors;
+    final titleStyle = TextStyles.h2.copyWith(fontSize: 24);
 
     return TextField(
       controller: _nameController,
@@ -323,16 +324,13 @@ class _PersonalNotePageState
       readOnly: !isEditing,
       showCursor: isEditing,
       enableInteractiveSelection: true,
-      style: TextStyles.h2.copyWith(fontSize: 24),
+      style: titleStyle,
       decoration: InputDecoration(
         border: InputBorder.none,
         isDense: true,
         contentPadding: EdgeInsets.zero,
         hintText: context.l10n.noteNameHint,
-        hintStyle: TextStyles.h2.copyWith(
-          fontSize: 24,
-          color: colors.textLighter,
-        ),
+        hintStyle: titleStyle.copyWith(color: colors.textLighter),
       ),
       textCapitalization: TextCapitalization.sentences,
       maxLines: 1,

@@ -3,7 +3,6 @@ import "dart:async";
 import 'package:ente_components/ente_components.dart';
 import "package:ente_events/event_bus.dart";
 import 'package:ente_ui/components/buttons/button_widget.dart';
-import "package:ente_ui/components/title_bar_title_widget.dart";
 import 'package:ente_ui/utils/dialog_util.dart';
 import 'package:ente_ui/utils/toast_util.dart';
 import 'package:flutter/material.dart';
@@ -108,24 +107,33 @@ class _TrashPageState extends State<TrashPage> {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
+    final hasTrashFiles = _trashFiles.isNotEmpty;
 
     return Scaffold(
       backgroundColor: colors.backgroundBase,
-      appBar: AppBar(
-        backgroundColor: colors.backgroundBase,
-        surfaceTintColor: Colors.transparent,
-        toolbarHeight: 48,
-        leadingWidth: 48,
-        leading: GestureDetector(
-          onTap: () {
-            Navigator.pop(context);
-          },
-          child: const Icon(Icons.arrow_back_outlined, semanticLabel: "Back"),
-        ),
-      ),
       body: Stack(
         children: [
-          _buildBody(context, colors),
+          AppBarComponent(
+            title: context.l10n.trash,
+            subtitle: hasTrashFiles
+                ? context.l10n.items(_trashFiles.length)
+                : null,
+            actions: hasTrashFiles
+                ? [
+                    IconButtonComponent(
+                      icon: HugeIcon(
+                        icon: HugeIcons.strokeRoundedDelete02,
+                        color: colors.warning,
+                      ),
+                      variant: IconButtonComponentVariant.primary,
+                      shouldSurfaceExecutionStates: false,
+                      onTap: _emptyTrash,
+                    ),
+                  ]
+                : const [],
+            controller: _scrollController,
+            slivers: _buildSlivers(context),
+          ),
           FileSelectionOverlayBar(
             selectedFiles: _selectedFiles,
             files: _trashFiles.cast<EnteFile>(),
@@ -137,49 +145,30 @@ class _TrashPageState extends State<TrashPage> {
     );
   }
 
-  Widget _buildBody(BuildContext context, ColorTokens colors) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TitleBarTitleWidget(
-            title: context.l10n.trash,
-            trailingWidgets: [
-              if (_trashFiles.isNotEmpty)
-                GestureDetector(
-                  onTap: _emptyTrash,
-                  child: Container(
-                    height: 44,
-                    width: 44,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: colors.fillLight,
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: HugeIcon(
-                      icon: HugeIcons.strokeRoundedDelete02,
-                      color: colors.textBase,
-                    ),
-                  ),
-                ),
-            ],
+  List<Widget> _buildSlivers(BuildContext context) {
+    if (_trashFiles.isEmpty) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: _TrashEmptyState(title: context.l10n.yourTrashIsEmpty),
+        ),
+      ];
+    }
+
+    final safeBottomInset = MediaQuery.of(context).padding.bottom;
+    final bottomPadding = safeBottomInset + 24.0;
+    return [
+      SliverPadding(
+        padding: EdgeInsets.fromLTRB(16.0, 0, 16.0, bottomPadding),
+        sliver: SliverToBoxAdapter(
+          child: ItemListView(
+            files: _trashFiles.cast<EnteFile>(),
+            selectedFiles: _selectedFiles,
+            selectionEnabled: true,
           ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: _trashFiles.isEmpty
-                ? _TrashEmptyState(title: context.l10n.yourTrashIsEmpty)
-                : ItemListView(
-                    files: _trashFiles.cast<EnteFile>(),
-                    physics: const BouncingScrollPhysics(),
-                    scrollController: _scrollController,
-                    selectedFiles: _selectedFiles,
-                    selectionEnabled: true,
-                  ),
-          ),
-        ],
+        ),
       ),
-    );
+    ];
   }
 }
 

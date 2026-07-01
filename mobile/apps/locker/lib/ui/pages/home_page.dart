@@ -40,6 +40,7 @@ class CustomLockerAppBar extends StatelessWidget
   final bool isSyncing;
   final TextEditingController searchController;
   final FocusNode searchFocusNode;
+  final bool isSearchActive;
   final VoidCallback onClearSearch;
   final ValueChanged<String>? onSearchChanged;
 
@@ -49,6 +50,7 @@ class CustomLockerAppBar extends StatelessWidget
     this.isSyncing = false,
     required this.searchController,
     required this.searchFocusNode,
+    this.isSearchActive = false,
     required this.onClearSearch,
     this.onSearchChanged,
   });
@@ -60,7 +62,7 @@ class CustomLockerAppBar extends StatelessWidget
   Widget build(BuildContext context) {
     final colors = context.componentColors;
     final hasQuery = searchController.text.trim().isNotEmpty;
-    final showClearIcon = searchFocusNode.hasFocus || hasQuery;
+    final showClearIcon = isSearchActive || hasQuery;
 
     return Container(
       decoration: BoxDecoration(
@@ -191,6 +193,7 @@ class _HomePageState extends UploaderPageState<HomePage>
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final _selectedFiles = SelectedFiles();
   final _scrollController = ScrollController();
+  final _keyboardFocusNode = FocusNode();
   bool _isLoading = true;
   bool _hasCompletedInitialLoad = false;
   bool _isSettingsOpen = false;
@@ -211,6 +214,7 @@ class _HomePageState extends UploaderPageState<HomePage>
   StreamSubscription? _mediaStreamSubscription;
   StreamSubscription<Uri>? _deepLinkSubscription;
   StreamSubscription<TriggerLogoutEvent>? _triggerLogoutSubscription;
+  StreamSubscription<CollectionsUpdatedEvent>? _collectionsUpdatedSubscription;
 
   @override
   void onFileUploadComplete() {
@@ -285,9 +289,11 @@ class _HomePageState extends UploaderPageState<HomePage>
       });
     }
 
-    Bus.instance.on<CollectionsUpdatedEvent>().listen((event) async {
-      await _loadCollections();
-    });
+    _collectionsUpdatedSubscription = Bus.instance
+        .on<CollectionsUpdatedEvent>()
+        .listen((event) async {
+          await _loadCollections();
+        });
 
     _triggerLogoutSubscription = Bus.instance.on<TriggerLogoutEvent>().listen((
       event,
@@ -299,10 +305,12 @@ class _HomePageState extends UploaderPageState<HomePage>
   @override
   void dispose() {
     searchFocusNode.removeListener(_onSearchFocusChanged);
+    _keyboardFocusNode.dispose();
     _scrollController.dispose();
     _displayedFilesNotifier.dispose();
     _deepLinkSubscription?.cancel();
     _triggerLogoutSubscription?.cancel();
+    _collectionsUpdatedSubscription?.cancel();
     disposeSharing();
     super.dispose();
   }
@@ -571,12 +579,6 @@ class _HomePageState extends UploaderPageState<HomePage>
       activateSearchWithQuery('');
       return;
     }
-    if (!searchFocusNode.hasFocus &&
-        isSearchActive &&
-        searchController.text.trim().isEmpty) {
-      dismissSearch();
-      return;
-    }
     setState(() {});
   }
 
@@ -619,7 +621,7 @@ class _HomePageState extends UploaderPageState<HomePage>
               }
             },
             child: KeyboardListener(
-              focusNode: FocusNode(),
+              focusNode: _keyboardFocusNode,
               onKeyEvent: handleKeyEvent,
               child: Scaffold(
                 key: scaffoldKey,
@@ -641,6 +643,7 @@ class _HomePageState extends UploaderPageState<HomePage>
                   isSyncing: _isSyncing,
                   searchController: searchController,
                   searchFocusNode: searchFocusNode,
+                  isSearchActive: isSearchActive,
                   onClearSearch: _handleClearSearch,
                   onSearchChanged: _handleSearchChange,
                 ),

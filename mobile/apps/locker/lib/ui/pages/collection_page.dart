@@ -2,7 +2,6 @@ import "dart:async";
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
-import "package:ente_ui/components/title_bar_title_widget.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
@@ -55,6 +54,7 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
 
   final _selectedFiles = SelectedFiles();
   final _scrollController = ScrollController();
+  final _keyboardFocusNode = FocusNode();
 
   @override
   void onFileUploadComplete() {
@@ -99,6 +99,7 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
   @override
   void dispose() {
     _collectionUpdateSubscription.cancel();
+    _keyboardFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -184,26 +185,20 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
     final colors = context.componentColors;
 
     return KeyboardListener(
-      focusNode: FocusNode(),
+      focusNode: _keyboardFocusNode,
       onKeyEvent: handleKeyEvent,
       child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: colors.backgroundBase,
-          surfaceTintColor: Colors.transparent,
-          toolbarHeight: 48,
-          leadingWidth: 48,
-          leading: GestureDetector(
-            onTap: () {
-              Navigator.pop(context);
-            },
-            child: const Icon(Icons.arrow_back_outlined),
-          ),
-        ),
         backgroundColor: colors.backgroundBase,
         body: Stack(
           alignment: Alignment.bottomCenter,
           children: [
-            _buildBody(colors),
+            AppBarComponent(
+              title: _collection.displayName ?? context.l10n.untitled,
+              subtitle: context.l10n.items(_displayedFiles.length),
+              actions: _buildActions(),
+              controller: _scrollController,
+              slivers: _buildSlivers(context),
+            ),
             FileSelectionOverlayBar(
               files: _displayedFiles,
               selectedFiles: _selectedFiles,
@@ -216,129 +211,101 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
     );
   }
 
-  Widget _buildShareButton(ColorTokens colors) {
-    if (isFavorite) {
-      return const SizedBox.shrink();
+  List<Widget> _buildActions() {
+    if (widget.isUncategorized || isFavorite) {
+      return const [];
     }
+
+    final actions = <Widget>[];
+
     final canShare =
         collectionViewType == CollectionViewType.ownedCollection ||
         collectionViewType == CollectionViewType.hiddenOwnedCollection ||
         collectionViewType == CollectionViewType.sharedCollectionViewer ||
         collectionViewType == CollectionViewType.sharedCollectionCollaborator ||
         isQuickLink;
-    if (!canShare) {
-      return const SizedBox.shrink();
+    if (canShare) {
+      actions.add(
+        IconButtonComponent(
+          icon: const HugeIcon(icon: HugeIcons.strokeRoundedShare08),
+          variant: IconButtonComponentVariant.primary,
+          onTap: _shareCollection,
+        ),
+      );
     }
-    return GestureDetector(
-      onTap: _shareCollection,
-      child: Container(
-        height: 44,
-        width: 44,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: colors.fillLight,
-        ),
-        padding: const EdgeInsets.all(12),
-        child: HugeIcon(
-          icon: HugeIcons.strokeRoundedShare08,
-          color: colors.textBase,
-        ),
-      ),
-    );
-  }
 
-  Widget _buildMenuButton(ColorTokens colors) {
-    if (isFavorite) {
-      return SizedBox.fromSize();
-    }
     final canManageCollection =
         collectionViewType == CollectionViewType.ownedCollection ||
         collectionViewType == CollectionViewType.hiddenOwnedCollection ||
         collectionViewType == CollectionViewType.sharedCollectionViewer ||
         collectionViewType == CollectionViewType.sharedCollectionCollaborator ||
         collectionViewType == CollectionViewType.quickLink;
-    if (!canManageCollection) {
-      return SizedBox.fromSize();
-    }
-
-    return CollectionPopupMenuWidget(
-      collection: _collection,
-      child: Container(
-        height: 44,
-        width: 44,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: colors.fillLight,
+    if (canManageCollection) {
+      actions.add(
+        CollectionPopupMenuWidget(
+          collection: _collection,
+          child: IgnorePointer(
+            child: IconButtonComponent(
+              icon: const HugeIcon(icon: HugeIcons.strokeRoundedMoreVertical),
+              variant: IconButtonComponentVariant.primary,
+              shouldSurfaceExecutionStates: false,
+              onTap: () {},
+            ),
+          ),
         ),
-        padding: const EdgeInsets.all(12),
-        child: HugeIcon(
-          icon: HugeIcons.strokeRoundedMoreVertical,
-          color: colors.textBase,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBody(ColorTokens colors) {
-    if (isSearchActive) {
-      return SearchResultView(
-        collections: const [], // CollectionPage primarily shows files
-        files: _filteredFiles,
-        searchQuery: searchQuery,
-        isHomePage: false,
-        onSearchEverywhere: _searchEverywhere,
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TitleBarTitleWidget(
-                title: _collection.displayName ?? context.l10n.untitled,
-                trailingWidgets: widget.isUncategorized
-                    ? const []
-                    : [
-                        _buildShareButton(colors),
-                        const SizedBox(width: 12),
-                        _buildMenuButton(colors),
-                      ],
-              ),
-              Text(
-                _displayedFiles.length.toString(),
-                style: TextStyles.body.copyWith(color: colors.textLight),
-              ),
-            ],
+    return actions;
+  }
+
+  List<Widget> _buildSlivers(BuildContext context) {
+    if (isSearchActive) {
+      return [
+        SliverToBoxAdapter(
+          child: SearchResultView(
+            collections: const [],
+            files: _filteredFiles,
+            searchQuery: searchQuery,
+            isHomePage: false,
+            onSearchEverywhere: _searchEverywhere,
           ),
         ),
-        Expanded(
+      ];
+    }
+
+    if (_displayedFiles.isEmpty) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: _displayedFiles.isEmpty
-                ? Center(
-                    child: EmptyStateWidget(
-                      assetPath: 'assets/empty_state.png',
-                      title: context.l10n.collectionEmptyStateTitle,
-                      subtitle: context.l10n.collectionEmptyStateSubtitle,
-                      showBorder: false,
-                    ),
-                  )
-                : ItemListView(
-                    key: ValueKey(_displayedFiles.length),
-                    files: _displayedFiles,
-                    selectedFiles: _selectedFiles,
-                    scrollController: _scrollController,
-                    physics: const BouncingScrollPhysics(),
-                    selectionEnabled: _isSelectionEnabled,
-                  ),
+            child: Center(
+              child: EmptyStateWidget(
+                assetPath: 'assets/empty_state.png',
+                title: context.l10n.collectionEmptyStateTitle,
+                subtitle: context.l10n.collectionEmptyStateSubtitle,
+                showBorder: false,
+              ),
+            ),
           ),
         ),
-      ],
-    );
+      ];
+    }
+
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        sliver: SliverToBoxAdapter(
+          child: ItemListView(
+            key: ValueKey(_displayedFiles.length),
+            files: _displayedFiles,
+            selectedFiles: _selectedFiles,
+            selectionEnabled: _isSelectionEnabled,
+          ),
+        ),
+      ),
+    ];
   }
 
   void _searchEverywhere() {
