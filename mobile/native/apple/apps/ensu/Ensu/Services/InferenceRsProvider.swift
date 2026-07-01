@@ -89,6 +89,7 @@ final class InferenceRsProvider {
     }
 
     private let modelDir: URL
+    private let transcriber: Transcriber
     private let downloadManager = ModelDownloadManager.shared
     private var modelHandle: LlmModelHandle?
     private var contextHandle: LlmContextHandle?
@@ -101,8 +102,9 @@ final class InferenceRsProvider {
     private var rustDownloadCancelled = false
     private let logger = EnsuLogging.shared.logger("InferenceRsProvider")
 
-    init(modelDir: URL) {
+    init(modelDir: URL, transcriber: Transcriber) {
         self.modelDir = modelDir
+        self.transcriber = transcriber
         try? FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true, attributes: nil)
     }
 
@@ -402,7 +404,7 @@ final class InferenceRsProvider {
     }
 
     private func unloadTranscriptionModelIfLoaded() {
-        try? unloadTranscriptionModel()
+        transcriber.unloadModel()
     }
 
     private func loadModelHandle(target: InferenceModelTarget, modelPath: URL) throws {

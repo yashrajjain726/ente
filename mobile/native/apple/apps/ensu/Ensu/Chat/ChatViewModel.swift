@@ -122,8 +122,11 @@ final class ChatViewModel: ObservableObject {
 
         // LLM model files.
         let llmDir = baseDir.appendingPathComponent("llm", isDirectory: true)
-        let provider = InferenceRsProvider(modelDir: llmDir)
-        let voiceTranscriber = VoiceTranscriptionService(baseDir: baseDir)
+        let transcriptionDir = baseDir.appendingPathComponent("transcription", isDirectory: true)
+        try? FileManager.default.createDirectory(at: transcriptionDir, withIntermediateDirectories: true, attributes: nil)
+        let transcriber = Transcriber(modelsDir: transcriptionDir.path)
+        let provider = InferenceRsProvider(modelDir: llmDir, transcriber: transcriber)
+        let voiceTranscriber = VoiceTranscriptionService(transcriber: transcriber)
 
         // Chat DB + attachments.
         let dbDir = baseDir.appendingPathComponent("llmchat", isDirectory: true)

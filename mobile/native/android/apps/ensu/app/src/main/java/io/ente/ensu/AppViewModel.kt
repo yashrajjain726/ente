@@ -1,6 +1,7 @@
 package io.ente.ensu
 
 import android.app.Application
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Environment
@@ -12,6 +13,7 @@ import io.ente.ensu.device.AndroidDeviceCapabilityProvider
 import io.ente.ensu.settings.SessionPreferencesDataStore
 import io.ente.ensu.chat.RustChatRepository
 import io.ente.ensu.config.RustDefaults
+import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.llm.RustLlmProvider
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.storage.CredentialStore
@@ -29,11 +31,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val credentialStore = CredentialStore(application)
     val appVersion = runCatching { getAppVersion(application) }.getOrDefault("unknown")
     private val deviceCapabilityProvider = AndroidDeviceCapabilityProvider(application)
+    private val transcriber = Transcriber(
+        application.getDir("ensu_transcription_models", Context.MODE_PRIVATE).absolutePath
+    )
 
     val logRepository = FileLogRepository(application)
     private val llmProvider = RustLlmProvider(
         context = application,
         modelDir = resolveModelDir(application),
+        transcriber = transcriber,
         legacyModelDir = File(application.filesDir, "llm"),
         deviceCapabilityProvider = deviceCapabilityProvider
     )
@@ -44,6 +50,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         sessionPreferences = sessionPreferences,
         chatRepository = chatRepository,
         llmProvider = llmProvider,
+        transcriber = transcriber,
         deviceCapabilityProvider = deviceCapabilityProvider,
         configDefaults = configDefaults,
         logRepository = logRepository

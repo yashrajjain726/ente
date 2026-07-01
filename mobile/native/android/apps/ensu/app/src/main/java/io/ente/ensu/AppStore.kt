@@ -5,6 +5,7 @@ import io.ente.ensu.chat.ChatStoreActions
 
 import io.ente.ensu.chat.RustChatRepository
 import io.ente.ensu.device.ChatDeviceCapability
+import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.device.AndroidDeviceCapabilityProvider
 import io.ente.ensu.llm.RustLlmProvider
 import io.ente.ensu.logging.FileLogRepository
@@ -26,6 +27,7 @@ class AppStore(
     private val sessionPreferences: SessionPreferencesDataStore,
     private val chatRepository: RustChatRepository,
     private val llmProvider: RustLlmProvider,
+    val transcriber: Transcriber,
     private val deviceCapabilityProvider: AndroidDeviceCapabilityProvider,
     val configDefaults: ConfigDefaults,
     private val logRepository: FileLogRepository,
