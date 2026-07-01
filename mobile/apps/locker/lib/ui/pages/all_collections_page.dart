@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
-import "package:ente_ui/components/title_bar_title_widget.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import 'package:locker/events/collections_updated_event.dart';
@@ -10,6 +9,7 @@ import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/selected_collections.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/collections/models/collection.dart';
+import 'package:locker/ui/components/collection_list_widget.dart';
 import "package:locker/ui/components/empty_state_widget.dart";
 import 'package:locker/ui/components/item_list_view.dart';
 import 'package:locker/ui/pages/collection_page.dart';
@@ -28,7 +28,6 @@ class AllCollectionsPage extends StatefulWidget {
 class _AllCollectionsPageState extends State<AllCollectionsPage> {
   List<Collection> _sortedCollections = [];
   Collection? _uncategorizedCollection;
-  int? _uncategorizedFileCount;
   bool _isLoading = true;
   String? _error;
   bool showUncategorized = false;
@@ -84,11 +83,6 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
 
       _sortedCollections = List.from(regularCollections);
       _uncategorizedCollection = uncategorized;
-      _uncategorizedFileCount = uncategorized != null
-          ? (await CollectionService.instance.getFilesInCollection(
-              uncategorized,
-            )).length
-          : 0;
 
       if (mounted) {
         if (showLoading) {
@@ -115,195 +109,138 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
+    final hasCollections =
+        !_isLoading && _error == null && _sortedCollections.isNotEmpty;
+
+    final showUncategorizedBar =
+        _uncategorizedCollection != null && showUncategorized;
 
     return Scaffold(
       backgroundColor: colors.backgroundBase,
-      appBar: AppBar(
-        backgroundColor: colors.backgroundBase,
-        surfaceTintColor: Colors.transparent,
-        toolbarHeight: 48,
-        leadingWidth: 48,
-        leading: GestureDetector(
-          onTap: () {
-            Navigator.pop(context);
-          },
-          child: const Icon(Icons.arrow_back_outlined),
-        ),
-      ),
       body: Stack(
         children: [
-          _buildBody(context),
+          AppBarComponent(
+            title: context.l10n.collections,
+            subtitle: hasCollections
+                ? context.l10n.items(_sortedCollections.length)
+                : null,
+            actions: hasCollections
+                ? [
+                    IconButtonComponent(
+                      icon: const HugeIcon(icon: HugeIcons.strokeRoundedAdd01),
+                      variant: IconButtonComponentVariant.primary,
+                      shouldSurfaceExecutionStates: false,
+                      onTap: () => CollectionActions.createCollection(context),
+                    ),
+                  ]
+                : const [],
+            controller: _scrollController,
+            slivers: _buildSlivers(context),
+          ),
           CollectionSelectionOverlayBar(
             collections: _sortedCollections,
             selectedCollections: _selectedCollections,
           ),
+          if (showUncategorizedBar)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: ListenableBuilder(
+                listenable: _selectedCollections,
+                builder: (context, _) => _selectedCollections.hasSelections
+                    ? const SizedBox.shrink()
+                    : _buildUncategorizedHook(),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context) {
-    final colors = context.componentColors;
-    final safeBottomInset = MediaQuery.of(context).padding.bottom;
-    final bottomPadding = safeBottomInset + 24.0;
-
+  List<Widget> _buildSlivers(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ];
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              EmptyStateWidget(
-                assetPath: 'assets/empty_state.png',
-                title: context.l10n.somethingWentWrong,
-                subtitle: _error!,
-                showBorder: false,
-              ),
-              const SizedBox(height: 20),
-              ButtonComponent(
-                label: context.l10n.retry,
-                onTap: _loadCollections,
-              ),
-            ],
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                EmptyStateWidget(
+                  assetPath: 'assets/empty_state.png',
+                  title: context.l10n.somethingWentWrong,
+                  subtitle: _error!,
+                  showBorder: false,
+                ),
+                const SizedBox(height: 20),
+                ButtonComponent(
+                  label: context.l10n.retry,
+                  onTap: _loadCollections,
+                ),
+              ],
+            ),
           ),
         ),
-      );
+      ];
     }
 
     if (_sortedCollections.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              EmptyStateWidget(
-                assetPath: 'assets/empty_state.png',
-                title: context.l10n.noCollections,
-                subtitle: "",
-                showBorder: false,
-              ),
-              const SizedBox(height: 20),
-              if (_uncategorizedCollection != null && showUncategorized)
-                _buildUncategorizedHook(),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, bottomPadding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TitleBarTitleWidget(title: context.l10n.collections),
-                  Text(
-                    _sortedCollections.length.toString() + " items",
-                    style: TextStyles.body.copyWith(color: colors.textLight),
-                  ),
-                ],
-              ),
-              GestureDetector(
-                onTap: () async {
-                  await CollectionActions.createCollection(context);
-                },
-                child: Container(
-                  height: 44,
-                  width: 44,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: colors.fillLight,
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: HugeIcon(
-                    icon: HugeIcons.strokeRoundedAdd01,
-                    color: colors.textBase,
-                  ),
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                EmptyStateWidget(
+                  assetPath: 'assets/empty_state.png',
+                  title: context.l10n.noCollections,
+                  subtitle: "",
+                  showBorder: false,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: ItemListView(
-              collections: _sortedCollections,
-              selectedCollections: _selectedCollections,
-              scrollController: _scrollController,
-              physics: const BouncingScrollPhysics(),
+              ],
             ),
           ),
-          if (_uncategorizedCollection != null && showUncategorized)
-            _buildUncategorizedHook(),
-        ],
+        ),
+      ];
+    }
+
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        sliver: SliverToBoxAdapter(
+          child: ItemListView(
+            collections: _sortedCollections,
+            selectedCollections: _selectedCollections,
+          ),
+        ),
       ),
-    );
+    ];
   }
 
   Widget _buildUncategorizedHook() {
     if (_uncategorizedCollection == null) return const SizedBox.shrink();
 
-    final colors = context.componentColors;
-    final borderRadius = BorderRadius.circular(20.0);
-
-    return Container(
-      margin: const EdgeInsets.only(top: 16.0, bottom: 4.0),
-      child: InkWell(
-        onTap: () => _openUncategorized(),
-        borderRadius: borderRadius,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-          decoration: BoxDecoration(
-            color: colors.fillLight,
-            border: Border.all(color: colors.strokeFaint, width: 0.5),
-            borderRadius: borderRadius,
-          ),
-          child: Row(
-            children: [
-              HugeIcon(
-                icon: HugeIcons.strokeRoundedFolderUnknown,
-                color: colors.textLight,
-                size: 22,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Row(
-                  children: [
-                    Text(context.l10n.uncategorized, style: TextStyles.large),
-                    if (_uncategorizedFileCount! > 0) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        '•',
-                        style: TextStyles.body.copyWith(
-                          color: colors.textLighter,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_uncategorizedFileCount!}',
-                        style: TextStyles.body.copyWith(
-                          color: colors.textLight,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: colors.textLight, size: 20),
-            ],
-          ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 12.0),
+        child: CollectionListWidget(
+          collection: _uncategorizedCollection!,
+          selectedCollections: _selectedCollections,
+          onTapCallback: (_) => _openUncategorized(),
         ),
       ),
     );

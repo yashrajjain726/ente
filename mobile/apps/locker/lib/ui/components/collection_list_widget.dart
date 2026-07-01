@@ -11,6 +11,7 @@ import "package:locker/services/collections/models/collection.dart";
 import "package:locker/services/configuration.dart";
 import "package:locker/ui/pages/collection_page.dart";
 import "package:locker/ui/sharing/album_share_info_widget.dart";
+import "package:locker/utils/file_icon_utils.dart";
 
 class CollectionListWidget extends StatelessWidget {
   final Collection collection;
@@ -49,23 +50,17 @@ class CollectionListWidget extends StatelessWidget {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: colors.backgroundBase,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: collection.type == CollectionType.favorites
-                        ? HugeIcon(
-                            icon: HugeIcons.strokeRoundedStar,
-                            color: colors.primary,
-                          )
-                        : HugeIcon(
-                            icon: HugeIcons.strokeRoundedWallet05,
-                            color: colors.textBase,
-                          ),
-                  ),
+                IconTile(
+                  backgroundColor: colors.backgroundBase,
+                  icon: collection.type == CollectionType.favorites
+                      ? HugeIcon(
+                          icon: HugeIcons.strokeRoundedStar,
+                          color: colors.primary,
+                        )
+                      : HugeIcon(
+                          icon: HugeIcons.strokeRoundedWallet05,
+                          color: colors.textBase,
+                        ),
                 ),
                 if (showSharingIndicator)
                   Positioned(
@@ -171,21 +166,8 @@ class CollectionListWidget extends StatelessWidget {
                           );
                         },
                         child: isSelected
-                            ? Container(
-                                key: const ValueKey("selected"),
-                                width: 18,
-                                height: 18,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: colors.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const HugeIcon(
-                                  icon: HugeIcons.strokeRoundedTick02,
-                                  color: Colors.white,
-                                  size: 12,
-                                  strokeWidth: 2,
-                                ),
+                            ? const SelectionCheckBadge(
+                                key: ValueKey("selected"),
                               )
                             : showSharingIndicator
                             ? (isIncoming

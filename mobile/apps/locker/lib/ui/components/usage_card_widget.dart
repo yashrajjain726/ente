@@ -124,10 +124,7 @@ class _UsageContent extends StatelessWidget {
       children: [
         Text(
           context.l10n.itemsStored,
-          style: TextStyles.bodyBold.copyWith(
-            color: cardTextMuted,
-            fontSize: 16,
-          ),
+          style: TextStyles.large.copyWith(color: cardTextMuted),
         ),
         const SizedBox(height: 4),
         if (isLoading)

@@ -153,7 +153,7 @@ class FileListWidget extends StatelessWidget {
                       );
                     },
                     child: _buildTrailingIndicator(
-                      color: isSelected ? colors.primary : colors.textLight,
+                      color: colors.textLight,
                       isSelected: isSelected,
                       isIncoming: isIncoming,
                       isMarkedOffline: !isTrashFile && isMarkedOffline,
@@ -219,19 +219,7 @@ class FileListWidget extends StatelessWidget {
     required User? owner,
   }) {
     if (isSelected) {
-      return Container(
-        key: const ValueKey("selected"),
-        width: 18,
-        height: 18,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        child: const HugeIcon(
-          icon: HugeIcons.strokeRoundedTick02,
-          color: Colors.white,
-          size: 12,
-          strokeWidth: 2,
-        ),
-      );
+      return const SelectionCheckBadge(key: ValueKey("selected"));
     }
 
     if (isMarkedOffline) {
