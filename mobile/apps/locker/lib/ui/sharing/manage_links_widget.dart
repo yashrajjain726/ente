@@ -134,7 +134,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                     ),
                     alignCaptionedTextToLeft: true,
                     isTopBorderRadiusRemoved: true,
-                    menuItemColor: context.componentColors.fillLight,
+                    menuItemColor: colors.fillLight,
                     trailingWidget: ToggleSwitchWidget(
                       value: () => url.passwordEnabled,
                       onChanged: () async {
@@ -174,11 +174,11 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                     MenuItemWidgetV2(
                       captionedTextWidget: CaptionedTextWidgetV2(
                         title: context.l10n.linkExpired,
-                        textColor: context.componentColors.warning,
+                        textColor: colors.warning,
                       ),
                       leadingIcon: Icons.error_outline,
-                      leadingIconColor: context.componentColors.warning,
-                      menuItemColor: context.componentColors.fillLight,
+                      leadingIconColor: colors.warning,
+                      menuItemColor: colors.fillLight,
                     ),
                   if (!url.isExpired)
                     MenuItemWidgetV2(
@@ -191,7 +191,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                         color: colors.textBase,
                         size: 20,
                       ),
-                      menuItemColor: context.componentColors.fillLight,
+                      menuItemColor: colors.fillLight,
                       showOnlyLoadingState: true,
                       onTap: () async {
                         await Clipboard.setData(ClipboardData(text: urlValue));
@@ -205,7 +205,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                   if (!url.isExpired)
                     DividerWidget(
                       dividerType: DividerType.menu,
-                      bgColor: context.componentColors.fillLight,
+                      bgColor: colors.fillLight,
                     ),
                   if (!url.isExpired)
                     MenuItemWidgetV2(
@@ -219,7 +219,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                         color: colors.textBase,
                         size: 20,
                       ),
-                      menuItemColor: context.componentColors.fillLight,
+                      menuItemColor: colors.fillLight,
                       onTap: () async {
                         unawaited(shareText(urlValue, context: context));
                       },
@@ -237,7 +237,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                       color: colors.warning,
                       size: 20,
                     ),
-                    menuItemColor: context.componentColors.fillLight,
+                    menuItemColor: colors.fillLight,
                     surfaceExecutionStates: false,
                     onTap: () async {
                       final bool result = await CollectionActions.disableUrl(

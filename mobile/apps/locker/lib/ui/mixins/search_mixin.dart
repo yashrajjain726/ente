@@ -1,10 +1,8 @@
 import 'dart:async';
 
-import 'package:ente_components/ente_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:locker/extensions/collection_extension.dart';
-import 'package:locker/l10n/l10n.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/collections/models/collection.dart';
 import 'package:locker/services/files/sync/models/file.dart';
@@ -45,76 +43,6 @@ mixin SearchMixin<T extends StatefulWidget> on State<T> {
     _searchFocusNode.dispose();
     _searchDebounceTimer?.cancel();
     super.dispose();
-  }
-
-  Widget buildSearchAction() {
-    final colors = context.componentColors;
-    if (_isSearchActive) {
-      return Flexible(
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(8.0, 8.0, 8.0, 8.0),
-          constraints: const BoxConstraints(
-            minWidth: 200,
-            maxWidth: double.infinity,
-          ),
-          child: TextField(
-            controller: _searchController,
-            focusNode: _searchFocusNode,
-            autofocus: true,
-            onChanged: _onSearchChanged,
-            decoration: InputDecoration(
-              hintText: context.l10n.searchHint,
-              hintStyle: TextStyles.body.copyWith(color: colors.textLight),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20.0),
-                borderSide: BorderSide.none,
-              ),
-              filled: true,
-              fillColor: context.componentColors.fillLight,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8.0,
-              ),
-              prefixIcon: _isSearching
-                  ? Container(
-                      width: 20,
-                      height: 20,
-                      padding: const EdgeInsets.all(8.0),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          colors.textLight,
-                        ),
-                      ),
-                    )
-                  : Icon(Icons.search, size: 20, color: colors.textLight),
-            ),
-            style: TextStyles.body,
-          ),
-        ),
-      );
-    } else {
-      return IconButton(
-        icon: const Icon(Icons.search),
-        onPressed: _activateSearch,
-      );
-    }
-  }
-
-  List<Widget> buildSearchActions() {
-    if (_isSearchActive) {
-      return [
-        IconButton(icon: const Icon(Icons.close), onPressed: _deactivateSearch),
-      ];
-    }
-    return [];
-  }
-
-  Widget? buildSearchLeading({Widget? defaultLeading}) {
-    if (_isSearchActive) {
-      return null;
-    }
-    return defaultLeading;
   }
 
   void _activateSearch() {
