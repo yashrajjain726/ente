@@ -1,11 +1,9 @@
 import "dart:async";
 
+import 'package:ente_components/ente_components.dart';
 import "package:ente_events/event_bus.dart";
 import 'package:ente_ui/components/buttons/button_widget.dart';
 import "package:ente_ui/components/title_bar_title_widget.dart";
-import "package:ente_ui/theme/colors.dart";
-import 'package:ente_ui/theme/ente_theme.dart';
-import "package:ente_ui/theme/text_style.dart";
 import 'package:ente_ui/utils/dialog_util.dart';
 import 'package:ente_ui/utils/toast_util.dart';
 import 'package:flutter/material.dart';
@@ -109,13 +107,12 @@ class _TrashPageState extends State<TrashPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
 
     return Scaffold(
-      backgroundColor: colorScheme.backgroundBase,
+      backgroundColor: colors.backgroundBase,
       appBar: AppBar(
-        backgroundColor: colorScheme.backgroundBase,
+        backgroundColor: colors.backgroundBase,
         surfaceTintColor: Colors.transparent,
         toolbarHeight: 48,
         leadingWidth: 48,
@@ -128,7 +125,7 @@ class _TrashPageState extends State<TrashPage> {
       ),
       body: Stack(
         children: [
-          _buildBody(context, colorScheme, textTheme),
+          _buildBody(context, colors),
           FileSelectionOverlayBar(
             selectedFiles: _selectedFiles,
             files: _trashFiles.cast<EnteFile>(),
@@ -140,11 +137,7 @@ class _TrashPageState extends State<TrashPage> {
     );
   }
 
-  Widget _buildBody(
-    BuildContext context,
-    EnteColorScheme colorScheme,
-    EnteTextTheme textTheme,
-  ) {
+  Widget _buildBody(BuildContext context, ColorTokens colors) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -161,12 +154,12 @@ class _TrashPageState extends State<TrashPage> {
                     width: 44,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
-                      color: colorScheme.backdropBase,
+                      color: colors.fillLight,
                     ),
                     padding: const EdgeInsets.all(12),
                     child: HugeIcon(
                       icon: HugeIcons.strokeRoundedDelete02,
-                      color: colorScheme.textBase,
+                      color: colors.textBase,
                     ),
                   ),
                 ),
@@ -197,9 +190,6 @@ class _TrashEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -208,11 +198,7 @@ class _TrashEmptyState extends StatelessWidget {
           children: [
             Image.asset('assets/empty_state.png', height: 112),
             const SizedBox(height: 20),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: textTheme.largeBold.copyWith(color: colorScheme.textBase),
-            ),
+            Text(title, textAlign: TextAlign.center, style: TextStyles.large),
           ],
         ),
       ),

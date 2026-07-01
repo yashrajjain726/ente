@@ -1,7 +1,6 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/components/buttons/models/button_result.dart";
-import "package:ente_ui/theme/ente_theme.dart";
 import "package:flutter/material.dart";
 import "package:locker/l10n/l10n.dart";
 
@@ -61,8 +60,7 @@ class _DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = getEnteTextTheme(context);
-    final colorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
 
     return BottomSheetComponent(
       illustration: Image.asset(widget.assetPath),
@@ -72,7 +70,7 @@ class _DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
         children: [
           Text(
             widget.body,
-            style: textTheme.body.copyWith(color: colorScheme.textMuted),
+            style: TextStyles.body.copyWith(color: colors.textLight),
             textAlign: TextAlign.center,
           ),
           if (widget.showDeleteFromAllCollectionsOption) ...[

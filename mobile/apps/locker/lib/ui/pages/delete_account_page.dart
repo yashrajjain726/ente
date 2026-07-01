@@ -7,7 +7,6 @@ import "package:ente_crypto_api/ente_crypto_api.dart";
 import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_strings/ente_strings.dart";
 import "package:ente_ui/components/alert_bottom_sheet.dart";
-import "package:ente_ui/theme/ente_theme.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:ente_utils/email_util.dart";
 import "package:flutter/material.dart";
@@ -20,14 +19,13 @@ class DeleteAccountPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     final l10n = context.l10n;
 
     return Scaffold(
-      backgroundColor: colorScheme.backgroundBase,
+      backgroundColor: colors.backgroundBase,
       appBar: AppBar(
-        backgroundColor: colorScheme.backgroundBase,
+        backgroundColor: colors.backgroundBase,
         surfaceTintColor: Colors.transparent,
         toolbarHeight: 48,
         leadingWidth: 48,
@@ -42,7 +40,7 @@ class DeleteAccountPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(l10n.deleteAccount, style: textTheme.h3Bold),
+              Text(l10n.deleteAccount, style: TextStyles.h2),
               const SizedBox(height: 24),
               Center(
                 child: Image.asset(
@@ -62,7 +60,7 @@ class DeleteAccountPage extends StatelessWidget {
                     ),
                     TextSpan(
                       text: "feedback@ente.com",
-                      style: TextStyle(color: colorScheme.primary700),
+                      style: TextStyle(color: colors.primary),
                     ),
                     TextSpan(
                       text: l10n
@@ -70,7 +68,7 @@ class DeleteAccountPage extends StatelessWidget {
                           .split("feedback@ente.com")[1],
                     ),
                   ],
-                  style: textTheme.body.copyWith(color: colorScheme.textMuted),
+                  style: TextStyles.body.copyWith(color: colors.textLight),
                 ),
               ),
               const SizedBox(height: 16),
@@ -87,7 +85,7 @@ class DeleteAccountPage extends StatelessWidget {
               const SizedBox(height: 24),
               Text(
                 l10n.deleteAccountPermanentWarning,
-                style: textTheme.body.copyWith(color: colorScheme.textMuted),
+                style: TextStyles.body.copyWith(color: colors.textLight),
               ),
               const SizedBox(height: 16),
               ButtonComponent(

@@ -1,10 +1,10 @@
+import 'package:ente_components/ente_components.dart';
 import "package:ente_ui/components/captioned_text_widget_v2.dart";
 import "package:ente_ui/components/divider_widget.dart";
 import "package:ente_ui/components/menu_item_widget_v2.dart";
 import "package:ente_ui/components/separators.dart";
 import "package:ente_ui/components/title_bar_title_widget.dart";
 import "package:ente_ui/components/title_bar_widget.dart";
-import "package:ente_ui/theme/ente_theme.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import 'package:flutter/material.dart';
 import "package:locker/core/constants.dart";
@@ -102,7 +102,7 @@ class _ItemsWidgetState extends State<ItemsWidget> {
       items,
       DividerWidget(
         dividerType: DividerType.menuNoIcon,
-        bgColor: getEnteColorScheme(context).fillFaint,
+        bgColor: context.componentColors.fillLight,
       ),
     );
     return Column(mainAxisSize: MainAxisSize.min, children: items);
@@ -115,7 +115,7 @@ class _ItemsWidgetState extends State<ItemsWidget> {
   }) {
     return MenuItemWidgetV2(
       key: ValueKey(deviceLimit),
-      menuItemColor: getEnteColorScheme(context).fillFaint,
+      menuItemColor: context.componentColors.fillLight,
       captionedTextWidget: CaptionedTextWidgetV2(
         title: deviceLimit == 0 ? context.l10n.noDeviceLimit : "$deviceLimit",
       ),
