@@ -44,6 +44,8 @@ class TextInputComponent extends StatefulWidget {
     this.inputFormatters,
     this.keyboardType,
     this.enableFillColor = true,
+    this.backgroundColor,
+    this.textColor,
     this.autocorrect = true,
     this.isRequired = false,
     this.prefix,
@@ -88,6 +90,8 @@ class TextInputComponent extends StatefulWidget {
   final List<TextInputFormatter>? inputFormatters;
   final TextInputType? keyboardType;
   final bool enableFillColor;
+  final Color? backgroundColor;
+  final Color? textColor;
   final bool autocorrect;
   final bool isRequired;
 
@@ -267,6 +271,7 @@ class _TextInputComponentState extends State<TextInputComponent> {
                         child: TextField(
                           controller: _controller,
                           focusNode: _focusNode,
+                          cursorColor: widget.textColor,
                           enabled: !widget.isDisabled,
                           autofocus: widget.autofocus,
                           obscureText: _obscureText,
@@ -366,11 +371,14 @@ class _TextInputComponentState extends State<TextInputComponent> {
   }
 
   Color _backgroundColor(ColorTokens colors) {
-    if (!widget.enableFillColor) {
-      return Colors.transparent;
-    }
     if (widget.isDisabled) {
       return colors.fillDark;
+    }
+    if (widget.backgroundColor != null) {
+      return widget.backgroundColor!;
+    }
+    if (!widget.enableFillColor) {
+      return Colors.transparent;
     }
     return colors.fillLight;
   }
@@ -389,7 +397,8 @@ class _TextInputComponentState extends State<TextInputComponent> {
   }
 
   Color _textColor(ColorTokens colors) {
-    return widget.isDisabled ? colors.textLightest : colors.textBase;
+    if (widget.isDisabled) return colors.textLightest;
+    return widget.textColor ?? colors.textBase;
   }
 
   Color _hintColor(ColorTokens colors) {
