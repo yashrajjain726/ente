@@ -21,14 +21,14 @@ const RESPONSE_START_TIMEOUT: Duration = Duration::from_secs(30);
 const READ_STALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelDownloadTarget {
+pub struct Target {
     pub label: String,
     pub url: String,
     pub destination_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelDownloadProgress {
+pub struct Progress {
     pub label: String,
     pub downloaded_bytes: u64,
     pub total_bytes: Option<u64>,
@@ -136,9 +136,9 @@ struct ContentRange {
     total: Option<u64>,
 }
 
-pub fn download_model_files(
-    targets: Vec<ModelDownloadTarget>,
-    on_progress: impl FnMut(ModelDownloadProgress),
+pub fn fetch(
+    targets: Vec<Target>,
+    on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
 ) -> Result<(), String> {
     let runtime = Builder::new_current_thread()
@@ -146,16 +146,16 @@ pub fn download_model_files(
         .enable_time()
         .build()
         .map_err(|err| err.to_string())?;
-    runtime.block_on(download_model_files_async(
+    runtime.block_on(fetch_async(
         targets,
         on_progress,
         is_cancelled,
     ))
 }
 
-async fn download_model_files_async(
-    targets: Vec<ModelDownloadTarget>,
-    on_progress: impl FnMut(ModelDownloadProgress),
+async fn fetch_async(
+    targets: Vec<Target>,
+    on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
 ) -> Result<(), String> {
     if targets.is_empty() {
@@ -253,7 +253,7 @@ async fn download_model_files_async(
                 return Err("Download cancelled".to_string());
             }
 
-            let file_report = download_model_file(
+            let file_report = download_file(
                 client,
                 target,
                 &destination,
@@ -336,9 +336,9 @@ async fn download_model_files_async(
     Ok(())
 }
 
-async fn download_model_file(
+async fn download_file(
     client: &Client,
-    target: &ModelDownloadTarget,
+    target: &Target,
     destination: &Path,
     download_probe: &DownloadProbe,
     mut on_progress: impl FnMut(FileDownloadProgress),
@@ -352,7 +352,7 @@ async fn download_model_file(
     let mut range_error = None;
     if let Some(total) = download_probe.content_length {
         if should_use_range_download(destination, total, download_probe) {
-            match download_model_file_ranged(
+            match download_file_ranged(
                 client,
                 target,
                 destination,
@@ -377,7 +377,7 @@ async fn download_model_file(
         cleanup_range_download(destination);
     }
 
-    let single_result = download_model_file_single(
+    let single_result = download_file_single(
         client,
         target,
         destination,
@@ -396,9 +396,9 @@ async fn download_model_file(
     }
 }
 
-async fn download_model_file_single(
+async fn download_file_single(
     client: &Client,
-    target: &ModelDownloadTarget,
+    target: &Target,
     destination: &Path,
     expected_file_total: Option<u64>,
     on_progress: &mut dyn FnMut(FileDownloadProgress),
@@ -415,7 +415,7 @@ async fn download_model_file_single(
         }
 
         let mut resume_from = valid_resume_bytes(&tmp_path)?;
-        let mut response = match request_model(client, &target.url, resume_from).await {
+        let mut response = match request_file(client, &target.url, resume_from).await {
             Ok(response) => response,
             Err(err) => {
                 if attempt == MAX_ATTEMPTS {
@@ -429,7 +429,7 @@ async fn download_model_file_single(
         if resume_from > 0 && response.status() == reqwest::StatusCode::OK {
             let _ = fs::remove_file(&tmp_path);
             resume_from = 0;
-            response = match request_model(client, &target.url, 0).await {
+            response = match request_file(client, &target.url, 0).await {
                 Ok(response) => response,
                 Err(err) => {
                     if attempt == MAX_ATTEMPTS {
@@ -611,12 +611,12 @@ async fn download_model_file_single(
         });
     }
 
-    Err("Failed to download model".to_string())
+    Err("Failed to download file".to_string())
 }
 
-async fn download_model_file_ranged(
+async fn download_file_ranged(
     client: &Client,
-    target: &ModelDownloadTarget,
+    target: &Target,
     destination: &Path,
     total: u64,
     response_metadata: Option<ResponseMetadata>,
@@ -749,7 +749,7 @@ async fn download_model_file_ranged(
 #[allow(clippy::too_many_arguments)]
 async fn download_range_part(
     client: &Client,
-    target: &ModelDownloadTarget,
+    target: &Target,
     file: Rc<File>,
     part_index: usize,
     range: RangeDownloadPartMetadata,
@@ -928,10 +928,10 @@ async fn download_range_part(
         return Ok(());
     }
 
-    Err("Failed to download model range".to_string())
+    Err("Failed to download file range".to_string())
 }
 
-async fn request_model(client: &Client, url: &str, resume_from: u64) -> Result<Response, String> {
+async fn request_file(client: &Client, url: &str, resume_from: u64) -> Result<Response, String> {
     let mut request = client.get(url);
     if resume_from > 0 {
         request = request.header(RANGE, format!("bytes={resume_from}-"));
@@ -1027,7 +1027,7 @@ fn is_download_cancelled_error(err: &str) -> bool {
 }
 
 fn prepare_range_download_metadata(
-    target: &ModelDownloadTarget,
+    target: &Target,
     destination: &Path,
     total: u64,
     response_metadata: Option<ResponseMetadata>,
@@ -1094,7 +1094,7 @@ fn range_download_parts(total: u64, concurrency: usize) -> Vec<RangeDownloadPart
 
 fn range_download_metadata_matches(
     metadata: &RangeDownloadMetadata,
-    target: &ModelDownloadTarget,
+    target: &Target,
     total: u64,
     response_metadata: Option<&ResponseMetadata>,
     ranges: &[RangeDownloadPartMetadata],
@@ -1271,7 +1271,7 @@ fn parse_content_range(value: &str) -> Option<ContentRange> {
     Some(ContentRange { start, end, total })
 }
 
-fn emit_progress_from_states<F: FnMut(ModelDownloadProgress)>(
+fn emit_progress_from_states<F: FnMut(Progress)>(
     label: &str,
     total_bytes: Option<u64>,
     metrics: DownloadProgressMetrics,
@@ -1394,14 +1394,14 @@ fn emit_combined_progress(
     file_downloaded_bytes: u64,
     file_total_bytes: Option<u64>,
     metrics: DownloadProgressMetrics,
-    on_progress: &mut impl FnMut(ModelDownloadProgress),
+    on_progress: &mut impl FnMut(Progress),
 ) {
     let percentage = total_bytes
         .filter(|value| *value > 0)
         .map(|total| ((downloaded_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0))
         .unwrap_or(0.0);
 
-    on_progress(ModelDownloadProgress {
+    on_progress(Progress {
         label: label.to_string(),
         downloaded_bytes,
         total_bytes,
@@ -1455,7 +1455,7 @@ fn bytes_per_second(bytes: u64, elapsed: Duration) -> f64 {
     }
 }
 
-fn prepare_cached_download(target: &ModelDownloadTarget, destination: &Path) -> bool {
+fn prepare_cached_download(target: &Target, destination: &Path) -> bool {
     if is_valid_gguf_download(destination) {
         if !download_metadata_matches(destination, &target.url) {
             let size = file_size(destination).unwrap_or(0);
@@ -1536,7 +1536,7 @@ fn copy_cached_download(source: &Path, destination: &Path) -> Result<(), String>
     fs::copy(source, &tmp_path).map_err(|err| err.to_string())?;
     if !is_valid_gguf_download(&tmp_path) {
         let _ = fs::remove_file(&tmp_path);
-        return Err("Cached model copy is invalid".to_string());
+        return Err("Cached file copy is invalid".to_string());
     }
     if destination.exists() {
         fs::remove_file(destination).map_err(|err| err.to_string())?;
@@ -1561,7 +1561,7 @@ fn download_metadata_matches(path: &Path, url: &str) -> bool {
 
 fn write_download_metadata(
     path: &Path,
-    target: &ModelDownloadTarget,
+    target: &Target,
     size_bytes: u64,
     response_metadata: Option<ResponseMetadata>,
 ) -> Result<(), String> {
@@ -1636,7 +1636,7 @@ fn now_ms() -> u64 {
 }
 
 fn existing_download_bytes(
-    target: &ModelDownloadTarget,
+    target: &Target,
     destination: &Path,
     probe: &DownloadProbe,
 ) -> u64 {
@@ -1916,8 +1916,8 @@ mod tests {
         assert_eq!(probe.content_length, Some(bytes.len() as u64));
         assert!(probe.supports_ranges);
 
-        let result = download_model_files(
-            vec![ModelDownloadTarget {
+        let result = fetch(
+            vec![Target {
                 label: "Model".to_string(),
                 url,
                 destination_path: destination.display().to_string(),
