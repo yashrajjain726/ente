@@ -42,9 +42,6 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    #[error(transparent)]
-    Image(#[from] ente_image::ImageError),
-
     #[cfg(feature = "sqlite")]
     #[error(transparent)]
     Sqlite(#[from] rusqlite::Error),

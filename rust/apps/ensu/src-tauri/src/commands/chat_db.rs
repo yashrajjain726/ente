@@ -58,7 +58,6 @@ impl From<DbError> for ApiError {
             E::Sqlite(_) => "db_sqlite",
             E::UnsupportedOperation(_) => "db_unsupported_operation",
             E::Migration(_) => "db_migration",
-            E::Image(_) => "db_image",
         };
 
         ApiError::new(code, e.to_string())
@@ -640,7 +639,8 @@ pub async fn chat_db_compress_attachment_image_file(path: String) -> Result<Vec<
         let data = fs::read(&path).map_err(|err| {
             ApiError::new("io", format!("failed to read image file '{path}': {err}"))
         })?;
-        db::compress_attachment_image(&data).map_err(|err| ApiError::new("image", err.to_string()))
+        ente_ensu::image::compress_attachment_image(&data)
+            .map_err(|err| ApiError::new("image", err.to_string()))
     })
     .await
     .map_err(|_| image_thread_error())?

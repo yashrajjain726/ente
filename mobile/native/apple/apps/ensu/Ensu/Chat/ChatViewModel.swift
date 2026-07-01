@@ -1,8 +1,6 @@
 import Foundation
 import SwiftUI
 
-typealias LlmChatSession = Session
-
 @MainActor
 final class ChatViewModel: ObservableObject {
     private struct ModelReadyKey: Equatable {
@@ -610,8 +608,8 @@ final class ChatViewModel: ObservableObject {
             return buildSelectedPath(for: sessionId, childrenMap: childrenMap).last?.id
         }()
 
-        let meta: [AttachmentMeta] = attachments.map { attachment in
-            AttachmentMeta(
+        let meta: [DbAttachmentMeta] = attachments.map { attachment in
+            DbAttachmentMeta(
                 id: attachment.id.uuidString.lowercased(),
                 kind: attachment.kind == .image ? .image : .document,
                 size: attachment.size,
@@ -1169,7 +1167,7 @@ final class ChatViewModel: ObservableObject {
             }()
 
             if isActiveGeneration {
-                let meta: [AttachmentMeta] = []
+                let meta: [DbAttachmentMeta] = []
                 do {
                     let inserted = try chatDb.insertMessage(
                         sessionUuid: parent.sessionId.uuidString,
@@ -1501,7 +1499,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     private nonisolated static func buildSessions(
-        from loaded: [LlmChatSession],
+        from loaded: [DbSession],
         chatDb: EnsuDb,
         summaries: [String: String]
     ) -> [ChatSession] {
