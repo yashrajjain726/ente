@@ -3,8 +3,8 @@ mod model;
 mod text;
 mod transcriber;
 
-pub use model::{ModelEvent, download_model, is_model_downloaded, model_path, model_size_mb};
-pub use transcriber::{load_model, transcribe_pcm16, unload_model};
+pub use model::ModelEvent;
+pub use transcriber::TranscriptionModel;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TranscriptionError {
