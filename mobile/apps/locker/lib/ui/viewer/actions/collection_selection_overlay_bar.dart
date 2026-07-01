@@ -1,4 +1,4 @@
-import "package:ente_ui/theme/ente_theme.dart";
+import 'package:ente_components/ente_components.dart';
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:flutter/material.dart";
@@ -73,8 +73,7 @@ class _CollectionSelectionOverlayBarState
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     final hasSelection = widget.selectedCollections.collections.isNotEmpty;
 
     return IgnorePointer(
@@ -92,13 +91,13 @@ class _CollectionSelectionOverlayBarState
             child: hasSelection
                 ? Container(
                     decoration: BoxDecoration(
-                      color: colorScheme.backdropBase.withValues(alpha: 1.0),
+                      color: colors.backgroundBase,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(20),
                         topRight: Radius.circular(20),
                       ),
                       border: Border(
-                        top: BorderSide(color: colorScheme.strokeFaint),
+                        top: BorderSide(color: colors.strokeFaint),
                       ),
                     ),
                     child: Padding(
@@ -133,7 +132,7 @@ class _CollectionSelectionOverlayBarState
                                     },
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: colorScheme.backgroundElevated2,
+                                        color: colors.fillLight,
                                         borderRadius: BorderRadius.circular(50),
                                       ),
                                       padding: const EdgeInsets.symmetric(
@@ -145,12 +144,12 @@ class _CollectionSelectionOverlayBarState
                                         children: [
                                           Text(
                                             buttonText,
-                                            style: textTheme.small,
+                                            style: TextStyles.body,
                                           ),
                                           const SizedBox(width: 6),
                                           Icon(
                                             iconData,
-                                            color: colorScheme.textBase,
+                                            color: colors.textBase,
                                             size: 20,
                                           ),
                                         ],
@@ -175,7 +174,7 @@ class _CollectionSelectionOverlayBarState
                                     },
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: colorScheme.backgroundElevated2,
+                                        color: colors.fillLight,
                                         borderRadius: BorderRadius.circular(50),
                                       ),
                                       padding: const EdgeInsets.symmetric(
@@ -187,12 +186,12 @@ class _CollectionSelectionOverlayBarState
                                         children: [
                                           Text(
                                             countText,
-                                            style: textTheme.small,
+                                            style: TextStyles.body,
                                           ),
                                           const SizedBox(width: 6),
                                           Icon(
                                             Icons.close,
-                                            color: colorScheme.textBase,
+                                            color: colors.textBase,
                                             size: 20,
                                           ),
                                         ],
@@ -217,7 +216,7 @@ class _CollectionSelectionOverlayBarState
   }
 
   Widget _buildPrimaryActionButtons() {
-    final colorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
     final selectedCollections = widget.selectedCollections.collections;
     if (selectedCollections.isEmpty) {
       return const SizedBox.shrink();
@@ -253,7 +252,7 @@ class _CollectionSelectionOverlayBarState
         SelectionActionButton(
           hugeIcon: HugeIcon(
             icon: HugeIcons.strokeRoundedLogout02,
-            color: colorScheme.warning500,
+            color: colors.warning,
           ),
           label: context.l10n.leaveCollection,
           onTap: () => _leaveCollections(sharedIncomingCollections),
@@ -263,7 +262,7 @@ class _CollectionSelectionOverlayBarState
         SelectionActionButton(
           hugeIcon: HugeIcon(
             icon: HugeIcons.strokeRoundedDelete02,
-            color: colorScheme.warning500,
+            color: colors.warning,
           ),
           label: context.l10n.delete,
           onTap: () {
@@ -279,7 +278,7 @@ class _CollectionSelectionOverlayBarState
 
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.backgroundElevated2,
+        color: colors.fillLight,
         borderRadius: BorderRadius.circular(24),
       ),
       child: Row(children: _buildActionRow(primaryActions)),
