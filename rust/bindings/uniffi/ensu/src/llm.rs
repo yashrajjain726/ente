@@ -289,7 +289,7 @@ pub fn llm_download_model_files(
     let progress_callback = Arc::clone(&callback);
     let cancel_callback = Arc::clone(&callback);
     let targets = targets.into_iter().map(Into::into).collect();
-    download::fetch(
+    core::download_model_files(
         targets,
         move |progress| progress_callback.on_progress(progress.into()),
         move || cancel_callback.is_cancelled(),

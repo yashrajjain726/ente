@@ -1,9 +1,11 @@
 mod context;
+mod download;
 mod event;
 mod generate;
 mod model;
 
 pub use context::*;
+pub use download::*;
 pub use event::*;
 pub use generate::*;
 pub use model::*;

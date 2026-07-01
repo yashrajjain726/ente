@@ -235,7 +235,7 @@ pub async fn llm_download_model_files(
 
     async_runtime::spawn_blocking(move || {
         let progress_window = window.clone();
-        download::fetch(
+        ente_ensu::llm::download_model_files(
             targets,
             move |progress| {
                 log_download_metrics(&progress);
