@@ -87,29 +87,10 @@ class FileIconUtils {
       return icon;
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: backgroundColor ?? _backgroundColor(config.colorRole, colors),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(padding: const EdgeInsets.all(8.0), child: icon),
-    );
-  }
-
-  static Color getFileIconColor(BuildContext context, String fileName) {
-    return _foregroundColor(
-      _getFileConfig(fileName).colorRole,
-      context.componentColors,
-    );
-  }
-
-  static Color getFileIconBackgroundColor(
-    BuildContext context,
-    String fileName,
-  ) {
-    return _backgroundColor(
-      _getFileConfig(fileName).colorRole,
-      context.componentColors,
+    return IconTile(
+      icon: icon,
+      backgroundColor:
+          backgroundColor ?? _backgroundColor(config.colorRole, colors),
     );
   }
 
@@ -129,5 +110,48 @@ class FileIconUtils {
       FileIconColorRole.primary => colors.primaryLight,
       FileIconColorRole.neutral => colors.fillLight,
     };
+  }
+}
+
+class IconTile extends StatelessWidget {
+  final Widget icon;
+  final Color backgroundColor;
+
+  const IconTile({
+    super.key,
+    required this.icon,
+    required this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(padding: const EdgeInsets.all(8.0), child: icon),
+    );
+  }
+}
+
+class SelectionCheckBadge extends StatelessWidget {
+  const SelectionCheckBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.componentColors;
+    return Container(
+      width: 18,
+      height: 18,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: colors.primary, shape: BoxShape.circle),
+      child: const HugeIcon(
+        icon: HugeIcons.strokeRoundedTick02,
+        color: Colors.white,
+        size: 12,
+        strokeWidth: 2,
+      ),
+    );
   }
 }

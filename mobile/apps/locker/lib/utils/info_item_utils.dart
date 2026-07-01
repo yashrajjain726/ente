@@ -2,6 +2,7 @@ import 'package:ente_components/ente_components.dart';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:locker/models/info/info_item.dart';
+import 'package:locker/utils/file_icon_utils.dart';
 
 enum InfoIconColorRole { caution, purple, primary, warning }
 
@@ -58,12 +59,10 @@ class InfoItemUtils {
       return icon;
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: backgroundColor ?? _backgroundColor(config.colorRole, colors),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(padding: const EdgeInsets.all(8.0), child: icon),
+    return IconTile(
+      icon: icon,
+      backgroundColor:
+          backgroundColor ?? _backgroundColor(config.colorRole, colors),
     );
   }
 
