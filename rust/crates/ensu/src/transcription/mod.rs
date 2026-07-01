@@ -4,7 +4,7 @@ mod text;
 mod transcriber;
 
 pub use model::ModelEvent;
-pub use transcriber::TranscriptionModel;
+pub use transcriber::Transcriber;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TranscriptionError {

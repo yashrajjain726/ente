@@ -103,7 +103,10 @@ pub(crate) fn download_model(
     if need_model {
         on_event(ModelEvent::ExtractionStarted);
         let extracting_path = models_dir.join(format!("{MODEL_DIR_NAME}.extracting"));
-        if let Err(err) = extract_archive(&archive_path, &extracting_path, &final_model_dir) {
+        let extract_result = extract_archive(&archive_path, &extracting_path, &final_model_dir);
+        let _ = fs::remove_file(&archive_path);
+        let _ = fs::remove_file(models_dir.join(format!("{MODEL_DIR_NAME}.tar.gz.metadata.json")));
+        if let Err(err) = extract_result {
             let _ = fs::remove_dir_all(&extracting_path);
             let message = err.to_string();
             on_event(ModelEvent::DownloadError {
@@ -111,8 +114,6 @@ pub(crate) fn download_model(
             });
             return Err(error(message));
         }
-        let _ = fs::remove_file(&archive_path);
-        let _ = fs::remove_file(models_dir.join(format!("{MODEL_DIR_NAME}.tar.gz.metadata.json")));
         on_event(ModelEvent::ExtractionCompleted);
     }
 

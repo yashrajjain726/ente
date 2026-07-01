@@ -57,16 +57,16 @@ pub trait TranscriptionModelEventCallback: Send + Sync {
 }
 
 #[derive(uniffi::Object)]
-pub struct TranscriptionModel {
-    inner: core::TranscriptionModel,
+pub struct Transcriber {
+    inner: core::Transcriber,
 }
 
 #[uniffi::export]
-impl TranscriptionModel {
+impl Transcriber {
     #[uniffi::constructor]
     pub fn new(models_dir: String) -> Arc<Self> {
         Arc::new(Self {
-            inner: core::TranscriptionModel::new(models_dir),
+            inner: core::Transcriber::new(models_dir),
         })
     }
 
