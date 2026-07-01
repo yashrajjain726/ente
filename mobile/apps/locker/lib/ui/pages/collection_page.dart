@@ -1,10 +1,8 @@
 import "dart:async";
 
+import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
 import "package:ente_ui/components/title_bar_title_widget.dart";
-import "package:ente_ui/theme/colors.dart";
-import 'package:ente_ui/theme/ente_theme.dart';
-import "package:ente_ui/theme/text_style.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
@@ -183,15 +181,14 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
 
     return KeyboardListener(
       focusNode: FocusNode(),
       onKeyEvent: handleKeyEvent,
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: colorScheme.backgroundBase,
+          backgroundColor: colors.backgroundBase,
           surfaceTintColor: Colors.transparent,
           toolbarHeight: 48,
           leadingWidth: 48,
@@ -202,11 +199,11 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
             child: const Icon(Icons.arrow_back_outlined),
           ),
         ),
-        backgroundColor: colorScheme.backgroundBase,
+        backgroundColor: colors.backgroundBase,
         body: Stack(
           alignment: Alignment.bottomCenter,
           children: [
-            _buildBody(colorScheme, textTheme),
+            _buildBody(colors),
             FileSelectionOverlayBar(
               files: _displayedFiles,
               selectedFiles: _selectedFiles,
@@ -219,7 +216,7 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
     );
   }
 
-  Widget _buildShareButton(EnteColorScheme colorScheme) {
+  Widget _buildShareButton(ColorTokens colors) {
     if (isFavorite) {
       return const SizedBox.shrink();
     }
@@ -239,18 +236,18 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
         width: 44,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: colorScheme.backdropBase,
+          color: colors.fillLight,
         ),
         padding: const EdgeInsets.all(12),
         child: HugeIcon(
           icon: HugeIcons.strokeRoundedShare08,
-          color: colorScheme.textBase,
+          color: colors.textBase,
         ),
       ),
     );
   }
 
-  Widget _buildMenuButton(EnteColorScheme colorScheme) {
+  Widget _buildMenuButton(ColorTokens colors) {
     if (isFavorite) {
       return SizedBox.fromSize();
     }
@@ -271,18 +268,18 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
         width: 44,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: colorScheme.backdropBase,
+          color: colors.fillLight,
         ),
         padding: const EdgeInsets.all(12),
         child: HugeIcon(
           icon: HugeIcons.strokeRoundedMoreVertical,
-          color: colorScheme.textBase,
+          color: colors.textBase,
         ),
       ),
     );
   }
 
-  Widget _buildBody(EnteColorScheme colorScheme, EnteTextTheme textTheme) {
+  Widget _buildBody(ColorTokens colors) {
     if (isSearchActive) {
       return SearchResultView(
         collections: const [], // CollectionPage primarily shows files
@@ -306,14 +303,14 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
                 trailingWidgets: widget.isUncategorized
                     ? const []
                     : [
-                        _buildShareButton(colorScheme),
+                        _buildShareButton(colors),
                         const SizedBox(width: 12),
-                        _buildMenuButton(colorScheme),
+                        _buildMenuButton(colors),
                       ],
               ),
               Text(
                 _displayedFiles.length.toString(),
-                style: textTheme.smallMuted,
+                style: TextStyles.body.copyWith(color: colors.textLight),
               ),
             ],
           ),

@@ -2,7 +2,6 @@ import "package:ente_components/ente_components.dart";
 import "package:ente_ui/components/alert_bottom_sheet.dart";
 import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/components/buttons/models/button_result.dart";
-import "package:ente_ui/theme/ente_theme.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:ente_utils/share_utils.dart";
@@ -47,8 +46,7 @@ class ShareLinkSheet extends StatefulWidget {
 class _ShareLinkSheetState extends State<ShareLinkSheet> {
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     final l10n = context.l10n;
 
     return BottomSheetComponent(
@@ -59,12 +57,12 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
         children: [
           Text(
             l10n.shareThisLink,
-            style: textTheme.body.copyWith(color: colorScheme.textMuted),
+            style: TextStyles.body.copyWith(color: colors.textLight),
           ),
           const SizedBox(height: 24),
           Container(
             decoration: BoxDecoration(
-              color: colorScheme.backgroundElevated,
+              color: colors.fillLight,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Stack(
@@ -79,8 +77,8 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
                       Expanded(
                         child: SelectableText(
                           widget.url,
-                          style: textTheme.small.copyWith(
-                            color: colorScheme.textBase,
+                          style: TextStyles.body.copyWith(
+                            color: colors.textBase,
                             fontFamily: 'monospace',
                           ),
                         ),
@@ -97,7 +95,7 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
                       visualDensity: VisualDensity.compact,
                       icon: HugeIcon(
                         icon: HugeIcons.strokeRoundedCopy01,
-                        color: colorScheme.textBase,
+                        color: colors.textBase,
                         size: 18,
                       ),
                       tooltip: 'Copy link',

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
 import "package:ente_ui/components/title_bar_title_widget.dart";
-import 'package:ente_ui/theme/ente_theme.dart';
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import 'package:locker/events/collections_updated_event.dart';
@@ -115,12 +114,12 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
 
     return Scaffold(
-      backgroundColor: colorScheme.backgroundBase,
+      backgroundColor: colors.backgroundBase,
       appBar: AppBar(
-        backgroundColor: colorScheme.backgroundBase,
+        backgroundColor: colors.backgroundBase,
         surfaceTintColor: Colors.transparent,
         toolbarHeight: 48,
         leadingWidth: 48,
@@ -144,8 +143,7 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
   }
 
   Widget _buildBody(BuildContext context) {
-    final textTheme = getEnteTextTheme(context);
-    final colorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
     final safeBottomInset = MediaQuery.of(context).padding.bottom;
     final bottomPadding = safeBottomInset + 24.0;
 
@@ -214,7 +212,7 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
                   TitleBarTitleWidget(title: context.l10n.collections),
                   Text(
                     _sortedCollections.length.toString() + " items",
-                    style: textTheme.smallMuted,
+                    style: TextStyles.body.copyWith(color: colors.textLight),
                   ),
                 ],
               ),
@@ -227,12 +225,12 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
                   width: 44,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    color: colorScheme.backdropBase,
+                    color: colors.fillLight,
                   ),
                   padding: const EdgeInsets.all(12),
                   child: HugeIcon(
                     icon: HugeIcons.strokeRoundedAdd01,
-                    color: colorScheme.textBase,
+                    color: colors.textBase,
                   ),
                 ),
               ),
@@ -257,7 +255,7 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
   Widget _buildUncategorizedHook() {
     if (_uncategorizedCollection == null) return const SizedBox.shrink();
 
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     final borderRadius = BorderRadius.circular(20.0);
 
     return Container(
@@ -268,62 +266,42 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withAlpha(30),
-            border: Border.all(
-              color: Theme.of(context).dividerColor.withAlpha(50),
-              width: 0.5,
-            ),
+            color: colors.fillLight,
+            border: Border.all(color: colors.strokeFaint, width: 0.5),
             borderRadius: borderRadius,
           ),
           child: Row(
             children: [
               HugeIcon(
                 icon: HugeIcons.strokeRoundedFolderUnknown,
-                color: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.color?.withAlpha(70),
+                color: colors.textLight,
                 size: 22,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Row(
                   children: [
-                    Text(
-                      context.l10n.uncategorized,
-                      style: textTheme.large.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                    Text(context.l10n.uncategorized, style: TextStyles.large),
                     if (_uncategorizedFileCount! > 0) ...[
                       const SizedBox(width: 8),
                       Text(
                         '•',
-                        style: textTheme.small.copyWith(
-                          color: Theme.of(
-                            context,
-                          ).textTheme.bodySmall?.color?.withAlpha(50),
+                        style: TextStyles.body.copyWith(
+                          color: colors.textLighter,
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         '${_uncategorizedFileCount!}',
-                        style: textTheme.small.copyWith(
-                          color: Theme.of(
-                            context,
-                          ).textTheme.bodySmall?.color?.withAlpha(70),
+                        style: TextStyles.body.copyWith(
+                          color: colors.textLight,
                         ),
                       ),
                     ],
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right,
-                color: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.color?.withAlpha(60),
-                size: 20,
-              ),
+              Icon(Icons.chevron_right, color: colors.textLight, size: 20),
             ],
           ),
         ),

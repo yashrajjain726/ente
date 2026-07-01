@@ -1,14 +1,13 @@
 import "dart:async";
 import "dart:convert";
 
+import 'package:ente_components/ente_components.dart';
 import "package:ente_crypto_api/ente_crypto_api.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_ui/components/captioned_text_widget_v2.dart";
 import "package:ente_ui/components/divider_widget.dart";
 import "package:ente_ui/components/menu_item_widget_v2.dart";
 import "package:ente_ui/components/toggle_switch_widget.dart";
-import "package:ente_ui/theme/colors.dart";
-import "package:ente_ui/theme/ente_theme.dart";
 import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:ente_utils/share_utils.dart";
@@ -44,7 +43,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final enteColorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
     final PublicURL url = widget.collection!.publicURLs.firstOrNull!;
     final String urlValue = CollectionService.instance.getPublicUrl(
       widget.collection!,
@@ -76,14 +75,14 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                                     ),
                                   ))
                           : context.l10n.never,
-                      subTitleColor: url.isExpired ? warning500 : null,
+                      subTitleColor: url.isExpired ? colors.warning : null,
                     ),
                     trailingWidget: HugeIcon(
                       icon: HugeIcons.strokeRoundedArrowRight01,
-                      color: enteColorScheme.textMuted,
+                      color: colors.textLight,
                       size: 20,
                     ),
-                    menuItemColor: enteColorScheme.fillFaint,
+                    menuItemColor: colors.fillLight,
                     surfaceExecutionStates: false,
                     onTap: () async {
                       unawaited(
@@ -106,10 +105,10 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                     ),
                     trailingWidget: HugeIcon(
                       icon: HugeIcons.strokeRoundedArrowRight01,
-                      color: enteColorScheme.textMuted,
+                      color: colors.textLight,
                       size: 20,
                     ),
-                    menuItemColor: enteColorScheme.fillFaint,
+                    menuItemColor: colors.fillLight,
                     alignCaptionedTextToLeft: true,
                     isBottomBorderRadiusRemoved: true,
                     onTap: () async {
@@ -126,7 +125,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                   ),
                   DividerWidget(
                     dividerType: DividerType.menu,
-                    bgColor: enteColorScheme.fillFaint,
+                    bgColor: colors.fillLight,
                   ),
                   MenuItemWidgetV2(
                     key: ValueKey("Password lock ${url.passwordEnabled}"),
@@ -135,7 +134,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                     ),
                     alignCaptionedTextToLeft: true,
                     isTopBorderRadiusRemoved: true,
-                    menuItemColor: getEnteColorScheme(context).fillFaint,
+                    menuItemColor: context.componentColors.fillLight,
                     trailingWidget: ToggleSwitchWidget(
                       value: () => url.passwordEnabled,
                       onChanged: () async {
@@ -175,11 +174,11 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                     MenuItemWidgetV2(
                       captionedTextWidget: CaptionedTextWidgetV2(
                         title: context.l10n.linkExpired,
-                        textColor: getEnteColorScheme(context).warning500,
+                        textColor: context.componentColors.warning,
                       ),
                       leadingIcon: Icons.error_outline,
-                      leadingIconColor: getEnteColorScheme(context).warning500,
-                      menuItemColor: getEnteColorScheme(context).fillFaint,
+                      leadingIconColor: context.componentColors.warning,
+                      menuItemColor: context.componentColors.fillLight,
                     ),
                   if (!url.isExpired)
                     MenuItemWidgetV2(
@@ -189,10 +188,10 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                       ),
                       leadingIconWidget: HugeIcon(
                         icon: HugeIcons.strokeRoundedCopy01,
-                        color: enteColorScheme.textBase,
+                        color: colors.textBase,
                         size: 20,
                       ),
-                      menuItemColor: getEnteColorScheme(context).fillFaint,
+                      menuItemColor: context.componentColors.fillLight,
                       showOnlyLoadingState: true,
                       onTap: () async {
                         await Clipboard.setData(ClipboardData(text: urlValue));
@@ -206,7 +205,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                   if (!url.isExpired)
                     DividerWidget(
                       dividerType: DividerType.menu,
-                      bgColor: getEnteColorScheme(context).fillFaint,
+                      bgColor: context.componentColors.fillLight,
                     ),
                   if (!url.isExpired)
                     MenuItemWidgetV2(
@@ -217,10 +216,10 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                       ),
                       leadingIconWidget: HugeIcon(
                         icon: HugeIcons.strokeRoundedShare08,
-                        color: enteColorScheme.textBase,
+                        color: colors.textBase,
                         size: 20,
                       ),
-                      menuItemColor: getEnteColorScheme(context).fillFaint,
+                      menuItemColor: context.componentColors.fillLight,
                       onTap: () async {
                         unawaited(shareText(urlValue, context: context));
                       },
@@ -230,15 +229,15 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
                   MenuItemWidgetV2(
                     captionedTextWidget: CaptionedTextWidgetV2(
                       title: context.l10n.removeLink,
-                      textColor: warning500,
+                      textColor: colors.warning,
                       makeTextBold: true,
                     ),
-                    leadingIconWidget: const HugeIcon(
+                    leadingIconWidget: HugeIcon(
                       icon: HugeIcons.strokeRoundedDelete02,
-                      color: warning500,
+                      color: colors.warning,
                       size: 20,
                     ),
-                    menuItemColor: getEnteColorScheme(context).fillFaint,
+                    menuItemColor: context.componentColors.fillLight,
                     surfaceExecutionStates: false,
                     onTap: () async {
                       final bool result = await CollectionActions.disableUrl(

@@ -8,7 +8,6 @@ import 'package:ente_accounts/pages/password_reentry_page.dart';
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_ui/components/alert_bottom_sheet.dart';
 import "package:ente_ui/pages/developer_settings_page.dart";
-import "package:ente_ui/theme/ente_theme.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import "package:flutter_svg/flutter_svg.dart";
@@ -106,18 +105,18 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
     final lightComponentTheme = ComponentTheme.lightTheme(
       app: ComponentApp.locker,
     );
     debugPrint("Building OnboardingPage");
     final l10n = context.l10n;
     return Scaffold(
-      backgroundColor: colorScheme.primary700,
+      backgroundColor: colors.primary,
       appBar: AppBar(
         leading: const SizedBox(),
         title: SvgPicture.asset("assets/svg/app-logo.svg"),
-        backgroundColor: colorScheme.primary700,
+        backgroundColor: colors.primary,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
@@ -181,8 +180,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
                               milliseconds: 300,
                             ),
                             decorator: DotsDecorator(
-                              activeColor: Colors.white,
-                              color: Colors.white.withValues(alpha: 0.32),
+                              activeColor: colors.specialWhite,
+                              color: colors.specialWhite.withValues(
+                                alpha: 0.32,
+                              ),
                               activeShape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
@@ -220,10 +221,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       onPressed: _navigateToSignInPage,
                       child: Text(
                         l10n.loginToExistingAccount,
-                        style: getEnteTextTheme(context).body.copyWith(
+                        style: TextStyles.body.copyWith(
                           decoration: TextDecoration.underline,
-                          decorationColor: Colors.white,
-                          color: Colors.white,
+                          decorationColor: colors.specialWhite,
+                          color: colors.specialWhite,
                         ),
                       ),
                     ),
@@ -338,7 +339,8 @@ class FeatureItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -351,7 +353,7 @@ class FeatureItemWidget extends StatelessWidget {
             children: [
               Text(
                 featureTitleFirstLine,
-                style: textTheme.largeBold.copyWith(color: Colors.white),
+                style: TextStyles.large.copyWith(color: colors.specialWhite),
                 textAlign: TextAlign.center,
               ),
             ],
