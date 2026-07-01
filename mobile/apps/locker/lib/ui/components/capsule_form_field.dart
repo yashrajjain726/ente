@@ -1,4 +1,4 @@
-import 'package:ente_ui/theme/ente_theme.dart';
+import 'package:ente_components/ente_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -122,13 +122,7 @@ class _CapsuleFormFieldState extends State<CapsuleFormField> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
-    final accentBlue = Color.lerp(
-      colorScheme.primary500,
-      const Color(0xFF3B82F6),
-      0.7,
-    )!;
+    final colors = context.componentColors;
 
     final isEnabled = widget.enabled && !widget.readOnly;
     _focusNode.canRequestFocus = isEnabled;
@@ -144,15 +138,13 @@ class _CapsuleFormFieldState extends State<CapsuleFormField> {
         (isMultiline ? TextInputType.multiline : TextInputType.text);
 
     final backgroundColor = !widget.enabled
-        ? colorScheme.fillMuted
+        ? colors.fillDarker
         : hasFocus
-        ? accentBlue.withValues(alpha: 0.14)
-        : colorScheme.fillFaint;
+        ? colors.primaryLight
+        : colors.fillDark;
 
     final textLineHeight = widget.lineHeight ?? (isMultiline ? 1.5 : 1.25);
-    final textColor = widget.enabled
-        ? colorScheme.textBase
-        : colorScheme.textFaint;
+    final textColor = widget.enabled ? colors.textBase : colors.textLighter;
 
     return FormField<String>(
       key: _fieldKey,
@@ -166,7 +158,7 @@ class _CapsuleFormFieldState extends State<CapsuleFormField> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (widget.labelText.isNotEmpty) ...[
-              Text(widget.labelText, style: textTheme.body),
+              Text(widget.labelText, style: TextStyles.body),
               const SizedBox(height: 8),
             ],
             AnimatedContainer(
@@ -206,8 +198,8 @@ class _CapsuleFormFieldState extends State<CapsuleFormField> {
                         },
                         onEditingComplete: widget.onEditingComplete,
                         onSubmitted: widget.onSubmitted,
-                        cursorColor: colorScheme.textBase,
-                        style: textTheme.body.copyWith(
+                        cursorColor: colors.textBase,
+                        style: TextStyles.body.copyWith(
                           height: textLineHeight,
                           color: textColor,
                         ),
@@ -216,8 +208,8 @@ class _CapsuleFormFieldState extends State<CapsuleFormField> {
                             : TextAlignVertical.center,
                         decoration: InputDecoration.collapsed(
                           hintText: widget.hintText,
-                          hintStyle: textTheme.body.copyWith(
-                            color: colorScheme.textFaint,
+                          hintStyle: TextStyles.body.copyWith(
+                            color: colors.textLighter,
                             height: textLineHeight,
                           ),
                         ),
@@ -235,7 +227,7 @@ class _CapsuleFormFieldState extends State<CapsuleFormField> {
               const SizedBox(height: 6),
               Text(
                 errorText,
-                style: textTheme.mini.copyWith(color: colorScheme.warning500),
+                style: TextStyles.mini.copyWith(color: colors.warning),
               ),
             ],
           ],
@@ -277,8 +269,7 @@ class _CapsuleDisplayFieldState extends State<CapsuleDisplayField> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     final displayValue = (widget.isSecret && !_isVisible)
         ? '•' * widget.value.length
         : widget.value;
@@ -289,12 +280,12 @@ class _CapsuleDisplayFieldState extends State<CapsuleDisplayField> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.labelText.isNotEmpty) ...[
-          Text(widget.labelText, style: textTheme.body),
+          Text(widget.labelText, style: TextStyles.body),
           const SizedBox(height: 8),
         ],
         Container(
           decoration: BoxDecoration(
-            color: colorScheme.fillFaint,
+            color: colors.fillDark,
             borderRadius: BorderRadius.circular(24),
           ),
           child: Padding(
@@ -308,7 +299,7 @@ class _CapsuleDisplayFieldState extends State<CapsuleDisplayField> {
                   child: (widget.isSecret && !_isVisible)
                       ? Text(
                           displayValue,
-                          style: textTheme.body.copyWith(
+                          style: TextStyles.body.copyWith(
                             height: textLineHeight,
                           ),
                           maxLines: 1,
@@ -316,7 +307,7 @@ class _CapsuleDisplayFieldState extends State<CapsuleDisplayField> {
                         )
                       : SelectableText(
                           displayValue,
-                          style: textTheme.body.copyWith(
+                          style: TextStyles.body.copyWith(
                             height: textLineHeight,
                           ),
                           maxLines: widget.maxLines,
@@ -333,7 +324,7 @@ class _CapsuleDisplayFieldState extends State<CapsuleDisplayField> {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: colorScheme.fillBase.withValues(alpha: 0.1),
+                        color: colors.fillBase.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -342,7 +333,7 @@ class _CapsuleDisplayFieldState extends State<CapsuleDisplayField> {
                         semanticLabel: _isVisible
                             ? 'hide_password'
                             : 'show_password',
-                        color: colorScheme.textMuted,
+                        color: colors.textLight,
                       ),
                     ),
                   ),
@@ -354,13 +345,13 @@ class _CapsuleDisplayFieldState extends State<CapsuleDisplayField> {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: colorScheme.fillBase.withValues(alpha: 0.1),
+                        color: colors.fillBase.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         Icons.copy,
                         size: 16,
-                        color: colorScheme.textMuted,
+                        color: colors.textLight,
                       ),
                     ),
                   ),

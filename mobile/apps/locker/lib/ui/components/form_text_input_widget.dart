@@ -1,5 +1,5 @@
+import 'package:ente_components/ente_components.dart';
 import 'package:ente_ui/components/text_input_widget.dart';
-import 'package:ente_ui/theme/ente_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -81,8 +81,7 @@ class _FormTextInputWidgetState extends State<FormTextInputWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,7 +106,7 @@ class _FormTextInputWidgetState extends State<FormTextInputWidget> {
         ] else ...[
           // Custom implementation for advanced features
           if (widget.labelText.isNotEmpty) ...[
-            Text(widget.labelText, style: textTheme.body),
+            Text(widget.labelText, style: TextStyles.body),
             const SizedBox(height: 8),
           ],
           ClipRRect(
@@ -126,14 +125,14 @@ class _FormTextInputWidgetState extends State<FormTextInputWidget> {
                 inputFormatters: widget.maxLength != null
                     ? [LengthLimitingTextInputFormatter(widget.maxLength!)]
                     : null,
-                style: textTheme.body,
+                style: TextStyles.body,
                 decoration: InputDecoration(
                   hintText: widget.hintText,
-                  hintStyle: textTheme.body.copyWith(
-                    color: colorScheme.textFaint,
+                  hintStyle: TextStyles.body.copyWith(
+                    color: colors.textLighter,
                   ),
                   filled: true,
-                  fillColor: colorScheme.fillFaint,
+                  fillColor: colors.fillDark,
                   contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                   border: const UnderlineInputBorder(
                     borderSide: BorderSide.none,
@@ -143,24 +142,15 @@ class _FormTextInputWidgetState extends State<FormTextInputWidget> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: colorScheme.strokeFaint,
-                      width: 2,
-                    ),
+                    borderSide: BorderSide(color: colors.strokeFaint, width: 2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   errorBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: colorScheme.warning500,
-                      width: 1,
-                    ),
+                    borderSide: BorderSide(color: colors.warning, width: 1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   focusedErrorBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: colorScheme.warning500,
-                      width: 2,
-                    ),
+                    borderSide: BorderSide(color: colors.warning, width: 2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   suffixIcon: widget.suffixIcon != null
@@ -189,7 +179,7 @@ class _FormTextInputWidgetState extends State<FormTextInputWidget> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(
               _errorText!,
-              style: textTheme.mini.copyWith(color: colorScheme.warning500),
+              style: TextStyles.mini.copyWith(color: colors.warning),
             ),
           ),
         ],

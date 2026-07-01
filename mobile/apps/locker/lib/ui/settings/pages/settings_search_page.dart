@@ -379,12 +379,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
-          Text(
-            context.l10n.suggestions,
-            style: TextStyles.large.copyWith(
-              color: context.componentColors.textBase,
-            ),
-          ),
+          Text(context.l10n.suggestions, style: TextStyles.large),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -449,12 +444,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
         rows.add(
           Padding(
             padding: const EdgeInsets.only(top: 12, bottom: 8),
-            child: Text(
-              entry.category,
-              style: TextStyles.large.copyWith(
-                color: context.componentColors.textBase,
-              ),
-            ),
+            child: Text(entry.category, style: TextStyles.large),
           ),
         );
       }
