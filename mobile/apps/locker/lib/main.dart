@@ -16,7 +16,6 @@ import 'package:ente_network/network.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:ente_rust/ente_rust.dart';
 import "package:ente_strings/l10n/strings_localizations.dart";
-import "package:ente_ui/theme/ente_theme_data.dart";
 import "package:ente_ui/theme/theme_config.dart";
 import 'package:ente_ui/utils/window_listener_service.dart';
 import "package:flutter/material.dart";
@@ -118,8 +117,14 @@ Future<void> _runInForeground() async {
         lockScreen: LockScreen(Configuration.instance),
         enabled: await LockScreenSettings.instance.shouldShowLockScreen(),
         locale: locale,
-        lightTheme: lightThemeData,
-        darkTheme: darkThemeData,
+        lightTheme: components.ComponentTheme.themeForApp(
+          components.ComponentApp.locker,
+          brightness: Brightness.light,
+        ),
+        darkTheme: components.ComponentTheme.themeForApp(
+          components.ComponentApp.locker,
+          brightness: Brightness.dark,
+        ),
         savedThemeMode: savedThemeMode,
         supportedLocales: appSupportedLocales,
         localizationsDelegates: const [
