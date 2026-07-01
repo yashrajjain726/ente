@@ -92,12 +92,12 @@ impl Transcriber {
             .map_err(Into::into)
     }
 
-    pub fn load(&self) -> Result<(), TranscriptionError> {
-        self.inner.load().map_err(Into::into)
+    pub fn load_model(&self) -> Result<(), TranscriptionError> {
+        self.inner.load_model().map_err(Into::into)
     }
 
-    pub fn unload(&self) {
-        self.inner.unload();
+    pub fn unload_model(&self) {
+        self.inner.unload_model();
     }
 
     pub fn transcribe(

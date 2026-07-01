@@ -49,7 +49,7 @@ impl Transcriber {
         model::download_model(&self.models_dir, on_event)
     }
 
-    pub fn load(&self) -> Result<()> {
+    pub fn load_model(&self) -> Result<()> {
         let model_dir = model::model_path(&self.models_dir);
         if !model_dir.is_dir() {
             return Err(error("Transcription model is not downloaded"));
@@ -57,7 +57,7 @@ impl Transcriber {
         ensure_loaded(&mut self.lock(), &model_dir)
     }
 
-    pub fn unload(&self) {
+    pub fn unload_model(&self) {
         *self.lock() = None;
     }
 
