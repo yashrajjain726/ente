@@ -134,6 +134,7 @@ class CustomLockerAppBar extends StatelessWidget
                 hintText: context.l10n.searchHint,
                 onChanged: onSearchChanged,
                 autocorrect: false,
+                enableSuggestions: false,
                 shouldUnfocusOnClearOrSubmit: true,
                 backgroundColor: colors.specialWhite,
                 textColor: Colors.black,
