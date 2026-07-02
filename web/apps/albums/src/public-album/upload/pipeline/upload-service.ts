@@ -1,10 +1,6 @@
 // TODO: Audit this file
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 
-import {
-    determineVideoDuration,
-    extractVideoMetadata,
-} from "@/public-album/media/processing/ffmpeg";
 import type { BytesOrB64 } from "ente-base/crypto/types";
 import { streamEncryptionChunkSize } from "ente-base/crypto/types";
 import type { CryptoWorker } from "ente-base/crypto/worker";
@@ -18,6 +14,10 @@ import {
 } from "ente-base/http";
 import log from "ente-base/log";
 import { extractExif } from "ente-gallery/services/exif";
+import {
+    determineVideoDuration,
+    extractVideoMetadata,
+} from "ente-gallery/services/ffmpeg";
 import { tryParseEpochMicrosecondsFromFileName } from "ente-gallery/services/upload/date";
 import { computeMd5Base64 } from "ente-gallery/services/upload/md5";
 import {

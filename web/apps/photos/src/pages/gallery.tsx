@@ -136,7 +136,10 @@ import {
     performFileOp,
     type SelectedState,
 } from "@/utils/file";
-import { quickLinkNameForFiles, resolveQuickLinkURL } from "@/utils/quick-link";
+import {
+    quickLinkNameForFiles,
+    resolveQuickLinkURL,
+} from "ente-gallery/utils/quick-link";
 import {
     savedCollectionFiles,
     savedCollections,

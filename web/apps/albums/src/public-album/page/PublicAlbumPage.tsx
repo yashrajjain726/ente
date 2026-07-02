@@ -17,7 +17,6 @@ import type { FileListHeaderOrFooter } from "@/public-album/components/FileList"
 import { FileListWithViewer } from "@/public-album/components/FileListWithViewer";
 import type { TripLayoutProps } from "@/public-album/components/TripLayout";
 import { setPublicAlbumsCredentials } from "@/public-album/data/auth/public-link-credentials";
-import { quickLinkDateRangeForFiles } from "@/public-album/data/utils/quick-link";
 import { ActiveDownloadStatusNotifications } from "@/public-album/download/components/ActiveDownloadStatusNotifications";
 import { downloadManager } from "@/public-album/download/services/download-manager";
 import { thumbnailManager } from "@/public-album/media/thumbnails/thumbnail-manager";
@@ -66,6 +65,7 @@ import {
     useSaveGroupsActions,
     type AddSaveGroup,
 } from "ente-gallery/components/utils/save-groups";
+import { quickLinkDateRangeForFiles } from "ente-gallery/utils/quick-link";
 import type { Collection } from "ente-media/collection";
 import type { EnteFile } from "ente-media/file";
 import { fileFileName } from "ente-media/file-metadata";
