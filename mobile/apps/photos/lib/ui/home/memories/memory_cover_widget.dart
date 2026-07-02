@@ -16,7 +16,7 @@ class MemoryCoverWidget extends StatefulWidget {
   final double height;
   final double width;
   static const outerStrokeWidth = 1.0;
-  static const aspectRatio = 3.0 / 2.0;
+  static const aspectRatio = 236.924 / 163.214;
   static const gap = 5.0;
   final String title;
   final List<String> allTitle;
@@ -131,11 +131,11 @@ class _MemoryCoverWidgetState extends State<MemoryCoverWidget> {
                           child: Text(
                             title,
                             style: getEnteTextTheme(context).body.copyWith(
-                              fontSize: widget.height * 0.09,
+                              fontSize: widget.height * 0.095,
                               fontFamily: TextStyles.outfitFontFamily,
                               package: TextStyles.fontPackage,
                               color: isSeen ? textFaintDark : Colors.white,
-                              fontWeight: .w500,
+                              fontWeight: .w400,
                             ),
                             textAlign: TextAlign.left,
                           ),
