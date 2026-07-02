@@ -1,1 +1,1 @@
-- Updated the Local Gallery backup banner UI and show it only from the second launch.
+- Updated the Local Gallery backup banner UI and capped text scaling for large accessibility text sizes.
