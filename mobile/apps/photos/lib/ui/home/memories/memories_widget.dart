@@ -1,4 +1,5 @@
 import "dart:async";
+import "dart:math";
 
 import 'package:flutter/material.dart';
 import "package:flutter_animate/flutter_animate.dart";
@@ -67,10 +68,10 @@ class _MemoriesWidgetState extends State<MemoriesWidget> {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final screenHeight = MediaQuery.sizeOf(context).height;
     if (screenWidth < screenHeight) {
-      _memoryWidth = screenWidth * .4352;
+      _memoryWidth = min(screenWidth * .4352, 240);
       _memoryheight = _memoryWidth * MemoryCoverWidget.aspectRatio;
     } else {
-      _memoryWidth = screenHeight * .35;
+      _memoryWidth = min(screenHeight * .35, 240);
       _memoryheight = _memoryWidth * MemoryCoverWidget.aspectRatio;
     }
   }
