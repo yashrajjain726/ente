@@ -4,7 +4,7 @@ import {
     Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import ErrorOutlinedIcon from "@mui/icons-material/ErrorOutlined";
 import ReplayIcon from "@mui/icons-material/Replay";
 import {
     Box,
@@ -221,7 +221,7 @@ export const DownloadStatusNotifications: React.FC<
                 // Determine the start icon based on state
                 let startIcon: React.ReactNode;
                 if (hasErrors) {
-                    startIcon = <ErrorOutlineIcon />;
+                    startIcon = <ErrorOutlinedIcon />;
                 } else if (isComplete) {
                     startIcon = (
                         <GlowingIconWrapper>
