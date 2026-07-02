@@ -84,6 +84,13 @@ struct DownloadMetadata {
     downloaded_at_ms: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PartialDownloadMetadata {
+    url: String,
+    etag: Option<String>,
+    last_modified: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 struct ResponseMetadata {
     etag: Option<String>,
@@ -417,6 +424,7 @@ async fn download_file_single(
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, String> {
     let tmp_path = tmp_path_for(destination);
+    let partial_metadata_path = partial_metadata_path_for(destination);
     let file_started_at = Instant::now();
     let mut network_downloaded_bytes = 0u64;
     let mut retry_count = 0u32;
@@ -426,7 +434,26 @@ async fn download_file_single(
             return Err("Download cancelled".to_string());
         }
 
-        let mut response = match request_file(client, &target.url).await {
+        let tmp_size = file_size(&tmp_path).unwrap_or(0);
+        let resume_validator = if tmp_size > 0 {
+            partial_download_validator(destination, &target.url)
+        } else {
+            None
+        };
+        let resume_from = if resume_validator.is_some() {
+            tmp_size
+        } else {
+            0
+        };
+
+        let mut response = match request_file(
+            client,
+            &target.url,
+            resume_from,
+            resume_validator.as_deref(),
+        )
+        .await
+        {
             Ok(response) => response,
             Err(err) => {
                 if attempt == MAX_ATTEMPTS {
@@ -436,6 +463,16 @@ async fn download_file_single(
                 continue;
             }
         };
+
+        if resume_from > 0 && response.status() == StatusCode::RANGE_NOT_SATISFIABLE {
+            let _ = fs::remove_file(&tmp_path);
+            let _ = fs::remove_file(&partial_metadata_path);
+            if attempt == MAX_ATTEMPTS {
+                return Err(format!("Failed to download {}: HTTP 416", target.label));
+            }
+            retry_count = retry_count.saturating_add(1);
+            continue;
+        }
 
         if !response.status().is_success() {
             if attempt == MAX_ATTEMPTS {
@@ -449,17 +486,28 @@ async fn download_file_single(
             continue;
         }
 
+        let append = resume_from > 0 && response.status() == StatusCode::PARTIAL_CONTENT;
+        let resume_from = if append { resume_from } else { 0 };
         let response_metadata = response_metadata(&response);
-        let file_total = content_total(&response).or(expected_file_total);
+        let file_total = content_total(&response, resume_from).or(expected_file_total);
+
+        if !append {
+            if if_range_header_value(Some(&response_metadata)).is_some() {
+                let _ = write_partial_download_metadata(destination, target, &response_metadata);
+            } else {
+                let _ = fs::remove_file(&partial_metadata_path);
+            }
+        }
 
         let mut file = OpenOptions::new()
             .create(true)
             .write(true)
-            .truncate(true)
+            .append(append)
+            .truncate(!append)
             .open(&tmp_path)
             .map_err(|err| err.to_string())?;
 
-        let mut downloaded = 0u64;
+        let mut downloaded = resume_from;
         let mut last_progress = Instant::now();
         let mut retry_attempt = false;
 
@@ -552,6 +600,7 @@ async fn download_file_single(
 
         if let Err(err) = validate(target, &tmp_path) {
             let _ = fs::remove_file(&tmp_path);
+            let _ = fs::remove_file(&partial_metadata_path);
             return Err(err);
         }
 
@@ -560,6 +609,7 @@ async fn download_file_single(
         }
         fs::rename(&tmp_path, destination).map_err(|err| err.to_string())?;
         let _ = fs::remove_file(range_metadata_path_for(destination));
+        let _ = fs::remove_file(&partial_metadata_path);
 
         let final_size = file_size(destination).unwrap_or(downloaded);
         if final_size != downloaded {
@@ -680,6 +730,7 @@ async fn download_file_ranged(
     }
     fs::rename(&tmp_path, destination).map_err(|err| err.to_string())?;
     let _ = fs::remove_file(&range_metadata_path);
+    let _ = fs::remove_file(partial_metadata_path_for(destination));
 
     let final_size = file_size(destination).unwrap_or(total);
     if final_size != total {
@@ -882,8 +933,20 @@ async fn download_range_part(
     Err("Failed to download file range".to_string())
 }
 
-async fn request_file(client: &Client, url: &str) -> Result<Response, String> {
-    let request = client.get(url);
+async fn request_file(
+    client: &Client,
+    url: &str,
+    resume_from: u64,
+    if_range: Option<&str>,
+) -> Result<Response, String> {
+    let mut request = client.get(url);
+    if resume_from > 0
+        && let Some(if_range) = if_range
+    {
+        request = request
+            .header(RANGE, format!("bytes={resume_from}-"))
+            .header(IF_RANGE, if_range);
+    }
     timeout(RESPONSE_START_TIMEOUT, request.send())
         .await
         .map_err(|_| {
@@ -1167,7 +1230,7 @@ fn if_range_header_value(response_metadata: Option<&ResponseMetadata>) -> Option
     })
 }
 
-fn content_total(response: &Response) -> Option<u64> {
+fn content_total(response: &Response, resume_from: u64) -> Option<u64> {
     let content_range_total = response
         .headers()
         .get(CONTENT_RANGE)
@@ -1175,7 +1238,13 @@ fn content_total(response: &Response) -> Option<u64> {
         .and_then(parse_content_range_total);
     let content_length = response.content_length().filter(|value| *value > 0);
 
-    content_range_total.or(content_length)
+    content_range_total.or_else(|| {
+        if resume_from > 0 && response.status() == StatusCode::PARTIAL_CONTENT {
+            content_length.map(|value| value.saturating_add(resume_from))
+        } else {
+            content_length
+        }
+    })
 }
 
 fn parse_content_range_total(value: &str) -> Option<u64> {
@@ -1476,9 +1545,37 @@ fn range_metadata_path_for(path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.tmp.ranges.json", path.display()))
 }
 
+fn partial_metadata_path_for(path: &Path) -> PathBuf {
+    PathBuf::from(format!("{}.tmp.partial.json", path.display()))
+}
+
+fn partial_download_validator(destination: &Path, url: &str) -> Option<String> {
+    let text = fs::read_to_string(partial_metadata_path_for(destination)).ok()?;
+    let metadata: PartialDownloadMetadata = serde_json::from_str(&text).ok()?;
+    if metadata.url != url {
+        return None;
+    }
+    metadata.etag.or(metadata.last_modified)
+}
+
+fn write_partial_download_metadata(
+    destination: &Path,
+    target: &Target,
+    response_metadata: &ResponseMetadata,
+) -> Result<(), String> {
+    let metadata = PartialDownloadMetadata {
+        url: target.url.clone(),
+        etag: response_metadata.etag.clone(),
+        last_modified: response_metadata.last_modified.clone(),
+    };
+    let text = serde_json::to_string_pretty(&metadata).map_err(|err| err.to_string())?;
+    fs::write(partial_metadata_path_for(destination), text).map_err(|err| err.to_string())
+}
+
 fn cleanup_range_download(destination: &Path) {
     let _ = fs::remove_file(tmp_path_for(destination));
     let _ = fs::remove_file(range_metadata_path_for(destination));
+    let _ = fs::remove_file(partial_metadata_path_for(destination));
 }
 
 fn now_ms() -> u64 {
@@ -2061,6 +2158,160 @@ mod tests {
         let _ = fs::remove_dir_all(test_dir);
     }
 
+    #[test]
+    fn single_stream_download_resumes_from_partial_tmp() {
+        let bytes = Arc::new(sample_bytes(512));
+        let head_count = Arc::new(AtomicUsize::new(0));
+        let range_get_count = Arc::new(AtomicUsize::new(0));
+        let full_get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let head_count = Arc::clone(&head_count);
+            let range_get_count = Arc::clone(&range_get_count);
+            let full_get_count = Arc::clone(&full_get_count);
+            TestServer::spawn(move |stream| {
+                handle_range_test_request(
+                    stream,
+                    Arc::clone(&bytes),
+                    Arc::clone(&head_count),
+                    Arc::clone(&range_get_count),
+                    Arc::clone(&full_get_count),
+                );
+            })
+        };
+
+        let test_dir = scratch_dir("resume-download");
+        let destination = test_dir.join("model.bin");
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+        fs::write(tmp_path_for(&destination), &bytes[..256]).expect("place partial tmp");
+        write_partial_download_metadata(
+            &destination,
+            &target,
+            &ResponseMetadata {
+                etag: Some("\"test-etag\"".to_string()),
+                last_modified: None,
+            },
+        )
+        .expect("write partial sidecar");
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("resume succeeds");
+
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
+        assert_eq!(
+            range_get_count.load(Ordering::SeqCst),
+            1,
+            "resume must continue with a single ranged GET"
+        );
+        assert_eq!(full_get_count.load(Ordering::SeqCst), 0);
+        assert!(!tmp_path_for(&destination).exists());
+        assert!(!partial_metadata_path_for(&destination).exists());
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn single_stream_download_restarts_when_resume_validator_is_stale() {
+        let bytes = Arc::new(sample_bytes(512));
+        let head_count = Arc::new(AtomicUsize::new(0));
+        let range_get_count = Arc::new(AtomicUsize::new(0));
+        let full_get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let head_count = Arc::clone(&head_count);
+            let range_get_count = Arc::clone(&range_get_count);
+            let full_get_count = Arc::clone(&full_get_count);
+            TestServer::spawn(move |stream| {
+                handle_range_test_request(
+                    stream,
+                    Arc::clone(&bytes),
+                    Arc::clone(&head_count),
+                    Arc::clone(&range_get_count),
+                    Arc::clone(&full_get_count),
+                );
+            })
+        };
+
+        let test_dir = scratch_dir("stale-resume-download");
+        let destination = test_dir.join("model.bin");
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+        fs::write(tmp_path_for(&destination), vec![0xAAu8; 256]).expect("place stale tmp");
+        write_partial_download_metadata(
+            &destination,
+            &target,
+            &ResponseMetadata {
+                etag: Some("\"other-etag\"".to_string()),
+                last_modified: None,
+            },
+        )
+        .expect("write stale partial sidecar");
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("restart succeeds");
+
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
+        assert_eq!(
+            full_get_count.load(Ordering::SeqCst),
+            1,
+            "a stale validator must trigger a full restart, not an append"
+        );
+        assert_eq!(range_get_count.load(Ordering::SeqCst), 0);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn single_stream_download_ignores_partial_without_sidecar() {
+        let bytes = Arc::new(sample_bytes(512));
+        let get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("no-sidecar-resume-download");
+        let destination = test_dir.join("model.bin");
+        fs::write(tmp_path_for(&destination), &bytes[..256]).expect("place orphan tmp");
+
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fresh download succeeds");
+
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
+        assert_eq!(
+            get_count.load(Ordering::SeqCst),
+            1,
+            "a partial without a sidecar must restart from scratch"
+        );
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
     fn sample_bytes(len: usize) -> Vec<u8> {
         (0..len).map(|index| (index % 251) as u8).collect()
     }
@@ -2169,15 +2420,18 @@ mod tests {
         }
 
         let mut range_header = None;
+        let mut if_range_header = None;
         loop {
             let mut line = String::new();
             if reader.read_line(&mut line).is_err() || line == "\r\n" || line.is_empty() {
                 break;
             }
-            if let Some((name, value)) = line.split_once(':')
-                && name.eq_ignore_ascii_case("range")
-            {
-                range_header = Some(value.trim().to_string());
+            if let Some((name, value)) = line.split_once(':') {
+                if name.eq_ignore_ascii_case("range") {
+                    range_header = Some(value.trim().to_string());
+                } else if name.eq_ignore_ascii_case("if-range") {
+                    if_range_header = Some(value.trim().to_string());
+                }
             }
         }
 
@@ -2191,7 +2445,10 @@ mod tests {
             return;
         }
 
-        if let Some(range_header) = range_header {
+        let resume_allowed = if_range_header
+            .as_deref()
+            .is_none_or(|value| value == "\"test-etag\"");
+        if let Some(range_header) = range_header.filter(|_| resume_allowed) {
             let Some((start, end)) = parse_test_range_header(&range_header, bytes.len() as u64)
             else {
                 let _ = stream

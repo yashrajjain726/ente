@@ -11,7 +11,6 @@ use crate::transcription::{Result, error};
 
 pub struct Transcriber {
     models_dir: PathBuf,
-    download_lock: Mutex<()>,
     loaded: Mutex<Option<ParakeetModel>>,
 }
 
@@ -19,7 +18,6 @@ impl Transcriber {
     pub fn new(models_dir: impl Into<PathBuf>) -> Self {
         Self {
             models_dir: models_dir.into(),
-            download_lock: Mutex::new(()),
             loaded: Mutex::new(None),
         }
     }
@@ -29,10 +27,6 @@ impl Transcriber {
     }
 
     pub fn download_model(&self, on_event: impl FnMut(ModelEvent)) -> Result<PathBuf> {
-        let _guard = self
-            .download_lock
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
         model::download_model(&self.models_dir, on_event)
     }
 

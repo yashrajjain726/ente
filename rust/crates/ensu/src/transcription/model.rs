@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use flate2::read::GzDecoder;
 use tar::Archive;
@@ -15,6 +17,14 @@ const MODEL_LABEL: &str = "Transcription model";
 const VAD_MODEL_URL: &str = "https://models.ente.io/silero_vad_v4.onnx";
 const VAD_MODEL_FILE_NAME: &str = "silero_vad_v4.onnx";
 const VAD_LABEL: &str = "Voice activity model";
+
+static DOWNLOAD_LOCKS: OnceLock<Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>> = OnceLock::new();
+
+fn download_lock(models_dir: &Path) -> Arc<Mutex<()>> {
+    let locks = DOWNLOAD_LOCKS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut locks = locks.lock().unwrap_or_else(PoisonError::into_inner);
+    locks.entry(models_dir.to_path_buf()).or_default().clone()
+}
 
 #[derive(Debug, Clone)]
 pub enum ModelEvent {
@@ -49,6 +59,8 @@ pub(crate) fn download_model(
     mut on_event: impl FnMut(ModelEvent),
 ) -> Result<PathBuf> {
     let models_dir = models_dir.as_ref();
+    let lock = download_lock(models_dir);
+    let _guard = lock.lock().unwrap_or_else(PoisonError::into_inner);
     fs::create_dir_all(models_dir)?;
     let _ = fs::remove_file(models_dir.join(format!("{MODEL_DIR_NAME}.partial")));
     let _ = fs::remove_file(models_dir.join(format!("{VAD_MODEL_FILE_NAME}.partial")));
