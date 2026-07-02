@@ -228,7 +228,6 @@ class _AppBarComponentState extends State<AppBarComponent> {
         controller: _controller,
         physics: widget.physics,
         cacheExtent: widget.cacheExtent,
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         slivers: [
           SliverAppBarComponent(
             title: widget.title,
