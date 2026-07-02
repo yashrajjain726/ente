@@ -1524,9 +1524,9 @@ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
 name = "crypto-bigint"
-version = "0.7.3"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42a0d26b245348befa0c121944541476763dcc46ede886c88f9d12e1697d27c3"
+checksum = "1a52aa3fcda4e6302a9f48734f234d35d4721b96f8fe07d073f07ce9df4f0271"
 dependencies = [
  "cpubits",
  "ctutils",
@@ -8130,8 +8130,9 @@ dependencies = [
 
 [[package]]
 name = "srp"
-version = "0.7.0-rc.2"
-source = "git+https://github.com/RustCrypto/PAKEs?rev=5b3bd1f3a9d51121a698ffe5d6ecc33cafcd6413#5b3bd1f3a9d51121a698ffe5d6ecc33cafcd6413"
+version = "0.7.0-rc.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b5f622c2d21b826b3501f4c620ccc4696e4a09a6b51727fcb21036dec87c101"
 dependencies = [
  "crypto-bigint",
  "crypto-common 0.2.1",
