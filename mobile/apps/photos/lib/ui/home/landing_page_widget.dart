@@ -43,16 +43,6 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
       riveFactory: rive.Factory.flutter,
     );
     Future(_showAutoLogoutDialogIfRequired);
-    if (mounted) {
-      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    }
-  }
-
-  @override
-  void dispose() {
-    _onboardingAnimationLoader.dispose();
-    SystemChrome.setPreferredOrientations([]);
-    super.dispose();
   }
 
   @override
@@ -78,89 +68,77 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
           onSettingsChanged: () {
             setState(() {});
           },
-          child: Column(
-            children: [
-              if (kDebugMode) _buildDebugLanguageButton(),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      _buildOnboardingAnimation(),
-                      Text(
-                        AppLocalizations.of(context).onboardingTitle,
-                        textAlign: .center,
-                        style: const TextStyle(
-                          fontWeight: .w900,
-                          fontFamily: TextStyles.outfitFontFamily,
-                          package: TextStyles.fontPackage,
-                          fontSize: 36,
-                          height: 1,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32),
-                        child: Text(
-                          AppLocalizations.of(context).onboardingDesc,
-                          textAlign: TextAlign.center,
-                          style: textTheme.body.copyWith(
-                            color: colorScheme.greenLight,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: .center,
+              mainAxisAlignment: .center,
+              children: [
+                if (kDebugMode) _buildDebugLanguageButton(),
+                _buildOnboardingAnimation(),
+                Text(
+                  AppLocalizations.of(context).onboardingTitle,
+                  textAlign: .center,
+                  style: const TextStyle(
+                    fontWeight: .w900,
+                    fontFamily: TextStyles.outfitFontFamily,
+                    package: TextStyles.fontPackage,
+                    fontSize: 36,
+                    height: 1,
+                    color: Colors.white,
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    Theme(
-                      data: lightComponentTheme,
-                      child: ButtonComponent(
-                        variant: ButtonComponentVariant.neutral,
-                        label: AppLocalizations.of(context).createAnEnteAccount,
-                        onTap: _navigateToSignUpPage,
-                        shouldSurfaceExecutionStates: false,
-                      ),
+                const Flexible(child: SizedBox(height: 16)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    AppLocalizations.of(context).onboardingDesc,
+                    textAlign: TextAlign.center,
+                    style: textTheme.body.copyWith(
+                      color: colorScheme.greenLight,
+                      fontSize: 14,
                     ),
-                    if (localSettings.showLocalGalleryModeOption) ...[
-                      const SizedBox(height: 12),
-                      Theme(
-                        data: lightComponentTheme,
-                        child: ButtonComponent(
-                          variant: ButtonComponentVariant.secondary,
-                          label: AppLocalizations.of(
-                            context,
-                          ).continueWithoutAccount,
-                          onTap: _navigateWithoutAccount,
-                          shouldSurfaceExecutionStates: false,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: _navigateToSignInPage,
-                      child: Text(
-                        AppLocalizations.of(context).loginToExistingAccount,
-                        style: textTheme.body.copyWith(
-                          decoration: TextDecoration.underline,
-                          decorationColor: Colors.white,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              const DeveloperSettingsWidget(),
-              const SizedBox(height: 24),
-            ],
+                const Flexible(child: SizedBox(height: 64)),
+                Theme(
+                  data: lightComponentTheme,
+                  child: ButtonComponent(
+                    variant: ButtonComponentVariant.neutral,
+                    label: AppLocalizations.of(context).createAnEnteAccount,
+                    onTap: _navigateToSignUpPage,
+                    shouldSurfaceExecutionStates: false,
+                  ),
+                ),
+                if (localSettings.showLocalGalleryModeOption) ...[
+                  const SizedBox(height: 12),
+                  Theme(
+                    data: lightComponentTheme,
+                    child: ButtonComponent(
+                      variant: ButtonComponentVariant.secondary,
+                      label: AppLocalizations.of(
+                        context,
+                      ).continueWithoutAccount,
+                      onTap: _navigateWithoutAccount,
+                      shouldSurfaceExecutionStates: false,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _navigateToSignInPage,
+                  child: Text(
+                    AppLocalizations.of(context).loginToExistingAccount,
+                    style: textTheme.body.copyWith(
+                      decoration: TextDecoration.underline,
+                      decorationColor: Colors.white,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                if (kDebugMode) const DeveloperSettingsWidget(),
+              ],
+            ),
           ),
         ),
       ),
