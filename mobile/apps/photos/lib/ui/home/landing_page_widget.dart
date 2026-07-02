@@ -69,38 +69,47 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
             setState(() {});
           },
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               crossAxisAlignment: .center,
               mainAxisAlignment: .center,
               children: [
-                if (kDebugMode) _buildDebugLanguageButton(),
-                _buildOnboardingAnimation(),
-                Text(
-                  AppLocalizations.of(context).onboardingTitle,
-                  textAlign: .center,
-                  style: const TextStyle(
-                    fontWeight: .w900,
-                    fontFamily: TextStyles.outfitFontFamily,
-                    package: TextStyles.fontPackage,
-                    fontSize: 36,
-                    height: 1,
-                    color: Colors.white,
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      if (kDebugMode) _buildDebugLanguageButton(),
+                      _buildOnboardingAnimation(),
+                      Text(
+                        AppLocalizations.of(context).onboardingTitle,
+                        textAlign: .center,
+                        textScaler: TextScaler.noScaling,
+                        style: TextStyle(
+                          fontWeight: .w900,
+                          fontFamily: TextStyles.outfitFontFamily,
+                          package: TextStyles.fontPackage,
+
+                          fontSize: MediaQuery.of(context).size.width * 0.09,
+                          height: 1,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const Flexible(child: SizedBox(height: 16)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          AppLocalizations.of(context).onboardingDesc,
+                          textAlign: TextAlign.center,
+                          style: textTheme.body.copyWith(
+                            color: colorScheme.greenLight,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      const Flexible(child: SizedBox(height: 64)),
+                    ],
                   ),
                 ),
-                const Flexible(child: SizedBox(height: 16)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Text(
-                    AppLocalizations.of(context).onboardingDesc,
-                    textAlign: TextAlign.center,
-                    style: textTheme.body.copyWith(
-                      color: colorScheme.greenLight,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                const Flexible(child: SizedBox(height: 64)),
                 Theme(
                   data: lightComponentTheme,
                   child: ButtonComponent(
@@ -148,7 +157,7 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
   Widget _buildOnboardingAnimation() {
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.35,
+        maxHeight: MediaQuery.of(context).size.height * 0.325,
       ),
       child: rive.RiveWidgetBuilder(
         fileLoader: _onboardingAnimationLoader,

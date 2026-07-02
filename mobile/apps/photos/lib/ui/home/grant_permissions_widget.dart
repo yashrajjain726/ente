@@ -352,23 +352,25 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        const SizedBox(height: 32),
                         _buildPermissionsAnimation(context),
-                        const SizedBox(height: 22),
+                        const Flexible(child: SizedBox(height: 22)),
                         Text(
                           AppLocalizations.of(
                             context,
                           ).grantGalleryPermissionTitle,
                           textAlign: .center,
+                          textScaler: .noScaling,
                           style: TextStyle(
                             fontWeight: .w900,
                             fontFamily: TextStyles.outfitFontFamily,
                             package: TextStyles.fontPackage,
-                            fontSize: 36,
+                            fontSize: MediaQuery.of(context).size.width * 0.125,
                             height: 1,
                             color: colorScheme.textBase,
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const Flexible(child: SizedBox(height: 24)),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Text(
@@ -382,7 +384,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 32),
+                        const Flexible(child: SizedBox(height: 32)),
                         ButtonWidgetV2(
                           buttonType: ButtonTypeV2.neutral,
                           labelText: AppLocalizations.of(
@@ -390,9 +392,9 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                           ).grantPermission,
                           onTap: _onTapOfflineGrantPermission,
                         ),
-                        const SizedBox(height: 20),
+                        const Flexible(child: SizedBox(height: 20)),
                         _buildOfflineTermsAndPrivacy(context),
-                        const SizedBox(height: 24),
+                        const Flexible(child: SizedBox(height: 24)),
                       ],
                     ),
                   ),
