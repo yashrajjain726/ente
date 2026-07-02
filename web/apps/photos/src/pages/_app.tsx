@@ -1,4 +1,3 @@
-import { useNotification } from "@/components/utils/hooks-app";
 import { useDesktopAppLockRoute } from "@/components/utils/use-app-lock-route";
 import { photosLogout } from "@/services/logout";
 import "@fontsource-variable/inter";
@@ -19,9 +18,11 @@ import {
 } from "ente-base/components/loaders";
 import { AttributedMiniDialog } from "ente-base/components/MiniDialog";
 import { Notification } from "ente-base/components/Notification";
+import { ThemedLoadingBar } from "ente-base/components/ThemedLoadingBar";
 import { useAttributedMiniDialog } from "ente-base/components/utils/dialog";
 import {
     useIsRouteChangeInProgress,
+    useNotification,
     useSetupI18n,
     useSetupLogs,
 } from "ente-base/components/utils/hooks-app";
@@ -36,7 +37,6 @@ import {
     isHLSGenerationSupported,
 } from "ente-gallery/services/video";
 import { AppLockReauthenticationDialog } from "ente-new/photos/components/app-lock/AppLockReauthenticationDialog";
-import { ThemedLoadingBar } from "ente-new/photos/components/ThemedLoadingBar";
 import {
     updateAvailableForDownloadDialogAttributes,
     updateReadyToInstallDialogAttributes,
