@@ -166,10 +166,13 @@ async fn fetch_async(
         .map_err(|err| err.to_string())?;
     let download_started_at = Instant::now();
     let mut download_probes = Vec::with_capacity(targets.len());
+    let mut cached = Vec::with_capacity(targets.len());
 
     for target in &targets {
         let destination = Path::new(&target.destination_path);
-        if prepare_cached_download(target, destination, &validate) {
+        let is_cached = prepare_cached_download(target, destination, &validate);
+        cached.push(is_cached);
+        if is_cached {
             download_probes.push(DownloadProbe {
                 content_length: file_size(destination),
                 supports_ranges: false,
@@ -201,12 +204,13 @@ async fn fetch_async(
     let file_states = targets
         .iter()
         .zip(&download_probes)
-        .map(|(target, probe)| {
+        .zip(&cached)
+        .map(|((target, probe), cached)| {
             let existing = existing_download_bytes(
                 target,
                 Path::new(&target.destination_path),
                 probe,
-                &validate,
+                *cached,
             );
             FileDownloadState {
                 downloaded_bytes: probe
@@ -234,13 +238,10 @@ async fn fetch_async(
     let mut downloads = Vec::new();
 
     for (index, target) in targets.iter().enumerate() {
-        let destination = PathBuf::from(&target.destination_path);
-        if destination.exists()
-            && download_metadata_matches(&destination, &target.url)
-            && validate(target, &destination).is_ok()
-        {
+        if cached[index] {
             continue;
         }
+        let destination = PathBuf::from(&target.destination_path);
 
         let download_probe = download_probes
             .get(index)
@@ -1392,7 +1393,7 @@ fn prepare_cached_download(
     if !destination.exists() || validate(target, destination).is_err() {
         return false;
     }
-    if read_download_metadata(destination).is_none() {
+    if !metadata_path_for(destination).exists() {
         let size = file_size(destination).unwrap_or(0);
         let _ = write_download_metadata(destination, target, size, None);
         return true;
@@ -1433,7 +1434,10 @@ fn write_download_metadata(
         downloaded_at_ms: now_ms(),
     };
     let text = serde_json::to_string_pretty(&metadata).map_err(|err| err.to_string())?;
-    fs::write(metadata_path_for(path), text).map_err(|err| err.to_string())
+    let metadata_path = metadata_path_for(path);
+    let tmp_path = PathBuf::from(format!("{}.tmp", metadata_path.display()));
+    fs::write(&tmp_path, text).map_err(|err| err.to_string())?;
+    fs::rename(&tmp_path, &metadata_path).map_err(|err| err.to_string())
 }
 
 fn response_metadata(response: &Response) -> ResponseMetadata {
@@ -1464,7 +1468,7 @@ fn write_range_download_metadata(
     fs::write(path, text).map_err(|err| err.to_string())
 }
 
-fn metadata_path_for(path: &Path) -> PathBuf {
+pub(crate) fn metadata_path_for(path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.metadata.json", path.display()))
 }
 
@@ -1488,16 +1492,13 @@ fn existing_download_bytes(
     target: &Target,
     destination: &Path,
     probe: &DownloadProbe,
-    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
+    cached: bool,
 ) -> u64 {
+    if cached {
+        return file_size(destination).unwrap_or(0);
+    }
     if destination.exists() {
-        return if download_metadata_matches(destination, &target.url)
-            && validate(target, destination).is_ok()
-        {
-            file_size(destination).unwrap_or(0)
-        } else {
-            0
-        };
+        return 0;
     }
 
     if range_metadata_path_for(destination).exists() {
@@ -1972,6 +1973,45 @@ mod tests {
             "adopting the file writes its metadata sidecar"
         );
         assert_eq!(fs::read(&destination).expect("read adopted file"), *bytes);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn existing_file_with_corrupt_sidecar_is_redownloaded() {
+        let bytes = Arc::new(sample_bytes(512));
+        let get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("corrupt-sidecar-download");
+        let destination = test_dir.join("model.bin");
+        fs::write(&destination, bytes.as_slice()).expect("place existing file");
+        fs::write(metadata_path_for(&destination), "{ truncated").expect("write corrupt sidecar");
+
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fetch redownloads");
+
+        assert_eq!(
+            get_count.load(Ordering::SeqCst),
+            1,
+            "a corrupt sidecar must trigger a re-download, not adoption"
+        );
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
 
         let _ = fs::remove_dir_all(test_dir);
     }

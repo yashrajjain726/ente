@@ -12,12 +12,7 @@ use crate::transcription::{Result, error};
 pub struct Transcriber {
     models_dir: PathBuf,
     download_lock: Mutex<()>,
-    loaded: Mutex<Option<LoadedModel>>,
-}
-
-struct LoadedModel {
-    path: PathBuf,
-    model: ParakeetModel,
+    loaded: Mutex<Option<ParakeetModel>>,
 }
 
 impl Transcriber {
@@ -33,14 +28,6 @@ impl Transcriber {
         model::is_model_downloaded(&self.models_dir)
     }
 
-    pub fn model_path(&self) -> PathBuf {
-        model::model_path(&self.models_dir)
-    }
-
-    pub fn model_size_mb(&self) -> u64 {
-        model::model_size_mb()
-    }
-
     pub fn download_model(&self, on_event: impl FnMut(ModelEvent)) -> Result<PathBuf> {
         let _guard = self
             .download_lock
@@ -50,11 +37,9 @@ impl Transcriber {
     }
 
     pub fn load_model(&self) -> Result<()> {
-        let model_dir = model::model_path(&self.models_dir);
-        if !model_dir.is_dir() {
-            return Err(error("Transcription model is not downloaded"));
-        }
-        ensure_loaded(&mut self.lock(), &model_dir)
+        let model_dir = self.downloaded_model_dir()?;
+        ensure_loaded(&mut self.lock(), &model_dir)?;
+        Ok(())
     }
 
     pub fn unload_model(&self) {
@@ -66,10 +51,7 @@ impl Transcriber {
             return Ok(String::new());
         }
 
-        let model_dir = model::model_path(&self.models_dir);
-        if !model_dir.is_dir() {
-            return Err(error("Transcription model is not downloaded"));
-        }
+        let model_dir = self.downloaded_model_dir()?;
         let vad_model_path = model::vad_model_path(&self.models_dir);
         if !vad_model_path.is_file() {
             return Err(error("Voice activity model is not downloaded"));
@@ -81,11 +63,7 @@ impl Transcriber {
         }
 
         let mut loaded = self.lock();
-        ensure_loaded(&mut loaded, &model_dir)?;
-        let model = &mut loaded
-            .as_mut()
-            .ok_or_else(|| error("Transcription model is not loaded"))?
-            .model;
+        let model = ensure_loaded(&mut loaded, &model_dir)?;
         let result = model.transcribe_with(
             &speech,
             &ParakeetParams {
@@ -97,20 +75,25 @@ impl Transcriber {
         Ok(filter_transcription_output(&result.text))
     }
 
-    fn lock(&self) -> MutexGuard<'_, Option<LoadedModel>> {
+    fn downloaded_model_dir(&self) -> Result<PathBuf> {
+        let model_dir = model::model_path(&self.models_dir);
+        if !model_dir.is_dir() {
+            return Err(error("Transcription model is not downloaded"));
+        }
+        Ok(model_dir)
+    }
+
+    fn lock(&self) -> MutexGuard<'_, Option<ParakeetModel>> {
         self.loaded.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 
-fn ensure_loaded(loaded: &mut Option<LoadedModel>, model_dir: &Path) -> Result<()> {
-    if loaded.as_ref().map(|entry| entry.path.as_path()) == Some(model_dir) {
-        return Ok(());
+fn ensure_loaded<'a>(
+    loaded: &'a mut Option<ParakeetModel>,
+    model_dir: &Path,
+) -> Result<&'a mut ParakeetModel> {
+    match loaded {
+        Some(model) => Ok(model),
+        slot => Ok(slot.insert(ParakeetModel::load(model_dir, &Quantization::Int8)?)),
     }
-
-    let model = ParakeetModel::load(model_dir, &Quantization::Int8)?;
-    *loaded = Some(LoadedModel {
-        path: model_dir.to_path_buf(),
-        model,
-    });
-    Ok(())
 }

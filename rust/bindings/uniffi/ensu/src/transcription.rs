@@ -74,14 +74,6 @@ impl Transcriber {
         self.inner.is_model_downloaded()
     }
 
-    pub fn model_path(&self) -> String {
-        self.inner.model_path().to_string_lossy().into_owned()
-    }
-
-    pub fn model_size_mb(&self) -> u64 {
-        self.inner.model_size_mb()
-    }
-
     pub fn download_model(
         &self,
         callback: Box<dyn TranscriptionModelEventCallback>,

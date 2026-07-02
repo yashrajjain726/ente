@@ -12,7 +12,6 @@ use crate::transcription::{Result, error};
 const MODEL_URL: &str = "https://models.ente.io/parakeet-v3-int8.tar.gz";
 const MODEL_DIR_NAME: &str = "parakeet-tdt-0.6b-v3-int8";
 const MODEL_LABEL: &str = "Transcription model";
-const MODEL_SIZE_MB: u64 = 480;
 const VAD_MODEL_URL: &str = "https://models.ente.io/silero_vad_v4.onnx";
 const VAD_MODEL_FILE_NAME: &str = "silero_vad_v4.onnx";
 const VAD_LABEL: &str = "Voice activity model";
@@ -45,16 +44,14 @@ pub(crate) fn vad_model_path(models_dir: impl AsRef<Path>) -> PathBuf {
     models_dir.as_ref().join(VAD_MODEL_FILE_NAME)
 }
 
-pub(crate) fn model_size_mb() -> u64 {
-    MODEL_SIZE_MB
-}
-
 pub(crate) fn download_model(
     models_dir: impl AsRef<Path>,
     mut on_event: impl FnMut(ModelEvent),
 ) -> Result<PathBuf> {
     let models_dir = models_dir.as_ref();
     fs::create_dir_all(models_dir)?;
+    let _ = fs::remove_file(models_dir.join(format!("{MODEL_DIR_NAME}.partial")));
+    let _ = fs::remove_file(models_dir.join(format!("{VAD_MODEL_FILE_NAME}.partial")));
 
     let final_model_dir = model_path(models_dir);
     let vad_path = vad_model_path(models_dir);
@@ -105,7 +102,7 @@ pub(crate) fn download_model(
         let extracting_path = models_dir.join(format!("{MODEL_DIR_NAME}.extracting"));
         let extract_result = extract_archive(&archive_path, &extracting_path, &final_model_dir);
         let _ = fs::remove_file(&archive_path);
-        let _ = fs::remove_file(models_dir.join(format!("{MODEL_DIR_NAME}.tar.gz.metadata.json")));
+        let _ = fs::remove_file(download::metadata_path_for(&archive_path));
         if let Err(err) = extract_result {
             let _ = fs::remove_dir_all(&extracting_path);
             let message = err.to_string();
@@ -125,7 +122,7 @@ fn validate_download(target: &download::Target, path: &Path) -> std::result::Res
     if !is_file_present(path) {
         return Err(format!("{} is empty", path.display()));
     }
-    if target.label == MODEL_LABEL && !looks_like_gzip(path) {
+    if target.destination_path.ends_with(".tar.gz") && !looks_like_gzip(path) {
         return Err(format!("{} is not a gzip archive", path.display()));
     }
     Ok(())

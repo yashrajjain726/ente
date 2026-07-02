@@ -18,12 +18,6 @@ impl From<std::io::Error> for TranscriptionError {
     }
 }
 
-impl From<reqwest::Error> for TranscriptionError {
-    fn from(value: reqwest::Error) -> Self {
-        Self::Message(value.to_string())
-    }
-}
-
 impl From<transcribe_rs::TranscribeError> for TranscriptionError {
     fn from(value: transcribe_rs::TranscribeError) -> Self {
         Self::Message(value.to_string())
