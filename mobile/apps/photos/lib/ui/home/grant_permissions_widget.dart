@@ -3,6 +3,7 @@ import "dart:async";
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:flutter/material.dart';
+import "package:flutter/services.dart";
 import 'package:flutter_svg/flutter_svg.dart';
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
@@ -23,6 +24,7 @@ import "package:photos/ui/components/alert_bottom_sheet.dart";
 import "package:photos/ui/components/buttons/button_widget_v2.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/utils/dialog_util.dart";
+import "package:rive/rive.dart" as rive;
 import "package:styled_text/styled_text.dart";
 
 class GrantPermissionsWidget extends StatefulWidget {
@@ -40,9 +42,22 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
     const Duration(milliseconds: 500),
     leading: true,
   );
+  late final rive.FileLoader _permissionsAnimationLoader;
+
+  @override
+  void initState() {
+    super.initState();
+    _permissionsAnimationLoader = rive.FileLoader.fromAsset(
+      "assets/home_tab.riv",
+      riveFactory: rive.Factory.flutter,
+    );
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  }
 
   @override
   void dispose() {
+    SystemChrome.setPreferredOrientations([]);
+    _permissionsAnimationLoader.dispose();
     _onlyNewActionDebouncer.cancelDebounceTimer();
     super.dispose();
   }
@@ -103,7 +118,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
         Center(
           child: Padding(
             padding: const EdgeInsets.only(top: 28),
-            child: Image.asset("assets/grant_permissions.png", height: 252),
+            child: _buildPermissionsAnimation(context),
           ),
         ),
         const SizedBox(height: 22),
@@ -133,6 +148,26 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPermissionsAnimation(BuildContext context) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.2,
+      ),
+      child: rive.RiveWidgetBuilder(
+        fileLoader: _permissionsAnimationLoader,
+        builder: (BuildContext context, rive.RiveState state) {
+          if (state is rive.RiveLoaded) {
+            return rive.RiveWidget(
+              controller: state.controller,
+              fit: rive.Fit.contain,
+            );
+          }
+          return const SizedBox.shrink();
+        },
+      ),
     );
   }
 
@@ -320,13 +355,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.asset(
-                          "assets/grant_permissions.png",
-                          height: 164,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const SizedBox(height: 164);
-                          },
-                        ),
+                        _buildPermissionsAnimation(context),
                         const SizedBox(height: 22),
                         Text(
                           AppLocalizations.of(
@@ -334,7 +363,7 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                           ).grantGalleryPermissionTitle,
                           textAlign: .center,
                           style: TextStyle(
-                            fontWeight: .w800,
+                            fontWeight: .w900,
                             fontFamily: TextStyles.outfitFontFamily,
                             package: TextStyles.fontPackage,
                             fontSize: 36,
@@ -343,13 +372,17 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        Text(
-                          AppLocalizations.of(
-                            context,
-                          ).grantGalleryPermissionDesc,
-                          textAlign: TextAlign.center,
-                          style: textTheme.body.copyWith(
-                            color: colorScheme.textMuted,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            AppLocalizations.of(
+                              context,
+                            ).grantGalleryPermissionDesc,
+                            textAlign: TextAlign.center,
+                            style: textTheme.body.copyWith(
+                              color: colorScheme.textMuted,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 32),

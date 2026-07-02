@@ -91,7 +91,7 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
                         AppLocalizations.of(context).onboardingTitle,
                         textAlign: .center,
                         style: const TextStyle(
-                          fontWeight: .w800,
+                          fontWeight: .w900,
                           fontFamily: TextStyles.outfitFontFamily,
                           package: TextStyles.fontPackage,
                           fontSize: 36,
@@ -100,11 +100,15 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Text(
-                        AppLocalizations.of(context).onboardingDesc,
-                        textAlign: .center,
-                        style: textTheme.body.copyWith(
-                          color: colorScheme.greenLight,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          AppLocalizations.of(context).onboardingDesc,
+                          textAlign: TextAlign.center,
+                          style: textTheme.body.copyWith(
+                            color: colorScheme.greenLight,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ],
