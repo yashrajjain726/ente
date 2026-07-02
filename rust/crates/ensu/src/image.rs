@@ -1,16 +1,14 @@
-use ente_image::image_compression::compress_image_bytes_to_jpeg;
-
-use crate::db::Result;
+use ente_image::{ImageError, image_compression::compress_image_bytes_to_jpeg};
 
 pub const ATTACHMENT_IMAGE_MAX_LONG_EDGE: u32 = 512;
 pub const ATTACHMENT_IMAGE_JPEG_QUALITY: u8 = 85;
 
-pub fn compress_attachment_image(image_bytes: &[u8]) -> Result<Vec<u8>> {
-    Ok(compress_image_bytes_to_jpeg(
+pub fn compress_attachment_image(image_bytes: &[u8]) -> Result<Vec<u8>, ImageError> {
+    compress_image_bytes_to_jpeg(
         image_bytes,
         ATTACHMENT_IMAGE_MAX_LONG_EDGE,
         ATTACHMENT_IMAGE_JPEG_QUALITY,
-    )?)
+    )
 }
 
 #[cfg(test)]

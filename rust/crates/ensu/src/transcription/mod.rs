@@ -3,8 +3,8 @@ mod model;
 mod text;
 mod transcriber;
 
-pub use model::{ModelEvent, download_model, is_model_downloaded, model_path, model_size_mb};
-pub use transcriber::{load_model, transcribe_pcm16, unload_model};
+pub use model::ModelEvent;
+pub use transcriber::Transcriber;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TranscriptionError {
@@ -14,12 +14,6 @@ pub enum TranscriptionError {
 
 impl From<std::io::Error> for TranscriptionError {
     fn from(value: std::io::Error) -> Self {
-        Self::Message(value.to_string())
-    }
-}
-
-impl From<reqwest::Error> for TranscriptionError {
-    fn from(value: reqwest::Error) -> Self {
         Self::Message(value.to_string())
     }
 }

@@ -1,3 +1,4 @@
+use ente_ensu::download;
 use ente_ensu::llm as core;
 use std::sync::Arc;
 use thiserror::Error;
@@ -178,7 +179,7 @@ impl From<LlmChatRequest> for core::ChatRequest {
     }
 }
 
-impl From<LlmModelDownloadTarget> for core::ModelDownloadTarget {
+impl From<LlmModelDownloadTarget> for download::Target {
     fn from(value: LlmModelDownloadTarget) -> Self {
         Self {
             label: value.label,
@@ -199,8 +200,8 @@ impl From<core::GenerationSummary> for LlmGenerationSummary {
     }
 }
 
-impl From<core::ModelDownloadProgress> for LlmModelDownloadProgress {
-    fn from(value: core::ModelDownloadProgress) -> Self {
+impl From<download::Progress> for LlmModelDownloadProgress {
+    fn from(value: download::Progress) -> Self {
         Self {
             label: value.label,
             downloaded_bytes: u64_to_i64(value.downloaded_bytes),

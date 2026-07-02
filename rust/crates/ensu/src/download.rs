@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::fs::{self, File, OpenOptions};
-use std::io::{Error, ErrorKind, Read, Write};
+use std::io::{Error, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::runtime::Builder;
 use tokio::time::timeout;
 
-const MIN_GGUF_BYTES: u64 = 1024 * 1024;
+const MIN_RANGE_DOWNLOAD_BYTES: u64 = 1024 * 1024;
 const MAX_ATTEMPTS: usize = 3;
 const RANGE_DOWNLOAD_CONCURRENCY: usize = 4;
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
@@ -21,14 +21,14 @@ const RESPONSE_START_TIMEOUT: Duration = Duration::from_secs(30);
 const READ_STALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelDownloadTarget {
+pub struct Target {
     pub label: String,
     pub url: String,
     pub destination_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelDownloadProgress {
+pub struct Progress {
     pub label: String,
     pub downloaded_bytes: u64,
     pub total_bytes: Option<u64>,
@@ -84,6 +84,13 @@ struct DownloadMetadata {
     downloaded_at_ms: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PartialDownloadMetadata {
+    url: String,
+    etag: Option<String>,
+    last_modified: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 struct ResponseMetadata {
     etag: Option<String>,
@@ -136,9 +143,10 @@ struct ContentRange {
     total: Option<u64>,
 }
 
-pub fn download_model_files(
-    targets: Vec<ModelDownloadTarget>,
-    on_progress: impl FnMut(ModelDownloadProgress),
+pub fn fetch(
+    targets: Vec<Target>,
+    validate: impl Fn(&Target, &Path) -> Result<(), String>,
+    on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
 ) -> Result<(), String> {
     let runtime = Builder::new_current_thread()
@@ -146,16 +154,13 @@ pub fn download_model_files(
         .enable_time()
         .build()
         .map_err(|err| err.to_string())?;
-    runtime.block_on(download_model_files_async(
-        targets,
-        on_progress,
-        is_cancelled,
-    ))
+    runtime.block_on(fetch_async(targets, validate, on_progress, is_cancelled))
 }
 
-async fn download_model_files_async(
-    targets: Vec<ModelDownloadTarget>,
-    on_progress: impl FnMut(ModelDownloadProgress),
+async fn fetch_async(
+    targets: Vec<Target>,
+    validate: impl Fn(&Target, &Path) -> Result<(), String>,
+    on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
 ) -> Result<(), String> {
     if targets.is_empty() {
@@ -168,10 +173,13 @@ async fn download_model_files_async(
         .map_err(|err| err.to_string())?;
     let download_started_at = Instant::now();
     let mut download_probes = Vec::with_capacity(targets.len());
+    let mut cached = Vec::with_capacity(targets.len());
 
     for target in &targets {
         let destination = Path::new(&target.destination_path);
-        if prepare_cached_download(target, destination) {
+        let is_cached = prepare_cached_download(target, destination, &validate);
+        cached.push(is_cached);
+        if is_cached {
             download_probes.push(DownloadProbe {
                 content_length: file_size(destination),
                 supports_ranges: false,
@@ -203,9 +211,14 @@ async fn download_model_files_async(
     let file_states = targets
         .iter()
         .zip(&download_probes)
-        .map(|(target, probe)| {
-            let existing =
-                existing_download_bytes(target, Path::new(&target.destination_path), probe);
+        .zip(&cached)
+        .map(|((target, probe), cached)| {
+            let existing = existing_download_bytes(
+                target,
+                Path::new(&target.destination_path),
+                probe,
+                *cached,
+            );
             FileDownloadState {
                 downloaded_bytes: probe
                     .content_length
@@ -232,10 +245,10 @@ async fn download_model_files_async(
     let mut downloads = Vec::new();
 
     for (index, target) in targets.iter().enumerate() {
-        let destination = PathBuf::from(&target.destination_path);
-        if destination.exists() && is_valid_gguf_download(&destination) {
+        if cached[index] {
             continue;
         }
+        let destination = PathBuf::from(&target.destination_path);
 
         let download_probe = download_probes
             .get(index)
@@ -247,17 +260,19 @@ async fn download_model_files_async(
         let target_label = target.label.clone();
         let client = &client;
         let is_cancelled = &is_cancelled;
+        let validate = &validate;
 
         downloads.push(async move {
             if is_cancelled() {
                 return Err("Download cancelled".to_string());
             }
 
-            let file_report = download_model_file(
+            let file_report = download_file(
                 client,
                 target,
                 &destination,
                 &download_probe,
+                validate,
                 |file_progress| {
                     {
                         let mut states = progress_states.borrow_mut();
@@ -336,11 +351,12 @@ async fn download_model_files_async(
     Ok(())
 }
 
-async fn download_model_file(
+async fn download_file(
     client: &Client,
-    target: &ModelDownloadTarget,
+    target: &Target,
     destination: &Path,
     download_probe: &DownloadProbe,
+    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
     mut on_progress: impl FnMut(FileDownloadProgress),
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, String> {
@@ -351,13 +367,14 @@ async fn download_model_file(
 
     let mut range_error = None;
     if let Some(total) = download_probe.content_length {
-        if should_use_range_download(destination, total, download_probe) {
-            match download_model_file_ranged(
+        if should_use_range_download(total, download_probe) {
+            match download_file_ranged(
                 client,
                 target,
                 destination,
                 total,
                 download_probe.response_metadata.clone(),
+                validate,
                 &mut on_progress,
                 is_cancelled,
             )
@@ -377,11 +394,12 @@ async fn download_model_file(
         cleanup_range_download(destination);
     }
 
-    let single_result = download_model_file_single(
+    let single_result = download_file_single(
         client,
         target,
         destination,
         download_probe.content_length,
+        validate,
         &mut on_progress,
         is_cancelled,
     )
@@ -396,15 +414,17 @@ async fn download_model_file(
     }
 }
 
-async fn download_model_file_single(
+async fn download_file_single(
     client: &Client,
-    target: &ModelDownloadTarget,
+    target: &Target,
     destination: &Path,
     expected_file_total: Option<u64>,
+    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
     on_progress: &mut dyn FnMut(FileDownloadProgress),
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, String> {
     let tmp_path = tmp_path_for(destination);
+    let partial_metadata_path = partial_metadata_path_for(destination);
     let file_started_at = Instant::now();
     let mut network_downloaded_bytes = 0u64;
     let mut retry_count = 0u32;
@@ -414,8 +434,26 @@ async fn download_model_file_single(
             return Err("Download cancelled".to_string());
         }
 
-        let mut resume_from = valid_resume_bytes(&tmp_path)?;
-        let mut response = match request_model(client, &target.url, resume_from).await {
+        let tmp_size = file_size(&tmp_path).unwrap_or(0);
+        let resume_validator = if tmp_size > 0 {
+            partial_download_validator(destination, &target.url)
+        } else {
+            None
+        };
+        let resume_from = if resume_validator.is_some() {
+            tmp_size
+        } else {
+            0
+        };
+
+        let mut response = match request_file(
+            client,
+            &target.url,
+            resume_from,
+            resume_validator.as_deref(),
+        )
+        .await
+        {
             Ok(response) => response,
             Err(err) => {
                 if attempt == MAX_ATTEMPTS {
@@ -426,19 +464,14 @@ async fn download_model_file_single(
             }
         };
 
-        if resume_from > 0 && response.status() == reqwest::StatusCode::OK {
+        if resume_from > 0 && response.status() == StatusCode::RANGE_NOT_SATISFIABLE {
             let _ = fs::remove_file(&tmp_path);
-            resume_from = 0;
-            response = match request_model(client, &target.url, 0).await {
-                Ok(response) => response,
-                Err(err) => {
-                    if attempt == MAX_ATTEMPTS {
-                        return Err(format!("Failed to download {}: {}", target.label, err));
-                    }
-                    retry_count = retry_count.saturating_add(1);
-                    continue;
-                }
-            };
+            let _ = fs::remove_file(&partial_metadata_path);
+            if attempt == MAX_ATTEMPTS {
+                return Err(format!("Failed to download {}: HTTP 416", target.label));
+            }
+            retry_count = retry_count.saturating_add(1);
+            continue;
         }
 
         if !response.status().is_success() {
@@ -453,17 +486,31 @@ async fn download_model_file_single(
             continue;
         }
 
-        let response_metadata = response_metadata(&response);
-        let file_total = content_total(&response, resume_from).or(expected_file_total);
-        if let Some(total) = file_total
-            && total <= resume_from
-        {
+        let append = resume_from > 0 && response.status() == StatusCode::PARTIAL_CONTENT;
+        if append && resumed_content_range_start(&response) != Some(resume_from) {
             let _ = fs::remove_file(&tmp_path);
+            let _ = fs::remove_file(&partial_metadata_path);
+            if attempt == MAX_ATTEMPTS {
+                return Err(format!(
+                    "Failed to download {}: server resumed from the wrong offset",
+                    target.label
+                ));
+            }
             retry_count = retry_count.saturating_add(1);
             continue;
         }
+        let resume_from = if append { resume_from } else { 0 };
+        let response_metadata = response_metadata(&response);
+        let file_total = content_total(&response, resume_from).or(expected_file_total);
 
-        let append = resume_from > 0 && response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+        if !append {
+            if if_range_header_value(Some(&response_metadata)).is_some() {
+                let _ = write_partial_download_metadata(destination, target, &response_metadata);
+            } else {
+                let _ = fs::remove_file(&partial_metadata_path);
+            }
+        }
+
         let mut file = OpenOptions::new()
             .create(true)
             .write(true)
@@ -473,11 +520,6 @@ async fn download_model_file_single(
             .map_err(|err| err.to_string())?;
 
         let mut downloaded = resume_from;
-        let mut first_bytes = if resume_from == 0 {
-            Vec::with_capacity(4)
-        } else {
-            Vec::new()
-        };
         let mut last_progress = Instant::now();
         let mut retry_attempt = false;
 
@@ -524,15 +566,6 @@ async fn download_model_file_single(
                 break;
             };
 
-            if downloaded < 4 {
-                let needed = 4usize.saturating_sub(first_bytes.len());
-                first_bytes.extend_from_slice(&chunk[..chunk.len().min(needed)]);
-                if first_bytes.len() == 4 && !is_gguf_header(&first_bytes) {
-                    let _ = fs::remove_file(&tmp_path);
-                    return Err("Downloaded file is not GGUF".to_string());
-                }
-            }
-
             file.write_all(&chunk).map_err(|err| err.to_string())?;
             downloaded = downloaded.saturating_add(chunk.len() as u64);
             network_downloaded_bytes = network_downloaded_bytes.saturating_add(chunk.len() as u64);
@@ -566,25 +599,25 @@ async fn download_model_file_single(
         });
 
         if let Some(total) = file_total
-            && downloaded < total
+            && downloaded != total
         {
+            if downloaded > total {
+                let _ = fs::remove_file(&tmp_path);
+                let _ = fs::remove_file(&partial_metadata_path);
+            }
             if attempt == MAX_ATTEMPTS {
                 return Err(format!(
-                    "Download incomplete: expected {total} bytes, got {downloaded}"
+                    "Download size mismatch: expected {total} bytes, got {downloaded}"
                 ));
             }
             retry_count = retry_count.saturating_add(1);
             continue;
         }
 
-        if downloaded < MIN_GGUF_BYTES {
+        if let Err(err) = validate(target, &tmp_path) {
             let _ = fs::remove_file(&tmp_path);
-            return Err("Downloaded file too small".to_string());
-        }
-
-        if !looks_like_gguf(&tmp_path) {
-            let _ = fs::remove_file(&tmp_path);
-            return Err("Downloaded file is not GGUF".to_string());
+            let _ = fs::remove_file(&partial_metadata_path);
+            return Err(err);
         }
 
         if destination.exists() {
@@ -592,6 +625,7 @@ async fn download_model_file_single(
         }
         fs::rename(&tmp_path, destination).map_err(|err| err.to_string())?;
         let _ = fs::remove_file(range_metadata_path_for(destination));
+        let _ = fs::remove_file(&partial_metadata_path);
 
         let final_size = file_size(destination).unwrap_or(downloaded);
         if final_size != downloaded {
@@ -611,15 +645,17 @@ async fn download_model_file_single(
         });
     }
 
-    Err("Failed to download model".to_string())
+    Err("Failed to download file".to_string())
 }
 
-async fn download_model_file_ranged(
+#[allow(clippy::too_many_arguments)]
+async fn download_file_ranged(
     client: &Client,
-    target: &ModelDownloadTarget,
+    target: &Target,
     destination: &Path,
     total: u64,
     response_metadata: Option<ResponseMetadata>,
+    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
     on_progress: &mut dyn FnMut(FileDownloadProgress),
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, String> {
@@ -699,16 +735,10 @@ async fn download_model_file_ranged(
 
     emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
 
-    if total < MIN_GGUF_BYTES {
+    if let Err(err) = validate(target, &tmp_path) {
         let _ = fs::remove_file(&tmp_path);
         let _ = fs::remove_file(&range_metadata_path);
-        return Err("Downloaded file too small".to_string());
-    }
-
-    if !looks_like_gguf(&tmp_path) {
-        let _ = fs::remove_file(&tmp_path);
-        let _ = fs::remove_file(&range_metadata_path);
-        return Err("Downloaded file is not GGUF".to_string());
+        return Err(err);
     }
 
     if destination.exists() {
@@ -716,6 +746,7 @@ async fn download_model_file_ranged(
     }
     fs::rename(&tmp_path, destination).map_err(|err| err.to_string())?;
     let _ = fs::remove_file(&range_metadata_path);
+    let _ = fs::remove_file(partial_metadata_path_for(destination));
 
     let final_size = file_size(destination).unwrap_or(total);
     if final_size != total {
@@ -749,7 +780,7 @@ async fn download_model_file_ranged(
 #[allow(clippy::too_many_arguments)]
 async fn download_range_part(
     client: &Client,
-    target: &ModelDownloadTarget,
+    target: &Target,
     file: Rc<File>,
     part_index: usize,
     range: RangeDownloadPartMetadata,
@@ -819,11 +850,6 @@ async fn download_range_part(
         validate_range_response(&response, range, total)?;
 
         let mut downloaded_in_range = 0u64;
-        let mut first_bytes = if range.start == 0 {
-            Vec::with_capacity(4)
-        } else {
-            Vec::new()
-        };
         let mut last_progress = Instant::now();
         let mut retry_attempt = false;
 
@@ -868,14 +894,6 @@ async fn download_range_part(
                     "Failed to download {} range: received more bytes than requested",
                     target.label
                 ));
-            }
-
-            if range.start == 0 && downloaded_in_range < 4 {
-                let needed = 4usize.saturating_sub(first_bytes.len());
-                first_bytes.extend_from_slice(&chunk[..chunk.len().min(needed)]);
-                if first_bytes.len() == 4 && !is_gguf_header(&first_bytes) {
-                    return Err("Downloaded file is not GGUF".to_string());
-                }
             }
 
             write_all_at(
@@ -928,13 +946,22 @@ async fn download_range_part(
         return Ok(());
     }
 
-    Err("Failed to download model range".to_string())
+    Err("Failed to download file range".to_string())
 }
 
-async fn request_model(client: &Client, url: &str, resume_from: u64) -> Result<Response, String> {
+async fn request_file(
+    client: &Client,
+    url: &str,
+    resume_from: u64,
+    if_range: Option<&str>,
+) -> Result<Response, String> {
     let mut request = client.get(url);
-    if resume_from > 0 {
-        request = request.header(RANGE, format!("bytes={resume_from}-"));
+    if resume_from > 0
+        && let Some(if_range) = if_range
+    {
+        request = request
+            .header(RANGE, format!("bytes={resume_from}-"))
+            .header(IF_RANGE, if_range);
     }
     timeout(RESPONSE_START_TIMEOUT, request.send())
         .await
@@ -1006,20 +1033,8 @@ async fn fetch_download_probe(client: &Client, url: &str) -> DownloadProbe {
     }
 }
 
-fn should_use_range_download(destination: &Path, total: u64, probe: &DownloadProbe) -> bool {
-    if total < MIN_GGUF_BYTES || !probe.supports_ranges {
-        return false;
-    }
-    if range_metadata_path_for(destination).exists() {
-        return true;
-    }
-
-    let tmp_path = tmp_path_for(destination);
-    if tmp_path.exists() && valid_resume_bytes(&tmp_path).unwrap_or(0) > 0 {
-        return false;
-    }
-
-    true
+fn should_use_range_download(total: u64, probe: &DownloadProbe) -> bool {
+    total >= MIN_RANGE_DOWNLOAD_BYTES && probe.supports_ranges
 }
 
 fn is_download_cancelled_error(err: &str) -> bool {
@@ -1027,7 +1042,7 @@ fn is_download_cancelled_error(err: &str) -> bool {
 }
 
 fn prepare_range_download_metadata(
-    target: &ModelDownloadTarget,
+    target: &Target,
     destination: &Path,
     total: u64,
     response_metadata: Option<ResponseMetadata>,
@@ -1094,7 +1109,7 @@ fn range_download_parts(total: u64, concurrency: usize) -> Vec<RangeDownloadPart
 
 fn range_download_metadata_matches(
     metadata: &RangeDownloadMetadata,
-    target: &ModelDownloadTarget,
+    target: &Target,
     total: u64,
     response_metadata: Option<&ResponseMetadata>,
     ranges: &[RangeDownloadPartMetadata],
@@ -1222,6 +1237,15 @@ fn validate_range_response(
     Ok(())
 }
 
+fn resumed_content_range_start(response: &Response) -> Option<u64> {
+    response
+        .headers()
+        .get(CONTENT_RANGE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(parse_content_range)
+        .map(|range| range.start)
+}
+
 fn if_range_header_value(response_metadata: Option<&ResponseMetadata>) -> Option<String> {
     response_metadata.and_then(|metadata| {
         metadata
@@ -1240,7 +1264,7 @@ fn content_total(response: &Response, resume_from: u64) -> Option<u64> {
     let content_length = response.content_length().filter(|value| *value > 0);
 
     content_range_total.or_else(|| {
-        if resume_from > 0 && response.status() == reqwest::StatusCode::PARTIAL_CONTENT {
+        if resume_from > 0 && response.status() == StatusCode::PARTIAL_CONTENT {
             content_length.map(|value| value.saturating_add(resume_from))
         } else {
             content_length
@@ -1271,7 +1295,7 @@ fn parse_content_range(value: &str) -> Option<ContentRange> {
     Some(ContentRange { start, end, total })
 }
 
-fn emit_progress_from_states<F: FnMut(ModelDownloadProgress)>(
+fn emit_progress_from_states<F: FnMut(Progress)>(
     label: &str,
     total_bytes: Option<u64>,
     metrics: DownloadProgressMetrics,
@@ -1394,14 +1418,14 @@ fn emit_combined_progress(
     file_downloaded_bytes: u64,
     file_total_bytes: Option<u64>,
     metrics: DownloadProgressMetrics,
-    on_progress: &mut impl FnMut(ModelDownloadProgress),
+    on_progress: &mut impl FnMut(Progress),
 ) {
     let percentage = total_bytes
         .filter(|value| *value > 0)
         .map(|total| ((downloaded_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0))
         .unwrap_or(0.0);
 
-    on_progress(ModelDownloadProgress {
+    on_progress(Progress {
         label: label.to_string(),
         downloaded_bytes,
         total_bytes,
@@ -1455,93 +1479,20 @@ fn bytes_per_second(bytes: u64, elapsed: Duration) -> f64 {
     }
 }
 
-fn prepare_cached_download(target: &ModelDownloadTarget, destination: &Path) -> bool {
-    if is_valid_gguf_download(destination) {
-        if !download_metadata_matches(destination, &target.url) {
-            let size = file_size(destination).unwrap_or(0);
-            let _ = write_download_metadata(destination, target, size, None);
-        }
+fn prepare_cached_download(
+    target: &Target,
+    destination: &Path,
+    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
+) -> bool {
+    if !destination.exists() || validate(target, destination).is_err() {
+        return false;
+    }
+    if !metadata_path_for(destination).exists() {
+        let size = file_size(destination).unwrap_or(0);
+        let _ = write_download_metadata(destination, target, size, None);
         return true;
     }
-
-    if let Some(source) = find_reusable_cached_download(destination, &target.url) {
-        if copy_cached_download(&source, destination).is_ok() && is_valid_gguf_download(destination)
-        {
-            let size = file_size(destination).unwrap_or(0);
-            let source_metadata =
-                read_download_metadata(&source).map(|metadata| ResponseMetadata {
-                    etag: metadata.etag,
-                    last_modified: metadata.last_modified,
-                });
-            let _ = write_download_metadata(destination, target, size, source_metadata);
-            return true;
-        }
-        let _ = fs::remove_file(destination);
-        let _ = fs::remove_file(metadata_path_for(destination));
-        let _ = fs::remove_file(range_metadata_path_for(destination));
-    }
-
-    false
-}
-
-fn find_reusable_cached_download(destination: &Path, url: &str) -> Option<PathBuf> {
-    for root in cache_search_roots(destination) {
-        let entries = match fs::read_dir(root) {
-            Ok(entries) => entries,
-            Err(_) => continue,
-        };
-
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path == destination || !path.is_file() || is_sidecar_download_file(&path) {
-                continue;
-            }
-            if !is_valid_gguf_download(&path) {
-                continue;
-            }
-            if download_metadata_matches(&path, url) {
-                return Some(path);
-            }
-        }
-    }
-
-    None
-}
-
-fn cache_search_roots(destination: &Path) -> Vec<PathBuf> {
-    let Some(parent) = destination.parent() else {
-        return Vec::new();
-    };
-
-    let mut roots = vec![parent.to_path_buf()];
-    if parent.file_name().and_then(|name| name.to_str()) == Some("custom") {
-        if let Some(models_dir) = parent.parent() {
-            roots.push(models_dir.to_path_buf());
-        }
-    } else {
-        roots.push(parent.join("custom"));
-    }
-    roots
-}
-
-fn copy_cached_download(source: &Path, destination: &Path) -> Result<(), String> {
-    let parent = destination
-        .parent()
-        .ok_or_else(|| format!("Invalid destination path: {}", destination.display()))?;
-    fs::create_dir_all(parent).map_err(|err| err.to_string())?;
-
-    let tmp_path = tmp_path_for(destination);
-    let _ = fs::remove_file(&tmp_path);
-    let _ = fs::remove_file(range_metadata_path_for(destination));
-    fs::copy(source, &tmp_path).map_err(|err| err.to_string())?;
-    if !is_valid_gguf_download(&tmp_path) {
-        let _ = fs::remove_file(&tmp_path);
-        return Err("Cached model copy is invalid".to_string());
-    }
-    if destination.exists() {
-        fs::remove_file(destination).map_err(|err| err.to_string())?;
-    }
-    fs::rename(&tmp_path, destination).map_err(|err| err.to_string())
+    download_metadata_matches(destination, &target.url)
 }
 
 fn read_download_metadata(path: &Path) -> Option<DownloadMetadata> {
@@ -1556,12 +1507,12 @@ fn download_metadata_matches(path: &Path, url: &str) -> bool {
     let Some(size) = file_size(path) else {
         return false;
     };
-    metadata.url == url && metadata.size_bytes == size && size >= MIN_GGUF_BYTES
+    metadata.url == url && metadata.size_bytes == size
 }
 
 fn write_download_metadata(
     path: &Path,
-    target: &ModelDownloadTarget,
+    target: &Target,
     size_bytes: u64,
     response_metadata: Option<ResponseMetadata>,
 ) -> Result<(), String> {
@@ -1577,7 +1528,10 @@ fn write_download_metadata(
         downloaded_at_ms: now_ms(),
     };
     let text = serde_json::to_string_pretty(&metadata).map_err(|err| err.to_string())?;
-    fs::write(metadata_path_for(path), text).map_err(|err| err.to_string())
+    let metadata_path = metadata_path_for(path);
+    let tmp_path = PathBuf::from(format!("{}.tmp", metadata_path.display()));
+    fs::write(&tmp_path, text).map_err(|err| err.to_string())?;
+    fs::rename(&tmp_path, &metadata_path).map_err(|err| err.to_string())
 }
 
 fn response_metadata(response: &Response) -> ResponseMetadata {
@@ -1608,7 +1562,7 @@ fn write_range_download_metadata(
     fs::write(path, text).map_err(|err| err.to_string())
 }
 
-fn metadata_path_for(path: &Path) -> PathBuf {
+pub(crate) fn metadata_path_for(path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.metadata.json", path.display()))
 }
 
@@ -1616,16 +1570,37 @@ fn range_metadata_path_for(path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.tmp.ranges.json", path.display()))
 }
 
+fn partial_metadata_path_for(path: &Path) -> PathBuf {
+    PathBuf::from(format!("{}.tmp.partial.json", path.display()))
+}
+
+fn partial_download_validator(destination: &Path, url: &str) -> Option<String> {
+    let text = fs::read_to_string(partial_metadata_path_for(destination)).ok()?;
+    let metadata: PartialDownloadMetadata = serde_json::from_str(&text).ok()?;
+    if metadata.url != url {
+        return None;
+    }
+    metadata.etag.or(metadata.last_modified)
+}
+
+fn write_partial_download_metadata(
+    destination: &Path,
+    target: &Target,
+    response_metadata: &ResponseMetadata,
+) -> Result<(), String> {
+    let metadata = PartialDownloadMetadata {
+        url: target.url.clone(),
+        etag: response_metadata.etag.clone(),
+        last_modified: response_metadata.last_modified.clone(),
+    };
+    let text = serde_json::to_string_pretty(&metadata).map_err(|err| err.to_string())?;
+    fs::write(partial_metadata_path_for(destination), text).map_err(|err| err.to_string())
+}
+
 fn cleanup_range_download(destination: &Path) {
     let _ = fs::remove_file(tmp_path_for(destination));
     let _ = fs::remove_file(range_metadata_path_for(destination));
-}
-
-fn is_sidecar_download_file(path: &Path) -> bool {
-    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-        return false;
-    };
-    name.ends_with(".tmp") || name.ends_with(".metadata.json") || name.ends_with(".tmp.ranges.json")
+    let _ = fs::remove_file(partial_metadata_path_for(destination));
 }
 
 fn now_ms() -> u64 {
@@ -1636,16 +1611,16 @@ fn now_ms() -> u64 {
 }
 
 fn existing_download_bytes(
-    target: &ModelDownloadTarget,
+    target: &Target,
     destination: &Path,
     probe: &DownloadProbe,
+    cached: bool,
 ) -> u64 {
+    if cached {
+        return file_size(destination).unwrap_or(0);
+    }
     if destination.exists() {
-        return if is_valid_gguf_download(destination) {
-            file_size(destination).unwrap_or(0)
-        } else {
-            0
-        };
+        return 0;
     }
 
     if range_metadata_path_for(destination).exists() {
@@ -1672,27 +1647,7 @@ fn existing_download_bytes(
         return 0;
     }
 
-    let tmp_path = tmp_path_for(destination);
-    valid_resume_bytes(&tmp_path).unwrap_or(0)
-}
-
-fn valid_resume_bytes(tmp_path: &Path) -> Result<u64, String> {
-    if !tmp_path.exists() {
-        return Ok(0);
-    }
-
-    let size = file_size(tmp_path).unwrap_or(0);
-    if size == 0 {
-        let _ = fs::remove_file(tmp_path);
-        return Ok(0);
-    }
-
-    if size < 4 || !looks_like_gguf(tmp_path) {
-        let _ = fs::remove_file(tmp_path);
-        return Ok(0);
-    }
-
-    Ok(size)
+    0
 }
 
 fn file_size(path: &Path) -> Option<u64> {
@@ -1701,23 +1656,6 @@ fn file_size(path: &Path) -> Option<u64> {
 
 fn tmp_path_for(destination: &Path) -> PathBuf {
     PathBuf::from(format!("{}.tmp", destination.display()))
-}
-
-fn looks_like_gguf(path: &Path) -> bool {
-    let mut file = match File::open(path) {
-        Ok(file) => file,
-        Err(_) => return false,
-    };
-    let mut header = [0u8; 4];
-    file.read_exact(&mut header).is_ok() && is_gguf_header(&header)
-}
-
-fn is_gguf_header(bytes: &[u8]) -> bool {
-    bytes == b"GGUF"
-}
-
-fn is_valid_gguf_download(path: &Path) -> bool {
-    file_size(path).is_some_and(|size| size >= MIN_GGUF_BYTES) && looks_like_gguf(path)
 }
 
 #[cfg(unix)]
@@ -1851,12 +1789,7 @@ mod tests {
 
     #[test]
     fn download_uses_four_ranges_when_server_supports_ranges() {
-        let mut bytes = vec![0u8; MIN_GGUF_BYTES as usize + 123];
-        bytes[..4].copy_from_slice(b"GGUF");
-        for (index, byte) in bytes.iter_mut().enumerate().skip(4) {
-            *byte = (index % 251) as u8;
-        }
-        let bytes = Arc::new(bytes);
+        let bytes = Arc::new(sample_bytes(MIN_RANGE_DOWNLOAD_BYTES as usize + 123));
         let head_count = Arc::new(AtomicUsize::new(0));
         let range_get_count = Arc::new(AtomicUsize::new(0));
         let full_get_count = Arc::new(AtomicUsize::new(0));
@@ -1901,10 +1834,9 @@ mod tests {
             })
         };
 
-        let test_dir = std::env::temp_dir().join(format!("ensu-range-download-test-{}", now_ms()));
-        fs::create_dir_all(&test_dir).expect("create test dir");
-        let destination = test_dir.join("model.gguf");
-        let url = format!("http://{address}/model.gguf");
+        let test_dir = scratch_dir("range-download");
+        let destination = test_dir.join("model.bin");
+        let url = format!("http://{address}/model.bin");
 
         let probe_client = Client::builder().build().expect("build probe client");
         let probe_runtime = Builder::new_current_thread()
@@ -1916,12 +1848,13 @@ mod tests {
         assert_eq!(probe.content_length, Some(bytes.len() as u64));
         assert!(probe.supports_ranges);
 
-        let result = download_model_files(
-            vec![ModelDownloadTarget {
+        let result = fetch(
+            vec![Target {
                 label: "Model".to_string(),
                 url,
                 destination_path: destination.display().to_string(),
             }],
+            |_, _| Ok(()),
             |_| {},
             || false,
         );
@@ -1948,6 +1881,665 @@ mod tests {
         let _ = fs::remove_dir_all(test_dir);
     }
 
+    #[test]
+    fn download_uses_single_stream_when_server_lacks_range_support() {
+        let bytes = Arc::new(sample_bytes(MIN_RANGE_DOWNLOAD_BYTES as usize + 123));
+        let get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("single-download");
+        let destination = test_dir.join("model.bin");
+
+        let result = fetch(
+            vec![Target {
+                label: "Model".to_string(),
+                url: server.url("/model.bin"),
+                destination_path: destination.display().to_string(),
+            }],
+            |_, _| Ok(()),
+            |_| {},
+            || false,
+        );
+
+        result.expect("single-stream download succeeds");
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
+        assert_eq!(get_count.load(Ordering::SeqCst), 1);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn rejected_validation_leaves_no_cached_file() {
+        let bytes = Arc::new(sample_bytes(MIN_RANGE_DOWNLOAD_BYTES as usize + 123));
+        let get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("reject-download");
+        let destination = test_dir.join("model.bin");
+
+        let result = fetch(
+            vec![Target {
+                label: "Model".to_string(),
+                url: server.url("/model.bin"),
+                destination_path: destination.display().to_string(),
+            }],
+            |_, _| Err("rejected".to_string()),
+            |_| {},
+            || false,
+        );
+
+        assert!(result.is_err(), "validation failure should fail the fetch");
+        assert_eq!(get_count.load(Ordering::SeqCst), 1);
+        assert!(
+            !destination.exists(),
+            "rejected download must not be committed"
+        );
+        assert!(
+            !metadata_path_for(&destination).exists(),
+            "rejected download must not be cached"
+        );
+        assert!(
+            !tmp_path_for(&destination).exists(),
+            "temp file must be cleaned up"
+        );
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn completed_download_is_served_from_cache() {
+        let bytes = Arc::new(sample_bytes(MIN_RANGE_DOWNLOAD_BYTES as usize + 123));
+        let head_count = Arc::new(AtomicUsize::new(0));
+        let range_get_count = Arc::new(AtomicUsize::new(0));
+        let full_get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let head_count = Arc::clone(&head_count);
+            let range_get_count = Arc::clone(&range_get_count);
+            let full_get_count = Arc::clone(&full_get_count);
+            TestServer::spawn(move |stream| {
+                handle_range_test_request(
+                    stream,
+                    Arc::clone(&bytes),
+                    Arc::clone(&head_count),
+                    Arc::clone(&range_get_count),
+                    Arc::clone(&full_get_count),
+                );
+            })
+        };
+
+        let test_dir = scratch_dir("cache-skip-download");
+        let destination = test_dir.join("model.bin");
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+
+        fetch(vec![target.clone()], |_, _| Ok(()), |_| {}, || false)
+            .expect("first download succeeds");
+        let requests_after_first =
+            head_count.load(Ordering::SeqCst) + range_get_count.load(Ordering::SeqCst);
+        assert!(requests_after_first > 0);
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("second download succeeds");
+        assert_eq!(
+            head_count.load(Ordering::SeqCst) + range_get_count.load(Ordering::SeqCst),
+            requests_after_first,
+            "cached download must not hit the network again"
+        );
+        assert_eq!(fs::read(&destination).expect("read cached file"), *bytes);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn cache_hit_is_revalidated_and_reheals_on_corruption() {
+        let bytes = Arc::new(sample_bytes(512));
+        let get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("revalidate-download");
+        let destination = test_dir.join("model.bin");
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+        let require_zero_header = |_: &Target, path: &Path| match fs::read(path)
+            .ok()
+            .and_then(|data| data.first().copied())
+        {
+            Some(0) => Ok(()),
+            _ => Err("bad header".to_string()),
+        };
+
+        fetch(vec![target.clone()], require_zero_header, |_| {}, || false)
+            .expect("first download succeeds");
+        assert_eq!(get_count.load(Ordering::SeqCst), 1);
+
+        let mut data = fs::read(&destination).expect("read cached file");
+        data[0] = 0xFF;
+        fs::write(&destination, &data).expect("corrupt cached file");
+
+        fetch(vec![target], require_zero_header, |_| {}, || false)
+            .expect("second download re-heals the corrupt cache");
+        assert_eq!(
+            get_count.load(Ordering::SeqCst),
+            2,
+            "corrupt cache must be re-downloaded, not served"
+        );
+        assert_eq!(fs::read(&destination).expect("read healed file"), *bytes);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn existing_valid_file_without_sidecar_is_adopted() {
+        let bytes = Arc::new(sample_bytes(512));
+        let get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("adopt-download");
+        let destination = test_dir.join("model.bin");
+        fs::write(&destination, bytes.as_slice()).expect("place existing file without sidecar");
+        assert!(!metadata_path_for(&destination).exists());
+
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fetch adopts existing file");
+
+        assert_eq!(
+            get_count.load(Ordering::SeqCst),
+            0,
+            "an existing valid file must not be re-downloaded"
+        );
+        assert!(
+            metadata_path_for(&destination).exists(),
+            "adopting the file writes its metadata sidecar"
+        );
+        assert_eq!(fs::read(&destination).expect("read adopted file"), *bytes);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn existing_file_with_corrupt_sidecar_is_redownloaded() {
+        let bytes = Arc::new(sample_bytes(512));
+        let get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("corrupt-sidecar-download");
+        let destination = test_dir.join("model.bin");
+        fs::write(&destination, bytes.as_slice()).expect("place existing file");
+        fs::write(metadata_path_for(&destination), "{ truncated").expect("write corrupt sidecar");
+
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fetch redownloads");
+
+        assert_eq!(
+            get_count.load(Ordering::SeqCst),
+            1,
+            "a corrupt sidecar must trigger a re-download, not adoption"
+        );
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn existing_file_with_stale_sidecar_is_redownloaded() {
+        let bytes = Arc::new(sample_bytes(512));
+        let get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("stale-sidecar-download");
+        let destination = test_dir.join("model.bin");
+        fs::write(&destination, bytes.as_slice()).expect("place existing file");
+        let stale_target = Target {
+            label: "Model".to_string(),
+            url: "http://127.0.0.1:1/old-model.bin".to_string(),
+            destination_path: destination.display().to_string(),
+        };
+        write_download_metadata(&destination, &stale_target, bytes.len() as u64, None)
+            .expect("write stale sidecar");
+
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fetch redownloads");
+
+        assert_eq!(
+            get_count.load(Ordering::SeqCst),
+            1,
+            "a stale sidecar must trigger a re-download, not adoption"
+        );
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn single_stream_download_resumes_from_partial_tmp() {
+        let bytes = Arc::new(sample_bytes(512));
+        let head_count = Arc::new(AtomicUsize::new(0));
+        let range_get_count = Arc::new(AtomicUsize::new(0));
+        let full_get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let head_count = Arc::clone(&head_count);
+            let range_get_count = Arc::clone(&range_get_count);
+            let full_get_count = Arc::clone(&full_get_count);
+            TestServer::spawn(move |stream| {
+                handle_range_test_request(
+                    stream,
+                    Arc::clone(&bytes),
+                    Arc::clone(&head_count),
+                    Arc::clone(&range_get_count),
+                    Arc::clone(&full_get_count),
+                );
+            })
+        };
+
+        let test_dir = scratch_dir("resume-download");
+        let destination = test_dir.join("model.bin");
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+        fs::write(tmp_path_for(&destination), &bytes[..256]).expect("place partial tmp");
+        write_partial_download_metadata(
+            &destination,
+            &target,
+            &ResponseMetadata {
+                etag: Some("\"test-etag\"".to_string()),
+                last_modified: None,
+            },
+        )
+        .expect("write partial sidecar");
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("resume succeeds");
+
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
+        assert_eq!(
+            range_get_count.load(Ordering::SeqCst),
+            1,
+            "resume must continue with a single ranged GET"
+        );
+        assert_eq!(full_get_count.load(Ordering::SeqCst), 0);
+        assert!(!tmp_path_for(&destination).exists());
+        assert!(!partial_metadata_path_for(&destination).exists());
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn single_stream_download_restarts_when_resume_validator_is_stale() {
+        let bytes = Arc::new(sample_bytes(512));
+        let head_count = Arc::new(AtomicUsize::new(0));
+        let range_get_count = Arc::new(AtomicUsize::new(0));
+        let full_get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let head_count = Arc::clone(&head_count);
+            let range_get_count = Arc::clone(&range_get_count);
+            let full_get_count = Arc::clone(&full_get_count);
+            TestServer::spawn(move |stream| {
+                handle_range_test_request(
+                    stream,
+                    Arc::clone(&bytes),
+                    Arc::clone(&head_count),
+                    Arc::clone(&range_get_count),
+                    Arc::clone(&full_get_count),
+                );
+            })
+        };
+
+        let test_dir = scratch_dir("stale-resume-download");
+        let destination = test_dir.join("model.bin");
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+        fs::write(tmp_path_for(&destination), vec![0xAAu8; 256]).expect("place stale tmp");
+        write_partial_download_metadata(
+            &destination,
+            &target,
+            &ResponseMetadata {
+                etag: Some("\"other-etag\"".to_string()),
+                last_modified: None,
+            },
+        )
+        .expect("write stale partial sidecar");
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("restart succeeds");
+
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
+        assert_eq!(
+            full_get_count.load(Ordering::SeqCst),
+            1,
+            "a stale validator must trigger a full restart, not an append"
+        );
+        assert_eq!(range_get_count.load(Ordering::SeqCst), 0);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn single_stream_download_ignores_partial_without_sidecar() {
+        let bytes = Arc::new(sample_bytes(512));
+        let get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("no-sidecar-resume-download");
+        let destination = test_dir.join("model.bin");
+        fs::write(tmp_path_for(&destination), &bytes[..256]).expect("place orphan tmp");
+
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fresh download succeeds");
+
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
+        assert_eq!(
+            get_count.load(Ordering::SeqCst),
+            1,
+            "a partial without a sidecar must restart from scratch"
+        );
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn single_stream_resume_restarts_when_server_resumes_from_wrong_offset() {
+        let bytes = Arc::new(sample_bytes(512));
+        let bad_resume_count = Arc::new(AtomicUsize::new(0));
+        let full_get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let bad_resume_count = Arc::clone(&bad_resume_count);
+            let full_get_count = Arc::clone(&full_get_count);
+            TestServer::spawn(move |stream| {
+                handle_wrong_offset_resume_request(
+                    stream,
+                    Arc::clone(&bytes),
+                    Arc::clone(&bad_resume_count),
+                    Arc::clone(&full_get_count),
+                );
+            })
+        };
+
+        let test_dir = scratch_dir("wrong-offset-resume");
+        let destination = test_dir.join("model.bin");
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+        fs::write(tmp_path_for(&destination), &bytes[..256]).expect("place partial tmp");
+        write_partial_download_metadata(
+            &destination,
+            &target,
+            &ResponseMetadata {
+                etag: Some("\"test-etag\"".to_string()),
+                last_modified: None,
+            },
+        )
+        .expect("write partial sidecar");
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false)
+            .expect("restart after bad 206 succeeds");
+
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes,
+            "a wrong-offset 206 must never append duplicate bytes"
+        );
+        assert_eq!(bad_resume_count.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            full_get_count.load(Ordering::SeqCst),
+            1,
+            "the retry must restart from scratch"
+        );
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    fn handle_wrong_offset_resume_request(
+        mut stream: TcpStream,
+        bytes: Arc<Vec<u8>>,
+        bad_resume_count: Arc<AtomicUsize>,
+        full_get_count: Arc<AtomicUsize>,
+    ) {
+        let mut reader = BufReader::new(stream.try_clone().expect("clone test stream"));
+        let mut request_line = String::new();
+        if reader.read_line(&mut request_line).is_err() {
+            return;
+        }
+        let mut has_range = false;
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_err() || line == "\r\n" || line.is_empty() {
+                break;
+            }
+            if let Some((name, _)) = line.split_once(':')
+                && name.eq_ignore_ascii_case("range")
+            {
+                has_range = true;
+            }
+        }
+
+        if request_line.starts_with("HEAD ") {
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nETag: \"test-etag\"\r\nConnection: close\r\n\r\n",
+                bytes.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+            return;
+        }
+
+        if has_range {
+            bad_resume_count.fetch_add(1, Ordering::SeqCst);
+            let response = format!(
+                "HTTP/1.1 206 Partial Content\r\nContent-Length: {len}\r\nContent-Range: bytes 0-{end}/{len}\r\nETag: \"test-etag\"\r\nConnection: close\r\n\r\n",
+                len = bytes.len(),
+                end = bytes.len() - 1
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.write_all(bytes.as_slice());
+        } else {
+            full_get_count.fetch_add(1, Ordering::SeqCst);
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                bytes.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.write_all(bytes.as_slice());
+        }
+    }
+
+    fn sample_bytes(len: usize) -> Vec<u8> {
+        (0..len).map(|index| (index % 251) as u8).collect()
+    }
+
+    fn scratch_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("ensu-{name}-test-{}", now_ms()));
+        fs::create_dir_all(&dir).expect("create test dir");
+        dir
+    }
+
+    struct TestServer {
+        address: std::net::SocketAddr,
+        running: Arc<AtomicBool>,
+        handle: Option<thread::JoinHandle<()>>,
+    }
+
+    impl TestServer {
+        fn spawn(handler: impl Fn(TcpStream) + Send + Sync + 'static) -> Self {
+            let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+            listener
+                .set_nonblocking(true)
+                .expect("configure test server");
+            let address = listener.local_addr().expect("test server address");
+            let running = Arc::new(AtomicBool::new(true));
+            let handler: Arc<dyn Fn(TcpStream) + Send + Sync> = Arc::new(handler);
+            let handle = {
+                let running = Arc::clone(&running);
+                thread::spawn(move || {
+                    while running.load(Ordering::SeqCst) {
+                        match listener.accept() {
+                            Ok((stream, _)) => {
+                                stream.set_nonblocking(false).ok();
+                                let handler = Arc::clone(&handler);
+                                thread::spawn(move || handler(stream));
+                            }
+                            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                                thread::sleep(Duration::from_millis(5));
+                            }
+                            Err(_) => break,
+                        }
+                    }
+                })
+            };
+            Self {
+                address,
+                running,
+                handle: Some(handle),
+            }
+        }
+
+        fn url(&self, path: &str) -> String {
+            format!("http://{}{}", self.address, path)
+        }
+    }
+
+    impl Drop for TestServer {
+        fn drop(&mut self) {
+            self.running.store(false, Ordering::SeqCst);
+            let _ = TcpStream::connect(self.address);
+            if let Some(handle) = self.handle.take() {
+                let _ = handle.join();
+            }
+        }
+    }
+
+    fn handle_no_range_test_request(
+        mut stream: TcpStream,
+        bytes: Arc<Vec<u8>>,
+        get_count: Arc<AtomicUsize>,
+    ) {
+        let mut reader = BufReader::new(stream.try_clone().expect("clone test stream"));
+        let mut request_line = String::new();
+        if reader.read_line(&mut request_line).is_err() {
+            return;
+        }
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_err() || line == "\r\n" || line.is_empty() {
+                break;
+            }
+        }
+
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            bytes.len()
+        );
+        let _ = stream.write_all(response.as_bytes());
+        if request_line.starts_with("HEAD ") {
+            return;
+        }
+        get_count.fetch_add(1, Ordering::SeqCst);
+        let _ = stream.write_all(bytes.as_slice());
+    }
+
     fn handle_range_test_request(
         mut stream: TcpStream,
         bytes: Arc<Vec<u8>>,
@@ -1962,15 +2554,18 @@ mod tests {
         }
 
         let mut range_header = None;
+        let mut if_range_header = None;
         loop {
             let mut line = String::new();
             if reader.read_line(&mut line).is_err() || line == "\r\n" || line.is_empty() {
                 break;
             }
-            if let Some((name, value)) = line.split_once(':')
-                && name.eq_ignore_ascii_case("range")
-            {
-                range_header = Some(value.trim().to_string());
+            if let Some((name, value)) = line.split_once(':') {
+                if name.eq_ignore_ascii_case("range") {
+                    range_header = Some(value.trim().to_string());
+                } else if name.eq_ignore_ascii_case("if-range") {
+                    if_range_header = Some(value.trim().to_string());
+                }
             }
         }
 
@@ -1984,7 +2579,10 @@ mod tests {
             return;
         }
 
-        if let Some(range_header) = range_header {
+        let resume_allowed = if_range_header
+            .as_deref()
+            .is_none_or(|value| value == "\"test-etag\"");
+        if let Some(range_header) = range_header.filter(|_| resume_allowed) {
             let Some((start, end)) = parse_test_range_header(&range_header, bytes.len() as u64)
             else {
                 let _ = stream

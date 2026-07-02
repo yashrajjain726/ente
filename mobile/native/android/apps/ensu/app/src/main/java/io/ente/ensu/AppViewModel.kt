@@ -29,11 +29,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val credentialStore = CredentialStore(application)
     val appVersion = runCatching { getAppVersion(application) }.getOrDefault("unknown")
     private val deviceCapabilityProvider = AndroidDeviceCapabilityProvider(application)
+    private val transcriber = (application as EnsuApplication).transcriber
 
     val logRepository = FileLogRepository(application)
     private val llmProvider = RustLlmProvider(
         context = application,
         modelDir = resolveModelDir(application),
+        transcriber = transcriber,
         legacyModelDir = File(application.filesDir, "llm"),
         deviceCapabilityProvider = deviceCapabilityProvider
     )
@@ -44,6 +46,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         sessionPreferences = sessionPreferences,
         chatRepository = chatRepository,
         llmProvider = llmProvider,
+        transcriber = transcriber,
         deviceCapabilityProvider = deviceCapabilityProvider,
         configDefaults = configDefaults,
         logRepository = logRepository

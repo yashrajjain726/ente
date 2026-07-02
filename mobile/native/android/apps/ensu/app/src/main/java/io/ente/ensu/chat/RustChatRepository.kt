@@ -9,9 +9,9 @@ import io.ente.ensu.chat.ChatMessage
 import io.ente.ensu.chat.ChatSession
 import io.ente.ensu.chat.MessageAuthor
 import io.ente.ensu.chat.sessionTitleFromText
-import io.ente.ensu.bindings.AttachmentKind
-import io.ente.ensu.bindings.AttachmentMeta
-import io.ente.ensu.bindings.Sender
+import io.ente.ensu.bindings.DbAttachmentKind
+import io.ente.ensu.bindings.DbAttachmentMeta
+import io.ente.ensu.bindings.DbSender
 import io.ente.ensu.bindings.EnsuDb
 import io.ente.ensu.bindings.DbException
 import java.io.File
@@ -66,8 +66,8 @@ class RustChatRepository(
                 sessionId = message.sessionUuid,
                 parentId = message.parentMessageUuid,
                 author = when (message.sender) {
-                    Sender.SELF_USER -> MessageAuthor.User
-                    Sender.OTHER -> MessageAuthor.Assistant
+                    DbSender.SELF_USER -> MessageAuthor.User
+                    DbSender.OTHER -> MessageAuthor.Assistant
                 },
                 text = message.text,
                 timestampMillis = message.createdAtUs / 1000,
@@ -77,8 +77,8 @@ class RustChatRepository(
                         name = meta.name,
                         sizeBytes = meta.size,
                         type = when (meta.kind) {
-                            AttachmentKind.IMAGE -> AttachmentType.Image
-                            AttachmentKind.DOCUMENT -> AttachmentType.Document
+                            DbAttachmentKind.IMAGE -> AttachmentType.Image
+                            DbAttachmentKind.DOCUMENT -> AttachmentType.Document
                         },
                         localPath = File(attachmentsDir, meta.id).absolutePath,
                         isUploading = false
@@ -96,11 +96,11 @@ class RustChatRepository(
         attachments: List<Attachment>
     ): ChatMessage = withDbRecovery {
         val meta = attachments.map { att ->
-            AttachmentMeta(
+            DbAttachmentMeta(
                 id = att.id,
                 kind = when (att.type) {
-                    AttachmentType.Image -> AttachmentKind.IMAGE
-                    AttachmentType.Document -> AttachmentKind.DOCUMENT
+                    AttachmentType.Image -> DbAttachmentKind.IMAGE
+                    AttachmentType.Document -> DbAttachmentKind.DOCUMENT
                 },
                 size = att.sizeBytes,
                 name = att.name
@@ -110,9 +110,9 @@ class RustChatRepository(
         val message = db.insertMessage(
             sessionUuid = sessionId,
             sender = if (author == MessageAuthor.User) {
-                Sender.SELF_USER
+                DbSender.SELF_USER
             } else {
-                Sender.OTHER
+                DbSender.OTHER
             },
             text = text,
             parentMessageUuid = parentId,
