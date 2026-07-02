@@ -1389,7 +1389,15 @@ fn prepare_cached_download(
     destination: &Path,
     validate: &impl Fn(&Target, &Path) -> Result<(), String>,
 ) -> bool {
-    download_metadata_matches(destination, &target.url) && validate(target, destination).is_ok()
+    if !destination.exists() || validate(target, destination).is_err() {
+        return false;
+    }
+    if read_download_metadata(destination).is_none() {
+        let size = file_size(destination).unwrap_or(0);
+        let _ = write_download_metadata(destination, target, size, None);
+        return true;
+    }
+    download_metadata_matches(destination, &target.url)
 }
 
 fn read_download_metadata(path: &Path) -> Option<DownloadMetadata> {
@@ -1924,6 +1932,91 @@ mod tests {
             "corrupt cache must be re-downloaded, not served"
         );
         assert_eq!(fs::read(&destination).expect("read healed file"), *bytes);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn existing_valid_file_without_sidecar_is_adopted() {
+        let bytes = Arc::new(sample_bytes(512));
+        let get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("adopt-download");
+        let destination = test_dir.join("model.bin");
+        fs::write(&destination, bytes.as_slice()).expect("place existing file without sidecar");
+        assert!(!metadata_path_for(&destination).exists());
+
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fetch adopts existing file");
+
+        assert_eq!(
+            get_count.load(Ordering::SeqCst),
+            0,
+            "an existing valid file must not be re-downloaded"
+        );
+        assert!(
+            metadata_path_for(&destination).exists(),
+            "adopting the file writes its metadata sidecar"
+        );
+        assert_eq!(fs::read(&destination).expect("read adopted file"), *bytes);
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn existing_file_with_stale_sidecar_is_redownloaded() {
+        let bytes = Arc::new(sample_bytes(512));
+        let get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let get_count = Arc::clone(&get_count);
+            TestServer::spawn(move |stream| {
+                handle_no_range_test_request(stream, Arc::clone(&bytes), Arc::clone(&get_count));
+            })
+        };
+
+        let test_dir = scratch_dir("stale-sidecar-download");
+        let destination = test_dir.join("model.bin");
+        fs::write(&destination, bytes.as_slice()).expect("place existing file");
+        let stale_target = Target {
+            label: "Model".to_string(),
+            url: "http://127.0.0.1:1/old-model.bin".to_string(),
+            destination_path: destination.display().to_string(),
+        };
+        write_download_metadata(&destination, &stale_target, bytes.len() as u64, None)
+            .expect("write stale sidecar");
+
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false).expect("fetch redownloads");
+
+        assert_eq!(
+            get_count.load(Ordering::SeqCst),
+            1,
+            "a stale sidecar must trigger a re-download, not adoption"
+        );
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes
+        );
 
         let _ = fs::remove_dir_all(test_dir);
     }
