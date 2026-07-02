@@ -133,6 +133,11 @@ const startSpaceRouteTransition = async <T,>(
         result = await updateRoute();
     });
 
+    void transition.ready.catch((error: unknown) => {
+        if (error instanceof DOMException && error.name == "AbortError") return;
+        console.error("Failed to start route transition", error);
+    });
+
     void transition.finished
         .catch(() => undefined)
         .then(() => {
