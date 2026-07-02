@@ -22,10 +22,7 @@ subtle = "2"
 md-5 = "0.11"
 
 # SRP authentication (optional; enable via the `srp` feature)
-# Pinned to upstream commit that includes the padded-u interop fix for
-# leading-zero A/B wire values (fixes sporadic SRP verify-session failures
-# against our Go SRP server path): https://github.com/RustCrypto/PAKEs/pull/285
-srp = { git = "https://github.com/RustCrypto/PAKEs", package = "srp", rev = "5b3bd1f3a9d51121a698ffe5d6ecc33cafcd6413", default-features = false, optional = true }
+srp = { version = "0.7.0-rc.3", default-features = false, optional = true }
 sha2 = { version = "0.11", optional = true }
 
 # Randomness
