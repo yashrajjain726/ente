@@ -71,43 +71,59 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
-              crossAxisAlignment: .center,
-              mainAxisAlignment: .center,
               children: [
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      if (kDebugMode) _buildDebugLanguageButton(),
-                      _buildOnboardingAnimation(),
-                      Text(
-                        AppLocalizations.of(context).onboardingTitle,
-                        textAlign: .center,
-                        textScaler: TextScaler.noScaling,
-                        style: TextStyle(
-                          fontWeight: .w900,
-                          fontFamily: TextStyles.outfitFontFamily,
-                          package: TextStyles.fontPackage,
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (kDebugMode) _buildDebugLanguageButton(),
 
-                          fontSize: MediaQuery.of(context).size.width * 0.09,
-                          height: 1,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const Flexible(child: SizedBox(height: 16)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32),
-                        child: Text(
-                          AppLocalizations.of(context).onboardingDesc,
-                          textAlign: TextAlign.center,
-                          style: textTheme.body.copyWith(
-                            color: colorScheme.greenLight,
-                            fontSize: 14,
+                              _buildOnboardingAnimation(),
+
+                              Text(
+                                AppLocalizations.of(context).onboardingTitle,
+                                textAlign: TextAlign.center,
+                                textScaler: TextScaler.noScaling,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontFamily: TextStyles.outfitFontFamily,
+                                  package: TextStyles.fontPackage,
+                                  fontSize:
+                                      MediaQuery.of(context).size.width * 0.09,
+                                  height: 1,
+                                  color: Colors.white,
+                                ),
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                ),
+                                child: Text(
+                                  AppLocalizations.of(context).onboardingDesc,
+                                  textAlign: TextAlign.center,
+                                  style: textTheme.body.copyWith(
+                                    color: colorScheme.greenLight,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 32),
+                            ],
                           ),
                         ),
-                      ),
-                      const Flexible(child: SizedBox(height: 64)),
-                    ],
+                      );
+                    },
                   ),
                 ),
                 Theme(
