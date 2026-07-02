@@ -487,6 +487,18 @@ async fn download_file_single(
         }
 
         let append = resume_from > 0 && response.status() == StatusCode::PARTIAL_CONTENT;
+        if append && resumed_content_range_start(&response) != Some(resume_from) {
+            let _ = fs::remove_file(&tmp_path);
+            let _ = fs::remove_file(&partial_metadata_path);
+            if attempt == MAX_ATTEMPTS {
+                return Err(format!(
+                    "Failed to download {}: server resumed from the wrong offset",
+                    target.label
+                ));
+            }
+            retry_count = retry_count.saturating_add(1);
+            continue;
+        }
         let resume_from = if append { resume_from } else { 0 };
         let response_metadata = response_metadata(&response);
         let file_total = content_total(&response, resume_from).or(expected_file_total);
@@ -587,11 +599,15 @@ async fn download_file_single(
         });
 
         if let Some(total) = file_total
-            && downloaded < total
+            && downloaded != total
         {
+            if downloaded > total {
+                let _ = fs::remove_file(&tmp_path);
+                let _ = fs::remove_file(&partial_metadata_path);
+            }
             if attempt == MAX_ATTEMPTS {
                 return Err(format!(
-                    "Download incomplete: expected {total} bytes, got {downloaded}"
+                    "Download size mismatch: expected {total} bytes, got {downloaded}"
                 ));
             }
             retry_count = retry_count.saturating_add(1);
@@ -1219,6 +1235,15 @@ fn validate_range_response(
     }
 
     Ok(())
+}
+
+fn resumed_content_range_start(response: &Response) -> Option<u64> {
+    response
+        .headers()
+        .get(CONTENT_RANGE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(parse_content_range)
+        .map(|range| range.start)
 }
 
 fn if_range_header_value(response_metadata: Option<&ResponseMetadata>) -> Option<String> {
@@ -2310,6 +2335,115 @@ mod tests {
         );
 
         let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn single_stream_resume_restarts_when_server_resumes_from_wrong_offset() {
+        let bytes = Arc::new(sample_bytes(512));
+        let bad_resume_count = Arc::new(AtomicUsize::new(0));
+        let full_get_count = Arc::new(AtomicUsize::new(0));
+
+        let server = {
+            let bytes = Arc::clone(&bytes);
+            let bad_resume_count = Arc::clone(&bad_resume_count);
+            let full_get_count = Arc::clone(&full_get_count);
+            TestServer::spawn(move |stream| {
+                handle_wrong_offset_resume_request(
+                    stream,
+                    Arc::clone(&bytes),
+                    Arc::clone(&bad_resume_count),
+                    Arc::clone(&full_get_count),
+                );
+            })
+        };
+
+        let test_dir = scratch_dir("wrong-offset-resume");
+        let destination = test_dir.join("model.bin");
+        let target = Target {
+            label: "Model".to_string(),
+            url: server.url("/model.bin"),
+            destination_path: destination.display().to_string(),
+        };
+        fs::write(tmp_path_for(&destination), &bytes[..256]).expect("place partial tmp");
+        write_partial_download_metadata(
+            &destination,
+            &target,
+            &ResponseMetadata {
+                etag: Some("\"test-etag\"".to_string()),
+                last_modified: None,
+            },
+        )
+        .expect("write partial sidecar");
+
+        fetch(vec![target], |_, _| Ok(()), |_| {}, || false)
+            .expect("restart after bad 206 succeeds");
+
+        assert_eq!(
+            fs::read(&destination).expect("read downloaded file"),
+            *bytes,
+            "a wrong-offset 206 must never append duplicate bytes"
+        );
+        assert_eq!(bad_resume_count.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            full_get_count.load(Ordering::SeqCst),
+            1,
+            "the retry must restart from scratch"
+        );
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    fn handle_wrong_offset_resume_request(
+        mut stream: TcpStream,
+        bytes: Arc<Vec<u8>>,
+        bad_resume_count: Arc<AtomicUsize>,
+        full_get_count: Arc<AtomicUsize>,
+    ) {
+        let mut reader = BufReader::new(stream.try_clone().expect("clone test stream"));
+        let mut request_line = String::new();
+        if reader.read_line(&mut request_line).is_err() {
+            return;
+        }
+        let mut has_range = false;
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_err() || line == "\r\n" || line.is_empty() {
+                break;
+            }
+            if let Some((name, _)) = line.split_once(':')
+                && name.eq_ignore_ascii_case("range")
+            {
+                has_range = true;
+            }
+        }
+
+        if request_line.starts_with("HEAD ") {
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nETag: \"test-etag\"\r\nConnection: close\r\n\r\n",
+                bytes.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+            return;
+        }
+
+        if has_range {
+            bad_resume_count.fetch_add(1, Ordering::SeqCst);
+            let response = format!(
+                "HTTP/1.1 206 Partial Content\r\nContent-Length: {len}\r\nContent-Range: bytes 0-{end}/{len}\r\nETag: \"test-etag\"\r\nConnection: close\r\n\r\n",
+                len = bytes.len(),
+                end = bytes.len() - 1
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.write_all(bytes.as_slice());
+        } else {
+            full_get_count.fetch_add(1, Ordering::SeqCst);
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                bytes.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.write_all(bytes.as_slice());
+        }
     }
 
     fn sample_bytes(len: usize) -> Vec<u8> {
