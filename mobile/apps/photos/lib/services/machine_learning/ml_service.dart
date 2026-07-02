@@ -1,6 +1,6 @@
 import "dart:async";
 import "dart:convert" show jsonEncode;
-import "dart:io" show Platform;
+import "dart:io" show File, PathNotFoundException, Platform;
 import "dart:math" show min;
 import "dart:typed_data" show Uint8List;
 
@@ -749,12 +749,13 @@ class MLService {
     bool actuallyRanML = false;
 
     final mlDataDB = _dbForMode(instruction.mode);
+    MLImageSource? source;
     try {
-      final String filePath = await getImagePathForML(instruction.file);
+      source = await getImagePathForML(instruction.file);
 
       final MLResult? result = await MLIndexingIsolate.instance.analyzeImage(
         instruction,
-        filePath,
+        source.imagePath,
       );
       // Check if there's no result simply because MLController paused indexing
       if (result == null) {
@@ -962,6 +963,20 @@ class MLService {
         await mlDataDB.deletePetDataForFiles([instruction.fileKey]);
       }
       return false;
+    } finally {
+      if (source != null && source.shouldDeleteAfterMLProcessing) {
+        try {
+          await File(source.imagePath).delete();
+        } on PathNotFoundException {
+          // Already deleted.
+        } catch (e, s) {
+          _logger.warning(
+            "Failed to delete origin file exported for ML at ${source.imagePath}",
+            e,
+            s,
+          );
+        }
+      }
     }
   }
 

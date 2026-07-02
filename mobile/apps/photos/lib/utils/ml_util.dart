@@ -696,8 +696,17 @@ Future<int> _getIndexableFileCount({required MLMode mode}) async {
   return getIndexableFileCount();
 }
 
-Future<String> getImagePathForML(EnteFile enteFile) async {
+typedef MLImageSource = ({
+  String imagePath,
+  bool shouldDeleteAfterMLProcessing,
+});
+
+/// Returns the path to use for ML processing of [enteFile], and whether the
+/// caller must delete that file afterwards (true only for iOS photo_manager
+/// origin exports).
+Future<MLImageSource> getImagePathForML(EnteFile enteFile) async {
   String? imagePath;
+  bool shouldDeleteAfterMLProcessing = false;
 
   final stopwatch = Stopwatch()..start();
   File? file;
@@ -725,6 +734,11 @@ Future<String> getImagePathForML(EnteFile enteFile) async {
         trackOriginFetchForUploadOrML.put(enteFile.localID!, true);
       }
       file = await getFile(enteFile, isOrigin: true);
+      shouldDeleteAfterMLProcessing =
+          Platform.isIOS &&
+          file != null &&
+          !enteFile.isRemoteFile &&
+          !enteFile.isSharedMediaToAppSandbox;
     } catch (e, s) {
       _logger.severe("Could not get file for $enteFile", e, s);
     }
@@ -742,7 +756,10 @@ Future<String> getImagePathForML(EnteFile enteFile) async {
     throw CouldNotRetrieveAnyFileData();
   }
 
-  return imagePath;
+  return (
+    imagePath: imagePath,
+    shouldDeleteAfterMLProcessing: shouldDeleteAfterMLProcessing,
+  );
 }
 
 bool _shouldRunIndexing(
