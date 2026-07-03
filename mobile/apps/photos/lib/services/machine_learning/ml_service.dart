@@ -986,7 +986,7 @@ class MLService {
   bool _shouldDeleteAfterMLProcessing(EnteFile file) {
     return Platform.isIOS &&
         file.fileType != FileType.video &&
-        !file.isRemoteFile;
+        !file.isRemoteOnlyFile;
   }
 
   bool _canRunMLFunction({required String function}) {
