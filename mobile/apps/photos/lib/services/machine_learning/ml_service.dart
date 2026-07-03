@@ -14,6 +14,7 @@ import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/compute_control_event.dart";
 import "package:photos/events/people_changed_event.dart";
 import "package:photos/main.dart";
+import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/ml/clip.dart";
 import "package:photos/models/ml/face/face.dart";
@@ -753,7 +754,7 @@ class MLService {
     String? pathToDeleteAfterMLProcessing;
     try {
       final String filePath = await getImagePathForML(instruction.file);
-      if (_shouldDeleteAfterMLProcessing(instruction)) {
+      if (_shouldDeleteAfterMLProcessing(instruction.file)) {
         pathToDeleteAfterMLProcessing = filePath;
       }
 
@@ -984,8 +985,7 @@ class MLService {
     }
   }
 
-  bool _shouldDeleteAfterMLProcessing(FileMLInstruction instruction) {
-    final file = instruction.file;
+  bool _shouldDeleteAfterMLProcessing(EnteFile file) {
     return Platform.isIOS &&
         file.fileType != FileType.video &&
         !file.isRemoteFile;
