@@ -6,7 +6,6 @@ import 'package:ente_accounts/pages/login_page.dart';
 import 'package:ente_accounts/pages/password_entry_page.dart';
 import 'package:ente_accounts/pages/password_reentry_page.dart';
 import 'package:ente_components/ente_components.dart';
-import 'package:ente_ui/components/alert_bottom_sheet.dart';
 import "package:ente_ui/pages/developer_settings_page.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -14,6 +13,7 @@ import "package:flutter_svg/flutter_svg.dart";
 import 'package:locker/l10n/l10n.dart';
 import 'package:locker/services/configuration.dart';
 import 'package:locker/ui/pages/home_page.dart';
+import "package:locker/utils/bottom_sheet_illustration.dart";
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key});
@@ -127,34 +127,34 @@ class _OnboardingPageState extends State<OnboardingPage> {
             _developerModeTapCount++;
             if (_developerModeTapCount >= kDeveloperModeTapCountThreshold) {
               _developerModeTapCount = 0;
-              await showAlertBottomSheet(
-                context,
-                title: l10n.developerSettings,
-                message: l10n.developerSettingsWarning,
-                assetPath: 'assets/warning-grey.png',
-                isDismissible: false,
-                showCloseButton: false,
-                buttons: [
-                  ButtonComponent(
-                    label: l10n.yes,
-                    onTap: () async {
-                      Navigator.of(context).pop();
-                      await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (BuildContext context) {
-                            return DeveloperSettingsPage(
-                              getCurrentEndpoint: () =>
-                                  Configuration.instance.getHttpEndpoint(),
-                              setEndpoint: (url) async =>
-                                  Configuration.instance.setHttpEndpoint(url),
-                            );
-                          },
-                        ),
-                      );
-                      setState(() {});
-                    },
-                  ),
-                ],
+              await showBottomSheetComponent(
+                context: context,
+                builder: (_) => BottomSheetComponent(
+                  title: l10n.developerSettings,
+                  message: l10n.developerSettingsWarning,
+                  illustration: LockerBottomSheetIllustration.warningGrey,
+                  actions: [
+                    ButtonComponent(
+                      label: l10n.yes,
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (BuildContext context) {
+                              return DeveloperSettingsPage(
+                                getCurrentEndpoint: () =>
+                                    Configuration.instance.getHttpEndpoint(),
+                                setEndpoint: (url) async =>
+                                    Configuration.instance.setHttpEndpoint(url),
+                              );
+                            },
+                          ),
+                        );
+                        setState(() {});
+                      },
+                    ),
+                  ],
+                ),
               );
             }
           },

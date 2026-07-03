@@ -6,11 +6,11 @@ import "package:ente_configuration/base_configuration.dart";
 import "package:ente_crypto_api/ente_crypto_api.dart";
 import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_strings/ente_strings.dart";
-import "package:ente_ui/components/alert_bottom_sheet.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:ente_utils/email_util.dart";
 import "package:flutter/material.dart";
 import "package:locker/l10n/l10n.dart";
+import "package:locker/utils/bottom_sheet_illustration.dart";
 
 class DeleteAccountPage extends StatelessWidget {
   final BaseConfiguration config;
@@ -140,18 +140,20 @@ class DeleteAccountPage extends StatelessWidget {
   }
 
   Future<bool?> _showDeleteConfirmationSheet(BuildContext context) async {
-    return showAlertBottomSheet<bool>(
-      context,
-      title: context.strings.confirmAccountDeleteTitle,
-      message: context.strings.confirmAccountDeleteMessage,
-      assetPath: "assets/warning-grey.png",
-      buttons: [
-        ButtonComponent(
-          label: context.strings.delete,
-          variant: ButtonComponentVariant.critical,
-          onTap: () => Navigator.of(context).pop(true),
-        ),
-      ],
+    return showBottomSheetComponent<bool>(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: context.strings.confirmAccountDeleteTitle,
+        message: context.strings.confirmAccountDeleteMessage,
+        illustration: LockerBottomSheetIllustration.warningGrey,
+        actions: [
+          ButtonComponent(
+            label: context.strings.delete,
+            variant: ButtonComponentVariant.critical,
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
     );
   }
 }
