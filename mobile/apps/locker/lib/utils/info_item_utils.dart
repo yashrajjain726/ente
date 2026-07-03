@@ -49,9 +49,9 @@ class InfoItemUtils {
     return buildRoleIcon(
       icon: config.icon,
       foregroundColor: _foregroundColor(config.colorRole, colors),
-      roleBackgroundColor: _backgroundColor(config.colorRole, colors),
+      backgroundColor:
+          backgroundColor ?? _backgroundColor(config.colorRole, colors),
       size: size,
-      backgroundColor: backgroundColor,
     );
   }
 

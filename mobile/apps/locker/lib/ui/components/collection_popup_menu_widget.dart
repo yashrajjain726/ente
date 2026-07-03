@@ -19,17 +19,10 @@ class CollectionPopupMenuWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.componentColors;
-
     return EntePopupMenuButton<String>(
       optionsBuilder: () => _buildOptions(context),
       onSelected: (value) => _handleMenuAction(context, value),
-      child:
-          child ??
-          HugeIcon(
-            icon: HugeIcons.strokeRoundedMoreVertical,
-            color: colors.textBase,
-          ),
+      child: child,
     );
   }
 

@@ -314,6 +314,7 @@ class _HomePageState extends UploaderPageState<HomePage>
     _keyboardFocusNode.dispose();
     _scrollController.dispose();
     _displayedFilesNotifier.dispose();
+    _selectedFiles.dispose();
     _deepLinkSubscription?.cancel();
     _triggerLogoutSubscription?.cancel();
     _collectionsUpdatedSubscription?.cancel();

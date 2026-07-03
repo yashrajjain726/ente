@@ -69,17 +69,16 @@ class FileIconUtils {
   static Widget getFileIcon(
     BuildContext context,
     String fileName, {
+    required Color backgroundColor,
     double size = 24,
-    Color? backgroundColor,
   }) {
     final colors = context.componentColors;
     final config = _getFileConfig(fileName);
     return buildRoleIcon(
       icon: config.icon,
       foregroundColor: _foregroundColor(config.colorRole, colors),
-      roleBackgroundColor: _backgroundColor(config.colorRole, colors),
-      size: size,
       backgroundColor: backgroundColor,
+      size: size,
     );
   }
 
@@ -91,27 +90,17 @@ class FileIconUtils {
       FileIconColorRole.neutral => colors.textLight,
     };
   }
-
-  static Color _backgroundColor(FileIconColorRole role, ColorTokens colors) {
-    return switch (role) {
-      FileIconColorRole.warning => colors.warningLight,
-      FileIconColorRole.green => colors.greenLight,
-      FileIconColorRole.primary => colors.primaryLight,
-      FileIconColorRole.neutral => colors.fillLight,
-    };
-  }
 }
 
 Widget buildRoleIcon({
   required dynamic icon,
   required Color foregroundColor,
-  required Color roleBackgroundColor,
+  required Color backgroundColor,
   double size = 24,
-  Color? backgroundColor,
 }) {
   return IconTile(
     icon: HugeIcon(icon: icon, color: foregroundColor, size: size),
-    backgroundColor: backgroundColor ?? roleBackgroundColor,
+    backgroundColor: backgroundColor,
   );
 }
 

@@ -101,6 +101,7 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
     _collectionUpdateSubscription.cancel();
     _keyboardFocusNode.dispose();
     _scrollController.dispose();
+    _selectedFiles.dispose();
     super.dispose();
   }
 
@@ -236,26 +237,9 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
       );
     }
 
-    final canManageCollection =
-        collectionViewType == CollectionViewType.ownedCollection ||
-        collectionViewType == CollectionViewType.hiddenOwnedCollection ||
-        collectionViewType == CollectionViewType.sharedCollectionViewer ||
-        collectionViewType == CollectionViewType.sharedCollectionCollaborator ||
-        collectionViewType == CollectionViewType.quickLink;
+    final canManageCollection = canShare;
     if (canManageCollection) {
-      actions.add(
-        CollectionPopupMenuWidget(
-          collection: _collection,
-          child: IgnorePointer(
-            child: IconButtonComponent(
-              icon: const HugeIcon(icon: HugeIcons.strokeRoundedMoreVertical),
-              variant: IconButtonComponentVariant.primary,
-              shouldSurfaceExecutionStates: false,
-              onTap: () {},
-            ),
-          ),
-        ),
-      );
+      actions.add(CollectionPopupMenuWidget(collection: _collection));
     }
 
     return actions;
