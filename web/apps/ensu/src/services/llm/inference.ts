@@ -405,7 +405,7 @@ class WasmInference implements InferenceBackend {
         this.abortControllers.set(jobId, controller);
 
         let generatedTokens = 0;
-        let promptTokens: number | null = null;
+        let promptTokens: number | null;
 
         try {
             try {
@@ -452,7 +452,7 @@ class WasmInference implements InferenceBackend {
             }
         } catch (error) {
             if (error instanceof WllamaAbortError) {
-                throw new Error("Generation cancelled");
+                throw new Error("Generation cancelled", { cause: error });
             }
             throw error instanceof Error ? error : new Error(String(error));
         } finally {

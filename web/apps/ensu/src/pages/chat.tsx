@@ -1983,6 +1983,7 @@ const Page: React.FC = () => {
             log.error("Failed to preload model", error);
             setModelGateError(message);
             setIsDownloading(false);
+            setDownloadStatus(null);
             setModelGateStatus("error");
         }
     }, [ensureProvider, formatErrorMessage, getModelSettings]);
@@ -2006,6 +2007,7 @@ const Page: React.FC = () => {
             log.error("Failed to prepare model", error);
             setModelGateError(message);
             setIsDownloading(false);
+            setDownloadStatus(null);
             setModelGateStatus("error");
             showMiniDialog({ title: "Model error", message });
         }
