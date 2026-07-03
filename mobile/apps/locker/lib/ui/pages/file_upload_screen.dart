@@ -263,7 +263,6 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
     return FileIconUtils.getFileIcon(
       context,
       fileName,
-      showBackground: true,
       backgroundColor: context.componentColors.backgroundBase,
     );
   }

@@ -96,9 +96,7 @@ class _CollectionSelectionOverlayBarState
                         topLeft: Radius.circular(20),
                         topRight: Radius.circular(20),
                       ),
-                      border: Border(
-                        top: BorderSide(color: colors.strokeFaint),
-                      ),
+                      border: Border(top: BorderSide(color: colors.strokeDark)),
                     ),
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),

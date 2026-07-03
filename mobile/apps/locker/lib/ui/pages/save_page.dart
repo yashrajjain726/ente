@@ -8,6 +8,7 @@ import 'package:locker/models/info/info_item.dart';
 import 'package:locker/ui/pages/account_credentials_page.dart';
 import 'package:locker/ui/pages/personal_note_page.dart';
 import 'package:locker/ui/pages/physical_records_page.dart';
+import 'package:locker/utils/file_icon_utils.dart';
 import 'package:locker/utils/info_item_utils.dart';
 
 enum SaveOptionType { document, note, physicalRecord, credentials }
@@ -59,10 +60,13 @@ class SaveBottomSheet extends StatelessWidget {
                   _buildSaveOption(
                     context,
                     rootContext: rootContext,
-                    icon: HugeIcon(
-                      icon: HugeIcons.strokeRoundedFileUpload,
-                      size: 24,
-                      color: colors.primary,
+                    icon: IconTile(
+                      backgroundColor: colors.primaryLight,
+                      icon: HugeIcon(
+                        icon: HugeIcons.strokeRoundedFileUpload,
+                        size: 24,
+                        color: colors.primary,
+                      ),
                     ),
                     title: context.l10n.saveDocumentTitle,
                     description: context.l10n.saveDocumentDescription,
@@ -75,7 +79,6 @@ class SaveBottomSheet extends StatelessWidget {
                     icon: InfoItemUtils.getInfoIcon(
                       context,
                       InfoType.note,
-                      showBackground: false,
                       size: 24,
                     ),
                     title: context.l10n.personalNote,
@@ -89,7 +92,6 @@ class SaveBottomSheet extends StatelessWidget {
                     icon: InfoItemUtils.getInfoIcon(
                       context,
                       InfoType.physicalRecord,
-                      showBackground: false,
                       size: 24,
                     ),
                     title: context.l10n.physicalRecords,
@@ -103,7 +105,6 @@ class SaveBottomSheet extends StatelessWidget {
                     icon: InfoItemUtils.getInfoIcon(
                       context,
                       InfoType.accountCredential,
-                      showBackground: false,
                       size: 24,
                     ),
                     title: context.l10n.accountCredentials,

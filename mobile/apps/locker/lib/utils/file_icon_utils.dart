@@ -69,28 +69,17 @@ class FileIconUtils {
   static Widget getFileIcon(
     BuildContext context,
     String fileName, {
-    bool showBackground = true,
     double size = 24,
     Color? backgroundColor,
   }) {
     final colors = context.componentColors;
     final config = _getFileConfig(fileName);
-    final foregroundColor = _foregroundColor(config.colorRole, colors);
-
-    final icon = HugeIcon(
+    return buildRoleIcon(
       icon: config.icon,
-      color: foregroundColor,
+      foregroundColor: _foregroundColor(config.colorRole, colors),
+      roleBackgroundColor: _backgroundColor(config.colorRole, colors),
       size: size,
-    );
-
-    if (!showBackground) {
-      return icon;
-    }
-
-    return IconTile(
-      icon: icon,
-      backgroundColor:
-          backgroundColor ?? _backgroundColor(config.colorRole, colors),
+      backgroundColor: backgroundColor,
     );
   }
 
@@ -111,6 +100,19 @@ class FileIconUtils {
       FileIconColorRole.neutral => colors.fillLight,
     };
   }
+}
+
+Widget buildRoleIcon({
+  required dynamic icon,
+  required Color foregroundColor,
+  required Color roleBackgroundColor,
+  double size = 24,
+  Color? backgroundColor,
+}) {
+  return IconTile(
+    icon: HugeIcon(icon: icon, color: foregroundColor, size: size),
+    backgroundColor: backgroundColor ?? roleBackgroundColor,
+  );
 }
 
 class IconTile extends StatelessWidget {
@@ -146,9 +148,9 @@ class SelectionCheckBadge extends StatelessWidget {
       height: 18,
       alignment: Alignment.center,
       decoration: BoxDecoration(color: colors.primary, shape: BoxShape.circle),
-      child: const HugeIcon(
+      child: HugeIcon(
         icon: HugeIcons.strokeRoundedTick02,
-        color: Colors.white,
+        color: colors.specialWhite,
         size: 12,
         strokeWidth: 2,
       ),

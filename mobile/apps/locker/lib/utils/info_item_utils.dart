@@ -41,28 +41,17 @@ class InfoItemUtils {
   static Widget getInfoIcon(
     BuildContext context,
     InfoType type, {
-    bool showBackground = true,
     double size = 24,
     Color? backgroundColor,
   }) {
     final colors = context.componentColors;
     final config = _getInfoConfig(type);
-    final foregroundColor = _foregroundColor(config.colorRole, colors);
-
-    final icon = HugeIcon(
+    return buildRoleIcon(
       icon: config.icon,
-      color: foregroundColor,
+      foregroundColor: _foregroundColor(config.colorRole, colors),
+      roleBackgroundColor: _backgroundColor(config.colorRole, colors),
       size: size,
-    );
-
-    if (!showBackground) {
-      return icon;
-    }
-
-    return IconTile(
-      icon: icon,
-      backgroundColor:
-          backgroundColor ?? _backgroundColor(config.colorRole, colors),
+      backgroundColor: backgroundColor,
     );
   }
 

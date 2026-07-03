@@ -164,7 +164,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
                           topRight: Radius.circular(20),
                         ),
                         border: Border(
-                          top: BorderSide(color: colors.strokeFaint),
+                          top: BorderSide(color: colors.strokeDark),
                         ),
                       ),
                       child: Padding(

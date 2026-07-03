@@ -191,7 +191,6 @@ class FileListWidget extends StatelessWidget {
     return FileIconUtils.getFileIcon(
       context,
       file.displayName,
-      showBackground: true,
       backgroundColor: backgroundColor,
     );
   }

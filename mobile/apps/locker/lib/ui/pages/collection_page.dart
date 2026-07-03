@@ -149,6 +149,7 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
       Configuration.instance.getUserID()!,
     );
     isFavorite = collectionViewType == CollectionViewType.favorite;
+    isQuickLink = collectionViewType == CollectionViewType.quickLink;
   }
 
   Future<void> _initializeData(Collection collection) async {
@@ -229,6 +230,7 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
         IconButtonComponent(
           icon: const HugeIcon(icon: HugeIcons.strokeRoundedShare08),
           variant: IconButtonComponentVariant.primary,
+          shouldSurfaceExecutionStates: false,
           onTap: _shareCollection,
         ),
       );
