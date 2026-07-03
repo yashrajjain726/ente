@@ -407,7 +407,6 @@
     "failed_uploads_hint": "Existirá uma opção para tentar novamente quando o envio finalizar",
     "retry_failed_uploads": "Repetir envios falhados",
     "thumbnail_generation_failed": "Falhou ao gerar miniaturas",
-    "canvas_blocked_upload_description": "As configurações do navegador estão bloqueando o acesso à tela. Corrija isso antes de enviar para que as miniaturas sejam geradas corretamente.",
     "thumbnail_generation_failed_hint": "Os arquivos foram enviados, porém, não conseguimos gerar miniaturas. (thumbnails)",
     "learn_how": "Saiba como",
     "unsupported_files": "Arquivos incompatíveis",

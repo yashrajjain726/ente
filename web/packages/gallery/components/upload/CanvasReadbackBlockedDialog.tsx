@@ -31,9 +31,9 @@ export const CanvasReadbackBlockedDialog: React.FC<
                 </IllustrationWrapper>
 
                 <TitleSection>
-                    <Title>{t("thumbnail_generation_failed")}</Title>
+                    <Title>{t("canvas_blocked_upload_failed_title")}</Title>
                     <Subtitle>
-                        {t("canvas_blocked_upload_description")}{" "}
+                        {t("canvas_blocked_upload_failed_description")}{" "}
                         <HelpLink
                             href="https://ente.com/help/photos/faq/troubleshooting#thumbnails"
                             target="_blank"
