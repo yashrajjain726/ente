@@ -11,7 +11,7 @@ data class LlmModelTarget(
 )
 
 data class DownloadProgress(
-    val percent: Int,
+    val percent: Int?,
     val status: String,
     val failure: DownloadFailure? = null,
     val phase: DownloadPhase = DownloadPhase.Downloading

@@ -18,6 +18,8 @@ pub enum TranscriptionError {
     Download { error: DownloadError },
     #[error("{detail}")]
     Transcribe { detail: String },
+    #[error("not enough storage space")]
+    StorageFull,
     #[error("{detail}")]
     Io { detail: String },
 }
@@ -36,6 +38,7 @@ impl From<transcription::TranscriptionError> for TranscriptionError {
             transcription::TranscriptionError::Transcribe(message) => {
                 Self::Transcribe { detail: message }
             }
+            transcription::TranscriptionError::StorageFull => Self::StorageFull,
             transcription::TranscriptionError::Io(err) => Self::Io {
                 detail: err.to_string(),
             },

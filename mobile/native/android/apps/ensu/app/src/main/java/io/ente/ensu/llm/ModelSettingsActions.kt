@@ -1,25 +1,22 @@
 package io.ente.ensu.llm
 
-import io.ente.ensu.device.isChatSupported
-import io.ente.ensu.llm.LlmModelTarget
-import io.ente.ensu.llm.LlmProvider
-import io.ente.ensu.logging.FileLogRepository
+import android.system.ErrnoException
+import android.system.OsConstants
+import io.ente.ensu.AppState
 import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.bindings.DownloadError
 import io.ente.ensu.bindings.LlmException
-import android.system.ErrnoException
-import android.system.OsConstants
+import io.ente.ensu.device.isChatSupported
+import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.settings.SessionPreferencesDataStore
-import io.ente.ensu.AppState
-import io.ente.ensu.llm.ModelSettingsState
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 internal class ModelSettingsActions(
     private val state: MutableStateFlow<AppState>,
@@ -112,13 +109,13 @@ internal class ModelSettingsActions(
         scope.launch {
             val progress = llmProvider.currentDownloadProgress(target)
             if (progress != null) {
-                val isFailure = progress.percent < 0
+                val isFailure = progress.phase == DownloadPhase.Failed
                 persistModelDownloadRequested(!isFailure)
                 state.update { appState ->
                     appState.copy(
                         chat = appState.chat.copy(
                             isDownloading = !isFailure,
-                            downloadPercent = progress.percent.takeIf { it >= 0 },
+                            downloadPercent = progress.percent,
                             downloadStatus = progress.status,
                             downloadPhase = progress.phase,
                             hasRequestedModelDownload = !isFailure
@@ -342,7 +339,7 @@ internal class ModelSettingsActions(
                     continue
                 }
                 emptyPollCount = 0
-                val isFailure = progress.percent < 0
+                val isFailure = progress.phase == DownloadPhase.Failed
                 if (isFailure) {
                     persistModelDownloadRequested(false)
                 }
@@ -350,7 +347,7 @@ internal class ModelSettingsActions(
                     appState.copy(
                         chat = appState.chat.copy(
                             isDownloading = !isFailure,
-                            downloadPercent = progress.percent.takeIf { it >= 0 },
+                            downloadPercent = progress.percent,
                             downloadStatus = progress.status,
                             downloadPhase = progress.phase,
                             hasRequestedModelDownload = if (isFailure) false else appState.chat.hasRequestedModelDownload

@@ -581,7 +581,7 @@ final class ChatViewModel: ObservableObject {
                 self.isDownloading = false
                 self.downloadToast = DownloadToastState(
                     phase: .errorDownload,
-                    percent: -1,
+                    percent: nil,
                     status: self.userFacingModelReadyError(error, wasDownloaded: false),
                     offerRetryDownload: true
                 )
@@ -835,7 +835,7 @@ final class ChatViewModel: ObservableObject {
                 await MainActor.run {
                     self.downloadToast = DownloadToastState(
                         phase: .errorDownload,
-                        percent: -1,
+                        percent: nil,
                         status: self.userFacingModelReadyError(error, wasDownloaded: false),
                         offerRetryDownload: true
                     )
@@ -872,7 +872,7 @@ final class ChatViewModel: ObservableObject {
                 await MainActor.run {
                     self.downloadToast = DownloadToastState(
                         phase: .errorLoad,
-                        percent: -1,
+                        percent: nil,
                         status: self.userFacingModelReadyError(error, wasDownloaded: true),
                         offerRetryDownload: true
                     )
@@ -1022,7 +1022,7 @@ final class ChatViewModel: ObservableObject {
                     streamingParentId = nil
                     downloadToast = DownloadToastState(
                         phase: .errorDownload,
-                        percent: -1,
+                        percent: nil,
                         status: self.userFacingModelReadyError(error, wasDownloaded: self.provider.isModelDownloaded(target: target)),
                         offerRetryDownload: true
                     )
@@ -1234,12 +1234,12 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func handleProgress(_ progress: DownloadProgress) {
-        if progress.percent == -1 {
+        if progress.phase == .failed {
             if modelDownloadLoggedStart {
                 logger.error("Model download failed", details: progress.status)
                 modelDownloadLoggedStart = false
             }
-            downloadToast = DownloadToastState(phase: .errorDownload, percent: -1, status: progress.status, offerRetryDownload: true)
+            downloadToast = DownloadToastState(phase: .errorDownload, percent: nil, status: progress.status, offerRetryDownload: true)
             isDownloading = false
             isModelDownloaded = false
             return
@@ -1263,14 +1263,14 @@ final class ChatViewModel: ObservableObject {
                 logger.info("Model download complete", details: progress.status)
                 modelDownloadLoggedStart = false
             }
-            downloadToast = DownloadToastState(phase: .complete, percent: 100, status: progress.status, offerRetryDownload: false)
+            downloadToast = DownloadToastState(phase: .ready, percent: 100, status: progress.status, offerRetryDownload: false)
             isDownloading = false
             isModelDownloaded = true
             modelDownloadSizeBytes = nil
             clearDownloadProgressMemory()
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
-                if self.downloadToast?.phase == .complete {
+                if self.downloadToast?.phase == .ready {
                     self.downloadToast = nil
                 }
             }
@@ -2223,8 +2223,8 @@ private final class DownloadProgressTracker {
     private var lastVisibleStatus: String?
 
     func seed(from toast: DownloadToastState?) {
-        if let toast, toast.percent >= 0 {
-            lastVisiblePercent = toast.percent
+        if let toast, let percent = toast.percent {
+            lastVisiblePercent = percent
             lastVisibleStatus = toast.status
         } else {
             lastVisiblePercent = 0
@@ -2240,7 +2240,7 @@ private final class DownloadProgressTracker {
     func resolve(_ progress: DownloadProgress) -> ResolvedDownloadProgress {
         let isLoading = progress.phase == .loading
         let isReady = progress.phase == .ready
-        let rawPercent = progress.percent >= 0 ? progress.percent : nil
+        let rawPercent = progress.percent
         let previousPercent = lastVisiblePercent
         let previousStatus = lastVisibleStatus
 

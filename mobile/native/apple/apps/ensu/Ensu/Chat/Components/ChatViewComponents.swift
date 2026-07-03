@@ -21,7 +21,7 @@ struct DownloadOnboardingView: View {
                     if let statusText, isLoadingModel {
                         return statusText
                     }
-                    if let totalBytes, let percent = downloadPercent, percent >= 0 {
+                    if let totalBytes, let percent = downloadPercent {
                         let clamped = min(max(percent, 0), 100)
                         let downloaded = Int64(Double(totalBytes) * Double(clamped) / 100.0)
                         return "Downloading... \(downloaded.formattedFileSize) / \(totalBytes.formattedFileSize)"
@@ -62,7 +62,7 @@ struct DownloadOnboardingView: View {
 
     @ViewBuilder
     private var progressView: some View {
-        if let percent = downloadPercent, percent >= 0 {
+        if let percent = downloadPercent {
             let clamped = min(max(percent, 0), 100)
             ProgressView(value: Double(clamped), total: 100)
                 .progressViewStyle(.linear)
@@ -374,7 +374,7 @@ struct ModelProgressIndicator: View {
     let state: DownloadToastState
 
     var body: some View {
-        let clamped = min(max(state.percent, 0), 100)
+        let clamped = min(max(state.percent ?? 0, 0), 100)
         if state.phase == .downloading {
             ProgressView(value: Double(clamped), total: 100)
                 .progressViewStyle(.circular)

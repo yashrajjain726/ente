@@ -20,7 +20,7 @@ internal class DownloadProgressTracker(
     fun resolve(progress: DownloadProgress): ResolvedDownloadProgress {
         val isLoading = progress.phase == DownloadPhase.Loading
         val isFinished = progress.phase == DownloadPhase.Ready
-        val rawPercent = progress.percent.takeIf { it >= 0 }
+        val rawPercent = progress.percent
         val previousPercent = lastVisiblePercent
         val previousStatus = lastVisibleStatus
 
@@ -49,7 +49,7 @@ internal class DownloadProgressTracker(
             percent = resolvedPercent,
             status = resolvedStatus,
             phase = progress.phase,
-            isDownloading = progress.percent >= 0 && !isFinished,
+            isDownloading = progress.phase != DownloadPhase.Failed && !isFinished,
             isFinished = isFinished
         )
     }

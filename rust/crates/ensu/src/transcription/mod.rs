@@ -18,8 +18,20 @@ pub enum TranscriptionError {
     Download(#[from] crate::download::Error),
     #[error("{0}")]
     Transcribe(String),
+    #[error("not enough storage space")]
+    StorageFull,
     #[error(transparent)]
-    Io(#[from] std::io::Error),
+    Io(std::io::Error),
+}
+
+impl From<std::io::Error> for TranscriptionError {
+    fn from(err: std::io::Error) -> Self {
+        if err.kind() == std::io::ErrorKind::StorageFull {
+            Self::StorageFull
+        } else {
+            Self::Io(err)
+        }
+    }
 }
 
 impl From<transcribe_rs::TranscribeError> for TranscriptionError {

@@ -77,7 +77,11 @@ fn download_code(err: &download::Error) -> &'static str {
         download::Error::Validation(_) => "validation",
         download::Error::Network(_) => "network",
         download::Error::StorageFull => "storage_full",
-        _ => "download",
+        download::Error::SizeMismatch { .. } => "size_mismatch",
+        download::Error::Protocol(_) => "protocol",
+        download::Error::InvalidTarget(_) => "invalid_target",
+        download::Error::Io(_) => "io",
+        download::Error::Json(_) => "json",
     }
 }
 

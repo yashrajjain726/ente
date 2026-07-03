@@ -452,6 +452,8 @@ internal class VoiceTranscriptionController(
         is TranscriptionException.VadNotDownloaded,
         is TranscriptionException.Transcribe -> "Voice model could not be loaded."
         is TranscriptionException.InvalidAudio -> "Could not detect speech in this recording."
+        is TranscriptionException.StorageFull ->
+            "Not enough storage space. Please free up space and try again."
         is TranscriptionException.Io -> "Could not transcribe voice input."
     }
 

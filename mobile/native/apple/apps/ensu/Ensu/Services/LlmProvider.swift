@@ -10,7 +10,7 @@ struct LlmModelTarget: Equatable {
 }
 
 struct DownloadProgress: Equatable {
-    let percent: Int
+    let percent: Int?
     let status: String
     var failure: DownloadFailure? = nil
     var phase: DownloadPhase = .downloading
@@ -576,8 +576,8 @@ final class LlmProvider {
             }
 
             if let progress = await downloadManager.progress(for: managerTargets) {
-                if progress.percent == -1 {
-                    throw progress.failure ?? DownloadFailure.failed(progress.status)
+                if let failure = progress.failure {
+                    throw failure
                 }
                 onProgress(progress)
             }

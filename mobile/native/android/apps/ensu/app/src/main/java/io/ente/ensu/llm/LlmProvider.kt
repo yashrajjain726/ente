@@ -265,7 +265,7 @@ class LlmProvider(
                                 "${download.label} download is invalid"
                             )
                             return@withContext DownloadProgress(
-                                -1, failure.message, failure, DownloadPhase.Failed
+                                null, failure.message, failure, DownloadPhase.Failed
                             )
                         }
                     }
@@ -274,7 +274,7 @@ class LlmProvider(
                         clearDownloadRecords(target)
                         val failure = downloadFailure(row.reason)
                         return@withContext DownloadProgress(
-                            -1, failure.message, failure, DownloadPhase.Failed
+                            null, failure.message, failure, DownloadPhase.Failed
                         )
                     }
                 }
@@ -471,9 +471,7 @@ class LlmProvider(
                 }
             } else {
                 emptyPollCount = 0
-                if (progress.percent < 0) {
-                    throw progress.failure ?: DownloadFailure.Failed(progress.status)
-                }
+                progress.failure?.let { throw it }
                 onProgress(progress)
             }
             pollCount += 1
