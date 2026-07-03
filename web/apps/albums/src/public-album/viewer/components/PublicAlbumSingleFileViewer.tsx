@@ -576,9 +576,9 @@ export const PublicAlbumSingleFileViewer: React.FC<
                     >
                         <Stack
                             direction="row"
-                            justifyContent="space-between"
-                            alignItems="center"
                             sx={{
+                                justifyContent: "space-between",
+                                alignItems: "center",
                                 pointerEvents: topControlsVisible
                                     ? "auto"
                                     : "none",
@@ -586,8 +586,8 @@ export const PublicAlbumSingleFileViewer: React.FC<
                         >
                             <Stack
                                 direction="row"
-                                alignItems="center"
                                 spacing={1.5}
+                                sx={{ alignItems: "center" }}
                             >
                                 <Box
                                     component="a"
@@ -648,8 +648,8 @@ export const PublicAlbumSingleFileViewer: React.FC<
                                     isLivePhotoFile && (
                                         <Stack
                                             direction="row"
-                                            alignItems="center"
                                             spacing={0.5}
+                                            sx={{ alignItems: "center" }}
                                         >
                                             <FileViewerStyleButton
                                                 onClick={
@@ -707,8 +707,8 @@ export const PublicAlbumSingleFileViewer: React.FC<
                             </Stack>
                             <Stack
                                 direction="row"
-                                alignItems="center"
                                 spacing={1}
+                                sx={{ alignItems: "center" }}
                             >
                                 <Button
                                     variant="contained"

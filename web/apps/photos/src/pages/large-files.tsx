@@ -701,8 +701,7 @@ const DeleteButton: React.FC<DeleteButtonProps> = ({
                         {t("delete_files_button", { count: selectedCount })}
                     </Typography>
                     <Typography
-                        sx={{ fontSize: "inherit" }}
-                        fontWeight="regular"
+                        sx={{ fontSize: "inherit", fontWeight: "regular" }}
                     >
                         ({formattedByteSize(selectedSize)})
                     </Typography>
