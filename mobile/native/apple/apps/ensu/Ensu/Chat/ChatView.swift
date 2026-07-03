@@ -386,6 +386,7 @@ struct ChatView: View {
                         isDownloading: viewModel.isDownloading,
                         downloadPercent: viewModel.downloadToast?.percent,
                         statusText: viewModel.downloadToast?.status,
+                        isLoadingModel: viewModel.downloadToast?.phase == .loading,
                         totalBytes: viewModel.modelDownloadSizeBytes,
                         sizeText: viewModel.modelDownloadSizeText,
                         onDownload: {

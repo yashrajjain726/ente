@@ -2238,8 +2238,8 @@ private final class DownloadProgressTracker {
     }
 
     func resolve(_ progress: DownloadProgress) -> ResolvedDownloadProgress {
-        let isLoading = progress.status.localizedCaseInsensitiveContains("Loading")
-        let isReady = progress.status.localizedCaseInsensitiveContains("Ready")
+        let isLoading = progress.phase == .loading
+        let isReady = progress.phase == .ready
         let rawPercent = progress.percent >= 0 ? progress.percent : nil
         let previousPercent = lastVisiblePercent
         let previousStatus = lastVisibleStatus

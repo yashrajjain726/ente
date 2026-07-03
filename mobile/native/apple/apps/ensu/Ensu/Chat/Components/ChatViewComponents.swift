@@ -4,6 +4,7 @@ struct DownloadOnboardingView: View {
     let isDownloading: Bool
     let downloadPercent: Int?
     let statusText: String?
+    let isLoadingModel: Bool
     let totalBytes: Int64?
     let sizeText: String
     let onDownload: () -> Void
@@ -17,7 +18,7 @@ struct DownloadOnboardingView: View {
 
             if isDownloading {
                 let statusLine: String = {
-                    if let statusText, statusText.localizedCaseInsensitiveContains("loading") {
+                    if let statusText, isLoadingModel {
                         return statusText
                     }
                     if let totalBytes, let percent = downloadPercent, percent >= 0 {

@@ -129,12 +129,21 @@ pub(crate) fn download_model(
     Ok(final_model_dir)
 }
 
-fn validate_download(target: &download::Target, path: &Path) -> std::result::Result<(), String> {
+fn validate_download(
+    target: &download::Target,
+    path: &Path,
+) -> std::result::Result<(), download::Error> {
     if !is_file_present(path) {
-        return Err(format!("{} is empty", path.display()));
+        return Err(download::Error::Validation(format!(
+            "{} is empty",
+            path.display()
+        )));
     }
     if target.destination_path.ends_with(".tar.gz") && !looks_like_gzip(path) {
-        return Err(format!("{} is not a gzip archive", path.display()));
+        return Err(download::Error::Validation(format!(
+            "{} is not a gzip archive",
+            path.display()
+        )));
     }
     Ok(())
 }

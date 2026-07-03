@@ -55,6 +55,7 @@ impl From<DbError> for ApiError {
             E::Uuid(_) => "db_uuid",
             E::Utf8(_) => "db_utf8",
             E::Io(_) => "db_io",
+            E::ReadonlyDatabase => "db_readonly",
             E::Sqlite(_) => "db_sqlite",
             E::UnsupportedOperation(_) => "db_unsupported_operation",
             E::Migration(_) => "db_migration",

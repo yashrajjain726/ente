@@ -188,19 +188,13 @@ class ChatRepository(
     }
 
     private fun shouldResetDb(error: DbException): Boolean {
-        val message = when (error) {
-            is DbException.Message -> error.v1
-            else -> error.message.orEmpty()
-        }
-        return ChatRecovery.shouldResetFromMessage(message)
+        return error is DbException.Crypto ||
+            error is DbException.InvalidBlobLength ||
+            error is DbException.InvalidEncryptedField
     }
 
     private fun isReadonlyDbError(error: DbException): Boolean {
-        val message = when (error) {
-            is DbException.Message -> error.v1
-            else -> error.message.orEmpty()
-        }
-        return message.contains("readonly database", ignoreCase = true)
+        return error is DbException.ReadonlyDatabase
     }
 
     private fun resetDb() {

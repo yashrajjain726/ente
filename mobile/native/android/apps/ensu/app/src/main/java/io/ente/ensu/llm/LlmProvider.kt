@@ -264,14 +264,18 @@ class LlmProvider(
                             val failure = DownloadFailure.InvalidContent(
                                 "${download.label} download is invalid"
                             )
-                            return@withContext DownloadProgress(-1, failure.message, failure)
+                            return@withContext DownloadProgress(
+                                -1, failure.message, failure, DownloadPhase.Failed
+                            )
                         }
                     }
 
                     DownloadManager.STATUS_FAILED -> {
                         clearDownloadRecords(target)
                         val failure = downloadFailure(row.reason)
-                        return@withContext DownloadProgress(-1, failure.message, failure)
+                        return@withContext DownloadProgress(
+                            -1, failure.message, failure, DownloadPhase.Failed
+                        )
                     }
                 }
             }
@@ -382,9 +386,9 @@ class LlmProvider(
             awaitForegroundDownload(target, onProgress)
         }
 
-        onProgress(DownloadProgress(100, "Loading model..."))
+        onProgress(DownloadProgress(100, "Loading model...", phase = DownloadPhase.Loading))
         loadWithFallbacks(target, modelFile)
-        onProgress(DownloadProgress(100, "Ready"))
+        onProgress(DownloadProgress(100, "Ready", phase = DownloadPhase.Ready))
     }
 
     private fun loadWithFallbacks(target: LlmModelTarget, modelFile: File) {

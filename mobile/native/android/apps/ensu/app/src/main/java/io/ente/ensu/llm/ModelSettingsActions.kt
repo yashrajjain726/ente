@@ -78,6 +78,7 @@ internal class ModelSettingsActions(
                         isDownloading = false,
                         downloadPercent = null,
                         downloadStatus = null,
+                        downloadPhase = null,
                         modelDownloadSizeBytes = null,
                         hasRequestedModelDownload = false
                     )
@@ -98,6 +99,7 @@ internal class ModelSettingsActions(
                     isDownloading = if (isDownloaded) false else appState.chat.isDownloading,
                     downloadPercent = if (isDownloaded) null else appState.chat.downloadPercent,
                     downloadStatus = if (isDownloaded) null else appState.chat.downloadStatus,
+                    downloadPhase = if (isDownloaded) null else appState.chat.downloadPhase,
                     modelDownloadSizeBytes = if (isDownloaded) null else appState.chat.modelDownloadSizeBytes,
                     hasRequestedModelDownload = appState.chat.hasRequestedModelDownload || isDownloaded
                 )
@@ -118,6 +120,7 @@ internal class ModelSettingsActions(
                             isDownloading = !isFailure,
                             downloadPercent = progress.percent.takeIf { it >= 0 },
                             downloadStatus = progress.status,
+                            downloadPhase = progress.phase,
                             hasRequestedModelDownload = !isFailure
                         )
                     )
@@ -133,6 +136,7 @@ internal class ModelSettingsActions(
                             isDownloading = false,
                             downloadPercent = null,
                             downloadStatus = null,
+                            downloadPhase = null,
                             hasRequestedModelDownload = false
                         )
                     )
@@ -187,6 +191,7 @@ internal class ModelSettingsActions(
                         isDownloading = true,
                         downloadPercent = 0,
                         downloadStatus = "Starting download...",
+                        downloadPhase = DownloadPhase.Downloading,
                         hasRequestedModelDownload = if (userInitiated) true else appState.chat.hasRequestedModelDownload
                     )
                 )
@@ -221,6 +226,7 @@ internal class ModelSettingsActions(
                                         isDownloading = resolvedProgress.isDownloading,
                                         downloadPercent = resolvedProgress.percent,
                                         downloadStatus = resolvedProgress.status,
+                                        downloadPhase = resolvedProgress.phase,
                                         isModelDownloaded = if (resolvedProgress.isFinished) true else appState.chat.isModelDownloaded,
                                         modelDownloadSizeBytes = if (resolvedProgress.isFinished) null else appState.chat.modelDownloadSizeBytes
                                     )
@@ -251,6 +257,7 @@ internal class ModelSettingsActions(
                             isDownloading = false,
                             downloadPercent = null,
                             downloadStatus = failureMessage,
+                            downloadPhase = if (cancelled) null else DownloadPhase.Failed,
                             hasRequestedModelDownload = false
                         )
                     )
@@ -311,6 +318,7 @@ internal class ModelSettingsActions(
                     isDownloading = false,
                     downloadPercent = null,
                     downloadStatus = "Download cancelled",
+                    downloadPhase = null,
                     hasRequestedModelDownload = false
                 )
             )
@@ -344,6 +352,7 @@ internal class ModelSettingsActions(
                             isDownloading = !isFailure,
                             downloadPercent = progress.percent.takeIf { it >= 0 },
                             downloadStatus = progress.status,
+                            downloadPhase = progress.phase,
                             hasRequestedModelDownload = if (isFailure) false else appState.chat.hasRequestedModelDownload
                         )
                     )

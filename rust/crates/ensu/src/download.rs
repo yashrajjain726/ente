@@ -47,10 +47,22 @@ pub enum Error {
     Protocol(String),
     #[error("invalid download target: {0}")]
     InvalidTarget(String),
+    #[error("not enough storage space")]
+    StorageFull,
     #[error(transparent)]
-    Io(#[from] std::io::Error),
+    Io(std::io::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Self {
+        if err.kind() == std::io::ErrorKind::StorageFull {
+            Error::StorageFull
+        } else {
+            Error::Io(err)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,7 +190,7 @@ struct ContentRange {
 
 pub fn fetch(
     targets: Vec<Target>,
-    validate: impl Fn(&Target, &Path) -> Result<(), String>,
+    validate: impl Fn(&Target, &Path) -> Result<(), Error>,
     on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
 ) -> Result<(), Error> {
@@ -191,7 +203,7 @@ pub fn fetch(
 
 async fn fetch_async(
     targets: Vec<Target>,
-    validate: impl Fn(&Target, &Path) -> Result<(), String>,
+    validate: impl Fn(&Target, &Path) -> Result<(), Error>,
     on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
 ) -> Result<(), Error> {
@@ -395,7 +407,7 @@ async fn download_file(
     target: &Target,
     destination: &Path,
     download_probe: &DownloadProbe,
-    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
+    validate: &impl Fn(&Target, &Path) -> Result<(), Error>,
     mut on_progress: impl FnMut(FileDownloadProgress),
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, Error> {
@@ -459,7 +471,7 @@ async fn download_file_single(
     target: &Target,
     destination: &Path,
     expected_file_total: Option<u64>,
-    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
+    validate: &impl Fn(&Target, &Path) -> Result<(), Error>,
     on_progress: &mut dyn FnMut(FileDownloadProgress),
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, Error> {
@@ -651,7 +663,7 @@ async fn download_file_single(
         if let Err(err) = validate(target, &tmp_path) {
             let _ = fs::remove_file(&tmp_path);
             let _ = fs::remove_file(&partial_metadata_path);
-            return Err(Error::Validation(err));
+            return Err(err);
         }
 
         if destination.exists() {
@@ -690,7 +702,7 @@ async fn download_file_ranged(
     destination: &Path,
     total: u64,
     response_metadata: Option<ResponseMetadata>,
-    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
+    validate: &impl Fn(&Target, &Path) -> Result<(), Error>,
     on_progress: &mut dyn FnMut(FileDownloadProgress),
     is_cancelled: &impl Fn() -> bool,
 ) -> Result<FileDownloadReport, Error> {
@@ -772,7 +784,7 @@ async fn download_file_ranged(
     if let Err(err) = validate(target, &tmp_path) {
         let _ = fs::remove_file(&tmp_path);
         let _ = fs::remove_file(&range_metadata_path);
-        return Err(Error::Validation(err));
+        return Err(err);
     }
 
     if destination.exists() {
@@ -1497,7 +1509,7 @@ fn bytes_per_second(bytes: u64, elapsed: Duration) -> f64 {
 fn prepare_cached_download(
     target: &Target,
     destination: &Path,
-    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
+    validate: &impl Fn(&Target, &Path) -> Result<(), Error>,
 ) -> bool {
     if !destination.exists() || validate(target, destination).is_err() {
         return false;
@@ -1958,7 +1970,7 @@ mod tests {
                 url: server.url("/model.bin"),
                 destination_path: destination.display().to_string(),
             }],
-            |_, _| Err("rejected".to_string()),
+            |_, _| Err(Error::Validation("rejected".to_string())),
             |_| {},
             || false,
         );
@@ -2054,7 +2066,7 @@ mod tests {
             .and_then(|data| data.first().copied())
         {
             Some(0) => Ok(()),
-            _ => Err("bad header".to_string()),
+            _ => Err(Error::Validation("bad header".to_string())),
         };
 
         fetch(vec![target.clone()], require_zero_header, |_| {}, || false)

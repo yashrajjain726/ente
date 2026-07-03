@@ -222,6 +222,7 @@ fun ChatView(
                         isDownloading = chatState.isDownloading,
                         downloadPercent = chatState.downloadPercent,
                         downloadStatus = chatState.downloadStatus,
+                        downloadPhase = chatState.downloadPhase,
                         modelDownloadSizeBytes = chatState.modelDownloadSizeBytes,
                         branchSelections = chatState.branchSelections,
                         onEditMessage = onEditMessage,

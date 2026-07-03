@@ -7,6 +7,7 @@ import io.ente.ensu.chat.ChatRepository
 import io.ente.ensu.device.ChatDeviceCapability
 import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.device.AndroidDeviceCapabilityProvider
+import io.ente.ensu.llm.DownloadPhase
 import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.chat.Attachment
@@ -71,6 +72,7 @@ class AppStore(
                 isDownloading = if (unsupported) false else _state.value.chat.isDownloading,
                 downloadPercent = if (unsupported) null else _state.value.chat.downloadPercent,
                 downloadStatus = if (unsupported) null else _state.value.chat.downloadStatus,
+                downloadPhase = if (unsupported) null else _state.value.chat.downloadPhase,
                 hasRequestedModelDownload = if (unsupported) false else _state.value.chat.hasRequestedModelDownload,
                 editingMessageId = if (unsupported) null else _state.value.chat.editingMessageId,
                 messageText = if (unsupported) "" else _state.value.chat.messageText,
@@ -104,7 +106,8 @@ class AppStore(
             chat = _state.value.chat.copy(
                 hasRequestedModelDownload = true,
                 isDownloading = true,
-                downloadStatus = "Resuming download..."
+                downloadStatus = "Resuming download...",
+                downloadPhase = DownloadPhase.Downloading
             )
         )
     }

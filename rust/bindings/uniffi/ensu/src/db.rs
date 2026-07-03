@@ -4,13 +4,88 @@ use uuid::Uuid;
 
 #[derive(Debug, Error, uniffi::Error)]
 pub enum DbError {
-    #[error("{0}")]
-    Message(String),
+    #[error("invalid encryption key length: expected {expected}, got {actual}")]
+    InvalidKeyLength { expected: u64, actual: u64 },
+    #[error("invalid blob length: expected at least {minimum} bytes, got {actual}")]
+    InvalidBlobLength { minimum: u64, actual: u64 },
+    #[error("invalid encrypted field format")]
+    InvalidEncryptedField,
+    #[error("unsupported value type: {detail}")]
+    UnsupportedValueType { detail: String },
+    #[error("row error: {detail}")]
+    Row { detail: String },
+    #[error("invalid sender: {detail}")]
+    InvalidSender { detail: String },
+    #[error("{entity} not found: {id}")]
+    NotFound { entity: String, id: String },
+    #[error("{detail}")]
+    Crypto { detail: String },
+    #[error("{detail}")]
+    Json { detail: String },
+    #[error("invalid UUID: {detail}")]
+    InvalidUuid { detail: String },
+    #[error("{detail}")]
+    Utf8 { detail: String },
+    #[error("{detail}")]
+    Io { detail: String },
+    #[error("database is readonly")]
+    ReadonlyDatabase,
+    #[error("{detail}")]
+    Sqlite { detail: String },
+    #[error("unsupported operation: {detail}")]
+    UnsupportedOperation { detail: String },
+    #[error("migration error: {detail}")]
+    Migration { detail: String },
 }
 
 impl From<db::Error> for DbError {
     fn from(err: db::Error) -> Self {
-        DbError::Message(err.to_string())
+        use db::Error as E;
+        match err {
+            E::InvalidKeyLength { expected, actual } => Self::InvalidKeyLength {
+                expected: expected as u64,
+                actual: actual as u64,
+            },
+            E::InvalidBlobLength { minimum, actual } => Self::InvalidBlobLength {
+                minimum: minimum as u64,
+                actual: actual as u64,
+            },
+            E::InvalidEncryptedField => Self::InvalidEncryptedField,
+            E::UnsupportedValueType(detail) => Self::UnsupportedValueType { detail },
+            E::Row(detail) => Self::Row { detail },
+            E::InvalidSender(detail) => Self::InvalidSender { detail },
+            E::NotFound { entity, id } => Self::NotFound {
+                entity: format!("{entity:?}"),
+                id: id.to_string(),
+            },
+            E::Crypto(err) => Self::Crypto {
+                detail: err.to_string(),
+            },
+            E::SerdeJson(err) => Self::Json {
+                detail: err.to_string(),
+            },
+            E::Uuid(err) => Self::InvalidUuid {
+                detail: err.to_string(),
+            },
+            E::Utf8(err) => Self::Utf8 {
+                detail: err.to_string(),
+            },
+            E::Io(err) => Self::Io {
+                detail: err.to_string(),
+            },
+            E::ReadonlyDatabase => Self::ReadonlyDatabase,
+            E::Sqlite(err) => Self::Sqlite {
+                detail: err.to_string(),
+            },
+            E::UnsupportedOperation(detail) => Self::UnsupportedOperation { detail },
+            E::Migration(detail) => Self::Migration { detail },
+        }
+    }
+}
+
+fn invalid_uuid(err: uuid::Error) -> DbError {
+    DbError::InvalidUuid {
+        detail: err.to_string(),
     }
 }
 
@@ -165,17 +240,17 @@ impl EnsuDb {
     }
 
     pub fn get_session(&self, uuid: String) -> Result<Option<DbSession>, DbError> {
-        let uuid = Uuid::parse_str(&uuid).map_err(|e| DbError::Message(e.to_string()))?;
+        let uuid = Uuid::parse_str(&uuid).map_err(invalid_uuid)?;
         Ok(self.inner.get_session(uuid)?.map(to_session))
     }
 
     pub fn delete_session(&self, uuid: String) -> Result<(), DbError> {
-        let uuid = Uuid::parse_str(&uuid).map_err(|e| DbError::Message(e.to_string()))?;
+        let uuid = Uuid::parse_str(&uuid).map_err(invalid_uuid)?;
         Ok(self.inner.delete_session(uuid)?)
     }
 
     pub fn update_session_title(&self, uuid: String, title: String) -> Result<(), DbError> {
-        let uuid = Uuid::parse_str(&uuid).map_err(|e| DbError::Message(e.to_string()))?;
+        let uuid = Uuid::parse_str(&uuid).map_err(invalid_uuid)?;
         Ok(self.inner.update_session_title(uuid, &title)?)
     }
 
@@ -187,12 +262,11 @@ impl EnsuDb {
         parent_message_uuid: Option<String>,
         attachments: Vec<DbAttachmentMeta>,
     ) -> Result<DbMessage, DbError> {
-        let session_uuid =
-            Uuid::parse_str(&session_uuid).map_err(|e| DbError::Message(e.to_string()))?;
+        let session_uuid = Uuid::parse_str(&session_uuid).map_err(invalid_uuid)?;
         let parent = parent_message_uuid
             .map(|v| Uuid::parse_str(&v))
             .transpose()
-            .map_err(|e| DbError::Message(e.to_string()))?;
+            .map_err(invalid_uuid)?;
 
         let message = self.inner.insert_message(
             session_uuid,
@@ -205,8 +279,7 @@ impl EnsuDb {
     }
 
     pub fn get_messages(&self, session_uuid: String) -> Result<Vec<DbMessage>, DbError> {
-        let session_uuid =
-            Uuid::parse_str(&session_uuid).map_err(|e| DbError::Message(e.to_string()))?;
+        let session_uuid = Uuid::parse_str(&session_uuid).map_err(invalid_uuid)?;
         Ok(self
             .inner
             .get_messages(session_uuid)?
@@ -216,7 +289,7 @@ impl EnsuDb {
     }
 
     pub fn update_message_text(&self, uuid: String, text: String) -> Result<(), DbError> {
-        let uuid = Uuid::parse_str(&uuid).map_err(|e| DbError::Message(e.to_string()))?;
+        let uuid = Uuid::parse_str(&uuid).map_err(invalid_uuid)?;
         Ok(self.inner.update_message_text(uuid, &text)?)
     }
 }

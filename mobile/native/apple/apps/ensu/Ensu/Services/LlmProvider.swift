@@ -13,6 +13,14 @@ struct DownloadProgress: Equatable {
     let percent: Int
     let status: String
     var failure: DownloadFailure? = nil
+    var phase: DownloadPhase = .downloading
+}
+
+enum DownloadPhase {
+    case downloading
+    case loading
+    case ready
+    case failed
 }
 
 enum DownloadFailure: Error, Codable, Equatable, LocalizedError {
@@ -222,7 +230,7 @@ final class LlmProvider {
             }
         }
 
-        onProgress(DownloadProgress(percent: 100, status: "Loading model..."))
+        onProgress(DownloadProgress(percent: 100, status: "Loading model...", phase: .loading))
         do {
             try loadModel(target: target, modelPath: modelPath)
         } catch {
@@ -234,7 +242,7 @@ final class LlmProvider {
             }
             throw error
         }
-        onProgress(DownloadProgress(percent: 100, status: "Ready"))
+        onProgress(DownloadProgress(percent: 100, status: "Ready", phase: .ready))
     }
 
     func generateChat(

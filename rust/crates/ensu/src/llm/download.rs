@@ -15,15 +15,18 @@ pub fn download_model_files(
     Ok(())
 }
 
-fn validate_gguf(_target: &Target, path: &Path) -> Result<(), String> {
+fn validate_gguf(_target: &Target, path: &Path) -> Result<(), download::Error> {
     if file_size(path).is_none_or(|size| size < MIN_MODEL_BYTES) {
-        return Err(format!(
+        return Err(download::Error::Validation(format!(
             "{} is too small to be a model file",
             path.display()
-        ));
+        )));
     }
     if !looks_like_gguf(path) {
-        return Err(format!("{} is not a valid GGUF file", path.display()));
+        return Err(download::Error::Validation(format!(
+            "{} is not a valid GGUF file",
+            path.display()
+        )));
     }
     Ok(())
 }

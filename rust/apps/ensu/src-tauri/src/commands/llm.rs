@@ -76,6 +76,7 @@ fn download_code(err: &download::Error) -> &'static str {
         download::Error::Http(_) => "http",
         download::Error::Validation(_) => "validation",
         download::Error::Network(_) => "network",
+        download::Error::StorageFull => "storage_full",
         _ => "download",
     }
 }

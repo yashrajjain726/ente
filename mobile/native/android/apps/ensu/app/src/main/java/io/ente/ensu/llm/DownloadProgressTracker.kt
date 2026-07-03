@@ -5,6 +5,7 @@ import io.ente.ensu.llm.DownloadProgress
 internal data class ResolvedDownloadProgress(
     val percent: Int?,
     val status: String,
+    val phase: DownloadPhase,
     val isDownloading: Boolean,
     val isFinished: Boolean
 )
@@ -17,8 +18,8 @@ internal class DownloadProgressTracker(
     private var lastVisibleStatus: String? = initialStatus
 
     fun resolve(progress: DownloadProgress): ResolvedDownloadProgress {
-        val isLoading = progress.status.contains("Loading", ignoreCase = true)
-        val isFinished = progress.status.contains("Ready", ignoreCase = true)
+        val isLoading = progress.phase == DownloadPhase.Loading
+        val isFinished = progress.phase == DownloadPhase.Ready
         val rawPercent = progress.percent.takeIf { it >= 0 }
         val previousPercent = lastVisiblePercent
         val previousStatus = lastVisibleStatus
@@ -47,6 +48,7 @@ internal class DownloadProgressTracker(
         return ResolvedDownloadProgress(
             percent = resolvedPercent,
             status = resolvedStatus,
+            phase = progress.phase,
             isDownloading = progress.percent >= 0 && !isFinished,
             isFinished = isFinished
         )

@@ -13,8 +13,16 @@ data class LlmModelTarget(
 data class DownloadProgress(
     val percent: Int,
     val status: String,
-    val failure: DownloadFailure? = null
+    val failure: DownloadFailure? = null,
+    val phase: DownloadPhase = DownloadPhase.Downloading
 )
+
+enum class DownloadPhase {
+    Downloading,
+    Loading,
+    Ready,
+    Failed
+}
 
 sealed class DownloadFailure(override val message: String) : Exception(message) {
     class Http(val status: Int) : DownloadFailure("Download failed: HTTP $status")

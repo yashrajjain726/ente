@@ -5,6 +5,7 @@ import io.ente.ensu.llm.ModelSettingsActions
 import io.ente.ensu.chat.ChatRepository
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
+import io.ente.ensu.llm.DownloadPhase
 import io.ente.ensu.llm.LlmMessage
 import io.ente.ensu.llm.LlmMessageRole
 import io.ente.ensu.llm.LlmModelTarget
@@ -189,6 +190,7 @@ internal class ChatStoreActions(
                     streamingParentId = if (resetCurrent) null else appState.chat.streamingParentId,
                     downloadPercent = if (resetCurrent) null else appState.chat.downloadPercent,
                     downloadStatus = if (resetCurrent) null else appState.chat.downloadStatus,
+                    downloadPhase = if (resetCurrent) null else appState.chat.downloadPhase,
                     messageText = if (resetCurrent) "" else appState.chat.messageText,
                     attachments = if (resetCurrent) emptyList() else appState.chat.attachments,
                     editingMessageId = if (resetCurrent) null else appState.chat.editingMessageId
@@ -447,6 +449,7 @@ internal class ChatStoreActions(
                     streamingParentId = userMessage.id,
                     downloadPercent = null,
                     downloadStatus = null,
+                    downloadPhase = null,
                     hasRequestedModelDownload = true
                 )
             )
@@ -466,6 +469,7 @@ internal class ChatStoreActions(
                                 isDownloading = resolvedProgress.isDownloading,
                                 downloadPercent = resolvedProgress.percent,
                                 downloadStatus = resolvedProgress.status,
+                                downloadPhase = resolvedProgress.phase,
                                 isModelDownloaded = if (resolvedProgress.isFinished) true else appState.chat.isModelDownloaded,
                                 modelDownloadSizeBytes = if (resolvedProgress.isFinished) null else appState.chat.modelDownloadSizeBytes
                             )
@@ -485,6 +489,7 @@ internal class ChatStoreActions(
                             streamingParentId = null,
                             downloadPercent = null,
                             downloadStatus = if (cancelled) "Download cancelled" else null,
+                            downloadPhase = null,
                             hasRequestedModelDownload = if (cancelled) false else appState.chat.hasRequestedModelDownload
                         )
                     )
@@ -528,7 +533,8 @@ internal class ChatStoreActions(
                             streamingResponse = "",
                             streamingParentId = null,
                             downloadPercent = null,
-                            downloadStatus = null
+                            downloadStatus = null,
+                            downloadPhase = null
                         )
                     )
                 }
@@ -673,6 +679,7 @@ internal class ChatStoreActions(
                         streamingParentId = null,
                         downloadPercent = null,
                         downloadStatus = null,
+                        downloadPhase = null,
                         messages = displayMessages,
                         branchSelections = branchSelectionIndices
                     )
@@ -1188,10 +1195,7 @@ internal class ChatStoreActions(
         stopRequested = false
     }
 
-    private fun resetGenerationState(
-        downloadStatus: String? = null,
-        hasRequestedModelDownload: Boolean? = null
-    ) {
+    private fun resetGenerationState() {
         cancelGeneration()
         state.update { appState ->
             appState.copy(
@@ -1201,9 +1205,8 @@ internal class ChatStoreActions(
                     streamingResponse = "",
                     streamingParentId = null,
                     downloadPercent = null,
-                    downloadStatus = downloadStatus,
-                    hasRequestedModelDownload =
-                        hasRequestedModelDownload ?: appState.chat.hasRequestedModelDownload
+                    downloadStatus = null,
+                    downloadPhase = null
                 )
             )
         }

@@ -1,7 +1,5 @@
 use ente_ensu::download;
 
-const ENOSPC: i32 = 28;
-
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum DownloadError {
     Cancelled,
@@ -29,15 +27,10 @@ impl From<download::Error> for DownloadError {
             }
             download::Error::Protocol(message) => Self::Protocol { message },
             download::Error::InvalidTarget(message) => Self::InvalidTarget { message },
-            download::Error::Io(err) => {
-                if err.raw_os_error() == Some(ENOSPC) {
-                    Self::StorageFull
-                } else {
-                    Self::Io {
-                        message: err.to_string(),
-                    }
-                }
-            }
+            download::Error::StorageFull => Self::StorageFull,
+            download::Error::Io(err) => Self::Io {
+                message: err.to_string(),
+            },
             download::Error::Json(err) => Self::Io {
                 message: err.to_string(),
             },

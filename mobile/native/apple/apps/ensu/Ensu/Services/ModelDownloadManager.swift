@@ -109,7 +109,9 @@ final class ModelDownloadManager: NSObject {
         if relevantTasks.isEmpty {
             if let failed = firstFailure(for: targets) {
                 let failure = failed.failure ?? .failed(failed.errorMessage ?? "Download failed")
-                return DownloadProgress(percent: -1, status: failure.message, failure: failure)
+                return DownloadProgress(
+                    percent: -1, status: failure.message, failure: failure, phase: .failed
+                )
             }
             return nil
         }
