@@ -79,6 +79,7 @@
   "downloadFailed": "Download failed",
   "failedToDownloadOrDecrypt": "Failed to download item",
   "errorOpeningFile": "Error opening item",
+  "unableToExtractFileInformation": "Unable to extract information from this file",
   "errorOpeningFileMessage": "Error opening item: {error}",
   "@errorOpeningFileMessage": {
     "description": "Error message when opening an item fails",
@@ -183,7 +184,6 @@
       }
     }
   },
-  "pleaseSelectAtLeastOneCollection": "Please select at least one collection",
   "unknownItemType": "Unknown item type",
   "fileDeletedSuccessfully": "Item deleted successfully",
   "failedToDeleteFile": "Failed to delete item: {error}",
@@ -315,7 +315,7 @@
   "optionalNote": "Optional note",
   "upload": "Upload",
   "documentsHint": "Documents",
-  "searchHint": "Search...",
+  "searchHint": "Search your documents",
   "searchEmptyTitle": "No matches found",
   "searchEmptyDescription": "Try searching for something else.",
   "searchEverywhereTitle": "Search everywhere for \"{query}\"",

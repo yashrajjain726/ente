@@ -123,6 +123,9 @@ jobs:
             - run: cargo codegen frb
               working-directory: rust
 
+            - name: Free runner disk space
+              run: sudo rm -rf /usr/share/dotnet
+
             - name: Prepare whatsnew
               run: |
                   mkdir -p whatsnew

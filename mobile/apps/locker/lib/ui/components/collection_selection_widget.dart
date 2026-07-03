@@ -1,7 +1,6 @@
 import 'package:collection/collection.dart' show IterableExtension;
 import 'package:dotted_border/dotted_border.dart';
 import "package:ente_components/ente_components.dart";
-import 'package:ente_ui/theme/ente_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:locker/extensions/collection_extension.dart';
 import 'package:locker/l10n/l10n.dart';
@@ -14,6 +13,7 @@ class CollectionSelectionWidget extends StatefulWidget {
   final Set<int> selectedCollectionIds;
   final Function(int) onToggleCollection;
   final Function(List<Collection>)? onCollectionsUpdated;
+  final double maxHeight;
 
   final String title;
 
@@ -23,6 +23,7 @@ class CollectionSelectionWidget extends StatefulWidget {
     required this.selectedCollectionIds,
     required this.onToggleCollection,
     this.onCollectionsUpdated,
+    this.maxHeight = 168,
     required this.title,
   });
 
@@ -91,7 +92,6 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = getEnteTextTheme(context);
     final containsUncategorized = _uncategorizedCollection != null;
 
     final chips = <Widget>[];
@@ -135,21 +135,24 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.title.isNotEmpty) ...[
-          Text(widget.title, style: textTheme.body),
-          const SizedBox(height: 12),
+          Text(widget.title, style: TextStyles.bodyBold),
+          const SizedBox(height: 8),
         ],
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 168),
-            child: Scrollbar(
-              controller: _scrollController,
-              thumbVisibility: true,
-              radius: const Radius.circular(4),
-              child: SingleChildScrollView(
+            constraints: BoxConstraints(maxHeight: widget.maxHeight),
+            child: SizedBox(
+              width: double.infinity,
+              child: Scrollbar(
                 controller: _scrollController,
-                padding: const EdgeInsets.only(right: 12, bottom: 12),
-                child: Wrap(spacing: 8, runSpacing: 12, children: chips),
+                thumbVisibility: true,
+                radius: const Radius.circular(4),
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(right: 12, bottom: 12),
+                  child: Wrap(spacing: 8, runSpacing: 12, children: chips),
+                ),
               ),
             ),
           ),
@@ -159,10 +162,10 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
   }
 
   Widget _buildNewCollectionChip() {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () async {
         await _createNewCollection();
       },
@@ -170,7 +173,7 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
         options: RoundedRectDottedBorderOptions(
           strokeWidth: 1,
           padding: EdgeInsets.zero,
-          color: colorScheme.textFaint,
+          color: colors.textLighter,
           dashPattern: const [5, 5],
           radius: const Radius.circular(16),
         ),
@@ -180,11 +183,11 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.add_rounded, size: 18, color: colorScheme.textMuted),
+              Icon(Icons.add_rounded, size: 18, color: colors.textLight),
               const SizedBox(width: 6),
               Text(
                 context.l10n.collectionLabel,
-                style: textTheme.small.copyWith(color: colorScheme.textMuted),
+                style: TextStyles.body.copyWith(color: colors.textLight),
               ),
             ],
           ),
