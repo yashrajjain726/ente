@@ -1117,7 +1117,7 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
                 children: [...previousChildren, ?currentChild],
               );
             },
-            child: (_isMoreOptionsShown)
+            child: (widget.isLocal && widget.isRemote && _isMoreOptionsShown)
                 ? Column(
                     spacing: Spacing.md,
                     children: [
