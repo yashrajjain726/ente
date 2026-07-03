@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:ente_components/ente_components.dart';
-import 'package:ente_ui/components/alert_bottom_sheet.dart';
 import 'package:ente_ui/utils/toast_util.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +8,7 @@ import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/info/info_item.dart';
 import 'package:locker/ui/components/collection_selection_widget.dart';
 import 'package:locker/ui/pages/base_info_page.dart';
+import "package:locker/utils/bottom_sheet_illustration.dart";
 
 class PersonalNotePage extends BaseInfoPage<PersonalNoteData> {
   const PersonalNotePage({
@@ -442,18 +442,20 @@ class _PersonalNotePageState
   }
 
   Future<bool> _showDiscardChangesDialog() async {
-    final result = await showAlertBottomSheet<bool>(
-      context,
-      title: context.l10n.unsavedNoteChangesTitle,
-      message: context.l10n.unsavedNoteChangesDescription,
-      assetPath: 'assets/warning-grey.png',
-      buttons: [
-        ButtonComponent(
-          label: context.l10n.discardChanges,
-          variant: ButtonComponentVariant.critical,
-          onTap: () => Navigator.of(context).pop(true),
-        ),
-      ],
+    final result = await showBottomSheetComponent<bool>(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: context.l10n.unsavedNoteChangesTitle,
+        message: context.l10n.unsavedNoteChangesDescription,
+        illustration: LockerBottomSheetIllustration.warningGrey,
+        actions: [
+          ButtonComponent(
+            label: context.l10n.discardChanges,
+            variant: ButtonComponentVariant.critical,
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
     );
 
     return result ?? false;

@@ -16,6 +16,7 @@ import "package:locker/ui/settings/pages/general_settings_page.dart";
 import "package:locker/ui/settings/pages/security_settings_page.dart";
 import "package:locker/ui/settings/pages/support_page.dart";
 import "package:locker/ui/settings/pages/theme_settings_page.dart";
+import "package:locker/utils/bottom_sheet_illustration.dart";
 
 class SettingsSearchPage extends StatefulWidget {
   const SettingsSearchPage({super.key});
@@ -289,7 +290,7 @@ class _SettingsSearchPageState extends State<SettingsSearchPage> {
       builder: (sheetContext) => BottomSheetComponent(
         title: context.l10n.warning,
         message: context.l10n.areYouSureYouWantToLogout,
-        illustration: Image.asset("assets/warning-grey.png"),
+        illustration: LockerBottomSheetIllustration.warningGrey,
         actions: [
           ButtonComponent(
             label: context.l10n.yesLogout,

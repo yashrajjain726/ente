@@ -19,7 +19,7 @@ Future<DeleteConfirmationResult?> showDeleteConfirmationSheet(
   required String title,
   required String body,
   required String deleteButtonLabel,
-  required String assetPath,
+  required Widget illustration,
   bool showDeleteFromAllCollectionsOption = false,
 }) {
   return showBottomSheetComponent<DeleteConfirmationResult>(
@@ -28,7 +28,7 @@ Future<DeleteConfirmationResult?> showDeleteConfirmationSheet(
       title: title,
       body: body,
       deleteButtonLabel: deleteButtonLabel,
-      assetPath: assetPath,
+      illustration: illustration,
       showDeleteFromAllCollectionsOption: showDeleteFromAllCollectionsOption,
     ),
   );
@@ -38,7 +38,7 @@ class DeleteConfirmationSheet extends StatefulWidget {
   final String title;
   final String body;
   final String deleteButtonLabel;
-  final String assetPath;
+  final Widget illustration;
   final bool showDeleteFromAllCollectionsOption;
 
   const DeleteConfirmationSheet({
@@ -46,7 +46,7 @@ class DeleteConfirmationSheet extends StatefulWidget {
     required this.title,
     required this.body,
     required this.deleteButtonLabel,
-    required this.assetPath,
+    required this.illustration,
     required this.showDeleteFromAllCollectionsOption,
   });
 
@@ -63,7 +63,7 @@ class _DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
     final colors = context.componentColors;
 
     return BottomSheetComponent(
-      illustration: Image.asset(widget.assetPath),
+      illustration: widget.illustration,
       title: widget.title,
       content: Column(
         mainAxisSize: MainAxisSize.min,

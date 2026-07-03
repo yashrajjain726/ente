@@ -6,7 +6,6 @@ import "package:ente_accounts/services/user_service.dart";
 import "package:ente_components/ente_components.dart";
 import 'package:ente_events/event_bus.dart';
 import "package:ente_events/models/trigger_logout_event.dart";
-import "package:ente_ui/components/alert_bottom_sheet.dart";
 import 'package:ente_ui/utils/dialog_util.dart';
 import "package:ente_utils/email_util.dart";
 import 'package:flutter/material.dart';
@@ -31,6 +30,7 @@ import 'package:locker/ui/mixins/search_mixin.dart';
 import 'package:locker/ui/pages/save_page.dart';
 import 'package:locker/ui/pages/uploader_page.dart';
 import "package:locker/ui/viewer/actions/file_selection_overlay_bar.dart";
+import "package:locker/utils/bottom_sheet_illustration.dart";
 import 'package:locker/utils/collection_sort_util.dart';
 import 'package:logging/logging.dart';
 
@@ -319,26 +319,29 @@ class _HomePageState extends UploaderPageState<HomePage>
     final navigator = Navigator.of(context);
     final l10n = context.l10n;
 
-    await showAlertBottomSheet(
-      context,
-      title: l10n.sessionExpired,
-      message: l10n.pleaseLoginAgain,
-      assetPath: "assets/warning-grey.png",
+    await showBottomSheetComponent(
+      context: context,
       isDismissible: false,
-      showCloseButton: false,
-      buttons: [
-        ButtonComponent(
-          label: context.l10n.ok,
-          onTap: () async {
-            navigator.pop();
-            final dialog = createProgressDialog(context, l10n.pleaseWait);
-            await dialog.show();
-            await Configuration.instance.logout();
-            await dialog.hide();
-            navigator.popUntil((route) => route.isFirst);
-          },
-        ),
-      ],
+      enableDrag: false,
+      builder: (_) => BottomSheetComponent(
+        title: l10n.sessionExpired,
+        message: l10n.pleaseLoginAgain,
+        illustration: LockerBottomSheetIllustration.warningGrey,
+        actions: [
+          ButtonComponent(
+            label: context.l10n.ok,
+            onTap: () async {
+              navigator.pop();
+              final dialog = createProgressDialog(context, l10n.pleaseWait);
+              await dialog.show();
+              await Configuration.instance.logout();
+              await dialog.hide();
+              navigator.popUntil((route) => route.isFirst);
+            },
+          ),
+        ],
+        showCloseButton: false,
+      ),
     );
   }
 
@@ -426,19 +429,21 @@ class _HomePageState extends UploaderPageState<HomePage>
     } catch (e) {
       _logger.severe('Error handling shared files: $e');
       if (mounted) {
-        await showAlertBottomSheet(
-          context,
-          title: context.l10n.uploadError,
-          message: context.l10n.somethingWentWrong,
-          assetPath: "assets/warning-grey.png",
-          buttons: [
-            ButtonComponent(
-              label: context.l10n.contactSupport,
-              onTap: () async {
-                await sendLogs(context, "support@ente.com", postShare: () {});
-              },
-            ),
-          ],
+        await showBottomSheetComponent(
+          context: context,
+          builder: (_) => BottomSheetComponent(
+            title: context.l10n.uploadError,
+            message: context.l10n.somethingWentWrong,
+            illustration: LockerBottomSheetIllustration.warningGrey,
+            actions: [
+              ButtonComponent(
+                label: context.l10n.contactSupport,
+                onTap: () async {
+                  await sendLogs(context, "support@ente.com", postShare: () {});
+                },
+              ),
+            ],
+          ),
         );
       }
     }

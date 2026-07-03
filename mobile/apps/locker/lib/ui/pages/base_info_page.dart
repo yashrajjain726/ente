@@ -2,9 +2,7 @@ import 'dart:io';
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
-import 'package:ente_ui/components/alert_bottom_sheet.dart';
 import "package:ente_ui/components/title_bar_title_widget.dart";
-import 'package:ente_ui/utils/dialog_util.dart';
 import 'package:ente_ui/utils/toast_util.dart';
 import "package:ente_utils/email_util.dart";
 import 'package:flutter/material.dart';
@@ -21,6 +19,8 @@ import 'package:locker/services/info_file_service.dart';
 import 'package:locker/services/trash/models/trash_file.dart';
 import 'package:locker/ui/components/collection_selection_widget.dart';
 import 'package:locker/ui/pages/home_page.dart';
+import "package:locker/utils/bottom_sheet_illustration.dart";
+import "package:locker/utils/error_sheet.dart";
 import 'package:logging/logging.dart';
 
 enum InfoPageMode { view, edit }
@@ -281,7 +281,7 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
       }
     } catch (e) {
       if (mounted) {
-        await showGenericErrorBottomSheet(context: context, error: e);
+        await showLockerErrorSheet(context, e);
       }
     }
   }
@@ -473,20 +473,23 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
   }
 
   Future<void> _showUploadErrorSheet(String title, String message) async {
-    await showAlertBottomSheet(
-      context,
-      title: title,
-      message: message,
-      assetPath: "assets/warning-grey.png",
+    await showBottomSheetComponent(
+      context: context,
       isDismissible: true,
-      buttons: [
-        ButtonComponent(
-          label: context.l10n.contactSupport,
-          onTap: () async {
-            await sendEmail(context, to: "support@ente.com", body: message);
-          },
-        ),
-      ],
+      enableDrag: true,
+      builder: (_) => BottomSheetComponent(
+        title: title,
+        message: message,
+        illustration: LockerBottomSheetIllustration.warningGrey,
+        actions: [
+          ButtonComponent(
+            label: context.l10n.contactSupport,
+            onTap: () async {
+              await sendEmail(context, to: "support@ente.com", body: message);
+            },
+          ),
+        ],
+      ),
     );
   }
 

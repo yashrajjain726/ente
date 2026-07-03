@@ -1,5 +1,4 @@
 import "package:ente_components/ente_components.dart";
-import "package:ente_ui/components/alert_bottom_sheet.dart";
 import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/components/buttons/models/button_result.dart";
 import "package:ente_ui/utils/dialog_util.dart";
@@ -11,6 +10,8 @@ import "package:hugeicons/hugeicons.dart";
 import "package:locker/l10n/l10n.dart";
 import "package:locker/services/files/links/links_service.dart";
 import "package:locker/services/files/sync/models/file.dart";
+import "package:locker/utils/bottom_sheet_illustration.dart";
+import "package:locker/utils/error_sheet.dart";
 
 Future<void> showShareLinkSheet(
   BuildContext context,
@@ -130,19 +131,21 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
   Future<void> _deleteShareLink(BuildContext context) async {
     final l10n = context.l10n;
 
-    final result = await showAlertBottomSheet<ButtonResult>(
-      context,
-      title: l10n.deleteShareLinkDialogTitle,
-      message: l10n.deleteShareLinkConfirmation,
-      assetPath: 'assets/file_delete_icon.png',
-      buttons: [
-        ButtonComponent(
-          label: l10n.delete,
-          variant: ButtonComponentVariant.critical,
-          onTap: () =>
-              Navigator.of(context).pop(ButtonResult(ButtonAction.first)),
-        ),
-      ],
+    final result = await showBottomSheetComponent<ButtonResult>(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: l10n.deleteShareLinkDialogTitle,
+        message: l10n.deleteShareLinkConfirmation,
+        illustration: LockerBottomSheetIllustration.fileDelete,
+        actions: [
+          ButtonComponent(
+            label: l10n.delete,
+            variant: ButtonComponentVariant.critical,
+            onTap: () =>
+                Navigator.of(context).pop(ButtonResult(ButtonAction.first)),
+          ),
+        ],
+      ),
     );
 
     if (result?.action == ButtonAction.first && context.mounted) {
@@ -164,7 +167,7 @@ class _ShareLinkSheetState extends State<ShareLinkSheet> {
         await dialog.hide();
 
         if (context.mounted) {
-          await showGenericErrorBottomSheet(context: context, error: e);
+          await showLockerErrorSheet(context, e);
         }
       }
     }

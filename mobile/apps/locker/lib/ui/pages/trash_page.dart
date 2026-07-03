@@ -16,6 +16,8 @@ import 'package:locker/services/trash/trash_service.dart';
 import "package:locker/ui/components/delete_confirmation_sheet.dart";
 import 'package:locker/ui/components/item_list_view.dart';
 import "package:locker/ui/viewer/actions/file_selection_overlay_bar.dart";
+import "package:locker/utils/bottom_sheet_illustration.dart";
+import "package:locker/utils/error_sheet.dart";
 
 class TrashPage extends StatefulWidget {
   final List<TrashFile> trashFiles;
@@ -67,7 +69,7 @@ class _TrashPageState extends State<TrashPage> {
       title: context.l10n.emptyTrash,
       body: context.l10n.emptyTrashConfirmation,
       deleteButtonLabel: context.l10n.emptyTrash,
-      assetPath: "assets/collection_delete_icon.png",
+      illustration: LockerBottomSheetIllustration.collectionDelete,
     );
 
     if (result?.buttonResult.action == ButtonAction.first && mounted) {
@@ -99,7 +101,7 @@ class _TrashPageState extends State<TrashPage> {
     } catch (error) {
       await dialog.hide();
       if (mounted) {
-        await showGenericErrorBottomSheet(context: context, error: error);
+        await showLockerErrorSheet(context, error);
       }
     }
   }

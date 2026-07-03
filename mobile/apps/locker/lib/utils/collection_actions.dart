@@ -5,7 +5,6 @@ import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_sharing/components/invite_dialog.dart";
 import "package:ente_sharing/models/user.dart";
-import "package:ente_ui/components/alert_bottom_sheet.dart";
 import "package:ente_ui/components/buttons/button_widget.dart";
 import "package:ente_ui/components/progress_dialog.dart";
 import 'package:ente_ui/utils/dialog_util.dart';
@@ -21,6 +20,8 @@ import "package:locker/services/trash/trash_service.dart";
 import "package:locker/ui/components/delete_confirmation_sheet.dart";
 import "package:locker/ui/components/subscription_required_sheet.dart";
 import "package:locker/ui/components/text_input_sheet.dart";
+import "package:locker/utils/bottom_sheet_illustration.dart";
+import "package:locker/utils/error_sheet.dart";
 import 'package:logging/logging.dart';
 
 /// Utility class for common collection actions like edit and delete
@@ -57,7 +58,7 @@ class CollectionActions {
 
     if (result is Exception) {
       if (context.mounted) {
-        await showGenericErrorBottomSheet(context: context, error: result);
+        await showLockerErrorSheet(context, result);
       }
       return null;
     } else if (createdCollection != null) {
@@ -107,7 +108,7 @@ class CollectionActions {
         } catch (error) {
           await progressDialog.hide();
 
-          await showGenericErrorBottomSheet(context: context, error: error);
+          await showLockerErrorSheet(context, error);
         }
       },
     );
@@ -127,7 +128,7 @@ class CollectionActions {
         collections.length,
       ),
       deleteButtonLabel: context.l10n.yesDeleteCollections(collections.length),
-      assetPath: "assets/collection_delete_icon.png",
+      illustration: LockerBottomSheetIllustration.collectionDelete,
       showDeleteFromAllCollectionsOption: true,
     );
 
@@ -199,10 +200,7 @@ class CollectionActions {
       await progressDialog.hide();
 
       if (errors.isNotEmpty) {
-        await showGenericErrorBottomSheet(
-          context: context,
-          error: errors.first,
-        );
+        await showLockerErrorSheet(context, errors.first);
       }
 
       showToast(
@@ -218,7 +216,7 @@ class CollectionActions {
     } catch (error) {
       await progressDialog.hide();
 
-      await showGenericErrorBottomSheet(context: context, error: error);
+      await showLockerErrorSheet(context, error);
     }
   }
 
@@ -255,7 +253,7 @@ class CollectionActions {
         await progressDialog.hide();
 
         if (context.mounted) {
-          await showGenericErrorBottomSheet(context: context, error: error);
+          await showLockerErrorSheet(context, error);
         }
       }
       return;
@@ -268,7 +266,7 @@ class CollectionActions {
       title: l10n.areYouSure,
       body: l10n.deleteCollectionDialogBody(collectionName),
       deleteButtonLabel: l10n.yesDeleteCollections(1),
-      assetPath: "assets/collection_delete_icon.png",
+      illustration: LockerBottomSheetIllustration.collectionDelete,
       showDeleteFromAllCollectionsOption: true,
     );
 
@@ -300,7 +298,7 @@ class CollectionActions {
       await progressDialog.hide();
 
       if (context.mounted) {
-        await showGenericErrorBottomSheet(context: context, error: error);
+        await showLockerErrorSheet(context, error);
       }
     }
   }
@@ -310,17 +308,19 @@ class CollectionActions {
     Collection collection, {
     VoidCallback? onSuccess,
   }) async {
-    final confirmed = await showAlertBottomSheet(
-      context,
-      title: context.l10n.leaveCollection,
-      message: context.l10n.filesAddedByYouWillBeRemovedFromTheCollection,
-      assetPath: "assets/warning-grey.png",
-      buttons: [
-        ButtonComponent(
-          label: context.l10n.leaveCollection,
-          onTap: () => Navigator.of(context).pop(true),
-        ),
-      ],
+    final confirmed = await showBottomSheetComponent(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: context.l10n.leaveCollection,
+        message: context.l10n.filesAddedByYouWillBeRemovedFromTheCollection,
+        illustration: LockerBottomSheetIllustration.warningGrey,
+        actions: [
+          ButtonComponent(
+            label: context.l10n.leaveCollection,
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
     );
     if (confirmed == true) {
       try {
@@ -332,7 +332,7 @@ class CollectionActions {
       } catch (e) {
         _logger.severe("Failed to leave collection", e);
         if (context.mounted) {
-          await showGenericErrorBottomSheet(context: context, error: e);
+          await showLockerErrorSheet(context, e);
         }
       }
     }
@@ -343,17 +343,19 @@ class CollectionActions {
     List<Collection> collections, {
     VoidCallback? onSuccess,
   }) async {
-    final confirmed = await showAlertBottomSheet(
-      context,
-      title: context.l10n.leaveCollection,
-      message: context.l10n.filesAddedByYouWillBeRemovedFromTheCollection,
-      assetPath: "assets/warning-grey.png",
-      buttons: [
-        ButtonComponent(
-          label: context.l10n.leaveCollection,
-          onTap: () => Navigator.of(context).pop(true),
-        ),
-      ],
+    final confirmed = await showBottomSheetComponent(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: context.l10n.leaveCollection,
+        message: context.l10n.filesAddedByYouWillBeRemovedFromTheCollection,
+        illustration: LockerBottomSheetIllustration.warningGrey,
+        actions: [
+          ButtonComponent(
+            label: context.l10n.leaveCollection,
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
     );
     if (confirmed == true) {
       try {
@@ -370,7 +372,7 @@ class CollectionActions {
       } catch (e) {
         _logger.severe("Failed to leave collections", e);
         if (context.mounted) {
-          await showGenericErrorBottomSheet(context: context, error: e);
+          await showLockerErrorSheet(context, e);
         }
       }
     }
@@ -392,7 +394,7 @@ class CollectionActions {
         await showSubscriptionRequiredSheet(context);
       } else {
         _logger.severe("Failed to update shareUrl collection", e);
-        await showGenericErrorBottomSheet(context: context, error: e);
+        await showLockerErrorSheet(context, e);
       }
       return false;
     }
@@ -402,20 +404,22 @@ class CollectionActions {
     BuildContext context,
     Collection collection,
   ) async {
-    final shouldRemove = await showAlertBottomSheet<bool>(
-      context,
-      title: context.l10n.removePublicLink,
-      message: context.l10n.removePublicLinkConfirmation(
-        collection.name ?? "this collection",
-      ),
-      assetPath: "assets/warning-grey.png",
-      buttons: [
-        ButtonComponent(
-          label: context.l10n.yesRemove,
-          variant: ButtonComponentVariant.critical,
-          onTap: () => Navigator.of(context).pop(true),
+    final shouldRemove = await showBottomSheetComponent<bool>(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: context.l10n.removePublicLink,
+        message: context.l10n.removePublicLinkConfirmation(
+          collection.name ?? "this collection",
         ),
-      ],
+        illustration: LockerBottomSheetIllustration.warningGrey,
+        actions: [
+          ButtonComponent(
+            label: context.l10n.yesRemove,
+            variant: ButtonComponentVariant.critical,
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
     );
 
     if (shouldRemove != true) {
@@ -427,7 +431,7 @@ class CollectionActions {
       return true;
     } catch (e) {
       if (context.mounted) {
-        await showGenericErrorBottomSheet(context: context, error: e);
+        await showLockerErrorSheet(context, e);
       }
       return false;
     }
@@ -453,7 +457,7 @@ class CollectionActions {
     } catch (e) {
       await dialog?.hide();
       _logger.severe("Failed to get public key", e);
-      await showGenericErrorBottomSheet(context: context, error: e);
+      await showLockerErrorSheet(context, e);
       return false;
     }
     // getPublicKey can return null when no user is associated with given
@@ -477,19 +481,23 @@ class CollectionActions {
     bool showProgress = false,
   }) async {
     if (!isValidEmail(email)) {
-      await showAlertBottomSheet(
-        context,
-        title: context.l10n.invalidEmailAddress,
-        message: context.l10n.enterValidEmail,
-        assetPath: "assets/warning-blue.png",
+      await showBottomSheetComponent(
+        context: context,
+        builder: (_) => BottomSheetComponent(
+          title: context.l10n.invalidEmailAddress,
+          message: context.l10n.enterValidEmail,
+          illustration: LockerBottomSheetIllustration.warningBlue,
+        ),
       );
       return false;
     } else if (email.trim() == Configuration.instance.getEmail()) {
-      await showAlertBottomSheet(
-        context,
-        title: context.l10n.oops,
-        message: context.l10n.youCannotShareWithYourself,
-        assetPath: "assets/warning-blue.png",
+      await showBottomSheetComponent(
+        context: context,
+        builder: (_) => BottomSheetComponent(
+          title: context.l10n.oops,
+          message: context.l10n.youCannotShareWithYourself,
+          illustration: LockerBottomSheetIllustration.warningBlue,
+        ),
       );
       return false;
     }
@@ -510,7 +518,7 @@ class CollectionActions {
     } catch (e) {
       await dialog?.hide();
       _logger.severe("Failed to get public key", e);
-      await showGenericErrorBottomSheet(context: context, error: e);
+      await showLockerErrorSheet(context, e);
       return false;
     }
     // getPublicKey can return null when no user is associated with given
@@ -536,7 +544,7 @@ class CollectionActions {
           await showSubscriptionRequiredSheet(context);
         } else {
           _logger.severe("failed to share collection", e);
-          await showGenericErrorBottomSheet(context: context, error: e);
+          await showLockerErrorSheet(context, e);
         }
         return false;
       }
@@ -558,7 +566,7 @@ class CollectionActions {
       return true;
     } catch (e) {
       _logger.severe("Failed to remove participant", e);
-      await showGenericErrorBottomSheet(context: context, error: e);
+      await showLockerErrorSheet(context, e);
       return false;
     }
   }

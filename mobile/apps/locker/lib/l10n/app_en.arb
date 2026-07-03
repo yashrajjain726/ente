@@ -79,6 +79,7 @@
   "downloadFailed": "Download failed",
   "failedToDownloadOrDecrypt": "Failed to download item",
   "errorOpeningFile": "Error opening item",
+  "unableToExtractFileInformation": "Unable to extract information from this file",
   "errorOpeningFileMessage": "Error opening item: {error}",
   "@errorOpeningFileMessage": {
     "description": "Error message when opening an item fails",

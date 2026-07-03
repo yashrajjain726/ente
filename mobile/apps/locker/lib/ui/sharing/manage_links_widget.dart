@@ -23,6 +23,7 @@ import "package:locker/ui/components/text_input_sheet.dart";
 import "package:locker/ui/sharing/pickers/device_limit_picker_page.dart";
 import "package:locker/ui/sharing/pickers/link_expiry_picker_page.dart";
 import "package:locker/utils/collection_actions.dart";
+import "package:locker/utils/error_sheet.dart";
 
 class ManageSharedLinkWidget extends StatefulWidget {
   final Collection? collection;
@@ -296,7 +297,7 @@ class _ManageSharedLinkWidgetState extends State<ManageSharedLinkWidget> {
       }
     } catch (e) {
       await dialog?.hide();
-      await showGenericErrorBottomSheet(context: context, error: e);
+      await showLockerErrorSheet(context, e);
       rethrow;
     }
   }

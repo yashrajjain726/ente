@@ -13,6 +13,7 @@ class CollectionSelectionWidget extends StatefulWidget {
   final Set<int> selectedCollectionIds;
   final Function(int) onToggleCollection;
   final Function(List<Collection>)? onCollectionsUpdated;
+  final double maxHeight;
 
   final String title;
 
@@ -22,6 +23,7 @@ class CollectionSelectionWidget extends StatefulWidget {
     required this.selectedCollectionIds,
     required this.onToggleCollection,
     this.onCollectionsUpdated,
+    this.maxHeight = 168,
     required this.title,
   });
 
@@ -134,20 +136,23 @@ class _CollectionSelectionWidgetState extends State<CollectionSelectionWidget> {
       children: [
         if (widget.title.isNotEmpty) ...[
           Text(widget.title, style: TextStyles.bodyBold),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
         ],
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 168),
-            child: Scrollbar(
-              controller: _scrollController,
-              thumbVisibility: true,
-              radius: const Radius.circular(4),
-              child: SingleChildScrollView(
+            constraints: BoxConstraints(maxHeight: widget.maxHeight),
+            child: SizedBox(
+              width: double.infinity,
+              child: Scrollbar(
                 controller: _scrollController,
-                padding: const EdgeInsets.only(right: 12, bottom: 12),
-                child: Wrap(spacing: 8, runSpacing: 12, children: chips),
+                thumbVisibility: true,
+                radius: const Radius.circular(4),
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(right: 12, bottom: 12),
+                  child: Wrap(spacing: 8, runSpacing: 12, children: chips),
+                ),
               ),
             ),
           ),

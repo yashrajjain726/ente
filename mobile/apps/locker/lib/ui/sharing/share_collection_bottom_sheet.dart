@@ -2,7 +2,6 @@ import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:ente_sharing/models/user.dart";
 import "package:ente_sharing/user_avator_widget.dart";
-import "package:ente_ui/components/alert_bottom_sheet.dart";
 import "package:ente_ui/components/captioned_text_widget_v2.dart";
 import "package:ente_ui/components/divider_widget.dart";
 import "package:ente_ui/components/menu_item_widget_v2.dart";
@@ -17,6 +16,7 @@ import "package:locker/services/configuration.dart";
 import "package:locker/ui/components/custom_list_scrollbar.dart";
 import "package:locker/ui/sharing/add_email_bottom_sheet.dart";
 import "package:locker/ui/sharing/manage_links_widget.dart";
+import "package:locker/utils/bottom_sheet_illustration.dart";
 import "package:locker/utils/collection_actions.dart";
 
 Future<void> showShareCollectionSheet(
@@ -289,22 +289,24 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
         user.isCollaborator && role == CollectionParticipantRole.viewer;
 
     if (isDowngrade) {
-      final confirmed = await showAlertBottomSheet(
-        context,
-        title: context.l10n.changePermissions,
-        message: context.l10n.cannotAddMoreFilesAfterBecomingViewer(
-          user.displayName ?? user.email,
-        ),
-        buttons: [
-          ButtonComponent(
-            label: context.l10n.yesConvertToViewer,
-            variant: ButtonComponentVariant.critical,
-            onTap: () {
-              Navigator.of(context).pop(true);
-            },
+      final confirmed = await showBottomSheetComponent(
+        context: context,
+        builder: (_) => BottomSheetComponent(
+          title: context.l10n.changePermissions,
+          message: context.l10n.cannotAddMoreFilesAfterBecomingViewer(
+            user.displayName ?? user.email,
           ),
-        ],
-        assetPath: "assets/warning-grey.png",
+          illustration: LockerBottomSheetIllustration.warningGrey,
+          actions: [
+            ButtonComponent(
+              label: context.l10n.yesConvertToViewer,
+              variant: ButtonComponentVariant.critical,
+              onTap: () {
+                Navigator.of(context).pop(true);
+              },
+            ),
+          ],
+        ),
       );
 
       if (confirmed != true) {
@@ -327,22 +329,24 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
   }
 
   Future<void> _removeSharee(User user) async {
-    final confirmed = await showAlertBottomSheet(
-      context,
-      title: context.l10n.removeWithQuestionMark,
-      message: context.l10n.removeParticipantBody(
-        user.displayName ?? user.email,
-      ),
-      assetPath: "assets/warning-grey.png",
-      buttons: [
-        ButtonComponent(
-          label: context.l10n.yesRemove,
-          variant: ButtonComponentVariant.critical,
-          onTap: () {
-            Navigator.of(context).pop(true);
-          },
+    final confirmed = await showBottomSheetComponent(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: context.l10n.removeWithQuestionMark,
+        message: context.l10n.removeParticipantBody(
+          user.displayName ?? user.email,
         ),
-      ],
+        illustration: LockerBottomSheetIllustration.warningGrey,
+        actions: [
+          ButtonComponent(
+            label: context.l10n.yesRemove,
+            variant: ButtonComponentVariant.critical,
+            onTap: () {
+              Navigator.of(context).pop(true);
+            },
+          ),
+        ],
+      ),
     );
 
     if (confirmed == true && mounted) {
