@@ -8,7 +8,7 @@ type ShareInvitePhase = "idle" | "sharing" | "copied";
 
 const copiedLabelDurationMs = 1400;
 
-const shareSpaceLink = async (
+const shareSpaceInviteLink = async (
     profileLink: string,
 ): Promise<ShareInviteResult> => {
     if (typeof navigator.share == "function") {
@@ -94,7 +94,7 @@ export const SpaceShareInviteButton: React.FC<SpaceShareInviteButtonProps> = ({
 
         try {
             if (typeof navigator.share == "function") setSharing(true);
-            const result = await shareSpaceLink(profileLink);
+            const result = await shareSpaceInviteLink(profileLink);
             if (result == "shared") onShareComplete?.();
             if (result == "copied") {
                 setPhase("copied");

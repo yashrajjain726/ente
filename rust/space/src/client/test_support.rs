@@ -6,10 +6,7 @@
 
 use serde_json::json;
 
-use super::{
-    AccountSpaceCtx, SpaceIdentity, SpaceLinkCtx, build_http_client, cache_lock, generate_key,
-    generate_keypair,
-};
+use super::{AccountSpaceCtx, SpaceIdentity, cache_lock, generate_key, generate_keypair};
 use crate::crypto::encrypt_secretbox_payload;
 use crate::models::OpenAccountSpaceCtxInput;
 use ente_core::crypto::encode_b64;
@@ -63,38 +60,6 @@ pub(crate) fn test_public_key(ctx: &AccountSpaceCtx) -> Vec<u8> {
         .expect("test identity")
         .public_key
         .clone()
-}
-
-/// Construct a [`SpaceLinkCtx`] directly from its parts, bypassing the
-/// link-session handshake. Confines knowledge of the private fields to one
-/// place so the link-viewer tests don't each repeat the struct literal.
-pub(crate) fn space_link_ctx_for_test(
-    base_url: &str,
-    session_token: &str,
-    space_id: &str,
-    space_slug: &str,
-    owner_public_key: Vec<u8>,
-    space_key: Vec<u8>,
-    key_version: i32,
-) -> SpaceLinkCtx {
-    SpaceLinkCtx {
-        client: build_http_client(
-            base_url,
-            Some(session_token.to_owned()),
-            None,
-            None,
-            None,
-            None,
-        )
-        .expect("http client"),
-        session_token: session_token.to_owned(),
-        owner_handle: "owner".to_owned(),
-        space_id: space_id.to_owned(),
-        space_slug: space_slug.to_owned(),
-        owner_public_key,
-        space_key,
-        key_version,
-    }
 }
 
 /// A canned `/space` owned-spaces list response wrapping `space_key` under

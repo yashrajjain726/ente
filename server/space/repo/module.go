@@ -11,7 +11,6 @@ type Module struct {
 	Posts    *PostsRepository
 	Friends  *FriendsRepository
 	Messages *MessagesRepository
-	Links    *LinksRepository
 	Assets   *AssetsRepository
 	Read     *ReadMarkersRepository
 	Sessions *SessionsRepository
@@ -30,10 +29,6 @@ type FriendsRepository struct {
 }
 
 type MessagesRepository struct {
-	DB *sql.DB
-}
-
-type LinksRepository struct {
 	DB *sql.DB
 }
 
@@ -210,30 +205,6 @@ type SpaceFriendRequestRecord struct {
 	Requester                     SpaceActorRecord
 }
 
-type SpaceLinkRecord struct {
-	SpaceID             string
-	SpaceSlug           string
-	OwnerSlug           string
-	AuthKeyHash         []byte
-	KeyVersion          int
-	LinkWrappedSpaceKey []byte
-	EncryptedAccessKey  []byte
-	Active              bool
-	CreatedAt           int64
-	UpdatedAt           int64
-}
-
-type SpaceLinkSessionRecord struct {
-	TokenHash           []byte
-	SpaceID             string
-	AuthKeyHash         []byte
-	KeyVersion          int
-	ExpiresAt           int64
-	CreatedAt           int64
-	SpaceSlug           string
-	LinkWrappedSpaceKey []byte
-}
-
 type SpaceBrowserSessionRecord struct {
 	TokenHash      []byte
 	UserID         int64
@@ -250,7 +221,6 @@ func NewModule(db *sql.DB, s3Config *s3config.S3Config) *Module {
 		Posts:    &PostsRepository{DB: db},
 		Friends:  &FriendsRepository{DB: db},
 		Messages: &MessagesRepository{DB: db},
-		Links:    &LinksRepository{DB: db},
 		Assets:   &AssetsRepository{DB: db, S3Config: s3Config},
 		Read:     &ReadMarkersRepository{DB: db},
 		Sessions: &SessionsRepository{DB: db},

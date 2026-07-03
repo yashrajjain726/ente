@@ -2,8 +2,6 @@ mod assets;
 mod entity_keys;
 mod friends;
 mod keys;
-mod link_ctx;
-mod links;
 mod media;
 mod messages;
 mod posts;
@@ -31,9 +29,8 @@ use crate::models::{
     OpenAccountSpaceCtxInput, PostObjectMetadata,
 };
 use crate::transport::{
-    AssetDownloadResponse, CreateSpaceRequest, FriendShareResponse, PostObjectPayload,
-    PostResponse, SpaceKeyResponse, SpaceKeyVersionResponse, SpaceLookupResponse,
-    SpaceProfileResponse, UpdateSpaceSlugRequest,
+    CreateSpaceRequest, FriendShareResponse, PostObjectPayload, PostResponse, SpaceKeyResponse,
+    SpaceKeyVersionResponse, SpaceLookupResponse, SpaceProfileResponse, UpdateSpaceSlugRequest,
 };
 use ente_core::{
     crypto::{decode_b64, encode_b64},
@@ -77,7 +74,6 @@ pub(crate) struct ResolvedSpaceAccess {
 
 #[derive(Debug, Clone)]
 pub(crate) struct ResolvedOwnedSpaceAccess {
-    space_root_key: Vec<u8>,
     space_key: Vec<u8>,
     key_version: i32,
 }
@@ -95,17 +91,6 @@ pub struct AccountSpaceCtx {
     space_identity_cache: Mutex<BTreeMap<String, SpaceIdentity>>,
     owned_spaces_cache: Mutex<Option<Vec<SpaceKeyResponse>>>,
     friend_shares_cache: Mutex<BTreeMap<String, Vec<DecryptedFriendShare>>>,
-}
-
-pub struct SpaceLinkCtx {
-    client: HttpClient,
-    session_token: String,
-    owner_handle: String,
-    space_id: String,
-    space_slug: String,
-    owner_public_key: Vec<u8>,
-    space_key: Vec<u8>,
-    key_version: i32,
 }
 
 impl AccountSpaceCtx {
@@ -364,7 +349,6 @@ impl AccountSpaceCtx {
         let packed = decode_b64(&record.root_wrapped_space_key)?;
         let space_key = decrypt_secretbox_payload(&space_root_key, &packed)?;
         Ok(Some(ResolvedOwnedSpaceAccess {
-            space_root_key,
             space_key,
             key_version: record.key_version,
         }))

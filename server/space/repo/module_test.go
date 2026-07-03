@@ -196,14 +196,6 @@ func deleteShareBySpaceAndFriend(ctx context.Context, module *Module, spaceID st
 	return err
 }
 
-func testUpsertLink(ctx context.Context, module *Module, spaceID string, authKeyHash []byte, keyVersion int, linkWrappedSpaceKey string, encryptedAccessKey string) (*SpaceLinkRecord, error) {
-	return module.Links.UpsertLink(ctx, spaceID, authKeyHash, keyVersion, testSpaceBytes(linkWrappedSpaceKey), testSpaceBytes(encryptedAccessKey))
-}
-
-func testRotateLink(ctx context.Context, module *Module, spaceID string, authKeyHash []byte, keyVersion int, linkWrappedSpaceKey string, encryptedAccessKey string) (*SpaceLinkRecord, error) {
-	return module.Links.RotateLink(ctx, spaceID, authKeyHash, keyVersion, testSpaceBytes(linkWrappedSpaceKey), testSpaceBytes(encryptedAccessKey))
-}
-
 func testCreatePost(ctx context.Context, module *Module, _ int64, spaceID string, encryptedPostKey string, captionCipher *string, keyVersion int, objects []SpacePostAssetRecord) (int64, error) {
 	var caption []byte
 	if captionCipher != nil {
@@ -261,7 +253,7 @@ func TestGetBrowserSession(t *testing.T) {
 	require.Equal(t, expiresAt, session.ExpiresAt)
 }
 
-func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
+func TestSpaceAccountDeletionResetAccountDeletionAccess(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
 
@@ -279,9 +271,6 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 	pendingRequest, created, err := testCreateFriendRequest(ctx, module, aliceID, aliceSpace.SpaceID, charlieSpace.SpaceID, "alice-charlie-share-key", aliceSpace.CurrentVersion)
 	require.NoError(t, err)
 	require.True(t, created)
-	_, err = testUpsertLink(ctx, module, aliceSpace.SpaceID, []byte("alice-auth-hash"), aliceSpace.CurrentVersion, "alice-link-space-key", "alice-link-access-key")
-	require.NoError(t, err)
-	require.NoError(t, module.Links.CreateSession(ctx, []byte("alice-link-token"), aliceSpace.SpaceID, []byte("alice-auth-hash"), aliceSpace.CurrentVersion, timeutil.NDaysFromNow(1)))
 	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, []byte("alice-browser-token"), aliceID, "session-wrap-key", timeutil.NDaysFromNow(1)))
 
 	postID, err := testCreatePost(ctx, module, aliceID, aliceSpace.SpaceID, "alice-post-key", nil, aliceSpace.CurrentVersion, nil)
@@ -300,24 +289,19 @@ func TestSpaceAccountDeletionResetUserAccess(t *testing.T) {
 	setMessageLikeCreatedAt(t, module, 1500, message.MessageID, aliceSpace.SpaceID)
 	require.NoError(t, module.Read.UpsertNotificationReadMarker(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, timeutil.Microseconds()))
 
-	require.NoError(t, module.ResetUserAccess(ctx, aliceID))
+	require.NoError(t, module.ResetAccountDeletionAccess(ctx, aliceID))
 
 	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM spaces WHERE owner_id = $1`, aliceID))
 	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_posts WHERE space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_browser_sessions WHERE user_id = $1`, aliceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_link_sessions WHERE space_id = $1`, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE requester_space_id = $1 OR target_space_id = $1`, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE message_id = $1 AND recipient_liked_at IS NOT NULL`, message.MessageID))
+	require.Equal(t, int64(2), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_requests WHERE requester_space_id = $1 OR target_space_id = $1`, aliceSpace.SpaceID))
+	require.Equal(t, int64(2), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID))
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE message_id = $1 AND recipient_liked_at IS NOT NULL`, message.MessageID))
 	_, _, err = testConfirmFriendRequest(ctx, module, charlieID, charlieSpace.SpaceID, pendingRequest.RequestID, "charlie-share-key", charlieSpace.CurrentVersion)
-	require.Error(t, err)
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE (space_id = $1 AND friend_space_id = $2) OR (space_id = $2 AND friend_space_id = $1)`, aliceSpace.SpaceID, charlieSpace.SpaceID))
-
-	var active bool
-	require.NoError(t, module.Links.DB.QueryRow(`SELECT active FROM space_links WHERE space_id = $1`, aliceSpace.SpaceID).Scan(&active))
-	require.False(t, active)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE (space_id = $1 AND friend_space_id = $2) OR (space_id = $2 AND friend_space_id = $1)`, aliceSpace.SpaceID, charlieSpace.SpaceID))
 }
 
 func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
@@ -354,9 +338,6 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 	}))
 	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, []byte("alice-delete-browser-token"), aliceID, "session-wrap-key", timeutil.NDaysFromNow(1)))
 	require.NoError(t, testAddFriend(ctx, module, bobID, bobSpace.SpaceID, aliceSpace.SpaceID, "alice-share-key", aliceSpace.CurrentVersion, "bob-share-key", bobSpace.CurrentVersion))
-	_, err = testUpsertLink(ctx, module, aliceSpace.SpaceID, []byte("alice-delete-auth-hash"), aliceSpace.CurrentVersion, "alice-link-space-key", "alice-link-access-key")
-	require.NoError(t, err)
-	require.NoError(t, module.Links.CreateSession(ctx, []byte("alice-delete-link-token"), aliceSpace.SpaceID, []byte("alice-delete-auth-hash"), aliceSpace.CurrentVersion, timeutil.NDaysFromNow(1)))
 	message, err := module.Messages.CreateMessage(ctx, CreateSpaceMessageRecord{
 		Kind:                         "regular",
 		SenderSpaceID:                bobSpace.SpaceID,
@@ -377,8 +358,6 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_post_assets WHERE object_key = $1`, "space/alice/post-asset"))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_messages WHERE sender_space_id = $1 OR recipient_space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_browser_sessions WHERE user_id = $1`, aliceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_link_sessions WHERE space_id = $1`, aliceSpace.SpaceID))
-	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_links WHERE space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_friend_shares WHERE space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
 
@@ -592,6 +571,8 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Equal(t, "message_like", conversations[0].LatestActivity.Type)
 	require.True(t, conversations[0].LatestActivity.Outgoing)
 	require.Equal(t, bobMessage.MessageID, conversations[0].LatestActivity.MessageID.String)
+	require.Equal(t, testSpaceBytes("bob-message-cipher"), conversations[0].LatestActivity.MessageCipher)
+	require.Equal(t, testSpaceBytes("bob-message-recipient-key"), conversations[0].LatestActivity.EncryptedMessageKey)
 
 	postID, err := testCreatePost(ctx, module, aliceID, aliceSpace.SpaceID, "post-key", nil, aliceSpace.CurrentVersion, nil)
 	require.NoError(t, err)
@@ -658,6 +639,9 @@ func TestSpaceMessageConversationsUseLatestActivity(t *testing.T) {
 	require.Equal(t, replyOnly.MessageID, conversations[0].LatestActivity.MessageID.String)
 	require.True(t, conversations[0].LatestActivity.PostID.Valid)
 	require.Equal(t, replyOnlyPostID, conversations[0].LatestActivity.PostID.Int64)
+	thread, _, err := module.Messages.ListThread(ctx, aliceSpace.SpaceID, bobSpace.SpaceID, "", 10)
+	require.NoError(t, err)
+	require.Equal(t, replyOnly.MessageID, thread[0].MessageID)
 	latestActivityAt, err := module.Read.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
 	require.NoError(t, err)
 	require.Equal(t, int64(5500), latestActivityAt)
@@ -972,6 +956,8 @@ func TestSpaceMessageConversationPreviewUsesLatestActivityWithSeparateUnreadStat
 	require.True(t, conversations[0].NotificationUnread)
 	require.Equal(t, "message_like", conversations[0].LatestActivity.Type)
 	require.Equal(t, aliceOldMessage.MessageID, conversations[0].LatestActivity.MessageID.String)
+	require.Equal(t, testSpaceBytes("alice-old-cipher"), conversations[0].LatestActivity.MessageCipher)
+	require.Equal(t, testSpaceBytes("alice-old-sender-key"), conversations[0].LatestActivity.EncryptedMessageKey)
 	require.Equal(t, int64(3000), conversations[0].SortCreatedAt)
 
 	latestActivityAt, err := module.Read.GetLatestConversationActivityAt(ctx, aliceSpace.SpaceID, bobSpace.SpaceID)
@@ -1224,9 +1210,12 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	var likeCount int
 	err = module.Posts.DB.QueryRow(`SELECT COUNT(*) FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID).Scan(&likeCount)
 	require.NoError(t, err)
-	require.Zero(t, likeCount)
+	require.Equal(t, 1, likeCount)
 
 	require.NoError(t, module.Posts.DeletePost(ctx, postID, aliceSpace.SpaceID))
+	err = module.Posts.DB.QueryRow(`SELECT COUNT(*) FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID).Scan(&likeCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, likeCount)
 
 	_, err = module.Posts.GetPost(ctx, postID, bobSpace.SpaceID)
 	require.Error(t, err)
@@ -1243,27 +1232,6 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, referenced)
 	require.NoError(t, tx.Rollback())
-
-	link, err := testUpsertLink(ctx, module, aliceSpace.SpaceID, []byte("hash"), rotatedSpace.CurrentVersion, "space-link-key", "owner-link-secret")
-	require.NoError(t, err)
-	require.Equal(t, testSpaceBytes("space-link-key"), link.LinkWrappedSpaceKey)
-
-	err = module.Links.CreateSession(ctx, []byte("token-hash"), link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.NMinFromNow(30))
-	require.NoError(t, err)
-
-	session, err := module.Links.GetSession(ctx, []byte("token-hash"))
-	require.NoError(t, err)
-	require.Equal(t, aliceSpace.SpaceID, session.SpaceID)
-
-	newLink, err := testRotateLink(ctx, module, aliceSpace.SpaceID, []byte("new-hash"), rotatedSpace.CurrentVersion, "new-space-link-key", "new-owner-link-secret")
-	require.NoError(t, err)
-	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
-	require.Error(t, err)
-
-	err = module.Links.CreateSession(ctx, []byte("token-hash"), newLink.SpaceID, newLink.AuthKeyHash, newLink.KeyVersion, timeutil.NMinFromNow(30))
-	require.NoError(t, err)
-	err = module.Links.DeleteLink(ctx, aliceSpace.SpaceID)
-	require.NoError(t, err)
 
 	lookup, err := module.Spaces.GetSpaceBySlug(ctx, "alice")
 	require.NoError(t, err)
@@ -1642,37 +1610,6 @@ func TestUpdateShareRejectsStaleKeyVersion(t *testing.T) {
 	require.Equal(t, aliceSpace.CurrentVersion, share.KeyVersion)
 }
 
-func TestRotateKeyRevokesSpaceLinks(t *testing.T) {
-	ctx := context.Background()
-	module := newSpaceTestModule(t)
-
-	aliceID := insertSpaceUser(t, module, "alice@example.com", "alice-public")
-	space, err := testCreateSpace(ctx, module, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
-	require.NoError(t, err)
-
-	link, err := testUpsertLink(ctx, module, space.SpaceID, []byte("hash"), space.CurrentVersion, "space-link-key", "owner-link-secret")
-	require.NoError(t, err)
-	require.Equal(t, testSpaceBytes("space-link-key"), link.LinkWrappedSpaceKey)
-
-	err = module.Links.CreateSession(ctx, []byte("token-hash"), link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.NMinFromNow(30))
-	require.NoError(t, err)
-	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
-	require.NoError(t, err)
-
-	rotatedSpace, err := testRotateKey(ctx, module, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
-	require.NoError(t, err)
-	require.Equal(t, 2, rotatedSpace.CurrentVersion)
-
-	_, err = module.Links.GetLink(ctx, space.SpaceID)
-	require.Error(t, err)
-	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
-	require.Error(t, err)
-
-	versions, err := module.Spaces.ListVersions(ctx, space.SpaceID)
-	require.NoError(t, err)
-	require.Len(t, versions, 2)
-}
-
 func TestGetVersionReturnsHistoricalProfile(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)
@@ -1693,147 +1630,6 @@ func TestGetVersionReturnsHistoricalProfile(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, v2.Version)
 	require.Equal(t, testSpaceBytes("alice-profile-v2"), v2.EncryptedProfile)
-}
-
-func TestUpsertLinkReusesExistingLinkWithoutRevokingSessions(t *testing.T) {
-	ctx := context.Background()
-	module := newSpaceTestModule(t)
-
-	aliceID := insertSpaceUser(t, module, "alice@example.com", "alice-public")
-	space, err := testCreateSpace(ctx, module, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
-	require.NoError(t, err)
-
-	link, err := testUpsertLink(ctx, module, space.SpaceID, []byte("same-hash"), space.CurrentVersion, "space-link-key", "owner-link-secret")
-	require.NoError(t, err)
-	err = module.Links.CreateSession(ctx, []byte("token-hash"), link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.NMinFromNow(30))
-	require.NoError(t, err)
-
-	reused, err := testUpsertLink(ctx, module, space.SpaceID, []byte("same-hash"), space.CurrentVersion, "new-random-envelope", "new-owner-link-secret")
-	require.NoError(t, err)
-	require.Equal(t, link.AuthKeyHash, reused.AuthKeyHash)
-	require.Equal(t, link.LinkWrappedSpaceKey, reused.LinkWrappedSpaceKey)
-	require.Equal(t, link.EncryptedAccessKey, reused.EncryptedAccessKey)
-
-	session, err := module.Links.GetSession(ctx, []byte("token-hash"))
-	require.NoError(t, err)
-	require.Equal(t, link.AuthKeyHash, session.AuthKeyHash)
-}
-
-func TestUpsertLinkRejectsDifferentActiveLinkSecret(t *testing.T) {
-	ctx := context.Background()
-	module := newSpaceTestModule(t)
-
-	aliceID := insertSpaceUser(t, module, "alice@example.com", "alice-public")
-	space, err := testCreateSpace(ctx, module, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
-	require.NoError(t, err)
-
-	_, err = testUpsertLink(ctx, module, space.SpaceID, []byte("old-hash"), space.CurrentVersion, "old-space-link-key", "old-owner-link-secret")
-	require.NoError(t, err)
-
-	_, err = testUpsertLink(ctx, module, space.SpaceID, []byte("new-hash"), space.CurrentVersion, "new-space-link-key", "new-owner-link-secret")
-	require.ErrorIs(t, err, ErrActiveLinkAlreadyExists)
-}
-
-func TestDeleteLinkTombstonesAuthHash(t *testing.T) {
-	ctx := context.Background()
-	module := newSpaceTestModule(t)
-
-	aliceID := insertSpaceUser(t, module, "alice@example.com", "alice-public")
-	space, err := testCreateSpace(ctx, module, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
-	require.NoError(t, err)
-
-	link, err := testUpsertLink(ctx, module, space.SpaceID, []byte("old-hash"), space.CurrentVersion, "old-space-link-key", "old-owner-link-secret")
-	require.NoError(t, err)
-	err = module.Links.CreateSession(ctx, []byte("token-hash"), link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.NMinFromNow(30))
-	require.NoError(t, err)
-
-	require.NoError(t, module.Links.DeleteLink(ctx, space.SpaceID))
-	_, err = module.Links.GetSession(ctx, []byte("token-hash"))
-	require.Error(t, err)
-
-	_, err = testUpsertLink(ctx, module, space.SpaceID, link.AuthKeyHash, space.CurrentVersion, "resurrected-space-link-key", "resurrected-owner-link-secret")
-	require.ErrorIs(t, err, ErrLinkAuthKeyReused)
-
-	freshLink, err := testUpsertLink(ctx, module, space.SpaceID, []byte("fresh-hash"), space.CurrentVersion, "fresh-space-link-key", "fresh-owner-link-secret")
-	require.NoError(t, err)
-	require.Equal(t, testSpaceBytes("fresh-space-link-key"), freshLink.LinkWrappedSpaceKey)
-}
-
-func TestCreateSessionRejectsStaleLinkAuthHash(t *testing.T) {
-	ctx := context.Background()
-	module := newSpaceTestModule(t)
-
-	aliceID := insertSpaceUser(t, module, "alice@example.com", "alice-public")
-	space, err := testCreateSpace(ctx, module, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
-	require.NoError(t, err)
-
-	oldLink, err := testUpsertLink(ctx, module, space.SpaceID, []byte("old-hash"), space.CurrentVersion, "old-space-link-key", "old-owner-link-secret")
-	require.NoError(t, err)
-	newLink, err := testRotateLink(ctx, module, space.SpaceID, []byte("new-hash"), space.CurrentVersion, "new-space-link-key", "new-owner-link-secret")
-	require.NoError(t, err)
-
-	err = module.Links.CreateSession(ctx, []byte("stale-token"), oldLink.SpaceID, oldLink.AuthKeyHash, oldLink.KeyVersion, timeutil.NMinFromNow(30))
-	require.Error(t, err)
-
-	err = module.Links.CreateSession(ctx, []byte("fresh-token"), newLink.SpaceID, newLink.AuthKeyHash, newLink.KeyVersion, timeutil.NMinFromNow(30))
-	require.NoError(t, err)
-	session, err := module.Links.GetSession(ctx, []byte("fresh-token"))
-	require.NoError(t, err)
-	require.Equal(t, newLink.KeyVersion, session.KeyVersion)
-	require.Equal(t, newLink.AuthKeyHash, session.AuthKeyHash)
-}
-
-func TestGetSessionRejectsStaleLinkMetadata(t *testing.T) {
-	ctx := context.Background()
-	module := newSpaceTestModule(t)
-
-	aliceID := insertSpaceUser(t, module, "alice@example.com", "alice-public")
-	space, err := testCreateSpace(ctx, module, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
-	require.NoError(t, err)
-
-	oldLink, err := testUpsertLink(ctx, module, space.SpaceID, []byte("old-hash"), space.CurrentVersion, "old-space-link-key", "old-owner-link-secret")
-	require.NoError(t, err)
-	_, err = testRotateLink(ctx, module, space.SpaceID, []byte("new-hash"), space.CurrentVersion, "new-space-link-key", "new-owner-link-secret")
-	require.NoError(t, err)
-
-	_, err = module.Links.DB.Exec(`
-		INSERT INTO space_link_sessions (token_hash, space_id, auth_key_hash, key_version, expires_at)
-		VALUES ($1, $2, $3, $4, $5)
-	`, []byte("stale-auth-token"), oldLink.SpaceID, oldLink.AuthKeyHash, oldLink.KeyVersion, timeutil.NMinFromNow(30))
-	require.NoError(t, err)
-	_, err = module.Links.GetSession(ctx, []byte("stale-auth-token"))
-	require.Error(t, err)
-
-	rotatedSpace, err := testRotateKey(ctx, module, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
-	require.NoError(t, err)
-	reusedHashLink, err := testUpsertLink(ctx, module, space.SpaceID, []byte("fresh-after-space-rotate"), rotatedSpace.CurrentVersion, "fresh-new-version-key", "fresh-owner-link-secret")
-	require.NoError(t, err)
-	_, err = module.Links.DB.Exec(`
-		INSERT INTO space_link_sessions (token_hash, space_id, auth_key_hash, key_version, expires_at)
-		VALUES ($1, $2, $3, $4, $5)
-	`, []byte("stale-version-token"), reusedHashLink.SpaceID, reusedHashLink.AuthKeyHash, space.CurrentVersion, timeutil.NMinFromNow(30))
-	require.NoError(t, err)
-	_, err = module.Links.GetSession(ctx, []byte("stale-version-token"))
-	require.Error(t, err)
-}
-
-func TestUpsertLinkRejectsStaleKeyVersion(t *testing.T) {
-	ctx := context.Background()
-	module := newSpaceTestModule(t)
-
-	aliceID := insertSpaceUser(t, module, "alice@example.com", "alice-public")
-	space, err := testCreateSpace(ctx, module, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
-	require.NoError(t, err)
-
-	rotatedSpace, err := testRotateKey(ctx, module, aliceID, space.SpaceID, space.CurrentVersion, "alice-space-key-v2", "wrapped-prev-key", "alice-profile-v2")
-	require.NoError(t, err)
-	require.Equal(t, space.CurrentVersion+1, rotatedSpace.CurrentVersion)
-
-	_, err = testUpsertLink(ctx, module, space.SpaceID, []byte("stale-hash"), space.CurrentVersion, "stale-space-link-key", "stale-owner-link-secret")
-	require.ErrorIs(t, err, sql.ErrNoRows)
-
-	_, err = module.Links.GetLink(ctx, space.SpaceID)
-	require.Error(t, err)
 }
 
 func TestListPostsBySpacePaginates(t *testing.T) {

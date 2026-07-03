@@ -104,38 +104,6 @@ type SpaceActorResponse struct {
 	Avatar           *ProfileAvatarResponse `json:"avatar,omitempty"`
 }
 
-type SpaceLinkCreateRequest struct {
-	AuthKey             string `json:"authKey" binding:"required"`
-	KeyVersion          int    `json:"keyVersion" binding:"required,gt=0"`
-	LinkWrappedSpaceKey string `json:"linkWrappedSpaceKey" binding:"required"`
-	EncryptedAccessKey  string `json:"encryptedAccessKey" binding:"required"`
-}
-
-type SpaceLinkStatusResponse struct {
-	SpaceID            string `json:"spaceId"`
-	SpaceSlug          string `json:"spaceSlug"`
-	KeyVersion         int    `json:"keyVersion"`
-	Active             bool   `json:"active"`
-	EncryptedAccessKey string `json:"encryptedAccessKey"`
-	CreatedAt          string `json:"createdAt"`
-	UpdatedAt          string `json:"updatedAt"`
-}
-
-type SpaceLinkLoginRequest struct {
-	SpaceID string `json:"spaceId" binding:"required"`
-	AuthKey string `json:"authKey" binding:"required"`
-}
-
-type SpaceLinkLoginResponse struct {
-	SessionToken        string `json:"sessionToken"`
-	SpaceID             string `json:"spaceId"`
-	SpaceSlug           string `json:"spaceSlug"`
-	Owner               string `json:"owner"`
-	PublicKey           string `json:"publicKey,omitempty"`
-	KeyVersion          int    `json:"keyVersion"`
-	LinkWrappedSpaceKey string `json:"linkWrappedSpaceKey"`
-}
-
 type AddFriendPayload struct {
 	TargetSpaceID                 string `json:"targetSpaceId,omitempty"`
 	TargetUsername                string `json:"targetUsername,omitempty"`
