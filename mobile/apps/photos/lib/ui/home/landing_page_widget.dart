@@ -5,7 +5,6 @@ import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import "package:photos/app.dart";
 import 'package:photos/core/configuration.dart';
 import "package:photos/generated/l10n.dart";
@@ -58,15 +57,6 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
           final textTheme = getEnteTextTheme(context);
           final colorScheme = getEnteColorScheme(context);
           return Scaffold(
-            appBar: AppBar(
-              backgroundColor: colorScheme.greenBase,
-              systemOverlayStyle: SystemUiOverlayStyle(
-                statusBarColor: colorScheme.greenBase,
-                statusBarIconBrightness: Brightness.light,
-                statusBarBrightness: Brightness.dark,
-              ),
-              leading: const SizedBox(),
-            ),
             backgroundColor: colorScheme.greenBase,
             body: SafeArea(
               child: DeveloperSettingsTapArea(
