@@ -91,7 +91,7 @@ final class ModelDownloadManager: NSObject {
         }
     }
 
-    func progress(for targets: [ModelDownloadTarget]) async -> InferenceDownloadProgress? {
+    func progress(for targets: [ModelDownloadTarget]) async -> DownloadProgress? {
         if targets.allSatisfy({ FileManager.default.fileExists(atPath: $0.destination.path) }) {
             clearRecords(for: targets)
             return nil
@@ -106,7 +106,7 @@ final class ModelDownloadManager: NSObject {
 
         if relevantTasks.isEmpty {
             if let failure = firstFailure(for: targets) {
-                return InferenceDownloadProgress(percent: -1, status: failure)
+                return DownloadProgress(percent: -1, status: failure)
             }
             return nil
         }
@@ -146,7 +146,7 @@ final class ModelDownloadManager: NSObject {
             percent = 0
             status = "Downloading model..."
         }
-        return InferenceDownloadProgress(percent: percent, status: status)
+        return DownloadProgress(percent: percent, status: status)
     }
 
     func cancelAllDownloads() async {

@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-struct InferenceModelTarget: Equatable {
+struct LlmModelTarget: Equatable {
     let id: String
     let url: String
     let mmprojUrl: String?
@@ -9,12 +9,12 @@ struct InferenceModelTarget: Equatable {
     let maxTokens: Int?
 }
 
-struct InferenceDownloadProgress: Equatable {
+struct DownloadProgress: Equatable {
     let percent: Int
     let status: String
 }
 
-enum InferenceMessageRole {
+enum LlmMessageRole {
     case user
     case assistant
     case system
@@ -31,13 +31,13 @@ enum InferenceMessageRole {
     }
 }
 
-struct InferenceMessage {
+struct LlmMessage {
     let text: String
-    let role: InferenceMessageRole
+    let role: LlmMessageRole
     let hasAttachments: Bool
 }
 
-struct InferenceGenerationSummary {
+struct GenerationSummary {
     let jobId: Int64
     let generatedTokens: Int
     let totalTimeMs: Int64?
@@ -76,7 +76,7 @@ private actor AsyncSerialGate {
     }
 }
 
-final class InferenceRsProvider {
+final class LlmProvider {
     private struct LoadedModelKey: Equatable {
         let id: String
         let requestedContextLength: Int?
@@ -100,7 +100,7 @@ final class InferenceRsProvider {
     private let modelLoadGate = AsyncSerialGate()
     private let rustDownloadCancelLock = NSLock()
     private var rustDownloadCancelled = false
-    private let logger = EnsuLogging.shared.logger("InferenceRsProvider")
+    private let logger = EnsuLogging.shared.logger("LlmProvider")
 
     init(modelDir: URL, transcriber: Transcriber) {
         self.modelDir = modelDir
@@ -109,8 +109,8 @@ final class InferenceRsProvider {
     }
 
     func ensureModelReady(
-        target: InferenceModelTarget,
-        onProgress: @escaping (InferenceDownloadProgress) -> Void
+        target: LlmModelTarget,
+        onProgress: @escaping (DownloadProgress) -> Void
     ) async throws {
         try await modelLoadGate.withLock {
             try await ensureModelReadyLocked(target: target, onProgress: onProgress, allowRecovery: true)
@@ -118,8 +118,8 @@ final class InferenceRsProvider {
     }
 
     private func ensureModelReadyLocked(
-        target: InferenceModelTarget,
-        onProgress: @escaping (InferenceDownloadProgress) -> Void,
+        target: LlmModelTarget,
+        onProgress: @escaping (DownloadProgress) -> Void,
         allowRecovery: Bool
     ) async throws {
         let capability = currentChatDeviceCapability()
@@ -163,7 +163,7 @@ final class InferenceRsProvider {
         let downloads = expectedTargets.filter { !FileManager.default.fileExists(atPath: $0.destination.path) }
 
         if !downloads.isEmpty {
-            onProgress(InferenceDownloadProgress(percent: 0, status: "Starting download..."))
+            onProgress(DownloadProgress(percent: 0, status: "Starting download..."))
             await downloadManager.cancelDownloads(for: downloads.map(downloadTarget(for:)))
             do {
                 try await downloadWithRust(expectedTargets, onProgress: onProgress)
@@ -180,35 +180,35 @@ final class InferenceRsProvider {
             }
         }
 
-        onProgress(InferenceDownloadProgress(percent: 100, status: "Loading model..."))
+        onProgress(DownloadProgress(percent: 100, status: "Loading model..."))
         do {
             try loadModel(target: target, modelPath: modelPath)
         } catch {
             if allowRecovery, downloads.isEmpty,
                recoverFromCachedModelLoadFailure(modelPath: modelPath, mmprojPath: mmprojPath) {
-                onProgress(InferenceDownloadProgress(percent: 0, status: "Starting download..."))
+                onProgress(DownloadProgress(percent: 0, status: "Starting download..."))
                 try await ensureModelReadyLocked(target: target, onProgress: onProgress, allowRecovery: false)
                 return
             }
             throw error
         }
-        onProgress(InferenceDownloadProgress(percent: 100, status: "Ready"))
+        onProgress(DownloadProgress(percent: 100, status: "Ready"))
     }
 
     func generateChat(
-        target: InferenceModelTarget,
-        messages: [InferenceMessage],
+        target: LlmModelTarget,
+        messages: [LlmMessage],
         imageFiles: [URL],
         temperature: Float,
         maxTokens: Int?,
         onToken: @escaping (String) -> Void
-    ) async throws -> InferenceGenerationSummary {
+    ) async throws -> GenerationSummary {
         let capability = currentChatDeviceCapability()
         if !capability.isChatSupported {
             throw UnsupportedDeviceMemoryError(capability: capability)
         }
         guard let context = loadedContext else {
-            throw NSError(domain: "InferenceRsProvider", code: -1, userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
+            throw NSError(domain: "LlmProvider", code: -1, userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
         currentJobId = nil
 
@@ -251,7 +251,7 @@ final class InferenceRsProvider {
             case let .error(_, message):
                 self.currentJobId = nil
                 lock.lock()
-                error = NSError(domain: "InferenceRsProvider", code: -2, userInfo: [NSLocalizedDescriptionKey: message])
+                error = NSError(domain: "LlmProvider", code: -2, userInfo: [NSLocalizedDescriptionKey: message])
                 lock.unlock()
             }
         }
@@ -275,7 +275,7 @@ final class InferenceRsProvider {
             }
         }
 
-        return InferenceGenerationSummary(
+        return GenerationSummary(
             jobId: summary.jobId,
             generatedTokens: Int(summary.generatedTokens ?? 0),
             totalTimeMs: summary.totalTimeMs
@@ -290,7 +290,7 @@ final class InferenceRsProvider {
         }
     }
 
-    func prewarmImageInference(target: InferenceModelTarget) async {
+    func prewarmImageInference(target: LlmModelTarget) async {
         guard isModelDownloaded(target: target) else { return }
 
         do {
@@ -334,14 +334,14 @@ final class InferenceRsProvider {
         }
     }
 
-    func cancelStaleDownloads(target: InferenceModelTarget) {
+    func cancelStaleDownloads(target: LlmModelTarget) {
         let targets = expectedTargets(for: target).map(downloadTarget(for:))
         Task {
             await downloadManager.cancelDownloads(except: targets)
         }
     }
 
-    func isModelDownloaded(target: InferenceModelTarget) -> Bool {
+    func isModelDownloaded(target: LlmModelTarget) -> Bool {
         let modelPath = modelPathFor(target: target)
         if !FileManager.default.fileExists(atPath: modelPath.path) {
             return false
@@ -355,7 +355,7 @@ final class InferenceRsProvider {
         return true
     }
 
-    func estimatedDownloadSize(target: InferenceModelTarget) async -> Int64? {
+    func estimatedDownloadSize(target: LlmModelTarget) async -> Int64? {
         let modelPath = modelPathFor(target: target)
         let mmprojPath = mmprojPathFor(target: target)
         let modelSize: Int64?
@@ -383,11 +383,11 @@ final class InferenceRsProvider {
         return sizes.reduce(0, +)
     }
 
-    func currentDownloadProgress(target: InferenceModelTarget) async -> InferenceDownloadProgress? {
+    func currentDownloadProgress(target: LlmModelTarget) async -> DownloadProgress? {
         await downloadManager.progress(for: expectedTargets(for: target).map(downloadTarget(for:)))
     }
 
-    func loadedContextLength(target: InferenceModelTarget) -> Int? {
+    func loadedContextLength(target: LlmModelTarget) -> Int? {
         let modelKey = LoadedModelKey(id: target.id, requestedContextLength: target.contextLength)
         guard currentModelKey == modelKey, loadedModel != nil, loadedContext != nil else {
             return nil
@@ -406,7 +406,7 @@ final class InferenceRsProvider {
         transcriber.unloadModel()
     }
 
-    private func loadModel(target: InferenceModelTarget, modelPath: URL) throws {
+    private func loadModel(target: LlmModelTarget, modelPath: URL) throws {
         let params = LlmModelLoadParams(modelPath: modelPath.path, nGpuLayers: 0, useMmap: true, useMlock: false)
         let model = try LlmModel.load(params: params)
         loadedModel = model
@@ -428,7 +428,7 @@ final class InferenceRsProvider {
                 continue
             }
         }
-        throw NSError(domain: "InferenceRsProvider", code: -5, userInfo: [NSLocalizedDescriptionKey: "Failed to create context"])
+        throw NSError(domain: "LlmProvider", code: -5, userInfo: [NSLocalizedDescriptionKey: "Failed to create context"])
     }
 
     private func fetchContentLength(for urlString: String) async -> Int64? {
@@ -482,7 +482,7 @@ final class InferenceRsProvider {
         return removedAny
     }
 
-    private func modelPathFor(target: InferenceModelTarget) -> URL {
+    private func modelPathFor(target: LlmModelTarget) -> URL {
         let base = modelDir.appendingPathComponent("models", isDirectory: true)
         let filename = URL(string: target.url)?.lastPathComponent ?? "model.gguf"
         if target.id.hasPrefix("custom:") {
@@ -492,7 +492,7 @@ final class InferenceRsProvider {
         return base.appendingPathComponent(filename)
     }
 
-    private func mmprojPathFor(target: InferenceModelTarget) -> URL? {
+    private func mmprojPathFor(target: LlmModelTarget) -> URL? {
         guard let url = target.mmprojUrl else { return nil }
         let base = modelDir.appendingPathComponent("models", isDirectory: true)
         let filename = URL(string: url)?.lastPathComponent ?? "mmproj.gguf"
@@ -509,7 +509,7 @@ final class InferenceRsProvider {
         return hashed.map { String(format: "%02x", $0) }.joined()
     }
 
-    private func expectedTargets(for target: InferenceModelTarget) -> [DownloadTarget] {
+    private func expectedTargets(for target: LlmModelTarget) -> [DownloadTarget] {
         let modelPath = modelPathFor(target: target)
         let mmprojPath = mmprojPathFor(target: target)
         var targets = [DownloadTarget(label: "Model", url: target.url, destination: modelPath)]
@@ -527,7 +527,7 @@ final class InferenceRsProvider {
 
     private func waitForDownloads(
         _ expectedTargets: [DownloadTarget],
-        onProgress: @escaping (InferenceDownloadProgress) -> Void
+        onProgress: @escaping (DownloadProgress) -> Void
     ) async throws {
         let managerTargets = expectedTargets.map(downloadTarget(for:))
         let maxPolls = 7_200
@@ -542,7 +542,7 @@ final class InferenceRsProvider {
             if let progress = await downloadManager.progress(for: managerTargets) {
                 if progress.percent == -1 {
                     throw NSError(
-                        domain: "InferenceRsProvider",
+                        domain: "LlmProvider",
                         code: -9,
                         userInfo: [NSLocalizedDescriptionKey: progress.status]
                     )
@@ -553,7 +553,7 @@ final class InferenceRsProvider {
             pollCount += 1
             if pollCount >= maxPolls {
                 throw NSError(
-                    domain: "InferenceRsProvider",
+                    domain: "LlmProvider",
                     code: -10,
                     userInfo: [NSLocalizedDescriptionKey: "Download timed out"]
                 )
@@ -564,7 +564,7 @@ final class InferenceRsProvider {
 
     private func downloadWithRust(
         _ expectedTargets: [DownloadTarget],
-        onProgress: @escaping (InferenceDownloadProgress) -> Void
+        onProgress: @escaping (DownloadProgress) -> Void
     ) async throws {
         setRustDownloadCancelled(false)
         let targets = expectedTargets.map {
@@ -669,7 +669,7 @@ private final class ModelDownloadCallbackSink: LlmModelDownloadCallback, @unchec
 }
 
 private extension LlmModelDownloadProgress {
-    func toInferenceProgress() -> InferenceDownloadProgress {
+    func toInferenceProgress() -> DownloadProgress {
         let total = totalBytes.flatMap { $0 > 0 ? $0 : nil }
         let percent: Int
         let status: String
@@ -683,6 +683,6 @@ private extension LlmModelDownloadProgress {
             percent = 0
             status = "Downloading \(label.lowercased())..."
         }
-        return InferenceDownloadProgress(percent: percent, status: status)
+        return DownloadProgress(percent: percent, status: status)
     }
 }

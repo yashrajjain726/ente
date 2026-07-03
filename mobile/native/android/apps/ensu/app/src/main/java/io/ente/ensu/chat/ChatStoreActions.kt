@@ -2,17 +2,17 @@ package io.ente.ensu.chat
 import io.ente.ensu.llm.DownloadProgressTracker
 import io.ente.ensu.llm.ModelSettingsActions
 
-import io.ente.ensu.chat.RustChatRepository
+import io.ente.ensu.chat.ChatRepository
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.llm.LlmMessage
 import io.ente.ensu.llm.LlmMessageRole
 import io.ente.ensu.llm.LlmModelTarget
-import io.ente.ensu.llm.RustLlmProvider
+import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.chat.Attachment
 import io.ente.ensu.chat.ChatMessage
 import io.ente.ensu.chat.ChatSession
-import io.ente.ensu.config.ConfigDefaults
+import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.chat.MessageAuthor
 import io.ente.ensu.chat.sessionTitleFromText
@@ -38,8 +38,8 @@ import kotlin.math.min
 internal class ChatStoreActions(
     private val state: MutableStateFlow<AppState>,
     private val sessionPreferences: SessionPreferencesDataStore,
-    private val chatRepository: RustChatRepository,
-    private val llmProvider: RustLlmProvider,
+    private val chatRepository: ChatRepository,
+    private val llmProvider: LlmProvider,
     private val clock: () -> Long,
     private val logRepository: FileLogRepository,
     private val messageStore: MutableMap<String, MutableList<ChatMessage>>,

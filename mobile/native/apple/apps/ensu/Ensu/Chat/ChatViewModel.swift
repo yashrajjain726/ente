@@ -14,14 +14,14 @@ final class ChatViewModel: ObservableObject {
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss z"
         return formatter
     }()
-    private static let systemPromptDatePlaceholder = EnsuRustDefaults.shared.systemPromptDatePlaceholder
+    private static let systemPromptDatePlaceholder = ConfigDefaults.shared.systemPromptDatePlaceholder
     private static let defaultGenerationMaxTokens = 8_192
     private static let overflowSafetyTokens = 256
     private static let imageTokenEstimate = 768
     private nonisolated static let sessionTitleMaxLength = 40
     private static let sessionSummaryMaxWords = 7
     private static let sessionSummaryStoreKey = "ensu.session_summaries"
-    private static let sessionSummarySystemPrompt = EnsuRustDefaults.shared.sessionSummarySystemPrompt
+    private static let sessionSummarySystemPrompt = ConfigDefaults.shared.sessionSummarySystemPrompt
 
     private func systemPrompt() -> String {
         let dateAndTime = Self.systemPromptDateFormatter.string(from: Date())
@@ -77,7 +77,7 @@ final class ChatViewModel: ObservableObject {
     @Published var voiceInputState: VoiceInputState = .idle
     @Published var draftCursorMoveToken = UUID()
 
-    private let provider: InferenceRsProvider
+    private let provider: LlmProvider
     private let voiceTranscriber: VoiceTranscriptionService
     private var chatDb: EnsuDb
     private let attachmentsDir: URL
@@ -125,7 +125,7 @@ final class ChatViewModel: ObservableObject {
         let transcriptionDir = baseDir.appendingPathComponent("transcription", isDirectory: true)
         try? FileManager.default.createDirectory(at: transcriptionDir, withIntermediateDirectories: true, attributes: nil)
         let transcriber = Transcriber(modelsDir: transcriptionDir.path)
-        let provider = InferenceRsProvider(modelDir: llmDir, transcriber: transcriber)
+        let provider = LlmProvider(modelDir: llmDir, transcriber: transcriber)
         let voiceTranscriber = VoiceTranscriptionService(transcriber: transcriber)
 
         // Chat DB + attachments.
@@ -731,11 +731,11 @@ final class ChatViewModel: ObservableObject {
         sharedModelReadyKey = nil
     }
 
-    private func modelReadyKey(for target: InferenceModelTarget) -> ModelReadyKey {
+    private func modelReadyKey(for target: LlmModelTarget) -> ModelReadyKey {
         ModelReadyKey(id: target.id, requestedContextLength: target.contextLength)
     }
 
-    private func ensureModelReadyShared(target: InferenceModelTarget) async throws {
+    private func ensureModelReadyShared(target: LlmModelTarget) async throws {
         if isChatUnsupported {
             throw UnsupportedDeviceMemoryError(capability: deviceCapability)
         }
@@ -1065,8 +1065,8 @@ final class ChatViewModel: ObservableObject {
             overflowAlert = nil
 
             let history = historySelection.messages
-            let systemMessage = InferenceMessage(text: systemPrompt(), role: .system, hasAttachments: false)
-            let messages = [systemMessage] + history + [InferenceMessage(text: prompt.text, role: .user, hasAttachments: !userNode.attachments.isEmpty)]
+            let systemMessage = LlmMessage(text: systemPrompt(), role: .system, hasAttachments: false)
+            let messages = [systemMessage] + history + [LlmMessage(text: prompt.text, role: .user, hasAttachments: !userNode.attachments.isEmpty)]
 
             let bufferLock = NSLock()
             var buffer = ""
@@ -1233,7 +1233,7 @@ final class ChatViewModel: ObservableObject {
         scheduleSessionSummary(for: parent.sessionId)
     }
 
-    private func handleProgress(_ progress: InferenceDownloadProgress) {
+    private func handleProgress(_ progress: DownloadProgress) {
         if progress.percent == -1 {
             if modelDownloadLoggedStart {
                 logger.error("Model download failed", details: progress.status)
@@ -1286,7 +1286,7 @@ final class ChatViewModel: ObservableObject {
         isDownloading = true
     }
 
-    private func startDownloadProgressMonitor(target: InferenceModelTarget) {
+    private func startDownloadProgressMonitor(target: LlmModelTarget) {
         downloadProgressMonitorTask?.cancel()
         let targetKey = modelReadyKey(for: target)
 
@@ -1333,8 +1333,8 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func currentDownloadSnapshot(
-        target: InferenceModelTarget
-    ) async -> (InferenceDownloadProgress?, Bool) {
+        target: LlmModelTarget
+    ) async -> (DownloadProgress?, Bool) {
         let progress = await provider.currentDownloadProgress(target: target)
         let isDownloaded = provider.isModelDownloaded(target: target)
         return (progress, isDownloaded)
@@ -1915,16 +1915,16 @@ final class ChatViewModel: ObservableObject {
         input: String,
         fallback: String,
         existingSummary: String?,
-        provider: InferenceRsProvider,
-        target: InferenceModelTarget
+        provider: LlmProvider,
+        target: LlmModelTarget
     ) async -> String? {
         if let existingSummary, !existingSummary.isEmpty { return nil }
         let cleanedInput = sanitizeTitleText(input)
         guard !cleanedInput.isEmpty else { return sessionTitle(from: fallback, fallback: fallback) }
 
         let messages = [
-            InferenceMessage(text: sessionSummarySystemPrompt, role: .system, hasAttachments: false),
-            InferenceMessage(text: cleanedInput, role: .user, hasAttachments: false)
+            LlmMessage(text: sessionSummarySystemPrompt, role: .system, hasAttachments: false),
+            LlmMessage(text: cleanedInput, role: .user, hasAttachments: false)
         ]
 
         let bufferLock = NSLock()
@@ -2057,7 +2057,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     private struct HistorySelection {
-        let messages: [InferenceMessage]
+        let messages: [LlmMessage]
         let inputTokens: Int
         let inputBudget: Int
         let wasTrimmed: Bool
@@ -2122,12 +2122,12 @@ final class ChatViewModel: ObservableObject {
             return HistorySelection(messages: [], inputTokens: inputTokens, inputBudget: inputBudget, wasTrimmed: inputTokens > inputBudget)
         }
 
-        var selected: [InferenceMessage] = []
+        var selected: [LlmMessage] = []
         for node in historyMessages.reversed() {
             let text = historyText(node)
             let cost = estimateTokens(text)
             if cost <= remaining {
-                selected.append(InferenceMessage(text: text, role: node.role == .user ? .user : .assistant, hasAttachments: !node.attachments.isEmpty))
+                selected.append(LlmMessage(text: text, role: node.role == .user ? .user : .assistant, hasAttachments: !node.attachments.isEmpty))
                 remaining -= cost
             } else {
                 break
@@ -2137,7 +2137,7 @@ final class ChatViewModel: ObservableObject {
         return HistorySelection(messages: selected.reversed(), inputTokens: inputTokens, inputBudget: inputBudget, wasTrimmed: inputTokens > inputBudget)
     }
 
-    private func resolveGenerationLimits(target: InferenceModelTarget) -> GenerationLimits {
+    private func resolveGenerationLimits(target: LlmModelTarget) -> GenerationLimits {
         let contextLength = provider.loadedContextLength(target: target) ?? target.contextLength ?? 12000
         let maxOutput = resolveMaxOutputTokens(configuredMaxTokens: target.maxTokens, contextLength: contextLength)
         return GenerationLimits(contextLength: contextLength, maxOutput: maxOutput)
@@ -2239,7 +2239,7 @@ private final class DownloadProgressTracker {
         lastVisibleStatus = nil
     }
 
-    func resolve(_ progress: InferenceDownloadProgress) -> ResolvedDownloadProgress {
+    func resolve(_ progress: DownloadProgress) -> ResolvedDownloadProgress {
         let isLoading = progress.status.localizedCaseInsensitiveContains("Loading")
         let isReady = progress.status.localizedCaseInsensitiveContains("Ready")
         let rawPercent = progress.percent >= 0 ? progress.percent : nil

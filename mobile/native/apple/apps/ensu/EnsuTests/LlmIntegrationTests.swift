@@ -30,7 +30,7 @@ private final class GenerateEventCollector: LlmGenerationEventCallback {
     }
 }
 
-final class InferenceIntegrationTests: XCTestCase {
+final class LlmIntegrationTests: XCTestCase {
     func testInitBackend() throws {
         try llmInitBackend()
     }

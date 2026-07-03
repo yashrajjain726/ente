@@ -24,7 +24,7 @@ struct ModelSettingsView: View {
     @State private var toastTask: Task<Void, Never>?
 
     private let modelChoices: [ModelChoice] = {
-        let defaults = EnsuRustDefaults.shared
+        let defaults = ConfigDefaults.shared
         let defaultModel = defaults.mobileDefaultModel
         let presets = defaults.mobileModelPresets
         return [

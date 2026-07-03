@@ -3,15 +3,15 @@ import io.ente.ensu.llm.ModelSettingsActions
 import io.ente.ensu.chat.AttachmentStoreActions
 import io.ente.ensu.chat.ChatStoreActions
 
-import io.ente.ensu.chat.RustChatRepository
+import io.ente.ensu.chat.ChatRepository
 import io.ente.ensu.device.ChatDeviceCapability
 import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.device.AndroidDeviceCapabilityProvider
-import io.ente.ensu.llm.RustLlmProvider
+import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.chat.Attachment
 import io.ente.ensu.chat.ChatMessage
-import io.ente.ensu.config.ConfigDefaults
+import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.settings.SessionPreferencesDataStore
 import io.ente.ensu.AppState
@@ -25,8 +25,8 @@ import kotlinx.coroutines.launch
 
 class AppStore(
     private val sessionPreferences: SessionPreferencesDataStore,
-    private val chatRepository: RustChatRepository,
-    private val llmProvider: RustLlmProvider,
+    private val chatRepository: ChatRepository,
+    private val llmProvider: LlmProvider,
     val transcriber: Transcriber,
     private val deviceCapabilityProvider: AndroidDeviceCapabilityProvider,
     val configDefaults: ConfigDefaults,

@@ -16,7 +16,7 @@ import io.ente.ensu.bindings.EnsuDb
 import io.ente.ensu.bindings.DbException
 import java.io.File
 
-class RustChatRepository(
+class ChatRepository(
     context: Context,
     private val credentialStore: CredentialStore
 ) {

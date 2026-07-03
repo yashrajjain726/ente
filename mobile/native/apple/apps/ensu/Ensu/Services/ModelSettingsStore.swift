@@ -105,16 +105,16 @@ final class ModelSettingsStore: ObservableObject {
         temperature = ""
     }
 
-    func currentTarget() -> InferenceModelTarget {
+    func currentTarget() -> LlmModelTarget {
         let useCustom = useCustomModel && !modelUrl.isEmpty
-        let defaults = EnsuRustDefaults.shared
+        let defaults = ConfigDefaults.shared
         let defaultModel = Self.platformDefaultModel
         let url = useCustom ? modelUrl : defaultModel.url
         let mmproj = useCustom ? (mmprojUrl.isEmpty ? nil : mmprojUrl) : defaultModel.mmprojUrl
         let context = Int(contextLength)
         let maxOutput = Int(maxTokens).flatMap { $0 > 0 ? $0 : nil }
         let id = useCustom ? "custom:\(url)" : "default"
-        return InferenceModelTarget(id: id, url: url, mmprojUrl: mmproj, contextLength: context, maxTokens: maxOutput)
+        return LlmModelTarget(id: id, url: url, mmprojUrl: mmproj, contextLength: context, maxTokens: maxOutput)
     }
 
     static var defaultModelName: String { platformDefaultModel.title }
@@ -132,12 +132,12 @@ final class ModelSettingsStore: ObservableObject {
         return trimmed.isEmpty ? platformSystemPromptBody : trimmed
     }
 
-    private static var platformDefaultModel: EnsuRustModelPreset {
-        EnsuRustDefaults.shared.mobileDefaultModel
+    private static var platformDefaultModel: ConfigModelPreset {
+        ConfigDefaults.shared.mobileDefaultModel
     }
 
     private static var platformSystemPromptBody: String {
-        EnsuRustDefaults.shared.mobileSystemPromptBody
+        ConfigDefaults.shared.mobileSystemPromptBody
     }
 
     private func persist() {

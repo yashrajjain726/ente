@@ -43,7 +43,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 
-class RustLlmProvider(
+class LlmProvider(
     context: Context,
     private val modelDir: File,
     private val transcriber: Transcriber,
@@ -168,7 +168,7 @@ class RustLlmProvider(
                     context.prewarmMultimodal(mmprojPath, null)
                 }
             }.onFailure { error ->
-                Log.d("RustLlmProvider", "Image inference prewarm skipped", error)
+                Log.d("LlmProvider", "Image inference prewarm skipped", error)
             }
         }
     }
@@ -351,7 +351,7 @@ class RustLlmProvider(
         runCatching {
             transcriber.unloadModel()
         }.onFailure { error ->
-            Log.d("RustLlmProvider", "Transcription model unload skipped", error)
+            Log.d("LlmProvider", "Transcription model unload skipped", error)
         }
     }
 
@@ -433,7 +433,7 @@ class RustLlmProvider(
             if (externalDownloadsRoot == null || downloadManager == null) {
                 throw error
             }
-            Log.w("RustLlmProvider", "Rust model download failed; falling back to DownloadManager", error)
+            Log.w("LlmProvider", "Rust model download failed; falling back to DownloadManager", error)
             awaitBackgroundDownload(target, onProgress)
         }
     }
@@ -524,7 +524,7 @@ class RustLlmProvider(
     private fun logDownloadMetrics(progress: LlmModelDownloadProgress) {
         if (progress.fileComplete) {
             Log.i(
-                "RustLlmProvider",
+                "LlmProvider",
                 "Model download file complete label=${progress.label} " +
                     "bytes=${progress.fileDownloadedBytes} " +
                     "elapsedMs=${progress.fileElapsedMs} " +
@@ -534,7 +534,7 @@ class RustLlmProvider(
         }
         if (progress.complete) {
             Log.i(
-                "RustLlmProvider",
+                "LlmProvider",
                 "Model download complete bytes=${progress.downloadedBytes} " +
                     "elapsedMs=${progress.elapsedMs} " +
                     "rate=${formatRate(progress.bytesPerSecond)} " +
@@ -743,7 +743,7 @@ class RustLlmProvider(
                         oldTarget.destination.delete()
                     }.onFailure { error ->
                         Log.w(
-                            "RustLlmProvider",
+                            "LlmProvider",
                             "Legacy migration failed for ${oldTarget.destination.absolutePath}",
                             error
                         )

@@ -2,9 +2,9 @@ package io.ente.ensu.llm
 
 import io.ente.ensu.device.isChatSupported
 import io.ente.ensu.llm.LlmModelTarget
-import io.ente.ensu.llm.RustLlmProvider
+import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.logging.FileLogRepository
-import io.ente.ensu.config.ConfigDefaults
+import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.settings.SessionPreferencesDataStore
 import io.ente.ensu.AppState
@@ -20,7 +20,7 @@ import kotlinx.coroutines.isActive
 internal class ModelSettingsActions(
     private val state: MutableStateFlow<AppState>,
     private val sessionPreferences: SessionPreferencesDataStore,
-    private val llmProvider: RustLlmProvider,
+    private val llmProvider: LlmProvider,
     private val logRepository: FileLogRepository,
     private val configDefaults: ConfigDefaults
 ) {
