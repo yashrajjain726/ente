@@ -37,11 +37,11 @@ Future<void> _pairWithCode(
   await gw.publishCastPayload(code, castData, collection.id, castToken);
 }
 
-Future<bool> showPairWithCodeSheet(
+Future<bool?> showPairWithCodeSheet(
   BuildContext context,
   Collection collection,
 ) async {
-  return await showBottomSheetComponent(
+  return await showBottomSheetComponent<bool>(
     context: context,
     builder: (_) => _PairWithCodeSheet(collection: collection),
   );
