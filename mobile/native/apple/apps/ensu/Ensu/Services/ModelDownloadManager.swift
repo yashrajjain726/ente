@@ -38,9 +38,7 @@ final class ModelDownloadManager: NSObject {
     private lazy var session: URLSession = {
         let configuration: URLSessionConfiguration
         configuration = URLSessionConfiguration.background(withIdentifier: "io.ente.ensu.model-downloads")
-        #if os(iOS)
         configuration.sessionSendsLaunchEvents = true
-        #endif
         configuration.isDiscretionary = false
         configuration.waitsForConnectivity = true
         return URLSession(configuration: configuration, delegate: self, delegateQueue: delegateQueue)

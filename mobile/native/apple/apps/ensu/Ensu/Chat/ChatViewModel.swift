@@ -74,7 +74,7 @@ final class ChatViewModel: ObservableObject {
     @Published var attachmentDownloads: [AttachmentDownloadItem] = []
     @Published var currentSessionMissingAttachments: [AttachmentDownloadItem] = []
     @Published var generationErrorMessage: String?
-    @Published var voiceInputState: VoiceInputState = .initial
+    @Published var voiceInputState: VoiceInputState = .idle
     @Published var draftCursorMoveToken = UUID()
 
     private let provider: InferenceRsProvider
@@ -426,9 +426,7 @@ final class ChatViewModel: ObservableObject {
         voiceTransientErrorTask?.cancel()
         voiceTransientErrorTask = nil
         voiceTranscriber.cancel()
-        if voiceInputState != .unsupported {
-            voiceInputState = .idle
-        }
+        voiceInputState = .idle
     }
 
     private func setVoiceInputState(_ state: VoiceInputState) {

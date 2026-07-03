@@ -133,23 +133,11 @@ final class ModelSettingsStore: ObservableObject {
     }
 
     private static var platformDefaultModel: EnsuRustModelPreset {
-        #if os(iOS)
         EnsuRustDefaults.shared.mobileDefaultModel
-        #else
-        if ProcessInfo.processInfo.physicalMemory >= highRAMThresholdBytes {
-            return EnsuRustDefaults.shared.desktopDefaultModel
-        } else {
-            return EnsuRustDefaults.shared.mobileDefaultModel
-        }
-        #endif
     }
 
     private static var platformSystemPromptBody: String {
-        #if os(iOS)
         EnsuRustDefaults.shared.mobileSystemPromptBody
-        #else
-        EnsuRustDefaults.shared.desktopSystemPromptBody
-        #endif
     }
 
     private func persist() {
