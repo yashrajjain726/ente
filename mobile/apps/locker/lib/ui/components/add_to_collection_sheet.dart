@@ -59,6 +59,8 @@ class _AddToCollectionSheetState extends State<AddToCollectionSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final maxCollectionListHeight = MediaQuery.sizeOf(context).height * 0.6;
+
     return BottomSheetComponent(
       title: context.l10n.addToCollection,
       content: CollectionSelectionWidget(
@@ -66,6 +68,7 @@ class _AddToCollectionSheetState extends State<AddToCollectionSheet> {
         selectedCollectionIds: _selectedCollectionIds,
         onToggleCollection: _toggleCollection,
         onCollectionsUpdated: _onCollectionsUpdated,
+        maxHeight: maxCollectionListHeight,
         title: context.l10n.collections,
       ),
       actions: [
