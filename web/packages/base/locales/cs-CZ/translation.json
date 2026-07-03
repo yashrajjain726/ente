@@ -407,7 +407,6 @@
     "failed_uploads_hint": "Po dokončení nahrávání bude k dispozici možnost tyto soubory zkusit nahrát znovu",
     "retry_failed_uploads": "Opakujte neúspěšné nahrávání",
     "thumbnail_generation_failed": "Vytvoření miniatury se nezdařilo",
-    "canvas_blocked_upload_description": "Nastavení prohlížeče blokuje přístup k plátnu. Opravte to před nahráním aby náhledy byly generovány správně.",
     "thumbnail_generation_failed_hint": "Tyto soubory byly nahrány, ale bohužel jsme pro ně nemohli vygenerovat miniatury.",
     "learn_how": "Jak na to",
     "unsupported_files": "Nepodporované soubory",
