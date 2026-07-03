@@ -1,5 +1,4 @@
 import 'package:ente_components/ente_components.dart';
-import "package:ente_ui/utils/dialog_util.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -10,6 +9,7 @@ import "package:locker/services/configuration.dart";
 import "package:locker/ui/components/selection_action_button_widget.dart";
 import "package:locker/ui/sharing/share_collection_bottom_sheet.dart";
 import "package:locker/utils/collection_actions.dart";
+import "package:locker/utils/error_sheet.dart";
 import "package:logging/logging.dart";
 
 class CollectionSelectionOverlayBar extends StatefulWidget {
@@ -305,7 +305,7 @@ class _CollectionSelectionOverlayBarState
       await CollectionActions.editCollection(context, collection);
     } catch (e, s) {
       _logger.severe(e, s);
-      await showGenericErrorBottomSheet(context: context, error: e);
+      await showLockerErrorSheet(context, e);
     }
     widget.selectedCollections.clearAll();
   }
@@ -321,7 +321,7 @@ class _CollectionSelectionOverlayBarState
       await CollectionActions.deleteCollection(context, collection);
     } catch (e, s) {
       _logger.severe(e, s);
-      await showGenericErrorBottomSheet(context: context, error: e);
+      await showLockerErrorSheet(context, e);
     }
     widget.selectedCollections.clearAll();
   }
@@ -340,7 +340,7 @@ class _CollectionSelectionOverlayBarState
       );
     } catch (e, s) {
       _logger.severe(e, s);
-      await showGenericErrorBottomSheet(context: context, error: e);
+      await showLockerErrorSheet(context, e);
     }
     widget.selectedCollections.clearAll();
   }
@@ -362,7 +362,7 @@ class _CollectionSelectionOverlayBarState
       await showShareCollectionSheet(context, collection: collection);
     } catch (e, s) {
       _logger.severe(e, s);
-      await showGenericErrorBottomSheet(context: context, error: e);
+      await showLockerErrorSheet(context, e);
     }
     widget.selectedCollections.clearAll();
   }
@@ -381,7 +381,7 @@ class _CollectionSelectionOverlayBarState
       }
     } catch (e, s) {
       _logger.severe(e, s);
-      await showGenericErrorBottomSheet(context: context, error: e);
+      await showLockerErrorSheet(context, e);
     }
     widget.selectedCollections.clearAll();
   }
