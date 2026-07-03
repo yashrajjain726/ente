@@ -45,11 +45,12 @@ The workflow also opens a PR to move `main` to `0.1.17-beta`. Merge that PR afte
 
 ## Update the RC if needed
 
-Cherry pick fixes to the release branch and push to replace the current RC.
+Cherry pick fixes to the release branch and push to replace the current RC. For release branches the build number does not auto increment and needs to be manually incremented.
 
 ```sh
 git switch release/ensu-v0.1.16
 git cherry-pick <fix-sha>
+node .github/scripts/app-version.mjs ensu bump-build-and-commit
 git push
 ```
 
@@ -80,6 +81,6 @@ It also opens a PR for updating the changelog in the docs.
 
 > [!NOTE]
 >
-> If a build has already reached Play Store or TestFlight, trigger a new workflow run instead of re-running failed jobs so that it gets a new build number.
+> Individual failed jobs can be re-run idempotently (e.g. if only the Android job failed, it can be re-run in place). Retrying the build as a whole is also fine, except when it has already reached Play Store or TestFlight, in which case it needs a fresh build number: for nightlies trigger a new workflow run, for RCs push a `bump-build-and-commit`.
 
 `app-release.yml` changes release state. If it fails, inspect the failed step before re-running. After it has pushed a branch, created a tag, or moved a draft release, either finish the remaining step manually or undo the partial state first. Cleanup is intentionally late: `action=start` pushes the release branch before deleting the beta pre-release from `ente/nightly`, and `action=promote` deletes the release branch last.
