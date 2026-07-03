@@ -64,7 +64,7 @@ class SaveBottomSheet extends StatelessWidget {
                       backgroundColor: colors.primaryLight,
                       icon: HugeIcon(
                         icon: HugeIcons.strokeRoundedFileUpload,
-                        size: 24,
+                        size: 20,
                         color: colors.primary,
                       ),
                     ),
@@ -79,7 +79,7 @@ class SaveBottomSheet extends StatelessWidget {
                     icon: InfoItemUtils.getInfoIcon(
                       context,
                       InfoType.note,
-                      size: 24,
+                      size: 20,
                     ),
                     title: context.l10n.personalNote,
                     description: context.l10n.personalNoteDescription,
@@ -92,7 +92,7 @@ class SaveBottomSheet extends StatelessWidget {
                     icon: InfoItemUtils.getInfoIcon(
                       context,
                       InfoType.physicalRecord,
-                      size: 24,
+                      size: 20,
                     ),
                     title: context.l10n.physicalRecords,
                     description: context.l10n.physicalRecordsDescription,
@@ -105,7 +105,7 @@ class SaveBottomSheet extends StatelessWidget {
                     icon: InfoItemUtils.getInfoIcon(
                       context,
                       InfoType.accountCredential,
-                      size: 24,
+                      size: 20,
                     ),
                     title: context.l10n.accountCredentials,
                     description: context.l10n.accountCredentialsDescription,
@@ -129,7 +129,12 @@ class SaveBottomSheet extends StatelessWidget {
     required SaveOptionType type,
   }) {
     final colors = sheetContext.componentColors;
-    return GestureDetector(
+    return MenuComponent(
+      title: title,
+      subtitle: description,
+      subtitleMaxLines: 2,
+      leading: icon,
+      trailing: Icon(Icons.chevron_right, color: colors.textBase),
       onTap: () {
         Navigator.of(sheetContext).pop();
         // Push the form route after the sheet has dismissed to avoid UI jank.
@@ -137,33 +142,6 @@ class SaveBottomSheet extends StatelessWidget {
           _handleSaveOption(rootContext, type);
         });
       },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: colors.fillLight,
-        ),
-        child: Row(
-          children: [
-            icon,
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyles.bodyBold),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: TextStyles.body.copyWith(color: colors.textLight),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, color: colors.textBase),
-          ],
-        ),
-      ),
     );
   }
 
