@@ -217,11 +217,7 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
       ),
       child: Row(
         children: [
-          SizedBox(
-            height: 40,
-            width: 40,
-            child: _buildFileIcon(fileName),
-          ),
+          SizedBox(height: 40, width: 40, child: _buildFileIcon(fileName)),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
