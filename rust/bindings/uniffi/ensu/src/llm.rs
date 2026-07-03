@@ -317,7 +317,7 @@ pub fn llm_download_model_files(
         move |progress| progress_callback.on_progress(progress.into()),
         move || cancel_callback.is_cancelled(),
     )
-    .map_err(LlmError::from)
+    .map_err(|err| LlmError::Message(err.to_string()))
 }
 
 #[uniffi::export]

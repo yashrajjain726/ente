@@ -244,7 +244,7 @@ pub async fn llm_download_model_files(
             },
             move || cancel_requested.load(Ordering::SeqCst),
         )
-        .map_err(llm_error)
+        .map_err(|err| llm_error(err.to_string()))
     })
     .await
     .map_err(|_| fs_thread_error())?

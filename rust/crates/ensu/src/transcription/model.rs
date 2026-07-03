@@ -91,7 +91,7 @@ pub(crate) fn download_model(
         });
     }
 
-    if let Err(message) = download::fetch(
+    if let Err(err) = download::fetch(
         targets,
         validate_download,
         |progress| {
@@ -103,6 +103,7 @@ pub(crate) fn download_model(
         },
         || false,
     ) {
+        let message = err.to_string();
         on_event(ModelEvent::DownloadError {
             message: message.clone(),
         });

@@ -10,7 +10,7 @@ pub fn download_model_files(
     targets: Vec<Target>,
     on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
-) -> Result<(), String> {
+) -> Result<(), download::Error> {
     download::fetch(targets, validate_gguf, on_progress, is_cancelled)
 }
 
