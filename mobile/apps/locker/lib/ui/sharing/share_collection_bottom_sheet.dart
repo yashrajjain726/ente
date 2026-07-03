@@ -15,7 +15,6 @@ import "package:locker/services/collections/collections_service.dart";
 import "package:locker/services/collections/models/collection.dart";
 import "package:locker/services/configuration.dart";
 import "package:locker/ui/components/custom_list_scrollbar.dart";
-import "package:locker/ui/components/popup_menu_item_widget.dart";
 import "package:locker/ui/sharing/add_email_bottom_sheet.dart";
 import "package:locker/ui/sharing/manage_links_widget.dart";
 import "package:locker/utils/collection_actions.dart";
@@ -256,7 +255,19 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
 
   Widget _buildRolePopupMenu(User user) {
     final colors = context.componentColors;
-    return PopupMenuButton<String>(
+    return EntePopupMenuButton<String>(
+      optionsBuilder: () => [
+        EntePopupMenuOption(
+          value: "remove",
+          label: context.l10n.removeAccess,
+          labelColor: colors.warning,
+          leadingWidget: HugeIcon(
+            icon: HugeIcons.strokeRoundedDelete02,
+            color: colors.warning,
+            size: IconSizes.small,
+          ),
+        ),
+      ],
       onSelected: (value) {
         if (value == "viewer") {
           _setUserRole(user, CollectionParticipantRole.viewer);
@@ -266,72 +277,10 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
           _removeSharee(user);
         }
       },
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colors.strokeFaint),
-      ),
-      padding: EdgeInsets.zero,
-      menuPadding: EdgeInsets.zero,
-      color: colors.fillLight,
-      surfaceTintColor: Colors.transparent,
-      elevation: 15,
-      shadowColor: Colors.black.withValues(alpha: 0.08),
-      constraints: const BoxConstraints(minWidth: 120),
-      position: PopupMenuPosition.under,
       child: HugeIcon(
         icon: HugeIcons.strokeRoundedMoreVertical,
         color: colors.textBase,
       ),
-      itemBuilder: (context) => [
-        // TODO: Re-enable viewer option when ready
-        // PopupMenuItem<String>(
-        //   value: "viewer",
-        //   height: 0,
-        //   padding: EdgeInsets.zero,
-        //   child: PopupMenuItemWidget(
-        //     icon: HugeIcon(
-        //       icon: HugeIcons.strokeRoundedView,
-        //       color: colorScheme.textBase,
-        //       size: 20,
-        //     ),
-        //     label: context.l10n.viewer,
-        //     isFirst: true,
-        //     isLast: false,
-        //   ),
-        // ),
-        // TODO: Re-enable collaborator option when ready
-        // PopupMenuItem<String>(
-        //   value: "collaborator",
-        //   height: 0,
-        //   padding: EdgeInsets.zero,
-        //   child: PopupMenuItemWidget(
-        //     icon: HugeIcon(
-        //       icon: HugeIcons.strokeRoundedUserMultiple,
-        //       color: colorScheme.textBase,
-        //       size: 20,
-        //     ),
-        //     label: context.l10n.collaborator,
-        //     isFirst: false,
-        //     isLast: false,
-        //   ),
-        // ),
-        PopupMenuItem<String>(
-          value: "remove",
-          height: 0,
-          padding: EdgeInsets.zero,
-          child: PopupMenuItemWidget(
-            icon: HugeIcon(
-              icon: HugeIcons.strokeRoundedDelete02,
-              color: colors.warning,
-              size: 20,
-            ),
-            label: context.l10n.removeAccess,
-            isFirst: true,
-            isLast: true,
-            isWarning: true,
-          ),
-        ),
-      ],
     );
   }
 
