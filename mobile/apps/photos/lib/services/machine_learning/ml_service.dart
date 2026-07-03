@@ -14,6 +14,7 @@ import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/compute_control_event.dart";
 import "package:photos/events/people_changed_event.dart";
 import "package:photos/main.dart";
+import "package:photos/models/file/file_type.dart";
 import "package:photos/models/ml/clip.dart";
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/ml_versions.dart";
@@ -749,13 +750,16 @@ class MLService {
     bool actuallyRanML = false;
 
     final mlDataDB = _dbForMode(instruction.mode);
-    MLImageSource? source;
+    String? pathToDeleteAfterMLProcessing;
     try {
-      source = await getImagePathForML(instruction.file);
+      final String filePath = await getImagePathForML(instruction.file);
+      if (_shouldDeleteAfterMLProcessing(instruction)) {
+        pathToDeleteAfterMLProcessing = filePath;
+      }
 
       final MLResult? result = await MLIndexingIsolate.instance.analyzeImage(
         instruction,
-        source.imagePath,
+        filePath,
       );
       // Check if there's no result simply because MLController paused indexing
       if (result == null) {
@@ -964,20 +968,28 @@ class MLService {
       }
       return false;
     } finally {
-      if (source != null && source.shouldDeleteAfterMLProcessing) {
+      if (pathToDeleteAfterMLProcessing != null) {
         try {
-          await File(source.imagePath).delete();
+          await File(pathToDeleteAfterMLProcessing).delete();
         } on PathNotFoundException {
           // Already deleted.
         } catch (e, s) {
           _logger.warning(
-            "Failed to delete origin file exported for ML at ${source.imagePath}",
+            "Failed to delete origin file exported for ML at $pathToDeleteAfterMLProcessing",
             e,
             s,
           );
         }
       }
     }
+  }
+
+  bool _shouldDeleteAfterMLProcessing(FileMLInstruction instruction) {
+    final file = instruction.file;
+    return Platform.isIOS &&
+        file.fileType != FileType.video &&
+        !file.isRemoteFile &&
+        !file.isSharedMediaToAppSandbox;
   }
 
   bool _canRunMLFunction({required String function}) {
