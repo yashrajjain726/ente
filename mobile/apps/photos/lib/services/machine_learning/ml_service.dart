@@ -1,6 +1,6 @@
 import "dart:async";
 import "dart:convert" show jsonEncode;
-import "dart:io" show File, PathNotFoundException, Platform;
+import "dart:io" show File, Platform;
 import "dart:math" show min;
 import "dart:typed_data" show Uint8List;
 
@@ -972,8 +972,6 @@ class MLService {
       if (pathToDeleteAfterMLProcessing != null) {
         try {
           await File(pathToDeleteAfterMLProcessing).delete();
-        } on PathNotFoundException {
-          // Already deleted.
         } catch (e, s) {
           _logger.warning(
             "Failed to delete origin file exported for ML at $pathToDeleteAfterMLProcessing",
