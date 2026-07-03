@@ -1,4 +1,5 @@
 import "dart:async";
+import "dart:math";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
@@ -47,125 +48,133 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = getEnteTextTheme(context);
-    final colorScheme = getEnteColorScheme(context);
     final lightComponentTheme = ComponentTheme.lightTheme(
       app: ComponentApp.photos,
     );
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: colorScheme.greenBase,
-        systemOverlayStyle: SystemUiOverlayStyle(
-          statusBarColor: colorScheme.greenBase,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
-        ),
-        leading: const SizedBox(),
-      ),
-      backgroundColor: colorScheme.greenBase,
-      body: SafeArea(
-        child: DeveloperSettingsTapArea(
-          onSettingsChanged: () {
-            setState(() {});
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: constraints.maxHeight,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (kDebugMode) _buildDebugLanguageButton(),
+    return Theme(
+      data: lightComponentTheme,
+      child: Builder(
+        builder: (context) {
+          final textTheme = getEnteTextTheme(context);
+          final colorScheme = getEnteColorScheme(context);
+          return Scaffold(
+            appBar: AppBar(
+              backgroundColor: colorScheme.greenBase,
+              systemOverlayStyle: SystemUiOverlayStyle(
+                statusBarColor: colorScheme.greenBase,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
+              ),
+              leading: const SizedBox(),
+            ),
+            backgroundColor: colorScheme.greenBase,
+            body: SafeArea(
+              child: DeveloperSettingsTapArea(
+                onSettingsChanged: () {
+                  setState(() {});
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SingleChildScrollView(
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minHeight: constraints.maxHeight,
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (kDebugMode) _buildDebugLanguageButton(),
 
-                              _buildOnboardingAnimation(),
+                                    _buildOnboardingAnimation(),
 
-                              Text(
-                                AppLocalizations.of(context).onboardingTitle,
-                                textAlign: TextAlign.center,
-                                textScaler: TextScaler.noScaling,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontFamily: TextStyles.outfitFontFamily,
-                                  package: TextStyles.fontPackage,
-                                  fontSize:
-                                      MediaQuery.of(context).size.width * 0.09,
-                                  height: 1,
-                                  color: Colors.white,
+                                    Text(
+                                      AppLocalizations.of(
+                                        context,
+                                      ).onboardingTitle,
+                                      textAlign: TextAlign.center,
+                                      textScaler: TextScaler.noScaling,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontFamily: TextStyles.outfitFontFamily,
+                                        package: TextStyles.fontPackage,
+                                        fontSize: min(
+                                          MediaQuery.of(context).size.width *
+                                              0.09,
+                                          48,
+                                        ),
+                                        height: 1,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 16),
+
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 32,
+                                      ),
+                                      child: Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        ).onboardingDesc,
+                                        textAlign: TextAlign.center,
+                                        style: textTheme.body.copyWith(
+                                          color: colorScheme.greenLight,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 32),
+                                  ],
                                 ),
                               ),
-
-                              const SizedBox(height: 16),
-
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 32,
-                                ),
-                                child: Text(
-                                  AppLocalizations.of(context).onboardingDesc,
-                                  textAlign: TextAlign.center,
-                                  style: textTheme.body.copyWith(
-                                    color: colorScheme.greenLight,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 32),
-                            ],
+                            );
+                          },
+                        ),
+                      ),
+                      ButtonComponent(
+                        variant: ButtonComponentVariant.neutral,
+                        label: AppLocalizations.of(context).createAnEnteAccount,
+                        onTap: _navigateToSignUpPage,
+                        shouldSurfaceExecutionStates: false,
+                      ),
+                      if (localSettings.showLocalGalleryModeOption) ...[
+                        const SizedBox(height: 12),
+                        ButtonComponent(
+                          variant: ButtonComponentVariant.secondary,
+                          label: AppLocalizations.of(
+                            context,
+                          ).continueWithoutAccount,
+                          onTap: _navigateWithoutAccount,
+                          shouldSurfaceExecutionStates: false,
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: _navigateToSignInPage,
+                        child: Text(
+                          AppLocalizations.of(context).loginToExistingAccount,
+                          style: textTheme.body.copyWith(
+                            decoration: TextDecoration.underline,
+                            decorationColor: Colors.white,
+                            color: Colors.white,
                           ),
                         ),
-                      );
-                    },
+                      ),
+                      const DeveloperSettingsWidget(),
+                    ],
                   ),
                 ),
-                Theme(
-                  data: lightComponentTheme,
-                  child: ButtonComponent(
-                    variant: ButtonComponentVariant.neutral,
-                    label: AppLocalizations.of(context).createAnEnteAccount,
-                    onTap: _navigateToSignUpPage,
-                    shouldSurfaceExecutionStates: false,
-                  ),
-                ),
-                if (localSettings.showLocalGalleryModeOption) ...[
-                  const SizedBox(height: 12),
-                  Theme(
-                    data: lightComponentTheme,
-                    child: ButtonComponent(
-                      variant: ButtonComponentVariant.secondary,
-                      label: AppLocalizations.of(
-                        context,
-                      ).continueWithoutAccount,
-                      onTap: _navigateWithoutAccount,
-                      shouldSurfaceExecutionStates: false,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: _navigateToSignInPage,
-                  child: Text(
-                    AppLocalizations.of(context).loginToExistingAccount,
-                    style: textTheme.body.copyWith(
-                      decoration: TextDecoration.underline,
-                      decorationColor: Colors.white,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                if (kDebugMode) const DeveloperSettingsWidget(),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

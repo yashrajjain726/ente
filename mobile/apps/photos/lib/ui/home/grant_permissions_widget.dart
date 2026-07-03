@@ -1,4 +1,5 @@
 import "dart:async";
+import "dart:math";
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
@@ -365,7 +366,10 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
                             fontWeight: .w900,
                             fontFamily: TextStyles.outfitFontFamily,
                             package: TextStyles.fontPackage,
-                            fontSize: MediaQuery.of(context).size.width * 0.125,
+                            fontSize: min(
+                              MediaQuery.of(context).size.width * 0.125,
+                              32,
+                            ),
                             height: 1,
                             color: colorScheme.textBase,
                           ),
