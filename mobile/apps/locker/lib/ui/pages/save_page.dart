@@ -1,9 +1,6 @@
 import 'dart:async';
 
 import "package:ente_components/ente_components.dart";
-import "package:ente_ui/theme/colors.dart";
-import 'package:ente_ui/theme/ente_theme.dart';
-import "package:ente_ui/theme/text_style.dart";
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:locker/l10n/l10n.dart';
@@ -11,6 +8,7 @@ import 'package:locker/models/info/info_item.dart';
 import 'package:locker/ui/pages/account_credentials_page.dart';
 import 'package:locker/ui/pages/personal_note_page.dart';
 import 'package:locker/ui/pages/physical_records_page.dart';
+import 'package:locker/utils/file_icon_utils.dart';
 import 'package:locker/utils/info_item_utils.dart';
 
 enum SaveOptionType { document, note, physicalRecord, credentials }
@@ -40,8 +38,7 @@ class SaveBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     final maxHeight = MediaQuery.of(context).size.height * 0.75;
 
     return BottomSheetComponent(
@@ -52,7 +49,7 @@ class SaveBottomSheet extends StatelessWidget {
         children: [
           Text(
             context.l10n.informationDescription,
-            style: textTheme.smallMuted,
+            style: TextStyles.body.copyWith(color: colors.textLight),
           ),
           const SizedBox(height: 24),
           ConstrainedBox(
@@ -63,61 +60,56 @@ class SaveBottomSheet extends StatelessWidget {
                   _buildSaveOption(
                     context,
                     rootContext: rootContext,
-                    icon: HugeIcon(
-                      icon: HugeIcons.strokeRoundedFileUpload,
-                      size: 24,
-                      color: colorScheme.primary700,
+                    icon: IconTile(
+                      backgroundColor: colors.primaryLight,
+                      icon: HugeIcon(
+                        icon: HugeIcons.strokeRoundedFileUpload,
+                        size: 24,
+                        color: colors.primary,
+                      ),
                     ),
                     title: context.l10n.saveDocumentTitle,
                     description: context.l10n.saveDocumentDescription,
                     type: SaveOptionType.document,
-                    colorScheme: colorScheme,
-                    textTheme: textTheme,
                   ),
                   const SizedBox(height: 16),
                   _buildSaveOption(
                     context,
                     rootContext: rootContext,
                     icon: InfoItemUtils.getInfoIcon(
+                      context,
                       InfoType.note,
-                      showBackground: false,
                       size: 24,
                     ),
                     title: context.l10n.personalNote,
                     description: context.l10n.personalNoteDescription,
                     type: SaveOptionType.note,
-                    colorScheme: colorScheme,
-                    textTheme: textTheme,
                   ),
                   const SizedBox(height: 16),
                   _buildSaveOption(
                     context,
                     rootContext: rootContext,
                     icon: InfoItemUtils.getInfoIcon(
+                      context,
                       InfoType.physicalRecord,
-                      showBackground: false,
                       size: 24,
                     ),
                     title: context.l10n.physicalRecords,
                     description: context.l10n.physicalRecordsDescription,
                     type: SaveOptionType.physicalRecord,
-                    colorScheme: colorScheme,
-                    textTheme: textTheme,
                   ),
                   const SizedBox(height: 16),
                   _buildSaveOption(
                     context,
                     rootContext: rootContext,
                     icon: InfoItemUtils.getInfoIcon(
+                      context,
                       InfoType.accountCredential,
-                      showBackground: false,
                       size: 24,
                     ),
                     title: context.l10n.accountCredentials,
                     description: context.l10n.accountCredentialsDescription,
                     type: SaveOptionType.credentials,
-                    colorScheme: colorScheme,
-                    textTheme: textTheme,
                   ),
                 ],
               ),
@@ -135,9 +127,8 @@ class SaveBottomSheet extends StatelessWidget {
     required String title,
     required String description,
     required SaveOptionType type,
-    required EnteColorScheme colorScheme,
-    required EnteTextTheme textTheme,
   }) {
+    final colors = sheetContext.componentColors;
     return GestureDetector(
       onTap: () {
         Navigator.of(sheetContext).pop();
@@ -150,7 +141,7 @@ class SaveBottomSheet extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: colorScheme.backdropBase,
+          color: colors.fillLight,
         ),
         child: Row(
           children: [
@@ -160,13 +151,16 @@ class SaveBottomSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: textTheme.bodyBold),
+                  Text(title, style: TextStyles.bodyBold),
                   const SizedBox(height: 4),
-                  Text(description, style: textTheme.smallMuted),
+                  Text(
+                    description,
+                    style: TextStyles.body.copyWith(color: colors.textLight),
+                  ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: colorScheme.textBase),
+            Icon(Icons.chevron_right, color: colors.textBase),
           ],
         ),
       ),

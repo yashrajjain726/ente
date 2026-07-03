@@ -45,6 +45,7 @@ class TextInputComponent extends StatefulWidget {
     this.keyboardType,
     this.enableFillColor = true,
     this.autocorrect = true,
+    this.enableSuggestions = true,
     this.isRequired = false,
     this.prefix,
     this.suffix,
@@ -89,6 +90,7 @@ class TextInputComponent extends StatefulWidget {
   final TextInputType? keyboardType;
   final bool enableFillColor;
   final bool autocorrect;
+  final bool enableSuggestions;
   final bool isRequired;
 
   /// Caller-owned leading widget. Pass explicit color and size when needed.
@@ -306,7 +308,9 @@ class _TextInputComponentState extends State<TextInputComponent> {
                                     : const []),
                             autocorrect:
                                 widget.autocorrect && !widget.isPasswordInput,
-                            enableSuggestions: !widget.isPasswordInput,
+                            enableSuggestions:
+                                widget.enableSuggestions &&
+                                !widget.isPasswordInput,
                             textAlignVertical: _isMultiline
                                 ? TextAlignVertical.top
                                 : TextAlignVertical.center,

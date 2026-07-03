@@ -6,9 +6,6 @@ import "package:ente_ui/components/alert_bottom_sheet.dart";
 import "package:ente_ui/components/captioned_text_widget_v2.dart";
 import "package:ente_ui/components/divider_widget.dart";
 import "package:ente_ui/components/menu_item_widget_v2.dart";
-import "package:ente_ui/theme/colors.dart";
-import "package:ente_ui/theme/ente_theme.dart";
-import "package:ente_ui/theme/text_style.dart";
 import "package:ente_utils/share_utils.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
@@ -18,7 +15,6 @@ import "package:locker/services/collections/collections_service.dart";
 import "package:locker/services/collections/models/collection.dart";
 import "package:locker/services/configuration.dart";
 import "package:locker/ui/components/custom_list_scrollbar.dart";
-import "package:locker/ui/components/popup_menu_item_widget.dart";
 import "package:locker/ui/sharing/add_email_bottom_sheet.dart";
 import "package:locker/ui/sharing/manage_links_widget.dart";
 import "package:locker/utils/collection_actions.dart";
@@ -67,8 +63,7 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     final shouldShowSharedWithLabel = !_isOwner || _sharees.isNotEmpty;
 
     return BottomSheetComponent(
@@ -77,18 +72,15 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_isOwner) ...[
-            _buildOwnerActions(colorScheme, textTheme),
-            const SizedBox(height: 20),
-          ],
+          if (_isOwner) ...[_buildOwnerActions(), const SizedBox(height: 20)],
           if (shouldShowSharedWithLabel) ...[
             Text(
               context.l10n.sharedWith,
-              style: textTheme.small.copyWith(color: colorScheme.textMuted),
+              style: TextStyles.body.copyWith(color: colors.textLight),
             ),
             const SizedBox(height: 8),
           ],
-          _buildShareesList(colorScheme, textTheme),
+          _buildShareesList(),
         ],
       ),
     );
@@ -96,10 +88,8 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
 
   bool get _hasPublicLink => widget.collection.publicURLs.isNotEmpty;
 
-  Widget _buildShareesList(
-    EnteColorScheme colorScheme,
-    EnteTextTheme textTheme,
-  ) {
+  Widget _buildShareesList() {
+    final colors = context.componentColors;
     final currentUserId = Configuration.instance.getUserID() ?? -1;
 
     final List<User> allUsers = [];
@@ -145,7 +135,7 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
                       if (!isFirst)
                         DividerWidget(
                           dividerType: DividerType.menu,
-                          bgColor: colorScheme.fillFaint,
+                          bgColor: colors.fillLight,
                         ),
                       MenuItemWidgetV2(
                         captionedTextWidget: CaptionedTextWidgetV2(
@@ -158,10 +148,10 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
                           config: Configuration.instance,
                           type: AvatarType.mini,
                         ),
-                        menuItemColor: colorScheme.fillFaint,
+                        menuItemColor: colors.fillLight,
                         trailingWidget: _isOwner
-                            ? _buildRolePopupMenu(user, colorScheme)
-                            : _buildRoleIcon(role, colorScheme),
+                            ? _buildRolePopupMenu(user)
+                            : _buildRoleIcon(role),
                         surfaceExecutionStates: false,
                         isTopBorderRadiusRemoved: !isFirst,
                         isBottomBorderRadiusRemoved: !isLast,
@@ -180,17 +170,13 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
             itemCount: allUsers.length,
             visibleItems: 4,
             containerHeight: maxVisibleHeight,
-            colorScheme: colorScheme,
           ),
         ],
       ],
     );
   }
 
-  Widget _buildOwnerActions(
-    EnteColorScheme colorScheme,
-    EnteTextTheme textTheme,
-  ) {
+  Widget _buildOwnerActions() {
     return Row(
       children: [
         _ShareActionOption(
@@ -247,7 +233,8 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
     }
   }
 
-  Widget _buildRoleIcon(CollectionParticipantRole role, colorScheme) {
+  Widget _buildRoleIcon(CollectionParticipantRole role) {
+    final colors = context.componentColors;
     final icon = switch (role) {
       CollectionParticipantRole.owner => HugeIcons.strokeRoundedCrown03,
       CollectionParticipantRole.collaborator =>
@@ -258,16 +245,29 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
 
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.backdropBase,
+        color: colors.fillLight,
         borderRadius: BorderRadius.circular(10),
       ),
       padding: const EdgeInsets.all(8),
-      child: HugeIcon(icon: icon, color: colorScheme.textMuted, size: 20),
+      child: HugeIcon(icon: icon, color: colors.textLight, size: 20),
     );
   }
 
-  Widget _buildRolePopupMenu(User user, colorScheme) {
-    return PopupMenuButton<String>(
+  Widget _buildRolePopupMenu(User user) {
+    final colors = context.componentColors;
+    return EntePopupMenuButton<String>(
+      optionsBuilder: () => [
+        EntePopupMenuOption(
+          value: "remove",
+          label: context.l10n.removeAccess,
+          labelColor: colors.warning,
+          leadingWidget: HugeIcon(
+            icon: HugeIcons.strokeRoundedDelete02,
+            color: colors.warning,
+            size: IconSizes.small,
+          ),
+        ),
+      ],
       onSelected: (value) {
         if (value == "viewer") {
           _setUserRole(user, CollectionParticipantRole.viewer);
@@ -277,72 +277,10 @@ class _ShareCollectionSheetState extends State<ShareCollectionSheet> {
           _removeSharee(user);
         }
       },
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.strokeFaint),
-      ),
-      padding: EdgeInsets.zero,
-      menuPadding: EdgeInsets.zero,
-      color: colorScheme.backdropBase,
-      surfaceTintColor: Colors.transparent,
-      elevation: 15,
-      shadowColor: Colors.black.withValues(alpha: 0.08),
-      constraints: const BoxConstraints(minWidth: 120),
-      position: PopupMenuPosition.under,
       child: HugeIcon(
         icon: HugeIcons.strokeRoundedMoreVertical,
-        color: colorScheme.textBase,
+        color: colors.textBase,
       ),
-      itemBuilder: (context) => [
-        // TODO: Re-enable viewer option when ready
-        // PopupMenuItem<String>(
-        //   value: "viewer",
-        //   height: 0,
-        //   padding: EdgeInsets.zero,
-        //   child: PopupMenuItemWidget(
-        //     icon: HugeIcon(
-        //       icon: HugeIcons.strokeRoundedView,
-        //       color: colorScheme.textBase,
-        //       size: 20,
-        //     ),
-        //     label: context.l10n.viewer,
-        //     isFirst: true,
-        //     isLast: false,
-        //   ),
-        // ),
-        // TODO: Re-enable collaborator option when ready
-        // PopupMenuItem<String>(
-        //   value: "collaborator",
-        //   height: 0,
-        //   padding: EdgeInsets.zero,
-        //   child: PopupMenuItemWidget(
-        //     icon: HugeIcon(
-        //       icon: HugeIcons.strokeRoundedUserMultiple,
-        //       color: colorScheme.textBase,
-        //       size: 20,
-        //     ),
-        //     label: context.l10n.collaborator,
-        //     isFirst: false,
-        //     isLast: false,
-        //   ),
-        // ),
-        PopupMenuItem<String>(
-          value: "remove",
-          height: 0,
-          padding: EdgeInsets.zero,
-          child: PopupMenuItemWidget(
-            icon: HugeIcon(
-              icon: HugeIcons.strokeRoundedDelete02,
-              color: colorScheme.warning500,
-              size: 20,
-            ),
-            label: context.l10n.removeAccess,
-            isFirst: true,
-            isLast: true,
-            isWarning: true,
-          ),
-        ),
-      ],
     );
   }
 
@@ -433,8 +371,7 @@ class _ShareActionOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
 
     return Expanded(
       child: GestureDetector(
@@ -444,7 +381,7 @@ class _ShareActionOption extends StatelessWidget {
         },
         child: Container(
           decoration: BoxDecoration(
-            color: colorScheme.fillFaint,
+            color: colors.fillLight,
             borderRadius: BorderRadius.circular(16),
           ),
           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -452,12 +389,12 @@ class _ShareActionOption extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              HugeIcon(icon: icon, color: colorScheme.textBase, size: 24),
+              HugeIcon(icon: icon, color: colors.textBase, size: 24),
               const SizedBox(height: 8),
               Text(
                 label,
                 textAlign: TextAlign.center,
-                style: textTheme.small.copyWith(color: colorScheme.textBase),
+                style: TextStyles.body.copyWith(color: colors.textBase),
               ),
             ],
           ),

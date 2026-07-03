@@ -1,4 +1,4 @@
-import 'package:ente_ui/theme/colors.dart';
+import 'package:ente_components/ente_components.dart';
 import 'package:flutter/material.dart';
 
 /// A thin scrollbar rendered beside a bounded [ListView], with the thumb sized
@@ -11,17 +11,16 @@ class CustomListScrollbar extends StatelessWidget {
     required this.itemCount,
     required this.visibleItems,
     required this.containerHeight,
-    required this.colorScheme,
   });
 
   final ScrollController scrollController;
   final int itemCount;
   final int visibleItems;
   final double containerHeight;
-  final EnteColorScheme colorScheme;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.componentColors;
     final thumbHeightRatio = visibleItems / itemCount;
     final thumbHeight = containerHeight * thumbHeightRatio;
 
@@ -49,7 +48,7 @@ class CustomListScrollbar extends StatelessWidget {
                 width: 5,
                 height: containerHeight,
                 decoration: BoxDecoration(
-                  color: colorScheme.strokeFaint,
+                  color: colors.strokeFaint,
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
@@ -59,7 +58,7 @@ class CustomListScrollbar extends StatelessWidget {
                   width: 5,
                   height: thumbHeight,
                   decoration: BoxDecoration(
-                    color: colorScheme.strokeMuted,
+                    color: colors.strokeDark,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
