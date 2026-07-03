@@ -72,7 +72,7 @@ class _PairWithAutoSheetState extends State<_PairWithAutoSheet> {
     final l10n = AppLocalizations.of(context);
     final textStyles = getEnteTextTheme(context);
     final body = Platform.isIOS
-        ? "${l10n.autoCastDialogBody}\n${l10n.autoCastiOSPermission}"
+        ? "${l10n.autoCastDialogBody}\n\n${l10n.autoCastiOSPermission}"
         : l10n.autoCastDialogBody;
     return BottomSheetComponent(
       isKeyboardAware: true,
@@ -90,7 +90,7 @@ class _PairWithAutoSheetState extends State<_PairWithAutoSheet> {
               return Center(child: Text("Error: ${snapshot.error}"));
             }
             if (!snapshot.hasData) {
-              return const EnteLoadingWidget();
+              return const EnteLoadingWidget(padding: 16);
             }
             if (snapshot.data!.isEmpty) {
               final colors = context.componentColors;
@@ -101,17 +101,13 @@ class _PairWithAutoSheetState extends State<_PairWithAutoSheet> {
                   vertical: 14,
                 ),
                 decoration: BoxDecoration(
-                  color: colors.fillDark,
+                  color: colors.fillLight,
                   borderRadius: Radii.buttonBorder,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset(
-                      "assets/warning-yellow.png",
-                      width: IconSizes.small,
-                      height: IconSizes.small,
-                    ),
+                    Image.asset("assets/warning-yellow.png"),
                     const SizedBox(width: Spacing.sm),
                     Flexible(
                       child: Text(
@@ -120,7 +116,7 @@ class _PairWithAutoSheetState extends State<_PairWithAutoSheet> {
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         style: TextStyles.bodyBold.copyWith(
-                          color: colors.textLightest,
+                          color: colors.caution,
                         ),
                       ),
                     ),
