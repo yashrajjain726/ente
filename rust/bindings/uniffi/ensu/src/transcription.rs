@@ -2,17 +2,47 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
-use ente_ensu::transcription as core;
+use ente_ensu::transcription;
+
+use crate::download::DownloadError;
 
 #[derive(Debug, Error, uniffi::Error)]
 pub enum TranscriptionError {
-    #[error("{0}")]
-    Message(String),
+    #[error("Transcription model is not downloaded")]
+    NotDownloaded,
+    #[error("Voice activity model is not downloaded")]
+    VadNotDownloaded,
+    #[error("{detail}")]
+    InvalidAudio { detail: String },
+    #[error("download failed")]
+    Download { error: DownloadError },
+    #[error("{detail}")]
+    Transcribe { detail: String },
+    #[error("not enough storage space")]
+    StorageFull,
+    #[error("{detail}")]
+    Io { detail: String },
 }
 
-impl From<core::TranscriptionError> for TranscriptionError {
-    fn from(value: core::TranscriptionError) -> Self {
-        Self::Message(value.to_string())
+impl From<transcription::TranscriptionError> for TranscriptionError {
+    fn from(value: transcription::TranscriptionError) -> Self {
+        match value {
+            transcription::TranscriptionError::NotDownloaded => Self::NotDownloaded,
+            transcription::TranscriptionError::VadNotDownloaded => Self::VadNotDownloaded,
+            transcription::TranscriptionError::InvalidAudio(message) => {
+                Self::InvalidAudio { detail: message }
+            }
+            transcription::TranscriptionError::Download(err) => {
+                Self::Download { error: err.into() }
+            }
+            transcription::TranscriptionError::Transcribe(message) => {
+                Self::Transcribe { detail: message }
+            }
+            transcription::TranscriptionError::StorageFull => Self::StorageFull,
+            transcription::TranscriptionError::Io(err) => Self::Io {
+                detail: err.to_string(),
+            },
+        }
     }
 }
 
@@ -31,10 +61,10 @@ pub enum TranscriptionModelEvent {
     },
 }
 
-impl From<core::ModelEvent> for TranscriptionModelEvent {
-    fn from(value: core::ModelEvent) -> Self {
+impl From<transcription::ModelEvent> for TranscriptionModelEvent {
+    fn from(value: transcription::ModelEvent) -> Self {
         match value {
-            core::ModelEvent::DownloadProgress {
+            transcription::ModelEvent::DownloadProgress {
                 downloaded,
                 total,
                 percentage,
@@ -43,10 +73,10 @@ impl From<core::ModelEvent> for TranscriptionModelEvent {
                 total,
                 percentage,
             },
-            core::ModelEvent::ExtractionStarted => Self::ExtractionStarted,
-            core::ModelEvent::ExtractionCompleted => Self::ExtractionCompleted,
-            core::ModelEvent::DownloadComplete => Self::DownloadComplete,
-            core::ModelEvent::DownloadError { message } => Self::DownloadError { message },
+            transcription::ModelEvent::ExtractionStarted => Self::ExtractionStarted,
+            transcription::ModelEvent::ExtractionCompleted => Self::ExtractionCompleted,
+            transcription::ModelEvent::DownloadComplete => Self::DownloadComplete,
+            transcription::ModelEvent::DownloadError { message } => Self::DownloadError { message },
         }
     }
 }
@@ -58,7 +88,7 @@ pub trait TranscriptionModelEventCallback: Send + Sync {
 
 #[derive(uniffi::Object)]
 pub struct Transcriber {
-    inner: core::Transcriber,
+    inner: transcription::Transcriber,
 }
 
 #[uniffi::export]
@@ -66,7 +96,7 @@ impl Transcriber {
     #[uniffi::constructor]
     pub fn new(models_dir: String) -> Arc<Self> {
         Arc::new(Self {
-            inner: core::Transcriber::new(models_dir),
+            inner: transcription::Transcriber::new(models_dir),
         })
     }
 

@@ -5,35 +5,33 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
-import io.ente.ensu.device.AndroidDeviceCapabilityProvider
-import io.ente.ensu.device.requireChatSupported
-import io.ente.ensu.llm.DownloadProgress
-import io.ente.ensu.llm.GenerationSummary
-import io.ente.ensu.llm.LlmMessage
-import io.ente.ensu.llm.LlmModelTarget
-import io.ente.ensu.format.formatBytes
-import io.ente.ensu.bindings.LlmContextHandle
+import io.ente.ensu.bindings.LlmChatMessage as NativeChatMessage
+import io.ente.ensu.bindings.LlmChatRequest
+import io.ente.ensu.bindings.LlmContext
 import io.ente.ensu.bindings.LlmContextParams
 import io.ente.ensu.bindings.LlmException
-import io.ente.ensu.bindings.LlmChatRequest
 import io.ente.ensu.bindings.LlmGenerationEvent
 import io.ente.ensu.bindings.LlmGenerationEventCallback
+import io.ente.ensu.bindings.LlmGenerationSummary as NativeSummary
+import io.ente.ensu.bindings.LlmModel
 import io.ente.ensu.bindings.LlmModelDownloadCallback
 import io.ente.ensu.bindings.LlmModelDownloadProgress
 import io.ente.ensu.bindings.LlmModelDownloadTarget
-import io.ente.ensu.bindings.LlmModelHandle
 import io.ente.ensu.bindings.LlmModelLoadParams
-import io.ente.ensu.bindings.llmCancel
-import io.ente.ensu.bindings.llmCreateContext
-import io.ente.ensu.bindings.llmDownloadModelFiles
-import io.ente.ensu.bindings.llmGenerateChatStream
-import io.ente.ensu.bindings.llmInitBackend
-import io.ente.ensu.bindings.llmLoadModel
-import io.ente.ensu.bindings.llmPrewarmMultimodalContext
-import io.ente.ensu.bindings.uniffiEnsureInitialized
 import io.ente.ensu.bindings.Transcriber
-import io.ente.ensu.bindings.LlmChatMessage as NativeChatMessage
-import io.ente.ensu.bindings.LlmGenerationSummary as NativeSummary
+import io.ente.ensu.bindings.llmCancel
+import io.ente.ensu.bindings.llmDownloadModelFiles
+import io.ente.ensu.bindings.llmInitBackend
+import io.ente.ensu.bindings.uniffiEnsureInitialized
+import io.ente.ensu.device.AndroidDeviceCapabilityProvider
+import io.ente.ensu.device.requireChatSupported
+import io.ente.ensu.format.formatBytes
+import java.io.File
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.coroutines.coroutineContext
+import kotlin.math.max
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -44,14 +42,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
-import java.io.File
-import java.io.IOException
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.coroutines.coroutineContext
-import kotlin.math.max
 
-class RustLlmProvider(
+class LlmProvider(
     context: Context,
     private val modelDir: File,
     private val transcriber: Transcriber,
@@ -89,8 +81,8 @@ class RustLlmProvider(
         appContext.getSharedPreferences("ensu.system.downloads", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
 
-    @Volatile private var modelHandle: LlmModelHandle? = null
-    @Volatile private var contextHandle: LlmContextHandle? = null
+    @Volatile private var loadedModel: LlmModel? = null
+    @Volatile private var loadedContext: LlmContext? = null
     @Volatile private var currentModelKey: LoadedModelKey? = null
     @Volatile private var currentContextLength: Int? = null
     @Volatile private var currentJobId: Long? = null
@@ -126,7 +118,7 @@ class RustLlmProvider(
         onToken: (String) -> Unit
     ): GenerationSummary = withContext(ioDispatcher) {
         deviceCapabilityProvider.chatCapability().requireChatSupported()
-        val context = contextHandle ?: throw IllegalStateException("Model context not loaded")
+        val context = loadedContext ?: throw IllegalStateException("Model context not loaded")
         currentJobId = null
         val mmprojPath = if (imageFiles.isEmpty()) {
             null
@@ -171,12 +163,12 @@ class RustLlmProvider(
                         ?.absolutePath
                         ?: return@withLock
                     ensureModelReadyLocked(target) { }
-                    val context = contextHandle ?: return@withLock
+                    val context = loadedContext ?: return@withLock
                     unloadTranscriptionModelIfLoaded()
-                    llmPrewarmMultimodalContext(context, mmprojPath, null)
+                    context.prewarmMultimodal(mmprojPath, null)
                 }
             }.onFailure { error ->
-                Log.d("RustLlmProvider", "Image inference prewarm skipped", error)
+                Log.d("LlmProvider", "Image inference prewarm skipped", error)
             }
         }
     }
@@ -269,13 +261,21 @@ class RustLlmProvider(
                             totalBytes += size
                         } else {
                             clearDownloadRecords(target)
-                            return@withContext DownloadProgress(-1, "${download.label} download is invalid")
+                            val failure = DownloadFailure.InvalidContent(
+                                "${download.label} download is invalid"
+                            )
+                            return@withContext DownloadProgress(
+                                null, failure.message, failure, DownloadPhase.Failed
+                            )
                         }
                     }
 
                     DownloadManager.STATUS_FAILED -> {
                         clearDownloadRecords(target)
-                        return@withContext DownloadProgress(-1, userFacingDownloadFailure(row.reason))
+                        val failure = downloadFailure(row.reason)
+                        return@withContext DownloadProgress(
+                            null, failure.message, failure, DownloadPhase.Failed
+                        )
                     }
                 }
             }
@@ -302,7 +302,7 @@ class RustLlmProvider(
 
     fun loadedContextLength(target: LlmModelTarget): Int? {
         val modelKey = LoadedModelKey(target.id, target.contextLength)
-        return if (currentModelKey == modelKey && contextHandle != null && modelHandle != null) {
+        return if (currentModelKey == modelKey && loadedContext != null && loadedModel != null) {
             currentContextLength
         } else {
             null
@@ -319,14 +319,14 @@ class RustLlmProvider(
     }
 
     fun resetContext() {
-        val model = modelHandle ?: return
+        val model = loadedModel ?: return
         val contextParams = LlmContextParams(
             contextSize = currentContextLength,
             nThreads = null,
             nBatch = null
         )
-        contextHandle?.destroy()
-        contextHandle = llmCreateContext(model, contextParams)
+        loadedContext?.destroy()
+        loadedContext = model.newContext(contextParams)
     }
 
     fun cancelDownload() {
@@ -347,10 +347,10 @@ class RustLlmProvider(
     }
 
     private fun unloadModel() {
-        contextHandle?.destroy()
-        contextHandle = null
-        modelHandle?.destroy()
-        modelHandle = null
+        loadedContext?.destroy()
+        loadedContext = null
+        loadedModel?.destroy()
+        loadedModel = null
         currentModelKey = null
         currentContextLength = null
     }
@@ -359,7 +359,7 @@ class RustLlmProvider(
         runCatching {
             transcriber.unloadModel()
         }.onFailure { error ->
-            Log.d("RustLlmProvider", "Transcription model unload skipped", error)
+            Log.d("LlmProvider", "Transcription model unload skipped", error)
         }
     }
 
@@ -374,7 +374,7 @@ class RustLlmProvider(
             backendInitialized = true
         }
 
-        if (currentModelKey == modelKey && contextHandle != null && modelHandle != null) {
+        if (currentModelKey == modelKey && loadedContext != null && loadedModel != null) {
             return
         }
 
@@ -386,9 +386,9 @@ class RustLlmProvider(
             awaitForegroundDownload(target, onProgress)
         }
 
-        onProgress(DownloadProgress(100, "Loading model..."))
+        onProgress(DownloadProgress(100, "Loading model...", phase = DownloadPhase.Loading))
         loadWithFallbacks(target, modelFile)
-        onProgress(DownloadProgress(100, "Ready"))
+        onProgress(DownloadProgress(100, "Ready", phase = DownloadPhase.Ready))
     }
 
     private fun loadWithFallbacks(target: LlmModelTarget, modelFile: File) {
@@ -404,8 +404,8 @@ class RustLlmProvider(
             useMlock = false
         )
 
-        val model = llmLoadModel(modelParams)
-        modelHandle = model
+        val model = LlmModel.load(modelParams)
+        loadedModel = model
 
         var lastError: Throwable? = null
         for (ctx in contexts) {
@@ -415,7 +415,7 @@ class RustLlmProvider(
                     nThreads = threads,
                     nBatch = batch
                 )
-                contextHandle = llmCreateContext(model, contextParams)
+                loadedContext = model.newContext(contextParams)
                 currentModelKey = LoadedModelKey(target.id, target.contextLength)
                 currentContextLength = ctx
                 return
@@ -441,7 +441,7 @@ class RustLlmProvider(
             if (externalDownloadsRoot == null || downloadManager == null) {
                 throw error
             }
-            Log.w("RustLlmProvider", "Rust model download failed; falling back to DownloadManager", error)
+            Log.w("LlmProvider", "Rust model download failed; falling back to DownloadManager", error)
             awaitBackgroundDownload(target, onProgress)
         }
     }
@@ -471,14 +471,12 @@ class RustLlmProvider(
                 }
             } else {
                 emptyPollCount = 0
-                if (progress.percent < 0) {
-                    throw IOException(progress.status)
-                }
+                progress.failure?.let { throw it }
                 onProgress(progress)
             }
             pollCount += 1
             if (pollCount >= maxPolls) {
-                throw IOException("Download timed out")
+                throw DownloadFailure.TimedOut()
             }
             delay(500)
         }
@@ -518,7 +516,7 @@ class RustLlmProvider(
     }
 
     private fun Throwable.isDownloadCancellation(): Boolean {
-        return message?.contains("cancelled", ignoreCase = true) == true
+        return this is LlmException.Cancelled || this is CancellationException
     }
 
     private fun cancelNativeDownloads(target: LlmModelTarget) {
@@ -532,7 +530,7 @@ class RustLlmProvider(
     private fun logDownloadMetrics(progress: LlmModelDownloadProgress) {
         if (progress.fileComplete) {
             Log.i(
-                "RustLlmProvider",
+                "LlmProvider",
                 "Model download file complete label=${progress.label} " +
                     "bytes=${progress.fileDownloadedBytes} " +
                     "elapsedMs=${progress.fileElapsedMs} " +
@@ -542,7 +540,7 @@ class RustLlmProvider(
         }
         if (progress.complete) {
             Log.i(
-                "RustLlmProvider",
+                "LlmProvider",
                 "Model download complete bytes=${progress.downloadedBytes} " +
                     "elapsedMs=${progress.elapsedMs} " +
                     "rate=${formatRate(progress.bytesPerSecond)} " +
@@ -751,7 +749,7 @@ class RustLlmProvider(
                         oldTarget.destination.delete()
                     }.onFailure { error ->
                         Log.w(
-                            "RustLlmProvider",
+                            "LlmProvider",
                             "Legacy migration failed for ${oldTarget.destination.absolutePath}",
                             error
                         )
@@ -767,15 +765,15 @@ class RustLlmProvider(
         }
     }
 
-    private fun userFacingDownloadFailure(reason: Int): String {
-        return when (reason) {
-            DownloadManager.ERROR_INSUFFICIENT_SPACE ->
-                "Not enough storage space to download the model. Please free up space and try again."
-            DownloadManager.ERROR_DEVICE_NOT_FOUND -> "Download storage is unavailable"
-            DownloadManager.ERROR_CANNOT_RESUME -> "Download could not resume"
-            DownloadManager.ERROR_UNHANDLED_HTTP_CODE,
-            DownloadManager.ERROR_HTTP_DATA_ERROR -> "Download failed. Please try again."
-            else -> "Download failed. Please try again."
+    private fun downloadFailure(reason: Int): DownloadFailure {
+        return when {
+            reason == DownloadManager.ERROR_INSUFFICIENT_SPACE -> DownloadFailure.InsufficientSpace()
+            reason in 400..599 -> DownloadFailure.Http(reason)
+            reason == DownloadManager.ERROR_DEVICE_NOT_FOUND ->
+                DownloadFailure.Failed("Download storage is unavailable")
+            reason == DownloadManager.ERROR_CANNOT_RESUME ->
+                DownloadFailure.Failed("Download could not resume")
+            else -> DownloadFailure.Failed("Download failed. Please try again.")
         }
     }
 
@@ -784,12 +782,10 @@ class RustLlmProvider(
     }
 
     private fun generateStreamWithCallback(
-        context: LlmContextHandle,
+        context: LlmContext,
         request: LlmChatRequest,
         onToken: (String) -> Unit
     ): NativeSummary {
-        var error: Throwable? = null
-
         val callback = object : LlmGenerationEventCallback {
             override fun onEvent(event: LlmGenerationEvent) {
                 when (event) {
@@ -802,17 +798,14 @@ class RustLlmProvider(
                     is LlmGenerationEvent.Done -> {
                         currentJobId = null
                     }
-                    is LlmGenerationEvent.Error -> {
-                        currentJobId = null
-                        error = LlmException.Message(event.message)
-                    }
                 }
             }
         }
 
-        val summary = llmGenerateChatStream(context, request, callback)
-
-        error?.let { throw it }
-        return summary
+        try {
+            return context.generateChatStream(request, callback)
+        } finally {
+            currentJobId = null
+        }
     }
 }

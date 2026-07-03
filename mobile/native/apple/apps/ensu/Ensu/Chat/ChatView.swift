@@ -71,7 +71,6 @@ struct ChatView: View {
                 } else {
                     mainContent(showsMenuButton: true)
                         .overlay(alignment: .leading) {
-                            #if os(iOS)
                             Color.clear
                                 .frame(width: 24)
                                 .contentShape(Rectangle())
@@ -86,14 +85,12 @@ struct ChatView: View {
                                             viewState.isDrawerOpen = true
                                         }
                                 )
-                            #endif
                         }
 
                     if viewState.isDrawerOpen {
                         Color.black.opacity(0.25)
                             .ignoresSafeArea()
                             .onTapGesture { viewState.isDrawerOpen = false }
-                            #if os(iOS)
                             .gesture(
                                 DragGesture(minimumDistance: 20)
                                     .onEnded { value in
@@ -103,7 +100,6 @@ struct ChatView: View {
                                         viewState.isDrawerOpen = false
                                     }
                             )
-                            #endif
                     }
 
                     drawerView(isPinned: false)
@@ -232,9 +228,7 @@ struct ChatView: View {
                 viewState.pendingWhatsNew = WhatsNewService.shared.pendingWhatsNew()
             }
         }
-        #if os(iOS)
         .ignoresSafeArea(.keyboard)
-        #endif
     }
 
     @ViewBuilder
@@ -392,6 +386,7 @@ struct ChatView: View {
                         isDownloading: viewModel.isDownloading,
                         downloadPercent: viewModel.downloadToast?.percent,
                         statusText: viewModel.downloadToast?.status,
+                        isLoadingModel: viewModel.downloadToast?.phase == .loading,
                         totalBytes: viewModel.modelDownloadSizeBytes,
                         sizeText: viewModel.modelDownloadSizeText,
                         onDownload: {

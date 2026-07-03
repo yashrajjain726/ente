@@ -15,13 +15,6 @@ private final class GenerateEventCollector: LlmGenerationEventCallback {
         }
     }
 
-    var lastError: String? {
-        events.compactMap { event in
-            if case let .error(_, message) = event { return message }
-            return nil
-        }.last
-    }
-
     var textOutput: String {
         events.compactMap { event in
             if case let .text(_, text, _) = event { return text }
@@ -30,7 +23,7 @@ private final class GenerateEventCollector: LlmGenerationEventCallback {
     }
 }
 
-final class InferenceIntegrationTests: XCTestCase {
+final class LlmIntegrationTests: XCTestCase {
     func testInitBackend() throws {
         try llmInitBackend()
     }
@@ -40,7 +33,7 @@ final class InferenceIntegrationTests: XCTestCase {
 
         try llmInitBackend()
 
-        let model = try llmLoadModel(
+        let model = try LlmModel.load(
             params: LlmModelLoadParams(
                 modelPath: modelPath,
                 nGpuLayers: nil,
@@ -49,8 +42,7 @@ final class InferenceIntegrationTests: XCTestCase {
             )
         )
 
-        let context = try llmCreateContext(
-            model: model,
+        let context = try model.newContext(
             params: LlmContextParams(contextSize: 2048, nThreads: nil, nBatch: nil)
         )
 
@@ -77,11 +69,10 @@ final class InferenceIntegrationTests: XCTestCase {
         )
 
         let collector = GenerateEventCollector()
-        let summary = try llmGenerateChatStream(context: context, request: request, callback: collector)
+        let summary = try context.generateChatStream(request: request, callback: collector)
 
         XCTAssertGreaterThan(summary.jobId, 0)
         XCTAssertTrue(collector.hasDone)
-        XCTAssertNil(collector.lastError)
         XCTAssertFalse(collector.textOutput.isEmpty)
     }
 
@@ -92,7 +83,7 @@ final class InferenceIntegrationTests: XCTestCase {
 
         try llmInitBackend()
 
-        let model = try llmLoadModel(
+        let model = try LlmModel.load(
             params: LlmModelLoadParams(
                 modelPath: modelPath,
                 nGpuLayers: nil,
@@ -101,8 +92,7 @@ final class InferenceIntegrationTests: XCTestCase {
             )
         )
 
-        let context = try llmCreateContext(
-            model: model,
+        let context = try model.newContext(
             params: LlmContextParams(contextSize: 2048, nThreads: nil, nBatch: nil)
         )
 
@@ -129,11 +119,10 @@ final class InferenceIntegrationTests: XCTestCase {
         )
 
         let collector = GenerateEventCollector()
-        let summary = try llmGenerateChatStream(context: context, request: request, callback: collector)
+        let summary = try context.generateChatStream(request: request, callback: collector)
 
         XCTAssertGreaterThan(summary.jobId, 0)
         XCTAssertTrue(collector.hasDone)
-        XCTAssertNil(collector.lastError)
         XCTAssertFalse(collector.textOutput.isEmpty)
     }
 

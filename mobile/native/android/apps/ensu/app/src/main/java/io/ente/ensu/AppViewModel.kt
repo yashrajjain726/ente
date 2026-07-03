@@ -10,9 +10,9 @@ import io.ente.ensu.settings.AdvancedSettingsDataStore
 import io.ente.ensu.settings.AdvancedSettingsSnapshot
 import io.ente.ensu.device.AndroidDeviceCapabilityProvider
 import io.ente.ensu.settings.SessionPreferencesDataStore
-import io.ente.ensu.chat.RustChatRepository
-import io.ente.ensu.config.RustDefaults
-import io.ente.ensu.llm.RustLlmProvider
+import io.ente.ensu.chat.ChatRepository
+import io.ente.ensu.config.loadConfigDefaults
+import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.storage.CredentialStore
 import io.ente.ensu.logging.LogLevel
@@ -32,15 +32,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val transcriber = (application as EnsuApplication).transcriber
 
     val logRepository = FileLogRepository(application)
-    private val llmProvider = RustLlmProvider(
+    private val llmProvider = LlmProvider(
         context = application,
         modelDir = resolveModelDir(application),
         transcriber = transcriber,
         legacyModelDir = File(application.filesDir, "llm"),
         deviceCapabilityProvider = deviceCapabilityProvider
     )
-    private val chatRepository = RustChatRepository(application, credentialStore)
-    val configDefaults = RustDefaults.load()
+    private val chatRepository = ChatRepository(application, credentialStore)
+    val configDefaults = loadConfigDefaults()
 
     val store = AppStore(
         sessionPreferences = sessionPreferences,

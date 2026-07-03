@@ -1849,7 +1849,6 @@ const Page: React.FC = () => {
             await provider.ensureModelReady(settings);
 
             let summary = "";
-            let errorMessage: string | null = null;
 
             await provider.generateChatStream(
                 {
@@ -1865,17 +1864,9 @@ const Page: React.FC = () => {
                 (event) => {
                     if (event.type === "text") {
                         summary += event.text;
-                        return;
-                    }
-                    if (event.type === "error") {
-                        errorMessage = event.message;
                     }
                 },
             );
-
-            if (errorMessage) {
-                throw new Error(errorMessage);
-            }
 
             return summary;
         },
@@ -1992,6 +1983,7 @@ const Page: React.FC = () => {
             log.error("Failed to preload model", error);
             setModelGateError(message);
             setIsDownloading(false);
+            setDownloadStatus(null);
             setModelGateStatus("error");
         }
     }, [ensureProvider, formatErrorMessage, getModelSettings]);
@@ -2015,6 +2007,7 @@ const Page: React.FC = () => {
             log.error("Failed to prepare model", error);
             setModelGateError(message);
             setIsDownloading(false);
+            setDownloadStatus(null);
             setModelGateStatus("error");
             showMiniDialog({ title: "Model error", message });
         }
@@ -2781,41 +2774,46 @@ const Page: React.FC = () => {
                     throw new Error("MMProj model not available");
                 }
 
-                await provider.generateChatStream(
-                    {
-                        messages,
-                        imagePaths: hasImages ? imagePaths : undefined,
-                        mmprojPath,
-                        mediaMarker: hasImages
-                            ? (mediaMarker ?? MEDIA_MARKER)
-                            : undefined,
-                        maxTokens,
-                        temperature: 0.7,
-                        topP: 0.9,
-                        repeatPenalty: REPEAT_PENALTY,
-                    },
-                    (event: GenerateEvent) => {
-                        if (!isActiveGeneration()) {
-                            return;
-                        }
-                        if (event.type === "text") {
-                            if (!currentJobIdRef.current) {
-                                currentJobIdRef.current = event.job_id;
-                                if (pendingCancelRef.current) {
-                                    pendingCancelRef.current = false;
-                                    provider.cancelGeneration(event.job_id);
-                                    return;
-                                }
+                await provider
+                    .generateChatStream(
+                        {
+                            messages,
+                            imagePaths: hasImages ? imagePaths : undefined,
+                            mmprojPath,
+                            mediaMarker: hasImages
+                                ? (mediaMarker ?? MEDIA_MARKER)
+                                : undefined,
+                            maxTokens,
+                            temperature: 0.7,
+                            topP: 0.9,
+                            repeatPenalty: REPEAT_PENALTY,
+                        },
+                        (event: GenerateEvent) => {
+                            if (!isActiveGeneration()) {
+                                return;
                             }
-                            streamingChunksRef.current.push(event.text);
-                            scheduleStreamingFlush();
-                        } else if (event.type === "error") {
-                            errorMessage = event.message;
-                        } else if (event.type === "done") {
-                            currentJobIdRef.current = event.summary.job_id;
-                        }
-                    },
-                );
+                            if (event.type === "text") {
+                                if (!currentJobIdRef.current) {
+                                    currentJobIdRef.current = event.job_id;
+                                    if (pendingCancelRef.current) {
+                                        pendingCancelRef.current = false;
+                                        provider.cancelGeneration(event.job_id);
+                                        return;
+                                    }
+                                }
+                                streamingChunksRef.current.push(event.text);
+                                scheduleStreamingFlush();
+                            } else if (event.type === "done") {
+                                currentJobIdRef.current = event.summary.job_id;
+                            }
+                        },
+                    )
+                    .catch((error: unknown) => {
+                        errorMessage =
+                            error instanceof Error
+                                ? error.message
+                                : String(error);
+                    });
 
                 if (!isActiveGeneration()) {
                     return;

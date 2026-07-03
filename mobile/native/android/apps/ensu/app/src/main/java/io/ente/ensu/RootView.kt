@@ -8,7 +8,7 @@ import androidx.compose.ui.Modifier
 import io.ente.ensu.settings.AdvancedSettingsDataStore
 import io.ente.ensu.designsystem.EnsuColor
 import io.ente.ensu.logging.FileLogRepository
-import io.ente.ensu.config.ConfigDefaults
+import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.AppState
 import io.ente.ensu.AppStore
 

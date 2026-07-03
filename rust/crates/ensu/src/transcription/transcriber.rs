@@ -7,7 +7,7 @@ use transcribe_rs::onnx::parakeet::{ParakeetModel, ParakeetParams, TimestampGran
 use crate::transcription::audio::extract_speech_from_pcm16;
 use crate::transcription::model::{self, ModelEvent};
 use crate::transcription::text::filter_transcription_output;
-use crate::transcription::{Result, error};
+use crate::transcription::{Result, TranscriptionError};
 
 pub struct Transcriber {
     models_dir: PathBuf,
@@ -48,7 +48,7 @@ impl Transcriber {
         let model_dir = self.downloaded_model_dir()?;
         let vad_model_path = model::vad_model_path(&self.models_dir);
         if !vad_model_path.is_file() {
-            return Err(error("Voice activity model is not downloaded"));
+            return Err(TranscriptionError::VadNotDownloaded);
         }
 
         let speech = extract_speech_from_pcm16(&vad_model_path, input_sample_rate, &pcm_le)?;
@@ -72,7 +72,7 @@ impl Transcriber {
     fn downloaded_model_dir(&self) -> Result<PathBuf> {
         let model_dir = model::model_path(&self.models_dir);
         if !model_dir.is_dir() {
-            return Err(error("Transcription model is not downloaded"));
+            return Err(TranscriptionError::NotDownloaded);
         }
         Ok(model_dir)
     }

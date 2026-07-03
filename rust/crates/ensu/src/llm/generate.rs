@@ -15,14 +15,13 @@ use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
-use super::context::ContextHandle;
+use super::context::Context;
 use super::event::{EventSink, GenerationEvent, GenerationSummary, JobId};
-use super::format_error;
+use super::{Error, format_error};
 
 static JOB_COUNTER: AtomicI64 = AtomicI64::new(1);
 static CANCEL_FLAGS: OnceLock<Mutex<HashMap<JobId, Arc<AtomicBool>>>> = OnceLock::new();
 
-const CANCEL_MESSAGE: &str = "Generation cancelled";
 const DEFAULT_GENERATION_MAX_TOKENS: i32 = 8_192;
 
 fn cancel_flags() -> &'static Mutex<HashMap<JobId, Arc<AtomicBool>>> {
@@ -42,9 +41,9 @@ fn cancel_all() {
     }
 }
 
-fn check_cancelled(cancel_flag: &AtomicBool) -> Result<(), String> {
+fn check_cancelled(cancel_flag: &AtomicBool) -> Result<(), Error> {
     if cancel_flag.load(Ordering::Relaxed) {
-        Err(CANCEL_MESSAGE.to_string())
+        Err(Error::Cancelled)
     } else {
         Ok(())
     }
@@ -118,7 +117,7 @@ fn build_chat_prompt(
     messages: Vec<ChatMessage>,
     template_override: Option<String>,
     add_assistant: bool,
-) -> Result<String, String> {
+) -> Result<String, Error> {
     let template_text = match template_override {
         Some(template) => template,
         None => model
@@ -128,11 +127,11 @@ fn build_chat_prompt(
             .unwrap_or_else(|| "chatml".to_string()),
     };
     let template = LlamaChatTemplate::new(&template_text)
-        .map_err(|err| format_error("Invalid chat template", err))?;
+        .map_err(|err| Error::InvalidInput(format_error("Invalid chat template", err)))?;
 
     if template_text.contains("enable_thinking") {
         let messages_json = serde_json::to_string(&messages)
-            .map_err(|err| format_error("Invalid chat messages", err))?;
+            .map_err(|err| Error::InvalidInput(format_error("Invalid chat messages", err)))?;
         let params = OpenAIChatTemplateParams {
             messages_json: &messages_json,
             tools_json: None,
@@ -151,7 +150,10 @@ fn build_chat_prompt(
         };
         let result = model
             .apply_chat_template_oaicompat(&template, &params)
-            .map_err(|err| format_error("Failed to apply chat template", err))?;
+            .map_err(|err| Error::Llama {
+                op: "Failed to apply chat template",
+                message: err.to_string(),
+            })?;
         return Ok(result.prompt);
     }
 
@@ -159,13 +161,16 @@ fn build_chat_prompt(
         .into_iter()
         .map(|message| {
             LlamaChatMessage::new(message.role, message.content)
-                .map_err(|err| format_error("Invalid chat message", err))
+                .map_err(|err| Error::InvalidInput(format_error("Invalid chat message", err)))
         })
-        .collect::<Result<Vec<_>, String>>()?;
+        .collect::<Result<Vec<_>, Error>>()?;
 
     model
         .apply_chat_template(&template, &chat_messages, add_assistant)
-        .map_err(|err| format_error("Failed to apply chat template", err))
+        .map_err(|err| Error::Llama {
+            op: "Failed to apply chat template",
+            message: err.to_string(),
+        })
 }
 
 fn should_add_bos(model: &LlamaModel, prompt: &str) -> AddBos {
@@ -323,14 +328,14 @@ fn run_generation_loop(
     generated_tokens_count: &mut i32,
     mut pos: i32,
     mut logits_index: i32,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     let mut decoder = StreamDecoder::new(stop_sequences);
     let mut stop_triggered = false;
     let n_ctx = ctx.n_ctx();
 
     for _ in 0..max_tokens {
         if cancel_flag.load(Ordering::Relaxed) {
-            return Err("Generation cancelled".to_string());
+            return Err(Error::Cancelled);
         }
         if pos >= n_ctx as i32 {
             break;
@@ -344,8 +349,10 @@ fn run_generation_loop(
             break;
         }
 
-        let bytes = token_piece_bytes(ctx.model, token)
-            .map_err(|err| format_error("Detokenize failed", err))?;
+        let bytes = token_piece_bytes(ctx.model, token).map_err(|err| Error::Llama {
+            op: "Detokenize failed",
+            message: err.to_string(),
+        })?;
         let step = decoder.push_bytes(&bytes);
 
         if let Some(text) = step.text {
@@ -364,9 +371,14 @@ fn run_generation_loop(
         let mut step_batch = LlamaBatch::new(1, 1);
         step_batch
             .add(token, pos, &[0], true)
-            .map_err(|err| format_error("Failed to add token", err))?;
-        ctx.decode(&mut step_batch)
-            .map_err(|err| format_error("Decode failed", err))?;
+            .map_err(|err| Error::Llama {
+                op: "Failed to add token",
+                message: err.to_string(),
+            })?;
+        ctx.decode(&mut step_batch).map_err(|err| Error::Llama {
+            op: "Decode failed",
+            message: err.to_string(),
+        })?;
 
         logits_index = 0;
         pos += 1;
@@ -386,7 +398,7 @@ fn run_generation_loop(
     Ok(())
 }
 
-fn build_sampler(model: &LlamaModel, request: &SamplingParams) -> Result<LlamaSampler, String> {
+fn build_sampler(model: &LlamaModel, request: &SamplingParams) -> Result<LlamaSampler, Error> {
     let mut samplers = Vec::new();
 
     let mut repeat_penalty = request.repeat_penalty.unwrap_or(1.0);
@@ -417,7 +429,7 @@ fn build_sampler(model: &LlamaModel, request: &SamplingParams) -> Result<LlamaSa
     if let Some(grammar) = request.grammar.as_deref() {
         samplers.push(
             LlamaSampler::grammar(model, grammar, "root")
-                .map_err(|err| format_error("Invalid grammar", err))?,
+                .map_err(|err| Error::InvalidInput(format_error("Invalid grammar", err)))?,
         );
     }
 
@@ -447,11 +459,21 @@ fn build_sampler(model: &LlamaModel, request: &SamplingParams) -> Result<LlamaSa
     Ok(LlamaSampler::chain_simple(samplers))
 }
 
-pub fn generate_chat_stream(
-    context: &ContextHandle,
+impl Context {
+    pub fn generate_chat_stream(
+        &self,
+        request: ChatRequest,
+        sink: &mut dyn EventSink,
+    ) -> Result<GenerationSummary, Error> {
+        generate_chat_stream(self, request, sink)
+    }
+}
+
+fn generate_chat_stream(
+    context: &Context,
     request: ChatRequest,
     sink: &mut dyn EventSink,
-) -> Result<GenerationSummary, String> {
+) -> Result<GenerationSummary, Error> {
     let ChatRequest {
         messages,
         template_override,
@@ -487,10 +509,9 @@ pub fn generate_chat_stream(
 
     let mut prompt_tokens_count: i32 = 0;
     let mut generated_tokens_count: i32 = 0;
-    let mut error_message: Option<String> = None;
 
     let result = match catch_unwind(AssertUnwindSafe(|| {
-        context.with_context_mut(|ctx| -> Result<(), String> {
+        context.with_context_mut(|ctx| -> Result<(), Error> {
             let add_assistant = add_assistant.unwrap_or(true);
             let mut messages = messages;
             let image_paths = image_paths.unwrap_or_default();
@@ -508,7 +529,9 @@ pub fn generate_chat_stream(
                         .iter()
                         .rposition(|message| message.role == "user")
                         .or_else(|| messages.len().checked_sub(1))
-                        .ok_or_else(|| "No chat messages provided".to_string())?;
+                        .ok_or_else(|| {
+                            Error::InvalidInput("No chat messages provided".to_string())
+                        })?;
                     if !messages[target_index].content.ends_with('\n') {
                         messages[target_index].content.push('\n');
                     }
@@ -519,10 +542,10 @@ pub fn generate_chat_stream(
                         .sum();
                 }
                 if marker_count != image_paths.len() {
-                    return Err(format!(
+                    return Err(Error::InvalidInput(format!(
                         "Found {marker_count} media markers but {} images were provided",
                         image_paths.len()
-                    ));
+                    )));
                 }
             }
 
@@ -541,30 +564,34 @@ pub fn generate_chat_stream(
 
             if image_paths.is_empty() {
                 let add_bos = should_add_bos(ctx.model, &prompt);
-                let prompt_tokens = ctx
-                    .model
-                    .str_to_token(&prompt, add_bos)
-                    .map_err(|err| format_error("Tokenize failed", err))?;
+                let prompt_tokens =
+                    ctx.model
+                        .str_to_token(&prompt, add_bos)
+                        .map_err(|err| Error::Llama {
+                            op: "Tokenize failed",
+                            message: err.to_string(),
+                        })?;
 
                 if prompt_tokens.is_empty() {
-                    return Err("Prompt produced no tokens".to_string());
+                    return Err(Error::InvalidInput("Prompt produced no tokens".to_string()));
                 }
-
-                prompt_tokens_count = i32::try_from(prompt_tokens.len())
-                    .map_err(|_| "Prompt is too long".to_string())?;
 
                 let n_ctx = ctx.n_ctx();
                 if prompt_tokens.len() as u32 > n_ctx {
-                    return Err(format!(
-                        "Prompt length {} exceeds context size {}",
-                        prompt_tokens.len(),
-                        n_ctx
-                    ));
+                    return Err(Error::PromptTooLong {
+                        tokens: prompt_tokens.len(),
+                        context_size: n_ctx,
+                    });
                 }
+                prompt_tokens_count =
+                    i32::try_from(prompt_tokens.len()).map_err(|_| Error::PromptTooLong {
+                        tokens: prompt_tokens.len(),
+                        context_size: n_ctx,
+                    })?;
 
                 let n_batch = ctx.n_batch() as usize;
                 if n_batch == 0 {
-                    return Err("Context batch size is 0".to_string());
+                    return Err(Error::InvalidInput("Context batch size is 0".to_string()));
                 }
 
                 ctx.clear_kv_cache();
@@ -581,10 +608,15 @@ pub fn generate_chat_stream(
                         let logits = token_offset + idx + 1 == prompt_tokens.len();
                         batch
                             .add(*token, pos, &[0], logits)
-                            .map_err(|err| format_error("Failed to add prompt token", err))?;
+                            .map_err(|err| Error::Llama {
+                                op: "Failed to add prompt token",
+                                message: err.to_string(),
+                            })?;
                     }
-                    ctx.decode(&mut batch)
-                        .map_err(|err| format_error("Prompt decode failed", err))?;
+                    ctx.decode(&mut batch).map_err(|err| Error::Llama {
+                        op: "Prompt decode failed",
+                        message: err.to_string(),
+                    })?;
                     if end == prompt_tokens.len() {
                         logits_index = (chunk.len() - 1) as i32;
                     }
@@ -612,7 +644,9 @@ pub fn generate_chat_stream(
             }
 
             let mmproj_path = mmproj_path.ok_or_else(|| {
-                "mmproj_path is required when image_paths are provided".to_string()
+                Error::InvalidInput(
+                    "mmproj_path is required when image_paths are provided".to_string(),
+                )
             })?;
             let mtmd_ctx = context.cached_mtmd_context(ctx.model, &mmproj_path, &marker)?;
 
@@ -620,12 +654,18 @@ pub fn generate_chat_stream(
             for image_path in &image_paths {
                 check_cancelled(&cancel_flag)?;
                 if !Path::new(image_path).exists() {
-                    return Err(format!("Image file not found at {image_path}"));
+                    return Err(Error::NotFound {
+                        what: "Image file",
+                        path: image_path.clone(),
+                    });
                 }
-                let bitmap = MtmdBitmap::from_file(&mtmd_ctx, image_path)
-                    .map_err(|err| format_error("Failed to load image", err))?;
+                let bitmap =
+                    MtmdBitmap::from_file(&mtmd_ctx, image_path).map_err(|err| Error::Llama {
+                        op: "Failed to load image",
+                        message: err.to_string(),
+                    })?;
                 if bitmap.is_audio() {
-                    return Err("Audio inputs are not supported".to_string());
+                    return Err(Error::Unsupported("Audio inputs are not supported"));
                 }
                 bitmaps.push(bitmap);
             }
@@ -638,29 +678,35 @@ pub fn generate_chat_stream(
                 parse_special: true,
             };
 
-            let chunks = mtmd_ctx
-                .tokenize(input_text, &bitmap_refs)
-                .map_err(|err| format_error("Failed to tokenize multimodal input", err))?;
+            let chunks =
+                mtmd_ctx
+                    .tokenize(input_text, &bitmap_refs)
+                    .map_err(|err| Error::Llama {
+                        op: "Failed to tokenize multimodal input",
+                        message: err.to_string(),
+                    })?;
 
             if chunks.is_empty() {
-                return Err("Prompt produced no tokens".to_string());
+                return Err(Error::InvalidInput("Prompt produced no tokens".to_string()));
             }
-
-            prompt_tokens_count = i32::try_from(chunks.total_tokens())
-                .map_err(|_| "Prompt is too long".to_string())?;
 
             let n_ctx = ctx.n_ctx();
             let total_positions = chunks.total_positions();
             if total_positions as u32 > n_ctx {
-                return Err(format!(
-                    "Prompt length {} exceeds context size {}",
-                    total_positions, n_ctx
-                ));
+                return Err(Error::PromptTooLong {
+                    tokens: total_positions as usize,
+                    context_size: n_ctx,
+                });
             }
+            prompt_tokens_count =
+                i32::try_from(chunks.total_tokens()).map_err(|_| Error::PromptTooLong {
+                    tokens: chunks.total_tokens(),
+                    context_size: n_ctx,
+                })?;
 
             let n_batch = ctx.n_batch() as i32;
             if n_batch <= 0 {
-                return Err("Context batch size is 0".to_string());
+                return Err(Error::InvalidInput("Context batch size is 0".to_string()));
             }
 
             ctx.clear_kv_cache();
@@ -668,7 +714,10 @@ pub fn generate_chat_stream(
 
             let n_past = chunks
                 .eval_chunks(&mtmd_ctx, ctx, 0, 0, n_batch, true)
-                .map_err(|err| format_error("Failed to evaluate multimodal prompt", err))?;
+                .map_err(|err| Error::Llama {
+                    op: "Failed to evaluate multimodal prompt",
+                    message: err.to_string(),
+                })?;
             check_cancelled(&cancel_flag)?;
 
             let mut sampler = build_sampler(ctx.model, &sampler_request)?;
@@ -699,12 +748,9 @@ pub fn generate_chat_stream(
         })
     })) {
         Ok(inner) => inner,
-        Err(_) => Err("Generation panicked".to_string()),
+        Err(_) => Err(Error::Panicked),
     };
-
-    if let Err(err) = result {
-        error_message = Some(err);
-    }
+    result?;
 
     let summary = GenerationSummary {
         job_id,
@@ -713,10 +759,6 @@ pub fn generate_chat_stream(
         total_time_ms: Some(start.elapsed().as_millis() as i64),
     };
 
-    if let Some(message) = error_message {
-        sink.add(GenerationEvent::Error { job_id, message });
-    }
-
     sink.add(GenerationEvent::Done {
         summary: summary.clone(),
     });
@@ -724,15 +766,14 @@ pub fn generate_chat_stream(
     Ok(summary)
 }
 
-pub fn cancel(job_id: JobId) -> Result<(), String> {
+pub fn cancel(job_id: JobId) {
     if job_id <= 0 {
         cancel_all();
-        return Ok(());
+        return;
     }
     if let Some(flag) = cancel_flags().lock().get(&job_id) {
         flag.store(true, Ordering::Relaxed);
     }
-    Ok(())
 }
 
 #[cfg(test)]
