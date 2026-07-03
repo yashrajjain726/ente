@@ -630,6 +630,11 @@ class TauriInference implements InferenceBackend {
     ): Promise<GenerateSummary> {
         let resolvedJobId: number | null = null;
 
+        let resolveDone!: () => void;
+        const done = new Promise<void>((resolve) => {
+            resolveDone = resolve;
+        });
+
         const unlisten = await listen<GenerateEvent>("llm-event", (event) => {
             const payload = event.payload;
 
@@ -644,6 +649,8 @@ class TauriInference implements InferenceBackend {
             if (onEvent) {
                 onEvent(payload);
             }
+
+            if (payload.type === "done") resolveDone();
         });
 
         try {
@@ -651,9 +658,12 @@ class TauriInference implements InferenceBackend {
                 messageCount: request.messages.length,
                 maxTokens: request.maxTokens ?? null,
             });
-            return await invoke<GenerateSummary>("llm_generate_chat_stream", {
-                request: buildGenerateChatRequest(request),
-            });
+            const summary = await invoke<GenerateSummary>(
+                "llm_generate_chat_stream",
+                { request: buildGenerateChatRequest(request) },
+            );
+            await done;
+            return summary;
         } catch (error) {
             const err = normalizeInvokeError(error, "Generation failed");
             log.error("LLM tauri generate failed", err);
