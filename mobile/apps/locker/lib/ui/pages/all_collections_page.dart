@@ -233,14 +233,18 @@ class _AllCollectionsPageState extends State<AllCollectionsPage> {
   Widget _buildUncategorizedHook() {
     if (_uncategorizedCollection == null) return const SizedBox.shrink();
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 12.0),
-        child: CollectionListWidget(
-          collection: _uncategorizedCollection!,
-          selectedCollections: _selectedCollections,
-          onTapCallback: (_) => _openUncategorized(),
+    final colors = context.componentColors;
+    return ColoredBox(
+      color: colors.backgroundBase,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: CollectionListWidget(
+            collection: _uncategorizedCollection!,
+            selectedCollections: _selectedCollections,
+            onTapCallback: (_) => _openUncategorized(),
+          ),
         ),
       ),
     );
