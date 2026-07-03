@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use thiserror::Error;
 
 use ente_ensu::transcription as core;
@@ -54,47 +56,49 @@ pub trait TranscriptionModelEventCallback: Send + Sync {
     fn on_event(&self, event: TranscriptionModelEvent);
 }
 
-#[uniffi::export]
-pub fn is_transcription_model_downloaded(models_dir: String) -> bool {
-    core::is_model_downloaded(models_dir)
+#[derive(uniffi::Object)]
+pub struct Transcriber {
+    inner: core::Transcriber,
 }
 
 #[uniffi::export]
-pub fn load_transcription_model(models_dir: String) -> Result<(), TranscriptionError> {
-    core::load_model(models_dir).map_err(Into::into)
-}
+impl Transcriber {
+    #[uniffi::constructor]
+    pub fn new(models_dir: String) -> Arc<Self> {
+        Arc::new(Self {
+            inner: core::Transcriber::new(models_dir),
+        })
+    }
 
-#[uniffi::export]
-pub fn transcription_model_path(models_dir: String) -> String {
-    core::model_path(models_dir).to_string_lossy().into_owned()
-}
+    pub fn is_model_downloaded(&self) -> bool {
+        self.inner.is_model_downloaded()
+    }
 
-#[uniffi::export]
-pub fn transcription_model_size_mb() -> u64 {
-    core::model_size_mb()
-}
+    pub fn download_model(
+        &self,
+        callback: Box<dyn TranscriptionModelEventCallback>,
+    ) -> Result<String, TranscriptionError> {
+        self.inner
+            .download_model(|event| callback.on_event(event.into()))
+            .map(|path| path.to_string_lossy().into_owned())
+            .map_err(Into::into)
+    }
 
-#[uniffi::export]
-pub fn download_transcription_model(
-    models_dir: String,
-    callback: Box<dyn TranscriptionModelEventCallback>,
-) -> Result<String, TranscriptionError> {
-    core::download_model(models_dir, |event| callback.on_event(event.into()))
-        .map(|path| path.to_string_lossy().into_owned())
-        .map_err(Into::into)
-}
+    pub fn load_model(&self) -> Result<(), TranscriptionError> {
+        self.inner.load_model().map_err(Into::into)
+    }
 
-#[uniffi::export]
-pub fn transcribe_pcm16(
-    models_dir: String,
-    vad_cache_dir: String,
-    input_sample_rate: u32,
-    pcm_le: Vec<u8>,
-) -> Result<String, TranscriptionError> {
-    core::transcribe_pcm16(models_dir, vad_cache_dir, input_sample_rate, pcm_le).map_err(Into::into)
-}
+    pub fn unload_model(&self) {
+        self.inner.unload_model();
+    }
 
-#[uniffi::export]
-pub fn unload_transcription_model() -> Result<(), TranscriptionError> {
-    core::unload_model().map_err(Into::into)
+    pub fn transcribe(
+        &self,
+        input_sample_rate: u32,
+        pcm_le: Vec<u8>,
+    ) -> Result<String, TranscriptionError> {
+        self.inner
+            .transcribe(input_sample_rate, pcm_le)
+            .map_err(Into::into)
+    }
 }

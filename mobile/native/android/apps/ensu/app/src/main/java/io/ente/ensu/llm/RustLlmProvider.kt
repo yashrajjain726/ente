@@ -31,7 +31,7 @@ import io.ente.ensu.bindings.llmInitBackend
 import io.ente.ensu.bindings.llmLoadModel
 import io.ente.ensu.bindings.llmPrewarmMultimodalContext
 import io.ente.ensu.bindings.uniffiEnsureInitialized
-import io.ente.ensu.bindings.unloadTranscriptionModel
+import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.bindings.LlmChatMessage as NativeChatMessage
 import io.ente.ensu.bindings.LlmGenerationSummary as NativeSummary
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +54,7 @@ import kotlin.math.max
 class RustLlmProvider(
     context: Context,
     private val modelDir: File,
+    private val transcriber: Transcriber,
     private val deviceCapabilityProvider: AndroidDeviceCapabilityProvider,
     private val legacyModelDir: File? = null,
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO
@@ -356,7 +357,7 @@ class RustLlmProvider(
 
     private fun unloadTranscriptionModelIfLoaded() {
         runCatching {
-            unloadTranscriptionModel()
+            transcriber.unloadModel()
         }.onFailure { error ->
             Log.d("RustLlmProvider", "Transcription model unload skipped", error)
         }

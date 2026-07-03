@@ -4,7 +4,7 @@ import { downloadManager } from "@/public-album/download/services/download-manag
 import CheckIcon from "@mui/icons-material/Check";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
-import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import ErrorOutlinedIcon from "@mui/icons-material/ErrorOutlined";
 import FullscreenOutlinedIcon from "@mui/icons-material/FullscreenOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -619,7 +619,7 @@ export const PublicAlbumSingleFileViewer: React.FC<
                                             transform: "translateY(1px)",
                                         }}
                                     >
-                                        <ErrorOutlineIcon
+                                        <ErrorOutlinedIcon
                                             aria-hidden="true"
                                             sx={{
                                                 fontSize: 20,

@@ -1,8 +1,6 @@
 import Foundation
 import SwiftUI
 
-typealias LlmChatSession = Session
-
 @MainActor
 final class ChatViewModel: ObservableObject {
     private struct ModelReadyKey: Equatable {
@@ -124,8 +122,11 @@ final class ChatViewModel: ObservableObject {
 
         // LLM model files.
         let llmDir = baseDir.appendingPathComponent("llm", isDirectory: true)
-        let provider = InferenceRsProvider(modelDir: llmDir)
-        let voiceTranscriber = VoiceTranscriptionService(baseDir: baseDir)
+        let transcriptionDir = baseDir.appendingPathComponent("transcription", isDirectory: true)
+        try? FileManager.default.createDirectory(at: transcriptionDir, withIntermediateDirectories: true, attributes: nil)
+        let transcriber = Transcriber(modelsDir: transcriptionDir.path)
+        let provider = InferenceRsProvider(modelDir: llmDir, transcriber: transcriber)
+        let voiceTranscriber = VoiceTranscriptionService(transcriber: transcriber)
 
         // Chat DB + attachments.
         let dbDir = baseDir.appendingPathComponent("llmchat", isDirectory: true)
@@ -610,8 +611,8 @@ final class ChatViewModel: ObservableObject {
             return buildSelectedPath(for: sessionId, childrenMap: childrenMap).last?.id
         }()
 
-        let meta: [AttachmentMeta] = attachments.map { attachment in
-            AttachmentMeta(
+        let meta: [DbAttachmentMeta] = attachments.map { attachment in
+            DbAttachmentMeta(
                 id: attachment.id.uuidString.lowercased(),
                 kind: attachment.kind == .image ? .image : .document,
                 size: attachment.size,
@@ -1169,7 +1170,7 @@ final class ChatViewModel: ObservableObject {
             }()
 
             if isActiveGeneration {
-                let meta: [AttachmentMeta] = []
+                let meta: [DbAttachmentMeta] = []
                 do {
                     let inserted = try chatDb.insertMessage(
                         sessionUuid: parent.sessionId.uuidString,
@@ -1501,7 +1502,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     private nonisolated static func buildSessions(
-        from loaded: [LlmChatSession],
+        from loaded: [DbSession],
         chatDb: EnsuDb,
         summaries: [String: String]
     ) -> [ChatSession] {

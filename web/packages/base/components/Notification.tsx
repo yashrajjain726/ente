@@ -12,6 +12,7 @@ import {
 import { EllipsizedTypography } from "ente-base/components/Typography";
 import { RippleDisabledButton } from "ente-base/components/mui/FocusVisibleButton";
 import type { ModalVisibilityProps } from "ente-base/components/utils/modal";
+import type {} from "ente-base/components/utils/mui-theme";
 import { isSxArray } from "ente-base/components/utils/sx";
 import React from "react";
 

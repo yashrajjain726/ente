@@ -7,7 +7,6 @@ import { AlbumAddedNotification } from "@/components/AlbumAddedNotification";
 import { AuthenticateUser } from "@/components/AuthenticateUser";
 import { GalleryBarAndListHeader } from "@/components/Collections/GalleryBarAndListHeader";
 import { PickCoverPhotoDialog } from "@/components/Collections/PickCoverPhotoDialog";
-import { DownloadStatusNotifications } from "@/components/DownloadStatusNotifications";
 import type { FileListHeaderOrFooter } from "@/components/FileList";
 import { FileListWithViewer } from "@/components/FileListWithViewer";
 import { FixCreationTime } from "@/components/FixCreationTime";
@@ -52,12 +51,13 @@ import {
 import { savedAuthToken } from "ente-base/token";
 import type { Location } from "ente-base/types";
 import { ensureContactsReady } from "ente-contacts-web";
+import { DownloadStatusNotifications } from "ente-gallery/components/DownloadStatusNotifications";
 import { FullScreenDropZone } from "ente-gallery/components/FullScreenDropZone";
-import { type UploadTypeSelectorIntent } from "ente-gallery/components/Upload";
+import type { UploadTypeSelectorIntent } from "ente-gallery/components/Upload";
 import { useSaveGroups } from "ente-gallery/components/utils/save-groups";
-import { type FileViewerInitialSidebar } from "ente-gallery/components/viewer/FileViewer";
+import type { FileViewerInitialSidebar } from "ente-gallery/components/viewer/FileViewer";
 import { CollectionSubType, type Collection } from "ente-media/collection";
-import { type EnteFile } from "ente-media/file";
+import type { EnteFile } from "ente-media/file";
 import { ItemVisibility, metadataHash } from "ente-media/file-metadata";
 import { AssignPersonDialog } from "ente-new/photos/components/AssignPersonDialog";
 import {
@@ -136,7 +136,10 @@ import {
     performFileOp,
     type SelectedState,
 } from "@/utils/file";
-import { quickLinkNameForFiles, resolveQuickLinkURL } from "@/utils/quick-link";
+import {
+    quickLinkNameForFiles,
+    resolveQuickLinkURL,
+} from "ente-gallery/utils/quick-link";
 import {
     savedCollectionFiles,
     savedCollections,
@@ -151,9 +154,9 @@ import {
     filterSearchableFiles,
     updateSearchCollectionsAndFiles,
 } from "ente-new/photos/services/search";
-import {
-    type SearchOption,
-    type SidebarActionID,
+import type {
+    SearchOption,
+    SidebarActionID,
 } from "ente-new/photos/services/search/types";
 import { initSettings } from "ente-new/photos/services/settings";
 import {

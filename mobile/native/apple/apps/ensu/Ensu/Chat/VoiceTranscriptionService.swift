@@ -93,7 +93,7 @@ final class VoiceTranscriptionService {
     typealias StateHandler = @MainActor @Sendable (VoiceInputState) -> Void
     typealias TranscriptHandler = @MainActor @Sendable (String) -> Void
 
-    private let modelsDir: URL
+    private let transcriber: Transcriber
     private var transcriptionTask: Task<Void, Never>?
     private var preloadTask: Task<Void, Never>?
     private var activeVoiceTaskId = UUID()
@@ -103,9 +103,8 @@ final class VoiceTranscriptionService {
     private let recorder = PcmAudioRecorder()
     #endif
 
-    init(baseDir: URL) {
-        self.modelsDir = baseDir.appendingPathComponent("transcription", isDirectory: true)
-        try? FileManager.default.createDirectory(at: modelsDir, withIntermediateDirectories: true, attributes: nil)
+    init(transcriber: Transcriber) {
+        self.transcriber = transcriber
     }
 
     func startRecording(
@@ -164,18 +163,18 @@ final class VoiceTranscriptionService {
             downloadId: downloadId,
             onState: onState
         )
-        let modelsDirPath = modelsDir.path
+        let transcriber = transcriber
         let sampleRate = recording.sampleRate
         let pcm = recording.pcm
 
         transcriptionTask = Task.detached(priority: .userInitiated) { [weak self] in
             do {
-                if !isTranscriptionModelDownloaded(modelsDir: modelsDirPath) {
+                if !transcriber.isModelDownloaded() {
                     await MainActor.run { [weak self] in
                         guard self?.isDownloadActive(taskId: taskId, downloadId: downloadId) == true else { return }
                         onState(.downloading(percent: nil))
                     }
-                    _ = try downloadTranscriptionModel(modelsDir: modelsDirPath, callback: downloadCallback)
+                    _ = try transcriber.downloadModel(callback: downloadCallback)
                 }
 
                 if Task.isCancelled { return }
@@ -194,13 +193,8 @@ final class VoiceTranscriptionService {
                     guard self?.isVoiceTaskActive(taskId) == true else { return }
                     onState(.transcribing)
                 }
-                let transcript = try transcribePcm16(
-                    modelsDir: modelsDirPath,
-                    vadCacheDir: modelsDirPath,
-                    inputSampleRate: sampleRate,
-                    pcmLe: pcm
-                )
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+                let transcript = try transcriber.transcribe(inputSampleRate: sampleRate, pcmLe: pcm)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
 
                 if Task.isCancelled { return }
                 await MainActor.run { [weak self] in
@@ -253,16 +247,16 @@ final class VoiceTranscriptionService {
             downloadId: downloadId,
             onState: onState
         )
-        let modelsDirPath = modelsDir.path
+        let transcriber = transcriber
 
         transcriptionTask = Task.detached(priority: .userInitiated) { [weak self] in
             do {
-                if !isTranscriptionModelDownloaded(modelsDir: modelsDirPath) {
+                if !transcriber.isModelDownloaded() {
                     await MainActor.run { [weak self] in
                         guard self?.isDownloadActive(taskId: taskId, downloadId: downloadId) == true else { return }
                         onState(.downloading(percent: nil))
                     }
-                    _ = try downloadTranscriptionModel(modelsDir: modelsDirPath, callback: downloadCallback)
+                    _ = try transcriber.downloadModel(callback: downloadCallback)
                 }
 
                 if Task.isCancelled { return }
@@ -274,7 +268,7 @@ final class VoiceTranscriptionService {
                         return
                     }
                     self.beginRecording(onState: onState)
-                    self.preloadTranscriptionModel(modelsDirPath: modelsDirPath)
+                    self.preloadTranscriptionModel()
                 }
             } catch is CancellationError {
                 return
@@ -296,11 +290,12 @@ final class VoiceTranscriptionService {
         return taskId
     }
 
-    private func preloadTranscriptionModel(modelsDirPath: String) {
+    private func preloadTranscriptionModel() {
+        let transcriber = transcriber
         preloadTask?.cancel()
         preloadTask = Task.detached(priority: .utility) {
             do {
-                try loadTranscriptionModel(modelsDir: modelsDirPath)
+                try transcriber.loadModel()
             } catch is CancellationError {
                 return
             } catch {

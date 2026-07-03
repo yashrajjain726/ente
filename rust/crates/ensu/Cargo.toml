@@ -52,7 +52,6 @@ transcription = [
     "dep:flate2",
     "dep:ort",
     "dep:regex",
-    "reqwest/blocking",
     "dep:rubato",
     "dep:tar",
     "dep:transcribe-rs",

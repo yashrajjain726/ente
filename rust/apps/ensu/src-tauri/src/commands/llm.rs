@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use ente_ensu::download;
 use ente_ensu::llm;
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime;
@@ -225,7 +226,7 @@ pub async fn llm_download_model_files(
     cancel_requested.store(false, Ordering::SeqCst);
     let targets = downloads
         .into_iter()
-        .map(|download| llm::ModelDownloadTarget {
+        .map(|download| download::Target {
             label: download.label,
             url: download.url,
             destination_path: download.path,
@@ -234,7 +235,7 @@ pub async fn llm_download_model_files(
 
     async_runtime::spawn_blocking(move || {
         let progress_window = window.clone();
-        llm::download_model_files(
+        ente_ensu::llm::download_model_files(
             targets,
             move |progress| {
                 log_download_metrics(&progress);
@@ -254,7 +255,7 @@ pub fn llm_cancel_model_download(state: TauriState<'_, ModelDownloadState>) {
     state.cancel_requested.store(true, Ordering::SeqCst);
 }
 
-fn tauri_download_progress(progress: llm::ModelDownloadProgress) -> DownloadProgress {
+fn tauri_download_progress(progress: download::Progress) -> DownloadProgress {
     let percent = if progress.total_bytes.is_some() {
         progress.percentage.round().clamp(0.0, 100.0) as i32
     } else {
@@ -273,7 +274,7 @@ fn tauri_download_progress(progress: llm::ModelDownloadProgress) -> DownloadProg
     }
 }
 
-fn download_progress_status(progress: &llm::ModelDownloadProgress) -> String {
+fn download_progress_status(progress: &download::Progress) -> String {
     if progress.label == "Complete" {
         return "Download complete".to_string();
     }
@@ -298,7 +299,7 @@ fn download_progress_status(progress: &llm::ModelDownloadProgress) -> String {
     }
 }
 
-fn log_download_metrics(progress: &llm::ModelDownloadProgress) {
+fn log_download_metrics(progress: &download::Progress) {
     if progress.file_complete {
         logging::log(
             "LLMDownload",

@@ -1,7 +1,6 @@
 package io.ente.ensu.chat
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -12,17 +11,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.bindings.TranscriptionException
 import io.ente.ensu.bindings.TranscriptionModelEvent
 import io.ente.ensu.bindings.TranscriptionModelEventCallback
-import io.ente.ensu.bindings.downloadTranscriptionModel
-import io.ente.ensu.bindings.isTranscriptionModelDownloaded
-import io.ente.ensu.bindings.loadTranscriptionModel
-import io.ente.ensu.bindings.transcribePcm16
 import io.ente.ensu.bindings.uniffiEnsureInitialized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -73,12 +68,12 @@ internal fun VoiceInputState.statusText(): String? = when (this) {
 
 @Composable
 internal fun rememberVoiceTranscriptionController(
+    transcriber: Transcriber,
     onTranscript: (String) -> Unit
 ): VoiceTranscriptionController {
-    val context = LocalContext.current.applicationContext
     val lifecycleOwner = LocalLifecycleOwner.current
-    val controller = remember(context) {
-        VoiceTranscriptionController(context, onTranscript)
+    val controller = remember(transcriber) {
+        VoiceTranscriptionController(transcriber, onTranscript)
     }
     DisposableEffect(controller, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -98,12 +93,11 @@ internal fun rememberVoiceTranscriptionController(
 }
 
 internal class VoiceTranscriptionController(
-    private val appContext: Context,
+    private val transcriber: Transcriber,
     private val onTranscript: (String) -> Unit
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val bufferLock = Any()
-    private val modelsDir = appContext.getDir("ensu_transcription_models", Context.MODE_PRIVATE)
 
     private var audioRecord: AudioRecord? = null
     private var preparingRecordingJob: Job? = null
@@ -274,9 +268,7 @@ internal class VoiceTranscriptionController(
                 withContext(Dispatchers.Main.immediate) {
                     state = VoiceInputState.Transcribing
                 }
-                transcribePcm16(
-                    modelsDir.absolutePath,
-                    modelsDir.absolutePath,
+                transcriber.transcribe(
                     sampleRate.toUInt(),
                     pcm
                 )
@@ -311,7 +303,7 @@ internal class VoiceTranscriptionController(
         transcriptionPreloadJob = scope.launch(Dispatchers.IO) {
             try {
                 uniffiEnsureInitialized()
-                loadTranscriptionModel(modelsDir.absolutePath)
+                transcriber.loadModel()
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -336,13 +328,12 @@ internal class VoiceTranscriptionController(
             val activeJob = coroutineContext[Job]
             uniffiEnsureInitialized()
 
-            if (isTranscriptionModelDownloaded(modelsDir.absolutePath)) {
+            if (transcriber.isModelDownloaded()) {
                 return@withContext
             }
 
             setStateIfJobActive(activeJob, VoiceInputState.Downloading(null))
-            downloadTranscriptionModel(
-                modelsDir.absolutePath,
+            transcriber.downloadModel(
                 object : TranscriptionModelEventCallback {
                     override fun onEvent(event: TranscriptionModelEvent) {
                         when (event) {
