@@ -130,42 +130,48 @@ class CustomLockerAppBar extends StatelessWidget
                 top: 16,
                 bottom: 16,
               ),
-              child: TextInputComponent(
-                controller: searchController,
-                focusNode: searchFocusNode,
-                hintText: context.l10n.searchHint,
-                onChanged: onSearchChanged,
-                autocorrect: false,
-                enableSuggestions: false,
-                shouldUnfocusOnClearOrSubmit: true,
-                backgroundColor: colors.specialWhite,
-                textColor: Colors.black,
-                prefix: HugeIcon(
-                  icon: HugeIcons.strokeRoundedSearch01,
-                  color: colors.primary,
-                  size: 20,
-                  strokeWidth: 1.75,
+              child: Theme(
+                data: ComponentTheme.lightTheme(app: ComponentApp.locker),
+                child: Builder(
+                  builder: (context) {
+                    final fieldColors = context.componentColors;
+                    return TextInputComponent(
+                      controller: searchController,
+                      focusNode: searchFocusNode,
+                      hintText: context.l10n.searchHint,
+                      onChanged: onSearchChanged,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      shouldUnfocusOnClearOrSubmit: true,
+                      prefix: HugeIcon(
+                        icon: HugeIcons.strokeRoundedSearch01,
+                        color: fieldColors.primary,
+                        size: 20,
+                        strokeWidth: 1.75,
+                      ),
+                      suffix: showClearIcon
+                          ? IconButton(
+                              onPressed: onClearSearch,
+                              splashRadius: 1,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 24,
+                                height: 24,
+                              ),
+                              visualDensity: const VisualDensity(
+                                horizontal: -1,
+                                vertical: -1,
+                              ),
+                              icon: HugeIcon(
+                                icon: HugeIcons.strokeRoundedCancel01,
+                                color: fieldColors.textLighter,
+                                size: 20,
+                              ),
+                            )
+                          : null,
+                    );
+                  },
                 ),
-                suffix: showClearIcon
-                    ? IconButton(
-                        onPressed: onClearSearch,
-                        splashRadius: 1,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 24,
-                          height: 24,
-                        ),
-                        visualDensity: const VisualDensity(
-                          horizontal: -1,
-                          vertical: -1,
-                        ),
-                        icon: HugeIcon(
-                          icon: HugeIcons.strokeRoundedCancel01,
-                          color: colors.textLighter,
-                          size: 20,
-                        ),
-                      )
-                    : null,
               ),
             ),
           ],
