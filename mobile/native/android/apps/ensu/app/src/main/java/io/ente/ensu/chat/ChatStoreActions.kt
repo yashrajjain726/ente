@@ -12,6 +12,7 @@ import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.chat.Attachment
 import io.ente.ensu.chat.ChatMessage
 import io.ente.ensu.chat.ChatSession
+import io.ente.ensu.bindings.LlmException
 import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.chat.MessageAuthor
@@ -582,7 +583,7 @@ internal class ChatStoreActions(
                     shouldUpdateUi = isActive()
                 )
             } catch (err: Throwable) {
-                val interrupted = stopRequested || err.message?.contains("cancel", ignoreCase = true) == true
+                val interrupted = stopRequested || err is LlmException.Cancelled
                 finishGeneration(
                     sessionId,
                     userMessage,

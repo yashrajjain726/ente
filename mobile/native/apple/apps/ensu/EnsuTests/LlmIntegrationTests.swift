@@ -15,13 +15,6 @@ private final class GenerateEventCollector: LlmGenerationEventCallback {
         }
     }
 
-    var lastError: String? {
-        events.compactMap { event in
-            if case let .error(_, message) = event { return message }
-            return nil
-        }.last
-    }
-
     var textOutput: String {
         events.compactMap { event in
             if case let .text(_, text, _) = event { return text }
@@ -80,7 +73,6 @@ final class LlmIntegrationTests: XCTestCase {
 
         XCTAssertGreaterThan(summary.jobId, 0)
         XCTAssertTrue(collector.hasDone)
-        XCTAssertNil(collector.lastError)
         XCTAssertFalse(collector.textOutput.isEmpty)
     }
 
@@ -131,7 +123,6 @@ final class LlmIntegrationTests: XCTestCase {
 
         XCTAssertGreaterThan(summary.jobId, 0)
         XCTAssertTrue(collector.hasDone)
-        XCTAssertNil(collector.lastError)
         XCTAssertFalse(collector.textOutput.isEmpty)
     }
 

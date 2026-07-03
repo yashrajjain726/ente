@@ -238,9 +238,6 @@ final class LlmProvider {
             grammar: nil
         )
 
-        var error: Error?
-        let lock = NSLock()
-
         let sink = CallbackSink { event in
             switch event {
             case let .text(jobId, text, _):
@@ -248,11 +245,6 @@ final class LlmProvider {
                 onToken(text)
             case .done:
                 self.currentJobId = nil
-            case let .error(_, message):
-                self.currentJobId = nil
-                lock.lock()
-                error = NSError(domain: "LlmProvider", code: -2, userInfo: [NSLocalizedDescriptionKey: message])
-                lock.unlock()
             }
         }
 
@@ -261,15 +253,9 @@ final class LlmProvider {
                 do {
                     self.unloadTranscriptionModelIfLoaded()
                     let summary = try context.generateChatStream(request: request, callback: sink)
-                    lock.lock()
-                    let localError = error
-                    lock.unlock()
-                    if let localError {
-                        continuation.resume(throwing: localError)
-                    } else {
-                        continuation.resume(returning: summary)
-                    }
+                    continuation.resume(returning: summary)
                 } catch {
+                    self.currentJobId = nil
                     continuation.resume(throwing: error)
                 }
             }
@@ -607,7 +593,9 @@ final class LlmProvider {
     }
 
     private func isDownloadCancellation(_ error: Error) -> Bool {
-        error is CancellationError ||
+        if case LlmError.Cancelled = error { return true }
+        // The description check covers the URLSession fallback path.
+        return error is CancellationError ||
             isRustDownloadCancelled() ||
             error.localizedDescription.range(of: "cancelled", options: .caseInsensitive) != nil
     }

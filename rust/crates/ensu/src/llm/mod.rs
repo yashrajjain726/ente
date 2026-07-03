@@ -13,12 +13,35 @@ pub use model::*;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use std::sync::OnceLock;
 
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Generation cancelled")]
+    Cancelled,
+    #[error("Generation panicked")]
+    Panicked,
+    #[error("{0}")]
+    InvalidInput(String),
+    #[error("{what} not found at {path}")]
+    NotFound { what: &'static str, path: String },
+    #[error("{0}")]
+    Unsupported(&'static str),
+    #[error("Prompt length {tokens} exceeds context size {context_size}")]
+    PromptTooLong { tokens: usize, context_size: u32 },
+    #[error("{op}: {message}")]
+    Llama { op: &'static str, message: String },
+    #[error(transparent)]
+    Download(#[from] crate::download::Error),
+}
+
 static BACKEND: OnceLock<Result<LlamaBackend, String>> = OnceLock::new();
 
-fn backend() -> Result<&'static LlamaBackend, String> {
+fn backend() -> Result<&'static LlamaBackend, Error> {
     match BACKEND.get_or_init(|| LlamaBackend::init().map_err(|err| err.to_string())) {
         Ok(backend) => Ok(backend),
-        Err(err) => Err(format!("Failed to initialize backend: {err}")),
+        Err(err) => Err(Error::Llama {
+            op: "Failed to initialize backend",
+            message: err.clone(),
+        }),
     }
 }
 

@@ -1958,6 +1958,8 @@ final class ChatViewModel: ObservableObject {
 
     private func isCancellation(_ error: Error) -> Bool {
         if error is CancellationError { return true }
+        if case LlmError.Cancelled = error { return true }
+        // The description check covers the URLSession download fallback path.
         return error.localizedDescription.localizedCaseInsensitiveContains("cancel")
     }
 
@@ -1974,6 +1976,18 @@ final class ChatViewModel: ObservableObject {
         if isCancellation(error) { return false }
         if isOutOfStorageError(error) { return false }
 
+        if case let LlmError.Download(inner) = error {
+            switch inner {
+            case .validation:
+                return false
+            case let .http(status):
+                if status == 401 || status == 403 || status == 404 { return false }
+            default:
+                break
+            }
+        }
+
+        // The message checks cover the URLSession download fallback path.
         let message = error.localizedDescription.lowercased()
         if message.contains("not gguf") { return false }
         if message.contains("http 401") || message.contains("http 403") || message.contains("http 404") {

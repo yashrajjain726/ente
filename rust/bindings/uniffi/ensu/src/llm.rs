@@ -1,17 +1,59 @@
 use ente_ensu::download;
 use ente_ensu::llm;
+
+use crate::download::DownloadError;
 use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Debug, Error, uniffi::Error)]
 pub enum LlmError {
-    #[error("{0}")]
-    Message(String),
+    #[error("Generation cancelled")]
+    Cancelled,
+    #[error("Generation panicked")]
+    Panicked,
+    #[error("{detail}")]
+    InvalidInput { detail: String },
+    #[error("{what} not found at {path}")]
+    NotFound { what: String, path: String },
+    #[error("{detail}")]
+    Unsupported { detail: String },
+    #[error("Prompt length {tokens} exceeds context size {context_size}")]
+    PromptTooLong { tokens: u64, context_size: u32 },
+    #[error("{op}: {detail}")]
+    Llama { op: String, detail: String },
+    #[error("download failed")]
+    Download { error: DownloadError },
 }
 
-impl From<String> for LlmError {
-    fn from(value: String) -> Self {
-        Self::Message(value)
+impl From<llm::Error> for LlmError {
+    fn from(value: llm::Error) -> Self {
+        match value {
+            llm::Error::Cancelled => Self::Cancelled,
+            llm::Error::Panicked => Self::Panicked,
+            llm::Error::InvalidInput(message) => Self::InvalidInput { detail: message },
+            llm::Error::NotFound { what, path } => Self::NotFound {
+                what: what.to_string(),
+                path,
+            },
+            llm::Error::Unsupported(message) => Self::Unsupported {
+                detail: message.to_string(),
+            },
+            llm::Error::PromptTooLong {
+                tokens,
+                context_size,
+            } => Self::PromptTooLong {
+                tokens: tokens as u64,
+                context_size,
+            },
+            llm::Error::Llama { op, message } => Self::Llama {
+                op: op.to_string(),
+                detail: message,
+            },
+            llm::Error::Download(err) => match DownloadError::from(err) {
+                DownloadError::Cancelled => Self::Cancelled,
+                error => Self::Download { error },
+            },
+        }
     }
 }
 
@@ -98,10 +140,6 @@ pub enum LlmGenerationEvent {
     },
     Done {
         summary: LlmGenerationSummary,
-    },
-    Error {
-        job_id: i64,
-        message: String,
     },
 }
 
@@ -275,7 +313,6 @@ impl From<llm::GenerationEvent> for LlmGenerationEvent {
             llm::GenerationEvent::Done { summary } => Self::Done {
                 summary: summary.into(),
             },
-            llm::GenerationEvent::Error { job_id, message } => Self::Error { job_id, message },
         }
     }
 }
@@ -317,10 +354,10 @@ pub fn llm_download_model_files(
         move |progress| progress_callback.on_progress(progress.into()),
         move || cancel_callback.is_cancelled(),
     )
-    .map_err(|err| LlmError::Message(err.to_string()))
+    .map_err(LlmError::from)
 }
 
 #[uniffi::export]
 pub fn llm_cancel(job_id: i64) {
-    let _ = llm::cancel(job_id);
+    llm::cancel(job_id);
 }

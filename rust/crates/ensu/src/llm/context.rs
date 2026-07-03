@@ -11,7 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::model::ModelRef;
-use super::{backend, format_error};
+use super::{Error, backend, format_error};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextParams {
@@ -56,8 +56,8 @@ unsafe impl Sync for Context {}
 impl Context {
     fn try_new(
         owner: ModelRef,
-        builder: impl for<'a> FnOnce(&'a ModelRef) -> Result<LlamaContext<'a>, String>,
-    ) -> Result<Self, String> {
+        builder: impl for<'a> FnOnce(&'a ModelRef) -> Result<LlamaContext<'a>, Error>,
+    ) -> Result<Self, Error> {
         ContextCell::try_new(owner, builder).map(|cell| Context {
             cell: Mutex::new(cell),
             mtmd_context: Mutex::new(None),
@@ -77,9 +77,12 @@ impl Context {
         model: &LlamaModel,
         mmproj_path: &str,
         marker: &str,
-    ) -> Result<Arc<MtmdContext>, String> {
+    ) -> Result<Arc<MtmdContext>, Error> {
         if !Path::new(mmproj_path).exists() {
-            return Err(format!("mmproj file not found at {mmproj_path}"));
+            return Err(Error::NotFound {
+                what: "mmproj file",
+                path: mmproj_path.to_string(),
+            });
         }
 
         let (key, params) = mtmd_cache_key_and_params(mmproj_path, marker)?;
@@ -92,12 +95,16 @@ impl Context {
         }
 
         let mtmd_ctx = Arc::new(
-            MtmdContext::init_from_file(mmproj_path, model, &params)
-                .map_err(|err| format_error("Failed to initialize mmproj", err))?,
+            MtmdContext::init_from_file(mmproj_path, model, &params).map_err(|err| {
+                Error::Llama {
+                    op: "Failed to initialize mmproj",
+                    message: err.to_string(),
+                }
+            })?,
         );
 
         if !mtmd_ctx.support_vision() {
-            return Err("Model does not support vision input".to_string());
+            return Err(Error::Unsupported("Model does not support vision input"));
         }
 
         *guard = Some(CachedMtmdContext {
@@ -111,9 +118,9 @@ impl Context {
 fn mtmd_cache_key_and_params(
     mmproj_path: &str,
     marker: &str,
-) -> Result<(MtmdCacheKey, MtmdContextParams), String> {
+) -> Result<(MtmdCacheKey, MtmdContextParams), Error> {
     let media_marker = CString::new(marker.to_string())
-        .map_err(|err| format_error("Invalid media marker", err))?;
+        .map_err(|err| Error::InvalidInput(format_error("Invalid media marker", err)))?;
     let params = MtmdContextParams {
         use_gpu: false,
         print_timings: false,
@@ -123,7 +130,7 @@ fn mtmd_cache_key_and_params(
     let marker = params
         .media_marker
         .to_str()
-        .map_err(|err| format_error("Invalid media marker", err))?
+        .map_err(|err| Error::InvalidInput(format_error("Invalid media marker", err)))?
         .to_string();
     let key = MtmdCacheKey {
         mmproj_path: mmproj_path.to_string(),
@@ -136,20 +143,20 @@ fn mtmd_cache_key_and_params(
 }
 
 impl Context {
-    pub fn new(model: &ModelRef, params: ContextParams) -> Result<ContextRef, String> {
+    pub fn new(model: &ModelRef, params: ContextParams) -> Result<ContextRef, Error> {
         let mut context_params = LlamaContextParams::default();
 
         if let Some(context_size) = params.context_size {
-            let context_size =
-                u32::try_from(context_size).map_err(|_| "context_size must be > 0".to_string())?;
+            let context_size = u32::try_from(context_size)
+                .map_err(|_| Error::InvalidInput("context_size must be > 0".to_string()))?;
             let context_size = NonZeroU32::new(context_size)
-                .ok_or_else(|| "context_size must be > 0".to_string())?;
+                .ok_or_else(|| Error::InvalidInput("context_size must be > 0".to_string()))?;
             context_params = context_params.with_n_ctx(Some(context_size));
         }
 
         if let Some(n_threads) = params.n_threads {
             if n_threads <= 0 {
-                return Err("n_threads must be > 0".to_string());
+                return Err(Error::InvalidInput("n_threads must be > 0".to_string()));
             }
             context_params = context_params
                 .with_n_threads(n_threads)
@@ -157,7 +164,8 @@ impl Context {
         }
 
         if let Some(n_batch) = params.n_batch {
-            let n_batch = u32::try_from(n_batch).map_err(|_| "n_batch must be > 0".to_string())?;
+            let n_batch = u32::try_from(n_batch)
+                .map_err(|_| Error::InvalidInput("n_batch must be > 0".to_string()))?;
             context_params = context_params.with_n_batch(n_batch);
         }
 
@@ -166,7 +174,10 @@ impl Context {
             model
                 .model()
                 .new_context(backend, context_params)
-                .map_err(|err| format_error("Failed to create context", err))
+                .map_err(|err| Error::Llama {
+                    op: "Failed to create context",
+                    message: err.to_string(),
+                })
         })?;
 
         Ok(Arc::new(context))
@@ -176,7 +187,7 @@ impl Context {
         &self,
         mmproj_path: String,
         media_marker: Option<String>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Error> {
         let marker = media_marker.unwrap_or_else(|| mtmd_default_marker().to_string());
         self.with_context_mut(|ctx| {
             self.cached_mtmd_context(ctx.model, &mmproj_path, &marker)

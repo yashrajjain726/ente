@@ -510,7 +510,9 @@ class LlmProvider(
     }
 
     private fun Throwable.isDownloadCancellation(): Boolean {
-        return message?.contains("cancelled", ignoreCase = true) == true
+        // The message check covers the system DownloadManager fallback path.
+        return this is LlmException.Cancelled ||
+            message?.contains("cancelled", ignoreCase = true) == true
     }
 
     private fun cancelNativeDownloads(target: LlmModelTarget) {
@@ -780,8 +782,6 @@ class LlmProvider(
         request: LlmChatRequest,
         onToken: (String) -> Unit
     ): NativeSummary {
-        var error: Throwable? = null
-
         val callback = object : LlmGenerationEventCallback {
             override fun onEvent(event: LlmGenerationEvent) {
                 when (event) {
@@ -794,17 +794,14 @@ class LlmProvider(
                     is LlmGenerationEvent.Done -> {
                         currentJobId = null
                     }
-                    is LlmGenerationEvent.Error -> {
-                        currentJobId = null
-                        error = LlmException.Message(event.message)
-                    }
                 }
             }
         }
 
-        val summary = context.generateChatStream(request, callback)
-
-        error?.let { throw it }
-        return summary
+        try {
+            return context.generateChatStream(request, callback)
+        } finally {
+            currentJobId = null
+        }
     }
 }

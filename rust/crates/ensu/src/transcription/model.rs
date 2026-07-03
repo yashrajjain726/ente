@@ -9,7 +9,7 @@ use flate2::read::GzDecoder;
 use tar::Archive;
 
 use crate::download;
-use crate::transcription::{Result, error};
+use crate::transcription::{Result, TranscriptionError};
 
 const MODEL_URL: &str = "https://models.ente.io/parakeet-v3-int8.tar.gz";
 const MODEL_DIR_NAME: &str = "parakeet-tdt-0.6b-v3-int8";
@@ -103,11 +103,10 @@ pub(crate) fn download_model(
         },
         || false,
     ) {
-        let message = err.to_string();
         on_event(ModelEvent::DownloadError {
-            message: message.clone(),
+            message: err.to_string(),
         });
-        return Err(error(message));
+        return Err(TranscriptionError::Download(err));
     }
 
     if need_model {
@@ -118,11 +117,10 @@ pub(crate) fn download_model(
         let _ = fs::remove_file(download::metadata_path_for(&archive_path));
         if let Err(err) = extract_result {
             let _ = fs::remove_dir_all(&extracting_path);
-            let message = err.to_string();
             on_event(ModelEvent::DownloadError {
-                message: message.clone(),
+                message: err.to_string(),
             });
-            return Err(error(message));
+            return Err(err);
         }
         on_event(ModelEvent::ExtractionCompleted);
     }

@@ -4,15 +4,42 @@ use thiserror::Error;
 
 use ente_ensu::transcription;
 
+use crate::download::DownloadError;
+
 #[derive(Debug, Error, uniffi::Error)]
 pub enum TranscriptionError {
-    #[error("{0}")]
-    Message(String),
+    #[error("Transcription model is not downloaded")]
+    NotDownloaded,
+    #[error("Voice activity model is not downloaded")]
+    VadNotDownloaded,
+    #[error("{detail}")]
+    InvalidAudio { detail: String },
+    #[error("download failed")]
+    Download { error: DownloadError },
+    #[error("{detail}")]
+    Transcribe { detail: String },
+    #[error("{detail}")]
+    Io { detail: String },
 }
 
 impl From<transcription::TranscriptionError> for TranscriptionError {
     fn from(value: transcription::TranscriptionError) -> Self {
-        Self::Message(value.to_string())
+        match value {
+            transcription::TranscriptionError::NotDownloaded => Self::NotDownloaded,
+            transcription::TranscriptionError::VadNotDownloaded => Self::VadNotDownloaded,
+            transcription::TranscriptionError::InvalidAudio(message) => {
+                Self::InvalidAudio { detail: message }
+            }
+            transcription::TranscriptionError::Download(err) => {
+                Self::Download { error: err.into() }
+            }
+            transcription::TranscriptionError::Transcribe(message) => {
+                Self::Transcribe { detail: message }
+            }
+            transcription::TranscriptionError::Io(err) => Self::Io {
+                detail: err.to_string(),
+            },
+        }
     }
 }
 
