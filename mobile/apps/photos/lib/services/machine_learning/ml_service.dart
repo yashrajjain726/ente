@@ -988,8 +988,7 @@ class MLService {
     final file = instruction.file;
     return Platform.isIOS &&
         file.fileType != FileType.video &&
-        !file.isRemoteFile &&
-        !file.isSharedMediaToAppSandbox;
+        !file.isRemoteFile;
   }
 
   bool _canRunMLFunction({required String function}) {
