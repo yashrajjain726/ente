@@ -5,31 +5,33 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
-import io.ente.ensu.device.AndroidDeviceCapabilityProvider
-import io.ente.ensu.device.requireChatSupported
-import io.ente.ensu.llm.DownloadProgress
-import io.ente.ensu.llm.GenerationSummary
-import io.ente.ensu.llm.LlmMessage
-import io.ente.ensu.llm.LlmModelTarget
-import io.ente.ensu.format.formatBytes
+import io.ente.ensu.bindings.LlmChatMessage as NativeChatMessage
+import io.ente.ensu.bindings.LlmChatRequest
 import io.ente.ensu.bindings.LlmContext
 import io.ente.ensu.bindings.LlmContextParams
 import io.ente.ensu.bindings.LlmException
-import io.ente.ensu.bindings.LlmChatRequest
 import io.ente.ensu.bindings.LlmGenerationEvent
 import io.ente.ensu.bindings.LlmGenerationEventCallback
+import io.ente.ensu.bindings.LlmGenerationSummary as NativeSummary
+import io.ente.ensu.bindings.LlmModel
 import io.ente.ensu.bindings.LlmModelDownloadCallback
 import io.ente.ensu.bindings.LlmModelDownloadProgress
 import io.ente.ensu.bindings.LlmModelDownloadTarget
-import io.ente.ensu.bindings.LlmModel
 import io.ente.ensu.bindings.LlmModelLoadParams
+import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.bindings.llmCancel
 import io.ente.ensu.bindings.llmDownloadModelFiles
 import io.ente.ensu.bindings.llmInitBackend
 import io.ente.ensu.bindings.uniffiEnsureInitialized
-import io.ente.ensu.bindings.Transcriber
-import io.ente.ensu.bindings.LlmChatMessage as NativeChatMessage
-import io.ente.ensu.bindings.LlmGenerationSummary as NativeSummary
+import io.ente.ensu.device.AndroidDeviceCapabilityProvider
+import io.ente.ensu.device.requireChatSupported
+import io.ente.ensu.format.formatBytes
+import java.io.File
+import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.coroutines.coroutineContext
+import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -40,12 +42,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
-import java.io.File
-import java.io.IOException
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.coroutines.coroutineContext
-import kotlin.math.max
 
 class RustLlmProvider(
     context: Context,

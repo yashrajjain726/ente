@@ -1,5 +1,5 @@
 use ente_ensu::download;
-use ente_ensu::llm as core;
+use ente_ensu::llm;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -107,26 +107,26 @@ pub enum LlmGenerationEvent {
 
 #[derive(uniffi::Object)]
 pub struct LlmModel {
-    handle: core::ModelRef,
+    handle: llm::ModelRef,
 }
 
 #[uniffi::export]
 impl LlmModel {
     #[uniffi::constructor]
     pub fn load(params: LlmModelLoadParams) -> Result<Arc<Self>, LlmError> {
-        let handle = core::Model::load(params.into()).map_err(LlmError::from)?;
+        let handle = llm::Model::load(params.into()).map_err(LlmError::from)?;
         Ok(Arc::new(Self { handle }))
     }
 
     pub fn new_context(&self, params: LlmContextParams) -> Result<Arc<LlmContext>, LlmError> {
-        let handle = core::Context::new(&self.handle, params.into()).map_err(LlmError::from)?;
+        let handle = llm::Context::new(&self.handle, params.into()).map_err(LlmError::from)?;
         Ok(Arc::new(LlmContext { handle }))
     }
 }
 
 #[derive(uniffi::Object)]
 pub struct LlmContext {
-    handle: core::ContextRef,
+    handle: llm::ContextRef,
 }
 
 #[uniffi::export]
@@ -165,7 +165,7 @@ pub trait LlmModelDownloadCallback: Send + Sync {
     fn is_cancelled(&self) -> bool;
 }
 
-impl From<LlmModelLoadParams> for core::ModelLoadParams {
+impl From<LlmModelLoadParams> for llm::ModelLoadParams {
     fn from(value: LlmModelLoadParams) -> Self {
         Self {
             model_path: value.model_path,
@@ -176,7 +176,7 @@ impl From<LlmModelLoadParams> for core::ModelLoadParams {
     }
 }
 
-impl From<LlmContextParams> for core::ContextParams {
+impl From<LlmContextParams> for llm::ContextParams {
     fn from(value: LlmContextParams) -> Self {
         Self {
             context_size: value.context_size,
@@ -186,7 +186,7 @@ impl From<LlmContextParams> for core::ContextParams {
     }
 }
 
-impl From<LlmChatMessage> for core::ChatMessage {
+impl From<LlmChatMessage> for llm::ChatMessage {
     fn from(value: LlmChatMessage) -> Self {
         Self {
             role: value.role,
@@ -195,7 +195,7 @@ impl From<LlmChatMessage> for core::ChatMessage {
     }
 }
 
-impl From<LlmChatRequest> for core::ChatRequest {
+impl From<LlmChatRequest> for llm::ChatRequest {
     fn from(value: LlmChatRequest) -> Self {
         Self {
             messages: value.messages.into_iter().map(Into::into).collect(),
@@ -228,8 +228,8 @@ impl From<LlmModelDownloadTarget> for download::Target {
     }
 }
 
-impl From<core::GenerationSummary> for LlmGenerationSummary {
-    fn from(value: core::GenerationSummary) -> Self {
+impl From<llm::GenerationSummary> for LlmGenerationSummary {
+    fn from(value: llm::GenerationSummary) -> Self {
         Self {
             job_id: value.job_id,
             prompt_tokens: value.prompt_tokens,
@@ -260,10 +260,10 @@ impl From<download::Progress> for LlmModelDownloadProgress {
     }
 }
 
-impl From<core::GenerationEvent> for LlmGenerationEvent {
-    fn from(value: core::GenerationEvent) -> Self {
+impl From<llm::GenerationEvent> for LlmGenerationEvent {
+    fn from(value: llm::GenerationEvent) -> Self {
         match value {
-            core::GenerationEvent::Text {
+            llm::GenerationEvent::Text {
                 job_id,
                 text,
                 token_id,
@@ -272,10 +272,10 @@ impl From<core::GenerationEvent> for LlmGenerationEvent {
                 text,
                 token_id,
             },
-            core::GenerationEvent::Done { summary } => Self::Done {
+            llm::GenerationEvent::Done { summary } => Self::Done {
                 summary: summary.into(),
             },
-            core::GenerationEvent::Error { job_id, message } => Self::Error { job_id, message },
+            llm::GenerationEvent::Error { job_id, message } => Self::Error { job_id, message },
         }
     }
 }
@@ -292,15 +292,15 @@ struct CallbackSink {
     callback: Box<dyn LlmGenerationEventCallback>,
 }
 
-impl core::EventSink for CallbackSink {
-    fn add(&mut self, event: core::GenerationEvent) {
+impl llm::EventSink for CallbackSink {
+    fn add(&mut self, event: llm::GenerationEvent) {
         self.callback.on_event(event.into());
     }
 }
 
 #[uniffi::export]
 pub fn llm_init_backend() -> Result<(), LlmError> {
-    core::init_backend().map_err(LlmError::from)
+    llm::init_backend().map_err(LlmError::from)
 }
 
 #[uniffi::export]
@@ -312,7 +312,7 @@ pub fn llm_download_model_files(
     let progress_callback = Arc::clone(&callback);
     let cancel_callback = Arc::clone(&callback);
     let targets = targets.into_iter().map(Into::into).collect();
-    core::download_model_files(
+    llm::download_model_files(
         targets,
         move |progress| progress_callback.on_progress(progress.into()),
         move || cancel_callback.is_cancelled(),
@@ -322,5 +322,5 @@ pub fn llm_download_model_files(
 
 #[uniffi::export]
 pub fn llm_cancel(job_id: i64) {
-    let _ = core::cancel(job_id);
+    let _ = llm::cancel(job_id);
 }

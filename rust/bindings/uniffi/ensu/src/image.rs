@@ -1,4 +1,4 @@
-use ente_ensu::image as core;
+use ente_ensu::image;
 use thiserror::Error;
 
 #[derive(Debug, Error, uniffi::Error)]
@@ -9,5 +9,5 @@ pub enum ImageError {
 
 #[uniffi::export]
 pub fn compress_attachment_image(data: Vec<u8>) -> Result<Vec<u8>, ImageError> {
-    core::compress_attachment_image(&data).map_err(|e| ImageError::Message(e.to_string()))
+    image::compress_attachment_image(&data).map_err(|e| ImageError::Message(e.to_string()))
 }

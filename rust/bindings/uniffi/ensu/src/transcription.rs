@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
-use ente_ensu::transcription as core;
+use ente_ensu::transcription;
 
 #[derive(Debug, Error, uniffi::Error)]
 pub enum TranscriptionError {
@@ -10,8 +10,8 @@ pub enum TranscriptionError {
     Message(String),
 }
 
-impl From<core::TranscriptionError> for TranscriptionError {
-    fn from(value: core::TranscriptionError) -> Self {
+impl From<transcription::TranscriptionError> for TranscriptionError {
+    fn from(value: transcription::TranscriptionError) -> Self {
         Self::Message(value.to_string())
     }
 }
@@ -31,10 +31,10 @@ pub enum TranscriptionModelEvent {
     },
 }
 
-impl From<core::ModelEvent> for TranscriptionModelEvent {
-    fn from(value: core::ModelEvent) -> Self {
+impl From<transcription::ModelEvent> for TranscriptionModelEvent {
+    fn from(value: transcription::ModelEvent) -> Self {
         match value {
-            core::ModelEvent::DownloadProgress {
+            transcription::ModelEvent::DownloadProgress {
                 downloaded,
                 total,
                 percentage,
@@ -43,10 +43,10 @@ impl From<core::ModelEvent> for TranscriptionModelEvent {
                 total,
                 percentage,
             },
-            core::ModelEvent::ExtractionStarted => Self::ExtractionStarted,
-            core::ModelEvent::ExtractionCompleted => Self::ExtractionCompleted,
-            core::ModelEvent::DownloadComplete => Self::DownloadComplete,
-            core::ModelEvent::DownloadError { message } => Self::DownloadError { message },
+            transcription::ModelEvent::ExtractionStarted => Self::ExtractionStarted,
+            transcription::ModelEvent::ExtractionCompleted => Self::ExtractionCompleted,
+            transcription::ModelEvent::DownloadComplete => Self::DownloadComplete,
+            transcription::ModelEvent::DownloadError { message } => Self::DownloadError { message },
         }
     }
 }
@@ -58,7 +58,7 @@ pub trait TranscriptionModelEventCallback: Send + Sync {
 
 #[derive(uniffi::Object)]
 pub struct Transcriber {
-    inner: core::Transcriber,
+    inner: transcription::Transcriber,
 }
 
 #[uniffi::export]
@@ -66,7 +66,7 @@ impl Transcriber {
     #[uniffi::constructor]
     pub fn new(models_dir: String) -> Arc<Self> {
         Arc::new(Self {
-            inner: core::Transcriber::new(models_dir),
+            inner: transcription::Transcriber::new(models_dir),
         })
     }
 
