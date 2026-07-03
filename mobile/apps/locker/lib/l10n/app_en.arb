@@ -314,7 +314,7 @@
   "optionalNote": "Optional note",
   "upload": "Upload",
   "documentsHint": "Documents",
-  "searchHint": "Search...",
+  "searchHint": "Search your documents",
   "searchEmptyTitle": "No matches found",
   "searchEmptyDescription": "Try searching for something else.",
   "searchEverywhereTitle": "Search everywhere for \"{query}\"",

@@ -42,6 +42,7 @@ class CustomLockerAppBar extends StatelessWidget
   final FocusNode searchFocusNode;
   final bool isSearchActive;
   final VoidCallback onClearSearch;
+  final VoidCallback onSearchTapped;
   final ValueChanged<String>? onSearchChanged;
 
   const CustomLockerAppBar({
@@ -52,6 +53,7 @@ class CustomLockerAppBar extends StatelessWidget
     required this.searchFocusNode,
     this.isSearchActive = false,
     required this.onClearSearch,
+    required this.onSearchTapped,
     this.onSearchChanged,
   });
 
@@ -130,47 +132,39 @@ class CustomLockerAppBar extends StatelessWidget
                 top: 16,
                 bottom: 16,
               ),
-              child: Theme(
-                data: ComponentTheme.lightTheme(app: ComponentApp.locker),
-                child: Builder(
-                  builder: (context) {
-                    final fieldColors = context.componentColors;
-                    return TextInputComponent(
-                      controller: searchController,
-                      focusNode: searchFocusNode,
-                      hintText: context.l10n.searchHint,
-                      onChanged: onSearchChanged,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      shouldUnfocusOnClearOrSubmit: true,
-                      prefix: HugeIcon(
-                        icon: HugeIcons.strokeRoundedSearch01,
-                        color: fieldColors.primary,
-                        size: 20,
-                        strokeWidth: 1.75,
-                      ),
-                      suffix: showClearIcon
-                          ? IconButton(
-                              onPressed: onClearSearch,
-                              splashRadius: 1,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints.tightFor(
-                                width: 24,
-                                height: 24,
-                              ),
-                              visualDensity: const VisualDensity(
-                                horizontal: -1,
-                                vertical: -1,
-                              ),
-                              icon: HugeIcon(
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (_) => onSearchTapped(),
+                child: Theme(
+                  data: ComponentTheme.lightTheme(app: ComponentApp.locker),
+                  child: Builder(
+                    builder: (context) {
+                      final fieldColors = context.componentColors;
+                      return TextInputComponent(
+                        controller: searchController,
+                        focusNode: searchFocusNode,
+                        hintText: context.l10n.searchHint,
+                        onChanged: onSearchChanged,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        shouldUnfocusOnClearOrSubmit: true,
+                        prefix: HugeIcon(
+                          icon: HugeIcons.strokeRoundedSearch01,
+                          color: fieldColors.primary,
+                          size: 20,
+                          strokeWidth: 1.75,
+                        ),
+                        suffix: showClearIcon
+                            ? HugeIcon(
                                 icon: HugeIcons.strokeRoundedCancel01,
-                                color: fieldColors.textLighter,
-                                size: 20,
-                              ),
-                            )
-                          : null,
-                    );
-                  },
+                                color: fieldColors.textLight,
+                                size: 18,
+                              )
+                            : null,
+                        onSuffixTap: showClearIcon ? onClearSearch : null,
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -264,8 +258,6 @@ class _HomePageState extends UploaderPageState<HomePage>
   void initState() {
     super.initState();
 
-    searchFocusNode.addListener(_onSearchFocusChanged);
-
     _loadCollections();
 
     // Initialize sharing functionality to handle shared files
@@ -310,7 +302,6 @@ class _HomePageState extends UploaderPageState<HomePage>
 
   @override
   void dispose() {
-    searchFocusNode.removeListener(_onSearchFocusChanged);
     _keyboardFocusNode.dispose();
     _scrollController.dispose();
     _displayedFilesNotifier.dispose();
@@ -580,15 +571,6 @@ class _HomePageState extends UploaderPageState<HomePage>
     updateSearchQuery(query);
   }
 
-  void _onSearchFocusChanged() {
-    if (!mounted) return;
-    if (searchFocusNode.hasFocus && !isSearchActive) {
-      activateSearchWithQuery('');
-      return;
-    }
-    setState(() {});
-  }
-
   void _handleClearSearch() {
     // Clear text and unfocus before dismissing search
     searchController.clear();
@@ -652,6 +634,11 @@ class _HomePageState extends UploaderPageState<HomePage>
                   searchFocusNode: searchFocusNode,
                   isSearchActive: isSearchActive,
                   onClearSearch: _handleClearSearch,
+                  onSearchTapped: () {
+                    if (!isSearchActive) {
+                      activateSearchWithQuery('');
+                    }
+                  },
                   onSearchChanged: _handleSearchChange,
                 ),
                 body: Stack(
