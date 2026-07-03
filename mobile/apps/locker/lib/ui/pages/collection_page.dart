@@ -2,7 +2,6 @@ import "dart:async";
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
-import "package:ente_ui/utils/dialog_util.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import 'package:locker/events/collections_updated_event.dart';
@@ -23,6 +22,7 @@ import 'package:locker/ui/pages/home_page.dart';
 import 'package:locker/ui/pages/uploader_page.dart';
 import "package:locker/ui/sharing/share_collection_bottom_sheet.dart";
 import "package:locker/ui/viewer/actions/file_selection_overlay_bar.dart";
+import "package:locker/utils/error_sheet.dart";
 import "package:logging/logging.dart";
 
 class CollectionPage extends UploaderPage {
@@ -178,7 +178,7 @@ class _CollectionPageState extends UploaderPageState<CollectionPage>
       }
     } catch (e, s) {
       _logger.severe(e, s);
-      await showGenericErrorBottomSheet(context: context, error: e);
+      await showLockerErrorSheet(context, e);
     }
   }
 

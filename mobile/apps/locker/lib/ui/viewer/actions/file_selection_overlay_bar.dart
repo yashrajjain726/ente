@@ -22,7 +22,9 @@ import "package:locker/services/trash/trash_service.dart";
 import "package:locker/ui/components/add_to_collection_sheet.dart";
 import "package:locker/ui/components/delete_confirmation_sheet.dart";
 import "package:locker/ui/components/selection_action_button_widget.dart";
+import "package:locker/utils/bottom_sheet_illustration.dart";
 import "package:locker/utils/collection_list_util.dart";
+import "package:locker/utils/error_sheet.dart";
 import "package:locker/utils/file_actions.dart";
 import "package:locker/utils/file_util.dart";
 import "package:logging/logging.dart";
@@ -552,7 +554,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
     } catch (e, stackTrace) {
       _logger.severe("Failed to download file: $e", e, stackTrace);
       if (context.mounted) {
-        await showGenericErrorBottomSheet(context: context, error: e);
+        await showLockerErrorSheet(context, e);
       }
     }
   }
@@ -573,7 +575,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
     } catch (e, stackTrace) {
       _logger.severe("Failed to download files: $e", e, stackTrace);
       if (context.mounted) {
-        await showGenericErrorBottomSheet(context: context, error: e);
+        await showLockerErrorSheet(context, e);
       }
     }
   }
@@ -699,7 +701,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
         await dialog.hide();
         _logger.severe('Failed add-to operation: $e');
 
-        await showGenericErrorBottomSheet(context: context, error: e);
+        await showLockerErrorSheet(context, e);
       }
     }
   }
@@ -734,7 +736,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
       title: context.l10n.areYouSure,
       body: context.l10n.deleteMultipleFilesDialogBody(ownedFiles.length),
       deleteButtonLabel: context.l10n.yesDeleteFiles(ownedFiles.length),
-      assetPath: "assets/file_delete_icon.png",
+      illustration: LockerBottomSheetIllustration.fileDelete,
     );
 
     if (confirmation?.buttonResult.action != ButtonAction.first) {
@@ -775,7 +777,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
       if (!context.mounted) {
         return;
       }
-      await showGenericErrorBottomSheet(context: context, error: e);
+      await showLockerErrorSheet(context, e);
     }
   }
 
@@ -861,7 +863,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
       _logger.severe('Failed to restore files: $e', e, stackTrace);
 
       if (context.mounted) {
-        await showGenericErrorBottomSheet(context: context, error: e);
+        await showLockerErrorSheet(context, e);
       }
     }
   }
@@ -875,7 +877,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
       title: context.l10n.permanentlyDelete,
       body: context.l10n.permanentlyDeleteFilesBody(files.length),
       deleteButtonLabel: context.l10n.yesDelete,
-      assetPath: "assets/collection_delete_icon.png",
+      illustration: LockerBottomSheetIllustration.collectionDelete,
     );
 
     if (confirmation?.buttonResult.action != ButtonAction.first) {
@@ -907,7 +909,7 @@ class _FileSelectionOverlayBarState extends State<FileSelectionOverlayBar> {
       _logger.severe('Failed to delete files from trash: $e', e, stackTrace);
 
       if (context.mounted) {
-        await showGenericErrorBottomSheet(context: context, error: e);
+        await showLockerErrorSheet(context, e);
       }
     }
   }
