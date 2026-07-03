@@ -106,13 +106,52 @@ pub enum LlmGenerationEvent {
 }
 
 #[derive(uniffi::Object)]
-pub struct LlmModelHandle {
-    handle: core::ModelHandleRef,
+pub struct LlmModel {
+    handle: core::ModelRef,
+}
+
+#[uniffi::export]
+impl LlmModel {
+    #[uniffi::constructor]
+    pub fn load(params: LlmModelLoadParams) -> Result<Arc<Self>, LlmError> {
+        let handle = core::Model::load(params.into()).map_err(LlmError::from)?;
+        Ok(Arc::new(Self { handle }))
+    }
+
+    pub fn new_context(&self, params: LlmContextParams) -> Result<Arc<LlmContext>, LlmError> {
+        let handle = core::Context::new(&self.handle, params.into()).map_err(LlmError::from)?;
+        Ok(Arc::new(LlmContext { handle }))
+    }
 }
 
 #[derive(uniffi::Object)]
-pub struct LlmContextHandle {
-    handle: core::ContextHandleRef,
+pub struct LlmContext {
+    handle: core::ContextRef,
+}
+
+#[uniffi::export]
+impl LlmContext {
+    pub fn generate_chat_stream(
+        &self,
+        request: LlmChatRequest,
+        callback: Box<dyn LlmGenerationEventCallback>,
+    ) -> Result<LlmGenerationSummary, LlmError> {
+        let mut sink = CallbackSink { callback };
+        self.handle
+            .generate_chat_stream(request.into(), &mut sink)
+            .map(Into::into)
+            .map_err(LlmError::from)
+    }
+
+    pub fn prewarm_multimodal(
+        &self,
+        mmproj_path: String,
+        media_marker: Option<String>,
+    ) -> Result<(), LlmError> {
+        self.handle
+            .prewarm_multimodal(mmproj_path, media_marker)
+            .map_err(LlmError::from)
+    }
 }
 
 #[uniffi::export(callback_interface)]
@@ -265,22 +304,6 @@ pub fn llm_init_backend() -> Result<(), LlmError> {
 }
 
 #[uniffi::export]
-pub fn llm_load_model(params: LlmModelLoadParams) -> Result<Arc<LlmModelHandle>, LlmError> {
-    let model = core::load_model(params.into()).map_err(LlmError::from)?;
-    Ok(Arc::new(LlmModelHandle { handle: model }))
-}
-
-#[uniffi::export]
-pub fn llm_create_context(
-    model: Arc<LlmModelHandle>,
-    params: LlmContextParams,
-) -> Result<Arc<LlmContextHandle>, LlmError> {
-    let context =
-        core::create_context(model.handle.clone(), params.into()).map_err(LlmError::from)?;
-    Ok(Arc::new(LlmContextHandle { handle: context }))
-}
-
-#[uniffi::export]
 pub fn llm_download_model_files(
     targets: Vec<LlmModelDownloadTarget>,
     callback: Box<dyn LlmModelDownloadCallback>,
@@ -295,28 +318,6 @@ pub fn llm_download_model_files(
         move || cancel_callback.is_cancelled(),
     )
     .map_err(LlmError::from)
-}
-
-#[uniffi::export]
-pub fn llm_prewarm_multimodal_context(
-    context: Arc<LlmContextHandle>,
-    mmproj_path: String,
-    media_marker: Option<String>,
-) -> Result<(), LlmError> {
-    core::prewarm_multimodal_context(context.handle.as_ref(), mmproj_path, media_marker)
-        .map_err(LlmError::from)
-}
-
-#[uniffi::export]
-pub fn llm_generate_chat_stream(
-    context: Arc<LlmContextHandle>,
-    request: LlmChatRequest,
-    callback: Box<dyn LlmGenerationEventCallback>,
-) -> Result<LlmGenerationSummary, LlmError> {
-    let mut sink = CallbackSink { callback };
-    core::generate_chat_stream(context.handle.as_ref(), request.into(), &mut sink)
-        .map(Into::into)
-        .map_err(LlmError::from)
 }
 
 #[uniffi::export]

@@ -12,7 +12,7 @@ import io.ente.ensu.llm.GenerationSummary
 import io.ente.ensu.llm.LlmMessage
 import io.ente.ensu.llm.LlmModelTarget
 import io.ente.ensu.format.formatBytes
-import io.ente.ensu.bindings.LlmContextHandle
+import io.ente.ensu.bindings.LlmContext
 import io.ente.ensu.bindings.LlmContextParams
 import io.ente.ensu.bindings.LlmException
 import io.ente.ensu.bindings.LlmChatRequest
@@ -21,15 +21,11 @@ import io.ente.ensu.bindings.LlmGenerationEventCallback
 import io.ente.ensu.bindings.LlmModelDownloadCallback
 import io.ente.ensu.bindings.LlmModelDownloadProgress
 import io.ente.ensu.bindings.LlmModelDownloadTarget
-import io.ente.ensu.bindings.LlmModelHandle
+import io.ente.ensu.bindings.LlmModel
 import io.ente.ensu.bindings.LlmModelLoadParams
 import io.ente.ensu.bindings.llmCancel
-import io.ente.ensu.bindings.llmCreateContext
 import io.ente.ensu.bindings.llmDownloadModelFiles
-import io.ente.ensu.bindings.llmGenerateChatStream
 import io.ente.ensu.bindings.llmInitBackend
-import io.ente.ensu.bindings.llmLoadModel
-import io.ente.ensu.bindings.llmPrewarmMultimodalContext
 import io.ente.ensu.bindings.uniffiEnsureInitialized
 import io.ente.ensu.bindings.Transcriber
 import io.ente.ensu.bindings.LlmChatMessage as NativeChatMessage
@@ -89,8 +85,8 @@ class RustLlmProvider(
         appContext.getSharedPreferences("ensu.system.downloads", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
 
-    @Volatile private var modelHandle: LlmModelHandle? = null
-    @Volatile private var contextHandle: LlmContextHandle? = null
+    @Volatile private var loadedModel: LlmModel? = null
+    @Volatile private var loadedContext: LlmContext? = null
     @Volatile private var currentModelKey: LoadedModelKey? = null
     @Volatile private var currentContextLength: Int? = null
     @Volatile private var currentJobId: Long? = null
@@ -126,7 +122,7 @@ class RustLlmProvider(
         onToken: (String) -> Unit
     ): GenerationSummary = withContext(ioDispatcher) {
         deviceCapabilityProvider.chatCapability().requireChatSupported()
-        val context = contextHandle ?: throw IllegalStateException("Model context not loaded")
+        val context = loadedContext ?: throw IllegalStateException("Model context not loaded")
         currentJobId = null
         val mmprojPath = if (imageFiles.isEmpty()) {
             null
@@ -171,9 +167,9 @@ class RustLlmProvider(
                         ?.absolutePath
                         ?: return@withLock
                     ensureModelReadyLocked(target) { }
-                    val context = contextHandle ?: return@withLock
+                    val context = loadedContext ?: return@withLock
                     unloadTranscriptionModelIfLoaded()
-                    llmPrewarmMultimodalContext(context, mmprojPath, null)
+                    context.prewarmMultimodal(mmprojPath, null)
                 }
             }.onFailure { error ->
                 Log.d("RustLlmProvider", "Image inference prewarm skipped", error)
@@ -302,7 +298,7 @@ class RustLlmProvider(
 
     fun loadedContextLength(target: LlmModelTarget): Int? {
         val modelKey = LoadedModelKey(target.id, target.contextLength)
-        return if (currentModelKey == modelKey && contextHandle != null && modelHandle != null) {
+        return if (currentModelKey == modelKey && loadedContext != null && loadedModel != null) {
             currentContextLength
         } else {
             null
@@ -319,14 +315,14 @@ class RustLlmProvider(
     }
 
     fun resetContext() {
-        val model = modelHandle ?: return
+        val model = loadedModel ?: return
         val contextParams = LlmContextParams(
             contextSize = currentContextLength,
             nThreads = null,
             nBatch = null
         )
-        contextHandle?.destroy()
-        contextHandle = llmCreateContext(model, contextParams)
+        loadedContext?.destroy()
+        loadedContext = model.newContext(contextParams)
     }
 
     fun cancelDownload() {
@@ -347,10 +343,10 @@ class RustLlmProvider(
     }
 
     private fun unloadModel() {
-        contextHandle?.destroy()
-        contextHandle = null
-        modelHandle?.destroy()
-        modelHandle = null
+        loadedContext?.destroy()
+        loadedContext = null
+        loadedModel?.destroy()
+        loadedModel = null
         currentModelKey = null
         currentContextLength = null
     }
@@ -374,7 +370,7 @@ class RustLlmProvider(
             backendInitialized = true
         }
 
-        if (currentModelKey == modelKey && contextHandle != null && modelHandle != null) {
+        if (currentModelKey == modelKey && loadedContext != null && loadedModel != null) {
             return
         }
 
@@ -404,8 +400,8 @@ class RustLlmProvider(
             useMlock = false
         )
 
-        val model = llmLoadModel(modelParams)
-        modelHandle = model
+        val model = LlmModel.load(modelParams)
+        loadedModel = model
 
         var lastError: Throwable? = null
         for (ctx in contexts) {
@@ -415,7 +411,7 @@ class RustLlmProvider(
                     nThreads = threads,
                     nBatch = batch
                 )
-                contextHandle = llmCreateContext(model, contextParams)
+                loadedContext = model.newContext(contextParams)
                 currentModelKey = LoadedModelKey(target.id, target.contextLength)
                 currentContextLength = ctx
                 return
@@ -784,7 +780,7 @@ class RustLlmProvider(
     }
 
     private fun generateStreamWithCallback(
-        context: LlmContextHandle,
+        context: LlmContext,
         request: LlmChatRequest,
         onToken: (String) -> Unit
     ): NativeSummary {
@@ -810,7 +806,7 @@ class RustLlmProvider(
             }
         }
 
-        val summary = llmGenerateChatStream(context, request, callback)
+        val summary = context.generateChatStream(request, callback)
 
         error?.let { throw it }
         return summary

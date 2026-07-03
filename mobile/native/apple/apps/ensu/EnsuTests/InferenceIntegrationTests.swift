@@ -40,7 +40,7 @@ final class InferenceIntegrationTests: XCTestCase {
 
         try llmInitBackend()
 
-        let model = try llmLoadModel(
+        let model = try LlmModel.load(
             params: LlmModelLoadParams(
                 modelPath: modelPath,
                 nGpuLayers: nil,
@@ -49,8 +49,7 @@ final class InferenceIntegrationTests: XCTestCase {
             )
         )
 
-        let context = try llmCreateContext(
-            model: model,
+        let context = try model.newContext(
             params: LlmContextParams(contextSize: 2048, nThreads: nil, nBatch: nil)
         )
 
@@ -77,7 +76,7 @@ final class InferenceIntegrationTests: XCTestCase {
         )
 
         let collector = GenerateEventCollector()
-        let summary = try llmGenerateChatStream(context: context, request: request, callback: collector)
+        let summary = try context.generateChatStream(request: request, callback: collector)
 
         XCTAssertGreaterThan(summary.jobId, 0)
         XCTAssertTrue(collector.hasDone)
@@ -92,7 +91,7 @@ final class InferenceIntegrationTests: XCTestCase {
 
         try llmInitBackend()
 
-        let model = try llmLoadModel(
+        let model = try LlmModel.load(
             params: LlmModelLoadParams(
                 modelPath: modelPath,
                 nGpuLayers: nil,
@@ -101,8 +100,7 @@ final class InferenceIntegrationTests: XCTestCase {
             )
         )
 
-        let context = try llmCreateContext(
-            model: model,
+        let context = try model.newContext(
             params: LlmContextParams(contextSize: 2048, nThreads: nil, nBatch: nil)
         )
 
@@ -129,7 +127,7 @@ final class InferenceIntegrationTests: XCTestCase {
         )
 
         let collector = GenerateEventCollector()
-        let summary = try llmGenerateChatStream(context: context, request: request, callback: collector)
+        let summary = try context.generateChatStream(request: request, callback: collector)
 
         XCTAssertGreaterThan(summary.jobId, 0)
         XCTAssertTrue(collector.hasDone)

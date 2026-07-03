@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
-use super::context::ContextHandle;
+use super::context::Context;
 use super::event::{EventSink, GenerationEvent, GenerationSummary, JobId};
 use super::format_error;
 
@@ -447,8 +447,18 @@ fn build_sampler(model: &LlamaModel, request: &SamplingParams) -> Result<LlamaSa
     Ok(LlamaSampler::chain_simple(samplers))
 }
 
-pub fn generate_chat_stream(
-    context: &ContextHandle,
+impl Context {
+    pub fn generate_chat_stream(
+        &self,
+        request: ChatRequest,
+        sink: &mut dyn EventSink,
+    ) -> Result<GenerationSummary, String> {
+        generate_chat_stream(self, request, sink)
+    }
+}
+
+fn generate_chat_stream(
+    context: &Context,
     request: ChatRequest,
     sink: &mut dyn EventSink,
 ) -> Result<GenerationSummary, String> {

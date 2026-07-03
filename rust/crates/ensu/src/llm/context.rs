@@ -10,7 +10,7 @@ use std::num::NonZeroU32;
 use std::path::Path;
 use std::sync::Arc;
 
-use super::model::ModelHandleRef;
+use super::model::ModelRef;
 use super::{backend, format_error};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,8 +21,8 @@ pub struct ContextParams {
 }
 
 self_cell!(
-    struct ContextHandleCell {
-        owner: ModelHandleRef,
+    struct ContextCell {
+        owner: ModelRef,
 
         #[covariant]
         dependent: LlamaContext,
@@ -43,22 +43,22 @@ struct CachedMtmdContext {
     context: Arc<MtmdContext>,
 }
 
-pub struct ContextHandle {
-    cell: Mutex<ContextHandleCell>,
+pub struct Context {
+    cell: Mutex<ContextCell>,
     mtmd_context: Mutex<Option<CachedMtmdContext>>,
 }
 
-pub type ContextHandleRef = Arc<ContextHandle>;
+pub type ContextRef = Arc<Context>;
 
-unsafe impl Send for ContextHandle {}
-unsafe impl Sync for ContextHandle {}
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}
 
-impl ContextHandle {
+impl Context {
     fn try_new(
-        owner: ModelHandleRef,
-        builder: impl for<'a> FnOnce(&'a ModelHandleRef) -> Result<LlamaContext<'a>, String>,
+        owner: ModelRef,
+        builder: impl for<'a> FnOnce(&'a ModelRef) -> Result<LlamaContext<'a>, String>,
     ) -> Result<Self, String> {
-        ContextHandleCell::try_new(owner, builder).map(|cell| ContextHandle {
+        ContextCell::try_new(owner, builder).map(|cell| Context {
             cell: Mutex::new(cell),
             mtmd_context: Mutex::new(None),
         })
@@ -135,54 +135,52 @@ fn mtmd_cache_key_and_params(
     Ok((key, params))
 }
 
-pub fn create_context(
-    model: ModelHandleRef,
-    params: ContextParams,
-) -> Result<ContextHandleRef, String> {
-    let mut context_params = LlamaContextParams::default();
+impl Context {
+    pub fn new(model: &ModelRef, params: ContextParams) -> Result<ContextRef, String> {
+        let mut context_params = LlamaContextParams::default();
 
-    if let Some(context_size) = params.context_size {
-        let context_size =
-            u32::try_from(context_size).map_err(|_| "context_size must be > 0".to_string())?;
-        let context_size =
-            NonZeroU32::new(context_size).ok_or_else(|| "context_size must be > 0".to_string())?;
-        context_params = context_params.with_n_ctx(Some(context_size));
-    }
-
-    if let Some(n_threads) = params.n_threads {
-        if n_threads <= 0 {
-            return Err("n_threads must be > 0".to_string());
+        if let Some(context_size) = params.context_size {
+            let context_size =
+                u32::try_from(context_size).map_err(|_| "context_size must be > 0".to_string())?;
+            let context_size = NonZeroU32::new(context_size)
+                .ok_or_else(|| "context_size must be > 0".to_string())?;
+            context_params = context_params.with_n_ctx(Some(context_size));
         }
-        context_params = context_params
-            .with_n_threads(n_threads)
-            .with_n_threads_batch(n_threads);
+
+        if let Some(n_threads) = params.n_threads {
+            if n_threads <= 0 {
+                return Err("n_threads must be > 0".to_string());
+            }
+            context_params = context_params
+                .with_n_threads(n_threads)
+                .with_n_threads_batch(n_threads);
+        }
+
+        if let Some(n_batch) = params.n_batch {
+            let n_batch = u32::try_from(n_batch).map_err(|_| "n_batch must be > 0".to_string())?;
+            context_params = context_params.with_n_batch(n_batch);
+        }
+
+        let context = Context::try_new(Arc::clone(model), |model| {
+            let backend = backend()?;
+            model
+                .model()
+                .new_context(backend, context_params)
+                .map_err(|err| format_error("Failed to create context", err))
+        })?;
+
+        Ok(Arc::new(context))
     }
 
-    if let Some(n_batch) = params.n_batch {
-        let n_batch = u32::try_from(n_batch).map_err(|_| "n_batch must be > 0".to_string())?;
-        context_params = context_params.with_n_batch(n_batch);
+    pub fn prewarm_multimodal(
+        &self,
+        mmproj_path: String,
+        media_marker: Option<String>,
+    ) -> Result<(), String> {
+        let marker = media_marker.unwrap_or_else(|| mtmd_default_marker().to_string());
+        self.with_context_mut(|ctx| {
+            self.cached_mtmd_context(ctx.model, &mmproj_path, &marker)
+                .map(|_| ())
+        })
     }
-
-    let context = ContextHandle::try_new(model, |model| {
-        let backend = backend()?;
-        model
-            .model()
-            .new_context(backend, context_params)
-            .map_err(|err| format_error("Failed to create context", err))
-    })?;
-
-    Ok(Arc::new(context))
-}
-
-pub fn prewarm_multimodal_context(
-    context: &ContextHandle,
-    mmproj_path: String,
-    media_marker: Option<String>,
-) -> Result<(), String> {
-    let marker = media_marker.unwrap_or_else(|| mtmd_default_marker().to_string());
-    context.with_context_mut(|ctx| {
-        context
-            .cached_mtmd_context(ctx.model, &mmproj_path, &marker)
-            .map(|_| ())
-    })
 }

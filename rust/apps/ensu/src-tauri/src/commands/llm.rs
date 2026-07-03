@@ -14,8 +14,8 @@ use crate::logging;
 
 #[derive(Default)]
 pub struct State {
-    model: Mutex<Option<llm::ModelHandleRef>>,
-    context: Mutex<Option<llm::ContextHandleRef>>,
+    model: Mutex<Option<llm::ModelRef>>,
+    context: Mutex<Option<llm::ContextRef>>,
 }
 
 pub struct ModelDownloadState {
@@ -66,8 +66,8 @@ fn fs_thread_error() -> ApiError {
 
 pub(crate) fn replace_state(
     state: &State,
-    model: Option<llm::ModelHandleRef>,
-    context: Option<llm::ContextHandleRef>,
+    model: Option<llm::ModelRef>,
+    context: Option<llm::ContextRef>,
 ) -> Result<(), ApiError> {
     let mut model_guard = state
         .model
@@ -383,7 +383,7 @@ pub async fn llm_load_model(
         format!("load model requested model_path={}", params.model_path),
     );
     let model = async_runtime::spawn_blocking(move || {
-        match catch_unwind(AssertUnwindSafe(|| llm::load_model(params))) {
+        match catch_unwind(AssertUnwindSafe(|| llm::Model::load(params))) {
             Ok(result) => result.map_err(llm_error),
             Err(payload) => {
                 let message = panic_message(payload);
@@ -431,7 +431,7 @@ pub async fn llm_create_context(
     );
 
     let context = async_runtime::spawn_blocking(move || {
-        match catch_unwind(AssertUnwindSafe(|| llm::create_context(model, params))) {
+        match catch_unwind(AssertUnwindSafe(|| llm::Context::new(&model, params))) {
             Ok(result) => result.map_err(llm_error),
             Err(payload) => {
                 let message = panic_message(payload);
@@ -493,7 +493,7 @@ pub async fn llm_prewarm_multimodal_context(
     );
     async_runtime::spawn_blocking(move || {
         match catch_unwind(AssertUnwindSafe(|| {
-            llm::prewarm_multimodal_context(context.as_ref(), mmproj_path, media_marker)
+            context.prewarm_multimodal(mmproj_path, media_marker)
         })) {
             Ok(result) => result.map_err(llm_error),
             Err(payload) => {
@@ -531,7 +531,7 @@ pub fn llm_generate_chat_stream(
     async_runtime::spawn_blocking(move || {
         match catch_unwind(AssertUnwindSafe(|| {
             let mut sink = EventSink::new(window.clone());
-            let _ = llm::generate_chat_stream(context.as_ref(), request, &mut sink);
+            let _ = context.generate_chat_stream(request, &mut sink);
         })) {
             Ok(()) => {}
             Err(payload) => {

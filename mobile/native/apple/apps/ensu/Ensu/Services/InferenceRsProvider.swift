@@ -91,8 +91,8 @@ final class InferenceRsProvider {
     private let modelDir: URL
     private let transcriber: Transcriber
     private let downloadManager = ModelDownloadManager.shared
-    private var modelHandle: LlmModelHandle?
-    private var contextHandle: LlmContextHandle?
+    private var loadedModel: LlmModel?
+    private var loadedContext: LlmContext?
     private var currentModelKey: LoadedModelKey?
     private var currentContextLength: Int?
     private var backendInitialized = false
@@ -127,7 +127,7 @@ final class InferenceRsProvider {
             throw UnsupportedDeviceMemoryError(capability: capability)
         }
         let modelKey = LoadedModelKey(id: target.id, requestedContextLength: target.contextLength)
-        if currentModelKey == modelKey, modelHandle != nil, contextHandle != nil {
+        if currentModelKey == modelKey, loadedModel != nil, loadedContext != nil {
             return
         }
 
@@ -182,7 +182,7 @@ final class InferenceRsProvider {
 
         onProgress(InferenceDownloadProgress(percent: 100, status: "Loading model..."))
         do {
-            try loadModelHandle(target: target, modelPath: modelPath)
+            try loadModel(target: target, modelPath: modelPath)
         } catch {
             if allowRecovery, downloads.isEmpty,
                recoverFromCachedModelLoadFailure(modelPath: modelPath, mmprojPath: mmprojPath) {
@@ -207,7 +207,7 @@ final class InferenceRsProvider {
         if !capability.isChatSupported {
             throw UnsupportedDeviceMemoryError(capability: capability)
         }
-        guard let context = contextHandle else {
+        guard let context = loadedContext else {
             throw NSError(domain: "InferenceRsProvider", code: -1, userInfo: [NSLocalizedDescriptionKey: "Model not loaded"])
         }
         currentJobId = nil
@@ -260,7 +260,7 @@ final class InferenceRsProvider {
             Task.detached {
                 do {
                     self.unloadTranscriptionModelIfLoaded()
-                    let summary = try llmGenerateChatStream(context: context, request: request, callback: sink)
+                    let summary = try context.generateChatStream(request: request, callback: sink)
                     lock.lock()
                     let localError = error
                     lock.unlock()
@@ -304,16 +304,15 @@ final class InferenceRsProvider {
                     }
 
                     try await self.ensureModelReadyLocked(target: target, onProgress: { _ in }, allowRecovery: true)
-                    guard let context = self.contextHandle else {
+                    guard let context = self.loadedContext else {
                         return
                     }
 
                     self.unloadTranscriptionModelIfLoaded()
-                    try llmPrewarmMultimodalContext(
-                        context: context,
+                    try context.prewarmMultimodal(
                         mmprojPath: mmprojPath.path,
                         mediaMarker: nil
-                    )
+                        )
                 }
             }.value
         } catch {
@@ -322,10 +321,10 @@ final class InferenceRsProvider {
     }
 
     func resetContext() {
-        guard let model = modelHandle else { return }
+        guard let model = loadedModel else { return }
         let contextParams = LlmContextParams(contextSize: currentContextLength.map(Int32.init), nThreads: nil, nBatch: nil)
-        contextHandle = nil
-        contextHandle = try? llmCreateContext(model: model, params: contextParams)
+        loadedContext = nil
+        loadedContext = try? model.newContext(params: contextParams)
     }
 
     func cancelDownload() {
@@ -390,15 +389,15 @@ final class InferenceRsProvider {
 
     func loadedContextLength(target: InferenceModelTarget) -> Int? {
         let modelKey = LoadedModelKey(id: target.id, requestedContextLength: target.contextLength)
-        guard currentModelKey == modelKey, modelHandle != nil, contextHandle != nil else {
+        guard currentModelKey == modelKey, loadedModel != nil, loadedContext != nil else {
             return nil
         }
         return currentContextLength
     }
 
     private func unloadModel() {
-        contextHandle = nil
-        modelHandle = nil
+        loadedContext = nil
+        loadedModel = nil
         currentModelKey = nil
         currentContextLength = nil
     }
@@ -407,10 +406,10 @@ final class InferenceRsProvider {
         transcriber.unloadModel()
     }
 
-    private func loadModelHandle(target: InferenceModelTarget, modelPath: URL) throws {
+    private func loadModel(target: InferenceModelTarget, modelPath: URL) throws {
         let params = LlmModelLoadParams(modelPath: modelPath.path, nGpuLayers: 0, useMmap: true, useMlock: false)
-        let model = try llmLoadModel(params: params)
-        modelHandle = model
+        let model = try LlmModel.load(params: params)
+        loadedModel = model
 
         let desiredContext = target.contextLength ?? 12000
         let candidates = [desiredContext, 12000, 8192, 4096, 2048, 1024]
@@ -421,7 +420,7 @@ final class InferenceRsProvider {
         for contextSize in candidates {
             do {
                 let contextParams = LlmContextParams(contextSize: Int32(contextSize), nThreads: Int32(threadCount), nBatch: Int32(512))
-                contextHandle = try llmCreateContext(model: model, params: contextParams)
+                loadedContext = try model.newContext(params: contextParams)
                 currentModelKey = LoadedModelKey(id: target.id, requestedContextLength: target.contextLength)
                 currentContextLength = contextSize
                 return
