@@ -12,6 +12,48 @@ struct LlmModelTarget: Equatable {
 struct DownloadProgress: Equatable {
     let percent: Int
     let status: String
+    var failure: DownloadFailure? = nil
+}
+
+enum DownloadFailure: Error, Codable, Equatable, LocalizedError {
+    case http(Int)
+    case invalidContent(String)
+    case insufficientSpace
+    case timedOut
+    case failed(String)
+
+    var message: String {
+        switch self {
+        case let .http(status):
+            return "Download failed: HTTP \(status)"
+        case let .invalidContent(message):
+            return message
+        case .insufficientSpace:
+            return "Not enough storage space to download the model. Please free up space and try again."
+        case .timedOut:
+            return "Download timed out"
+        case let .failed(message):
+            return message
+        }
+    }
+
+    var errorDescription: String? { message }
+}
+
+extension Error {
+    var isOutOfDiskSpace: Bool {
+        var current: NSError? = self as NSError
+        while let nsError = current {
+            if nsError.domain == NSCocoaErrorDomain, nsError.code == NSFileWriteOutOfSpaceError {
+                return true
+            }
+            if nsError.domain == NSPOSIXErrorDomain, nsError.code == Int(ENOSPC) {
+                return true
+            }
+            current = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
+        }
+        return false
+    }
 }
 
 enum LlmMessageRole {
@@ -527,22 +569,14 @@ final class LlmProvider {
 
             if let progress = await downloadManager.progress(for: managerTargets) {
                 if progress.percent == -1 {
-                    throw NSError(
-                        domain: "LlmProvider",
-                        code: -9,
-                        userInfo: [NSLocalizedDescriptionKey: progress.status]
-                    )
+                    throw progress.failure ?? DownloadFailure.failed(progress.status)
                 }
                 onProgress(progress)
             }
 
             pollCount += 1
             if pollCount >= maxPolls {
-                throw NSError(
-                    domain: "LlmProvider",
-                    code: -10,
-                    userInfo: [NSLocalizedDescriptionKey: "Download timed out"]
-                )
+                throw DownloadFailure.timedOut
             }
             try await Task.sleep(nanoseconds: 500_000_000)
         }
@@ -594,10 +628,8 @@ final class LlmProvider {
 
     private func isDownloadCancellation(_ error: Error) -> Bool {
         if case LlmError.Cancelled = error { return true }
-        // The description check covers the URLSession fallback path.
-        return error is CancellationError ||
-            isRustDownloadCancelled() ||
-            error.localizedDescription.range(of: "cancelled", options: .caseInsensitive) != nil
+        if (error as? URLError)?.code == .cancelled { return true }
+        return error is CancellationError || isRustDownloadCancelled()
     }
 
     private func logDownloadMetrics(_ progress: LlmModelDownloadProgress) {

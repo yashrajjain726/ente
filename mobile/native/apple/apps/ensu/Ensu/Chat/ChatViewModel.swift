@@ -1959,8 +1959,7 @@ final class ChatViewModel: ObservableObject {
     private func isCancellation(_ error: Error) -> Bool {
         if error is CancellationError { return true }
         if case LlmError.Cancelled = error { return true }
-        // The description check covers the URLSession download fallback path.
-        return error.localizedDescription.localizedCaseInsensitiveContains("cancel")
+        return (error as? URLError)?.code == .cancelled
     }
 
     private func seedDownloadProgressMemory() {
@@ -1987,11 +1986,13 @@ final class ChatViewModel: ObservableObject {
             }
         }
 
-        // The message checks cover the URLSession download fallback path.
-        let message = error.localizedDescription.lowercased()
-        if message.contains("not gguf") { return false }
-        if message.contains("http 401") || message.contains("http 403") || message.contains("http 404") {
+        switch error as? DownloadFailure {
+        case .invalidContent:
             return false
+        case let .http(status):
+            if status == 401 || status == 403 || status == 404 { return false }
+        default:
+            break
         }
         return true
     }
@@ -2014,26 +2015,9 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func isOutOfStorageError(_ error: Error) -> Bool {
-        func containsStorageMessage(_ message: String) -> Bool {
-            let normalized = message.lowercased()
-            return normalized.contains("no space left on device") ||
-                normalized.contains("not enough space") ||
-                normalized.contains("out of space") ||
-                normalized.contains("disk is full") ||
-                normalized.contains("enospc")
-        }
-
-        var current: NSError? = error as NSError
-        while let nsError = current {
-            if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileWriteOutOfSpaceError {
-                return true
-            }
-            if containsStorageMessage(nsError.localizedDescription) {
-                return true
-            }
-            current = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
-        }
-        return containsStorageMessage(error.localizedDescription)
+        if case DownloadFailure.insufficientSpace = error { return true }
+        if case LlmError.Download(.storageFull) = error { return true }
+        return error.isOutOfDiskSpace
     }
 
     private nonisolated func attachmentsDirectory() throws -> URL {

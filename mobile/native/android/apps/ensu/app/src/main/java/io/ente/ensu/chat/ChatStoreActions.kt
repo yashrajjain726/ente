@@ -474,7 +474,7 @@ internal class ChatStoreActions(
                 }
             } catch (err: Throwable) {
                 val cancelled = err is kotlinx.coroutines.CancellationException ||
-                    err.message?.contains("cancel", ignoreCase = true) == true
+                    err is LlmException.Cancelled
                 if (!isActive()) return@launch
                 streamingParentId = null
                 state.update { appState ->

@@ -5,6 +5,10 @@ import io.ente.ensu.llm.LlmModelTarget
 import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.bindings.ConfigDefaults
+import io.ente.ensu.bindings.DownloadError
+import io.ente.ensu.bindings.LlmException
+import android.system.ErrnoException
+import android.system.OsConstants
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.settings.SessionPreferencesDataStore
 import io.ente.ensu.AppState
@@ -235,7 +239,7 @@ internal class ModelSettingsActions(
                 }
             } catch (err: Throwable) {
                 val cancelled = err is kotlinx.coroutines.CancellationException ||
-                    err.message?.contains("cancel", ignoreCase = true) == true
+                    err is LlmException.Cancelled
                 val failureMessage = if (cancelled) {
                     "Download cancelled"
                 } else {
@@ -407,6 +411,7 @@ internal class ModelSettingsActions(
 
     companion object {
         private const val MAX_DOWNLOAD_RETRIES = 5
+        private val NON_RETRYABLE_HTTP = setOf(401, 403, 404)
         private const val RETRY_DELAY_BASE_MS = 1500L
         private const val RETRY_DELAY_MAX_MS = 12000L
         private const val DEFAULT_TEMPERATURE = 0.5f
@@ -415,14 +420,16 @@ internal class ModelSettingsActions(
     private fun shouldRetryDownload(err: Throwable, retryCount: Int): Boolean {
         if (retryCount >= MAX_DOWNLOAD_RETRIES) return false
         if (err is kotlinx.coroutines.CancellationException) return false
+        if (err is LlmException.Cancelled) return false
         if (isOutOfStorageError(err)) return false
-        val message = err.message.orEmpty()
-        if (message.contains("not GGUF", ignoreCase = true)) return false
-        if (message.contains("HTTP 401", ignoreCase = true) ||
-            message.contains("HTTP 403", ignoreCase = true) ||
-            message.contains("HTTP 404", ignoreCase = true)
-        ) {
-            return false
+        if (err is DownloadFailure.InvalidContent) return false
+        if (err is DownloadFailure.Http && err.status in NON_RETRYABLE_HTTP) return false
+        if (err is LlmException.Download) {
+            when (val error = err.error) {
+                is DownloadError.Validation -> return false
+                is DownloadError.Http -> if (error.status.toInt() in NON_RETRYABLE_HTTP) return false
+                else -> {}
+            }
         }
         return true
     }
@@ -442,14 +449,11 @@ internal class ModelSettingsActions(
     private fun isOutOfStorageError(err: Throwable): Boolean {
         var current: Throwable? = err
         while (current != null) {
-            val message = current.message.orEmpty()
-            if (message.contains("ENOSPC", ignoreCase = true) ||
-                message.contains("No space left on device", ignoreCase = true) ||
-                message.contains("disk is full", ignoreCase = true) ||
-                message.contains("not enough storage", ignoreCase = true)
-            ) {
+            if (current is DownloadFailure.InsufficientSpace) return true
+            if (current is LlmException.Download && current.error is DownloadError.StorageFull) {
                 return true
             }
+            if (current is ErrnoException && current.errno == OsConstants.ENOSPC) return true
             current = current.cause
         }
         return false

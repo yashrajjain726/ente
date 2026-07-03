@@ -27,11 +27,11 @@ import io.ente.ensu.device.AndroidDeviceCapabilityProvider
 import io.ente.ensu.device.requireChatSupported
 import io.ente.ensu.format.formatBytes
 import java.io.File
-import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.coroutines.coroutineContext
 import kotlin.math.max
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -261,13 +261,17 @@ class LlmProvider(
                             totalBytes += size
                         } else {
                             clearDownloadRecords(target)
-                            return@withContext DownloadProgress(-1, "${download.label} download is invalid")
+                            val failure = DownloadFailure.InvalidContent(
+                                "${download.label} download is invalid"
+                            )
+                            return@withContext DownloadProgress(-1, failure.message, failure)
                         }
                     }
 
                     DownloadManager.STATUS_FAILED -> {
                         clearDownloadRecords(target)
-                        return@withContext DownloadProgress(-1, userFacingDownloadFailure(row.reason))
+                        val failure = downloadFailure(row.reason)
+                        return@withContext DownloadProgress(-1, failure.message, failure)
                     }
                 }
             }
@@ -464,13 +468,13 @@ class LlmProvider(
             } else {
                 emptyPollCount = 0
                 if (progress.percent < 0) {
-                    throw IOException(progress.status)
+                    throw progress.failure ?: DownloadFailure.Failed(progress.status)
                 }
                 onProgress(progress)
             }
             pollCount += 1
             if (pollCount >= maxPolls) {
-                throw IOException("Download timed out")
+                throw DownloadFailure.TimedOut()
             }
             delay(500)
         }
@@ -510,9 +514,7 @@ class LlmProvider(
     }
 
     private fun Throwable.isDownloadCancellation(): Boolean {
-        // The message check covers the system DownloadManager fallback path.
-        return this is LlmException.Cancelled ||
-            message?.contains("cancelled", ignoreCase = true) == true
+        return this is LlmException.Cancelled || this is CancellationException
     }
 
     private fun cancelNativeDownloads(target: LlmModelTarget) {
@@ -761,15 +763,15 @@ class LlmProvider(
         }
     }
 
-    private fun userFacingDownloadFailure(reason: Int): String {
-        return when (reason) {
-            DownloadManager.ERROR_INSUFFICIENT_SPACE ->
-                "Not enough storage space to download the model. Please free up space and try again."
-            DownloadManager.ERROR_DEVICE_NOT_FOUND -> "Download storage is unavailable"
-            DownloadManager.ERROR_CANNOT_RESUME -> "Download could not resume"
-            DownloadManager.ERROR_UNHANDLED_HTTP_CODE,
-            DownloadManager.ERROR_HTTP_DATA_ERROR -> "Download failed. Please try again."
-            else -> "Download failed. Please try again."
+    private fun downloadFailure(reason: Int): DownloadFailure {
+        return when {
+            reason == DownloadManager.ERROR_INSUFFICIENT_SPACE -> DownloadFailure.InsufficientSpace()
+            reason in 400..599 -> DownloadFailure.Http(reason)
+            reason == DownloadManager.ERROR_DEVICE_NOT_FOUND ->
+                DownloadFailure.Failed("Download storage is unavailable")
+            reason == DownloadManager.ERROR_CANNOT_RESUME ->
+                DownloadFailure.Failed("Download could not resume")
+            else -> DownloadFailure.Failed("Download failed. Please try again.")
         }
     }
 

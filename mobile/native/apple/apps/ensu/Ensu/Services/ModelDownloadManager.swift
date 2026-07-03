@@ -23,6 +23,7 @@ final class ModelDownloadManager: NSObject {
         let destinationPath: String
         var state: State
         var errorMessage: String?
+        var failure: DownloadFailure?
         var resumeDataFile: String?
     }
 
@@ -69,12 +70,13 @@ final class ModelDownloadManager: NSObject {
                 destinationPath: target.destination.path,
                 state: .queued,
                 errorMessage: nil,
+                failure: nil,
                 resumeDataFile: nil
             )
 
             guard let url = URL(string: target.url) else {
                 saveRecord(record)
-                markFailed(id: id, message: "Invalid URL")
+                markFailed(id: id, failure: .failed("Invalid URL"))
                 continue
             }
 
@@ -105,8 +107,9 @@ final class ModelDownloadManager: NSObject {
         }
 
         if relevantTasks.isEmpty {
-            if let failure = firstFailure(for: targets) {
-                return DownloadProgress(percent: -1, status: failure)
+            if let failed = firstFailure(for: targets) {
+                let failure = failed.failure ?? .failed(failed.errorMessage ?? "Download failed")
+                return DownloadProgress(percent: -1, status: failure.message, failure: failure)
             }
             return nil
         }
@@ -204,9 +207,9 @@ final class ModelDownloadManager: NSObject {
         return (attrs?[.size] as? NSNumber)?.int64Value ?? 0
     }
 
-    private func firstFailure(for targets: [ModelDownloadTarget]) -> String? {
+    private func firstFailure(for targets: [ModelDownloadTarget]) -> DownloadRecord? {
         let ids = Set(targets.map { recordId(for: $0.destination) })
-        return loadRecords().values.first(where: { ids.contains($0.id) && $0.state == .failed })?.errorMessage
+        return loadRecords().values.first(where: { ids.contains($0.id) && $0.state == .failed })
     }
 
     private func loadRecords() -> [String: DownloadRecord] {
@@ -265,10 +268,11 @@ final class ModelDownloadManager: NSObject {
         }
     }
 
-    private func markFailed(id: String, message: String) {
+    private func markFailed(id: String, failure: DownloadFailure) {
         updateRecord(id: id) { record in
             record.state = .failed
-            record.errorMessage = message
+            record.errorMessage = failure.message
+            record.failure = failure
         }
     }
 
@@ -276,6 +280,7 @@ final class ModelDownloadManager: NSObject {
         updateRecord(id: id) { record in
             record.state = .downloading
             record.errorMessage = nil
+            record.failure = nil
             removeResumeData(for: record)
             record.resumeDataFile = nil
         }
@@ -345,7 +350,7 @@ extension ModelDownloadManager: URLSessionDownloadDelegate, URLSessionTaskDelega
         guard let record = loadRecords()[id] else { return }
         if let response = downloadTask.response as? HTTPURLResponse,
            !(200...299).contains(response.statusCode) {
-            markFailed(id: id, message: "Download failed: HTTP \(response.statusCode)")
+            markFailed(id: id, failure: .http(response.statusCode))
             return
         }
 
@@ -353,7 +358,7 @@ extension ModelDownloadManager: URLSessionDownloadDelegate, URLSessionTaskDelega
         do {
             if !location.looksLikeGgufFile {
                 try? FileManager.default.removeItem(at: location)
-                markFailed(id: id, message: "Downloaded file is not GGUF")
+                markFailed(id: id, failure: .invalidContent("Downloaded file is not GGUF"))
                 return
             }
             try FileManager.default.createDirectory(
@@ -367,7 +372,9 @@ extension ModelDownloadManager: URLSessionDownloadDelegate, URLSessionTaskDelega
             try FileManager.default.moveItem(at: location, to: destination)
             clearRecord(id: id)
         } catch {
-            markFailed(id: id, message: error.localizedDescription)
+            let failure: DownloadFailure =
+                error.isOutOfDiskSpace ? .insufficientSpace : .failed(error.localizedDescription)
+            markFailed(id: id, failure: failure)
         }
     }
 
@@ -379,6 +386,7 @@ extension ModelDownloadManager: URLSessionDownloadDelegate, URLSessionTaskDelega
             updateRecord(id: id) { record in
                 record.state = .failed
                 record.errorMessage = error.localizedDescription
+                record.failure = .failed(error.localizedDescription)
                 removeResumeData(for: record)
                 record.resumeDataFile = persistResumeData(resumeData, for: id)
             }
