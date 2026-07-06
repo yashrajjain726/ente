@@ -14,9 +14,10 @@ func TestShouldSkipBodyLogForEvents(t *testing.T) {
 	require.False(t, shouldSkipBodyLog(http.MethodGet, "/events"))
 }
 
-func TestEventsUsePublicRouteRateLimit(t *testing.T) {
+func TestEventsUseRouteRateLimit(t *testing.T) {
 	limit := util.NewRateLimiter("10-M")
 	rateLimiter := &RateLimitMiddleware{limit10ReqPerMin: limit}
 
 	require.Same(t, limit, rateLimiter.getLimiter("/events", http.MethodPost))
+	require.Same(t, limit, rateLimiter.getLimiter("/events/user", http.MethodPost))
 }
