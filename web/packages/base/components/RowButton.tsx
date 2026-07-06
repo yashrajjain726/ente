@@ -260,7 +260,7 @@ export const RowButton: React.FC<RowButtonProps> = ({
                             </CaptionTypography>
                         </Stack>
                     ) : (
-                        <Typography fontWeight={fontWeight}>{label}</Typography>
+                        <Typography sx={{ fontWeight }}>{label}</Typography>
                     )}
                 </Box>
             </Stack>
