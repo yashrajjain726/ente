@@ -71,7 +71,7 @@ class _MemoriesWidgetState extends State<MemoriesWidget> {
       _memoryWidth = min(screenWidth * .4352, 240);
       _memoryheight = _memoryWidth * MemoryCoverWidget.aspectRatio;
     } else {
-      _memoryWidth = min(screenHeight * .35, 240);
+      _memoryWidth = min(screenHeight * .35, 128);
       _memoryheight = _memoryWidth * MemoryCoverWidget.aspectRatio;
     }
   }
