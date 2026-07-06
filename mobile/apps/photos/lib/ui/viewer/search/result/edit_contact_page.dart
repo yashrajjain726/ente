@@ -1,40 +1,24 @@
-import "dart:async";
 import "dart:typed_data";
 
+import "package:ente_components/ente_components.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
 import "package:ente_pure_utils/ente_pure_utils.dart";
-import "package:figma_squircle/figma_squircle.dart";
 import "package:flutter/material.dart";
-import "package:intl/intl.dart";
 import "package:logging/logging.dart";
-import "package:photos/core/constants.dart";
-import "package:photos/db/files_db.dart";
-import "package:photos/db/ml/db.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
-import "package:photos/models/ml/face/person.dart";
-import "package:photos/models/search/generic_search_result.dart";
-import "package:photos/models/search/search_constants.dart";
-import "package:photos/services/machine_learning/face_ml/face_filtering/face_filtering_constants.dart";
-import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
-import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/services/photos_contacts_service.dart";
-import "package:photos/services/search_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/action_sheet_widget.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
-import "package:photos/ui/components/menu_item_widget/menu_item_widget_new.dart";
 import "package:photos/ui/components/models/button_type.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
-import "package:photos/ui/viewer/people/person_face_widget.dart";
-import "package:photos/ui/viewer/people/person_selection_action_widgets.dart";
 import "package:photos/ui/viewer/search/result/contact_photo_adjust_page.dart";
 import "package:photos/ui/viewer/search/result/contact_photo_picker_sheet.dart";
+import "package:photos/utils/contact_photo_util.dart";
 import "package:photos/utils/dialog_util.dart";
-import "package:photos/utils/face/face_thumbnail_cache.dart";
-import "package:photos/utils/file_util.dart";
 import "package:photos/utils/thumbnail_util.dart";
 
 class EditContactPage extends StatefulWidget {
@@ -54,22 +38,17 @@ class EditContactPage extends StatefulWidget {
 }
 
 class _EditContactPageState extends State<EditContactPage> {
-  static const _maxThumbnailCompressionAttempts = 2;
   static const _avatarSize = 108.0;
   static const _editBadgeSize = 32.0;
-  static const _avatarRadius = 20.0;
-  static const _avatarCornerSmoothing = 0.6;
 
   final _logger = Logger("EditContactPage");
   late final TextEditingController _nameController;
-  String? _selectedBirthDate;
+  late final FocusNode _nameFocusNode;
+  late final String? _birthDateToPreserve;
   bool _isSaving = false;
   bool _isLoadingPhoto = false;
   bool _photoDirty = false;
-  bool _resolvedAutofillPeople = false;
   Uint8List? _draftPhotoBytes;
-  PersonEntity? _autofillPerson;
-  List<PersonEntity> _autofillPreviewPeople = const [];
   int _photoLoadGeneration = 0;
 
   @override
@@ -82,29 +61,31 @@ class _EditContactPageState extends State<EditContactPage> {
               setState(() {});
             }
           });
-    _selectedBirthDate = widget.existingContact?.data?.birthDate;
+    _nameFocusNode = FocusNode()
+      ..addListener(() {
+        if (mounted) {
+          setState(() {});
+        }
+      });
+    _birthDateToPreserve = widget.existingContact?.data?.birthDate;
     _loadExistingPhoto();
-    unawaited(_loadAutofillPeoplePreview());
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _nameFocusNode.dispose();
     super.dispose();
   }
 
   bool get _canSave => !_isSaving && _nameController.text.trim().isNotEmpty;
   String get _initialName => (widget.existingContact?.data?.name ?? "").trim();
-  String? get _initialBirthDate => widget.existingContact?.data?.birthDate;
   bool get _hasUnsavedChanges =>
-      _nameController.text.trim() != _initialName ||
-      _selectedBirthDate != _initialBirthDate ||
-      _photoDirty;
+      _nameController.text.trim() != _initialName || _photoDirty;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     final l10n = AppLocalizations.of(context);
 
     return PopScope(
@@ -132,22 +113,20 @@ class _EditContactPageState extends State<EditContactPage> {
         }
       },
       child: Scaffold(
-        backgroundColor: colorScheme.backgroundColour,
-        appBar: AppBar(
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          backgroundColor: colorScheme.backgroundColour,
-          surfaceTintColor: Colors.transparent,
-          title: Text(
-            l10n.editContact,
-            style: textTheme.h3Bold.copyWith(fontSize: 20, height: 28 / 20),
-          ),
-          centerTitle: false,
-        ),
+        resizeToAvoidBottomInset: true,
+        backgroundColor: colors.backgroundBase,
         body: Column(
           children: [
+            _EditContactHeader(
+              title: l10n.editContact,
+              onBack: () {
+                Navigator.of(context).maybePop();
+              },
+            ),
             Expanded(
               child: ListView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
                 children: [
                   Center(
@@ -161,8 +140,8 @@ class _EditContactPageState extends State<EditContactPage> {
                           children: [
                             _buildAvatar(context, size: _avatarSize),
                             Positioned(
-                              right: -4,
-                              bottom: -4,
+                              right: 0,
+                              bottom: 0,
                               child: _AvatarEditButton(
                                 size: _editBadgeSize,
                                 onTap: _pickContactPhoto,
@@ -173,82 +152,30 @@ class _EditContactPageState extends State<EditContactPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
-                  if (_showAutofillRow) ...[
-                    MenuItemWidgetNew(
-                      title: l10n.autoFetchFromPeople,
-                      subText: l10n.useTheirNameAndPhoto,
-                      titleToSubTextSpacing: 4,
-                      subTextStyle: textTheme.mini.copyWith(
-                        color: colorScheme.textMuted,
-                        height: 16 / 12,
-                      ),
-                      leadingIconSize: 44,
-                      leadingIconWidget: _AutofillLeadingWidget(
-                        person: _autofillPerson,
-                        previewPeople: _autofillPreviewPeople,
-                      ),
-                      trailingIcon: Icons.chevron_right_rounded,
-                      onTap: _autoFillFromPeople,
-                    ),
-                    const SizedBox(height: 28),
-                  ],
-                  _FieldLabel(text: l10n.email, isRequired: true),
-                  const SizedBox(height: 8),
-                  _InputShell(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
-                      child: Text(widget.email, style: textTheme.body),
-                    ),
+                  const SizedBox(height: 20),
+                  _ReadOnlyContactTextInput(
+                    label: l10n.email,
+                    value: widget.email,
                   ),
-                  const SizedBox(height: 24),
-                  _FieldLabel(text: l10n.name),
-                  const SizedBox(height: 8),
-                  _InputShell(
-                    child: TextField(
-                      controller: _nameController,
-                      textCapitalization: TextCapitalization.words,
-                      style: textTheme.body,
-                      decoration: InputDecoration(
-                        hintText: l10n.enterName,
-                        hintStyle: textTheme.bodyFaint,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _FieldLabel(text: l10n.birthday),
-                  const SizedBox(height: 8),
-                  _BirthDateField(
-                    value: _selectedBirthDate,
-                    onTap: _pickBirthDate,
-                    onClear: _selectedBirthDate == null
-                        ? null
-                        : () {
-                            setState(() {
-                              _selectedBirthDate = null;
-                            });
-                          },
-                    hintText: l10n.enterDateOfBirthHint,
+                  const SizedBox(height: 20),
+                  TextInputComponent(
+                    label: l10n.name,
+                    hintText: l10n.enterName,
+                    controller: _nameController,
+                    focusNode: _nameFocusNode,
+                    isRequired: true,
+                    textCapitalization: TextCapitalization.words,
+                    onSubmit: _canSave ? (_) => _saveContact() : null,
                   ),
                 ],
               ),
             ),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                child: _SaveContactButton(
-                  isDisabled: !_canSave,
-                  onTap: _canSave ? _saveContact : null,
-                ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+              child: _ContactSaveButton(
+                label: l10n.saveContact,
+                isDisabled: !_canSave,
+                onTap: _canSave ? _saveContact : null,
               ),
             ),
           ],
@@ -361,53 +288,15 @@ class _EditContactPageState extends State<EditContactPage> {
     setState(() {
       _isLoadingPhoto = true;
     });
-    final photoBytes = await _normalizeAttachmentBytes(croppedBytes);
+    final photoBytes = await normalizeContactPhotoAttachmentBytes(croppedBytes);
     if (!mounted) {
       return;
     }
     setState(() {
       _draftPhotoBytes = photoBytes;
       _isLoadingPhoto = false;
-      _photoDirty = photoBytes != null;
-      _autofillPerson = null;
+      _photoDirty = true;
     });
-  }
-
-  Future<void> _autoFillFromPeople() async {
-    final person = await routeToPage(
-      context,
-      const LinkContactToPersonSelectionPage(
-        mode: PersonSelectionMode.autofillContact,
-      ),
-    );
-    if (person is! PersonEntity || !mounted) {
-      return;
-    }
-    _photoLoadGeneration++;
-    _nameController.text = person.data.name;
-    setState(() {
-      _selectedBirthDate = person.data.birthDate;
-      _autofillPerson = person;
-      _isLoadingPhoto = true;
-    });
-    final photoBytes = await _buildAttachmentBytesFromPerson(person);
-    if (!mounted) {
-      return;
-    }
-    final shouldReloadExistingPhoto =
-        photoBytes == null &&
-        _draftPhotoBytes == null &&
-        widget.existingContact?.profilePictureAttachmentId != null;
-    setState(() {
-      if (photoBytes != null) {
-        _draftPhotoBytes = photoBytes;
-        _photoDirty = true;
-      }
-      _isLoadingPhoto = false;
-    });
-    if (shouldReloadExistingPhoto) {
-      unawaited(_loadExistingPhoto());
-    }
   }
 
   Future<void> _saveContact() async {
@@ -418,7 +307,7 @@ class _EditContactPageState extends State<EditContactPage> {
       var saved = await PhotosContactsService.instance.createOrUpdateContact(
         contactUserId: widget.contactUserId,
         name: _nameController.text.trim(),
-        birthDate: _selectedBirthDate,
+        birthDate: _birthDateToPreserve,
       );
       if (_photoDirty && _draftPhotoBytes != null) {
         saved = await PhotosContactsService.instance.setProfilePicture(
@@ -504,267 +393,159 @@ class _EditContactPageState extends State<EditContactPage> {
   Future<Uint8List?> _loadEditablePhotoBytesFromFile(EnteFile file) async {
     return getThumbnail(file);
   }
-
-  Future<Uint8List?> _normalizeAttachmentBytes(Uint8List sourceBytes) async {
-    var bytes = sourceBytes;
-    var attempts = 0;
-    while (bytes.length > thumbnailDataLimit &&
-        attempts < _maxThumbnailCompressionAttempts) {
-      bytes = await compressThumbnail(bytes);
-      attempts++;
-    }
-    return bytes;
-  }
-
-  Future<Uint8List?> _buildAttachmentBytesFromPerson(
-    PersonEntity person,
-  ) async {
-    try {
-      final hiddenFileIds = await SearchService.instance.getHiddenFiles().then(
-        (files) => files.map((file) => file.uploadedFileID).toSet(),
-      );
-      final faceIds = await MLDataDB.instance.getFaceIDsForPersonOrderedByScore(
-        person.remoteID,
-      );
-      EnteFile? sourceFile;
-      String? faceId = person.data.avatarFaceID;
-
-      if (faceId != null) {
-        final fileId = getFileIdFromFaceId<int>(faceId);
-        if (!hiddenFileIds.contains(fileId)) {
-          sourceFile = await FilesDB.instance.getAnyUploadedFile(fileId);
-        }
-      }
-
-      if (sourceFile == null) {
-        for (final candidateFaceId in faceIds) {
-          final fileId = getFileIdFromFaceId<int>(candidateFaceId);
-          if (hiddenFileIds.contains(fileId)) {
-            continue;
-          }
-          sourceFile = await FilesDB.instance.getAnyUploadedFile(fileId);
-          if (sourceFile != null) {
-            faceId = candidateFaceId;
-            break;
-          }
-        }
-      }
-
-      if (sourceFile == null || sourceFile.uploadedFileID == null) {
-        return null;
-      }
-
-      final face = await MLDataDB.instance.getCoverFaceForPerson(
-        recentFileID: sourceFile.uploadedFileID!,
-        avatarFaceId: faceId,
-        personID: person.remoteID,
-      );
-      if (face == null) {
-        return null;
-      }
-
-      final crops = await getCachedFaceCrops(
-        sourceFile,
-        [face],
-        useFullFile: true,
-        personOrClusterID: person.remoteID,
-        useTempCache: false,
-      );
-      final croppedBytes = crops?[face.faceID];
-      if (croppedBytes == null) {
-        return null;
-      }
-      return _normalizeAttachmentBytes(croppedBytes);
-    } catch (e, s) {
-      _logger.warning("Failed to build contact photo from person", e, s);
-      return null;
-    }
-  }
-
-  Future<void> _pickBirthDate() async {
-    final locale = Localizations.localeOf(context);
-    final lastDate = DateTime.now();
-    final initialDate = _selectedBirthDate == null
-        ? lastDate
-        : DateTime.tryParse(_selectedBirthDate!) ?? lastDate;
-    final picked = await showDatePicker(
-      context: context,
-      locale: locale,
-      initialDate: initialDate.isAfter(lastDate) ? lastDate : initialDate,
-      firstDate: DateTime(1900),
-      lastDate: lastDate,
-    );
-    if (picked == null || !mounted) {
-      return;
-    }
-    setState(() {
-      _selectedBirthDate = picked.toIso8601String().split("T").first;
-    });
-  }
-
-  bool get _showAutofillRow =>
-      _autofillPerson != null ||
-      (_resolvedAutofillPeople && _autofillPreviewPeople.isNotEmpty);
-
-  Future<void> _loadAutofillPeoplePreview() async {
-    try {
-      final persons = await PersonService.instance.getPersons();
-      final results = await SearchService.instance.getAllFace(
-        null,
-        minClusterSize: kMinimumClusterSizeAllFaces,
-      );
-      final resultsById = <String, GenericSearchResult>{};
-      for (final result in results) {
-        final personId = result.params[kPersonParamID] as String?;
-        if (personId == null || personId.isEmpty) {
-          continue;
-        }
-        resultsById[personId] = result;
-      }
-
-      final previewPeople = <PersonEntity>[];
-      for (final person in persons) {
-        if (person.data.isIgnored) {
-          continue;
-        }
-        if (!resultsById.containsKey(person.remoteID)) {
-          continue;
-        }
-        previewPeople.add(person);
-        if (previewPeople.length == 3) {
-          break;
-        }
-      }
-
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _autofillPreviewPeople = previewPeople;
-        _resolvedAutofillPeople = true;
-      });
-    } catch (e, s) {
-      _logger.warning("Failed to load autofill people preview", e, s);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _autofillPreviewPeople = const [];
-        _resolvedAutofillPeople = true;
-      });
-    }
-  }
 }
 
-class _FieldLabel extends StatelessWidget {
-  final String text;
-  final bool isRequired;
+class _EditContactHeader extends StatelessWidget {
+  const _EditContactHeader({required this.title, required this.onBack});
 
-  const _FieldLabel({required this.text, this.isRequired = false});
+  final String title;
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = getEnteTextTheme(context);
-    final colorScheme = getEnteColorScheme(context);
+    final topPadding = MediaQuery.paddingOf(context).top;
+    final colors = context.componentColors;
+    final height = topPadding + 76;
 
-    return RichText(
-      text: TextSpan(
-        style: textTheme.small.copyWith(fontWeight: FontWeight.w600),
+    return SizedBox(
+      width: double.infinity,
+      height: height,
+      child: Padding(
+        padding: EdgeInsets.only(top: topPadding),
+        child: ColoredBox(
+          color: colors.backgroundBase,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+            child: _expandedContent(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _expandedContent(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: Spacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextSpan(text: text),
-          if (isRequired)
-            TextSpan(
-              text: " *",
-              style: textTheme.small.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.textBase,
-              ),
-            ),
+          _BackButton(onBack: onBack),
+          const SizedBox(height: 8),
+          Text(title, style: _titleStyle(context)),
         ],
       ),
     );
   }
-}
 
-class _InputShell extends StatelessWidget {
-  final Widget child;
-
-  const _InputShell({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final backgroundColor = EnteTheme.isDark(context)
-        ? colorScheme.backgroundElevated2
-        : Colors.white;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: child,
+  TextStyle _titleStyle(BuildContext context) {
+    return TextStyles.display2.copyWith(
+      color: context.componentColors.textBase,
     );
   }
 }
 
-class _BirthDateField extends StatelessWidget {
-  final String? value;
-  final String hintText;
-  final VoidCallback onTap;
-  final VoidCallback? onClear;
+class _BackButton extends StatelessWidget {
+  const _BackButton({required this.onBack});
 
-  const _BirthDateField({
-    required this.value,
-    required this.onTap,
-    required this.hintText,
-    this.onClear,
-  });
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = getEnteTextTheme(context);
-    final parsedDate = value == null ? null : DateTime.tryParse(value!);
-    final localeName = Localizations.localeOf(context).toLanguageTag();
-    final formattedDate = parsedDate == null
-        ? null
-        : DateFormat.yMMMd(localeName).format(parsedDate);
+    final tooltip = MaterialLocalizations.of(context).backButtonTooltip;
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onBack,
+        child: SizedBox(
+          width: 40,
+          height: 20,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Icon(
+              Icons.arrow_back,
+              size: 24,
+              color: getEnteColorScheme(context).textBase,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: _InputShell(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  formattedDate ?? hintText,
-                  style: formattedDate == null
-                      ? textTheme.bodyFaint
-                      : textTheme.body,
-                ),
-              ),
-              if (onClear != null)
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: onClear,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                      color: getEnteColorScheme(context).textMuted,
-                    ),
-                  ),
-                ),
-              Icon(
-                Icons.calendar_today_outlined,
-                size: 18,
-                color: getEnteColorScheme(context).textMuted,
-              ),
-            ],
+class _ReadOnlyContactTextInput extends StatelessWidget {
+  const _ReadOnlyContactTextInput({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.componentColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: TextStyles.body.copyWith(color: colors.textBase)),
+        const SizedBox(height: 9),
+        Container(
+          height: 52,
+          width: double.infinity,
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+          decoration: BoxDecoration(
+            color: colors.fillLight,
+            borderRadius: BorderRadius.circular(Radii.lg),
+          ),
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyles.body.copyWith(color: colors.textLightest),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ContactSaveButton extends StatelessWidget {
+  const _ContactSaveButton({
+    required this.label,
+    required this.isDisabled,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isDisabled;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.componentColors;
+    final enabled = !isDisabled && onTap != null;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: enabled ? onTap : null,
+      child: AnimatedContainer(
+        duration: Motion.standard,
+        curve: Curves.easeInOutCubic,
+        width: double.infinity,
+        height: 48,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.xxl),
+        decoration: BoxDecoration(
+          color: enabled ? colors.primary : colors.fillDark,
+          borderRadius: BorderRadius.circular(Radii.button),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyles.body.copyWith(
+            color: enabled ? colors.specialWhite : colors.textLightest,
           ),
         ),
       ),
@@ -813,160 +594,11 @@ class _ContactThumbnailShell extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: ClipSmoothRect(
-        radius: SmoothBorderRadius(
-          cornerRadius: _EditContactPageState._avatarRadius,
-          cornerSmoothing: _EditContactPageState._avatarCornerSmoothing,
-        ),
+      child: FaceThumbnailSquircleClip(
+        borderRadius: faceThumbnailSquircleBorderRadius(size),
         child: ColoredBox(
           color: backgroundColor ?? Colors.transparent,
           child: SizedBox.expand(child: child),
-        ),
-      ),
-    );
-  }
-}
-
-class _AutofillLeadingWidget extends StatelessWidget {
-  final PersonEntity? person;
-  final List<PersonEntity> previewPeople;
-
-  const _AutofillLeadingWidget({this.person, this.previewPeople = const []});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final selectedPerson = person;
-
-    if (selectedPerson != null) {
-      return Stack(
-        clipBehavior: Clip.none,
-        children: [
-          SizedBox(
-            width: 32,
-            height: 32,
-            child: FaceThumbnailSquircleClip(
-              child: PersonFaceWidget(
-                personId: selectedPerson.remoteID,
-                useFullFile: false,
-              ),
-            ),
-          ),
-          Positioned(
-            right: -2,
-            bottom: -2,
-            child: Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: colorScheme.primary500,
-                border: Border.all(color: Colors.white, width: 1.5),
-              ),
-              child: const Icon(
-                Icons.edit_outlined,
-                size: 10,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    Widget buildFace(double left, PersonEntity person) {
-      return Positioned(
-        left: left,
-        top: 3,
-        child: Container(
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 1.5),
-          ),
-          child: ClipOval(
-            child: PersonFaceWidget(
-              personId: person.remoteID,
-              useFullFile: false,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      width: 44,
-      height: 32,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          for (final entry in previewPeople.take(3).indexed)
-            buildFace(entry.$1 * 11.0, entry.$2),
-          Positioned(
-            right: -2,
-            bottom: -2,
-            child: Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: colorScheme.primary500,
-                border: Border.all(color: Colors.white, width: 1.5),
-              ),
-              child: const Icon(
-                Icons.edit_outlined,
-                size: 10,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SaveContactButton extends StatelessWidget {
-  const _SaveContactButton({required this.isDisabled, required this.onTap});
-
-  final bool isDisabled;
-  final Future<void> Function()? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
-    final l10n = AppLocalizations.of(context);
-    final backgroundColor = isDisabled
-        ? colorScheme.fillFaint
-        : colorScheme.primary500;
-    final textColor = isDisabled
-        ? colorScheme.textFaint
-        : colorScheme.contentReverse;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: isDisabled ? null : onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Ink(
-          height: 48,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Center(
-            child: Text(
-              l10n.saveContact,
-              style: textTheme.small.copyWith(
-                color: textColor,
-                fontWeight: FontWeight.w500,
-                height: 20 / 14,
-              ),
-            ),
-          ),
         ),
       ),
     );

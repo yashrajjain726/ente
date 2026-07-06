@@ -1,17 +1,21 @@
+import "dart:async";
 import "dart:typed_data";
 
 import "package:flutter/foundation.dart" show kDebugMode;
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
+import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
+import "package:photos/events/contacts_changed_event.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/service_locator.dart" show isLocalGalleryMode;
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
+import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/loading_widget.dart";
@@ -58,11 +62,14 @@ class PersonFaceWidget extends StatefulWidget {
 class _PersonFaceWidgetState extends State<PersonFaceWidget>
     with AutomaticKeepAliveClientMixin {
   Future<Uint8List?>? faceCropFuture;
-  EnteFile? fileForFaceCrop;
   int? _faceCropFileId;
   String? _personName;
   bool _showingFallback = false;
   bool _fallbackEverUsed = false;
+  bool _personHasContactLink = false;
+  int? _linkedContactUserId;
+  int _loadGeneration = 0;
+  StreamSubscription<ContactsChangedEvent>? _contactsChangedSubscription;
 
   bool get isPerson => widget.personId != null;
 
@@ -72,11 +79,27 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
   @override
   void initState() {
     super.initState();
-    faceCropFuture = _loadFaceCrop();
+    _contactsChangedSubscription = Bus.instance
+        .on<ContactsChangedEvent>()
+        .listen(_onContactsChanged);
+    faceCropFuture = _startFaceCropLoad();
+  }
+
+  @override
+  void didUpdateWidget(covariant PersonFaceWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.personId != widget.personId ||
+        oldWidget.clusterID != widget.clusterID ||
+        oldWidget.useFullFile != widget.useFullFile) {
+      _personHasContactLink = false;
+      _linkedContactUserId = null;
+      faceCropFuture = _startFaceCropLoad();
+    }
   }
 
   @override
   void dispose() {
+    _contactsChangedSubscription?.cancel();
     if (_faceCropFileId != null) {
       checkStopTryingToGenerateFaceThumbnails(
         _faceCropFileId!,
@@ -90,6 +113,22 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
       }
     }
     super.dispose();
+  }
+
+  void _onContactsChanged(ContactsChangedEvent event) {
+    if (!isPerson || !mounted) {
+      return;
+    }
+    if (!_personHasContactLink && _linkedContactUserId == null) {
+      return;
+    }
+    if (event.contactUserIds == null ||
+        _linkedContactUserId == null ||
+        event.matchesContactUserId(_linkedContactUserId)) {
+      setState(() {
+        faceCropFuture = _startFaceCropLoad();
+      });
+    }
   }
 
   @override
@@ -165,35 +204,50 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
     );
   }
 
-  Future<Uint8List?> _loadFaceCrop() async {
+  Future<Uint8List?> _startFaceCropLoad() {
+    final generation = ++_loadGeneration;
+    return _loadFaceCrop(generation);
+  }
+
+  Future<Uint8List?> _loadFaceCrop(int generation) async {
+    final String personOrClusterId = widget.personId ?? widget.clusterID!;
     if (!widget.useFullFile) {
       final Uint8List? thumbnailCrop = await _getFaceCrop(
+        generation: generation,
         useFullFile: widget.useFullFile,
       );
-      if (thumbnailCrop != null) {
+      if (_isCurrentLoad(generation, personOrClusterId) &&
+          thumbnailCrop != null) {
         _fallbackEverUsed = true;
+        _showingFallback = false;
       }
-      _showingFallback = false;
       return thumbnailCrop;
     }
 
     final Uint8List? fullCrop = await _getFaceCrop(
+      generation: generation,
       useFullFile: widget.useFullFile,
     );
     if (fullCrop != null) {
-      _showingFallback = false;
+      if (_isCurrentLoad(generation, personOrClusterId)) {
+        _showingFallback = false;
+      }
       return fullCrop;
     }
 
-    final String personOrClusterId = widget.personId ?? widget.clusterID!;
     _logger.warning(
       "Full face crop unavailable for $personOrClusterId, attempting thumbnail fallback.",
     );
 
-    final Uint8List? fallbackCrop = await _getFaceCrop(useFullFile: false);
+    final Uint8List? fallbackCrop = await _getFaceCrop(
+      generation: generation,
+      useFullFile: false,
+    );
     if (fallbackCrop != null) {
-      _showingFallback = true;
-      _fallbackEverUsed = true;
+      if (_isCurrentLoad(generation, personOrClusterId)) {
+        _showingFallback = true;
+        _fallbackEverUsed = true;
+      }
       return fallbackCrop;
     }
 
@@ -203,13 +257,12 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
     return null;
   }
 
-  Future<Uint8List?> _getFaceCrop({required bool useFullFile}) async {
+  Future<Uint8List?> _getFaceCrop({
+    required int generation,
+    required bool useFullFile,
+  }) async {
     try {
       final String personOrClusterId = widget.personId ?? widget.clusterID!;
-      final tryInMemoryCachedCrop = checkInMemoryCachedCropForPersonOrClusterID(
-        personOrClusterId,
-      );
-      if (tryInMemoryCachedCrop != null) return tryInMemoryCachedCrop;
       String? fixedFaceID;
       PersonEntity? personEntity;
       final mlDataDB = isLocalGalleryMode
@@ -223,9 +276,28 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
           );
           return null;
         }
+        if (!_isCurrentLoad(generation, personOrClusterId)) {
+          return null;
+        }
         _personName = personEntity.data.name;
+        _personHasContactLink = _hasContactLink(personEntity);
+        final contactPhotoBytes = await _getLinkedContactPhotoBytes(
+          personEntity,
+          generation: generation,
+          personOrClusterId: personOrClusterId,
+        );
+        if (contactPhotoBytes != null) {
+          return contactPhotoBytes;
+        }
         fixedFaceID = personEntity.data.avatarFaceID;
+      } else {
+        _personHasContactLink = false;
+        _linkedContactUserId = null;
       }
+      final tryInMemoryCachedCrop = checkInMemoryCachedCropForPersonOrClusterID(
+        personOrClusterId,
+      );
+      if (tryInMemoryCachedCrop != null) return tryInMemoryCachedCrop;
       fixedFaceID ??= await checkUsedFaceIDForPersonOrClusterId(
         personOrClusterId,
       );
@@ -388,8 +460,9 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
         personOrClusterID: personOrClusterId,
         useTempCache: false,
       );
-      this.fileForFaceCrop = fileForFaceCrop;
-      _faceCropFileId = recentFileID;
+      if (_isCurrentLoad(generation, personOrClusterId)) {
+        _faceCropFileId = recentFileID;
+      }
       final result = cropMap?[face.faceID];
       if (result == null) {
         _logger.severe(
@@ -406,6 +479,43 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
       widget.onErrorCallback?.call();
       return null;
     }
+  }
+
+  bool _isCurrentLoad(int generation, String personOrClusterId) {
+    return _loadGeneration == generation &&
+        (widget.personId ?? widget.clusterID) == personOrClusterId;
+  }
+
+  bool _hasContactLink(PersonEntity personEntity) {
+    final userId = personEntity.data.userID;
+    final email = personEntity.data.email?.trim();
+    return (userId != null && userId > 0) ||
+        (email != null && email.isNotEmpty);
+  }
+
+  Future<Uint8List?> _getLinkedContactPhotoBytes(
+    PersonEntity personEntity, {
+    required int generation,
+    required String personOrClusterId,
+  }) async {
+    if (!_personHasContactLink) {
+      _linkedContactUserId = null;
+      return null;
+    }
+    final contact = await PhotosContactsService.instance.getContact(
+      contactUserId: personEntity.data.userID,
+      email: personEntity.data.email,
+    );
+    if (!_isCurrentLoad(generation, personOrClusterId)) {
+      return null;
+    }
+    _linkedContactUserId = contact?.contactUserId ?? personEntity.data.userID;
+    if (contact == null) {
+      return null;
+    }
+    return PhotosContactsService.instance.getProfilePictureBytesByUserId(
+      contact.contactUserId,
+    );
   }
 }
 

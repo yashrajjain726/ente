@@ -17,7 +17,9 @@ import "package:photos/models/ml/face/person.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/entity_service.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
+import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/settings/local_settings.dart";
+import "package:photos/utils/contact_photo_util.dart";
 import "package:photos/utils/face/face_thumbnail_cache.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
@@ -581,12 +583,50 @@ class PersonService {
     }
 
     final person = (await getPerson(p.remoteID))!;
+    await _updateLinkedContactAvatarBeforePerson(person, file, face);
     final updatedPerson = person.copyWith(
       data: person.data.copyWith(avatarFaceId: face.faceID),
     );
     await updatePerson(updatedPerson);
     await putFaceIdCachedForPersonOrCluster(p.remoteID, face.faceID);
     return updatedPerson;
+  }
+
+  Future<void> _updateLinkedContactAvatarBeforePerson(
+    PersonEntity person,
+    EnteFile file,
+    Face face,
+  ) async {
+    if (!flagService.enableContact) {
+      return;
+    }
+    final contact = await PhotosContactsService.instance.getContact(
+      contactUserId: person.data.userID,
+      email: person.data.email,
+    );
+    if (contact == null || !flagService.enableContact) {
+      return;
+    }
+    final Uint8List? bytes = await buildContactPhotoAttachmentBytesFromFace(
+      file: file,
+      face: face,
+    );
+    if (bytes == null) {
+      throw StateError(
+        "Failed to prepare contact avatar for linked person ${person.remoteID}",
+      );
+    }
+    try {
+      await PhotosContactsService.instance.setProfilePicture(
+        contactId: contact.id,
+        bytes: bytes,
+      );
+    } on StateError {
+      if (!flagService.enableContact) {
+        return;
+      }
+      rethrow;
+    }
   }
 
   Future<PersonEntity> updateAttributes(

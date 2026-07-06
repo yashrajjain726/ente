@@ -66,10 +66,21 @@ void main() {
 
     expect(service.hasHydratedCache, isTrue);
     expect(service.getCachedContactByUserId(7), isNotNull);
+    expect((await service.getContact(email: 'ALICE@test.test'))?.id, 'ct_1');
     expect(service.getCachedSavedNameByUserId(7), 'Alice');
     expect(service.getCachedResolvedEmailByUserId(7), 'alice@test.test');
     expect(contactsService.openCalls, 1);
     expect(contactsService.syncCalls, 1);
+  });
+
+  test('user id lookup does not fall back to email', () async {
+    await service.debugOpenAndSync(session);
+
+    expect(
+      await service.getContact(contactUserId: 99, email: 'ALICE@test.test'),
+      isNull,
+    );
+    expect((await service.getContact(email: 'ALICE@test.test'))?.id, 'ct_1');
   });
 
   test(
@@ -228,6 +239,43 @@ void main() {
     },
   );
 
+  test('loads profile picture through linked email lookup', () async {
+    contactsService = FakeContactsService(
+      localContacts: const [
+        contacts.ContactRecord(
+          id: 'ct_1',
+          contactUserId: 7,
+          email: 'alice@test.test',
+          data: contacts.ContactData(contactUserId: 7, name: 'Alice'),
+          profilePictureAttachmentId: 'att_1',
+          isDeleted: false,
+          createdAt: 1,
+          updatedAt: 2,
+        ),
+      ],
+    );
+    contactsService.profilePictureBytesByContactId['ct_1'] = Uint8List.fromList(
+      [4, 5, 6],
+    );
+    service = PhotosContactsService.forTesting(
+      contactsService: contactsService,
+    );
+
+    await service.debugOpenAndSync(session);
+
+    final contact = await service.getContact(email: 'ALICE@test.test');
+    expect(contact?.id, 'ct_1');
+    expect(
+      await service.getProfilePictureBytesByUserId(contact!.contactUserId),
+      Uint8List.fromList([4, 5, 6]),
+    );
+    expect(
+      service.getCachedProfilePictureBytesByUserId(7),
+      Uint8List.fromList([4, 5, 6]),
+    );
+    expect(contactsService.getProfilePictureCalls, 1);
+  });
+
   test('logout event clears hydrated contact cache immediately', () async {
     await service.debugOpenAndSync(session);
 
@@ -296,6 +344,20 @@ class FakeContactsService extends Fake implements contacts.ContactsService {
       await barrier.future;
     }
     return response;
+  }
+
+  @override
+  Future<contacts.ContactRecord?> getContactByUserId(
+    int contactUserId, {
+    bool includeDeleted = false,
+  }) async {
+    for (final contact in localContacts) {
+      if (contact.contactUserId == contactUserId &&
+          (includeDeleted || !contact.isDeleted)) {
+        return contact;
+      }
+    }
+    return null;
   }
 
   @override
