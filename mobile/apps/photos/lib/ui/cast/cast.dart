@@ -1,4 +1,8 @@
+import "dart:async";
+import "dart:io";
+
 import "package:ente_components/ente_components.dart";
+import "package:flutter/foundation.dart";
 import "package:flutter/widgets.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
@@ -17,6 +21,7 @@ Future<void> showCastSheet(BuildContext context, Collection collection) async {
   final l10n = AppLocalizations.of(context);
   final textStyle = getEnteTextTheme(context);
   final gw = CastGateway(NetworkClient.instance.enteDio);
+  final showAutoPair = Platform.isAndroid || kDebugMode;
   if (!flagService.enableMultiCast) {
     if (castService.getActiveSessions().isNotEmpty) {
       await showChoiceDialog(
@@ -26,14 +31,16 @@ Future<void> showCastSheet(BuildContext context, Collection collection) async {
         firstButtonLabel: l10n.yes,
         secondButtonLabel: l10n.no,
         firstButtonOnTap: () async {
-          await gw.revokeAllTokens();
+          unawaited(gw.revokeAllTokens());
           await castService.closeActiveCasts();
         },
       );
       return;
     }
+    unawaited(gw.revokeAllTokens());
+  } else {
+    await castService.closeActiveCasts();
   }
-  await castService.closeActiveCasts();
   final logger = Logger("showCastSheet");
   List<CastInfo> sessions = [];
   if (flagService.enableMultiCast) {
@@ -54,17 +61,19 @@ Future<void> showCastSheet(BuildContext context, Collection collection) async {
       snap: true,
       title: l10n.castAlbum,
       actions: [
-        Text(l10n.pairWithAutoDesc, style: textStyle.smallMuted),
-        ButtonComponent(
-          label: l10n.autoPair,
-          variant: .secondary,
-          leading: const HugeIcon(icon: HugeIcons.strokeRoundedTvSmart),
-          shouldSurfaceExecutionStates: false,
-          onTap: () async {
-            Navigator.of(context).pop();
-            await showPairWithAutoSheet(context, collection);
-          },
-        ),
+        if (showAutoPair) ...[
+          Text(l10n.pairWithAutoDesc, style: textStyle.smallMuted),
+          ButtonComponent(
+            label: l10n.autoPair,
+            variant: .secondary,
+            leading: const HugeIcon(icon: HugeIcons.strokeRoundedTvSmart),
+            shouldSurfaceExecutionStates: false,
+            onTap: () async {
+              Navigator.of(context).pop();
+              await showPairWithAutoSheet(context, collection);
+            },
+          ),
+        ],
         Text(l10n.pairWithCodeDesc, style: textStyle.smallMuted),
         ButtonComponent(
           label: l10n.pairUsingCode,

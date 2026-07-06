@@ -1,4 +1,3 @@
-import "dart:async";
 import "dart:io";
 
 import "package:ente_cast/ente_cast.dart";
@@ -27,9 +26,6 @@ Future<void> _pairWithAuto(
   String code,
 ) async {
   final gw = CastGateway(NetworkClient.instance.enteDio);
-  if (!flagService.enableMultiCast) {
-    await gw.revokeAllTokens();
-  }
   final publicKey = await gw.getPublicKey(code);
   if (publicKey == null) {
     throw const _DeviceNotFoundException();
@@ -148,25 +144,18 @@ class _PairWithAutoSheetState extends State<_PairWithAutoSheet> {
       return;
     }
     setState(() => _devicesInProgress.add(device));
-    final pairing = Completer<void>();
     try {
       await castService.connectDevice(
         context,
         device,
-        collectionID: widget.collection.id,
         onMessage: (message) async {
-          if (pairing.isCompleted) {
-            return;
-          }
           final code = message[CastMessageType.pairCode]?["code"];
           if (code is! String) {
             return;
           }
           await _handlePairCode(context, device, code);
-          pairing.complete();
         },
       );
-      await pairing.future;
     } catch (e, s) {
       await _handleError(context, device, e, s);
     }
