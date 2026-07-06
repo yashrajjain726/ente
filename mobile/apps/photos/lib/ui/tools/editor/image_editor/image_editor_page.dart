@@ -83,99 +83,22 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
         quality: 95,
         format: CompressFormat.jpeg,
       );
-      img.Image? image;
-      img.ExifData? originalImageExif;
-      Map<String, IfdTag>? originalExifReaderTags;
       if (flagService.internalUser) {
-        try {
-          originalExifReaderTags = await getExif(widget.originalFile);
-        } catch (e, s) {
-          _logger.warning("Image Editor: getExif failed", e, s);
-        }
-        originalImageExif = await _readOriginalImageExif(widget.originalFile);
-        image = img.decodePng(bytes);
-      }
-      if (image != null &&
-          (originalImageExif != null || originalExifReaderTags != null)) {
-        image.exif = originalImageExif ?? img.ExifData();
-        for (final key in [
-          "Orientation",
-          "WhitePoint",
-          "PrimaryChromaticities",
-          "PhotometricInterpretation",
-          "BitsPerSample",
-          "SamplesPerPixel",
-          "Compression",
-          "ImageWidth",
-          "ImageHeight",
-          "YCbCrPositioning",
-          "YCbCrSubSampling",
-          "YCbCrCoefficients",
-          "ReferenceBlackWhite",
-          "XResolution",
-          "YResolution",
-          "ResolutionUnit",
-        ]) {
-          image.exif.imageIfd[key] = null;
-        }
-        for (final key in [
-          "JPEGInterchangeFormat",
-          "JPEGInterchangeFormatLength",
-        ]) {
-          image.exif.thumbnailIfd[key] = null;
-        }
-        for (final key in [
-          "ColorSpace",
-          "Gamma",
-          "ExifImageWidth",
-          "ExifImageHeight",
-          "ExifImageLength",
-          "ComponentsConfiguration",
-          "CustomRendered",
-          "SceneCaptureType",
-          "WhiteBalance",
-          "LightSource",
-          "Flash",
-          "GainControl",
-          "Contrast",
-          "Saturation",
-          "Sharpness",
-          "SubjectDistanceRange",
-        ]) {
-          image.exif.exifIfd[key] = null;
-        }
-
-        final make = originalExifReaderTags?["Image Make"]?.toString();
-        final model = originalExifReaderTags?["Image Model"]?.toString();
-        if (make != null) {
-          image.exif.imageIfd["Make"] = make;
-        }
-        if (model != null) {
-          image.exif.imageIfd["Model"] = model;
-        }
-
-        void copyRatio(String sourceKey, String targetKey) {
-          final values = originalExifReaderTags?[sourceKey]?.values.toList();
-          if (values == null || values.isEmpty || values.first is! Ratio) {
-            return;
-          }
-          final value = values.first as Ratio;
-          image!.exif.exifIfd[targetKey] = img.IfdValueRational(
-            value.numerator,
-            value.denominator,
+        final image = img.decodePng(bytes);
+        if (image != null) {
+          final originalExifTags = await _getOriginalExifTags(
+            widget.originalFile,
           );
+          final originalImageExif = await _readOriginalImageExif(
+            widget.originalFile,
+          );
+          if (originalImageExif != null || originalExifTags.isNotEmpty) {
+            image.exif = originalImageExif ?? img.ExifData();
+            _clearEditorExifTags(image.exif);
+            _copyCameraExif(originalExifTags, image.exif);
+            result = img.encodeJpg(image, quality: 95);
+          }
         }
-
-        copyRatio("EXIF FocalLength", "FocalLength");
-        copyRatio("EXIF FNumber", "FNumber");
-        copyRatio("EXIF ExposureTime", "ExposureTime");
-
-        final isoValues =
-            originalExifReaderTags?["EXIF ISOSpeedRatings"]?.values;
-        if (isoValues != null && isoValues.length != 0) {
-          image.exif.exifIfd["ISOSpeed"] = isoValues.firstAsInt();
-        }
-        result = img.encodeJpg(image, quality: 95);
       }
       _logger.info('Size after compression = ${result.length}');
       final Duration diff = DateTime.now().difference(start);
@@ -250,6 +173,17 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     }
   }
 
+  Future<Map<String, IfdTag>> _getOriginalExifTags(
+    ente.EnteFile enteFile,
+  ) async {
+    try {
+      return await getExif(enteFile);
+    } catch (e, s) {
+      _logger.warning("Image Editor: getExif failed", e, s);
+      return const {};
+    }
+  }
+
   Future<img.ExifData?> _readOriginalImageExif(ente.EnteFile enteFile) async {
     final file = await getFile(enteFile, isOrigin: true);
     if (file == null) {
@@ -258,17 +192,98 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     try {
       final bytes = await file.readAsBytes();
       final image = img.decodeImage(bytes);
-      if (image == null) {
-        return null;
-      }
-      return image.exif;
+      return image?.exif;
     } catch (e, s) {
       _logger.warning("Image Editor: _readOriginalImageExif failed: ", e, s);
       return null;
     } finally {
-      if (!enteFile.isRemoteFile && Platform.isIOS) {
+      if (!enteFile.isRemoteOnlyFile && Platform.isIOS) {
         await file.delete();
       }
+    }
+  }
+
+  void _clearEditorExifTags(img.ExifData exif) {
+    final imageIfdKeys = [
+      "Orientation",
+      "WhitePoint",
+      "PrimaryChromaticities",
+      "PhotometricInterpretation",
+      "BitsPerSample",
+      "SamplesPerPixel",
+      "Compression",
+      "ImageWidth",
+      "ImageHeight",
+      "YCbCrPositioning",
+      "YCbCrSubSampling",
+      "YCbCrCoefficients",
+      "ReferenceBlackWhite",
+      "XResolution",
+      "YResolution",
+      "ResolutionUnit",
+    ];
+    final thumbnailIfdKeys = [
+      "JPEGInterchangeFormat",
+      "JPEGInterchangeFormatLength",
+    ];
+    final exifIfdKeys = [
+      "ColorSpace",
+      "Gamma",
+      "ExifImageWidth",
+      "ExifImageHeight",
+      "ExifImageLength",
+      "ComponentsConfiguration",
+      "CustomRendered",
+      "SceneCaptureType",
+      "WhiteBalance",
+      "LightSource",
+      "Flash",
+      "GainControl",
+      "Contrast",
+      "Saturation",
+      "Sharpness",
+      "SubjectDistanceRange",
+    ];
+
+    void clear(img.IfdDirectory ifd, List<String> keys) {
+      for (final key in keys) {
+        ifd[key] = null;
+      }
+    }
+
+    clear(exif.imageIfd, imageIfdKeys);
+    clear(exif.thumbnailIfd, thumbnailIfdKeys);
+    clear(exif.exifIfd, exifIfdKeys);
+  }
+
+  void _copyCameraExif(Map<String, IfdTag> tags, img.ExifData exif) {
+    for (final entry in {
+      "Image Make": "Make",
+      "Image Model": "Model",
+    }.entries) {
+      final value = tags[entry.key]?.toString();
+      if (value != null) {
+        exif.imageIfd[entry.value] = value;
+      }
+    }
+
+    for (final entry in {
+      "EXIF FocalLength": "FocalLength",
+      "EXIF FNumber": "FNumber",
+      "EXIF ExposureTime": "ExposureTime",
+    }.entries) {
+      final value = tags[entry.key]?.values.toList().firstOrNull;
+      if (value is Ratio) {
+        exif.exifIfd[entry.value] = img.IfdValueRational(
+          value.numerator,
+          value.denominator,
+        );
+      }
+    }
+
+    final iso = tags["EXIF ISOSpeedRatings"]?.values;
+    if (iso != null && iso.length > 0) {
+      exif.exifIfd["ISOSpeed"] = iso.firstAsInt();
     }
   }
 
