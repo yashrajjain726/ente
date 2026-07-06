@@ -69,6 +69,8 @@ dependencies:
     path: plugins/ente_feature_flag
   ente_icons:
     path: ../../packages/ente_icons
+  ente_install_source:
+    path: ../../packages/install_source
   ente_lock_screen:
     path: ../../packages/lock_screen
   ente_photos_rust:

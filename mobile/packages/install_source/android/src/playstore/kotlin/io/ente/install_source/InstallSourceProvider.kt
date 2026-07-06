@@ -1,4 +1,4 @@
-package io.ente.photos
+package io.ente.install_source
 
 import android.content.Context
 import android.content.pm.PackageManager

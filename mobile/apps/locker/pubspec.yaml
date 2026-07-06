@@ -36,6 +36,8 @@ dependencies:
     path: ../../packages/events
   ente_icons:
     path: ../../packages/ente_icons
+  ente_install_source:
+    path: ../../packages/install_source
   ente_legacy: 
     path: ../../packages/legacy
   ente_lock_screen:
