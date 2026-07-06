@@ -21,6 +21,7 @@ import 'package:ente_accounts/pages/password_reentry_page.dart';
 import 'package:ente_accounts/pages/recovery_page.dart';
 import 'package:ente_accounts/pages/two_factor_authentication_page.dart';
 import 'package:ente_accounts/pages/two_factor_recovery_page.dart';
+import 'package:ente_accounts/services/install_source_handler.dart';
 import 'package:ente_base/models/key_attributes.dart';
 import 'package:ente_base/models/key_gen_result.dart';
 import 'package:ente_configuration/base_configuration.dart';
@@ -60,14 +61,20 @@ class UserService {
   late ValueNotifier<String?> emailValueNotifier;
   late BaseConfiguration _config;
   late BaseHomePage _homePage;
+  InstallSourceHandler? _installSourceHandler;
 
   UserService._privateConstructor();
 
   static final UserService instance = UserService._privateConstructor();
 
-  Future<void> init(BaseConfiguration config, BaseHomePage homePage) async {
+  Future<void> init(
+    BaseConfiguration config,
+    BaseHomePage homePage, {
+    InstallSourceHandler? installSourceHandler,
+  }) async {
     _config = config;
     _homePage = homePage;
+    _installSourceHandler = installSourceHandler;
     emailValueNotifier = ValueNotifier<String?>(config.getEmail());
     _preferences = await SharedPreferences.getInstance();
   }
@@ -409,6 +416,7 @@ class UserService {
             userPassword,
             _config.getKeyAttributes()!,
           );
+          unawaited(autoAttributePendingSource());
           _config.resetVolatilePassword();
           page = _homePage;
         } else {
@@ -800,6 +808,7 @@ class UserService {
             _config.getKeyAttributes()!,
             keyEncryptionKey: keyEncryptionKey,
           );
+          unawaited(autoAttributePendingSource());
           _config.resetVolatilePassword();
           page = _homePage;
         } else {
@@ -1114,6 +1123,20 @@ class UserService {
     } else {
       await _config.setToken(responseData["token"]);
     }
+    final isSignUp = responseData["encryptedToken"] == null;
+    unawaited(autoAttributeSource(isSignUp: isSignUp));
+  }
+
+  Future<bool> hasInstallSource() async {
+    return await _installSourceHandler?.hasInstallSource() ?? false;
+  }
+
+  Future<void> autoAttributeSource({required bool isSignUp}) async {
+    await _installSourceHandler?.autoAttributeSource(isSignUp: isSignUp);
+  }
+
+  Future<void> autoAttributePendingSource() async {
+    await _installSourceHandler?.autoAttributePendingSource();
   }
 
   bool? canDisableEmailMFA() {

@@ -1,4 +1,4 @@
-package io.ente.photos
+package io.ente.install_source
 
 import android.content.Context
 import java.net.URLDecoder
@@ -29,15 +29,11 @@ class InstallSourceEventStore(private val context: Context) {
                     put(key, paramsJson.optString(key))
                 }
             }
-            InstallSource(
-                referrerParams = params,
-            )
+            InstallSource(referrerParams = params)
         }.getOrNull()
     }
 
-    fun playSource(
-        referrer: String?,
-    ): InstallSource = InstallSource(
+    fun playSource(referrer: String?): InstallSource = InstallSource(
         referrerParams = parseReferrerParams(referrer),
     )
 
