@@ -16,8 +16,23 @@ import "package:photos/utils/dialog_util.dart";
 Future<void> showCastSheet(BuildContext context, Collection collection) async {
   final l10n = AppLocalizations.of(context);
   final textStyle = getEnteTextTheme(context);
-  await castService.closeActiveCasts();
   final gw = CastGateway(NetworkClient.instance.enteDio);
+  if (!flagService.enableMultiCast) {
+    if (castService.getActiveSessions().isNotEmpty) {
+      await showChoiceDialog(
+        context,
+        title: l10n.stopCastingTitle,
+        body: l10n.stopCastingBody,
+        firstButtonLabel: l10n.yes,
+        secondButtonLabel: l10n.no,
+        firstButtonOnTap: () async {
+          await gw.revokeAllTokens();
+        },
+      );
+      return;
+    }
+  }
+  await castService.closeActiveCasts();
   final logger = Logger("showCastSheet");
   List<CastInfo> sessions = [];
   if (flagService.enableMultiCast) {
