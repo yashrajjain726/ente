@@ -129,6 +129,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
           "Gamma",
           "ExifImageWidth",
           "ExifImageHeight",
+          "ExifImageLength",
           "ComponentsConfiguration",
           "CustomRendered",
           "SceneCaptureType",
