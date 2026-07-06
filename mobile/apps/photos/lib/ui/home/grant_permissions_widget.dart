@@ -345,9 +345,11 @@ class _GrantPermissionsWidgetState extends State<GrantPermissionsWidget> {
             ),
           ),
           SafeArea(
-            child: Column(
-              children: [
-                Expanded(
+            child: CustomScrollView(
+              primary: false,
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
