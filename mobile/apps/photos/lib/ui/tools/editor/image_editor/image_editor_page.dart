@@ -5,6 +5,7 @@ import 'dart:ui' as ui show Image, ImageByteFormat;
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:exif_reader/exif_reader.dart";
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
 import "package:flutter_image_compress/flutter_image_compress.dart";
@@ -35,6 +36,7 @@ import "package:photos/ui/tools/editor/image_editor/image_editor_text_bar.dart";
 import "package:photos/ui/tools/editor/image_editor/image_editor_tune_bar.dart";
 import "package:photos/ui/viewer/file/detail_page.dart";
 import "package:photos/utils/dialog_util.dart";
+import "package:photos/utils/exif_util.dart";
 import 'package:photos/utils/file_util.dart';
 import 'package:pro_image_editor/pro_image_editor.dart';
 
@@ -83,12 +85,19 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
       );
       img.Image? image;
       img.ExifData? originalImageExif;
+      Map<String, IfdTag>? originalExifReaderTags;
       if (flagService.internalUser) {
+        try {
+          originalExifReaderTags = await getExif(widget.originalFile);
+        } catch (e, s) {
+          _logger.warning("Image Editor: getExif failed", e, s);
+        }
         originalImageExif = await _readOriginalImageExif(widget.originalFile);
         image = img.decodePng(bytes);
       }
-      if (originalImageExif != null && image != null) {
-        image.exif = originalImageExif;
+      if (image != null &&
+          (originalImageExif != null || originalExifReaderTags != null)) {
+        image.exif = originalImageExif ?? img.ExifData();
         for (final key in [
           "Orientation",
           "WhitePoint",
@@ -133,6 +142,37 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
           "SubjectDistanceRange",
         ]) {
           image.exif.exifIfd[key] = null;
+        }
+
+        final make = originalExifReaderTags?["Image Make"]?.toString();
+        final model = originalExifReaderTags?["Image Model"]?.toString();
+        if (make != null) {
+          image.exif.imageIfd["Make"] = make;
+        }
+        if (model != null) {
+          image.exif.imageIfd["Model"] = model;
+        }
+
+        void copyRatio(String sourceKey, String targetKey) {
+          final values = originalExifReaderTags?[sourceKey]?.values.toList();
+          if (values == null || values.isEmpty || values.first is! Ratio) {
+            return;
+          }
+          final value = values.first as Ratio;
+          image!.exif.exifIfd[targetKey] = img.IfdValueRational(
+            value.numerator,
+            value.denominator,
+          );
+        }
+
+        copyRatio("EXIF FocalLength", "FocalLength");
+        copyRatio("EXIF FNumber", "FNumber");
+        copyRatio("EXIF ExposureTime", "ExposureTime");
+
+        final isoValues =
+            originalExifReaderTags?["EXIF ISOSpeedRatings"]?.values;
+        if (isoValues != null && isoValues.length != 0) {
+          image.exif.exifIfd["ISOSpeed"] = isoValues.firstAsInt();
         }
         result = img.encodeJpg(image, quality: 95);
       }
