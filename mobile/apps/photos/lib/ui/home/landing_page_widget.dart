@@ -46,6 +46,12 @@ class _LandingPageWidgetState extends State<LandingPageWidget> {
   }
 
   @override
+  void dispose() {
+    _onboardingAnimationLoader.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final lightComponentTheme = ComponentTheme.lightTheme(
       app: ComponentApp.photos,
