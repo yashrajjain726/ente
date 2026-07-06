@@ -27,6 +27,7 @@ Future<void> showCastSheet(BuildContext context, Collection collection) async {
         secondButtonLabel: l10n.no,
         firstButtonOnTap: () async {
           await gw.revokeAllTokens();
+          await castService.closeActiveCasts();
         },
       );
       return;
