@@ -19,13 +19,15 @@ Future<void> showCastSheet(BuildContext context, Collection collection) async {
   await castService.closeActiveCasts();
   final gw = CastGateway(NetworkClient.instance.enteDio);
   final logger = Logger("showCastSheet");
-  late final List<CastInfo> sessions;
-  try {
-    sessions = await gw.getAllCastSessions();
-  } catch (e, s) {
-    logger.severe('Failed to fetch active sessions in cast sheet: ', e, s);
-    await showGenericErrorDialog(context: context, error: e);
-    return;
+  List<CastInfo> sessions = [];
+  if (flagService.enableMultiCast) {
+    try {
+      sessions = await gw.getAllCastSessions();
+    } catch (e, s) {
+      logger.severe('Failed to fetch active sessions in cast sheet: ', e, s);
+      await showGenericErrorDialog(context: context, error: e);
+      return;
+    }
   }
   return showBottomSheetComponent(
     context: context,
