@@ -554,7 +554,7 @@ const AllAlbumsContent: React.FC<AllAlbumsContentProps> = ({
                         height: "100%",
                     }}
                 >
-                    <Typography color="text.muted">
+                    <Typography sx={{ color: "text.muted" }}>
                         {t("no_results")}
                     </Typography>
                 </Box>

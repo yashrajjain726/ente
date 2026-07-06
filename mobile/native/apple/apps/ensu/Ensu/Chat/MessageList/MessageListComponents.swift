@@ -1,13 +1,7 @@
 import SwiftUI
 import Markdown
-#if os(macOS)
-import QuickLookUI
-#else
 import QuickLook
-#endif
-#if os(iOS)
 import UIKit
-#endif
 
 struct BottomOffsetKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
@@ -31,7 +25,6 @@ struct AttachmentPreviewItem: Identifiable {
     var id: String { url.path }
 }
 
-#if os(iOS)
 struct ImageAttachmentPreview: View {
     let url: URL
     let accessibilityLabel: String
@@ -149,22 +142,6 @@ struct QuickLookPreview: UIViewControllerRepresentable {
         }
     }
 }
-#elseif os(macOS)
-struct QuickLookPreview: NSViewRepresentable {
-    let url: URL
-
-    func makeNSView(context: Context) -> QLPreviewView {
-        let view = QLPreviewView(frame: .zero, style: .normal)!
-        view.autostarts = true
-        view.previewItem = url as NSURL
-        return view
-    }
-
-    func updateNSView(_ nsView: QLPreviewView, context: Context) {
-        nsView.previewItem = url as NSURL
-    }
-}
-#endif
 
 struct UserMessageBubbleView: View {
     let message: RenderedChatMessage
@@ -229,7 +206,6 @@ struct UserMessageBubbleView: View {
                 .padding(EnsuSpacing.md)
                 .background(bubbleFill)
                 .clipShape(bubbleShape)
-                #if os(iOS)
                 .contextMenu {
                     Button("Edit") {
                         hapticTap()
@@ -240,7 +216,6 @@ struct UserMessageBubbleView: View {
                         onCopy()
                     }
                 }
-                #endif
 
                 HStack(spacing: EnsuSpacing.sm) {
                     Spacer()
@@ -283,7 +258,6 @@ struct AssistantMessageBubbleView: View {
                 }
                 .padding(.vertical, EnsuSpacing.md)
                 .padding(.horizontal, EnsuSpacing.sm)
-                #if os(iOS)
                 .contextMenu {
                     if !message.isSynthetic {
                         Button("Copy") {
@@ -298,7 +272,6 @@ struct AssistantMessageBubbleView: View {
                         }
                     }
                 }
-                #endif
 
                 if showsMetadata && !message.isSynthetic {
                     HStack(spacing: EnsuSpacing.sm) {

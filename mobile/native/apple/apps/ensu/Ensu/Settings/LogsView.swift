@@ -27,9 +27,7 @@ struct LogsView: View {
                     content
                 }
                 .background(EnsuColor.backgroundBase)
-                #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
-                #endif
                 .toolbar {
                     toolbarContent
                 }
@@ -39,9 +37,7 @@ struct LogsView: View {
                         content
                     }
                     .background(EnsuColor.backgroundBase)
-                    #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)
-                    #endif
                     .toolbar {
                         toolbarContent
                         ToolbarItem(placement: .cancellationAction) {
@@ -58,14 +54,12 @@ struct LogsView: View {
         .onChange(of: logStore.entries) { _ in
             refreshEntries()
         }
-        #if os(iOS)
         .sheet(item: $shareArchive) { archive in
             ActivityView(activityItems: [archive.url])
         }
         .sheet(item: $exportArchive) { archive in
             ExportDocumentPicker(urls: [archive.url])
         }
-        #endif
         .sheet(item: $selectedEntry) { entry in
             LogDetailView(entry: entry)
         }
@@ -117,9 +111,8 @@ struct LogsView: View {
     private var searchField: some View {
         TextField("Search logs", text: $query)
             .font(EnsuTypography.body)
-            .platformTextInputAutocapitalization(.never)
+            .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
-            .platformTextFieldStyle()
             .padding(.horizontal, EnsuSpacing.inputHorizontal)
             .padding(.vertical, EnsuSpacing.inputVertical)
             .background(EnsuColor.fillFaint)
@@ -226,11 +219,7 @@ struct LogsView: View {
     private func shareTapped() {
         do {
             let archiveURL = try EnsuLogging.shared.createLogsArchive()
-            #if os(iOS)
             shareArchive = LogArchive(url: archiveURL)
-            #elseif os(macOS)
-            MacShareSheet(items: [archiveURL]).present()
-            #endif
         } catch {
             logger.error("Failed to create logs archive", error)
         }
@@ -239,33 +228,12 @@ struct LogsView: View {
     private func exportTapped() {
         do {
             let archiveURL = try EnsuLogging.shared.createLogsArchive()
-            #if os(iOS)
             exportArchive = LogArchive(url: archiveURL)
-            #elseif os(macOS)
-            exportOnMac(url: archiveURL)
-            #endif
         } catch {
             logger.error("Failed to create logs archive", error)
         }
     }
 
-    #if os(macOS)
-    private func exportOnMac(url archiveURL: URL) {
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = archiveURL.lastPathComponent
-        panel.begin { response in
-            guard response == .OK, let dest = panel.url else { return }
-            do {
-                if FileManager.default.fileExists(atPath: dest.path) {
-                    try FileManager.default.removeItem(at: dest)
-                }
-                try FileManager.default.copyItem(at: archiveURL, to: dest)
-            } catch {
-                logger.error("Failed to export logs", error)
-            }
-        }
-    }
-    #endif
 }
 
 private struct LogArchive: Identifiable {
@@ -360,9 +328,7 @@ private struct LogDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .navigationTitle("Log details")
-            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
@@ -391,7 +357,6 @@ private let logLineRegex: NSRegularExpression = {
     return try! NSRegularExpression(pattern: pattern, options: [])
 }()
 
-#if os(iOS)
 import UIKit
 
 struct ActivityView: UIViewControllerRepresentable {
@@ -415,23 +380,4 @@ struct ExportDocumentPicker: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
 }
-#endif
 
-#if os(macOS)
-import AppKit
-
-private final class MacShareSheet: NSObject {
-    private let items: [Any]
-
-    init(items: [Any]) {
-        self.items = items
-    }
-
-    func present() {
-        guard let keyWindow = NSApplication.shared.keyWindow,
-              let contentView = keyWindow.contentView else { return }
-        let picker = NSSharingServicePicker(items: items)
-        picker.show(relativeTo: .zero, of: contentView, preferredEdge: .minY)
-    }
-}
-#endif

@@ -30,7 +30,7 @@ import io.ente.ensu.settings.AdvancedSettingsDataStore
 import io.ente.ensu.designsystem.EnsuColor
 import io.ente.ensu.chat.Attachment
 import io.ente.ensu.chat.AttachmentType
-import io.ente.ensu.config.ConfigDefaults
+import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.AppState
 import io.ente.ensu.AppStore
 import io.ente.ensu.llm.ModelSettingsScreen

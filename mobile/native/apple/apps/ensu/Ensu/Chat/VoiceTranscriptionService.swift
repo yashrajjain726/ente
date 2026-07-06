@@ -1,23 +1,12 @@
 import Foundation
-#if os(iOS)
 import AVFoundation
-#endif
 
 enum VoiceInputState: Equatable {
     case idle
-    case unsupported
     case recording
     case downloading(percent: Int?)
     case transcribing
     case error(String)
-
-    static var initial: VoiceInputState {
-        #if os(iOS)
-        return .idle
-        #else
-        return .unsupported
-        #endif
-    }
 
     var isRecording: Bool {
         if case .recording = self {
@@ -30,7 +19,7 @@ enum VoiceInputState: Equatable {
         switch self {
         case .recording, .downloading, .transcribing:
             return true
-        case .idle, .unsupported, .error:
+        case .idle, .error:
             return false
         }
     }
@@ -39,7 +28,7 @@ enum VoiceInputState: Equatable {
         switch self {
         case .downloading, .transcribing:
             return true
-        case .idle, .unsupported, .recording, .error:
+        case .idle, .recording, .error:
             return false
         }
     }
@@ -48,7 +37,7 @@ enum VoiceInputState: Equatable {
         switch self {
         case .recording, .transcribing:
             return true
-        case .idle, .unsupported, .downloading, .error:
+        case .idle, .downloading, .error:
             return false
         }
     }
@@ -64,14 +53,14 @@ enum VoiceInputState: Equatable {
         switch self {
         case let .error(message):
             return message == "No speech detected." || message == "No speech captured."
-        case .idle, .unsupported, .recording, .downloading, .transcribing:
+        case .idle, .recording, .downloading, .transcribing:
             return false
         }
     }
 
     var statusText: String? {
         switch self {
-        case .idle, .unsupported:
+        case .idle:
             return nil
         case .recording:
             return "Listening..."
@@ -99,9 +88,7 @@ final class VoiceTranscriptionService {
     private var activeVoiceTaskId = UUID()
     private var activeDownloadId: UUID?
 
-    #if os(iOS)
     private let recorder = PcmAudioRecorder()
-    #endif
 
     init(transcriber: Transcriber) {
         self.transcriber = transcriber
@@ -111,7 +98,6 @@ final class VoiceTranscriptionService {
         onState: @escaping StateHandler,
         shouldStartRecording: @escaping @MainActor @Sendable () -> Bool = { true }
     ) {
-        #if os(iOS)
         guard !recorder.isRecording else { return }
 
         let session = AVAudioSession.sharedInstance()
@@ -137,16 +123,12 @@ final class VoiceTranscriptionService {
         @unknown default:
             onState(.error("Microphone permission is required for voice input."))
         }
-        #else
-        onState(.unsupported)
-        #endif
     }
 
     func stopAndTranscribe(
         onState: @escaping StateHandler,
         onTranscript: @escaping TranscriptHandler
     ) {
-        #if os(iOS)
         guard recorder.isRecording else { return }
         onState(.transcribing)
         let recording = recorder.stop()
@@ -216,9 +198,6 @@ final class VoiceTranscriptionService {
                 }
             }
         }
-        #else
-        onState(.unsupported)
-        #endif
     }
 
     func cancel() {
@@ -228,14 +207,11 @@ final class VoiceTranscriptionService {
         preloadTask = nil
         activeVoiceTaskId = UUID()
         activeDownloadId = nil
-        #if os(iOS)
         if recorder.isRecording {
             _ = recorder.stop()
         }
-        #endif
     }
 
-    #if os(iOS)
     private func prepareModelAndStartRecording(
         onState: @escaping StateHandler,
         shouldStartRecording: @escaping @MainActor @Sendable () -> Bool
@@ -373,10 +349,8 @@ final class VoiceTranscriptionService {
     private func minimumRecordingBytes(sampleRate: UInt32) -> Int {
         Int(sampleRate) / 4 * 2
     }
-    #endif
 }
 
-#if os(iOS)
 private struct VoiceRecording {
     let sampleRate: UInt32
     let pcm: Data
@@ -463,4 +437,3 @@ private final class TranscriptionProgressCallback: TranscriptionModelEventCallba
         handler(event)
     }
 }
-#endif

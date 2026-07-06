@@ -1,4 +1,3 @@
-#if os(iOS)
 import UIKit
 
 final class EnsuAppDelegate: NSObject, UIApplicationDelegate {
@@ -10,4 +9,3 @@ final class EnsuAppDelegate: NSObject, UIApplicationDelegate {
         ModelDownloadManager.shared.setBackgroundCompletionHandler(completionHandler)
     }
 }
-#endif

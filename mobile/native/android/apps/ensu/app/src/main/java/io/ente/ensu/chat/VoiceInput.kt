@@ -139,14 +139,14 @@ internal class VoiceTranscriptionController(
                 state = VoiceInputState.Error("Voice transcription is not available on this device.")
             } catch (error: TranscriptionException) {
                 Log.w(TAG, "Voice model preparation failed: ${error.message}", error)
-                state = VoiceInputState.Error(transcriptionErrorMessage(error.message))
+                state = VoiceInputState.Error(transcriptionErrorMessage(error))
             } catch (error: Throwable) {
                 Log.w(
                     TAG,
                     "Voice model preparation failed: ${error.javaClass.simpleName}: ${error.message}",
                     error
                 )
-                state = VoiceInputState.Error(transcriptionErrorMessage(error.message))
+                state = VoiceInputState.Error("Could not transcribe voice input.")
             }
         }
     }
@@ -287,14 +287,14 @@ internal class VoiceTranscriptionController(
             state = VoiceInputState.Error("Voice transcription is not available on this device.")
         } catch (error: TranscriptionException) {
             Log.w(TAG, "Voice transcription failed: ${error.message}", error)
-            state = VoiceInputState.Error(transcriptionErrorMessage(error.message))
+            state = VoiceInputState.Error(transcriptionErrorMessage(error))
         } catch (error: Throwable) {
             Log.w(
                 TAG,
                 "Voice transcription failed: ${error.javaClass.simpleName}: ${error.message}",
                 error
             )
-            state = VoiceInputState.Error(transcriptionErrorMessage(error.message))
+            state = VoiceInputState.Error("Could not transcribe voice input.")
         }
     }
 
@@ -446,21 +446,15 @@ internal class VoiceTranscriptionController(
     private fun downloadErrorMessage(): String =
         "Voice model download failed. Check your connection and try again."
 
-    private fun transcriptionErrorMessage(message: String?): String {
-        val lowerMessage = message.orEmpty().lowercase()
-        return when {
-            lowerMessage.contains("download") ||
-                lowerMessage.contains("http") ||
-                lowerMessage.contains("request") ||
-                lowerMessage.contains("connection") ||
-                lowerMessage.contains("network") ||
-                lowerMessage.contains("dns") ||
-                lowerMessage.contains("certificate") ||
-                lowerMessage.contains("tls") -> downloadErrorMessage()
-            lowerMessage.contains("model") -> "Voice model could not be loaded."
-            lowerMessage.contains("vad") -> "Could not detect speech in this recording."
-            else -> "Could not transcribe voice input."
-        }
+    private fun transcriptionErrorMessage(error: TranscriptionException): String = when (error) {
+        is TranscriptionException.Download -> downloadErrorMessage()
+        is TranscriptionException.NotDownloaded,
+        is TranscriptionException.VadNotDownloaded,
+        is TranscriptionException.Transcribe -> "Voice model could not be loaded."
+        is TranscriptionException.InvalidAudio -> "Could not detect speech in this recording."
+        is TranscriptionException.StorageFull ->
+            "Not enough storage space. Please free up space and try again."
+        is TranscriptionException.Io -> "Could not transcribe voice input."
     }
 
     private fun showTransientError(message: String) {

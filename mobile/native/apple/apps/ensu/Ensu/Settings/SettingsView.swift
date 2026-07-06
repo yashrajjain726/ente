@@ -77,12 +77,8 @@ struct SettingsView: View {
                 .padding(EnsuSpacing.lg)
             }
             .background(EnsuColor.backgroundBase)
-            #if os(iOS)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always))
             .navigationBarTitleDisplayMode(.inline)
-            #else
-            .searchable(text: $query)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Settings")
@@ -274,9 +270,7 @@ private struct SystemPromptSettingsView: View {
         Group {
             if embeddedInNavigation {
                 content
-                    #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)
-                    #endif
                     .toolbar {
                         ToolbarItem(placement: .principal) {
                             Text("System Prompt")
@@ -285,7 +279,6 @@ private struct SystemPromptSettingsView: View {
                         }
                     }
             } else {
-                #if os(iOS)
                 NavigationStack {
                     content
                         .navigationBarTitleDisplayMode(.inline)
@@ -300,9 +293,6 @@ private struct SystemPromptSettingsView: View {
                             }
                         }
                 }
-                #else
-                content
-                #endif
             }
         }
         .onAppear {
@@ -315,32 +305,6 @@ private struct SystemPromptSettingsView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        #if os(macOS)
-        .safeAreaInset(edge: .top) {
-            if embeddedInNavigation {
-                EmptyView()
-            } else {
-                MacSheetHeader(
-                    leading: {
-                        EmptyView()
-                    },
-                    center: {
-                        Text("System Prompt")
-                            .font(EnsuTypography.large)
-                            .foregroundStyle(EnsuColor.textPrimary)
-                    },
-                    trailing: {
-                        Button("Done") {
-                            dismiss()
-                        }
-                        .font(EnsuTypography.small)
-                        .foregroundStyle(EnsuColor.textMuted)
-                        .buttonStyle(.plain)
-                    }
-                )
-            }
-        }
-        #endif
     }
 
     private var content: some View {

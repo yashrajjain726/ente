@@ -58,7 +58,7 @@ import io.ente.ensu.designsystem.EnsuSpacing
 import io.ente.ensu.designsystem.EnsuTypography
 import io.ente.ensu.chat.Attachment
 import io.ente.ensu.chat.AttachmentType
-import io.ente.ensu.config.ConfigDefaults
+import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.chat.MaxImageAttachmentsPerMessage
 import io.ente.ensu.AppState
 import io.ente.ensu.AppStore

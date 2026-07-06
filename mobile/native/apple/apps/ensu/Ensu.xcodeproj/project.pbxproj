@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10000012F11111100AA0001 /* InferenceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000022F11111100AA0001 /* InferenceIntegrationTests.swift */; };
+		A10000012F11111100AA0001 /* LlmIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000022F11111100AA0001 /* LlmIntegrationTests.swift */; };
 		DAF584672E61BB8300F8A08F /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = DAF584662E61BB8300F8A08F /* ZIPFoundation */; };
 		DB9F1C3C2F9D123400ABCD02 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = DB9F1C3B2F9D123400ABCD02 /* Markdown */; };
 		DBA3E91C2F7A6B9000AA11BB /* SwiftMath in Frameworks */ = {isa = PBXBuildFile; productRef = DBA3E91B2F7A6B9000AA11BB /* SwiftMath */; };
@@ -24,7 +24,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A10000022F11111100AA0001 /* InferenceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceIntegrationTests.swift; sourceTree = "<group>"; };
+		A10000022F11111100AA0001 /* LlmIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlmIntegrationTests.swift; sourceTree = "<group>"; };
 		A10000032F11111100AA0001 /* EnsuTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EnsuTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DA72BC612E5F87A000D128FF /* Ensu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ensu.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -74,7 +74,7 @@
 		A10000042F11111100AA0001 /* EnsuTests */ = {
 			isa = PBXGroup;
 			children = (
-				A10000022F11111100AA0001 /* InferenceIntegrationTests.swift */,
+				A10000022F11111100AA0001 /* LlmIntegrationTests.swift */,
 			);
 			path = EnsuTests;
 			sourceTree = "<group>";
@@ -238,7 +238,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000012F11111100AA0001 /* InferenceIntegrationTests.swift in Sources */,
+				A10000012F11111100AA0001 /* LlmIntegrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

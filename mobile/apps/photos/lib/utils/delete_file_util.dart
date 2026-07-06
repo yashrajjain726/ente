@@ -1028,6 +1028,15 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
   var _isMoreOptionsShown = false;
   var _isSetAsDefaultSelected = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Always display the more options if the user hasn't set a preference yet.
+    if (localSettings.getDeletePreference() == null) {
+      _isMoreOptionsShown = true;
+    }
+  }
+
   Future<void> _onDelete(
     BuildContext context,
     Future<void> Function() callback,
@@ -1108,7 +1117,7 @@ class DeleteConfirmationSheetState extends State<DeleteConfirmationSheet> {
                 children: [...previousChildren, ?currentChild],
               );
             },
-            child: (_isMoreOptionsShown)
+            child: (widget.isLocal && widget.isRemote && _isMoreOptionsShown)
                 ? Column(
                     spacing: Spacing.md,
                     children: [

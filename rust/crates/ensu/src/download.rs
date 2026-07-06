@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::fs::{self, File, OpenOptions};
-use std::io::{Error, ErrorKind, Write};
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -19,6 +19,51 @@ const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const RESPONSE_START_TIMEOUT: Duration = Duration::from_secs(30);
 const READ_STALL_TIMEOUT: Duration = Duration::from_secs(30);
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Download cancelled")]
+    Cancelled,
+    #[error("Failed to download {label}: {source}")]
+    Target {
+        label: String,
+        #[source]
+        source: Box<Error>,
+    },
+    #[error("{single}; range download fallback was used after: {ranged}")]
+    Fallback {
+        single: Box<Error>,
+        ranged: Box<Error>,
+    },
+    #[error("{0}")]
+    Validation(String),
+    #[error("HTTP {0}")]
+    Http(u16),
+    #[error("network: {0}")]
+    Network(String),
+    #[error("size mismatch: expected {expected} bytes, got {actual}")]
+    SizeMismatch { expected: u64, actual: u64 },
+    #[error("range protocol violation: {0}")]
+    Protocol(String),
+    #[error("invalid download target: {0}")]
+    InvalidTarget(String),
+    #[error("not enough storage space")]
+    StorageFull,
+    #[error(transparent)]
+    Io(std::io::Error),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Self {
+        if err.kind() == std::io::ErrorKind::StorageFull {
+            Error::StorageFull
+        } else {
+            Error::Io(err)
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Target {
@@ -145,24 +190,23 @@ struct ContentRange {
 
 pub fn fetch(
     targets: Vec<Target>,
-    validate: impl Fn(&Target, &Path) -> Result<(), String>,
+    validate: impl Fn(&Target, &Path) -> Result<(), Error>,
     on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     let runtime = Builder::new_current_thread()
         .enable_io()
         .enable_time()
-        .build()
-        .map_err(|err| err.to_string())?;
+        .build()?;
     runtime.block_on(fetch_async(targets, validate, on_progress, is_cancelled))
 }
 
 async fn fetch_async(
     targets: Vec<Target>,
-    validate: impl Fn(&Target, &Path) -> Result<(), String>,
+    validate: impl Fn(&Target, &Path) -> Result<(), Error>,
     on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     if targets.is_empty() {
         return Ok(());
     }
@@ -170,7 +214,7 @@ async fn fetch_async(
     let client = Client::builder()
         .connect_timeout(CONNECT_TIMEOUT)
         .build()
-        .map_err(|err| err.to_string())?;
+        .map_err(|err| Error::Network(err.to_string()))?;
     let download_started_at = Instant::now();
     let mut download_probes = Vec::with_capacity(targets.len());
     let mut cached = Vec::with_capacity(targets.len());
@@ -264,7 +308,7 @@ async fn fetch_async(
 
         downloads.push(async move {
             if is_cancelled() {
-                return Err("Download cancelled".to_string());
+                return Err(Error::Cancelled);
             }
 
             let file_report = download_file(
@@ -303,7 +347,14 @@ async fn fetch_async(
                 },
                 is_cancelled,
             )
-            .await?;
+            .await
+            .map_err(|err| match err {
+                Error::Cancelled => Error::Cancelled,
+                err => Error::Target {
+                    label: target.label.clone(),
+                    source: Box::new(err),
+                },
+            })?;
 
             {
                 let mut states = progress_states.borrow_mut();
@@ -356,14 +407,14 @@ async fn download_file(
     target: &Target,
     destination: &Path,
     download_probe: &DownloadProbe,
-    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
+    validate: &impl Fn(&Target, &Path) -> Result<(), Error>,
     mut on_progress: impl FnMut(FileDownloadProgress),
     is_cancelled: &impl Fn() -> bool,
-) -> Result<FileDownloadReport, String> {
+) -> Result<FileDownloadReport, Error> {
     let parent = destination
         .parent()
-        .ok_or_else(|| format!("Invalid destination path: {}", destination.display()))?;
-    fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+        .ok_or_else(|| Error::InvalidTarget(destination.display().to_string()))?;
+    fs::create_dir_all(parent)?;
 
     let mut range_error = None;
     if let Some(total) = download_probe.content_length {
@@ -381,7 +432,7 @@ async fn download_file(
             .await
             {
                 Ok(report) => return Ok(report),
-                Err(err) if is_download_cancelled_error(&err) => return Err(err),
+                Err(Error::Cancelled) => return Err(Error::Cancelled),
                 Err(err) => {
                     range_error = Some(err);
                     cleanup_range_download(destination);
@@ -407,9 +458,10 @@ async fn download_file(
 
     match (single_result, range_error) {
         (Ok(report), _) => Ok(report),
-        (Err(single_error), Some(range_error)) => Err(format!(
-            "{single_error}; range download fallback was used after: {range_error}"
-        )),
+        (Err(single_error), Some(range_error)) => Err(Error::Fallback {
+            single: Box::new(single_error),
+            ranged: Box::new(range_error),
+        }),
         (Err(single_error), None) => Err(single_error),
     }
 }
@@ -419,10 +471,10 @@ async fn download_file_single(
     target: &Target,
     destination: &Path,
     expected_file_total: Option<u64>,
-    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
+    validate: &impl Fn(&Target, &Path) -> Result<(), Error>,
     on_progress: &mut dyn FnMut(FileDownloadProgress),
     is_cancelled: &impl Fn() -> bool,
-) -> Result<FileDownloadReport, String> {
+) -> Result<FileDownloadReport, Error> {
     let tmp_path = tmp_path_for(destination);
     let partial_metadata_path = partial_metadata_path_for(destination);
     let file_started_at = Instant::now();
@@ -431,7 +483,7 @@ async fn download_file_single(
 
     for attempt in 1..=MAX_ATTEMPTS {
         if is_cancelled() {
-            return Err("Download cancelled".to_string());
+            return Err(Error::Cancelled);
         }
 
         let tmp_size = file_size(&tmp_path).unwrap_or(0);
@@ -457,7 +509,7 @@ async fn download_file_single(
             Ok(response) => response,
             Err(err) => {
                 if attempt == MAX_ATTEMPTS {
-                    return Err(format!("Failed to download {}: {}", target.label, err));
+                    return Err(err);
                 }
                 retry_count = retry_count.saturating_add(1);
                 continue;
@@ -468,7 +520,7 @@ async fn download_file_single(
             let _ = fs::remove_file(&tmp_path);
             let _ = fs::remove_file(&partial_metadata_path);
             if attempt == MAX_ATTEMPTS {
-                return Err(format!("Failed to download {}: HTTP 416", target.label));
+                return Err(Error::Http(416));
             }
             retry_count = retry_count.saturating_add(1);
             continue;
@@ -476,11 +528,7 @@ async fn download_file_single(
 
         if !response.status().is_success() {
             if attempt == MAX_ATTEMPTS {
-                return Err(format!(
-                    "Failed to download {}: HTTP {}",
-                    target.label,
-                    response.status()
-                ));
+                return Err(Error::Http(response.status().as_u16()));
             }
             retry_count = retry_count.saturating_add(1);
             continue;
@@ -491,9 +539,8 @@ async fn download_file_single(
             let _ = fs::remove_file(&tmp_path);
             let _ = fs::remove_file(&partial_metadata_path);
             if attempt == MAX_ATTEMPTS {
-                return Err(format!(
-                    "Failed to download {}: server resumed from the wrong offset",
-                    target.label
+                return Err(Error::Protocol(
+                    "server resumed from the wrong offset".to_string(),
                 ));
             }
             retry_count = retry_count.saturating_add(1);
@@ -516,8 +563,7 @@ async fn download_file_single(
             .write(true)
             .append(append)
             .truncate(!append)
-            .open(&tmp_path)
-            .map_err(|err| err.to_string())?;
+            .open(&tmp_path)?;
 
         let mut downloaded = resume_from;
         let mut last_progress = Instant::now();
@@ -534,7 +580,7 @@ async fn download_file_single(
         loop {
             if is_cancelled() {
                 file.flush().ok();
-                return Err("Download cancelled".to_string());
+                return Err(Error::Cancelled);
             }
 
             let chunk = match timeout(READ_STALL_TIMEOUT, response.chunk()).await {
@@ -542,7 +588,7 @@ async fn download_file_single(
                 Ok(Err(err)) => {
                     file.flush().ok();
                     if attempt == MAX_ATTEMPTS {
-                        return Err(format!("Failed to download {}: {}", target.label, err));
+                        return Err(Error::Network(err.to_string()));
                     }
                     retry_count = retry_count.saturating_add(1);
                     retry_attempt = true;
@@ -551,11 +597,10 @@ async fn download_file_single(
                 Err(_) => {
                     file.flush().ok();
                     if attempt == MAX_ATTEMPTS {
-                        return Err(format!(
-                            "Failed to download {}: stalled for {} seconds",
-                            target.label,
+                        return Err(Error::Network(format!(
+                            "stalled for {} seconds",
                             READ_STALL_TIMEOUT.as_secs()
-                        ));
+                        )));
                     }
                     retry_count = retry_count.saturating_add(1);
                     retry_attempt = true;
@@ -566,7 +611,7 @@ async fn download_file_single(
                 break;
             };
 
-            file.write_all(&chunk).map_err(|err| err.to_string())?;
+            file.write_all(&chunk)?;
             downloaded = downloaded.saturating_add(chunk.len() as u64);
             network_downloaded_bytes = network_downloaded_bytes.saturating_add(chunk.len() as u64);
 
@@ -587,7 +632,7 @@ async fn download_file_single(
             continue;
         }
 
-        file.flush().map_err(|err| err.to_string())?;
+        file.flush()?;
         drop(file);
 
         on_progress(FileDownloadProgress {
@@ -606,9 +651,10 @@ async fn download_file_single(
                 let _ = fs::remove_file(&partial_metadata_path);
             }
             if attempt == MAX_ATTEMPTS {
-                return Err(format!(
-                    "Download size mismatch: expected {total} bytes, got {downloaded}"
-                ));
+                return Err(Error::SizeMismatch {
+                    expected: total,
+                    actual: downloaded,
+                });
             }
             retry_count = retry_count.saturating_add(1);
             continue;
@@ -621,18 +667,19 @@ async fn download_file_single(
         }
 
         if destination.exists() {
-            fs::remove_file(destination).map_err(|err| err.to_string())?;
+            fs::remove_file(destination)?;
         }
-        fs::rename(&tmp_path, destination).map_err(|err| err.to_string())?;
+        fs::rename(&tmp_path, destination)?;
         let _ = fs::remove_file(range_metadata_path_for(destination));
         let _ = fs::remove_file(&partial_metadata_path);
 
         let final_size = file_size(destination).unwrap_or(downloaded);
         if final_size != downloaded {
             let _ = fs::remove_file(destination);
-            return Err(format!(
-                "Downloaded file size mismatch ({final_size} != {downloaded})"
-            ));
+            return Err(Error::SizeMismatch {
+                expected: downloaded,
+                actual: final_size,
+            });
         }
 
         let _ = write_download_metadata(destination, target, final_size, Some(response_metadata));
@@ -645,7 +692,7 @@ async fn download_file_single(
         });
     }
 
-    Err("Failed to download file".to_string())
+    unreachable!("the final attempt returns")
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -655,10 +702,10 @@ async fn download_file_ranged(
     destination: &Path,
     total: u64,
     response_metadata: Option<ResponseMetadata>,
-    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
+    validate: &impl Fn(&Target, &Path) -> Result<(), Error>,
     on_progress: &mut dyn FnMut(FileDownloadProgress),
     is_cancelled: &impl Fn() -> bool,
-) -> Result<FileDownloadReport, String> {
+) -> Result<FileDownloadReport, Error> {
     let tmp_path = tmp_path_for(destination);
     let range_metadata_path = range_metadata_path_for(destination);
     let file_started_at = Instant::now();
@@ -670,9 +717,8 @@ async fn download_file_ranged(
         .read(true)
         .write(true)
         .truncate(false)
-        .open(&tmp_path)
-        .map_err(|err| err.to_string())?;
-    file.set_len(total).map_err(|err| err.to_string())?;
+        .open(&tmp_path)?;
+    file.set_len(total)?;
     let file = Rc::new(file);
 
     let range_states = range_metadata
@@ -742,18 +788,19 @@ async fn download_file_ranged(
     }
 
     if destination.exists() {
-        fs::remove_file(destination).map_err(|err| err.to_string())?;
+        fs::remove_file(destination)?;
     }
-    fs::rename(&tmp_path, destination).map_err(|err| err.to_string())?;
+    fs::rename(&tmp_path, destination)?;
     let _ = fs::remove_file(&range_metadata_path);
     let _ = fs::remove_file(partial_metadata_path_for(destination));
 
     let final_size = file_size(destination).unwrap_or(total);
     if final_size != total {
         let _ = fs::remove_file(destination);
-        return Err(format!(
-            "Downloaded file size mismatch ({final_size} != {total})"
-        ));
+        return Err(Error::SizeMismatch {
+            expected: total,
+            actual: final_size,
+        });
     }
 
     let network_downloaded_bytes = range_states
@@ -792,12 +839,12 @@ async fn download_range_part(
     file_started_at: Instant,
     on_progress: Rc<RefCell<&mut dyn FnMut(FileDownloadProgress)>>,
     is_cancelled: &impl Fn() -> bool,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     let range_len = range_download_len(range);
 
     for attempt in 1..=MAX_ATTEMPTS {
         if is_cancelled() {
-            return Err("Download cancelled".to_string());
+            return Err(Error::Cancelled);
         }
 
         {
@@ -814,10 +861,7 @@ async fn download_range_part(
                 Ok(response) => response,
                 Err(err) => {
                     if attempt == MAX_ATTEMPTS {
-                        return Err(format!(
-                            "Failed to download {} range: {}",
-                            target.label, err
-                        ));
+                        return Err(err);
                     }
                     increment_range_retry(&range_states, part_index);
                     emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
@@ -829,18 +873,10 @@ async fn download_range_part(
             if response.status() == StatusCode::OK
                 || response.status() == StatusCode::RANGE_NOT_SATISFIABLE
             {
-                return Err(format!(
-                    "Failed to download {} range: HTTP {}",
-                    target.label,
-                    response.status()
-                ));
+                return Err(Error::Http(response.status().as_u16()));
             }
             if attempt == MAX_ATTEMPTS {
-                return Err(format!(
-                    "Failed to download {} range: HTTP {}",
-                    target.label,
-                    response.status()
-                ));
+                return Err(Error::Http(response.status().as_u16()));
             }
             increment_range_retry(&range_states, part_index);
             emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
@@ -855,17 +891,14 @@ async fn download_range_part(
 
         loop {
             if is_cancelled() {
-                return Err("Download cancelled".to_string());
+                return Err(Error::Cancelled);
             }
 
             let chunk = match timeout(READ_STALL_TIMEOUT, response.chunk()).await {
                 Ok(Ok(chunk)) => chunk,
                 Ok(Err(err)) => {
                     if attempt == MAX_ATTEMPTS {
-                        return Err(format!(
-                            "Failed to download {} range: {}",
-                            target.label, err
-                        ));
+                        return Err(Error::Network(err.to_string()));
                     }
                     increment_range_retry(&range_states, part_index);
                     retry_attempt = true;
@@ -873,11 +906,10 @@ async fn download_range_part(
                 }
                 Err(_) => {
                     if attempt == MAX_ATTEMPTS {
-                        return Err(format!(
-                            "Failed to download {} range: stalled for {} seconds",
-                            target.label,
+                        return Err(Error::Network(format!(
+                            "stalled for {} seconds",
                             READ_STALL_TIMEOUT.as_secs()
-                        ));
+                        )));
                     }
                     increment_range_retry(&range_states, part_index);
                     retry_attempt = true;
@@ -890,9 +922,8 @@ async fn download_range_part(
 
             let chunk_len = chunk.len() as u64;
             if downloaded_in_range.saturating_add(chunk_len) > range_len {
-                return Err(format!(
-                    "Failed to download {} range: received more bytes than requested",
-                    target.label
+                return Err(Error::Protocol(
+                    "received more bytes than requested".to_string(),
                 ));
             }
 
@@ -900,8 +931,7 @@ async fn download_range_part(
                 file.as_ref(),
                 chunk.as_ref(),
                 range.start + downloaded_in_range,
-            )
-            .map_err(|err| err.to_string())?;
+            )?;
             downloaded_in_range = downloaded_in_range.saturating_add(chunk_len);
 
             {
@@ -926,9 +956,10 @@ async fn download_range_part(
 
         if downloaded_in_range != range_len {
             if attempt == MAX_ATTEMPTS {
-                return Err(format!(
-                    "Download incomplete: expected {range_len} bytes, got {downloaded_in_range}"
-                ));
+                return Err(Error::SizeMismatch {
+                    expected: range_len,
+                    actual: downloaded_in_range,
+                });
             }
             increment_range_retry(&range_states, part_index);
             emit_range_file_progress(total, file_started_at, &range_states, &on_progress);
@@ -946,7 +977,7 @@ async fn download_range_part(
         return Ok(());
     }
 
-    Err("Failed to download file range".to_string())
+    unreachable!("the final attempt returns")
 }
 
 async fn request_file(
@@ -954,7 +985,7 @@ async fn request_file(
     url: &str,
     resume_from: u64,
     if_range: Option<&str>,
-) -> Result<Response, String> {
+) -> Result<Response, Error> {
     let mut request = client.get(url);
     if resume_from > 0
         && let Some(if_range) = if_range
@@ -966,12 +997,12 @@ async fn request_file(
     timeout(RESPONSE_START_TIMEOUT, request.send())
         .await
         .map_err(|_| {
-            format!(
+            Error::Network(format!(
                 "request did not receive a response within {} seconds",
                 RESPONSE_START_TIMEOUT.as_secs()
-            )
+            ))
         })?
-        .map_err(|err| err.to_string())
+        .map_err(|err| Error::Network(err.to_string()))
 }
 
 async fn request_model_range(
@@ -979,7 +1010,7 @@ async fn request_model_range(
     url: &str,
     range: RangeDownloadPartMetadata,
     response_metadata: Option<&ResponseMetadata>,
-) -> Result<Response, String> {
+) -> Result<Response, Error> {
     let mut request = client
         .get(url)
         .header(RANGE, format!("bytes={}-{}", range.start, range.end));
@@ -989,12 +1020,12 @@ async fn request_model_range(
     timeout(RESPONSE_START_TIMEOUT, request.send())
         .await
         .map_err(|_| {
-            format!(
+            Error::Network(format!(
                 "request did not receive a response within {} seconds",
                 RESPONSE_START_TIMEOUT.as_secs()
-            )
+            ))
         })?
-        .map_err(|err| err.to_string())
+        .map_err(|err| Error::Network(err.to_string()))
 }
 
 async fn fetch_download_probe(client: &Client, url: &str) -> DownloadProbe {
@@ -1037,16 +1068,12 @@ fn should_use_range_download(total: u64, probe: &DownloadProbe) -> bool {
     total >= MIN_RANGE_DOWNLOAD_BYTES && probe.supports_ranges
 }
 
-fn is_download_cancelled_error(err: &str) -> bool {
-    err == "Download cancelled"
-}
-
 fn prepare_range_download_metadata(
     target: &Target,
     destination: &Path,
     total: u64,
     response_metadata: Option<ResponseMetadata>,
-) -> Result<RangeDownloadMetadata, String> {
+) -> Result<RangeDownloadMetadata, Error> {
     let tmp_path = tmp_path_for(destination);
     let ranges = range_download_parts(total, RANGE_DOWNLOAD_CONCURRENCY);
 
@@ -1190,7 +1217,7 @@ fn mark_range_complete(
     range_metadata: &Rc<RefCell<RangeDownloadMetadata>>,
     range_metadata_path: &Path,
     part_index: usize,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     let mut metadata = range_metadata.borrow_mut();
     if let Some(range) = metadata.ranges.get_mut(part_index) {
         range.complete = true;
@@ -1202,35 +1229,35 @@ fn validate_range_response(
     response: &Response,
     range: RangeDownloadPartMetadata,
     total: u64,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     let content_range = response
         .headers()
         .get(CONTENT_RANGE)
         .and_then(|value| value.to_str().ok())
         .and_then(parse_content_range)
-        .ok_or_else(|| "Range response did not include a valid Content-Range".to_string())?;
+        .ok_or_else(|| Error::Protocol("range response had no valid Content-Range".to_string()))?;
 
     if content_range.start != range.start || content_range.end != range.end {
-        return Err(format!(
-            "Range response mismatch: expected {}-{}, got {}-{}",
+        return Err(Error::Protocol(format!(
+            "range mismatch: expected {}-{}, got {}-{}",
             range.start, range.end, content_range.start, content_range.end
-        ));
+        )));
     }
 
     if let Some(content_total) = content_range.total
         && content_total != total
     {
-        return Err(format!(
-            "Range response total mismatch: expected {total}, got {content_total}"
-        ));
+        return Err(Error::Protocol(format!(
+            "range total mismatch: expected {total}, got {content_total}"
+        )));
     }
 
     if let Some(content_length) = response.content_length() {
         let expected_length = range_download_len(range);
         if content_length != expected_length {
-            return Err(format!(
-                "Range response length mismatch: expected {expected_length}, got {content_length}"
-            ));
+            return Err(Error::Protocol(format!(
+                "range length mismatch: expected {expected_length}, got {content_length}"
+            )));
         }
     }
 
@@ -1482,7 +1509,7 @@ fn bytes_per_second(bytes: u64, elapsed: Duration) -> f64 {
 fn prepare_cached_download(
     target: &Target,
     destination: &Path,
-    validate: &impl Fn(&Target, &Path) -> Result<(), String>,
+    validate: &impl Fn(&Target, &Path) -> Result<(), Error>,
 ) -> bool {
     if !destination.exists() || validate(target, destination).is_err() {
         return false;
@@ -1515,7 +1542,7 @@ fn write_download_metadata(
     target: &Target,
     size_bytes: u64,
     response_metadata: Option<ResponseMetadata>,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     let (etag, last_modified) = response_metadata
         .map(|metadata| (metadata.etag, metadata.last_modified))
         .unwrap_or((None, None));
@@ -1527,11 +1554,12 @@ fn write_download_metadata(
         last_modified,
         downloaded_at_ms: now_ms(),
     };
-    let text = serde_json::to_string_pretty(&metadata).map_err(|err| err.to_string())?;
+    let text = serde_json::to_string_pretty(&metadata)?;
     let metadata_path = metadata_path_for(path);
     let tmp_path = PathBuf::from(format!("{}.tmp", metadata_path.display()));
-    fs::write(&tmp_path, text).map_err(|err| err.to_string())?;
-    fs::rename(&tmp_path, &metadata_path).map_err(|err| err.to_string())
+    fs::write(&tmp_path, text)?;
+    fs::rename(&tmp_path, &metadata_path)?;
+    Ok(())
 }
 
 fn response_metadata(response: &Response) -> ResponseMetadata {
@@ -1557,9 +1585,10 @@ fn read_range_download_metadata(path: &Path) -> Option<RangeDownloadMetadata> {
 fn write_range_download_metadata(
     path: &Path,
     metadata: &RangeDownloadMetadata,
-) -> Result<(), String> {
-    let text = serde_json::to_string_pretty(metadata).map_err(|err| err.to_string())?;
-    fs::write(path, text).map_err(|err| err.to_string())
+) -> Result<(), Error> {
+    let text = serde_json::to_string_pretty(metadata)?;
+    fs::write(path, text)?;
+    Ok(())
 }
 
 pub(crate) fn metadata_path_for(path: &Path) -> PathBuf {
@@ -1587,14 +1616,15 @@ fn write_partial_download_metadata(
     destination: &Path,
     target: &Target,
     response_metadata: &ResponseMetadata,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     let metadata = PartialDownloadMetadata {
         url: target.url.clone(),
         etag: response_metadata.etag.clone(),
         last_modified: response_metadata.last_modified.clone(),
     };
-    let text = serde_json::to_string_pretty(&metadata).map_err(|err| err.to_string())?;
-    fs::write(partial_metadata_path_for(destination), text).map_err(|err| err.to_string())
+    let text = serde_json::to_string_pretty(&metadata)?;
+    fs::write(partial_metadata_path_for(destination), text)?;
+    Ok(())
 }
 
 fn cleanup_range_download(destination: &Path) {
@@ -1665,7 +1695,7 @@ fn write_all_at(file: &File, mut bytes: &[u8], mut offset: u64) -> std::io::Resu
     while !bytes.is_empty() {
         let written = file.write_at(bytes, offset)?;
         if written == 0 {
-            return Err(Error::new(
+            return Err(std::io::Error::new(
                 ErrorKind::WriteZero,
                 "failed to write range bytes",
             ));
@@ -1684,7 +1714,7 @@ fn write_all_at(file: &File, mut bytes: &[u8], mut offset: u64) -> std::io::Resu
     while !bytes.is_empty() {
         let written = file.seek_write(bytes, offset)?;
         if written == 0 {
-            return Err(Error::new(
+            return Err(std::io::Error::new(
                 ErrorKind::WriteZero,
                 "failed to write range bytes",
             ));
@@ -1940,7 +1970,7 @@ mod tests {
                 url: server.url("/model.bin"),
                 destination_path: destination.display().to_string(),
             }],
-            |_, _| Err("rejected".to_string()),
+            |_, _| Err(Error::Validation("rejected".to_string())),
             |_| {},
             || false,
         );
@@ -2036,7 +2066,7 @@ mod tests {
             .and_then(|data| data.first().copied())
         {
             Some(0) => Ok(()),
-            _ => Err("bad header".to_string()),
+            _ => Err(Error::Validation("bad header".to_string())),
         };
 
         fetch(vec![target.clone()], require_zero_header, |_| {}, || false)
@@ -2444,6 +2474,27 @@ mod tests {
             let _ = stream.write_all(response.as_bytes());
             let _ = stream.write_all(bytes.as_slice());
         }
+    }
+
+    #[test]
+    fn cancelled_fetch_returns_the_cancelled_variant() {
+        let test_dir = scratch_dir("cancel-download");
+        let destination = test_dir.join("model.bin");
+
+        let result = fetch(
+            vec![Target {
+                label: "Model".to_string(),
+                url: "http://127.0.0.1:1/model.bin".to_string(),
+                destination_path: destination.display().to_string(),
+            }],
+            |_, _| Ok(()),
+            |_| {},
+            || true,
+        );
+
+        assert!(matches!(result, Err(Error::Cancelled)));
+
+        let _ = fs::remove_dir_all(test_dir);
     }
 
     fn sample_bytes(len: usize) -> Vec<u8> {
