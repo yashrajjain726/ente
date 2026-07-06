@@ -67,10 +67,16 @@ class _MemoriesWidgetState extends State<MemoriesWidget> {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final screenHeight = MediaQuery.sizeOf(context).height;
     if (screenWidth < screenHeight) {
-      _memoryWidth = min(screenWidth * .4352, 240);
+      _memoryWidth = min(
+        screenWidth * (MemoryCoverWidget.defaultWidth / 376.0),
+        MemoryCoverWidget.defaultWidth * 1.5,
+      );
       _memoryheight = _memoryWidth * MemoryCoverWidget.aspectRatio;
     } else {
-      _memoryWidth = min(screenHeight * .35, 128);
+      _memoryWidth = min(
+        screenHeight * .3,
+        MemoryCoverWidget.defaultWidth * 1.5,
+      );
       _memoryheight = _memoryWidth * MemoryCoverWidget.aspectRatio;
     }
   }

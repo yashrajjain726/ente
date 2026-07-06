@@ -14,8 +14,10 @@ class MemoryCoverWidget extends StatefulWidget {
   final List<SmartMemory> allMemories;
   final double height;
   final double width;
+  static const defaultWidth = 145.011;
+  static const defaultHeight = 210.5;
   static const outerStrokeWidth = 1.0;
-  static const aspectRatio = 236.924 / 163.214;
+  static const aspectRatio = defaultHeight / defaultWidth;
   static const gap = 5.0;
   final int currentMemoryIndex;
 
@@ -73,11 +75,9 @@ class _MemoryCoverWidgetState extends State<MemoryCoverWidget> {
         child: Container(
           height: widget.height,
           width: widget.width,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18)),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(18),
             child: Container(
               foregroundDecoration: isSeen
                   ? const BoxDecoration(
