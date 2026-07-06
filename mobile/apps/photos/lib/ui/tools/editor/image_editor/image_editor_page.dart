@@ -85,7 +85,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
       img.ExifData? originalImageExif;
       if (flagService.internalUser) {
         originalImageExif = await _readOriginalImageExif(widget.originalFile);
-        image = img.decodeJpg(result);
+        image = img.decodePng(bytes);
       }
       if (originalImageExif != null && image != null) {
         image.exif = originalImageExif;
@@ -134,7 +134,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
         ]) {
           image.exif.exifIfd[key] = null;
         }
-        result = img.encodeJpg(image);
+        result = img.encodeJpg(image, quality: 95);
       }
       _logger.info('Size after compression = ${result.length}');
       final Duration diff = DateTime.now().difference(start);
