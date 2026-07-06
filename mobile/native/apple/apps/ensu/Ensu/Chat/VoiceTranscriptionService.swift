@@ -1,23 +1,12 @@
 import Foundation
-#if os(iOS)
 import AVFoundation
-#endif
 
 enum VoiceInputState: Equatable {
     case idle
-    case unsupported
     case recording
     case downloading(percent: Int?)
     case transcribing
     case error(String)
-
-    static var initial: VoiceInputState {
-        #if os(iOS)
-        return .idle
-        #else
-        return .unsupported
-        #endif
-    }
 
     var isRecording: Bool {
         if case .recording = self {
@@ -30,7 +19,7 @@ enum VoiceInputState: Equatable {
         switch self {
         case .recording, .downloading, .transcribing:
             return true
-        case .idle, .unsupported, .error:
+        case .idle, .error:
             return false
         }
     }
@@ -39,7 +28,7 @@ enum VoiceInputState: Equatable {
         switch self {
         case .downloading, .transcribing:
             return true
-        case .idle, .unsupported, .recording, .error:
+        case .idle, .recording, .error:
             return false
         }
     }
@@ -48,7 +37,7 @@ enum VoiceInputState: Equatable {
         switch self {
         case .recording, .transcribing:
             return true
-        case .idle, .unsupported, .downloading, .error:
+        case .idle, .downloading, .error:
             return false
         }
     }
@@ -64,14 +53,14 @@ enum VoiceInputState: Equatable {
         switch self {
         case let .error(message):
             return message == "No speech detected." || message == "No speech captured."
-        case .idle, .unsupported, .recording, .downloading, .transcribing:
+        case .idle, .recording, .downloading, .transcribing:
             return false
         }
     }
 
     var statusText: String? {
         switch self {
-        case .idle, .unsupported:
+        case .idle:
             return nil
         case .recording:
             return "Listening..."
@@ -93,26 +82,22 @@ final class VoiceTranscriptionService {
     typealias StateHandler = @MainActor @Sendable (VoiceInputState) -> Void
     typealias TranscriptHandler = @MainActor @Sendable (String) -> Void
 
-    private let modelsDir: URL
+    private let transcriber: Transcriber
     private var transcriptionTask: Task<Void, Never>?
     private var preloadTask: Task<Void, Never>?
     private var activeVoiceTaskId = UUID()
     private var activeDownloadId: UUID?
 
-    #if os(iOS)
     private let recorder = PcmAudioRecorder()
-    #endif
 
-    init(baseDir: URL) {
-        self.modelsDir = baseDir.appendingPathComponent("transcription", isDirectory: true)
-        try? FileManager.default.createDirectory(at: modelsDir, withIntermediateDirectories: true, attributes: nil)
+    init(transcriber: Transcriber) {
+        self.transcriber = transcriber
     }
 
     func startRecording(
         onState: @escaping StateHandler,
         shouldStartRecording: @escaping @MainActor @Sendable () -> Bool = { true }
     ) {
-        #if os(iOS)
         guard !recorder.isRecording else { return }
 
         let session = AVAudioSession.sharedInstance()
@@ -138,16 +123,12 @@ final class VoiceTranscriptionService {
         @unknown default:
             onState(.error("Microphone permission is required for voice input."))
         }
-        #else
-        onState(.unsupported)
-        #endif
     }
 
     func stopAndTranscribe(
         onState: @escaping StateHandler,
         onTranscript: @escaping TranscriptHandler
     ) {
-        #if os(iOS)
         guard recorder.isRecording else { return }
         onState(.transcribing)
         let recording = recorder.stop()
@@ -164,18 +145,18 @@ final class VoiceTranscriptionService {
             downloadId: downloadId,
             onState: onState
         )
-        let modelsDirPath = modelsDir.path
+        let transcriber = transcriber
         let sampleRate = recording.sampleRate
         let pcm = recording.pcm
 
         transcriptionTask = Task.detached(priority: .userInitiated) { [weak self] in
             do {
-                if !isTranscriptionModelDownloaded(modelsDir: modelsDirPath) {
+                if !transcriber.isModelDownloaded() {
                     await MainActor.run { [weak self] in
                         guard self?.isDownloadActive(taskId: taskId, downloadId: downloadId) == true else { return }
                         onState(.downloading(percent: nil))
                     }
-                    _ = try downloadTranscriptionModel(modelsDir: modelsDirPath, callback: downloadCallback)
+                    _ = try transcriber.downloadModel(callback: downloadCallback)
                 }
 
                 if Task.isCancelled { return }
@@ -194,13 +175,8 @@ final class VoiceTranscriptionService {
                     guard self?.isVoiceTaskActive(taskId) == true else { return }
                     onState(.transcribing)
                 }
-                let transcript = try transcribePcm16(
-                    modelsDir: modelsDirPath,
-                    vadCacheDir: modelsDirPath,
-                    inputSampleRate: sampleRate,
-                    pcmLe: pcm
-                )
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+                let transcript = try transcriber.transcribe(inputSampleRate: sampleRate, pcmLe: pcm)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
 
                 if Task.isCancelled { return }
                 await MainActor.run { [weak self] in
@@ -222,9 +198,6 @@ final class VoiceTranscriptionService {
                 }
             }
         }
-        #else
-        onState(.unsupported)
-        #endif
     }
 
     func cancel() {
@@ -234,14 +207,11 @@ final class VoiceTranscriptionService {
         preloadTask = nil
         activeVoiceTaskId = UUID()
         activeDownloadId = nil
-        #if os(iOS)
         if recorder.isRecording {
             _ = recorder.stop()
         }
-        #endif
     }
 
-    #if os(iOS)
     private func prepareModelAndStartRecording(
         onState: @escaping StateHandler,
         shouldStartRecording: @escaping @MainActor @Sendable () -> Bool
@@ -253,16 +223,16 @@ final class VoiceTranscriptionService {
             downloadId: downloadId,
             onState: onState
         )
-        let modelsDirPath = modelsDir.path
+        let transcriber = transcriber
 
         transcriptionTask = Task.detached(priority: .userInitiated) { [weak self] in
             do {
-                if !isTranscriptionModelDownloaded(modelsDir: modelsDirPath) {
+                if !transcriber.isModelDownloaded() {
                     await MainActor.run { [weak self] in
                         guard self?.isDownloadActive(taskId: taskId, downloadId: downloadId) == true else { return }
                         onState(.downloading(percent: nil))
                     }
-                    _ = try downloadTranscriptionModel(modelsDir: modelsDirPath, callback: downloadCallback)
+                    _ = try transcriber.downloadModel(callback: downloadCallback)
                 }
 
                 if Task.isCancelled { return }
@@ -274,7 +244,7 @@ final class VoiceTranscriptionService {
                         return
                     }
                     self.beginRecording(onState: onState)
-                    self.preloadTranscriptionModel(modelsDirPath: modelsDirPath)
+                    self.preloadTranscriptionModel()
                 }
             } catch is CancellationError {
                 return
@@ -296,11 +266,12 @@ final class VoiceTranscriptionService {
         return taskId
     }
 
-    private func preloadTranscriptionModel(modelsDirPath: String) {
+    private func preloadTranscriptionModel() {
+        let transcriber = transcriber
         preloadTask?.cancel()
         preloadTask = Task.detached(priority: .utility) {
             do {
-                try loadTranscriptionModel(modelsDir: modelsDirPath)
+                try transcriber.loadModel()
             } catch is CancellationError {
                 return
             } catch {
@@ -378,10 +349,8 @@ final class VoiceTranscriptionService {
     private func minimumRecordingBytes(sampleRate: UInt32) -> Int {
         Int(sampleRate) / 4 * 2
     }
-    #endif
 }
 
-#if os(iOS)
 private struct VoiceRecording {
     let sampleRate: UInt32
     let pcm: Data
@@ -468,4 +437,3 @@ private final class TranscriptionProgressCallback: TranscriptionModelEventCallba
         handler(event)
     }
 }
-#endif

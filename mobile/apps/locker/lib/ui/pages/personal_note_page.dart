@@ -1,15 +1,14 @@
 import 'dart:math' as math;
 
-import 'package:ente_ui/components/alert_bottom_sheet.dart';
-import 'package:ente_ui/theme/ente_theme.dart';
+import 'package:ente_components/ente_components.dart';
 import 'package:ente_ui/utils/toast_util.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/info/info_item.dart';
 import 'package:locker/ui/components/collection_selection_widget.dart';
-import 'package:locker/ui/components/gradient_button.dart';
 import 'package:locker/ui/pages/base_info_page.dart';
+import "package:locker/utils/bottom_sheet_illustration.dart";
 
 class PersonalNotePage extends BaseInfoPage<PersonalNoteData> {
   const PersonalNotePage({
@@ -201,14 +200,8 @@ class _PersonalNotePageState
     BoxConstraints constraints, {
     required bool isEditing,
   }) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     final dimensions = _calculateEditorDimensions(context, constraints);
-    final accentBlue = Color.lerp(
-      colorScheme.primary500,
-      const Color(0xFF3B82F6),
-      0.7,
-    )!;
 
     _contentFocusNode.canRequestFocus = isEditing;
     if (!isEditing && _contentFocusNode.hasFocus) {
@@ -216,8 +209,8 @@ class _PersonalNotePageState
     }
     final isEditorFocused = isEditing && _contentFocusNode.hasFocus;
     final editorFillColor = isEditorFocused
-        ? accentBlue.withValues(alpha: 0.14)
-        : colorScheme.fillFaint;
+        ? colors.primaryLight
+        : colors.fillDark;
 
     final contentPadding = isEditing
         ? _editorContentPadding
@@ -271,11 +264,11 @@ class _PersonalNotePageState
                           minLines: null,
                           expands: true,
                           textAlignVertical: TextAlignVertical.top,
-                          style: textTheme.body.copyWith(height: 1.69),
+                          style: TextStyles.body.copyWith(height: 1.69),
                           decoration: InputDecoration.collapsed(
                             hintText: context.l10n.noteContentHint,
-                            hintStyle: textTheme.body.copyWith(
-                              color: colorScheme.textFaint,
+                            hintStyle: TextStyles.body.copyWith(
+                              color: colors.textLighter,
                               height: 1.69,
                             ),
                           ),
@@ -292,15 +285,13 @@ class _PersonalNotePageState
                           child: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: colorScheme.fillBase.withValues(
-                                alpha: 0.2,
-                              ),
+                              color: colors.fillBase.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
                               Icons.copy,
                               size: 16,
-                              color: colorScheme.textMuted,
+                              color: colors.textLight,
                             ),
                           ),
                         ),
@@ -317,7 +308,6 @@ class _PersonalNotePageState
 
   @override
   Widget buildAppBarTitle(BuildContext context) {
-    final textTheme = getEnteTextTheme(context);
     final isEditing = isInEditMode;
 
     if (!isEditing && _titleFocusNode.hasFocus) {
@@ -325,7 +315,8 @@ class _PersonalNotePageState
     }
     _titleFocusNode.canRequestFocus = isEditing;
 
-    final colorScheme = getEnteColorScheme(context);
+    final colors = context.componentColors;
+    final titleStyle = TextStyles.h2.copyWith(fontSize: 24);
 
     return TextField(
       controller: _nameController,
@@ -333,13 +324,13 @@ class _PersonalNotePageState
       readOnly: !isEditing,
       showCursor: isEditing,
       enableInteractiveSelection: true,
-      style: textTheme.h3Bold,
+      style: titleStyle,
       decoration: InputDecoration(
         border: InputBorder.none,
         isDense: true,
         contentPadding: EdgeInsets.zero,
         hintText: context.l10n.noteNameHint,
-        hintStyle: textTheme.h3Bold.copyWith(color: colorScheme.textFaint),
+        hintStyle: titleStyle.copyWith(color: colors.textLighter),
       ),
       textCapitalization: TextCapitalization.sentences,
       maxLines: 1,
@@ -451,19 +442,20 @@ class _PersonalNotePageState
   }
 
   Future<bool> _showDiscardChangesDialog() async {
-    final colorScheme = getEnteColorScheme(context);
-    final result = await showAlertBottomSheet<bool>(
-      context,
-      title: context.l10n.unsavedNoteChangesTitle,
-      message: context.l10n.unsavedNoteChangesDescription,
-      assetPath: 'assets/warning-grey.png',
-      buttons: [
-        GradientButton(
-          text: context.l10n.discardChanges,
-          backgroundColor: colorScheme.warning400,
-          onTap: () => Navigator.of(context).pop(true),
-        ),
-      ],
+    final result = await showBottomSheetComponent<bool>(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: context.l10n.unsavedNoteChangesTitle,
+        message: context.l10n.unsavedNoteChangesDescription,
+        illustration: LockerBottomSheetIllustration.warningGrey,
+        actions: [
+          ButtonComponent(
+            label: context.l10n.discardChanges,
+            variant: ButtonComponentVariant.critical,
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
     );
 
     return result ?? false;

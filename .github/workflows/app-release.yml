@@ -28,6 +28,7 @@ on:
                 type: string
 
 permissions:
+    actions: read
     contents: write
     pull-requests: write
 
@@ -45,6 +46,14 @@ jobs:
             VERSION: ${{ inputs.version }}
 
         steps:
+            - name: Validate version input
+              shell: bash
+              run: |
+                  if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                      echo "::error::version must be x.y.z"
+                      exit 1
+                  fi
+
             - name: Checkout main
               if: inputs.action == 'start'
               uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -71,18 +80,13 @@ jobs:
               if: inputs.action == 'start'
               env:
                   GH_TOKEN: ${{ steps.app_token.outputs.token }}
+                  RUNS_TOKEN: ${{ github.token }}
                   APP_SLUG: ${{ steps.app_token.outputs.app-slug }}
               run: |
                   set -euo pipefail
 
                   app_version() {
-                      if [ "${APP}" = "ensu" ]; then
-                          node .github/scripts/ensu-version.mjs "$@"
-                      elif [ "${APP}" = "photos-desktop" ]; then
-                          node .github/scripts/photos-desktop-version.mjs "$@"
-                      else
-                          node .github/scripts/flutter-version.mjs "${APP}" "$@"
-                      fi
+                      node .github/scripts/app-version.mjs "${APP}" "$@"
                   }
 
                   git_push_release_branch() {
@@ -112,9 +116,13 @@ jobs:
                   fi
 
                   git switch -c "${release_branch}"
-                  if [ "${APP}" = "ensu" ] || [ "${APP}" = "photos-desktop" ]; then
+                  if [ "${APP}" = "photos-desktop" ]; then
                       app_version set "${VERSION}"
                       git commit -am "${APP^} v${VERSION}"
+                  else
+                      build_base="$(app_version get-build-base)"
+                      last_run="$(GH_TOKEN="${RUNS_TOKEN}" gh api "/repos/${GITHUB_REPOSITORY}/actions/workflows/${APP}-build.yml/runs?per_page=1" --jq '.workflow_runs[0].run_number // 0')"
+                      app_version set-build-and-commit "${VERSION}" "$((build_base + last_run + 1))"
                   fi
                   git_push_release_branch "${release_branch}"
 
@@ -143,13 +151,7 @@ jobs:
                   set -euo pipefail
 
                   app_version() {
-                      if [ "${APP}" = "ensu" ]; then
-                          node .github/scripts/ensu-version.mjs "$@"
-                      elif [ "${APP}" = "photos-desktop" ]; then
-                          node .github/scripts/photos-desktop-version.mjs "$@"
-                      else
-                          node .github/scripts/flutter-version.mjs "${APP}" "$@"
-                      fi
+                      node .github/scripts/app-version.mjs "${APP}" "$@"
                   }
 
                   git_push_release_branch() {

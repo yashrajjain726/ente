@@ -23,7 +23,7 @@ class CheckboxComponent extends StatelessWidget {
     final fill = selected
         ? (enabled ? colors.primary : colors.fillDarkest)
         : Colors.transparent;
-    final stroke = enabled ? colors.strokeDark : colors.strokeFaint;
+    final stroke = enabled ? colors.textLight : colors.strokeFaint;
 
     return InkWell(
       onTap: enabled ? () => onChanged!(!selected) : null,

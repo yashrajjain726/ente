@@ -1,7 +1,5 @@
 import Foundation
-#if os(iOS)
 import UIKit
-#endif
 #if canImport(ZIPFoundation)
 import ZIPFoundation
 #endif
@@ -259,11 +257,7 @@ final class EnsuLogging {
             }
         }
 
-        #if os(iOS)
         parts.append("device=\(UIDevice.current.model)")
-        #elseif os(macOS)
-        parts.append("device=Mac")
-        #endif
 
         parts.append("os=\(ProcessInfo.processInfo.operatingSystemVersionString)")
         return parts.joined(separator: " ")

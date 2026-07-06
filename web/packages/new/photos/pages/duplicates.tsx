@@ -1,6 +1,6 @@
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DoneIcon from "@mui/icons-material/Done";
-import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
+import RemoveCircleOutlinedIcon from "@mui/icons-material/RemoveCircleOutlined";
 import SortIcon from "@mui/icons-material/Sort";
 import {
     Box,
@@ -387,7 +387,7 @@ type OptionsMenuProps = Pick<NavbarProps, "onDeselectAll">;
 const OptionsMenu: React.FC<OptionsMenuProps> = ({ onDeselectAll }) => (
     <OverflowMenu ariaID="duplicates-options">
         <OverflowMenuOption
-            startIcon={<RemoveCircleOutlineIcon />}
+            startIcon={<RemoveCircleOutlinedIcon />}
             onClick={onDeselectAll}
         >
             {t("deselect_all")}

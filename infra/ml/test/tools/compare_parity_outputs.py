@@ -5,12 +5,9 @@ import argparse
 from datetime import UTC, datetime
 import json
 from pathlib import Path
-import sys
 from typing import Any
 
-ML_DIR = Path(__file__).resolve().parents[1]
-if str(ML_DIR) not in sys.path:
-    sys.path.insert(0, str(ML_DIR))
+import _paths  # noqa: F401  # puts the ML test dir on sys.path
 
 from comparator.compare import ThresholdConfig, compare_platform_matrix
 from ground_truth.schema import load_results_document
@@ -20,10 +17,6 @@ def _load_results(path: Path) -> tuple[str | None, tuple[Any, ...]]:
     payload = json.loads(path.read_text())
     platform = payload.get("platform") if isinstance(payload, dict) else None
     return platform, load_results_document(payload)
-
-
-def _serialize_reports(reports: tuple[Any, ...]) -> list[dict[str, Any]]:
-    return [report.to_dict() for report in reports]
 
 
 def main() -> int:
@@ -99,7 +92,7 @@ def main() -> int:
         "all_files_passed": all_files_passed,
         "status": overall_status,
         "passed": all_files_passed,
-        "comparisons": _serialize_reports(reports),
+        "comparisons": [report.to_dict() for report in reports],
     }
 
     if args.output:

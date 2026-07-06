@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use ente_core::crypto;
-use ente_ensu::db::{self, EnsuDb, Error as DbError, SqliteBackend};
+use ente_ensu::db::{self, Db, Error as DbError, SqliteBackend};
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime;
 use tauri::{AppHandle, Manager, State};
@@ -20,7 +20,7 @@ pub struct ChatDbState {
 
 struct ChatDbHolder {
     key_b64: String,
-    db: Arc<EnsuDb<SqliteBackend>>,
+    db: Arc<Db<SqliteBackend>>,
 }
 
 const CHAT_DB_FILE_NAME_V2: &str = "ensu_llmchat_v2.db";
@@ -55,10 +55,10 @@ impl From<DbError> for ApiError {
             E::Uuid(_) => "db_uuid",
             E::Utf8(_) => "db_utf8",
             E::Io(_) => "db_io",
+            E::ReadonlyDatabase => "db_readonly",
             E::Sqlite(_) => "db_sqlite",
             E::UnsupportedOperation(_) => "db_unsupported_operation",
             E::Migration(_) => "db_migration",
-            E::Image(_) => "db_image",
         };
 
         ApiError::new(code, e.to_string())
@@ -211,7 +211,7 @@ pub struct ChatMessageDto {
 }
 
 fn build_message_dto(
-    db: &EnsuDb<SqliteBackend>,
+    db: &Db<SqliteBackend>,
     message: db::Message,
 ) -> Result<ChatMessageDto, DbError> {
     let uploads = db.get_uploads_for_message(message.uuid)?;
@@ -640,7 +640,8 @@ pub async fn chat_db_compress_attachment_image_file(path: String) -> Result<Vec<
         let data = fs::read(&path).map_err(|err| {
             ApiError::new("io", format!("failed to read image file '{path}': {err}"))
         })?;
-        db::compress_attachment_image(&data).map_err(|err| ApiError::new("image", err.to_string()))
+        ente_ensu::image::compress_attachment_image(&data)
+            .map_err(|err| ApiError::new("image", err.to_string()))
     })
     .await
     .map_err(|_| image_thread_error())?
@@ -701,7 +702,7 @@ fn cleanup_legacy_chat_artifacts(app: &AppHandle) -> Result<(), ApiError> {
 }
 
 fn verify_migrated_chat_db(
-    target_db: &EnsuDb<SqliteBackend>,
+    target_db: &Db<SqliteBackend>,
     source_session_ids: &[Uuid],
     source_message_ids_by_session: &HashMap<Uuid, Vec<Uuid>>,
     target_attachments_dir: &Path,
@@ -778,10 +779,10 @@ fn migrate_legacy_chat_db(
     let key = crypto::decode_b64(&input.key_b64).map_err(ApiError::from)?;
 
     let legacy_db =
-        EnsuDb::open_sqlite_with_defaults(&legacy_db_path, &legacy_attachments_db_path, legacy_key)
+        Db::open_sqlite_with_defaults(&legacy_db_path, &legacy_attachments_db_path, legacy_key)
             .map_err(ApiError::from)?;
     let target_db =
-        EnsuDb::open_sqlite_with_defaults(&target_db_path, &target_attachments_db_path, key)
+        Db::open_sqlite_with_defaults(&target_db_path, &target_attachments_db_path, key)
             .map_err(ApiError::from)?;
 
     let mut migrated_sessions = 0_i64;
@@ -921,7 +922,7 @@ fn with_chat_db<T, F>(
     f: F,
 ) -> Result<T, ApiError>
 where
-    F: FnOnce(&EnsuDb<SqliteBackend>) -> Result<T, DbError>,
+    F: FnOnce(&Db<SqliteBackend>) -> Result<T, DbError>,
 {
     let db = {
         let mut guard = inner
@@ -945,12 +946,11 @@ where
                     attachments_db_path.display()
                 ),
             );
-            let db = EnsuDb::open_sqlite_with_defaults(path, attachments_db_path, key).map_err(
-                |err| {
+            let db =
+                Db::open_sqlite_with_defaults(path, attachments_db_path, key).map_err(|err| {
                     logging::log("ChatDb", format!("failed to open chat DB error={err}"));
                     ApiError::from(err)
-                },
-            )?;
+                })?;
             *guard = Some(ChatDbHolder {
                 key_b64: key_b64.to_string(),
                 db: Arc::new(db),
@@ -976,7 +976,7 @@ async fn with_chat_db_async<T, F>(
 ) -> Result<T, ApiError>
 where
     T: Send + 'static,
-    F: FnOnce(&EnsuDb<SqliteBackend>) -> Result<T, DbError> + Send + 'static,
+    F: FnOnce(&Db<SqliteBackend>) -> Result<T, DbError> + Send + 'static,
 {
     let inner = state.inner.clone();
     async_runtime::spawn_blocking(move || with_chat_db(&inner, &app, &key_b64, f))

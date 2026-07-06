@@ -407,9 +407,8 @@ func (c *FileController) GetThumbnailURLForOwner(ctx *gin.Context, ownerID int64
 	return c.getSignedURLForOwnedObject(ctx, ownerID, fileID, ente.THUMBNAIL)
 }
 
-func (c *FileController) CleanUpStaleCollectionFiles(userID int64, fileID int64) {
+func (c *FileController) CleanUpStaleCollectionFiles(fileID int64) {
 	logger := log.WithFields(log.Fields{
-		"userID": userID,
 		"fileID": fileID,
 		"action": "CleanUpStaleCollectionFiles",
 	})
@@ -419,19 +418,17 @@ func (c *FileController) CleanUpStaleCollectionFiles(userID int64, fileID int64)
 			logger.Error("Recovered from panic", r)
 		}
 	}()
-	fileIDs := make([]int64, 0)
-	fileIDs = append(fileIDs, fileID)
 
-	// verify file ownership
-	err := c.FileRepo.VerifyFileOwner(context.Background(), fileIDs, userID, logger)
-
+	ownerID, err := c.FileRepo.GetOwnerID(fileID)
 	if err != nil {
-		logger.Warning("Failed to verify file ownership", err)
+		logger.WithError(err).Warning("Failed to get file owner")
 		return
 	}
-	err = c.TrashRepository.CleanUpDeletedFilesFromCollection(context.Background(), fileIDs, userID)
+
+	fileIDs := []int64{fileID}
+	err = c.TrashRepository.CleanUpDeletedFilesFromCollection(context.Background(), fileIDs, ownerID)
 	if err != nil {
-		logger.WithError(err).Error("Failed to clean up stale files from collection")
+		logger.WithError(err).WithField("ownerID", ownerID).Error("Failed to clean up stale files from collection")
 	}
 
 }
@@ -483,7 +480,7 @@ func (c *FileController) getSignedURLForAccessibleObject(ctx *gin.Context, userI
 	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			go c.CleanUpStaleCollectionFiles(userID, fileID)
+			go c.CleanUpStaleCollectionFiles(fileID)
 		}
 		return "", stacktrace.Propagate(err, "")
 	}
@@ -509,7 +506,7 @@ func (c *FileController) getSignedURLForOwnedObject(ctx *gin.Context, ownerID in
 	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			go c.CleanUpStaleCollectionFiles(ownerID, fileID)
+			go c.CleanUpStaleCollectionFiles(fileID)
 		}
 		return "", stacktrace.Propagate(err, "")
 	}

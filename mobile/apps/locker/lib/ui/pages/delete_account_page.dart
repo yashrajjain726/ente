@@ -1,17 +1,16 @@
 import "dart:convert";
 
 import "package:ente_accounts/ente_accounts.dart";
+import "package:ente_components/ente_components.dart";
 import "package:ente_configuration/base_configuration.dart";
 import "package:ente_crypto_api/ente_crypto_api.dart";
 import "package:ente_lock_screen/local_authentication_service.dart";
 import "package:ente_strings/ente_strings.dart";
-import "package:ente_ui/components/alert_bottom_sheet.dart";
-import "package:ente_ui/theme/ente_theme.dart";
 import "package:ente_ui/utils/toast_util.dart";
 import "package:ente_utils/email_util.dart";
 import "package:flutter/material.dart";
 import "package:locker/l10n/l10n.dart";
-import "package:locker/ui/components/gradient_button.dart";
+import "package:locker/utils/bottom_sheet_illustration.dart";
 
 class DeleteAccountPage extends StatelessWidget {
   final BaseConfiguration config;
@@ -20,14 +19,13 @@ class DeleteAccountPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
     final l10n = context.l10n;
 
     return Scaffold(
-      backgroundColor: colorScheme.backgroundBase,
+      backgroundColor: colors.backgroundBase,
       appBar: AppBar(
-        backgroundColor: colorScheme.backgroundBase,
+        backgroundColor: colors.backgroundBase,
         surfaceTintColor: Colors.transparent,
         toolbarHeight: 48,
         leadingWidth: 48,
@@ -42,7 +40,7 @@ class DeleteAccountPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(l10n.deleteAccount, style: textTheme.h3Bold),
+              Text(l10n.deleteAccount, style: TextStyles.h2),
               const SizedBox(height: 24),
               Center(
                 child: Image.asset(
@@ -62,7 +60,7 @@ class DeleteAccountPage extends StatelessWidget {
                     ),
                     TextSpan(
                       text: "feedback@ente.com",
-                      style: TextStyle(color: colorScheme.primary700),
+                      style: TextStyle(color: colors.primary),
                     ),
                     TextSpan(
                       text: l10n
@@ -70,12 +68,12 @@ class DeleteAccountPage extends StatelessWidget {
                           .split("feedback@ente.com")[1],
                     ),
                   ],
-                  style: textTheme.body.copyWith(color: colorScheme.textMuted),
+                  style: TextStyles.body.copyWith(color: colors.textLight),
                 ),
               ),
               const SizedBox(height: 16),
-              GradientButton(
-                text: l10n.sendFeedback,
+              ButtonComponent(
+                label: l10n.sendFeedback,
                 onTap: () async {
                   await sendEmail(
                     context,
@@ -87,12 +85,12 @@ class DeleteAccountPage extends StatelessWidget {
               const SizedBox(height: 24),
               Text(
                 l10n.deleteAccountPermanentWarning,
-                style: textTheme.body.copyWith(color: colorScheme.textMuted),
+                style: TextStyles.body.copyWith(color: colors.textLight),
               ),
               const SizedBox(height: 16),
-              GradientButton(
-                text: l10n.deleteAccount,
-                backgroundColor: colorScheme.warning700,
+              ButtonComponent(
+                label: l10n.deleteAccount,
+                variant: ButtonComponentVariant.critical,
                 onTap: () async => {await _initiateDelete(context)},
               ),
             ],
@@ -142,20 +140,20 @@ class DeleteAccountPage extends StatelessWidget {
   }
 
   Future<bool?> _showDeleteConfirmationSheet(BuildContext context) async {
-    final colorScheme = getEnteColorScheme(context);
-
-    return showAlertBottomSheet<bool>(
-      context,
-      title: context.strings.confirmAccountDeleteTitle,
-      message: context.strings.confirmAccountDeleteMessage,
-      assetPath: "assets/warning-grey.png",
-      buttons: [
-        GradientButton(
-          text: context.strings.delete,
-          backgroundColor: colorScheme.warning700,
-          onTap: () => Navigator.of(context).pop(true),
-        ),
-      ],
+    return showBottomSheetComponent<bool>(
+      context: context,
+      builder: (_) => BottomSheetComponent(
+        title: context.strings.confirmAccountDeleteTitle,
+        message: context.strings.confirmAccountDeleteMessage,
+        illustration: LockerBottomSheetIllustration.warningGrey,
+        actions: [
+          ButtonComponent(
+            label: context.strings.delete,
+            variant: ButtonComponentVariant.critical,
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
     );
   }
 }

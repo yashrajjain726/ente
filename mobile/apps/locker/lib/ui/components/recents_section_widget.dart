@@ -1,7 +1,4 @@
 import "package:ente_components/ente_components.dart";
-import "package:ente_ui/theme/colors.dart";
-import 'package:ente_ui/theme/ente_theme.dart';
-import "package:ente_ui/theme/text_style.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import "package:hugeicons/hugeicons.dart";
@@ -545,8 +542,7 @@ class _FilterBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
+    final colors = context.componentColors;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -558,15 +554,13 @@ class _FilterBottomSheet extends StatelessWidget {
               _ActionPillButton(
                 label: context.l10n.seeAllCollections,
                 onTap: onSeeAllCollections,
-                colorScheme: colorScheme,
-                textTheme: textTheme,
+                colors: colors,
               ),
               const Spacer(),
               _ActionPillButton(
                 label: context.l10n.clearAllFilters,
                 onTap: onClearAllFilters,
-                colorScheme: colorScheme,
-                textTheme: textTheme,
+                colors: colors,
               ),
             ],
           ),
@@ -605,14 +599,12 @@ class _ActionPillButton extends StatelessWidget {
   const _ActionPillButton({
     required this.label,
     required this.onTap,
-    required this.colorScheme,
-    required this.textTheme,
+    required this.colors,
   });
 
   final String label;
   final VoidCallback onTap;
-  final EnteColorScheme colorScheme;
-  final EnteTextTheme textTheme;
+  final ColorTokens colors;
 
   @override
   Widget build(BuildContext context) {
@@ -620,12 +612,12 @@ class _ActionPillButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: colorScheme.backgroundElevated2,
+          color: colors.fillLight,
           borderRadius: BorderRadius.circular(50),
-          border: Border.all(color: colorScheme.strokeFaint, width: 1),
+          border: Border.all(color: colors.strokeFaint, width: 1),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-        child: Text(label, style: textTheme.small),
+        child: Text(label, style: TextStyles.body),
       ),
     );
   }

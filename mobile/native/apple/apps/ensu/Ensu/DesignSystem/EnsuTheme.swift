@@ -1,13 +1,6 @@
 import SwiftUI
-#if canImport(UIKit)
 import UIKit
 typealias PlatformColor = UIColor
-typealias PlatformFont = UIFont
-#elseif canImport(AppKit)
-import AppKit
-typealias PlatformColor = NSColor
-typealias PlatformFont = NSFont
-#endif
 
 enum EnsuColor {
     static let backgroundBase = Color(PlatformColor.dynamic(light: "#F8F5F0", dark: "#141414"))
@@ -88,11 +81,11 @@ enum EnsuTypography {
 
 enum EnsuFont {
     static func serif(size: CGFloat, weight: Font.Weight) -> Font {
-        font(named: serifName(for: weight), size: size, fallbackDesign: .serif, weight: weight)
+        .system(size: size, weight: weight, design: .serif)
     }
 
     static func ui(size: CGFloat, weight: Font.Weight) -> Font {
-        font(named: uiName(for: weight), size: size, fallbackDesign: .default, weight: weight)
+        .system(size: size, weight: weight, design: .default)
     }
 
     static func message(size: CGFloat, weight: Font.Weight) -> Font {
@@ -100,33 +93,8 @@ enum EnsuFont {
     }
 
     static func code(size: CGFloat, weight: Font.Weight) -> Font {
-        font(named: "JetBrainsMono-Regular", size: size, fallbackDesign: .monospaced, weight: weight)
+        .system(size: size, weight: weight, design: .monospaced)
     }
-
-    private static func font(named name: String, size: CGFloat, fallbackDesign: Font.Design, weight: Font.Weight) -> Font {
-        if PlatformFont(name: name, size: size) != nil {
-            return .custom(name, size: size)
-        }
-        return .system(size: size, weight: weight, design: fallbackDesign)
-    }
-
-    private static func serifName(for weight: Font.Weight) -> String {
-        "DMSerifText-Regular"
-    }
-
-    private static func uiName(for weight: Font.Weight) -> String {
-        switch weight {
-        case .bold:
-            return "Inter-Bold"
-        case .semibold:
-            return "Inter-SemiBold"
-        case .medium:
-            return "Inter-Medium"
-        default:
-            return "Inter-Regular"
-        }
-    }
-
 }
 
 extension Color {
@@ -156,15 +124,8 @@ extension PlatformColor {
     }
 
     static func dynamic(light: String, dark: String) -> PlatformColor {
-        #if canImport(UIKit)
         return PlatformColor { trait in
             trait.userInterfaceStyle == .dark ? PlatformColor(hex: dark) : PlatformColor(hex: light)
         }
-        #else
-        return PlatformColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            return PlatformColor(hex: isDark ? dark : light)
-        }
-        #endif
     }
 }
