@@ -140,12 +140,15 @@ FROM (
 		m.message_id,
 		NULL::bigint AS post_id,
 		NULL::text AS post_space_id,
-		NULL::text AS message_kind,
+		m.kind AS message_kind,
 		m.sender_space_id,
 		m.recipient_space_id,
-		NULL::bytea AS message_cipher,
-		NULL::bytea AS encrypted_message_key,
-		NULL::text AS reply_message_id,
+		m.message_cipher,
+		CASE
+			WHEN m.sender_space_id = $1 THEN m.sender_encrypted_message_key
+			ELSE m.recipient_encrypted_message_key
+		END AS encrypted_message_key,
+		m.reply_message_id,
 		CASE WHEN m.sender_space_id = $1 THEN m.recipient_liked_at ELSE NULL::bigint END AS notification_created_at,
 		(m.recipient_space_id = $1) AS is_outgoing
 	FROM peer_messages m

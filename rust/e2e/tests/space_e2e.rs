@@ -2,15 +2,46 @@
 mod space;
 mod support;
 
-use ente_space::{OpenSpaceLinkCtxInput, SpaceLinkCtx};
+use ente_space::AccountSpaceCtx;
 
 use support::auth;
 
 const TEST_WEBP_BYTES: &[u8] = b"RIFF0000WEBP";
 
+async fn request_and_confirm_friend(
+    requester_ctx: &AccountSpaceCtx,
+    requester_space_id: &str,
+    target_ctx: &AccountSpaceCtx,
+    target_space_id: &str,
+    target_username: &str,
+) {
+    let status = requester_ctx
+        .request_friend_by_username(requester_space_id, target_username)
+        .await
+        .expect("friend request should be sent");
+    if status.status == "friend" {
+        return;
+    }
+    assert_eq!(status.status, "requested");
+
+    let requests = target_ctx
+        .list_friend_requests(target_space_id)
+        .await
+        .expect("friend requests should load");
+    let request = requests
+        .iter()
+        .find(|request| request.requester.space_id == requester_space_id)
+        .expect("friend request should be visible to target");
+    let confirmed = target_ctx
+        .confirm_friend_request(target_space_id, request.request_id)
+        .await
+        .expect("friend request should confirm");
+    assert_eq!(confirmed.status, "friend");
+}
+
 #[tokio::test]
 #[ignore = "requires local Museum at ENTE_E2E_ENDPOINT or http://localhost:8080"]
-async fn space_bootstrap_posts_friend_share_and_link_suite() {
+async fn space_bootstrap_posts_and_friend_share_suite() {
     let endpoint = support::endpoint();
     if !support::assert_server_or_skip(&endpoint, "space rust e2e suite").await {
         return;
@@ -162,24 +193,14 @@ async fn space_bootstrap_posts_friend_share_and_link_suite() {
         403,
     );
 
-    let link = owner_ctx
-        .create_space_link(&owner_space.space_id)
-        .await
-        .expect("space link should be created");
-    let link_ctx = SpaceLinkCtx::open(OpenSpaceLinkCtxInput {
-        base_url: endpoint.clone(),
-        space_username: link.space_username.clone(),
-        access_key: link.access_key.clone(),
-        user_agent: Some("ente-e2e".to_string()),
-        client_package: Some("io.ente.photos".to_string()),
-        client_version: Some("ente-e2e".to_string()),
-    })
-    .await
-    .expect("space link should open");
-    friend_ctx
-        .add_friend_from_link(&link_ctx)
-        .await
-        .expect("friend add should succeed");
+    request_and_confirm_friend(
+        &friend_ctx,
+        &friend_space.space_id,
+        &owner_ctx,
+        &owner_space.space_id,
+        &updated_slug,
+    )
+    .await;
 
     let shares = friend_ctx
         .list_friend_shares()
@@ -269,41 +290,6 @@ async fn space_bootstrap_posts_friend_share_and_link_suite() {
             .await,
         403,
     );
-
-    let link_profile = link_ctx
-        .get_space_profile_decrypted(None)
-        .await
-        .expect("link session should decrypt profile");
-    assert_eq!(link_profile.profile, updated_profile);
-    let link_posts = link_ctx
-        .list_posts(None, None)
-        .await
-        .expect("link session should list posts");
-    assert_eq!(link_posts.items.len(), 1);
-    assert_eq!(link_posts.items[0].author.space_id, owner_space.space_id);
-    let link_author_profile = link_ctx
-        .decrypt_actor_profile(&link_posts.items[0].author)
-        .await
-        .expect("link should decrypt owner actor profile");
-    assert_eq!(
-        link_author_profile.as_deref(),
-        Some(updated_profile.as_slice())
-    );
-    assert!(link_posts.next_cursor.is_empty());
-    let link_post = link_ctx
-        .decrypt_post(&link_posts.items[0])
-        .await
-        .expect("link session should decrypt post");
-    assert_eq!(
-        link_post.caption_plaintext.as_deref(),
-        Some(br#"{"caption":"hello world"}"#.as_slice())
-    );
-
-    owner_ctx
-        .delete_space_link(&owner_space.space_id)
-        .await
-        .expect("space link deletion should succeed");
-    space::assert_http_status(link_ctx.get_space_profile_raw(None).await, 401);
 }
 
 #[tokio::test]
@@ -366,24 +352,14 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite() {
         .await
         .expect("post creation should succeed");
 
-    let link = owner_ctx
-        .create_space_link(&owner_space.space_id)
-        .await
-        .expect("space link should be created");
-    let link_ctx = SpaceLinkCtx::open(OpenSpaceLinkCtxInput {
-        base_url: endpoint.clone(),
-        space_username: link.space_username.clone(),
-        access_key: link.access_key.clone(),
-        user_agent: Some("ente-e2e".to_string()),
-        client_package: Some("io.ente.photos".to_string()),
-        client_version: Some("ente-e2e".to_string()),
-    })
-    .await
-    .expect("space link should open");
-    friend_ctx
-        .add_friend_from_link(&link_ctx)
-        .await
-        .expect("friend add should succeed");
+    request_and_confirm_friend(
+        &friend_ctx,
+        &friend_space.space_id,
+        &owner_ctx,
+        &owner_space.space_id,
+        &owner_slug,
+    )
+    .await;
 
     let friend_owner_profile = friend_ctx
         .get_space_profile_decrypted(&owner_space.space_id, None)
@@ -557,7 +533,7 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite() {
 
 #[tokio::test]
 #[ignore = "requires local Museum at ENTE_E2E_ENDPOINT or http://localhost:8080"]
-async fn space_rotation_history_refresh_and_link_suite() {
+async fn space_rotation_history_and_refresh_suite() {
     let endpoint = support::endpoint();
     if !support::assert_server_or_skip(&endpoint, "space rotation e2e suite").await {
         return;
@@ -586,7 +562,7 @@ async fn space_rotation_history_refresh_and_link_suite() {
         .create_space(&owner_slug, &profile_v1)
         .await
         .expect("owner space creation failed");
-    friend_ctx
+    let friend_space = friend_ctx
         .create_space(
             &friend_slug,
             &space::profile_payload("Rotation Friender", "Friender bio"),
@@ -617,24 +593,14 @@ async fn space_rotation_history_refresh_and_link_suite() {
         .await
         .expect("v1 post creation should succeed");
 
-    let link = owner_ctx
-        .create_space_link(&owner_space.space_id)
-        .await
-        .expect("rotation space link should be created");
-    let link_ctx = SpaceLinkCtx::open(OpenSpaceLinkCtxInput {
-        base_url: endpoint.clone(),
-        space_username: link.space_username.clone(),
-        access_key: link.access_key.clone(),
-        user_agent: Some("ente-e2e".to_string()),
-        client_package: Some("io.ente.photos".to_string()),
-        client_version: Some("ente-e2e".to_string()),
-    })
-    .await
-    .expect("rotation space link should open");
-    friend_ctx
-        .add_friend_from_link(&link_ctx)
-        .await
-        .expect("friend add should succeed");
+    request_and_confirm_friend(
+        &friend_ctx,
+        &friend_space.space_id,
+        &owner_ctx,
+        &owner_space.space_id,
+        &owner_slug,
+    )
+    .await;
 
     let friend_profile_v1 = friend_ctx
         .get_space_profile_decrypted(&owner_space.space_id, Some(owner_space.key_version))
@@ -728,63 +694,6 @@ async fn space_rotation_history_refresh_and_link_suite() {
         .expect("friend should decrypt v2 post after rotation");
     assert_eq!(
         friend_post_v2.caption_plaintext.as_deref(),
-        Some(br#"{"caption":"version two"}"#.as_slice())
-    );
-
-    let link = owner_ctx
-        .create_space_link(&owner_space.space_id)
-        .await
-        .expect("space link should be created after rotation");
-    let link_ctx = SpaceLinkCtx::open(OpenSpaceLinkCtxInput {
-        base_url: endpoint.clone(),
-        space_username: link.space_username.clone(),
-        access_key: link.access_key.clone(),
-        user_agent: Some("ente-e2e".to_string()),
-        client_package: Some("io.ente.photos".to_string()),
-        client_version: Some("ente-e2e".to_string()),
-    })
-    .await
-    .expect("space link should open after rotation");
-
-    let link_profile_v1 = link_ctx
-        .get_space_profile_decrypted(Some(owner_space.key_version))
-        .await
-        .expect("link should decrypt historical profile");
-    assert_eq!(link_profile_v1.profile, profile_v1);
-    let link_profile_v2 = link_ctx
-        .get_space_profile_decrypted(None)
-        .await
-        .expect("link should decrypt current profile");
-    assert_eq!(link_profile_v2.profile, profile_v2);
-
-    let link_posts = link_ctx
-        .list_posts(None, Some(10))
-        .await
-        .expect("link should list posts after rotation");
-    let link_post_v1 = link_posts
-        .items
-        .iter()
-        .find(|item| item.post_id == post_id_v1)
-        .expect("link should list v1 post");
-    let link_post_v2 = link_posts
-        .items
-        .iter()
-        .find(|item| item.post_id == post_id_v2)
-        .expect("link should list v2 post");
-    let link_decrypted_v1 = link_ctx
-        .decrypt_post(link_post_v1)
-        .await
-        .expect("link should decrypt v1 post after rotation");
-    assert_eq!(
-        link_decrypted_v1.caption_plaintext.as_deref(),
-        Some(br#"{"caption":"version one"}"#.as_slice())
-    );
-    let link_decrypted_v2 = link_ctx
-        .decrypt_post(link_post_v2)
-        .await
-        .expect("link should decrypt v2 post after rotation");
-    assert_eq!(
-        link_decrypted_v2.caption_plaintext.as_deref(),
         Some(br#"{"caption":"version two"}"#.as_slice())
     );
 }

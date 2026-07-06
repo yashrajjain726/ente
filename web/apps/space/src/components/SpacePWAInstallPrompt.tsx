@@ -314,13 +314,13 @@ const SpacePWAInstallInstructions: React.FC<
                     : undefined
             }
             slotProps={{
-                backdrop: { sx: { backgroundColor: "rgba(0, 0, 0, 0.48)" } },
+                backdrop: { sx: { backgroundColor: "rgba(0, 0, 0, 0.56)" } },
                 paper: {
                     sx: {
-                        bgcolor: "#FAFAFA",
+                        bgcolor: "#FFFFFF",
                         borderRadius: "28px 28px 0 0",
                         bottom: 0,
-                        boxShadow: "none",
+                        boxShadow: "0 -18px 44px rgba(0, 0, 0, 0.18)",
                         boxSizing: "border-box",
                         left: 0,
                         m: 0,
@@ -417,7 +417,7 @@ const InstallInstructionStep: React.FC<InstallStep> = ({ icon, text }) => (
     <Box
         sx={{
             alignItems: "center",
-            bgcolor: "#FFFFFF",
+            bgcolor: "#FAFAFA",
             borderRadius: "18px",
             color: textSoft,
             display: "flex",

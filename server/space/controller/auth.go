@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"strings"
@@ -10,7 +9,6 @@ import (
 	"github.com/ente/museum/ente"
 	baserepo "github.com/ente/museum/pkg/repo"
 	"github.com/ente/museum/pkg/utils/auth"
-	timeutil "github.com/ente/museum/pkg/utils/time"
 	spacerepo "github.com/ente/museum/space/repo"
 	"github.com/ente/stacktrace"
 	"github.com/gin-gonic/gin"
@@ -19,7 +17,6 @@ import (
 type viewerAuth struct {
 	UserID  int64
 	SpaceID string
-	Link    *spacerepo.SpaceLinkSessionRecord
 }
 
 type selectedSpaceAuth struct {
@@ -30,7 +27,6 @@ const selectedSpaceAuthKey = "space.selectedSpaceAuth"
 
 type authDeps struct {
 	UserAuthRepo *baserepo.UserAuthRepository
-	LinksRepo    *spacerepo.LinksRepository
 	SpacesRepo   *spacerepo.SpacesRepository
 	FriendsRepo  *spacerepo.FriendsRepository
 	SessionsRepo *spacerepo.SessionsRepository
@@ -64,24 +60,6 @@ func (a authDeps) resolveViewer(c *gin.Context, rawViewerSpaceID string) (*viewe
 			return nil, err
 		}
 	}
-	if token != "" && a.LinksRepo != nil {
-		if viewerSpaceID != "" {
-			return nil, ente.ErrPermissionDenied
-		}
-		sum := sha256.Sum256([]byte(token))
-		session, err := a.LinksRepo.GetSession(c, sum[:])
-		if err != nil {
-			if errors.Is(stacktrace.RootCause(err), sql.ErrNoRows) {
-				return nil, ente.ErrAuthenticationRequired
-			}
-			return nil, err
-		}
-		if session.ExpiresAt <= timeutil.Microseconds() {
-			_ = a.LinksRepo.DeleteSession(c, sum[:])
-			return nil, ente.ErrAuthenticationRequired
-		}
-		return &viewerAuth{Link: session}, nil
-	}
 	if sessionToken := strings.TrimSpace(c.GetHeader(SpaceBrowserSessionTokenHeader)); sessionToken != "" {
 		session, err := validateBrowserSession(c, a.SessionsRepo, sessionToken)
 		if err != nil {
@@ -96,9 +74,6 @@ func (a authDeps) resolveViewer(c *gin.Context, rawViewerSpaceID string) (*viewe
 			viewer.SpaceID = space.SpaceID
 		}
 		return viewer, nil
-	}
-	if token == "" || a.LinksRepo == nil {
-		return nil, ente.ErrAuthenticationRequired
 	}
 	return nil, ente.ErrAuthenticationRequired
 }
@@ -174,11 +149,6 @@ func (a authDeps) canViewSpace(ctx context.Context, viewer *viewerAuth, space *s
 				return ente.ErrPermissionDenied
 			}
 			return err
-		}
-		return nil
-	case viewer.Link != nil:
-		if viewer.Link.SpaceID != space.SpaceID {
-			return ente.ErrPermissionDenied
 		}
 		return nil
 	default:

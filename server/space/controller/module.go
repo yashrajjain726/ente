@@ -11,7 +11,6 @@ type Module struct {
 	Posts      *PostsController
 	Friends    *FriendsController
 	Messages   *MessagesController
-	Links      *LinksController
 	Assets     *AssetsController
 	Read       *ReadMarkersController
 	Sessions   *SessionsController
@@ -31,7 +30,6 @@ func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, em
 	}
 	authDeps := authDeps{
 		UserAuthRepo: userAuthRepo,
-		LinksRepo:    repos.Links,
 		SpacesRepo:   repos.Spaces,
 		FriendsRepo:  repos.Friends,
 		SessionsRepo: repos.Sessions,
@@ -41,7 +39,6 @@ func NewModule(repos *repo.Module, userAuthRepo *baserepo.UserAuthRepository, em
 		Posts:    &PostsController{PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, AssetsRepo: repos.Assets, EmailNotifier: emailNotifier, auth: authDeps},
 		Friends:  &FriendsController{FriendsRepo: repos.Friends, SpacesRepo: repos.Spaces, EmailNotifier: emailNotifier},
 		Messages: &MessagesController{MessagesRepo: repos.Messages, PostsRepo: repos.Posts, SpacesRepo: repos.Spaces, FriendsRepo: repos.Friends, ReadMarkersRepo: repos.Read, EmailNotifier: emailNotifier, auth: authDeps},
-		Links:    &LinksController{LinksRepo: repos.Links, SpacesRepo: repos.Spaces},
 		Assets:   &AssetsController{AssetsRepo: repos.Assets, SpacesRepo: repos.Spaces, auth: authDeps},
 		Read:     &ReadMarkersController{ReadMarkersRepo: repos.Read},
 		Sessions: &SessionsController{SessionsRepo: repos.Sessions},

@@ -160,7 +160,9 @@ export const SpaceAppStateProvider: React.FC<React.PropsWithChildren> = ({
             setProfileLoadStatus("loading");
 
             try {
-                const nextProfile = await loadExistingSpaceProfile();
+                const nextProfile = await loadExistingSpaceProfile({
+                    force: true,
+                });
                 if (profileLoadGenerationRef.current == generation) {
                     setProfileLoadError(undefined);
                     applyProfile(nextProfile);

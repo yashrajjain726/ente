@@ -38,6 +38,10 @@ type SpaceAccessResetter interface {
 	ResetUserAccess(ctx context.Context, userID int64) error
 }
 
+type SpaceAccountDeletionAccessResetter interface {
+	ResetAccountDeletionAccess(ctx context.Context, userID int64) error
+}
+
 // UserController exposes request handlers for all user related requests
 type UserController struct {
 	UserRepo                *repo.UserRepository
@@ -261,6 +265,14 @@ func (c *UserController) HandleAutomatedAccountDeletion(ctx context.Context, use
 }
 
 func (c *UserController) ResetUserAccess(ctx context.Context, userID int64, logger *logrus.Entry) error {
+	return c.resetUserAccess(ctx, userID, logger, false)
+}
+
+func (c *UserController) resetAccountDeletionAccess(ctx context.Context, userID int64, logger *logrus.Entry) error {
+	return c.resetUserAccess(ctx, userID, logger, true)
+}
+
+func (c *UserController) resetUserAccess(ctx context.Context, userID int64, logger *logrus.Entry, accountDeletion bool) error {
 	logger.Info("remove locker and photos tokens for user")
 	if err := c.RemoveTokensForApps(userID, []ente.App{ente.Locker, ente.Photos}); err != nil {
 		return stacktrace.Propagate(err, "")
@@ -276,7 +288,17 @@ func (c *UserController) ResetUserAccess(ctx context.Context, userID int64, logg
 
 	if c.SpaceAccessResetter != nil {
 		logger.Info("reset space access for user")
-		if err := c.SpaceAccessResetter.ResetUserAccess(ctx, userID); err != nil {
+		var err error
+		if accountDeletion {
+			if resetter, ok := c.SpaceAccessResetter.(SpaceAccountDeletionAccessResetter); ok {
+				err = resetter.ResetAccountDeletionAccess(ctx, userID)
+			} else {
+				err = c.SpaceAccessResetter.ResetUserAccess(ctx, userID)
+			}
+		} else {
+			err = c.SpaceAccessResetter.ResetUserAccess(ctx, userID)
+		}
+		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}
@@ -294,7 +316,7 @@ func (c *UserController) handleAccountDeletion(
 		return nil, stacktrace.Propagate(err, "")
 	}
 
-	err = c.ResetUserAccess(ctx, userID, logger)
+	err = c.resetAccountDeletionAccess(ctx, userID, logger)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}

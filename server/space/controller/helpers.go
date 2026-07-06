@@ -86,10 +86,6 @@ func actorVisibility(ctx context.Context, auth authDeps, viewer *viewerAuth, act
 	if len(spaceIDSet) == 0 {
 		return visible, nil
 	}
-	if viewer.Link != nil {
-		visible[viewer.Link.SpaceID] = true
-		return visible, nil
-	}
 	if viewer.UserID <= 0 || viewer.SpaceID == "" || auth.FriendsRepo == nil {
 		return visible, nil
 	}

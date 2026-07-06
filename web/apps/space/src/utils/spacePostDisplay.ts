@@ -31,6 +31,7 @@ export const profilePostGroupsFromPosts = (
             imageUrl: post.imageUrl,
             name: post.name,
             postId: post.postId,
+            spaceId: post.spaceId,
             timestampMs: post.timestampMs,
             thumbHash: post.thumbHash,
             viewerLiked: post.viewerLiked,

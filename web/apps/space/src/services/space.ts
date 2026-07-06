@@ -733,11 +733,9 @@ export const loadCurrentMessageActivityPostPreview = async (
     return { ...post, imageUrl: loadedPost.imageUrl };
 };
 
-const messageActivityFromSpaceActivity = async (
-    _ctx: SpaceAccountCtxHandle,
+const messageActivityFromSpaceActivity = (
     activity: SpaceMessageConversationActivity,
-    _viewerSpaceId?: string,
-): Promise<SpaceMessageActivity> => {
+): SpaceMessageActivity => {
     const post = messageActivityPostFromActivity(activity);
     return {
         createdAtMs: timestampMsFromSpaceDate(activity.createdAt),
@@ -750,15 +748,29 @@ const messageActivityFromSpaceActivity = async (
     };
 };
 
-export const isPassiveAutoReadMessageActivity = (
-    activity: SpaceMessageActivity,
-) =>
+const isPassiveAutoReadMessageActivity = (activity: SpaceMessageActivity) =>
     activity.type == "friend_added" ||
     activity.type == "message_like" ||
     activity.type == "post_like";
 
-const isConversationBadgeActivity = (activity: SpaceMessageActivity) =>
-    activity.type != "friend_added";
+const messageConversationUnreadCount = (activities: SpaceMessageActivity[]) => {
+    if (activities.length == 1 && activities[0]?.type == "post_like") {
+        return 0;
+    }
+
+    return activities.filter((activity) => {
+        if (activity.type == "friend_added") return false;
+        if (activity.type == "message_like") return false;
+        return true;
+    }).length;
+};
+
+export const shouldAutoReadMessageActivities = (
+    activities: SpaceMessageActivity[],
+) =>
+    activities.length > 0 &&
+    activities.every(isPassiveAutoReadMessageActivity) &&
+    messageConversationUnreadCount(activities) == 0;
 
 export const joinSpaceInvite = async ({
     spaceUsername,
@@ -1192,26 +1204,17 @@ export const loadCurrentMessageConversations = async (
                     friendSpaceID,
                 );
                 const unreadActivities = summary
-                    ? await Promise.all(
-                          (summary.unreadActivities ?? []).map((activity) =>
-                              messageActivityFromSpaceActivity(
-                                  ctx,
-                                  activity,
-                                  spaceId,
-                              ),
-                          ),
+                    ? (summary.unreadActivities ?? []).map(
+                          messageActivityFromSpaceActivity,
                       )
                     : [];
-                const unreadCount = unreadActivities.filter(
-                    isConversationBadgeActivity,
-                ).length;
+                const unreadCount =
+                    messageConversationUnreadCount(unreadActivities);
                 return {
                     friend,
                     latestActivity: summary
-                        ? await messageActivityFromSpaceActivity(
-                              ctx,
+                        ? messageActivityFromSpaceActivity(
                               summary.latestActivity,
-                              spaceId,
                           )
                         : {
                               createdAtMs: timestampMsFromSpaceDate(

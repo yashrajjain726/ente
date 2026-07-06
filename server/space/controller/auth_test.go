@@ -86,23 +86,3 @@ func TestResolveViewerAcceptsSpaceBrowserSessionHeader(t *testing.T) {
 	require.NotNil(t, resp)
 	require.Equal(t, space.SpaceID, resp.SpaceID)
 }
-
-func TestResolveViewerAcceptsSpaceLinkSessionToken(t *testing.T) {
-	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
-	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
-	space, err := testCreateSpace(ctx, repos, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
-	require.NoError(t, err)
-	authHash := sha256.Sum256([]byte("link-auth-key"))
-	link, err := testUpsertLink(ctx, repos, space.SpaceID, authHash[:], space.CurrentVersion, "encrypted-link-space-key", "encrypted-owner-link-secret")
-	require.NoError(t, err)
-	sessionHash := sha256.Sum256([]byte("link-session-token"))
-	require.NoError(t, repos.Links.CreateSession(ctx, sessionHash[:], link.SpaceID, link.AuthKeyHash, link.KeyVersion, timeutil.MicrosecondsAfterMinutes(5)))
-	ginCtx := newPublicSpaceContext()
-	ginCtx.Request.Header.Set("X-Auth-Token", "link-session-token")
-
-	resp, err := module.Spaces.GetProfile(ginCtx, models.GetSpaceProfileRequest{SpaceID: space.SpaceID})
-
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	require.Equal(t, space.SpaceID, resp.SpaceID)
-}

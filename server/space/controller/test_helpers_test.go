@@ -51,10 +51,6 @@ func testAddFriend(ctx context.Context, module *spacerepo.Module, requesterID in
 	return err
 }
 
-func testUpsertLink(ctx context.Context, module *spacerepo.Module, spaceID string, authKeyHash []byte, keyVersion int, linkWrappedSpaceKey string, encryptedAccessKey string) (*spacerepo.SpaceLinkRecord, error) {
-	return module.Links.UpsertLink(ctx, spaceID, authKeyHash, keyVersion, testSpaceBytes(linkWrappedSpaceKey), testSpaceBytes(encryptedAccessKey))
-}
-
 func testCreatePost(ctx context.Context, module *spacerepo.Module, _ int64, spaceID string, encryptedPostKey string, captionCipher *string, keyVersion int, objects []spacerepo.SpacePostAssetRecord) (int64, error) {
 	var caption []byte
 	if captionCipher != nil {

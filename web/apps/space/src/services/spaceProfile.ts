@@ -131,7 +131,16 @@ let currentSpaceContext:
 let pendingCurrentSpaceContext:
     | { cacheKey: string; promise: Promise<SpaceAccountCtxHandle> }
     | undefined;
+let currentSpaceProfile:
+    | { cacheKey: string; profile: SetupProfile | null }
+    | undefined;
+let pendingCurrentSpaceProfile:
+    | { cacheKey: string; promise: Promise<SetupProfile | null> }
+    | undefined;
 let currentSpaceContextGeneration = 0;
+
+const cloneSetupProfile = (profile: SetupProfile | null) =>
+    profile ? { ...profile } : null;
 
 export const openCurrentSpaceContext = async () => {
     const config = await currentSpaceContextConfig();
@@ -146,6 +155,8 @@ export const clearCurrentSpaceContext = () => {
     currentSpaceContextGeneration += 1;
     currentSpaceContext = undefined;
     pendingCurrentSpaceContext = undefined;
+    currentSpaceProfile = undefined;
+    pendingCurrentSpaceProfile = undefined;
     cached?.ctx.free();
 };
 
@@ -245,19 +256,45 @@ const profileFromDecryptedSpaceProfile = (
     };
 };
 
-export const loadExistingSpaceProfile = async () => {
-    if (!(await currentSpaceContextConfig())) return null;
+export const loadExistingSpaceProfile = async (options?: {
+    force?: boolean;
+}) => {
+    const config = await currentSpaceContextConfig();
+    if (!config) return null;
 
-    const ctx = await ensureCurrentSpaceContext();
-    const spaces = (await ctx.list_owned_spaces()) as OwnedSpace[];
-    const space = defaultOwnedSpace(spaces);
-    if (!space) return null;
+    if (pendingCurrentSpaceProfile?.cacheKey == config.cacheKey) {
+        return cloneSetupProfile(await pendingCurrentSpaceProfile.promise);
+    }
+    if (!options?.force && currentSpaceProfile?.cacheKey == config.cacheKey) {
+        return cloneSetupProfile(currentSpaceProfile.profile);
+    }
 
-    const spaceProfile = (await ctx.get_space_profile(
-        space.spaceId,
-        space.spaceId,
-    )) as DecryptedSpaceProfile;
-    return profileFromDecryptedSpaceProfile(spaceProfile);
+    const promise = (async () => {
+        const ctx = await ensureCurrentSpaceContext();
+        const spaces = (await ctx.list_owned_spaces()) as OwnedSpace[];
+        const space = defaultOwnedSpace(spaces);
+        if (!space) return null;
+
+        const spaceProfile = (await ctx.get_space_profile(
+            space.spaceId,
+            space.spaceId,
+        )) as DecryptedSpaceProfile;
+        return profileFromDecryptedSpaceProfile(spaceProfile);
+    })();
+
+    const pendingProfile = { cacheKey: config.cacheKey, promise };
+    pendingCurrentSpaceProfile = pendingProfile;
+    try {
+        const profile = await promise;
+        if (pendingCurrentSpaceProfile == pendingProfile) {
+            currentSpaceProfile = { cacheKey: config.cacheKey, profile };
+        }
+        return cloneSetupProfile(profile);
+    } finally {
+        if (pendingCurrentSpaceProfile == pendingProfile) {
+            pendingCurrentSpaceProfile = undefined;
+        }
+    }
 };
 
 export const loadExistingSpaceAvatar = async (
@@ -405,7 +442,7 @@ export const saveSpaceProfile = async (
             )) as UpdateSpaceProfileResponse;
         }
 
-        return {
+        const savedProfile = {
             avatarObjectID:
                 updateResponse?.avatar?.objectID ?? profile.avatarObjectID,
             avatarUpdatedAt:
@@ -421,6 +458,9 @@ export const saveSpaceProfile = async (
             spaceId,
             spaceSlug,
         };
+        currentSpaceProfile = undefined;
+        pendingCurrentSpaceProfile = undefined;
+        return savedProfile;
     } catch (error) {
         if (spaceHTTPStatus(error) == 409) {
             throw new Error("This username is already taken.", {

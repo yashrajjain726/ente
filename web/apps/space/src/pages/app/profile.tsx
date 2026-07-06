@@ -180,7 +180,7 @@ const Page: React.FC = () => {
                 }}
                 onDraftPostPublished={() => void router.push(spaceRoutes.home)}
                 onDeletePost={async (postId) => {
-                    const spaceId = profile?.spaceId;
+                    const spaceId = profile.spaceId;
                     if (!spaceId) throw new Error("Missing space.");
                     await deleteCurrentPost(spaceId, postId);
                     setLocalFeedPosts((currentPosts) =>

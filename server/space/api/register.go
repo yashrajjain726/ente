@@ -38,10 +38,6 @@ func Register(privateAPI, publicAPI gin.IRouter, handlers *Handlers) {
 	spaceAPI.POST("/friends/shares/refresh", selected(handlers.RefreshFriendShares))
 	spaceAPI.GET("/friends/shares", selected(handlers.ListFriendShares))
 	spaceAPI.POST("/rotate", selected(handlers.RotateSpaceKey))
-	spaceAPI.GET("/links", selected(handlers.GetSpaceLink))
-	spaceAPI.POST("/links", selected(handlers.CreateSpaceLink))
-	spaceAPI.POST("/links/rotate", selected(handlers.RotateSpaceLink))
-	spaceAPI.DELETE("/links", selected(handlers.DeleteSpaceLink))
 
 	publicAPI.GET("/spaces/:spaceID/profile", handlers.GetSpaceProfile)
 	publicAPI.GET("/spaces/:spaceID/assets/redirect", handlers.AssetRedirect)
@@ -50,7 +46,6 @@ func Register(privateAPI, publicAPI gin.IRouter, handlers *Handlers) {
 	publicAPI.GET("/spaces/:spaceID/versions", handlers.ListSpaceKeyVersions)
 	publicAPI.GET("/space/public/by-slug/:spaceSlug", handlers.LookupSpaceBySlug)
 	publicAPI.GET("/space/public/slug-availability/:spaceSlug", handlers.SpaceSlugAvailability)
-	publicAPI.POST("/space/links/session", handlers.SpaceLinkLogin)
 	publicAPI.POST("/account/space/sessions/bootstrap", handlers.BootstrapBrowserSession)
 	publicAPI.DELETE("/account/space/sessions/current", handlers.DeleteBrowserSession)
 }

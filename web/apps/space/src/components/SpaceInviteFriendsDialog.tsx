@@ -57,7 +57,6 @@ export const SpaceInviteFriendsDialog: React.FC<
                         "@media (min-width: 600px)": {
                             borderRadius: "20px",
                             bottom: "auto",
-                            boxShadow: "0 18px 48px rgba(0, 0, 0, 0.18)",
                             left: "50%",
                             maxWidth: 342,
                             p: "24px 20px 20px",

@@ -240,9 +240,6 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID int64, spaceID 
 		if !isDeleted {
 			return sql.ErrNoRows
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
 		if err := tx.Commit(); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -277,9 +274,6 @@ func (r *PostsRepository) DeletePost(ctx context.Context, postID int64, spaceID 
 		if err := QueueObjectCleanupTx(ctx, tx, object); err != nil {
 			return err
 		}
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM space_messages WHERE kind = 'post_like' AND reply_post_id = $1`, postID); err != nil {
-		return stacktrace.Propagate(err, "")
 	}
 	if err := tx.Commit(); err != nil {
 		return stacktrace.Propagate(err, "")
