@@ -84,7 +84,6 @@ struct MessageListView: View {
             QuickLookPreview(url: item.url)
         }
 
-        #if os(iOS)
         content
             .fullScreenCover(item: $imagePreviewItem) { item in
                 ImageAttachmentPreview(
@@ -93,9 +92,6 @@ struct MessageListView: View {
                     onDismiss: { imagePreviewItem = nil }
                 )
             }
-        #else
-        content
-        #endif
     }
 
     private var currentScrollChange: ScrollChange {
@@ -320,7 +316,6 @@ struct MessageListView: View {
     }
 
     private func performStreamingStartHapticIfNeeded() {
-        #if os(iOS)
         guard isGenerating,
               !didPerformStreamingStartHaptic,
               hasVisibleStreamingContent(streamingResponse) else {
@@ -328,19 +323,16 @@ struct MessageListView: View {
         }
         hapticTap()
         didPerformStreamingStartHaptic = true
-        #endif
     }
 
     private func openAttachment(_ attachment: ChatAttachment) {
         guard let url = attachment.url else { return }
         guard FileManager.default.fileExists(atPath: url.path) else { return }
 
-        #if os(iOS)
         if attachment.kind == .image {
             imagePreviewItem = AttachmentPreviewItem(url: url, name: attachment.name)
             return
         }
-        #endif
 
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = sanitizedAttachmentName(attachment)

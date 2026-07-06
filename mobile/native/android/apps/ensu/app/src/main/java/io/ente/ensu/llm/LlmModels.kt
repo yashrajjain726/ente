@@ -11,9 +11,28 @@ data class LlmModelTarget(
 )
 
 data class DownloadProgress(
-    val percent: Int,
-    val status: String
+    val percent: Int?,
+    val status: String,
+    val failure: DownloadFailure? = null,
+    val phase: DownloadPhase = DownloadPhase.Downloading
 )
+
+enum class DownloadPhase {
+    Downloading,
+    Loading,
+    Ready,
+    Failed
+}
+
+sealed class DownloadFailure(override val message: String) : Exception(message) {
+    class Http(val status: Int) : DownloadFailure("Download failed: HTTP $status")
+    class InvalidContent(message: String) : DownloadFailure(message)
+    class InsufficientSpace : DownloadFailure(
+        "Not enough storage space to download the model. Please free up space and try again."
+    )
+    class TimedOut : DownloadFailure("Download timed out")
+    class Failed(message: String) : DownloadFailure(message)
+}
 
 enum class LlmMessageRole {
     User,

@@ -14,8 +14,8 @@ use crate::logging;
 
 #[derive(Default)]
 pub struct State {
-    model: Mutex<Option<llm::ModelHandleRef>>,
-    context: Mutex<Option<llm::ContextHandleRef>>,
+    model: Mutex<Option<llm::ModelRef>>,
+    context: Mutex<Option<llm::ContextRef>>,
 }
 
 pub struct ModelDownloadState {
@@ -29,8 +29,6 @@ impl Default for ModelDownloadState {
         }
     }
 }
-
-const PANIC_JOB_ID: i64 = 0;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,6 +54,37 @@ fn llm_error(message: impl Into<String>) -> ApiError {
     ApiError::new("llm", message)
 }
 
+fn llm_api_error(err: llm::Error) -> ApiError {
+    let code = match &err {
+        llm::Error::Cancelled => "cancelled",
+        llm::Error::Panicked => "panicked",
+        llm::Error::InvalidInput(_) => "invalid_input",
+        llm::Error::NotFound { .. } => "not_found",
+        llm::Error::Unsupported(_) => "unsupported",
+        llm::Error::PromptTooLong { .. } => "prompt_too_long",
+        llm::Error::Llama { .. } => "llm",
+        llm::Error::Download(err) => download_code(err),
+    };
+    ApiError::new(code, err.to_string())
+}
+
+fn download_code(err: &download::Error) -> &'static str {
+    match err {
+        download::Error::Cancelled => "cancelled",
+        download::Error::Target { source, .. } => download_code(source),
+        download::Error::Fallback { single, .. } => download_code(single),
+        download::Error::Http(_) => "http",
+        download::Error::Validation(_) => "validation",
+        download::Error::Network(_) => "network",
+        download::Error::StorageFull => "storage_full",
+        download::Error::SizeMismatch { .. } => "size_mismatch",
+        download::Error::Protocol(_) => "protocol",
+        download::Error::InvalidTarget(_) => "invalid_target",
+        download::Error::Io(_) => "io",
+        download::Error::Json(_) => "json",
+    }
+}
+
 fn llm_thread_error() -> ApiError {
     ApiError::new("llm", "LLM task failed")
 }
@@ -66,8 +95,8 @@ fn fs_thread_error() -> ApiError {
 
 pub(crate) fn replace_state(
     state: &State,
-    model: Option<llm::ModelHandleRef>,
-    context: Option<llm::ContextHandleRef>,
+    model: Option<llm::ModelRef>,
+    context: Option<llm::ContextRef>,
 ) -> Result<(), ApiError> {
     let mut model_guard = state
         .model
@@ -103,10 +132,6 @@ enum Event {
     Done {
         summary: llm::GenerationSummary,
     },
-    Error {
-        job_id: llm::JobId,
-        message: String,
-    },
 }
 
 impl From<llm::GenerationEvent> for Event {
@@ -122,7 +147,6 @@ impl From<llm::GenerationEvent> for Event {
                 token_id,
             },
             llm::GenerationEvent::Done { summary } => Self::Done { summary },
-            llm::GenerationEvent::Error { job_id, message } => Self::Error { job_id, message },
         }
     }
 }
@@ -206,12 +230,6 @@ impl llm::EventSink for EventSink {
                 self.flush_text();
                 let _ = self.window.emit("llm-event", Event::Done { summary });
             }
-            llm::GenerationEvent::Error { job_id, message } => {
-                self.flush_text();
-                let _ = self
-                    .window
-                    .emit("llm-event", Event::Error { job_id, message });
-            }
         }
     }
 }
@@ -244,7 +262,7 @@ pub async fn llm_download_model_files(
             },
             move || cancel_requested.load(Ordering::SeqCst),
         )
-        .map_err(llm_error)
+        .map_err(llm_api_error)
     })
     .await
     .map_err(|_| fs_thread_error())?
@@ -354,7 +372,7 @@ fn format_rate(bytes_per_second: f64) -> String {
 pub async fn llm_init_backend() -> Result<(), ApiError> {
     logging::log("LLM", "init backend requested");
     async_runtime::spawn_blocking(|| match catch_unwind(AssertUnwindSafe(llm::init_backend)) {
-        Ok(result) => result.map_err(llm_error),
+        Ok(result) => result.map_err(llm_api_error),
         Err(payload) => {
             let message = panic_message(payload);
             log_command_panic("llm_init_backend", &message);
@@ -383,8 +401,8 @@ pub async fn llm_load_model(
         format!("load model requested model_path={}", params.model_path),
     );
     let model = async_runtime::spawn_blocking(move || {
-        match catch_unwind(AssertUnwindSafe(|| llm::load_model(params))) {
-            Ok(result) => result.map_err(llm_error),
+        match catch_unwind(AssertUnwindSafe(|| llm::Model::load(params))) {
+            Ok(result) => result.map_err(llm_api_error),
             Err(payload) => {
                 let message = panic_message(payload);
                 log_command_panic("llm_load_model", &message);
@@ -431,8 +449,8 @@ pub async fn llm_create_context(
     );
 
     let context = async_runtime::spawn_blocking(move || {
-        match catch_unwind(AssertUnwindSafe(|| llm::create_context(model, params))) {
-            Ok(result) => result.map_err(llm_error),
+        match catch_unwind(AssertUnwindSafe(|| llm::Context::new(&model, params))) {
+            Ok(result) => result.map_err(llm_api_error),
             Err(payload) => {
                 let message = panic_message(payload);
                 log_command_panic("llm_create_context", &message);
@@ -493,9 +511,9 @@ pub async fn llm_prewarm_multimodal_context(
     );
     async_runtime::spawn_blocking(move || {
         match catch_unwind(AssertUnwindSafe(|| {
-            llm::prewarm_multimodal_context(context.as_ref(), mmproj_path, media_marker)
+            context.prewarm_multimodal(mmproj_path, media_marker)
         })) {
-            Ok(result) => result.map_err(llm_error),
+            Ok(result) => result.map_err(llm_api_error),
             Err(payload) => {
                 let message = panic_message(payload);
                 log_command_panic("llm_prewarm_multimodal_context", &message);
@@ -516,11 +534,11 @@ pub async fn llm_prewarm_multimodal_context(
 }
 
 #[tauri::command]
-pub fn llm_generate_chat_stream(
-    state: TauriState<State>,
+pub async fn llm_generate_chat_stream(
+    state: TauriState<'_, State>,
     window: WebviewWindow,
     request: llm::ChatRequest,
-) -> Result<(), ApiError> {
+) -> Result<llm::GenerationSummary, ApiError> {
     let context = state
         .context
         .lock()
@@ -531,29 +549,24 @@ pub fn llm_generate_chat_stream(
     async_runtime::spawn_blocking(move || {
         match catch_unwind(AssertUnwindSafe(|| {
             let mut sink = EventSink::new(window.clone());
-            let _ = llm::generate_chat_stream(context.as_ref(), request, &mut sink);
+            context.generate_chat_stream(request, &mut sink)
         })) {
-            Ok(()) => {}
+            Ok(Ok(summary)) => Ok(summary),
+            Ok(Err(err)) => Err(llm_api_error(err)),
             Err(payload) => {
                 let message = panic_message(payload);
                 log_command_panic("llm_generate_chat_stream", &message);
-                let _ = window.emit(
-                    "llm-event",
-                    Event::Error {
-                        job_id: PANIC_JOB_ID,
-                        message: format!("Generation panicked: {message}"),
-                    },
-                );
+                Err(llm_error(format!("Generation panicked: {message}")))
             }
         }
-    });
-
-    Ok(())
+    })
+    .await
+    .map_err(|_| llm_thread_error())?
 }
 
 #[tauri::command]
-pub fn llm_cancel(job_id: i64) -> Result<(), ApiError> {
-    llm::cancel(job_id).map_err(llm_error)
+pub fn llm_cancel(job_id: i64) {
+    llm::cancel(job_id);
 }
 
 pub(crate) fn clear_for_exit(app: &AppHandle) {

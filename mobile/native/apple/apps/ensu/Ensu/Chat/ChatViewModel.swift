@@ -14,14 +14,14 @@ final class ChatViewModel: ObservableObject {
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss z"
         return formatter
     }()
-    private static let systemPromptDatePlaceholder = EnsuRustDefaults.shared.systemPromptDatePlaceholder
+    private static let systemPromptDatePlaceholder = ConfigDefaults.shared.systemPromptDatePlaceholder
     private static let defaultGenerationMaxTokens = 8_192
     private static let overflowSafetyTokens = 256
     private static let imageTokenEstimate = 768
     private nonisolated static let sessionTitleMaxLength = 40
     private static let sessionSummaryMaxWords = 7
     private static let sessionSummaryStoreKey = "ensu.session_summaries"
-    private static let sessionSummarySystemPrompt = EnsuRustDefaults.shared.sessionSummarySystemPrompt
+    private static let sessionSummarySystemPrompt = ConfigDefaults.shared.sessionSummarySystemPrompt
 
     private func systemPrompt() -> String {
         let dateAndTime = Self.systemPromptDateFormatter.string(from: Date())
@@ -74,10 +74,10 @@ final class ChatViewModel: ObservableObject {
     @Published var attachmentDownloads: [AttachmentDownloadItem] = []
     @Published var currentSessionMissingAttachments: [AttachmentDownloadItem] = []
     @Published var generationErrorMessage: String?
-    @Published var voiceInputState: VoiceInputState = .initial
+    @Published var voiceInputState: VoiceInputState = .idle
     @Published var draftCursorMoveToken = UUID()
 
-    private let provider: InferenceRsProvider
+    private let provider: LlmProvider
     private let voiceTranscriber: VoiceTranscriptionService
     private var chatDb: EnsuDb
     private let attachmentsDir: URL
@@ -125,7 +125,7 @@ final class ChatViewModel: ObservableObject {
         let transcriptionDir = baseDir.appendingPathComponent("transcription", isDirectory: true)
         try? FileManager.default.createDirectory(at: transcriptionDir, withIntermediateDirectories: true, attributes: nil)
         let transcriber = Transcriber(modelsDir: transcriptionDir.path)
-        let provider = InferenceRsProvider(modelDir: llmDir, transcriber: transcriber)
+        let provider = LlmProvider(modelDir: llmDir, transcriber: transcriber)
         let voiceTranscriber = VoiceTranscriptionService(transcriber: transcriber)
 
         // Chat DB + attachments.
@@ -426,9 +426,7 @@ final class ChatViewModel: ObservableObject {
         voiceTransientErrorTask?.cancel()
         voiceTransientErrorTask = nil
         voiceTranscriber.cancel()
-        if voiceInputState != .unsupported {
-            voiceInputState = .idle
-        }
+        voiceInputState = .idle
     }
 
     private func setVoiceInputState(_ state: VoiceInputState) {
@@ -583,7 +581,7 @@ final class ChatViewModel: ObservableObject {
                 self.isDownloading = false
                 self.downloadToast = DownloadToastState(
                     phase: .errorDownload,
-                    percent: -1,
+                    percent: nil,
                     status: self.userFacingModelReadyError(error, wasDownloaded: false),
                     offerRetryDownload: true
                 )
@@ -733,11 +731,11 @@ final class ChatViewModel: ObservableObject {
         sharedModelReadyKey = nil
     }
 
-    private func modelReadyKey(for target: InferenceModelTarget) -> ModelReadyKey {
+    private func modelReadyKey(for target: LlmModelTarget) -> ModelReadyKey {
         ModelReadyKey(id: target.id, requestedContextLength: target.contextLength)
     }
 
-    private func ensureModelReadyShared(target: InferenceModelTarget) async throws {
+    private func ensureModelReadyShared(target: LlmModelTarget) async throws {
         if isChatUnsupported {
             throw UnsupportedDeviceMemoryError(capability: deviceCapability)
         }
@@ -837,7 +835,7 @@ final class ChatViewModel: ObservableObject {
                 await MainActor.run {
                     self.downloadToast = DownloadToastState(
                         phase: .errorDownload,
-                        percent: -1,
+                        percent: nil,
                         status: self.userFacingModelReadyError(error, wasDownloaded: false),
                         offerRetryDownload: true
                     )
@@ -874,7 +872,7 @@ final class ChatViewModel: ObservableObject {
                 await MainActor.run {
                     self.downloadToast = DownloadToastState(
                         phase: .errorLoad,
-                        percent: -1,
+                        percent: nil,
                         status: self.userFacingModelReadyError(error, wasDownloaded: true),
                         offerRetryDownload: true
                     )
@@ -1024,7 +1022,7 @@ final class ChatViewModel: ObservableObject {
                     streamingParentId = nil
                     downloadToast = DownloadToastState(
                         phase: .errorDownload,
-                        percent: -1,
+                        percent: nil,
                         status: self.userFacingModelReadyError(error, wasDownloaded: self.provider.isModelDownloaded(target: target)),
                         offerRetryDownload: true
                     )
@@ -1067,8 +1065,8 @@ final class ChatViewModel: ObservableObject {
             overflowAlert = nil
 
             let history = historySelection.messages
-            let systemMessage = InferenceMessage(text: systemPrompt(), role: .system, hasAttachments: false)
-            let messages = [systemMessage] + history + [InferenceMessage(text: prompt.text, role: .user, hasAttachments: !userNode.attachments.isEmpty)]
+            let systemMessage = LlmMessage(text: systemPrompt(), role: .system, hasAttachments: false)
+            let messages = [systemMessage] + history + [LlmMessage(text: prompt.text, role: .user, hasAttachments: !userNode.attachments.isEmpty)]
 
             let bufferLock = NSLock()
             var buffer = ""
@@ -1235,13 +1233,13 @@ final class ChatViewModel: ObservableObject {
         scheduleSessionSummary(for: parent.sessionId)
     }
 
-    private func handleProgress(_ progress: InferenceDownloadProgress) {
-        if progress.percent == -1 {
+    private func handleProgress(_ progress: DownloadProgress) {
+        if progress.phase == .failed {
             if modelDownloadLoggedStart {
                 logger.error("Model download failed", details: progress.status)
                 modelDownloadLoggedStart = false
             }
-            downloadToast = DownloadToastState(phase: .errorDownload, percent: -1, status: progress.status, offerRetryDownload: true)
+            downloadToast = DownloadToastState(phase: .errorDownload, percent: nil, status: progress.status, offerRetryDownload: true)
             isDownloading = false
             isModelDownloaded = false
             return
@@ -1265,14 +1263,14 @@ final class ChatViewModel: ObservableObject {
                 logger.info("Model download complete", details: progress.status)
                 modelDownloadLoggedStart = false
             }
-            downloadToast = DownloadToastState(phase: .complete, percent: 100, status: progress.status, offerRetryDownload: false)
+            downloadToast = DownloadToastState(phase: .ready, percent: 100, status: progress.status, offerRetryDownload: false)
             isDownloading = false
             isModelDownloaded = true
             modelDownloadSizeBytes = nil
             clearDownloadProgressMemory()
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
-                if self.downloadToast?.phase == .complete {
+                if self.downloadToast?.phase == .ready {
                     self.downloadToast = nil
                 }
             }
@@ -1288,7 +1286,7 @@ final class ChatViewModel: ObservableObject {
         isDownloading = true
     }
 
-    private func startDownloadProgressMonitor(target: InferenceModelTarget) {
+    private func startDownloadProgressMonitor(target: LlmModelTarget) {
         downloadProgressMonitorTask?.cancel()
         let targetKey = modelReadyKey(for: target)
 
@@ -1335,8 +1333,8 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func currentDownloadSnapshot(
-        target: InferenceModelTarget
-    ) async -> (InferenceDownloadProgress?, Bool) {
+        target: LlmModelTarget
+    ) async -> (DownloadProgress?, Bool) {
         let progress = await provider.currentDownloadProgress(target: target)
         let isDownloaded = provider.isModelDownloaded(target: target)
         return (progress, isDownloaded)
@@ -1917,16 +1915,16 @@ final class ChatViewModel: ObservableObject {
         input: String,
         fallback: String,
         existingSummary: String?,
-        provider: InferenceRsProvider,
-        target: InferenceModelTarget
+        provider: LlmProvider,
+        target: LlmModelTarget
     ) async -> String? {
         if let existingSummary, !existingSummary.isEmpty { return nil }
         let cleanedInput = sanitizeTitleText(input)
         guard !cleanedInput.isEmpty else { return sessionTitle(from: fallback, fallback: fallback) }
 
         let messages = [
-            InferenceMessage(text: sessionSummarySystemPrompt, role: .system, hasAttachments: false),
-            InferenceMessage(text: cleanedInput, role: .user, hasAttachments: false)
+            LlmMessage(text: sessionSummarySystemPrompt, role: .system, hasAttachments: false),
+            LlmMessage(text: cleanedInput, role: .user, hasAttachments: false)
         ]
 
         let bufferLock = NSLock()
@@ -1960,7 +1958,8 @@ final class ChatViewModel: ObservableObject {
 
     private func isCancellation(_ error: Error) -> Bool {
         if error is CancellationError { return true }
-        return error.localizedDescription.localizedCaseInsensitiveContains("cancel")
+        if case LlmError.Cancelled = error { return true }
+        return (error as? URLError)?.code == .cancelled
     }
 
     private func seedDownloadProgressMemory() {
@@ -1976,10 +1975,24 @@ final class ChatViewModel: ObservableObject {
         if isCancellation(error) { return false }
         if isOutOfStorageError(error) { return false }
 
-        let message = error.localizedDescription.lowercased()
-        if message.contains("not gguf") { return false }
-        if message.contains("http 401") || message.contains("http 403") || message.contains("http 404") {
+        if case let LlmError.Download(inner) = error {
+            switch inner {
+            case .validation:
+                return false
+            case let .http(status):
+                if status == 401 || status == 403 || status == 404 { return false }
+            default:
+                break
+            }
+        }
+
+        switch error as? DownloadFailure {
+        case .invalidContent:
             return false
+        case let .http(status):
+            if status == 401 || status == 403 || status == 404 { return false }
+        default:
+            break
         }
         return true
     }
@@ -2002,26 +2015,9 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func isOutOfStorageError(_ error: Error) -> Bool {
-        func containsStorageMessage(_ message: String) -> Bool {
-            let normalized = message.lowercased()
-            return normalized.contains("no space left on device") ||
-                normalized.contains("not enough space") ||
-                normalized.contains("out of space") ||
-                normalized.contains("disk is full") ||
-                normalized.contains("enospc")
-        }
-
-        var current: NSError? = error as NSError
-        while let nsError = current {
-            if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileWriteOutOfSpaceError {
-                return true
-            }
-            if containsStorageMessage(nsError.localizedDescription) {
-                return true
-            }
-            current = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
-        }
-        return containsStorageMessage(error.localizedDescription)
+        if case DownloadFailure.insufficientSpace = error { return true }
+        if case LlmError.Download(.storageFull) = error { return true }
+        return error.isOutOfDiskSpace
     }
 
     private nonisolated func attachmentsDirectory() throws -> URL {
@@ -2059,7 +2055,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     private struct HistorySelection {
-        let messages: [InferenceMessage]
+        let messages: [LlmMessage]
         let inputTokens: Int
         let inputBudget: Int
         let wasTrimmed: Bool
@@ -2124,12 +2120,12 @@ final class ChatViewModel: ObservableObject {
             return HistorySelection(messages: [], inputTokens: inputTokens, inputBudget: inputBudget, wasTrimmed: inputTokens > inputBudget)
         }
 
-        var selected: [InferenceMessage] = []
+        var selected: [LlmMessage] = []
         for node in historyMessages.reversed() {
             let text = historyText(node)
             let cost = estimateTokens(text)
             if cost <= remaining {
-                selected.append(InferenceMessage(text: text, role: node.role == .user ? .user : .assistant, hasAttachments: !node.attachments.isEmpty))
+                selected.append(LlmMessage(text: text, role: node.role == .user ? .user : .assistant, hasAttachments: !node.attachments.isEmpty))
                 remaining -= cost
             } else {
                 break
@@ -2139,7 +2135,7 @@ final class ChatViewModel: ObservableObject {
         return HistorySelection(messages: selected.reversed(), inputTokens: inputTokens, inputBudget: inputBudget, wasTrimmed: inputTokens > inputBudget)
     }
 
-    private func resolveGenerationLimits(target: InferenceModelTarget) -> GenerationLimits {
+    private func resolveGenerationLimits(target: LlmModelTarget) -> GenerationLimits {
         let contextLength = provider.loadedContextLength(target: target) ?? target.contextLength ?? 12000
         let maxOutput = resolveMaxOutputTokens(configuredMaxTokens: target.maxTokens, contextLength: contextLength)
         return GenerationLimits(contextLength: contextLength, maxOutput: maxOutput)
@@ -2227,8 +2223,8 @@ private final class DownloadProgressTracker {
     private var lastVisibleStatus: String?
 
     func seed(from toast: DownloadToastState?) {
-        if let toast, toast.percent >= 0 {
-            lastVisiblePercent = toast.percent
+        if let toast, let percent = toast.percent {
+            lastVisiblePercent = percent
             lastVisibleStatus = toast.status
         } else {
             lastVisiblePercent = 0
@@ -2241,10 +2237,10 @@ private final class DownloadProgressTracker {
         lastVisibleStatus = nil
     }
 
-    func resolve(_ progress: InferenceDownloadProgress) -> ResolvedDownloadProgress {
-        let isLoading = progress.status.localizedCaseInsensitiveContains("Loading")
-        let isReady = progress.status.localizedCaseInsensitiveContains("Ready")
-        let rawPercent = progress.percent >= 0 ? progress.percent : nil
+    func resolve(_ progress: DownloadProgress) -> ResolvedDownloadProgress {
+        let isLoading = progress.phase == .loading
+        let isReady = progress.phase == .ready
+        let rawPercent = progress.percent
         let previousPercent = lastVisiblePercent
         let previousStatus = lastVisibleStatus
 

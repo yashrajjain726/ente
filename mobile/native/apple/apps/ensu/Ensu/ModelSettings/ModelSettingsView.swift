@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ModelSettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -23,15 +24,9 @@ struct ModelSettingsView: View {
     @State private var toastTask: Task<Void, Never>?
 
     private let modelChoices: [ModelChoice] = {
-        let defaults = EnsuRustDefaults.shared
-        #if os(iOS)
+        let defaults = ConfigDefaults.shared
         let defaultModel = defaults.mobileDefaultModel
         let presets = defaults.mobileModelPresets
-        #else
-        let isHighRAM = ProcessInfo.processInfo.physicalMemory >= ModelSettingsStore.highRAMThresholdBytes
-        let defaultModel = isHighRAM ? defaults.desktopDefaultModel : defaults.mobileDefaultModel
-        let presets = isHighRAM ? defaults.desktopModelPresets : defaults.mobileModelPresets
-        #endif
         return [
             ModelChoice(
                 id: Self.defaultOptionId,
@@ -64,9 +59,7 @@ struct ModelSettingsView: View {
         Group {
             if embeddedInNavigation {
                 content
-                    #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)
-                    #endif
                     .toolbar {
                         ToolbarItem(placement: .principal) {
                             Text("Model Settings")
@@ -75,7 +68,6 @@ struct ModelSettingsView: View {
                         }
                     }
             } else {
-                #if os(iOS)
                 NavigationStack {
                     content
                         .navigationBarTitleDisplayMode(.inline)
@@ -90,9 +82,6 @@ struct ModelSettingsView: View {
                             }
                         }
                 }
-                #else
-                content
-                #endif
             }
         }
         .onAppear {
@@ -111,32 +100,6 @@ struct ModelSettingsView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        #if os(macOS)
-        .safeAreaInset(edge: .top) {
-            if embeddedInNavigation {
-                EmptyView()
-            } else {
-                MacSheetHeader(
-                    leading: {
-                        EmptyView()
-                    },
-                    center: {
-                        Text("Model Settings")
-                            .font(EnsuTypography.large)
-                            .foregroundStyle(EnsuColor.textPrimary)
-                    },
-                    trailing: {
-                        Button("Done") {
-                            dismiss()
-                        }
-                        .font(EnsuTypography.small)
-                        .foregroundStyle(EnsuColor.textMuted)
-                        .buttonStyle(.plain)
-                    }
-                )
-            }
-        }
-        #endif
     }
 
     private var isStoredCustomModel: Bool {
@@ -281,7 +244,7 @@ struct ModelSettingsView: View {
         hint: String,
         text: Binding<String>,
         error: String?,
-        keyboardType: PlatformKeyboardType
+        keyboardType: UIKeyboardType
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)

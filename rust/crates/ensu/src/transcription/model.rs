@@ -9,7 +9,7 @@ use flate2::read::GzDecoder;
 use tar::Archive;
 
 use crate::download;
-use crate::transcription::{Result, error};
+use crate::transcription::{Result, TranscriptionError};
 
 const MODEL_URL: &str = "https://models.ente.io/parakeet-v3-int8.tar.gz";
 const MODEL_DIR_NAME: &str = "parakeet-tdt-0.6b-v3-int8";
@@ -91,7 +91,7 @@ pub(crate) fn download_model(
         });
     }
 
-    if let Err(message) = download::fetch(
+    if let Err(err) = download::fetch(
         targets,
         validate_download,
         |progress| {
@@ -104,9 +104,9 @@ pub(crate) fn download_model(
         || false,
     ) {
         on_event(ModelEvent::DownloadError {
-            message: message.clone(),
+            message: err.to_string(),
         });
-        return Err(error(message));
+        return Err(TranscriptionError::Download(err));
     }
 
     if need_model {
@@ -117,11 +117,10 @@ pub(crate) fn download_model(
         let _ = fs::remove_file(download::metadata_path_for(&archive_path));
         if let Err(err) = extract_result {
             let _ = fs::remove_dir_all(&extracting_path);
-            let message = err.to_string();
             on_event(ModelEvent::DownloadError {
-                message: message.clone(),
+                message: err.to_string(),
             });
-            return Err(error(message));
+            return Err(err);
         }
         on_event(ModelEvent::ExtractionCompleted);
     }
@@ -130,12 +129,21 @@ pub(crate) fn download_model(
     Ok(final_model_dir)
 }
 
-fn validate_download(target: &download::Target, path: &Path) -> std::result::Result<(), String> {
+fn validate_download(
+    target: &download::Target,
+    path: &Path,
+) -> std::result::Result<(), download::Error> {
     if !is_file_present(path) {
-        return Err(format!("{} is empty", path.display()));
+        return Err(download::Error::Validation(format!(
+            "{} is empty",
+            path.display()
+        )));
     }
     if target.destination_path.ends_with(".tar.gz") && !looks_like_gzip(path) {
-        return Err(format!("{} is not a gzip archive", path.display()));
+        return Err(download::Error::Validation(format!(
+            "{} is not a gzip archive",
+            path.display()
+        )));
     }
     Ok(())
 }

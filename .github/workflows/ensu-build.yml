@@ -13,7 +13,6 @@ on:
 
 env:
     NDK_VERSION: "27.3.13750724"
-    BUILD_NUMBER_BASE: "33"
 
 permissions:
     contents: write
@@ -58,7 +57,6 @@ jobs:
 
                   version="$(node .github/scripts/ensu-version.mjs get)"
                   release_version="${version%-beta}"
-                  build_number=$((BUILD_NUMBER_BASE + GITHUB_RUN_NUMBER))
 
                   if [[ "${GITHUB_REF_NAME}" == release/ensu-v* ]]; then
                       if [[ "${version}" != "${release_version}" ]]; then
@@ -69,6 +67,7 @@ jobs:
                           echo "::error::Branch ${GITHUB_REF_NAME} does not match Ensu version ${release_version}"
                           exit 1
                       fi
+                      build_number="$(node .github/scripts/ensu-version.mjs get-build-base)"
                       release_tag="ensu-v${release_version}-rc"
                       release_title="🤖 Ensu release candidate · ${release_version} (build ${build_number})"
                   else
@@ -76,6 +75,8 @@ jobs:
                           echo "::error::${GITHUB_REF_NAME} is ${version}, expected ${release_version}-beta"
                           exit 1
                       fi
+                      build_number_base="$(node .github/scripts/ensu-version.mjs get-build-base)"
+                      build_number=$((build_number_base + GITHUB_RUN_NUMBER))
                       release_tag="ensu-v${release_version}-beta"
                       release_title="🤖 Ensu nightly · ${version} (build ${build_number})"
                   fi

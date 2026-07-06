@@ -70,9 +70,8 @@ struct SessionDrawerView: View {
 
             TextField("Search chats", text: $searchQuery)
                 .font(EnsuTypography.body)
-                .platformTextInputAutocapitalization(.never)
+                .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .platformTextFieldStyle()
                 .foregroundStyle(EnsuColor.textPrimary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }

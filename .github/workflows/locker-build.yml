@@ -54,17 +54,18 @@ jobs:
                   fi
 
                   release_version="$(node .github/scripts/flutter-version.mjs locker get)"
-                  build_number_base="$(node .github/scripts/flutter-version.mjs locker get-build-base)"
-                  build_number=$((build_number_base + GITHUB_RUN_NUMBER))
 
                   if [[ "${GITHUB_REF_NAME}" == release/locker-v* ]]; then
                       if [[ "${GITHUB_REF_NAME}" != "release/locker-v${release_version}" ]]; then
                           echo "::error::Branch ${GITHUB_REF_NAME} does not match Locker version ${release_version}"
                           exit 1
                       fi
+                      build_number="$(node .github/scripts/flutter-version.mjs locker get-build-base)"
                       release_tag="locker-v${release_version}-rc"
                       release_title="🗄️ Locker release candidate - ${release_version} (build ${build_number})"
                   else
+                      build_number_base="$(node .github/scripts/flutter-version.mjs locker get-build-base)"
+                      build_number=$((build_number_base + GITHUB_RUN_NUMBER))
                       release_tag="locker-v${release_version}-beta"
                       release_title="🗄️ Locker nightly - ${release_version} (build ${build_number})"
                   fi

@@ -42,13 +42,30 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
+    #[error("database is readonly")]
+    ReadonlyDatabase,
+
     #[cfg(feature = "sqlite")]
     #[error(transparent)]
-    Sqlite(#[from] rusqlite::Error),
+    Sqlite(rusqlite::Error),
 
     #[error("unsupported operation: {0}")]
     UnsupportedOperation(String),
 
     #[error("migration error: {0}")]
     Migration(String),
+}
+
+#[cfg(feature = "sqlite")]
+impl From<rusqlite::Error> for Error {
+    fn from(err: rusqlite::Error) -> Self {
+        match &err {
+            rusqlite::Error::SqliteFailure(failure, _)
+                if failure.code == rusqlite::ErrorCode::ReadOnly =>
+            {
+                Error::ReadonlyDatabase
+            }
+            _ => Error::Sqlite(err),
+        }
+    }
 }

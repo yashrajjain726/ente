@@ -126,14 +126,14 @@ struct DownloadToastState: Identifiable, Equatable {
     enum Phase {
         case downloading
         case loading
-        case complete
+        case ready
         case errorDownload
         case errorLoad
     }
 
     let id = UUID()
     var phase: Phase
-    var percent: Int
+    var percent: Int?
     var status: String
     var offerRetryDownload: Bool
 }

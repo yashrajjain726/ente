@@ -83,6 +83,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import io.ente.ensu.llm.DownloadPhase
 
 @Composable
 internal fun MessageList(
@@ -96,6 +97,7 @@ internal fun MessageList(
     isDownloading: Boolean,
     downloadPercent: Int?,
     downloadStatus: String?,
+    downloadPhase: DownloadPhase?,
     modelDownloadSizeBytes: Long?,
     branchSelections: Map<String, Int>,
     onEditMessage: (ChatMessage) -> Unit,
@@ -111,6 +113,7 @@ internal fun MessageList(
                 isDownloading = isDownloading,
                 downloadPercent = downloadPercent,
                 downloadStatus = downloadStatus,
+                downloadPhase = downloadPhase,
                 modelDownloadSizeBytes = modelDownloadSizeBytes,
                 onDownload = { onStartDownload(true) }
             )
@@ -386,6 +389,7 @@ private fun DownloadOnboarding(
     isDownloading: Boolean,
     downloadPercent: Int?,
     downloadStatus: String?,
+    downloadPhase: DownloadPhase?,
     modelDownloadSizeBytes: Long?,
     onDownload: () -> Unit
 ) {
@@ -406,10 +410,10 @@ private fun DownloadOnboarding(
             )
             Spacer(modifier = Modifier.height(EnsuSpacing.md.dp))
             if (isDownloading) {
-                val showProgress = downloadPercent != null ||
-                    downloadStatus?.contains("Loading", ignoreCase = true) == true
+                val isLoadingModel = downloadPhase == DownloadPhase.Loading
+                val showProgress = downloadPercent != null || isLoadingModel
                 val statusText = when {
-                    downloadStatus?.contains("Loading", ignoreCase = true) == true -> downloadStatus
+                    isLoadingModel -> downloadStatus
                     modelDownloadSizeBytes != null && downloadPercent != null && downloadPercent >= 0 -> {
                         val downloadedBytes = (modelDownloadSizeBytes * (downloadPercent / 100f)).roundToLong()
                         "Downloading... ${formatBytes(downloadedBytes)} / ${formatBytes(modelDownloadSizeBytes)}"
@@ -450,9 +454,7 @@ private fun DownloadOnboarding(
                     Text(
                         text = downloadStatus,
                         style = EnsuTypography.body,
-                        color = if (downloadStatus.contains("not enough storage", ignoreCase = true) ||
-                            downloadStatus.contains("failed", ignoreCase = true)
-                        ) {
+                        color = if (downloadPhase == DownloadPhase.Failed) {
                             EnsuColor.error
                         } else {
                             EnsuColor.textMuted()
