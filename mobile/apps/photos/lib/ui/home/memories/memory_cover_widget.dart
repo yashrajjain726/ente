@@ -1,6 +1,7 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
+import "package:photos/core/constants.dart";
 import "package:photos/models/memories/memory.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/effects.dart";
@@ -104,6 +105,7 @@ class _MemoryCoverWidgetState extends State<MemoryCoverWidget> {
                     child: ThumbnailWidget(
                       memory.file,
                       shouldShowSyncStatus: false,
+                      thumbnailSize: thumbnailLargeSize,
                       key: Key("memories" + memory.file.tag),
                     ),
                   ),
