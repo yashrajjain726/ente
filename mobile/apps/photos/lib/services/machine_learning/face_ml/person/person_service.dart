@@ -308,6 +308,7 @@ class PersonService {
     bool hideFromMemories = false,
     String? birthdate,
     String? email,
+    int? userID,
   }) async {
     final faceIds = await faceMLDataDB.getFaceIDsForCluster(clusterID);
     final data = PersonData(
@@ -320,6 +321,7 @@ class PersonService {
       hideFromMemories: hideFromMemories,
       birthDate: birthdate,
       email: email,
+      userID: userID,
     );
     final result = await _addOrUpdateEntity(EntityType.cgroup, data.toJson());
     await faceMLDataDB.assignClusterToPerson(

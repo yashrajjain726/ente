@@ -66,6 +66,20 @@ String? _trimEmptyToNull(String? value) {
   return trimmedValue;
 }
 
+bool _matchesCurrentUserEmail(String? email) {
+  final currentEmail = _trimEmptyToNull(Configuration.instance.getEmail());
+  final candidateEmail = _trimEmptyToNull(email);
+  return currentEmail != null &&
+      candidateEmail != null &&
+      candidateEmail.toLowerCase() == currentEmail.toLowerCase();
+}
+
+int? _currentUserIDForEmail(String? email) {
+  return _matchesCurrentUserEmail(email)
+      ? Configuration.instance.getUserID()
+      : null;
+}
+
 class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   static const int _maxSuggestedPersons = 3;
   bool isKeypadOpen = false;
@@ -84,11 +98,21 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
 
   String? get _emailToSave => _trimEmptyToNull(_email);
 
+  int? get _currentUserIDToSave => _currentUserIDForEmail(_emailToSave);
+
   bool get _shouldClearContactUserID =>
       widget.isEditing &&
       _contactLinkEmailCleared &&
       person?.data.userID != null &&
       _emailToSave == null;
+
+  bool get _shouldSetCurrentUserID =>
+      widget.isEditing &&
+      _currentUserIDToSave != null &&
+      person?.data.userID != _currentUserIDToSave;
+
+  bool get _shouldUpdateContactUserID =>
+      _shouldClearContactUserID || _shouldSetCurrentUserID;
 
   @override
   void initState() {
@@ -632,6 +656,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
         hideFromMemories: _hideFromMemories,
         birthdate: birthdate,
         email: email,
+        userID: _currentUserIDForEmail(email),
       );
       final bool extraPhotosFound = await ClusterFeedbackService.instance
           .checkAndDoAutomaticMerges(personEntity, personClusterID: clusterID);
@@ -658,7 +683,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
       ? (_inputName.trim() != person!.data.name ||
             _selectedDate != person!.data.birthDate ||
             _emailToSave != _trimEmptyToNull(person!.data.email) ||
-            _shouldClearContactUserID ||
+            _shouldUpdateContactUserID ||
             _isPinned != person!.data.isPinned ||
             _hideFromMemories != person!.data.hideFromMemories)
       : _inputName.trim().isNotEmpty;
@@ -674,7 +699,10 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
       }
       final String name = _inputName.trim();
       final String? birthDate = _selectedDate;
-      final personEntity = _shouldClearContactUserID
+      final userIDToSave = _shouldClearContactUserID
+          ? null
+          : _currentUserIDToSave;
+      final personEntity = _shouldUpdateContactUserID
           ? await PersonService.instance.updateAttributes(
               person!.remoteID,
               name: name,
@@ -682,7 +710,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
               isPinned: _isPinned,
               hideFromMemories: _hideFromMemories,
               email: emailToSave,
-              userID: null,
+              userID: userIDToSave,
             )
           : await PersonService.instance.updateAttributes(
               person!.remoteID,

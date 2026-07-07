@@ -359,10 +359,17 @@ class _LinkEmailScreen extends State<LinkEmailScreen> {
       try {
         final personEntity = await PersonService.instance.getPerson(personID);
         late final PersonEntity updatedPerson;
+        final currentUserID = _currentUserIDForEmail(email);
 
         if (personEntity == null) {
           throw AssertionError(
             "Cannot link email to non-existent person. First save the person",
+          );
+        } else if (currentUserID != null) {
+          updatedPerson = await PersonService.instance.updateAttributes(
+            personID,
+            email: email,
+            userID: currentUserID,
           );
         } else {
           updatedPerson = await PersonService.instance.updateAttributes(
@@ -386,4 +393,15 @@ class _LinkEmailScreen extends State<LinkEmailScreen> {
       }
     }
   }
+}
+
+bool _matchesCurrentUserEmail(String email) {
+  final currentEmail = Configuration.instance.getEmail()?.trim().toLowerCase();
+  return currentEmail != null && email.trim().toLowerCase() == currentEmail;
+}
+
+int? _currentUserIDForEmail(String email) {
+  return _matchesCurrentUserEmail(email)
+      ? Configuration.instance.getUserID()
+      : null;
 }
