@@ -34,9 +34,15 @@ class PersonService {
   final EntityService entityService;
   final MLDataDB faceMLDataDB;
   final SharedPreferences prefs;
+  final PhotosContactsService _contactsService;
   final _emailToPartialPersonDataMapCache = <String, Map<String, String>>{};
 
-  PersonService(this.entityService, this.faceMLDataDB, this.prefs);
+  PersonService(
+    this.entityService,
+    this.faceMLDataDB,
+    this.prefs, {
+    PhotosContactsService? contactsService,
+  }) : _contactsService = contactsService ?? PhotosContactsService.instance;
 
   // instance
   static PersonService? _instance;
@@ -600,7 +606,7 @@ class PersonService {
     if (!flagService.enableContact) {
       return;
     }
-    final contact = await PhotosContactsService.instance.getContact(
+    final contact = await _contactsService.getContact(
       contactUserId: person.data.userID,
       email: person.data.email,
     );
@@ -617,7 +623,7 @@ class PersonService {
       );
     }
     try {
-      await PhotosContactsService.instance.setProfilePicture(
+      await _contactsService.setProfilePicture(
         contactId: contact.id,
         bytes: bytes,
       );
@@ -639,8 +645,17 @@ class PersonService {
     int? version,
     Object? birthDate = _attributeNotProvided,
     Object? email = _attributeNotProvided,
+    Object? userID = _attributeNotProvided,
+    bool syncLinkedContactName = true,
   }) async {
     final person = (await getPerson(id))!;
+    final trimmedName = name?.trim();
+    if (syncLinkedContactName &&
+        trimmedName != null &&
+        trimmedName.isNotEmpty &&
+        trimmedName != person.data.name.trim()) {
+      await _updateLinkedContactNameBeforePerson(person, trimmedName);
+    }
     var updatedData = person.data.copyWith(
       name: name,
       avatarFaceId: avatarFaceId,
@@ -655,6 +670,9 @@ class PersonService {
     if (!identical(email, _attributeNotProvided)) {
       updatedData = updatedData.copyWith(email: email as String?);
     }
+    if (!identical(userID, _attributeNotProvided)) {
+      updatedData = updatedData.copyWith(userID: userID as int?);
+    }
     final updatedPerson = person.copyWith(data: updatedData);
     await updatePerson(updatedPerson);
     await refreshPersonCache();
@@ -668,18 +686,45 @@ class PersonService {
     return updatedPerson;
   }
 
+  Future<void> _updateLinkedContactNameBeforePerson(
+    PersonEntity person,
+    String name,
+  ) async {
+    if (!flagService.enableContact) {
+      return;
+    }
+    final contact = await _contactsService.getContact(
+      contactUserId: person.data.userID,
+      email: person.data.email,
+    );
+    if (contact == null || !flagService.enableContact) {
+      return;
+    }
+    try {
+      await _contactsService.createOrUpdateContact(
+        contactUserId: contact.contactUserId,
+        name: name,
+        birthDate: contact.data?.birthDate,
+      );
+    } on StateError {
+      if (!flagService.enableContact) {
+        return;
+      }
+      rethrow;
+    }
+  }
+
   Future<PersonEntity> updateContactLink(
     String id, {
     required int? userID,
     required String? email,
   }) async {
-    final person = (await getPerson(id))!;
-    final updatedPerson = person.copyWith(
-      data: person.data.copyWith(userID: userID, email: email),
+    return updateAttributes(
+      id,
+      userID: userID,
+      email: email,
+      syncLinkedContactName: false,
     );
-    await updatePerson(updatedPerson);
-    await refreshPersonCache();
-    return updatedPerson;
   }
 
   Future<ManualPersonAssignmentResult> addManualFileAssignments({

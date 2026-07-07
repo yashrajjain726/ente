@@ -125,26 +125,27 @@ class _ContactPhotoPickerSheetState extends State<_ContactPhotoPickerSheet> {
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _ContactPhotoSheetButton(
+                      ButtonComponent(
                         label: l10n.setSelectedPhoto,
                         isDisabled: !value,
-                        backgroundColor: colors.primary,
-                        disabledBackgroundColor: colors.fillDark,
-                        foregroundColor: colors.specialWhite,
-                        disabledForegroundColor: colors.textLightest,
-                        onTap: () {
-                          Navigator.pop(
-                            context,
-                            ContactPhotoPickerFile(_selectedFiles.files.first),
-                          );
-                        },
+                        shouldSurfaceExecutionStates: false,
+                        onTap: value
+                            ? () {
+                                Navigator.pop(
+                                  context,
+                                  ContactPhotoPickerFile(
+                                    _selectedFiles.files.first,
+                                  ),
+                                );
+                              }
+                            : null,
                       ),
                       if (widget.canRemovePhoto) ...[
                         const SizedBox(height: Spacing.md),
-                        _ContactPhotoSheetButton(
+                        ButtonComponent(
                           label: l10n.removeContactPhoto,
-                          backgroundColor: colors.fillDark,
-                          foregroundColor: colors.textBase,
+                          variant: ButtonComponentVariant.secondary,
+                          shouldSurfaceExecutionStates: false,
                           onTap: () {
                             Navigator.pop(
                               context,
@@ -204,57 +205,6 @@ class _ContactPhotoSheetHeader extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ContactPhotoSheetButton extends StatelessWidget {
-  const _ContactPhotoSheetButton({
-    required this.label,
-    required this.backgroundColor,
-    required this.foregroundColor,
-    required this.onTap,
-    this.disabledBackgroundColor,
-    this.disabledForegroundColor,
-    this.isDisabled = false,
-  });
-
-  final String label;
-  final Color backgroundColor;
-  final Color foregroundColor;
-  final Color? disabledBackgroundColor;
-  final Color? disabledForegroundColor;
-  final VoidCallback onTap;
-  final bool isDisabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = !isDisabled;
-    final effectiveBackground = enabled
-        ? backgroundColor
-        : disabledBackgroundColor ?? backgroundColor;
-    final effectiveForeground = enabled
-        ? foregroundColor
-        : disabledForegroundColor ?? foregroundColor;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: enabled ? onTap : null,
-      child: Container(
-        width: double.infinity,
-        height: 48,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: Spacing.xxl),
-        decoration: BoxDecoration(
-          color: effectiveBackground,
-          borderRadius: BorderRadius.circular(Radii.button),
-        ),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyles.body.copyWith(color: effectiveForeground),
-        ),
       ),
     );
   }

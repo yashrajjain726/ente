@@ -94,10 +94,6 @@ class PhotosContactsService {
     return readyFuture;
   }
 
-  Future<contacts.ContactRecord?> getContactByUserId(int contactUserId) async {
-    return getContact(contactUserId: contactUserId);
-  }
-
   Future<contacts.ContactRecord?> getContact({
     int? contactUserId,
     String? email,
@@ -138,10 +134,6 @@ class PhotosContactsService {
 
   contacts.ContactRecord? getCachedContactByUserId(int? contactUserId) {
     return _getCachedContact(contactUserId: contactUserId);
-  }
-
-  contacts.ContactRecord? getCachedContactByEmail(String? email) {
-    return _getCachedContact(email: email);
   }
 
   contacts.ContactRecord? getCachedContact({

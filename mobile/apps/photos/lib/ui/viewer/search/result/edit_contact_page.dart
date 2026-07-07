@@ -192,9 +192,10 @@ class _EditContactPageState extends State<EditContactPage> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-              child: _ContactSaveButton(
+              child: ButtonComponent(
                 label: l10n.saveContact,
                 isDisabled: !_canSave,
+                shouldShowSuccessState: false,
                 onTap: _canSave ? _saveContact : null,
               ),
             ),
@@ -469,13 +470,18 @@ class _EditContactPageState extends State<EditContactPage> {
   }
 
   Future<void> _saveContact() async {
+    if (!_canSave) {
+      return;
+    }
     setState(() {
       _isSaving = true;
     });
     try {
+      final contactName = _nameController.text.trim();
+      final contactNameChanged = contactName != _initialName;
       var saved = await PhotosContactsService.instance.createOrUpdateContact(
         contactUserId: widget.contactUserId,
-        name: _nameController.text.trim(),
+        name: contactName,
         birthDate: _birthDateToPreserve,
       );
       if (_photoDirty) {
@@ -491,7 +497,10 @@ class _EditContactPageState extends State<EditContactPage> {
           );
         }
       }
-      await _savePersonLinkChanges();
+      await _savePersonLinkChanges(
+        contactName: contactName,
+        contactNameChanged: contactNameChanged,
+      );
       if (!mounted) {
         return;
       }
@@ -508,7 +517,10 @@ class _EditContactPageState extends State<EditContactPage> {
     }
   }
 
-  Future<void> _savePersonLinkChanges() async {
+  Future<void> _savePersonLinkChanges({
+    required String contactName,
+    required bool contactNameChanged,
+  }) async {
     final previousPerson = _initialLinkedPerson;
     final selectedPerson = _unlinkDraft ? null : _draftLinkedPerson;
     final updatedPersons = <PersonEntity>[];
@@ -530,12 +542,26 @@ class _EditContactPageState extends State<EditContactPage> {
           previousPerson?.remoteID != selectedPerson.remoteID ||
           selectedPerson.data.userID != widget.contactUserId ||
           !contactLinkEmailMatches(selectedPerson.data.email, widget.email);
+      final shouldUpdateSelectedName =
+          contactNameChanged &&
+          contactName.isNotEmpty &&
+          selectedPerson.data.name.trim() != contactName;
       if (shouldUpdateSelectedLink) {
         updatedPersons.add(
-          await PersonService.instance.updateContactLink(
+          await PersonService.instance.updateAttributes(
             selectedPerson.remoteID,
+            name: shouldUpdateSelectedName ? contactName : null,
             userID: widget.contactUserId,
             email: widget.email,
+            syncLinkedContactName: false,
+          ),
+        );
+      } else if (shouldUpdateSelectedName) {
+        updatedPersons.add(
+          await PersonService.instance.updateAttributes(
+            selectedPerson.remoteID,
+            name: contactName,
+            syncLinkedContactName: false,
           ),
         );
       }
@@ -727,48 +753,6 @@ class _ReadOnlyContactTextInput extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ContactSaveButton extends StatelessWidget {
-  const _ContactSaveButton({
-    required this.label,
-    required this.isDisabled,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool isDisabled;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.componentColors;
-    final enabled = !isDisabled && onTap != null;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: enabled ? onTap : null,
-      child: AnimatedContainer(
-        duration: Motion.standard,
-        curve: Curves.easeInOutCubic,
-        width: double.infinity,
-        height: 48,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: Spacing.xxl),
-        decoration: BoxDecoration(
-          color: enabled ? colors.primary : colors.fillDark,
-          borderRadius: BorderRadius.circular(Radii.button),
-        ),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyles.body.copyWith(
-            color: enabled ? colors.specialWhite : colors.textLightest,
-          ),
-        ),
-      ),
     );
   }
 }

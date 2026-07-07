@@ -306,8 +306,8 @@ class _ContactResultPageState extends State<ContactResultPage> {
     if (contactUserId == null) {
       return;
     }
-    final saved = await PhotosContactsService.instance.getContactByUserId(
-      contactUserId,
+    final saved = await PhotosContactsService.instance.getContact(
+      contactUserId: contactUserId,
     );
     if (!mounted) {
       return;

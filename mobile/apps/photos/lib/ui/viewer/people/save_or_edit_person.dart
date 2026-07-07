@@ -58,12 +58,21 @@ class SaveOrEditPerson extends StatefulWidget {
   State<SaveOrEditPerson> createState() => _SaveOrEditPersonState();
 }
 
+String? _trimEmptyToNull(String? value) {
+  final trimmedValue = value?.trim();
+  if (trimmedValue == null || trimmedValue.isEmpty) {
+    return null;
+  }
+  return trimmedValue;
+}
+
 class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   static const int _maxSuggestedPersons = 3;
   bool isKeypadOpen = false;
   String _inputName = "";
   String? _selectedDate;
   String? _email;
+  bool _contactLinkEmailCleared = false;
   bool _isPinned = false;
   bool _hideFromMemories = false;
   bool userAlreadyAssigned = false;
@@ -72,6 +81,14 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   PersonEntity? person;
   final _nameFocsNode = FocusNode();
   List<PersonEntity> _allPersons = [];
+
+  String? get _emailToSave => _trimEmptyToNull(_email);
+
+  bool get _shouldClearContactUserID =>
+      widget.isEditing &&
+      _contactLinkEmailCleared &&
+      person?.data.userID != null &&
+      _emailToSave == null;
 
   @override
   void initState() {
@@ -640,30 +657,41 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   bool get changed => widget.isEditing
       ? (_inputName.trim() != person!.data.name ||
             _selectedDate != person!.data.birthDate ||
-            _email != person!.data.email ||
+            _emailToSave != _trimEmptyToNull(person!.data.email) ||
+            _shouldClearContactUserID ||
             _isPinned != person!.data.isPinned ||
             _hideFromMemories != person!.data.hideFromMemories)
       : _inputName.trim().isNotEmpty;
 
   Future<PersonEntity?> updatePerson(BuildContext context) async {
     try {
-      if (_email != null &&
-          _email!.isNotEmpty &&
-          _email != person!.data.email &&
-          await checkIfEmailAlreadyAssignedToAPerson(_email!)) {
-        await showAlreadyLinkedEmailDialog(context, _email!);
+      final emailToSave = _emailToSave;
+      if (emailToSave != null &&
+          emailToSave != _trimEmptyToNull(person!.data.email) &&
+          await checkIfEmailAlreadyAssignedToAPerson(emailToSave)) {
+        await showAlreadyLinkedEmailDialog(context, emailToSave);
         return null;
       }
       final String name = _inputName.trim();
       final String? birthDate = _selectedDate;
-      final personEntity = await PersonService.instance.updateAttributes(
-        person!.remoteID,
-        name: name,
-        birthDate: birthDate,
-        isPinned: _isPinned,
-        hideFromMemories: _hideFromMemories,
-        email: _email,
-      );
+      final personEntity = _shouldClearContactUserID
+          ? await PersonService.instance.updateAttributes(
+              person!.remoteID,
+              name: name,
+              birthDate: birthDate,
+              isPinned: _isPinned,
+              hideFromMemories: _hideFromMemories,
+              email: emailToSave,
+              userID: null,
+            )
+          : await PersonService.instance.updateAttributes(
+              person!.remoteID,
+              name: name,
+              birthDate: birthDate,
+              isPinned: _isPinned,
+              hideFromMemories: _hideFromMemories,
+              email: emailToSave,
+            );
 
       Bus.instance.fire(
         PeopleChangedEvent(
@@ -1208,8 +1236,13 @@ class _EmailSectionState extends State<_EmailSection> {
   void _updateEmailField(String? newEmail) {
     final saveOrEditPersonState = context
         .findAncestorStateOfType<_SaveOrEditPersonState>()!;
+    final clearedExistingEmail =
+        saveOrEditPersonState.widget.isEditing &&
+        _trimEmptyToNull(saveOrEditPersonState.person?.data.email) != null &&
+        _trimEmptyToNull(newEmail) == null;
     saveOrEditPersonState.setState(() {
       saveOrEditPersonState._email = newEmail;
+      saveOrEditPersonState._contactLinkEmailCleared = clearedExistingEmail;
     });
   }
 

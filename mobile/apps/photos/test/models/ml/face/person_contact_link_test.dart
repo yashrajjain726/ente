@@ -1,16 +1,38 @@
 import "dart:convert";
 
+import "package:dio/dio.dart";
+import "package:ente_contacts/contacts.dart" as contacts;
 import "package:flutter_test/flutter_test.dart";
+import "package:package_info_plus/package_info_plus.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/gateways/entity/models/type.dart";
 import "package:photos/models/local_entity_data.dart";
 import "package:photos/models/ml/face/person.dart";
+import "package:photos/service_locator.dart";
 import "package:photos/services/entity_service.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
+import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/utils/person_contact_linking_util.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
 void main() {
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    ServiceLocator.instance.init(
+      prefs,
+      Dio(),
+      Dio(),
+      Dio(),
+      PackageInfo(
+        appName: "Photos",
+        packageName: "photos",
+        version: "1.0.0",
+        buildNumber: "1",
+      ),
+    );
+  });
+
   group("PersonData contact link", () {
     test("copyWith preserves link fields when omitted", () {
       final data = PersonData(
@@ -42,6 +64,7 @@ void main() {
 
   group("PersonService contact link", () {
     late _FakeEntityService entityService;
+    late _FakePhotosContactsService contactsService;
     late PersonService personService;
 
     setUp(() async {
@@ -53,10 +76,28 @@ void main() {
             PersonData(name: "Alex", email: "old@example.com", userID: 3),
           ),
         );
+      contactsService = _FakePhotosContactsService()
+        ..seed(
+          const contacts.ContactRecord(
+            id: "contact-1",
+            contactUserId: 3,
+            email: "old@example.com",
+            data: contacts.ContactData(
+              contactUserId: 3,
+              name: "Old Contact",
+              birthDate: "2001-04-02",
+            ),
+            profilePictureAttachmentId: null,
+            isDeleted: false,
+            createdAt: 1,
+            updatedAt: 2,
+          ),
+        );
       personService = _TestPersonService(
         entityService,
         _FakeMLDataDB(),
         await SharedPreferences.getInstance(),
+        contactsService: contactsService,
       );
     });
 
@@ -88,19 +129,62 @@ void main() {
       expect(storedJson["email"], isNull);
     });
 
-    test(
-      "updateAttributes preserves contact link fields when omitted",
-      () async {
-        final updated = await personService.updateAttributes(
-          "person-1",
-          name: "Alex R",
-        );
+    test("updateAttributes syncs changed name to linked contact", () async {
+      final updated = await personService.updateAttributes(
+        "person-1",
+        name: "Alex R",
+      );
 
-        expect(updated.data.name, "Alex R");
-        expect(updated.data.userID, 3);
-        expect(updated.data.email, "old@example.com");
-      },
-    );
+      expect(updated.data.name, "Alex R");
+      expect(updated.data.userID, 3);
+      expect(updated.data.email, "old@example.com");
+      expect(contactsService.createOrUpdateCalls, 1);
+      expect(contactsService.lastUpdatedContactUserId, 3);
+      expect(contactsService.lastUpdatedName, "Alex R");
+      expect(contactsService.lastUpdatedBirthDate, "2001-04-02");
+    });
+
+    test("updateAttributes does not sync unchanged person name", () async {
+      final updated = await personService.updateAttributes(
+        "person-1",
+        name: "Alex",
+      );
+
+      expect(updated.data.name, "Alex");
+      expect(contactsService.createOrUpdateCalls, 0);
+      expect(contactsService.lastUpdatedName, isNull);
+    });
+
+    test("updateAttributes can skip linked contact name sync", () async {
+      final updated = await personService.updateAttributes(
+        "person-1",
+        name: "Alex R",
+        syncLinkedContactName: false,
+      );
+
+      expect(updated.data.name, "Alex R");
+      expect(contactsService.createOrUpdateCalls, 0);
+      expect(contactsService.lastUpdatedName, isNull);
+    });
+
+    test("updateAttributes clears userID when explicitly provided", () async {
+      final updated = await personService.updateAttributes(
+        "person-1",
+        email: null,
+        userID: null,
+      );
+
+      expect(updated.data.userID, isNull);
+      expect(updated.data.email, isNull);
+
+      final stored = await entityService.getEntity(
+        EntityType.cgroup,
+        "person-1",
+      );
+      final storedJson = jsonDecode(stored!.data) as Map<String, dynamic>;
+      expect(storedJson["userID"], isNull);
+      expect(storedJson["email"], isNull);
+    });
   });
 
   group("contact link conflict rules", () {
@@ -167,13 +251,79 @@ void main() {
 }
 
 class _TestPersonService extends PersonService {
-  _TestPersonService(super.entityService, super.faceMLDataDB, super.prefs);
+  _TestPersonService(
+    super.entityService,
+    super.faceMLDataDB,
+    super.prefs, {
+    super.contactsService,
+  });
 
   @override
   Future<void> refreshPersonCache({
     bool notifyListeners = false,
     String source = "",
   }) async {}
+}
+
+class _FakePhotosContactsService implements PhotosContactsService {
+  contacts.ContactRecord? contact;
+  int createOrUpdateCalls = 0;
+  int? lastUpdatedContactUserId;
+  String? lastUpdatedName;
+  String? lastUpdatedBirthDate;
+
+  void seed(contacts.ContactRecord value) {
+    contact = value;
+  }
+
+  @override
+  Future<contacts.ContactRecord?> getContact({
+    int? contactUserId,
+    String? email,
+  }) async {
+    final saved = contact;
+    if (saved == null || saved.isDeleted) {
+      return null;
+    }
+    if (contactUserId != null) {
+      return saved.contactUserId == contactUserId ? saved : null;
+    }
+    final normalizedEmail = email?.trim().toLowerCase();
+    if (normalizedEmail == null || normalizedEmail.isEmpty) {
+      return null;
+    }
+    return saved.email?.trim().toLowerCase() == normalizedEmail ? saved : null;
+  }
+
+  @override
+  Future<contacts.ContactRecord> createOrUpdateContact({
+    required int contactUserId,
+    required String name,
+    String? birthDate,
+  }) async {
+    createOrUpdateCalls += 1;
+    lastUpdatedContactUserId = contactUserId;
+    lastUpdatedName = name.trim();
+    lastUpdatedBirthDate = birthDate;
+    final saved = contact;
+    return contacts.ContactRecord(
+      id: saved?.id ?? "contact-$contactUserId",
+      contactUserId: contactUserId,
+      email: saved?.email,
+      data: contacts.ContactData(
+        contactUserId: contactUserId,
+        name: name.trim(),
+        birthDate: birthDate,
+      ),
+      profilePictureAttachmentId: saved?.profilePictureAttachmentId,
+      isDeleted: false,
+      createdAt: saved?.createdAt ?? 1,
+      updatedAt: (saved?.updatedAt ?? 1) + 1,
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _FakeEntityService implements EntityService {

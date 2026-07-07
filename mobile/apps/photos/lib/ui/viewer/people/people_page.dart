@@ -356,6 +356,11 @@ class _GalleryState extends State<_Gallery> {
 
   @override
   Widget build(BuildContext context) {
+    final showLinkEmailBanner =
+        !flagService.enableContact &&
+        !widget.personEntity.data.isIgnored &&
+        (widget.personEntity.data.email == null ||
+            widget.personEntity.data.email!.isEmpty);
     if (widget.showTimelineBanner && !_loggedTimelineImpression) {
       _timelineLogger.info(
         "banner_impression person=${widget.personEntity.remoteID}",
@@ -382,24 +387,21 @@ class _GalleryState extends State<_Gallery> {
           : [],
       header: Column(
         children: [
-          (widget.personEntity.data.email != null &&
-                      widget.personEntity.data.email!.isNotEmpty) ||
-                  widget.personEntity.data.isIgnored
-              ? const SizedBox.shrink()
-              : Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 8),
-                  child: EndToEndBanner(
-                    title: context.l10n.linkEmail,
-                    caption: context.l10n.linkEmailToContactBannerCaption,
-                    leadingIcon: Icons.email_outlined,
-                    onTap: () async {
-                      await routeToPage(
-                        context,
-                        LinkEmailScreen(widget.personEntity.remoteID),
-                      );
-                    },
-                  ),
-                ),
+          if (showLinkEmailBanner)
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              child: EndToEndBanner(
+                title: context.l10n.linkEmail,
+                caption: context.l10n.linkEmailToContactBannerCaption,
+                leadingIcon: Icons.email_outlined,
+                onTap: () async {
+                  await routeToPage(
+                    context,
+                    LinkEmailScreen(widget.personEntity.remoteID),
+                  );
+                },
+              ),
+            ),
           MemoryLaneBannerSection(
             showBanner: widget.memoryLaneEnabled && widget.showTimelineBanner,
             person: widget.personEntity,
