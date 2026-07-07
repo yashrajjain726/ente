@@ -638,7 +638,7 @@ class PersonService {
     bool? hideFromMemories,
     int? version,
     Object? birthDate = _attributeNotProvided,
-    String? email,
+    Object? email = _attributeNotProvided,
   }) async {
     final person = (await getPerson(id))!;
     var updatedData = person.data.copyWith(
@@ -648,10 +648,12 @@ class PersonService {
       isPinned: isPinned,
       hideFromMemories: hideFromMemories,
       version: version,
-      email: email,
     );
     if (!identical(birthDate, _attributeNotProvided)) {
       updatedData = updatedData.copyWith(birthDate: birthDate as String?);
+    }
+    if (!identical(email, _attributeNotProvided)) {
+      updatedData = updatedData.copyWith(email: email as String?);
     }
     final updatedPerson = person.copyWith(data: updatedData);
     await updatePerson(updatedPerson);
@@ -663,6 +665,20 @@ class PersonService {
         unawaited(memoriesCacheService.purgePersonFromMemoriesCache(id));
       }
     }
+    return updatedPerson;
+  }
+
+  Future<PersonEntity> updateContactLink(
+    String id, {
+    required int? userID,
+    required String? email,
+  }) async {
+    final person = (await getPerson(id))!;
+    final updatedPerson = person.copyWith(
+      data: person.data.copyWith(userID: userID, email: email),
+    );
+    await updatePerson(updatedPerson);
+    await refreshPersonCache();
     return updatedPerson;
   }
 

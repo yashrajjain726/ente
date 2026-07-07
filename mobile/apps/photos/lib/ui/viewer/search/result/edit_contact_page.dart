@@ -6,8 +6,12 @@ import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
+import "package:photos/core/event_bus.dart";
+import "package:photos/events/people_changed_event.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
+import "package:photos/models/ml/face/person.dart";
+import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/loading_widget.dart";
@@ -16,10 +20,12 @@ import "package:photos/ui/components/buttons/button_widget.dart";
 import "package:photos/ui/components/models/button_type.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
+import "package:photos/ui/viewer/search/result/contact_person_picker_page.dart";
 import "package:photos/ui/viewer/search/result/contact_photo_adjust_page.dart";
 import "package:photos/ui/viewer/search/result/contact_photo_picker_sheet.dart";
 import "package:photos/utils/contact_photo_util.dart";
 import "package:photos/utils/dialog_util.dart";
+import "package:photos/utils/person_contact_linking_util.dart";
 import "package:photos/utils/thumbnail_util.dart";
 
 class EditContactPage extends StatefulWidget {
@@ -51,6 +57,10 @@ class _EditContactPageState extends State<EditContactPage> {
   bool _photoDirty = false;
   Uint8List? _draftPhotoBytes;
   int _photoLoadGeneration = 0;
+  PersonEntity? _initialLinkedPerson;
+  PersonEntity? _draftLinkedPerson;
+  bool _linkDirty = false;
+  bool _unlinkDraft = false;
 
   @override
   void initState() {
@@ -70,6 +80,7 @@ class _EditContactPageState extends State<EditContactPage> {
       });
     _birthDateToPreserve = widget.existingContact?.data?.birthDate;
     _loadExistingPhoto();
+    _loadLinkedPersonDraft();
   }
 
   @override
@@ -82,7 +93,7 @@ class _EditContactPageState extends State<EditContactPage> {
   bool get _canSave => !_isSaving && _nameController.text.trim().isNotEmpty;
   String get _initialName => (widget.existingContact?.data?.name ?? "").trim();
   bool get _hasUnsavedChanges =>
-      _nameController.text.trim() != _initialName || _photoDirty;
+      _nameController.text.trim() != _initialName || _photoDirty || _linkDirty;
   bool get _hasContactPhoto =>
       _draftPhotoBytes != null ||
       (!_photoDirty &&
@@ -139,7 +150,7 @@ class _EditContactPageState extends State<EditContactPage> {
                       width: _avatarSize,
                       height: _avatarSize,
                       child: GestureDetector(
-                        onTap: _pickContactPhoto,
+                        onTap: _openAvatarEditor,
                         child: Stack(
                           clipBehavior: Clip.none,
                           children: [
@@ -149,7 +160,7 @@ class _EditContactPageState extends State<EditContactPage> {
                               bottom: 0,
                               child: _AvatarEditButton(
                                 size: _editBadgeSize,
-                                onTap: _pickContactPhoto,
+                                onTap: _openAvatarEditor,
                               ),
                             ),
                           ],
@@ -260,6 +271,143 @@ class _EditContactPageState extends State<EditContactPage> {
     });
   }
 
+  Future<void> _loadLinkedPersonDraft() async {
+    try {
+      final linkedPerson = await findPersonLinkedToContact(
+        contactUserId: widget.contactUserId,
+        email: widget.email,
+      );
+      if (!mounted || linkedPerson == null) {
+        return;
+      }
+
+      final needsContactLinkUpdate =
+          linkedPerson.data.userID != widget.contactUserId ||
+          !contactLinkEmailMatches(linkedPerson.data.email, widget.email);
+      final shouldPrefillFromPerson = widget.existingContact == null;
+      if (shouldPrefillFromPerson && _nameController.text.trim().isEmpty) {
+        _nameController.text = linkedPerson.data.name;
+      }
+      setState(() {
+        _initialLinkedPerson = linkedPerson;
+        _draftLinkedPerson = linkedPerson;
+        _unlinkDraft = false;
+        _linkDirty = needsContactLinkUpdate;
+      });
+
+      if (shouldPrefillFromPerson && !_photoDirty && _draftPhotoBytes == null) {
+        await _loadPersonPhotoDraft(linkedPerson, showError: false);
+      }
+    } catch (e, s) {
+      _logger.warning("Failed to load linked person for contact", e, s);
+    }
+  }
+
+  Future<void> _openAvatarEditor() async {
+    if (_isSaving) {
+      return;
+    }
+    List<PersonEntity> persons;
+    try {
+      persons = await PersonService.instance.getPersons();
+    } catch (e, s) {
+      _logger.warning(
+        "Failed to load people before editing contact photo",
+        e,
+        s,
+      );
+      await _pickContactPhoto();
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    if (persons.where((person) => !person.data.isIgnored).isEmpty) {
+      await _pickContactPhoto();
+      return;
+    }
+
+    final result = await routeToPage(
+      context,
+      ContactPersonPickerPage(
+        contactUserId: widget.contactUserId,
+        contactEmail: widget.email,
+        linkedPerson: _unlinkDraft ? null : _draftLinkedPerson,
+      ),
+    );
+    if (!mounted || result == null) {
+      return;
+    }
+    if (result is ContactPersonPickerPickPhoto) {
+      await _pickContactPhoto();
+      return;
+    }
+    if (result is ContactPersonPickerUnlink) {
+      setState(() {
+        _draftLinkedPerson = null;
+        _unlinkDraft = true;
+        _linkDirty = _initialLinkedPerson != null;
+      });
+      return;
+    }
+    if (result is ContactPersonPickerSelected) {
+      await _draftSelectedPerson(result.person);
+    }
+  }
+
+  Future<void> _draftSelectedPerson(PersonEntity person) async {
+    final success = await _loadPersonPhotoDraft(person, showError: true);
+    if (!success || !mounted) {
+      return;
+    }
+    _nameController.text = person.data.name;
+    setState(() {
+      _draftLinkedPerson = person;
+      _unlinkDraft = false;
+      _linkDirty =
+          _initialLinkedPerson?.remoteID != person.remoteID ||
+          person.data.userID != widget.contactUserId ||
+          !contactLinkEmailMatches(person.data.email, widget.email);
+    });
+  }
+
+  Future<bool> _loadPersonPhotoDraft(
+    PersonEntity person, {
+    required bool showError,
+  }) async {
+    final loadGeneration = ++_photoLoadGeneration;
+    setState(() {
+      _isLoadingPhoto = true;
+    });
+    Uint8List? photoBytes;
+    try {
+      photoBytes = await buildContactPhotoAttachmentBytesFromPerson(person);
+    } catch (e, s) {
+      _logger.warning("Failed to build contact photo from person", e, s);
+    }
+    if (!mounted || loadGeneration != _photoLoadGeneration) {
+      return false;
+    }
+    if (photoBytes == null) {
+      setState(() {
+        _isLoadingPhoto = false;
+      });
+      if (showError) {
+        showShortToast(
+          context,
+          AppLocalizations.of(context).couldNotLoadSelectedPhoto,
+        );
+      }
+      return false;
+    }
+    setState(() {
+      _draftPhotoBytes = photoBytes;
+      _isLoadingPhoto = false;
+      _photoDirty = true;
+    });
+    return true;
+  }
+
   Future<void> _pickContactPhoto() async {
     final result = await showContactPhotoPickerSheet(
       context,
@@ -340,6 +488,7 @@ class _EditContactPageState extends State<EditContactPage> {
           );
         }
       }
+      await _savePersonLinkChanges();
       if (!mounted) {
         return;
       }
@@ -353,6 +502,49 @@ class _EditContactPageState extends State<EditContactPage> {
       setState(() {
         _isSaving = false;
       });
+    }
+  }
+
+  Future<void> _savePersonLinkChanges() async {
+    final previousPerson = _initialLinkedPerson;
+    final selectedPerson = _unlinkDraft ? null : _draftLinkedPerson;
+    final updatedPersons = <PersonEntity>[];
+
+    if (previousPerson != null &&
+        (selectedPerson == null ||
+            selectedPerson.remoteID != previousPerson.remoteID)) {
+      updatedPersons.add(
+        await PersonService.instance.updateContactLink(
+          previousPerson.remoteID,
+          userID: null,
+          email: null,
+        ),
+      );
+    }
+
+    if (selectedPerson != null) {
+      final shouldUpdateSelectedLink =
+          previousPerson?.remoteID != selectedPerson.remoteID ||
+          selectedPerson.data.userID != widget.contactUserId ||
+          !contactLinkEmailMatches(selectedPerson.data.email, widget.email);
+      if (shouldUpdateSelectedLink) {
+        updatedPersons.add(
+          await PersonService.instance.updateContactLink(
+            selectedPerson.remoteID,
+            userID: widget.contactUserId,
+            email: widget.email,
+          ),
+        );
+      }
+    }
+
+    if (updatedPersons.isNotEmpty) {
+      Bus.instance.fire(
+        PeopleChangedEvent(
+          person: updatedPersons.last,
+          source: "edit_contact_link",
+        ),
+      );
     }
   }
 

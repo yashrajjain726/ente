@@ -7,10 +7,66 @@ import "package:photos/services/machine_learning/face_ml/person/person_service.d
 import "package:photos/ui/viewer/people/people_page.dart";
 import "package:photos/utils/dialog_util.dart";
 
+String? normalizeContactLinkEmail(String? email) {
+  final normalized = email?.trim().toLowerCase();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+  return normalized;
+}
+
+bool contactLinkEmailMatches(String? first, String? second) {
+  final normalizedFirst = normalizeContactLinkEmail(first);
+  final normalizedSecond = normalizeContactLinkEmail(second);
+  return normalizedFirst != null && normalizedFirst == normalizedSecond;
+}
+
+Future<PersonEntity?> findPersonLinkedToContact({
+  required int contactUserId,
+  required String? email,
+}) async {
+  final persons = await PersonService.instance.getPersons();
+  final PersonEntity? userIdMatch = persons.firstWhereOrNull(
+    (person) => person.data.userID == contactUserId,
+  );
+  if (userIdMatch != null) {
+    return userIdMatch;
+  }
+
+  final normalizedEmail = normalizeContactLinkEmail(email);
+  if (normalizedEmail == null) {
+    return null;
+  }
+  return persons.firstWhereOrNull(
+    (person) => contactLinkEmailMatches(person.data.email, normalizedEmail),
+  );
+}
+
+bool isLinkedToDifferentContact(
+  PersonEntity person, {
+  required int contactUserId,
+  required String? email,
+}) {
+  final linkedUserId = person.data.userID;
+  if (linkedUserId != null && linkedUserId != contactUserId) {
+    return true;
+  }
+  if (linkedUserId == contactUserId) {
+    return false;
+  }
+
+  final linkedEmail = normalizeContactLinkEmail(person.data.email);
+  if (linkedEmail == null) {
+    return false;
+  }
+  return !contactLinkEmailMatches(linkedEmail, email);
+}
+
 Future<bool> checkIfEmailAlreadyAssignedToAPerson(String email) async {
   final persons = await PersonService.instance.getPersons();
+  final normalizedEmail = normalizeContactLinkEmail(email);
   for (var person in persons) {
-    if (person.data.email == email) {
+    if (contactLinkEmailMatches(person.data.email, normalizedEmail)) {
       return true;
     }
   }
@@ -23,7 +79,7 @@ Future<void> showAlreadyLinkedEmailDialog(
 ) async {
   final persons = await PersonService.instance.getPersons();
   final PersonEntity? person = persons.firstWhereOrNull(
-    (person) => person.data.email == email,
+    (person) => contactLinkEmailMatches(person.data.email, email),
   );
   if (person == null) {
     return;
