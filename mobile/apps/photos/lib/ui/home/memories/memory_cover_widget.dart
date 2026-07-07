@@ -1,34 +1,31 @@
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
-import "package:photos/models/memories/memory.dart";
+import "package:photos/core/constants.dart";
+import "package:photos/models/memories/smart_memory.dart";
 import "package:photos/theme/colors.dart";
-import "package:photos/theme/effects.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/home/memories/all_memories_page.dart";
 import "package:photos/ui/home/memories/memory_cover_util.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 
-// TODO: Use a single instance variable for `allMemories` and `allTitles`
 class MemoryCoverWidget extends StatefulWidget {
-  final List<Memory> memories;
-  final List<List<Memory>> allMemories;
+  final SmartMemory smartMemory;
+  final List<SmartMemory> allMemories;
   final double height;
   final double width;
+  static const defaultWidth = 145.011;
+  static const defaultHeight = 210.5;
   static const outerStrokeWidth = 1.0;
-  static const aspectRatio = 236.924 / 163.214;
+  static const aspectRatio = defaultHeight / defaultWidth;
   static const gap = 5.0;
-  final String title;
-  final List<String> allTitle;
   final int currentMemoryIndex;
 
   const MemoryCoverWidget({
-    required this.memories,
+    required this.smartMemory,
     required this.allMemories,
     required this.height,
     required this.width,
-    required this.title,
-    required this.allTitle,
     required this.currentMemoryIndex,
     super.key,
   });
@@ -42,16 +39,21 @@ class _MemoryCoverWidgetState extends State<MemoryCoverWidget> {
   Widget build(BuildContext context) {
     //memories will be empty if all memories are deleted and setState is called
     //after FullScreenMemory screen is popped
-    if (widget.memories.isEmpty) {
+    final memories = widget.smartMemory.memories;
+    if (memories.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final index = getNextMemoryIndex(widget.memories);
-    final title = widget.title;
+    final index = getNextMemoryIndex(memories);
+    final title = widget.smartMemory.title;
 
-    final memory = widget.memories[index];
+    final memory = memories[index];
     final isSeen = memory.isSeen();
-    final brightness = Theme.of(context).brightness;
+    final titleFontWeight =
+        widget.smartMemory.type == MemoryType.time ||
+            widget.smartMemory.type == MemoryType.filler
+        ? FontWeight.w300
+        : FontWeight.w700;
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -65,7 +67,6 @@ class _MemoryCoverWidgetState extends State<MemoryCoverWidget> {
             AllMemoriesPage(
               initialPageIndex: widget.currentMemoryIndex,
               allMemories: widget.allMemories,
-              allTitles: widget.allTitle,
             ),
           );
           if (!mounted) return;
@@ -74,20 +75,9 @@ class _MemoryCoverWidgetState extends State<MemoryCoverWidget> {
         child: Container(
           height: widget.height,
           width: widget.width,
-          decoration: BoxDecoration(
-            boxShadow: brightness == Brightness.dark
-                ? [
-                    const BoxShadow(
-                      color: strokeFainterDark,
-                      spreadRadius: MemoryCoverWidget.outerStrokeWidth,
-                      blurRadius: 0,
-                    ),
-                  ]
-                : [...shadowFloatFaintestLight],
-            borderRadius: BorderRadius.circular(22),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18)),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(18),
             child: Container(
               foregroundDecoration: isSeen
                   ? const BoxDecoration(
@@ -104,6 +94,7 @@ class _MemoryCoverWidgetState extends State<MemoryCoverWidget> {
                     child: ThumbnailWidget(
                       memory.file,
                       shouldShowSyncStatus: false,
+                      thumbnailSize: thumbnailLargeSize,
                       key: Key("memories" + memory.file.tag),
                     ),
                   ),
@@ -131,11 +122,11 @@ class _MemoryCoverWidgetState extends State<MemoryCoverWidget> {
                           child: Text(
                             title,
                             style: getEnteTextTheme(context).body.copyWith(
-                              fontSize: widget.height * 0.095,
+                              fontSize: widget.height * 0.085,
                               fontFamily: TextStyles.outfitFontFamily,
                               package: TextStyles.fontPackage,
                               color: isSeen ? textFaintDark : Colors.white,
-                              fontWeight: .w400,
+                              fontWeight: titleFontWeight,
                             ),
                             textAlign: TextAlign.left,
                           ),

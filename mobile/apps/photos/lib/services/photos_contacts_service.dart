@@ -140,8 +140,26 @@ class PhotosContactsService {
     return _getCachedContact(contactUserId: contactUserId);
   }
 
+  contacts.ContactRecord? getCachedContactByEmail(String? email) {
+    return _getCachedContact(email: email);
+  }
+
+  contacts.ContactRecord? getCachedContact({
+    int? contactUserId,
+    String? email,
+  }) {
+    return _getCachedContact(contactUserId: contactUserId, email: email);
+  }
+
   String? getCachedSavedNameByUserId(int? contactUserId) {
-    final savedName = getCachedContactByUserId(contactUserId)?.data?.name;
+    return getCachedSavedName(contactUserId: contactUserId);
+  }
+
+  String? getCachedSavedName({int? contactUserId, String? email}) {
+    final savedName = getCachedContact(
+      contactUserId: contactUserId,
+      email: email,
+    )?.data?.name;
     if (savedName == null) {
       return null;
     }
@@ -150,7 +168,14 @@ class PhotosContactsService {
   }
 
   String? getCachedResolvedEmailByUserId(int? contactUserId) {
-    final resolved = getCachedContactByUserId(contactUserId)?.email;
+    return getCachedResolvedEmail(contactUserId: contactUserId);
+  }
+
+  String? getCachedResolvedEmail({int? contactUserId, String? email}) {
+    final resolved = getCachedContact(
+      contactUserId: contactUserId,
+      email: email,
+    )?.email;
     if (resolved == null) {
       return null;
     }
@@ -277,6 +302,18 @@ class PhotosContactsService {
     final contact = await contactsService.setProfilePicture(contactId, bytes);
     _cacheContact(contact);
     _profilePictureBytesByUserId[contact.contactUserId] = bytes;
+    _resolvedProfilePictureUserIds.add(contact.contactUserId);
+    _notifyChanged(contact);
+    return contact;
+  }
+
+  Future<contacts.ContactRecord> deleteProfilePicture({
+    required String contactId,
+  }) async {
+    final contactsService = await _ensureReadyForWrite();
+    final contact = await contactsService.deleteProfilePicture(contactId);
+    _cacheContact(contact);
+    _profilePictureBytesByUserId.remove(contact.contactUserId);
     _resolvedProfilePictureUserIds.add(contact.contactUserId);
     _notifyChanged(contact);
     return contact;

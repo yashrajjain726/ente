@@ -84,3 +84,11 @@ It also opens a PR for updating the changelog in the docs.
 > Individual failed jobs can be re-run idempotently (e.g. if only the Android job failed, it can be re-run in place). Retrying the build as a whole is also fine, except when it has already reached Play Store or TestFlight, in which case it needs a fresh build number: for nightlies trigger a new workflow run, for RCs push a `bump-build-and-commit`.
 
 `app-release.yml` changes release state. If it fails, inspect the failed step before re-running. After it has pushed a branch, created a tag, or moved a draft release, either finish the remaining step manually or undo the partial state first. Cleanup is intentionally late: `action=start` pushes the release branch before deleting the beta pre-release from `ente/nightly`, and `action=promote` deletes the release branch last.
+
+## Hotfix release
+
+To ship a fix on top of the last release when main has moved on, create the release branch by hand from the released tag instead of using `action=start`. Use the code for the `start` in `app-release.yml` as a checklist. The one deviation: in the PR moving main to the next version, delete only the changes entries that the hotfix shipped, since the others are still unreleased.
+
+> In the PR moving main to the next version, delete only the changes entries that the hotfix shipped.
+
+Once the release branch exists, `action=promote` works as usual.

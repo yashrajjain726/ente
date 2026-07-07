@@ -82,6 +82,10 @@ class _EditContactPageState extends State<EditContactPage> {
   String get _initialName => (widget.existingContact?.data?.name ?? "").trim();
   bool get _hasUnsavedChanges =>
       _nameController.text.trim() != _initialName || _photoDirty;
+  bool get _hasContactPhoto =>
+      _draftPhotoBytes != null ||
+      (!_photoDirty &&
+          widget.existingContact?.profilePictureAttachmentId != null);
 
   @override
   Widget build(BuildContext context) {
@@ -256,10 +260,23 @@ class _EditContactPageState extends State<EditContactPage> {
   }
 
   Future<void> _pickContactPhoto() async {
-    final selectedFile = await showContactPhotoPickerSheet(context);
-    if (selectedFile == null) {
+    final result = await showContactPhotoPickerSheet(
+      context,
+      canRemovePhoto: _hasContactPhoto,
+    );
+    if (result == null) {
       return;
     }
+    if (result is ContactPhotoPickerRemove) {
+      _photoLoadGeneration++;
+      setState(() {
+        _draftPhotoBytes = null;
+        _isLoadingPhoto = false;
+        _photoDirty = true;
+      });
+      return;
+    }
+    final selectedFile = (result as ContactPhotoPickerFile).file;
     setState(() {
       _isLoadingPhoto = true;
     });
@@ -309,11 +326,18 @@ class _EditContactPageState extends State<EditContactPage> {
         name: _nameController.text.trim(),
         birthDate: _birthDateToPreserve,
       );
-      if (_photoDirty && _draftPhotoBytes != null) {
-        saved = await PhotosContactsService.instance.setProfilePicture(
-          contactId: saved.id,
-          bytes: _draftPhotoBytes!,
-        );
+      if (_photoDirty) {
+        final draftPhotoBytes = _draftPhotoBytes;
+        if (draftPhotoBytes != null) {
+          saved = await PhotosContactsService.instance.setProfilePicture(
+            contactId: saved.id,
+            bytes: draftPhotoBytes,
+          );
+        } else if (widget.existingContact?.profilePictureAttachmentId != null) {
+          saved = await PhotosContactsService.instance.deleteProfilePicture(
+            contactId: saved.id,
+          );
+        }
       }
       if (!mounted) {
         return;

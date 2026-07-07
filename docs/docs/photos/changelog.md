@@ -7,6 +7,10 @@ description: Release notes of recent updates to Ente Photos mobile and desktop a
 
 A short summary list of changes to the Ente Photos mobile and desktop apps. For a more descriptive list with screenshots and blog post links, see the [news](https://ente.com/news).
 
+## v1.7.26 (desktop) - Jul 2026
+
+- Fix machine learning features failing to load.
+
 ## v1.7.25 (desktop) - Jun 2026
 
 - Reduce desktop app package size by excluding unused ONNX Runtime native binaries.

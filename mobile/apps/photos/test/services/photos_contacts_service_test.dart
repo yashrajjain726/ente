@@ -68,7 +68,12 @@ void main() {
     expect(service.getCachedContactByUserId(7), isNotNull);
     expect((await service.getContact(email: 'ALICE@test.test'))?.id, 'ct_1');
     expect(service.getCachedSavedNameByUserId(7), 'Alice');
+    expect(service.getCachedSavedName(email: 'ALICE@test.test'), 'Alice');
     expect(service.getCachedResolvedEmailByUserId(7), 'alice@test.test');
+    expect(
+      service.getCachedResolvedEmail(email: 'ALICE@test.test'),
+      'alice@test.test',
+    );
     expect(contactsService.openCalls, 1);
     expect(contactsService.syncCalls, 1);
   });
