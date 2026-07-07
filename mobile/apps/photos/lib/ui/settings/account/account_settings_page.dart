@@ -190,14 +190,15 @@ class AccountSettingsPage extends StatelessWidget {
     if (!context.mounted || !hasAuthenticated) {
       return;
     }
-    unawaited(
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (BuildContext context) {
-            return const DeleteAccountPage();
-          },
-        ),
+    final deleted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (BuildContext context) {
+          return const DeleteAccountPage();
+        },
       ),
     );
+    if (deleted == true && context.mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 }
