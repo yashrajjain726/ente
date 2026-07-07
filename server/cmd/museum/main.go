@@ -981,6 +981,7 @@ func main() {
 	spaceRepos := spacerepo.NewModule(db, s3Config)
 	userController.SpaceAccessResetter = spaceRepos
 	spaceModule := spacecontroller.NewModule(spaceRepos, userAuthRepo, &spacecontroller.SpaceEmailSender{UserRepo: userRepo})
+	spaceDripController := spacecontroller.NewSpaceDripController(spaceRepos, userRepo, notificationHistoryRepo, lockController)
 	spaceModule.UserTokens = userController
 	spaceHandlers := spaceapi.NewHandlers(spaceModule)
 	spacePrivateAPI := server.Group("/")
@@ -1067,7 +1068,7 @@ func main() {
 	setupAndStartCrons(
 		userAuthRepo, collectionLinkRepo, fileLinkRepo, pasteRepo, twoFactorRepo, passkeysRepo, fileController, taskLockingRepo, emailNotificationCtrl,
 		trashController, pushController, objectController, dataCleanupController, storageBonusCtrl, emergencyCtrl,
-		embeddingController, healthCheckHandler, castDb, inactiveUserOrchestrator)
+		embeddingController, healthCheckHandler, castDb, inactiveUserOrchestrator, spaceDripController)
 
 	// Create new collectors, the names will be used as labels on the metrics
 	primaryDBCollector := sqlstats.NewStatsCollector("prod_db", db)
@@ -1255,7 +1256,8 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 	embeddingCtrl *embeddingCtrl.Controller,
 	healthCheckHandler *api.HealthCheckHandler,
 	castDb castRepo.Repository,
-	inactiveUserOrchestrator *user.InactiveUserOrchestrator) {
+	inactiveUserOrchestrator *user.InactiveUserOrchestrator,
+	spaceDripController *spacecontroller.SpaceDripController) {
 	if viper.GetBool("jobs.cron.skip") {
 		log.Info("Skipping cron jobs")
 		return
@@ -1369,6 +1371,10 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 
 	scheduleAndRun(c, "@every 24h", func() {
 		emailNotificationCtrl.SendStorageWarningMails()
+	})
+
+	schedule(c, "@every 24h", func() {
+		spaceDripController.ProcessSpaceDrips()
 	})
 
 	schedule(c, "@every 1m", func() {
