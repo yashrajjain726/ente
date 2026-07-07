@@ -94,6 +94,7 @@ class _EditContactPageState extends State<EditContactPage> {
   String get _initialName => (widget.existingContact?.data?.name ?? "").trim();
   bool get _hasUnsavedChanges =>
       _nameController.text.trim() != _initialName || _photoDirty || _linkDirty;
+  bool get _hasLinkedPersonDraft => !_unlinkDraft && _draftLinkedPerson != null;
   bool get _hasContactPhoto =>
       _draftPhotoBytes != null ||
       (!_photoDirty &&
@@ -158,9 +159,12 @@ class _EditContactPageState extends State<EditContactPage> {
                             Positioned(
                               right: 0,
                               bottom: 0,
-                              child: _AvatarEditButton(
+                              child: _AvatarActionButton(
                                 size: _editBadgeSize,
-                                onTap: _openAvatarEditor,
+                                isUnlink: _hasLinkedPersonDraft,
+                                onTap: _hasLinkedPersonDraft
+                                    ? _draftUnlinkPerson
+                                    : _openAvatarEditor,
                               ),
                             ),
                           ],
@@ -332,7 +336,6 @@ class _EditContactPageState extends State<EditContactPage> {
       ContactPersonPickerPage(
         contactUserId: widget.contactUserId,
         contactEmail: widget.email,
-        linkedPerson: _unlinkDraft ? null : _draftLinkedPerson,
       ),
     );
     if (!mounted || result == null) {
@@ -342,17 +345,17 @@ class _EditContactPageState extends State<EditContactPage> {
       await _pickContactPhoto();
       return;
     }
-    if (result is ContactPersonPickerUnlink) {
-      setState(() {
-        _draftLinkedPerson = null;
-        _unlinkDraft = true;
-        _linkDirty = _initialLinkedPerson != null;
-      });
-      return;
-    }
     if (result is ContactPersonPickerSelected) {
       await _draftSelectedPerson(result.person);
     }
+  }
+
+  void _draftUnlinkPerson() {
+    setState(() {
+      _draftLinkedPerson = null;
+      _unlinkDraft = true;
+      _linkDirty = _initialLinkedPerson != null;
+    });
   }
 
   Future<void> _draftSelectedPerson(PersonEntity person) async {
@@ -770,26 +773,34 @@ class _ContactSaveButton extends StatelessWidget {
   }
 }
 
-class _AvatarEditButton extends StatelessWidget {
+class _AvatarActionButton extends StatelessWidget {
   final double size;
+  final bool isUnlink;
   final VoidCallback onTap;
 
-  const _AvatarEditButton({required this.size, required this.onTap});
+  const _AvatarActionButton({
+    required this.size,
+    required this.isUnlink,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.componentColors;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: getEnteColorScheme(context).greenBase,
+          color: isUnlink ? colors.warning : colors.primary,
           shape: BoxShape.circle,
         ),
-        child: const Center(
+        child: Center(
           child: HugeIcon(
-            icon: HugeIcons.strokeRoundedEdit03,
+            icon: isUnlink
+                ? HugeIcons.strokeRoundedCancel01
+                : HugeIcons.strokeRoundedEdit03,
             color: Colors.white,
             size: 12,
             strokeWidth: 2,

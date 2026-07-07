@@ -25,21 +25,15 @@ class ContactPersonPickerPickPhoto extends ContactPersonPickerResult {
   const ContactPersonPickerPickPhoto();
 }
 
-class ContactPersonPickerUnlink extends ContactPersonPickerResult {
-  const ContactPersonPickerUnlink();
-}
-
 class ContactPersonPickerPage extends StatefulWidget {
   const ContactPersonPickerPage({
     required this.contactUserId,
     required this.contactEmail,
-    required this.linkedPerson,
     super.key,
   });
 
   final int contactUserId;
   final String contactEmail;
-  final PersonEntity? linkedPerson;
 
   @override
   State<ContactPersonPickerPage> createState() =>
@@ -116,7 +110,6 @@ class _ContactPersonPickerPageState extends State<ContactPersonPickerPage> {
   Widget _buildHeader(BuildContext context, AppLocalizations l10n) {
     final colors = context.componentColors;
     final topPadding = MediaQuery.paddingOf(context).top;
-    final linkedPerson = widget.linkedPerson;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -151,20 +144,10 @@ class _ContactPersonPickerPageState extends State<ContactPersonPickerPage> {
           IconButtonComponent(
             variant: IconButtonComponentVariant.primary,
             shouldSurfaceExecutionStates: false,
-            tooltip: linkedPerson == null
-                ? l10n.setAContactPhoto
-                : l10n.removeLink,
-            icon: HugeIcon(
-              icon: linkedPerson == null
-                  ? HugeIcons.strokeRoundedImageAdd02
-                  : HugeIcons.strokeRoundedCancel01,
-            ),
+            tooltip: l10n.setAContactPhoto,
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedImageAdd02),
             onTap: () {
-              Navigator.of(context).pop(
-                linkedPerson == null
-                    ? const ContactPersonPickerPickPhoto()
-                    : const ContactPersonPickerUnlink(),
-              );
+              Navigator.of(context).pop(const ContactPersonPickerPickPhoto());
             },
           ),
         ],
