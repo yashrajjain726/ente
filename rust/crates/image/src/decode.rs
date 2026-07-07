@@ -15,6 +15,7 @@ use ente_heic::{
 };
 use exif::{In, Reader as ExifReader, Tag};
 use image::{DynamicImage, ImageFormat, ImageReader, hooks::decoding_hook_registered};
+use jxl_oxide::integration::register_image_decoding_hook as register_jxl_decoding_hook;
 use tiff::{
     ColorType as TiffColorType,
     decoder::{Decoder as TiffDecoder, DecodingResult as TiffDecodingResult},
@@ -230,6 +231,8 @@ fn init_image_decoders() {
         let heic_hook_active = decoding_hook_registered(OsStr::new("heic"));
         let heif_hook_active = decoding_hook_registered(OsStr::new("heif"));
         let avif_hook_active = decoding_hook_registered(OsStr::new("avif"));
+        let jxl_registered_now = register_jxl_decoding_hook();
+        let jxl_hook_active = decoding_hook_registered(OsStr::new("jxl"));
         let has_heif_family_support = heic_hook_active || heif_hook_active;
 
         if !has_heif_family_support {
@@ -258,6 +261,14 @@ fn init_image_decoders() {
             heic_hook_active || heif_hook_active || avif_hook_active,
             "no ente_heic image decoder hooks are active"
         );
+
+        if !jxl_hook_active {
+            eprintln!(
+                "[ml][decode] failed to activate JPEG XL decoder hook; registered_now={jxl_registered_now}, active_hook={jxl_hook_active}"
+            );
+        }
+
+        debug_assert!(jxl_hook_active, "JPEG XL image decoder hook is not active");
     });
 }
 
@@ -371,9 +382,12 @@ fn bytes_look_like_heif(image_bytes: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use image::ImageFormat;
+    use std::ffi::OsStr;
 
-    use super::{bytes_look_like_heif, should_attempt_tiff_fallback};
+    use image::ImageFormat;
+    use image::hooks::decoding_hook_registered;
+
+    use super::{bytes_look_like_heif, init_image_decoders, should_attempt_tiff_fallback};
 
     #[test]
     fn attempts_tiff_fallback_for_tiff_format() {
@@ -398,5 +412,12 @@ mod tests {
     #[test]
     fn skips_non_heif_bytes() {
         assert!(!bytes_look_like_heif(b"not an image"));
+    }
+
+    #[test]
+    fn registers_jxl_decoder_hook() {
+        init_image_decoders();
+
+        assert!(decoding_hook_registered(OsStr::new("jxl")));
     }
 }
