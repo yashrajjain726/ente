@@ -49,27 +49,18 @@ class _ContactPhotoPickerSheet extends StatefulWidget {
 }
 
 class _ContactPhotoPickerSheetState extends State<_ContactPhotoPickerSheet> {
-  late final ValueNotifier<bool> _isFileSelected;
   late final SelectedFiles _selectedFiles;
 
   @override
   void initState() {
     super.initState();
-    _isFileSelected = ValueNotifier(false);
-    _selectedFiles = SelectedFiles()..addListener(_handleSelectionChanged);
+    _selectedFiles = SelectedFiles();
   }
 
   @override
   void dispose() {
-    _selectedFiles
-      ..removeListener(_handleSelectionChanged)
-      ..dispose();
-    _isFileSelected.dispose();
+    _selectedFiles.dispose();
     super.dispose();
-  }
-
-  void _handleSelectionChanged() {
-    _isFileSelected.value = _selectedFiles.files.isNotEmpty;
   }
 
   @override
@@ -119,17 +110,18 @@ class _ContactPhotoPickerSheetState extends State<_ContactPhotoPickerSheet> {
                 Spacing.xl,
                 Spacing.xl,
               ),
-              child: ValueListenableBuilder<bool>(
-                valueListenable: _isFileSelected,
-                builder: (context, value, _) {
+              child: ListenableBuilder(
+                listenable: _selectedFiles,
+                builder: (context, _) {
+                  final isFileSelected = _selectedFiles.files.isNotEmpty;
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       ButtonComponent(
                         label: l10n.setSelectedPhoto,
-                        isDisabled: !value,
+                        isDisabled: !isFileSelected,
                         shouldSurfaceExecutionStates: false,
-                        onTap: value
+                        onTap: isFileSelected
                             ? () {
                                 Navigator.pop(
                                   context,

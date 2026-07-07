@@ -71,7 +71,7 @@ Future<Widget?> _buildDestination(
   required String email,
 }) async {
   final contactsService = PhotosContactsService.instance;
-  final cachedContact = contactsService.getCachedContactByUserId(userId);
+  final cachedContact = contactsService.getCachedContact(contactUserId: userId);
   if (cachedContact != null) {
     return _contactResultPageForUser(user);
   }
@@ -88,7 +88,7 @@ Future<Widget?> _buildDestination(
     }
   }
 
-  final savedContact = contactsService.getCachedContactByUserId(userId);
+  final savedContact = contactsService.getCachedContact(contactUserId: userId);
   if (savedContact != null) {
     return _contactResultPageForUser(user);
   }

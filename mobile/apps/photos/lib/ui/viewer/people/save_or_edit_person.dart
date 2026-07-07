@@ -66,20 +66,6 @@ String? _trimEmptyToNull(String? value) {
   return trimmedValue;
 }
 
-bool _matchesCurrentUserEmail(String? email) {
-  final currentEmail = _trimEmptyToNull(Configuration.instance.getEmail());
-  final candidateEmail = _trimEmptyToNull(email);
-  return currentEmail != null &&
-      candidateEmail != null &&
-      candidateEmail.toLowerCase() == currentEmail.toLowerCase();
-}
-
-int? _currentUserIDForEmail(String? email) {
-  return _matchesCurrentUserEmail(email)
-      ? Configuration.instance.getUserID()
-      : null;
-}
-
 class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   static const int _maxSuggestedPersons = 3;
   bool isKeypadOpen = false;
@@ -98,7 +84,8 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
 
   String? get _emailToSave => _trimEmptyToNull(_email);
 
-  int? get _currentUserIDToSave => _currentUserIDForEmail(_emailToSave);
+  int? get _currentUserIDToSave =>
+      currentUserIDForContactLinkEmail(_emailToSave);
 
   bool get _shouldClearContactUserID =>
       widget.isEditing &&
@@ -631,14 +618,19 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
     String? birthdate,
     String? email,
   }) async {
-    if (email != null &&
-        email.isNotEmpty &&
-        await checkIfEmailAlreadyAssignedToAPerson(email)) {
-      _logger.severe(
-        "Failed to addNewPerson, email is already assigned to a person",
-      );
-      await showAlreadyLinkedEmailDialog(context, email);
-      return null;
+    if (email != null && email.isNotEmpty) {
+      final linkedPerson = await findPersonLinkedToEmail(email);
+      if (linkedPerson != null) {
+        _logger.severe(
+          "Failed to addNewPerson, email is already assigned to a person",
+        );
+        await showAlreadyLinkedEmailDialog(
+          context,
+          email,
+          linkedPerson: linkedPerson,
+        );
+        return null;
+      }
     }
 
     try {
@@ -656,7 +648,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
         hideFromMemories: _hideFromMemories,
         birthdate: birthdate,
         email: email,
-        userID: _currentUserIDForEmail(email),
+        userID: currentUserIDForContactLinkEmail(email),
       );
       final bool extraPhotosFound = await ClusterFeedbackService.instance
           .checkAndDoAutomaticMerges(personEntity, personClusterID: clusterID);
@@ -692,10 +684,16 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
     try {
       final emailToSave = _emailToSave;
       if (emailToSave != null &&
-          emailToSave != _trimEmptyToNull(person!.data.email) &&
-          await checkIfEmailAlreadyAssignedToAPerson(emailToSave)) {
-        await showAlreadyLinkedEmailDialog(context, emailToSave);
-        return null;
+          emailToSave != _trimEmptyToNull(person!.data.email)) {
+        final linkedPerson = await findPersonLinkedToEmail(emailToSave);
+        if (linkedPerson != null) {
+          await showAlreadyLinkedEmailDialog(
+            context,
+            emailToSave,
+            linkedPerson: linkedPerson,
+          );
+          return null;
+        }
       }
       final String name = _inputName.trim();
       final String? birthDate = _selectedDate;

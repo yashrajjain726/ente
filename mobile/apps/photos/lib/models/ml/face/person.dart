@@ -83,7 +83,6 @@ class PersonData {
     bool? isHidden,
     bool? isPinned,
     bool? hideFromMemories,
-    int? version,
     Object? birthDate = _personDataUnchanged,
     Object? email = _personDataUnchanged,
     Object? userID = _personDataUnchanged,

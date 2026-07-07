@@ -315,8 +315,13 @@ class _LinkEmailScreen extends State<LinkEmailScreen> {
     String personID,
     BuildContext context,
   ) async {
-    if (await checkIfEmailAlreadyAssignedToAPerson(email)) {
-      await showAlreadyLinkedEmailDialog(context, email);
+    final linkedPerson = await findPersonLinkedToEmail(email);
+    if (linkedPerson != null) {
+      await showAlreadyLinkedEmailDialog(
+        context,
+        email,
+        linkedPerson: linkedPerson,
+      );
       return false;
     }
 
@@ -359,7 +364,7 @@ class _LinkEmailScreen extends State<LinkEmailScreen> {
       try {
         final personEntity = await PersonService.instance.getPerson(personID);
         late final PersonEntity updatedPerson;
-        final currentUserID = _currentUserIDForEmail(email);
+        final currentUserID = currentUserIDForContactLinkEmail(email);
 
         if (personEntity == null) {
           throw AssertionError(
@@ -393,15 +398,4 @@ class _LinkEmailScreen extends State<LinkEmailScreen> {
       }
     }
   }
-}
-
-bool _matchesCurrentUserEmail(String email) {
-  final currentEmail = Configuration.instance.getEmail()?.trim().toLowerCase();
-  return currentEmail != null && email.trim().toLowerCase() == currentEmail;
-}
-
-int? _currentUserIDForEmail(String email) {
-  return _matchesCurrentUserEmail(email)
-      ? Configuration.instance.getUserID()
-      : null;
 }

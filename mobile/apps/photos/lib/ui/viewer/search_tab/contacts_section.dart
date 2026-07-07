@@ -199,34 +199,26 @@ class _ContactsSectionState extends State<ContactsSection> {
   }
 }
 
-class ContactRecommendation extends StatefulWidget {
+class ContactRecommendation extends StatelessWidget {
   static const _avatarSize = 62.0;
 
   final GenericSearchResult contactSearchResult;
   const ContactRecommendation(this.contactSearchResult, {super.key});
 
   @override
-  State<ContactRecommendation> createState() => _ContactRecommendationState();
-}
-
-class _ContactRecommendationState extends State<ContactRecommendation> {
-  @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final personId =
-        widget.contactSearchResult.params[kPersonParamID] as String?;
-    final contactUserId =
-        widget.contactSearchResult.params[kContactUserId] as int?;
-    final contactEmail =
-        widget.contactSearchResult.params[kContactEmail] as String;
+    final personId = contactSearchResult.params[kPersonParamID] as String?;
+    final contactUserId = contactSearchResult.params[kContactUserId] as int?;
+    final contactEmail = contactSearchResult.params[kContactEmail] as String;
     final displayName = _displayName(contactUserId, contactEmail);
     return GestureDetector(
       onTap: () {
         RecentSearches().add(displayName);
-        if (widget.contactSearchResult.onResultTap != null) {
-          widget.contactSearchResult.onResultTap!(context);
+        if (contactSearchResult.onResultTap != null) {
+          contactSearchResult.onResultTap!(context);
         } else {
-          routeToPage(context, ContactResultPage(widget.contactSearchResult));
+          routeToPage(context, ContactResultPage(contactSearchResult));
         }
       },
       child: SizedBox(
@@ -266,7 +258,7 @@ class _ContactRecommendationState extends State<ContactRecommendation> {
     final resolvedName = resolveDisplayName(contactUser);
     final resolvedEmail = resolveKnownEmail(contactUser) ?? contactEmail;
     if (resolvedName == resolvedEmail || resolvedName == "Someone") {
-      return widget.contactSearchResult.name();
+      return contactSearchResult.name();
     }
     return resolvedName;
   }

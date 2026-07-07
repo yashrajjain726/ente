@@ -102,19 +102,21 @@ void main() {
     });
 
     test("sets and clears contact link fields", () async {
-      final linked = await personService.updateContactLink(
+      final linked = await personService.updateAttributes(
         "person-1",
         userID: 7,
         email: "alex@example.com",
+        syncLinkedContactName: false,
       );
 
       expect(linked.data.userID, 7);
       expect(linked.data.email, "alex@example.com");
 
-      final cleared = await personService.updateContactLink(
+      final cleared = await personService.updateAttributes(
         "person-1",
         userID: null,
         email: null,
+        syncLinkedContactName: false,
       );
 
       expect(cleared.data.userID, isNull);

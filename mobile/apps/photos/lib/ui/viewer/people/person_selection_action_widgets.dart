@@ -33,14 +33,10 @@ import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/people_sort_util.dart";
 import "package:photos/utils/person_contact_linking_util.dart";
 
-enum PersonSelectionMode { linkContact, autofillContact }
-
 class LinkContactToPersonSelectionPage extends StatefulWidget {
-  final String? emailToLink;
-  final PersonSelectionMode mode;
+  final String emailToLink;
   const LinkContactToPersonSelectionPage({
-    this.emailToLink,
-    this.mode = PersonSelectionMode.linkContact,
+    required this.emailToLink,
     super.key,
   });
 
@@ -96,7 +92,7 @@ class _LinkContactToPersonSelectionPageState
       if (person.data.isIgnored) {
         continue;
       }
-      if (widget.mode == PersonSelectionMode.linkContact && isAlreadyLinked) {
+      if (isAlreadyLinked) {
         continue;
       }
       final searchResult = resultsById[person.remoteID];
@@ -329,17 +325,10 @@ class _LinkContactToPersonSelectionPageState
                     return _RoundedPersonFaceWidget(
                       key: ValueKey(results[index].personEntity.remoteID),
                       onTap: () async {
-                        if (widget.mode ==
-                            PersonSelectionMode.autofillContact) {
-                          Navigator.of(
-                            context,
-                          ).pop(results[index].personEntity);
-                          return;
-                        }
                         try {
                           final updatedPerson = await linkPersonToContact(
                             context,
-                            emailToLink: widget.emailToLink!,
+                            emailToLink: widget.emailToLink,
                             personEntity: results[index].personEntity,
                           );
 
@@ -522,8 +511,13 @@ class _LinkContactToPersonSelectionPageState
     required String emailToLink,
     required PersonEntity personEntity,
   }) async {
-    if (await checkIfEmailAlreadyAssignedToAPerson(emailToLink)) {
-      await showAlreadyLinkedEmailDialog(context, emailToLink);
+    final linkedPerson = await findPersonLinkedToEmail(emailToLink);
+    if (linkedPerson != null) {
+      await showAlreadyLinkedEmailDialog(
+        context,
+        emailToLink,
+        linkedPerson: linkedPerson,
+      );
       return null;
     }
 

@@ -1,5 +1,6 @@
 import "dart:typed_data";
 
+import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
 import "package:ente_pure_utils/ente_pure_utils.dart";
@@ -9,7 +10,6 @@ import "package:logging/logging.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/people_changed_event.dart";
 import "package:photos/generated/l10n.dart";
-import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/photos_contacts_service.dart";
@@ -286,9 +286,9 @@ class _EditContactPageState extends State<EditContactPage> {
         return;
       }
 
-      final needsContactLinkUpdate =
-          linkedPerson.data.userID != widget.contactUserId ||
-          !contactLinkEmailMatches(linkedPerson.data.email, widget.email);
+      final needsContactLinkUpdate = _personNeedsContactLinkUpdate(
+        linkedPerson,
+      );
       final shouldPrefillFromPerson = widget.existingContact == null;
       if (shouldPrefillFromPerson && _nameController.text.trim().isEmpty) {
         _nameController.text = linkedPerson.data.name;
@@ -327,7 +327,19 @@ class _EditContactPageState extends State<EditContactPage> {
     if (!mounted) {
       return;
     }
-    if (persons.where((person) => !person.data.isIgnored).isEmpty) {
+    final visiblePersons =
+        persons.where((person) => !person.data.isIgnored).toList()
+          ..sort((first, second) {
+            final nameComparison = compareAsciiLowerCaseNatural(
+              first.data.name,
+              second.data.name,
+            );
+            if (nameComparison != 0) {
+              return nameComparison;
+            }
+            return first.remoteID.compareTo(second.remoteID);
+          });
+    if (visiblePersons.isEmpty) {
       await _pickContactPhoto();
       return;
     }
@@ -337,6 +349,7 @@ class _EditContactPageState extends State<EditContactPage> {
       ContactPersonPickerPage(
         contactUserId: widget.contactUserId,
         contactEmail: widget.email,
+        persons: visiblePersons,
       ),
     );
     if (!mounted || result == null) {
@@ -359,6 +372,11 @@ class _EditContactPageState extends State<EditContactPage> {
     });
   }
 
+  bool _personNeedsContactLinkUpdate(PersonEntity person) {
+    return person.data.userID != widget.contactUserId ||
+        !contactLinkEmailMatches(person.data.email, widget.email);
+  }
+
   Future<void> _draftSelectedPerson(PersonEntity person) async {
     final success = await _loadPersonPhotoDraft(person, showError: true);
     if (!success || !mounted) {
@@ -370,8 +388,7 @@ class _EditContactPageState extends State<EditContactPage> {
       _unlinkDraft = false;
       _linkDirty =
           _initialLinkedPerson?.remoteID != person.remoteID ||
-          person.data.userID != widget.contactUserId ||
-          !contactLinkEmailMatches(person.data.email, widget.email);
+          _personNeedsContactLinkUpdate(person);
     });
   }
 
@@ -433,7 +450,7 @@ class _EditContactPageState extends State<EditContactPage> {
     setState(() {
       _isLoadingPhoto = true;
     });
-    final sourceBytes = await _loadEditablePhotoBytesFromFile(selectedFile);
+    final sourceBytes = await getThumbnail(selectedFile);
     if (!mounted) {
       return;
     }
@@ -529,10 +546,11 @@ class _EditContactPageState extends State<EditContactPage> {
         (selectedPerson == null ||
             selectedPerson.remoteID != previousPerson.remoteID)) {
       updatedPersons.add(
-        await PersonService.instance.updateContactLink(
+        await PersonService.instance.updateAttributes(
           previousPerson.remoteID,
           userID: null,
           email: null,
+          syncLinkedContactName: false,
         ),
       );
     }
@@ -540,8 +558,7 @@ class _EditContactPageState extends State<EditContactPage> {
     if (selectedPerson != null) {
       final shouldUpdateSelectedLink =
           previousPerson?.remoteID != selectedPerson.remoteID ||
-          selectedPerson.data.userID != widget.contactUserId ||
-          !contactLinkEmailMatches(selectedPerson.data.email, widget.email);
+          _personNeedsContactLinkUpdate(selectedPerson);
       final shouldUpdateSelectedName =
           contactNameChanged &&
           contactName.isNotEmpty &&
@@ -634,10 +651,6 @@ class _EditContactPageState extends State<EditContactPage> {
       actionSheetType: ActionSheetType.defaultActionSheet,
     );
     return actionResult?.action;
-  }
-
-  Future<Uint8List?> _loadEditablePhotoBytesFromFile(EnteFile file) async {
-    return getThumbnail(file);
   }
 }
 

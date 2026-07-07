@@ -65,11 +65,11 @@ void main() {
     await service.debugOpenAndSync(session);
 
     expect(service.hasHydratedCache, isTrue);
-    expect(service.getCachedContactByUserId(7), isNotNull);
+    expect(service.getCachedContact(contactUserId: 7), isNotNull);
     expect((await service.getContact(email: 'ALICE@test.test'))?.id, 'ct_1');
-    expect(service.getCachedSavedNameByUserId(7), 'Alice');
+    expect(service.getCachedSavedName(contactUserId: 7), 'Alice');
     expect(service.getCachedSavedName(email: 'ALICE@test.test'), 'Alice');
-    expect(service.getCachedResolvedEmailByUserId(7), 'alice@test.test');
+    expect(service.getCachedResolvedEmail(contactUserId: 7), 'alice@test.test');
     expect(
       service.getCachedResolvedEmail(email: 'ALICE@test.test'),
       'alice@test.test',
@@ -136,16 +136,16 @@ void main() {
       );
       await service.debugOpenAndSync(nextSession);
 
-      expect(service.getCachedSavedNameByUserId(9), 'Bob');
-      expect(service.getCachedSavedNameByUserId(7), isNull);
+      expect(service.getCachedSavedName(contactUserId: 9), 'Bob');
+      expect(service.getCachedSavedName(contactUserId: 7), isNull);
 
       contactsService.getContactsBarrier!.complete();
       await oldOpenAndSync;
 
-      expect(service.getCachedSavedNameByUserId(9), 'Bob');
-      expect(service.getCachedResolvedEmailByUserId(9), 'bob@test.test');
-      expect(service.getCachedSavedNameByUserId(7), isNull);
-      expect(service.getCachedResolvedEmailByUserId(7), isNull);
+      expect(service.getCachedSavedName(contactUserId: 9), 'Bob');
+      expect(service.getCachedResolvedEmail(contactUserId: 9), 'bob@test.test');
+      expect(service.getCachedSavedName(contactUserId: 7), isNull);
+      expect(service.getCachedResolvedEmail(contactUserId: 7), isNull);
     },
   );
 
@@ -198,16 +198,16 @@ void main() {
     );
     await service.debugOpenAndSync(nextSession);
 
-    expect(service.getCachedSavedNameByUserId(9), 'Bob');
-    expect(service.getCachedSavedNameByUserId(7), isNull);
+    expect(service.getCachedSavedName(contactUserId: 9), 'Bob');
+    expect(service.getCachedSavedName(contactUserId: 7), isNull);
 
     firstService.openBarrier!.complete();
     await oldOpenAndSync;
 
     expect(firstService.openCalls, 1);
     expect(secondService.openCalls, 1);
-    expect(service.getCachedSavedNameByUserId(9), 'Bob');
-    expect(service.getCachedSavedNameByUserId(7), isNull);
+    expect(service.getCachedSavedName(contactUserId: 9), 'Bob');
+    expect(service.getCachedSavedName(contactUserId: 7), isNull);
   });
 
   test(
@@ -284,13 +284,13 @@ void main() {
   test('logout event clears hydrated contact cache immediately', () async {
     await service.debugOpenAndSync(session);
 
-    expect(service.getCachedSavedNameByUserId(7), 'Alice');
+    expect(service.getCachedSavedName(contactUserId: 7), 'Alice');
 
     Bus.instance.fire(UserLoggedOutEvent());
     await Future<void>.delayed(Duration.zero);
 
-    expect(service.getCachedSavedNameByUserId(7), isNull);
-    expect(service.getCachedResolvedEmailByUserId(7), isNull);
+    expect(service.getCachedSavedName(contactUserId: 7), isNull);
+    expect(service.getCachedResolvedEmail(contactUserId: 7), isNull);
     expect(service.getCachedProfilePictureBytesByUserId(7), isNull);
     expect(service.hasHydratedCache, isFalse);
   });

@@ -51,16 +51,10 @@ String? _savedContactName(User user) {
   }
 
   final contactUserId = _validContactUserId(user);
-  final savedName = PhotosContactsService.instance
-      .getCachedSavedName(
-        contactUserId: contactUserId,
-        email: contactUserId == null ? user.email : null,
-      )
-      ?.trim();
-  if (savedName == null || savedName.isEmpty) {
-    return null;
-  }
-  return savedName;
+  return PhotosContactsService.instance.getCachedSavedName(
+    contactUserId: contactUserId,
+    email: contactUserId == null ? user.email : null,
+  );
 }
 
 int? _validContactUserId(User user) {

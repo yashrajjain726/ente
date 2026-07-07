@@ -1,11 +1,8 @@
-import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/ml/face/person.dart";
-import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
-import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
 import "package:photos/ui/viewer/people/person_face_widget.dart";
@@ -25,50 +22,19 @@ class ContactPersonPickerPickPhoto extends ContactPersonPickerResult {
   const ContactPersonPickerPickPhoto();
 }
 
-class ContactPersonPickerPage extends StatefulWidget {
+class ContactPersonPickerPage extends StatelessWidget {
   const ContactPersonPickerPage({
     required this.contactUserId,
     required this.contactEmail,
+    required this.persons,
     super.key,
   });
 
   final int contactUserId;
   final String contactEmail;
-
-  @override
-  State<ContactPersonPickerPage> createState() =>
-      _ContactPersonPickerPageState();
-}
-
-class _ContactPersonPickerPageState extends State<ContactPersonPickerPage> {
+  final List<PersonEntity> persons;
   static const _horizontalPadding = 16.0;
   static const _gridGap = 10.0;
-
-  late final Future<List<PersonEntity>> _personsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _personsFuture = _loadPersons();
-  }
-
-  Future<List<PersonEntity>> _loadPersons() async {
-    final persons = await PersonService.instance.getPersons();
-    final visiblePersons = persons
-        .where((person) => !person.data.isIgnored)
-        .toList();
-    visiblePersons.sort((first, second) {
-      final nameComparison = compareAsciiLowerCaseNatural(
-        first.data.name,
-        second.data.name,
-      );
-      if (nameComparison != 0) {
-        return nameComparison;
-      }
-      return first.remoteID.compareTo(second.remoteID);
-    });
-    return visiblePersons;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,28 +46,18 @@ class _ContactPersonPickerPageState extends State<ContactPersonPickerPage> {
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildHeader(context, l10n)),
-          FutureBuilder<List<PersonEntity>>(
-            future: _personsFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SliverFillRemaining(
-                  child: Center(child: EnteLoadingWidget()),
-                );
-              }
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Text(
-                      "${l10n.noResultsFound}.",
-                      style: TextStyles.body.copyWith(color: colors.textLight),
-                    ),
-                  ),
-                );
-              }
-              return _buildGrid(snapshot.data!);
-            },
-          ),
+          if (persons.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Text(
+                  "${l10n.noResultsFound}.",
+                  style: TextStyles.body.copyWith(color: colors.textLight),
+                ),
+              ),
+            )
+          else
+            _buildGrid(persons),
         ],
       ),
     );
@@ -182,8 +138,8 @@ class _ContactPersonPickerPageState extends State<ContactPersonPickerPage> {
               (context, index) => _PersonTile(
                 person: persons[index],
                 size: tileSize,
-                contactUserId: widget.contactUserId,
-                contactEmail: widget.contactEmail,
+                contactUserId: contactUserId,
+                contactEmail: contactEmail,
               ),
             ),
           );

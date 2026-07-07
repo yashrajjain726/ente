@@ -3,6 +3,7 @@ import "dart:convert";
 import "dart:developer";
 
 import "package:computer/computer.dart";
+import "package:ente_contacts/contacts.dart" as contacts;
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/foundation.dart";
 import "package:logging/logging.dart";
@@ -605,14 +606,8 @@ class PersonService {
     EnteFile file,
     Face face,
   ) async {
-    if (!flagService.enableContact) {
-      return;
-    }
-    final contact = await _contactsService.getContact(
-      contactUserId: person.data.userID,
-      email: person.data.email,
-    );
-    if (contact == null || !flagService.enableContact) {
+    final contact = await _getLinkedContactIfEnabled(person);
+    if (contact == null) {
       return;
     }
     final Uint8List? bytes = await buildContactPhotoAttachmentBytesFromFace(
@@ -624,17 +619,12 @@ class PersonService {
         "Failed to prepare contact avatar for linked person ${person.remoteID}",
       );
     }
-    try {
-      await _contactsService.setProfilePicture(
+    await _runLinkedContactWriteIfEnabled(
+      () => _contactsService.setProfilePicture(
         contactId: contact.id,
         bytes: bytes,
-      );
-    } on StateError {
-      if (!flagService.enableContact) {
-        return;
-      }
-      rethrow;
-    }
+      ),
+    );
   }
 
   Future<PersonEntity> updateAttributes(
@@ -644,7 +634,6 @@ class PersonService {
     bool? isHidden,
     bool? isPinned,
     bool? hideFromMemories,
-    int? version,
     Object? birthDate = _attributeNotProvided,
     Object? email = _attributeNotProvided,
     Object? userID = _attributeNotProvided,
@@ -664,7 +653,6 @@ class PersonService {
       isHidden: isHidden,
       isPinned: isPinned,
       hideFromMemories: hideFromMemories,
-      version: version,
     );
     if (!identical(birthDate, _attributeNotProvided)) {
       updatedData = updatedData.copyWith(birthDate: birthDate as String?);
@@ -692,41 +680,49 @@ class PersonService {
     PersonEntity person,
     String name,
   ) async {
-    if (!flagService.enableContact) {
+    final contact = await _getLinkedContactIfEnabled(person);
+    if (contact == null) {
       return;
+    }
+    await _runLinkedContactWriteIfEnabled(
+      () => _contactsService.createOrUpdateContact(
+        contactUserId: contact.contactUserId,
+        name: name,
+        birthDate: contact.data?.birthDate,
+      ),
+    );
+  }
+
+  Future<contacts.ContactRecord?> _getLinkedContactIfEnabled(
+    PersonEntity person,
+  ) async {
+    if (!flagService.enableContact) {
+      return null;
     }
     final contact = await _contactsService.getContact(
       contactUserId: person.data.userID,
       email: person.data.email,
     );
     if (contact == null || !flagService.enableContact) {
+      return null;
+    }
+    return contact;
+  }
+
+  Future<void> _runLinkedContactWriteIfEnabled(
+    Future<void> Function() write,
+  ) async {
+    if (!flagService.enableContact) {
       return;
     }
     try {
-      await _contactsService.createOrUpdateContact(
-        contactUserId: contact.contactUserId,
-        name: name,
-        birthDate: contact.data?.birthDate,
-      );
+      await write();
     } on StateError {
       if (!flagService.enableContact) {
         return;
       }
       rethrow;
     }
-  }
-
-  Future<PersonEntity> updateContactLink(
-    String id, {
-    required int? userID,
-    required String? email,
-  }) async {
-    return updateAttributes(
-      id,
-      userID: userID,
-      email: email,
-      syncLinkedContactName: false,
-    );
   }
 
   Future<ManualPersonAssignmentResult> addManualFileAssignments({

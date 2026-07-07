@@ -1,6 +1,7 @@
 import "package:collection/collection.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/widgets.dart";
+import "package:photos/core/configuration.dart";
 import "package:photos/l10n/l10n.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
@@ -21,6 +22,22 @@ bool contactLinkEmailMatches(String? first, String? second) {
   return normalizedFirst != null && normalizedFirst == normalizedSecond;
 }
 
+bool isCurrentUserContactLinkEmail(String? email) {
+  return contactLinkEmailMatches(email, Configuration.instance.getEmail());
+}
+
+int? currentUserIDForContactLinkEmail(String? email) {
+  return isCurrentUserContactLinkEmail(email)
+      ? Configuration.instance.getUserID()
+      : null;
+}
+
+bool isCurrentUserContactLink({String? email, int? userID}) {
+  final currentUserID = Configuration.instance.getUserID();
+  return (currentUserID != null && userID == currentUserID) ||
+      isCurrentUserContactLinkEmail(email);
+}
+
 Future<PersonEntity?> findPersonLinkedToContact({
   required int contactUserId,
   required String? email,
@@ -37,6 +54,17 @@ Future<PersonEntity?> findPersonLinkedToContact({
   if (normalizedEmail == null) {
     return null;
   }
+  return persons.firstWhereOrNull(
+    (person) => contactLinkEmailMatches(person.data.email, normalizedEmail),
+  );
+}
+
+Future<PersonEntity?> findPersonLinkedToEmail(String? email) async {
+  final normalizedEmail = normalizeContactLinkEmail(email);
+  if (normalizedEmail == null) {
+    return null;
+  }
+  final persons = await PersonService.instance.getPersons();
   return persons.firstWhereOrNull(
     (person) => contactLinkEmailMatches(person.data.email, normalizedEmail),
   );
@@ -62,25 +90,12 @@ bool isLinkedToDifferentContact(
   return !contactLinkEmailMatches(linkedEmail, email);
 }
 
-Future<bool> checkIfEmailAlreadyAssignedToAPerson(String email) async {
-  final persons = await PersonService.instance.getPersons();
-  final normalizedEmail = normalizeContactLinkEmail(email);
-  for (var person in persons) {
-    if (contactLinkEmailMatches(person.data.email, normalizedEmail)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 Future<void> showAlreadyLinkedEmailDialog(
   BuildContext context,
-  String email,
-) async {
-  final persons = await PersonService.instance.getPersons();
-  final PersonEntity? person = persons.firstWhereOrNull(
-    (person) => contactLinkEmailMatches(person.data.email, email),
-  );
+  String email, {
+  PersonEntity? linkedPerson,
+}) async {
+  final person = linkedPerson ?? await findPersonLinkedToEmail(email);
   if (person == null) {
     return;
   }
