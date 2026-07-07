@@ -4,6 +4,7 @@ import "package:ente_components/ente_components.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
+import "package:hugeicons/hugeicons.dart";
 import "package:logging/logging.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
@@ -595,7 +596,12 @@ class _AvatarEditButton extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: const Center(
-          child: Icon(Icons.edit_outlined, color: Colors.white, size: 12),
+          child: HugeIcon(
+            icon: HugeIcons.strokeRoundedEdit03,
+            color: Colors.white,
+            size: 12,
+            strokeWidth: 2,
+          ),
         ),
       ),
     );
