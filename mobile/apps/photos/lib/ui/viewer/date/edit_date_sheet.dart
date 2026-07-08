@@ -5,8 +5,6 @@ import 'package:intl/intl.dart';
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/theme/ente_theme.dart";
-import "package:photos/ui/components/buttons/button_widget.dart";
-import "package:photos/ui/components/models/button_type.dart";
 import "package:photos/ui/viewer/date/date_time_picker.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/utils/magic_util.dart";
@@ -175,33 +173,22 @@ class _EditDateSheetState extends State<EditDateSheet> {
               !selectingDate &&
               !selectingTime &&
               selectedDate != startDate)
-            Column(
-              children: [
-                const SizedBox(height: 16),
-                ButtonWidget(
-                  buttonType: ButtonType.primary,
-                  labelText: AppLocalizations.of(context).confirm,
-                  buttonSize: ButtonSize.large,
-                  onTap: () async {
-                    final newDate = await _editDates(
-                      context,
-                      widget.enteFiles,
-                      selectedDate,
-                      selectSingleDate ? null : startDate,
-                    );
-                    Navigator.of(context).pop(newDate);
-                  },
-                ),
-                const SizedBox(height: 8),
-                ButtonWidget(
-                  buttonType: ButtonType.neutral,
-                  labelText: AppLocalizations.of(context).cancel,
-                  buttonSize: ButtonSize.large,
-                  onTap: () async {
-                    Navigator.of(context).pop(null);
-                  },
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.only(top: Spacing.lg),
+              child: ButtonComponent(
+                variant: ButtonComponentVariant.primary,
+                size: ButtonComponentSize.large,
+                label: AppLocalizations.of(context).confirm,
+                onTap: () async {
+                  final newDate = await _editDates(
+                    context,
+                    widget.enteFiles,
+                    selectedDate,
+                    selectSingleDate ? null : startDate,
+                  );
+                  Navigator.of(context).pop(newDate);
+                },
+              ),
             ),
         ],
       ),

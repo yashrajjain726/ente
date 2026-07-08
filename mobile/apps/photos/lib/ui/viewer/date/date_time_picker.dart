@@ -2,7 +2,6 @@ import "package:ente_components/ente_components.dart";
 import "package:flutter/cupertino.dart";
 import "package:flutter/material.dart";
 import "package:photos/generated/l10n.dart";
-import "package:photos/theme/ente_theme.dart";
 
 Future<DateTime?> showDatePickerSheet(
   BuildContext context, {
@@ -11,20 +10,30 @@ Future<DateTime?> showDatePickerSheet(
   DateTime? minDate,
   bool startWithTime = false,
 }) {
+  bool showTimePicker = startWithTime;
   return showBottomSheetComponent<DateTime?>(
     context: context,
-    builder: (context) => BottomSheetComponent(
-      showCloseButton: true,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      content: DateTimePickerWidget(
-        (dateTime) => Navigator.of(context).pop(dateTime),
-        () => Navigator.of(context).pop(null),
-        initialDate,
-        minDateTime: minDate,
-        maxDateTime: maxDate,
-        startWithTime: startWithTime,
-      ),
-    ),
+    builder: (context) {
+      final l10n = AppLocalizations.of(context);
+      return StatefulBuilder(
+        builder: (context, setState) => BottomSheetComponent(
+          title: showTimePicker ? l10n.selectTime : l10n.selectDate,
+          showCloseButton: true,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          content: DateTimePickerWidget(
+            (dateTime) => Navigator.of(context).pop(dateTime),
+            () => Navigator.of(context).pop(null),
+            initialDate,
+            minDateTime: minDate,
+            maxDateTime: maxDate,
+            startWithTime: startWithTime,
+            showTitle: false,
+            onShowTimePickerChanged: (value) =>
+                setState(() => showTimePicker = value),
+          ),
+        ),
+      );
+    },
   );
 }
 
@@ -67,7 +76,6 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
     final colors = context.componentColors;
     return Container(
       color: colors.backgroundBase,
@@ -84,7 +92,7 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
                   _showTimePicker
                       ? AppLocalizations.of(context).selectTime
                       : AppLocalizations.of(context).selectDate,
-                  style: TextStyle(color: colorScheme.textBase, fontSize: 16),
+                  style: TextStyle(color: colors.textBase, fontSize: 16),
                 ),
               ),
             ),
@@ -101,7 +109,7 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
                 brightness: Theme.of(context).brightness,
                 textTheme: CupertinoTextThemeData(
                   dateTimePickerTextStyle: TextStyle(
-                    color: colorScheme.textBase,
+                    color: colors.textBase,
                     fontSize: 22,
                   ),
                 ),
@@ -154,54 +162,51 @@ class _DateTimePickerWidgetState extends State<DateTimePickerWidget> {
           ),
 
           // Buttons
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Cancel Button
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  child: Text(
-                    _showTimePicker
-                        ? AppLocalizations.of(context).previous
-                        : AppLocalizations.of(context).cancel,
-                    style: TextStyle(color: colorScheme.textBase, fontSize: 14),
-                  ),
-                  onPressed: () {
-                    if (_showTimePicker) {
-                      // Go back to date picker
-                      _setShowTimePicker(false);
-                    } else {
-                      widget.onCancel();
-                    }
-                  },
-                ),
-
-                // Next/Done Button
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  child: Text(
-                    _showTimePicker
-                        ? AppLocalizations.of(context).done
-                        : AppLocalizations.of(context).next,
-                    style: TextStyle(
-                      color: colorScheme.primary700,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: colors.textBase,
+                      textStyle: TextStyles.body,
+                    ),
+                    onPressed: () {
+                      if (_showTimePicker) {
+                        _setShowTimePicker(false);
+                      } else {
+                        widget.onCancel();
+                      }
+                    },
+                    child: Text(
+                      _showTimePicker
+                          ? AppLocalizations.of(context).previous
+                          : AppLocalizations.of(context).cancel,
                     ),
                   ),
-                  onPressed: () {
-                    if (_showTimePicker) {
-                      // We're done, call the callback
-                      widget.onDateTimeSelected(_selectedDateTime);
-                    } else {
-                      // Move to time picker
-                      _setShowTimePicker(true);
-                    }
-                  },
-                ),
-              ],
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: colors.primary,
+                      textStyle: TextStyles.bodyBold,
+                    ),
+                    onPressed: () {
+                      if (_showTimePicker) {
+                        widget.onDateTimeSelected(_selectedDateTime);
+                      } else {
+                        _setShowTimePicker(true);
+                      }
+                    },
+                    child: Text(
+                      _showTimePicker
+                          ? AppLocalizations.of(context).done
+                          : AppLocalizations.of(context).next,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
