@@ -257,6 +257,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
       context,
       SaveOrEditPerson(clusterID, person: person, isEditing: true),
     );
+    if (!mounted) return;
     if (result is PersonEntity) {
       _appBarTitle = result.data.name;
       person = result;
