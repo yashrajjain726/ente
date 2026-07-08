@@ -250,6 +250,9 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
   }
 
   Future<dynamic> _editPerson(BuildContext context) async {
+    if (person.data.assigned.isEmpty) {
+      return;
+    }
     final result = await routeToPage(
       context,
       SaveOrEditPerson(
@@ -270,6 +273,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     final bool isIgnored = person.data.isIgnored;
     final bool isPinned = person.data.isPinned;
     final bool hideFromMemories = person.data.hideFromMemories;
+    final bool hasAssignedCluster = person.data.assigned.isNotEmpty;
     final List<Widget> actions = <Widget>[];
     // If the user has selected files, don't show any actions
     if (widget.selectedFiles.files.isNotEmpty ||
@@ -295,30 +299,33 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
 
     if (!isIgnored) {
       items.addAll([
-        EntePopupMenuOption(
-          value: PeoplePopupAction.rename,
-          label: AppLocalizations.of(context).edit,
-          leadingWidget: galleryAppBarMenuIcon(
-            HugeIcons.strokeRoundedPencilEdit01,
-            iconColor,
+        if (hasAssignedCluster)
+          EntePopupMenuOption(
+            value: PeoplePopupAction.rename,
+            label: AppLocalizations.of(context).edit,
+            leadingWidget: galleryAppBarMenuIcon(
+              HugeIcons.strokeRoundedPencilEdit01,
+              iconColor,
+            ),
           ),
-        ),
-        EntePopupMenuOption(
-          value: PeoplePopupAction.reviewSuggestions,
-          label: AppLocalizations.of(context).review,
-          leadingWidget: galleryAppBarMenuIcon(
-            HugeIcons.strokeRoundedSearch01,
-            iconColor,
+        if (hasAssignedCluster)
+          EntePopupMenuOption(
+            value: PeoplePopupAction.reviewSuggestions,
+            label: AppLocalizations.of(context).review,
+            leadingWidget: galleryAppBarMenuIcon(
+              HugeIcons.strokeRoundedSearch01,
+              iconColor,
+            ),
           ),
-        ),
-        EntePopupMenuOption(
-          value: PeoplePopupAction.setCover,
-          label: AppLocalizations.of(context).setCover,
-          leadingWidget: galleryAppBarMenuIcon(
-            HugeIcons.strokeRoundedImage01,
-            iconColor,
+        if (hasAssignedCluster)
+          EntePopupMenuOption(
+            value: PeoplePopupAction.setCover,
+            label: AppLocalizations.of(context).setCover,
+            leadingWidget: galleryAppBarMenuIcon(
+              HugeIcons.strokeRoundedImage01,
+              iconColor,
+            ),
           ),
-        ),
         EntePopupMenuOption(
           value: PeoplePopupAction.pinPerson,
           label: isPinned ? context.l10n.unpinPerson : context.l10n.pinPerson,
@@ -370,22 +377,24 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
       ]);
     } else {
       items.addAll([
-        EntePopupMenuOption(
-          value: PeoplePopupAction.rename,
-          label: AppLocalizations.of(context).edit,
-          leadingWidget: galleryAppBarMenuIcon(
-            HugeIcons.strokeRoundedPencilEdit01,
-            iconColor,
+        if (hasAssignedCluster)
+          EntePopupMenuOption(
+            value: PeoplePopupAction.rename,
+            label: AppLocalizations.of(context).edit,
+            leadingWidget: galleryAppBarMenuIcon(
+              HugeIcons.strokeRoundedPencilEdit01,
+              iconColor,
+            ),
           ),
-        ),
-        EntePopupMenuOption(
-          value: PeoplePopupAction.reviewSuggestions,
-          label: AppLocalizations.of(context).review,
-          leadingWidget: galleryAppBarMenuIcon(
-            HugeIcons.strokeRoundedSearch01,
-            iconColor,
+        if (hasAssignedCluster)
+          EntePopupMenuOption(
+            value: PeoplePopupAction.reviewSuggestions,
+            label: AppLocalizations.of(context).review,
+            leadingWidget: galleryAppBarMenuIcon(
+              HugeIcons.strokeRoundedSearch01,
+              iconColor,
+            ),
           ),
-        ),
         EntePopupMenuOption(
           value: PeoplePopupAction.unignore,
           label: AppLocalizations.of(context).showPerson,

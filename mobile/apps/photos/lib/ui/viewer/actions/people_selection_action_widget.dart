@@ -78,6 +78,13 @@ class _PeopleSelectionActionWidgetState
         .toList();
   }
 
+  bool _hasAssignedCluster(
+    String personID,
+    Map<String, PersonEntity> personMap,
+  ) {
+    return personMap[personID]?.data.assigned.isNotEmpty ?? false;
+  }
+
   void _selectionChangedListener() {
     if (mounted) {
       setState(() {});
@@ -104,6 +111,9 @@ class _PeopleSelectionActionWidgetState
             selectedPersonIds.length == 1 && selectedClusterIds.isEmpty;
         final onlyPersonSelected =
             selectedPersonIds.isNotEmpty && selectedClusterIds.isEmpty;
+        final onlySelectedPersonHasAssignedCluster =
+            onlyOnePerson &&
+            _hasAssignedCluster(selectedPersonIds.first, personMap);
         final ignoredSelectedPersonIds = selectedPersonIds
             .where((id) => personMap[id]?.data.isIgnored ?? false)
             .toList();
@@ -116,8 +126,8 @@ class _PeopleSelectionActionWidgetState
             selectedPersonIds.every(
               (id) => (personMap[id]?.data.name ?? "").isNotEmpty,
             );
-        final bool showEditAction = onlyOnePerson;
-        final bool showReviewAction = onlyOnePerson;
+        final bool showEditAction = onlySelectedPersonHasAssignedCluster;
+        final bool showReviewAction = onlySelectedPersonHasAssignedCluster;
         final bool showMergeAction = onlyIgnoredPersonsSelected
             ? false
             : selectedClusterIds.isNotEmpty;
@@ -311,6 +321,7 @@ class _PeopleSelectionActionWidgetState
     final personID = selectedPersonIds.first;
     final person = personMap[personID];
     if (person == null) return;
+    if (person.data.assigned.isEmpty) return;
 
     await routeToPage(
       context,
@@ -330,6 +341,7 @@ class _PeopleSelectionActionWidgetState
     final personID = selectedPersonIds.first;
     final person = personMap[personID];
     if (person == null) return;
+    if (person.data.assigned.isEmpty) return;
 
     await routeToPage(context, PersonReviewClusterSuggestion(person));
     widget.selectedPeople.clearAll();
