@@ -30,9 +30,10 @@ class _FilePropertiesItemWidgetState extends State<FilePropertiesItemWidget> {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final canEdit = !(widget.file.uploadedFileID == null ||
-        widget.file.ownerID != widget.currentUserID ||
-        widget.file.isTrash);
+    final canEdit =
+        !(widget.file.uploadedFileID == null ||
+            widget.file.ownerID != widget.currentUserID ||
+            widget.file.isTrash);
     final title =
         path.basenameWithoutExtension(widget.file.displayName) +
         path.extension(widget.file.displayName).toUpperCase();
