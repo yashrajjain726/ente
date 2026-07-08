@@ -637,6 +637,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
           }
         })
         .onError((error, stackTrace) {
+          if (!mounted) return;
           showErrorDialog(
             context,
             AppLocalizations.of(context).error,
