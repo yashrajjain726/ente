@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "dataset": "ml-indexing/v1",
-  "fixture_base_url": "https://raw.githubusercontent.com/ente/test-fixtures/main/ml/indexing/v1/",
+  "fixture_base_url": "https://raw.githubusercontent.com/ente/test-fixtures/13c7cf83717140be20b32e6fbb178d5f15ea09ea/ml/indexing/v1/",
   "manifest": {
     "path": "manifest.json",
-    "url": "https://raw.githubusercontent.com/ente/test-fixtures/main/ml/indexing/v1/manifest.json",
+    "url": "https://raw.githubusercontent.com/ente/test-fixtures/13c7cf83717140be20b32e6fbb178d5f15ea09ea/ml/indexing/v1/manifest.json",
     "sha256": "fa4a2dcd1787825a77b85343aace954572e0f4d9080e4cb3031179159af9011c"
   },
   "python_golden": {
     "path": "goldens/python/results.json",
-    "url": "https://raw.githubusercontent.com/ente/test-fixtures/main/ml/indexing/v1/goldens/python/results.json",
+    "url": "https://raw.githubusercontent.com/ente/test-fixtures/13c7cf83717140be20b32e6fbb178d5f15ea09ea/ml/indexing/v1/goldens/python/results.json",
     "sha256": "2def6506e098234abc2e6e10febd820b8e3e66d6ad4c9525cb4f1cec3418f9b6"
   },
   "onnx_runtime": {
