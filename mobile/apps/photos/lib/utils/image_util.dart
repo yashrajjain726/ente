@@ -37,6 +37,13 @@ const _copiedExifFields = [
   (ifd: "EXIF",  src: "FocalLength",             dst: "FocalLength",             render: false),
   (ifd: "EXIF",  src: "FocalLengthIn35mmFilm",   dst: "FocalLengthIn35mmFilm",   render: false),
   (ifd: "EXIF",  src: "ColorSpace",              dst: "ColorSpace",              render: false),
+  (ifd: "GPS",   src: "GPSLatitudeRef",          dst: "GPSLatitudeRef",          render: false),
+  (ifd: "GPS",   src: "GPSLatitude",             dst: "GPSLatitude",             render: false),
+  (ifd: "GPS",   src: "GPSLongitudeRef",         dst: "GPSLongitudeRef",         render: false),
+  (ifd: "GPS",   src: "GPSLongitude",            dst: "GPSLongitude",            render: false),
+  (ifd: "GPS",   src: "GPSAltitudeRef",          dst: "GPSAltitudeRef",          render: false),
+  (ifd: "GPS",   src: "GPSAltitude",             dst: "GPSAltitude",             render: false),
+  (ifd: "GPS",   src: "GPSMapDatum",             dst: "GPSMapDatum",             render: false),
 ];
 // dart format on
 
@@ -91,9 +98,12 @@ Future<void> copyEXIF(
     if (!copyRenderingFields && field.render) {
       continue;
     }
-    final destIfd = field.ifd == "Image"
-        ? dest.exif.imageIfd
-        : dest.exif.exifIfd;
+    final destIfd = switch (field.ifd) {
+      "Image" => dest.exif.imageIfd,
+      "EXIF" => dest.exif.exifIfd,
+      "GPS" => dest.exif.gpsIfd,
+      _ => throw UnsupportedError("Unknown EXIF IFD: ${field.ifd}"),
+    };
     final value = _convertExifReaderValueToImageValue(
       srcExif["${field.ifd} ${field.src}"],
     );
