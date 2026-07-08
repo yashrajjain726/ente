@@ -13,6 +13,7 @@ workspace:
   - apps/photos/plugins/ente_feature_flag
   - apps/photos/plugins/onnx_dart
   - packages/accounts
+  - packages/account_deletion
   - packages/backup_exclusion
   - packages/base
   - packages/configuration
@@ -22,6 +23,7 @@ workspace:
   - packages/ente_crypto_api
   - packages/ente_crypto_dart_adapter
   - packages/ente_icons
+  - packages/install_source
   - packages/ente_pure_utils
   - packages/ente_qr
   - packages/ente_qr_scanner

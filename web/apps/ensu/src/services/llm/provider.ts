@@ -613,14 +613,14 @@ export class LlmProvider {
         const baseDir = await appDataDir();
         const modelsDir = await join(baseDir, "models");
         const filename = filenameFromUrl(url);
+        const hash = await hashUrl(url);
 
         if (settings.useCustomModel) {
-            const hash = await hashUrl(url);
             const customDir = await join(modelsDir, "custom");
             return join(customDir, `${hash}_${filename}`);
         }
 
-        return join(modelsDir, filename);
+        return join(modelsDir, `${hash}_${filename}`);
     }
 
     private async downloadModelsCombined(

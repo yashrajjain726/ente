@@ -2,17 +2,18 @@ import 'dart:io';
 
 import 'package:ente_components/ente_components.dart';
 import 'package:ente_events/event_bus.dart';
-import "package:ente_ui/components/title_bar_title_widget.dart";
 import 'package:ente_ui/utils/toast_util.dart';
 import "package:ente_utils/email_util.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:locker/core/errors.dart';
 import 'package:locker/events/user_details_refresh_event.dart';
 import 'package:locker/l10n/l10n.dart';
 import 'package:locker/models/info/info_item.dart';
 import 'package:locker/services/collections/collections_service.dart';
 import 'package:locker/services/collections/models/collection.dart';
+import 'package:locker/services/configuration.dart';
 import 'package:locker/services/favorites_service.dart';
 import 'package:locker/services/files/sync/models/file.dart';
 import 'package:locker/services/info_file_service.dart';
@@ -41,7 +42,6 @@ abstract class BaseInfoPage<T extends InfoData> extends StatefulWidget {
 abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
     extends State<W> {
   final _logger = Logger('BaseInfoPageState');
-  final _formKey = GlobalKey<FormState>();
   late InfoPageMode _currentMode;
 
   @protected
@@ -95,13 +95,32 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
 
   bool get showCollectionSelectionTitle => true;
   double get collectionSpacing => 24;
+  double get viewModeBottomPadding => 20;
 
   @protected
   bool get isSaveEnabled =>
       _hasLoadedCollectionSelection &&
-      (widget.existingFile == null || _selectedCollectionIds.isNotEmpty);
+      (widget.existingFile == null || _selectedCollectionIds.isNotEmpty) &&
+      validateForm();
 
-  bool get _canEditExistingFile => widget.existingFile is! TrashFile;
+  @protected
+  void onFieldChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  bool get _canEditExistingFile {
+    final existingFile = widget.existingFile;
+    if (existingFile == null) {
+      return true;
+    }
+    if (existingFile is TrashFile) {
+      return false;
+    }
+    final currentUserID = Configuration.instance.getUserID();
+    return currentUserID != null && existingFile.ownerID == currentUserID;
+  }
 
   @protected
   Future<bool> onEditModeBackPressed() async {
@@ -111,11 +130,6 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
   @protected
   Future<bool> onPopRequested() async {
     return true;
-  }
-
-  @protected
-  Widget buildAppBarTitle(BuildContext context) {
-    return TitleBarTitleWidget(title: pageTitle);
   }
 
   @protected
@@ -135,46 +149,30 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
   }
 
   @protected
-  Widget buildEditModeContent(
-    BuildContext context,
-    BoxConstraints constraints,
-  ) {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ...buildFormFields(),
-            SizedBox(height: collectionSpacing),
-            CollectionSelectionWidget(
-              collections: _availableCollections,
-              selectedCollectionIds: _selectedCollectionIds,
-              onToggleCollection: _onToggleCollection,
-              onCollectionsUpdated: _onCollectionsUpdated,
-              title: showCollectionSelectionTitle
-                  ? context.l10n.collections
-                  : '',
-            ),
-          ],
-        ),
+  Widget buildEditModeContent(BuildContext context) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      sliver: SliverList.list(
+        children: [
+          ...buildFormFields(),
+          SizedBox(height: collectionSpacing),
+          CollectionSelectionWidget(
+            collections: _availableCollections,
+            selectedCollectionIds: _selectedCollectionIds,
+            onToggleCollection: _onToggleCollection,
+            onCollectionsUpdated: _onCollectionsUpdated,
+            title: showCollectionSelectionTitle ? context.l10n.collections : '',
+          ),
+        ],
       ),
     );
   }
 
   @protected
-  Widget buildViewModeContent(
-    BuildContext context,
-    BoxConstraints constraints,
-  ) {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: buildViewFields(),
-        ),
-      ),
+  Widget buildViewModeContent(BuildContext context) {
+    return SliverPadding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, viewModeBottomPadding),
+      sliver: SliverList.list(children: buildViewFields()),
     );
   }
 
@@ -235,7 +233,7 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
   }
 
   Future<void> _saveRecord() async {
-    if (!_formKey.currentState!.validate() || !validateForm()) {
+    if (!validateForm()) {
       return;
     }
 
@@ -511,60 +509,15 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
     required String value,
     bool isSecret = false,
     int? maxLines,
+    int? minLines,
   }) {
-    final colors = context.componentColors;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (label.isNotEmpty) ...[
-          Text(
-            label,
-            style: TextStyles.body,
-          ), // Use default style to match FormTextInputWidget
-          const SizedBox(height: 12),
-        ],
-        ClipRRect(
-          borderRadius: const BorderRadius.all(Radius.circular(8)),
-          child: Material(
-            color: Colors.transparent,
-            child: Stack(
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                  decoration: BoxDecoration(
-                    color: colors.fillDark,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    isSecret ? '••••••••' : value,
-                    style: TextStyles.body,
-                    maxLines: maxLines,
-                    overflow: maxLines != null ? TextOverflow.ellipsis : null,
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: InkWell(
-                    onTap: () => _copyToClipboard(value, label),
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(
-                        Icons.copy,
-                        size: 16,
-                        color: colors.textLight,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+    return _InfoViewField(
+      label: label.isEmpty ? null : label,
+      value: value,
+      isSecret: isSecret,
+      maxLines: maxLines,
+      minLines: minLines,
+      onCopy: () => _copyToClipboard(value, label),
     );
   }
 
@@ -614,35 +567,6 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
         }
       },
       child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: colors.backgroundBase,
-          surfaceTintColor: Colors.transparent,
-          toolbarHeight: 48,
-          leadingWidth: 48,
-          centerTitle: false,
-          titleSpacing: 0,
-          title: buildAppBarTitle(context),
-          leading: isEditMode && currentData != null
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_outlined),
-                  onPressed: _handleBackNavigation,
-                  tooltip: context.l10n.backToView,
-                )
-              : IconButton(
-                  icon: const Icon(Icons.arrow_back_outlined),
-                  onPressed: _handleBackNavigation,
-                  tooltip: context.l10n.back,
-                ),
-          automaticallyImplyLeading: false,
-          actions: [
-            if (isViewMode && currentData != null && _canEditExistingFile)
-              IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: _toggleMode,
-                tooltip: context.l10n.edit,
-              ),
-          ],
-        ),
         backgroundColor: colors.backgroundBase,
         body: GestureDetector(
           onTap: Platform.isIOS
@@ -651,38 +575,177 @@ abstract class BaseInfoPageState<T extends InfoData, W extends BaseInfoPage<T>>
                 }
               : null,
           behavior: HitTestBehavior.translucent,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        if (isViewMode) {
-                          return buildViewModeContent(context, constraints);
-                        }
-                        return buildEditModeContent(context, constraints);
-                      },
+          child: Column(
+            children: [
+              Expanded(
+                child: AppBarComponent(
+                  title: pageTitle,
+                  backgroundColor: colors.backgroundBase,
+                  onBack: _handleBackNavigation,
+                  actions: [
+                    if (isViewMode &&
+                        currentData != null &&
+                        _canEditExistingFile)
+                      IconButtonComponent(
+                        icon: const HugeIcon(
+                          icon: HugeIcons.strokeRoundedEdit03,
+                        ),
+                        variant: IconButtonComponentVariant.unfilled,
+                        shouldSurfaceExecutionStates: false,
+                        onTap: _toggleMode,
+                        tooltip: context.l10n.edit,
+                      ),
+                  ],
+                  slivers: [
+                    isViewMode
+                        ? buildViewModeContent(context)
+                        : buildEditModeContent(context),
+                  ],
+                ),
+              ),
+              if (isEditMode)
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: ButtonComponent(
+                      label: submitButtonText,
+                      onTap: isSaveEnabled ? _saveRecord : null,
                     ),
                   ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-                  // Save button only in edit mode
-                  if (isEditMode) ...[
-                    const SizedBox(height: 8),
-                    SafeArea(
-                      child: ButtonComponent(
-                        label: submitButtonText,
-                        onTap: isSaveEnabled ? _saveRecord : null,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                ],
-              ),
-            ),
+class _InfoViewField extends StatefulWidget {
+  const _InfoViewField({
+    required this.value,
+    required this.onCopy,
+    this.label,
+    this.isSecret = false,
+    this.maxLines,
+    this.minLines,
+  });
+
+  final String? label;
+  final String value;
+  final VoidCallback onCopy;
+  final bool isSecret;
+  final int? maxLines;
+  final int? minLines;
+
+  @override
+  State<_InfoViewField> createState() => _InfoViewFieldState();
+}
+
+class _InfoViewFieldState extends State<_InfoViewField> {
+  static const _defaultMaxLines = 1;
+
+  final FocusNode _focusNode = FocusNode(
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
+  bool _revealed = false;
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.componentColors;
+    final hasValue = widget.value.trim().isNotEmpty;
+    final onCopy = hasValue ? widget.onCopy : null;
+
+    if (widget.isSecret) {
+      return TextInputComponent(
+        label: widget.label,
+        focusNode: _focusNode,
+        initialValue: _revealed ? widget.value : '••••••••',
+        readOnly: true,
+        maxLines: 1,
+        suffix: _secretSuffix(colors.textBase, onCopy),
+      );
+    }
+
+    final copyAffordance = hasValue
+        ? HugeIcon(
+            icon: HugeIcons.strokeRoundedCopy01,
+            size: IconSizes.small,
+            color: colors.textBase,
+          )
+        : null;
+
+    final minLines = widget.minLines;
+    final maxLines =
+        widget.maxLines ??
+        (minLines != null && minLines > _defaultMaxLines
+            ? minLines
+            : _defaultMaxLines);
+
+    return TextInputComponent(
+      label: widget.label,
+      focusNode: _focusNode,
+      initialValue: widget.value,
+      readOnly: true,
+      maxLines: maxLines,
+      minLines: minLines,
+      suffix: copyAffordance,
+      onSuffixTap: onCopy,
+    );
+  }
+
+  Widget _secretSuffix(Color iconColor, VoidCallback? onCopy) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _secretAffordance(
+          semanticLabel: _revealed ? 'hide_password' : 'show_password',
+          icon: _revealed
+              ? HugeIcons.strokeRoundedViewOffSlash
+              : HugeIcons.strokeRoundedView,
+          color: iconColor,
+          onTap: () => setState(() => _revealed = !_revealed),
+        ),
+        if (onCopy != null) ...[
+          const SizedBox(width: Spacing.sm),
+          _secretAffordance(
+            semanticLabel: 'copy_password',
+            icon: HugeIcons.strokeRoundedCopy01,
+            color: iconColor,
+            onTap: onCopy,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _secretAffordance({
+    required String semanticLabel,
+    required List<List<dynamic>> icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      label: semanticLabel,
+      button: true,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: SizedBox(
+          width: IconSizes.medium,
+          height: 48,
+          child: Center(
+            child: HugeIcon(icon: icon, size: IconSizes.small, color: color),
           ),
         ),
       ),
