@@ -400,6 +400,31 @@ pub async fn llm_load_model(
         "LLM",
         format!("load model requested model_path={}", params.model_path),
     );
+    // GPU offload selection, in order of precedence: an explicit value from the
+    // web layer > the ENSU_N_GPU_LAYERS env override > the default. Benchmarking
+    // on the Vulkan backend (RX 480, Gemma 4 E4B) showed full offload is both
+    // fastest (no per-token CPU<->GPU activation transfers; partial offload was
+    // up to ~1.6x slower) and most robust (it sidesteps a ggml scheduler assert
+    // that can abort partial CPU/GPU splits). The driver spills any VRAM overflow
+    // to system memory instead of failing, so "offload everything" is a safe
+    // default. Set ENSU_N_GPU_LAYERS to cap it on a small GPU, or to 0 for CPU.
+    const DEFAULT_GPU_LAYERS: i32 = 999; // llama.cpp clamps to the model's layer count
+    let mut params = params;
+    if params.n_gpu_layers.is_none() {
+        params.n_gpu_layers = Some(match std::env::var("ENSU_N_GPU_LAYERS") {
+            Ok(raw) => match raw.trim().parse::<i32>() {
+                Ok(layers) => {
+                    logging::log("LLM", format!("n_gpu_layers from ENSU_N_GPU_LAYERS={layers}"));
+                    layers
+                }
+                Err(_) => {
+                    logging::log("LLM", format!("ignoring invalid ENSU_N_GPU_LAYERS={raw:?}"));
+                    DEFAULT_GPU_LAYERS
+                }
+            },
+            Err(_) => DEFAULT_GPU_LAYERS,
+        });
+    }
     let model = async_runtime::spawn_blocking(move || {
         match catch_unwind(AssertUnwindSafe(|| llm::Model::load(params))) {
             Ok(result) => result.map_err(llm_api_error),
