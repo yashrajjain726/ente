@@ -4,7 +4,6 @@ import "package:hugeicons/hugeicons.dart";
 import 'package:intl/intl.dart';
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/file.dart";
-import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/viewer/date/date_time_picker.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
 import "package:photos/utils/magic_util.dart";
@@ -248,7 +247,6 @@ class DateAndTimeWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
     final colors = context.componentColors;
     final locale = Localizations.localeOf(context);
     final String date = DateFormat.yMMMd(locale.toString()).format(dateTime);
@@ -266,7 +264,7 @@ class DateAndTimeWidget extends StatelessWidget {
                 selectDate
                     ? AppLocalizations.of(context).selectOneDateAndTimeForAll
                     : AppLocalizations.of(context).selectStartOfRange,
-                style: TextStyle(color: colorScheme.textBase, fontSize: 16),
+                style: TextStyle(color: colors.textBase, fontSize: 16),
               ),
             ),
           if (!singleFile) const SizedBox(height: 8),
@@ -281,7 +279,7 @@ class DateAndTimeWidget extends StatelessWidget {
                     : AppLocalizations.of(
                         context,
                       ).allWillShiftRangeBasedOnFirst,
-                style: TextStyle(color: colorScheme.textFaint, fontSize: 12),
+                style: TextStyle(color: colors.textLight, fontSize: 12),
               ),
             ),
           if (!singleFile) const SizedBox(height: 16),
@@ -323,15 +321,15 @@ class DateAndTimeWidget extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(
                 AppLocalizations.of(context).newRange,
-                style: TextStyle(color: colorScheme.textBase, fontSize: 12),
+                style: TextStyle(color: colors.textBase, fontSize: 12),
               ),
             ),
           if (newRangeEnd != null) const SizedBox(height: 8),
           if (newRangeEnd != null)
             Container(
               decoration: BoxDecoration(
-                color: colorScheme.backgroundElevated2,
-                border: Border.all(color: colorScheme.strokeFaint, width: 0.5),
+                color: colors.fillLight,
+                border: Border.all(color: colors.strokeFaint, width: 0.5),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Padding(
@@ -343,7 +341,7 @@ class DateAndTimeWidget extends StatelessWidget {
                       padding: const EdgeInsets.all(8.0),
                       child: Icon(
                         Icons.calendar_today_outlined,
-                        color: colorScheme.textBase,
+                        color: colors.textBase,
                       ),
                     ),
                     Expanded(
@@ -353,7 +351,7 @@ class DateAndTimeWidget extends StatelessWidget {
                           Text(
                             _formatDate(dateTime, locale, context),
                             style: TextStyle(
-                              color: colorScheme.textFaint,
+                              color: colors.textLight,
                               fontSize: 12,
                             ),
                           ),
@@ -362,7 +360,7 @@ class DateAndTimeWidget extends StatelessWidget {
                             child: Text(
                               "-",
                               style: TextStyle(
-                                color: colorScheme.textFaint,
+                                color: colors.textLight,
                                 fontSize: 12,
                               ),
                             ),
@@ -370,7 +368,7 @@ class DateAndTimeWidget extends StatelessWidget {
                           Text(
                             _formatDate(newRangeEnd!, locale, context),
                             style: TextStyle(
-                              color: colorScheme.textFaint,
+                              color: colors.textLight,
                               fontSize: 12,
                             ),
                           ),
