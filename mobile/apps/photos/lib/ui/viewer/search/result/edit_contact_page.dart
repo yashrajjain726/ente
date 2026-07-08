@@ -598,10 +598,11 @@ class _EditContactPageState extends State<EditContactPage> {
       }
     }
 
-    if (updatedPersons.isNotEmpty) {
+    for (final updatedPerson in updatedPersons) {
       Bus.instance.fire(
         PeopleChangedEvent(
-          person: updatedPersons.last,
+          type: PeopleEventType.saveOrEditPerson,
+          person: updatedPerson,
           source: "edit_contact_link",
         ),
       );

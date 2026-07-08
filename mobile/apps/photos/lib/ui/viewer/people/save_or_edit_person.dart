@@ -72,7 +72,6 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   String _inputName = "";
   String? _selectedDate;
   String? _email;
-  bool _contactLinkEmailCleared = false;
   bool _isPinned = false;
   bool _hideFromMemories = false;
   bool userAlreadyAssigned = false;
@@ -87,11 +86,13 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   int? get _currentUserIDToSave =>
       currentUserIDForContactLinkEmail(_emailToSave);
 
+  bool get _contactLinkEmailChanged =>
+      widget.isEditing && _emailToSave != _trimEmptyToNull(person?.data.email);
+
   bool get _shouldClearContactUserID =>
-      widget.isEditing &&
-      _contactLinkEmailCleared &&
+      _contactLinkEmailChanged &&
       person?.data.userID != null &&
-      _emailToSave == null;
+      _currentUserIDToSave == null;
 
   bool get _shouldSetCurrentUserID =>
       widget.isEditing &&
@@ -1262,13 +1263,8 @@ class _EmailSectionState extends State<_EmailSection> {
   void _updateEmailField(String? newEmail) {
     final saveOrEditPersonState = context
         .findAncestorStateOfType<_SaveOrEditPersonState>()!;
-    final clearedExistingEmail =
-        saveOrEditPersonState.widget.isEditing &&
-        _trimEmptyToNull(saveOrEditPersonState.person?.data.email) != null &&
-        _trimEmptyToNull(newEmail) == null;
     saveOrEditPersonState.setState(() {
       saveOrEditPersonState._email = newEmail;
-      saveOrEditPersonState._contactLinkEmailCleared = clearedExistingEmail;
     });
   }
 
