@@ -657,6 +657,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
         MediaQuery.textScalerOf(context).scale(smallFontSize) / smallFontSize;
     const horizontalEdgePadding = 20.0;
     const gridPadding = 16.0;
+    const labelHeight = 28.0;
 
     return FutureBuilder<List<GenericSearchResult>>(
       future: sectionData,
@@ -705,6 +706,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
                   ((horizontalEdgePadding * 2) +
                       ((crossAxisCount - 1) * gridPadding))) /
               crossAxisCount;
+          final gridItemHeight = itemSize + (labelHeight * textScaleFactor);
 
           if (_isSearching) {
             final searchResults = [
@@ -725,8 +727,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
                     mainAxisSpacing: gridPadding,
                     crossAxisSpacing: gridPadding,
                     crossAxisCount: crossAxisCount,
-                    childAspectRatio:
-                        itemSize / (itemSize + (24 * textScaleFactor)),
+                    childAspectRatio: itemSize / gridItemHeight,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     childCount: searchResults.length,
@@ -796,8 +797,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
                     mainAxisSpacing: gridPadding,
                     crossAxisSpacing: gridPadding,
                     crossAxisCount: crossAxisCount,
-                    childAspectRatio:
-                        itemSize / (itemSize + (24 * textScaleFactor)),
+                    childAspectRatio: itemSize / gridItemHeight,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     childCount: filteredNormalFaces.length,
@@ -834,8 +834,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
                       mainAxisSpacing: gridPadding,
                       crossAxisSpacing: gridPadding,
                       crossAxisCount: crossAxisCount,
-                      childAspectRatio:
-                          itemSize / (itemSize + (24 * textScaleFactor)),
+                      childAspectRatio: itemSize / gridItemHeight,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       childCount: filteredExtraFaces.length,
