@@ -1,11 +1,10 @@
 import "package:ente_components/ente_components.dart";
 import 'package:flutter/material.dart';
+import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/file_caption_updated_event.dart";
 import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
-import 'package:photos/ui/components/keyboard/keyboard_oveylay.dart';
-import 'package:photos/ui/components/keyboard/keyboard_top_button.dart';
 import "package:photos/ui/notification/toast.dart";
 import 'package:photos/utils/magic_util.dart';
 
@@ -41,12 +40,10 @@ class _FileCaptionWidgetState extends State<FileCaptionWidget> {
   late String defaultHintText = AppLocalizations.of(
     context,
   ).fileInfoAddDescHint;
-  Widget? keyboardTopButtons;
 
   @override
   void initState() {
     super.initState();
-    _focusNode.addListener(_focusNodeListener);
     editedCaption = widget.file.caption;
     if (editedCaption != null && editedCaption!.isNotEmpty) {
       _textController.text = editedCaption!;
@@ -55,7 +52,7 @@ class _FileCaptionWidgetState extends State<FileCaptionWidget> {
 
   @override
   void dispose() {
-    if (editedCaption != null) {
+    if (_hasPendingCaptionEdit) {
       editFileCaption(
         null,
         widget.file,
@@ -63,30 +60,46 @@ class _FileCaptionWidgetState extends State<FileCaptionWidget> {
       ).then((isSuccess) => _onEditFileFinish(isSuccess));
     }
     _textController.dispose();
-    _focusNode.removeListener(_focusNodeListener);
+    _focusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return TextInputComponent(
-      controller: _textController,
-      focusNode: _focusNode,
-      hintText: defaultHintText,
-      maxLength: maxLength,
-      minLines: 1,
-      maxLines: 10,
-      textCapitalization: TextCapitalization.sentences,
-      keyboardType: TextInputType.multiline,
-      onSubmit: (value) => _onDoneClick(context),
-      onChanged: (value) {
-        editedCaption = value;
-      },
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: TextInputComponent(
+            controller: _textController,
+            focusNode: _focusNode,
+            hintText: defaultHintText,
+            maxLength: maxLength,
+            minLines: 1,
+            maxLines: 10,
+            textCapitalization: TextCapitalization.sentences,
+            keyboardType: TextInputType.multiline,
+            onSubmit: (value) => _onDoneClick(context),
+            onChanged: (value) {
+              setState(() {
+                editedCaption = value;
+              });
+            },
+          ),
+        ),
+        const SizedBox(width: Spacing.sm),
+        IconButtonComponent(
+          variant: IconButtonComponentVariant.green,
+          tooltip: AppLocalizations.of(context).done,
+          icon: const HugeIcon(icon: HugeIcons.strokeRoundedTick02),
+          onTap: _hasPendingCaptionEdit ? onDoneTap : null,
+        ),
+      ],
     );
   }
 
   Future<void> _onDoneClick(BuildContext context) async {
-    if (editedCaption != null) {
+    if (_hasPendingCaptionEdit) {
       final isSuccesful = await editFileCaption(
         context,
         widget.file,
@@ -100,28 +113,13 @@ class _FileCaptionWidgetState extends State<FileCaptionWidget> {
     }
   }
 
-  void onCancelTap() {
-    _textController.text = widget.file.caption ?? '';
-    _focusNode.unfocus();
-    editedCaption = null;
-  }
-
   void onDoneTap() {
     _focusNode.unfocus();
     _onDoneClick(context);
   }
 
-  void _focusNodeListener() {
-    keyboardTopButtons ??= KeyboardTopButton(
-      onDoneTap: onDoneTap,
-      onCancelTap: onCancelTap,
-    );
-    if (_focusNode.hasFocus) {
-      KeyboardOverlay.showOverlay(context, keyboardTopButtons!);
-    } else {
-      KeyboardOverlay.removeOverlay();
-    }
-  }
+  bool get _hasPendingCaptionEdit =>
+      editedCaption != null && editedCaption != (widget.file.caption ?? '');
 
   bool _onEditFileFinish(bool isSuccess) {
     if (!mounted) {
