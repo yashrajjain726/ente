@@ -36,7 +36,7 @@ const _copiedExifFields = [
   (ifd: "EXIF",  src: "ISOSpeedRatings",         dst: "ISOSpeed",                render: false), //ishowspeed
   (ifd: "EXIF",  src: "FocalLength",             dst: "FocalLength",             render: false),
   (ifd: "EXIF",  src: "FocalLengthIn35mmFilm",   dst: "FocalLengthIn35mmFilm",   render: false),
-  (ifd: "EXIF",  src: "ColorSpace",              dst: "ColorSpace",              render: false),
+  (ifd: "EXIF",  src: "ColorSpace",              dst: "ColorSpace",              render: true),
   (ifd: "GPS",   src: "GPSLatitudeRef",          dst: "GPSLatitudeRef",          render: false),
   (ifd: "GPS",   src: "GPSLatitude",             dst: "GPSLatitude",             render: false),
   (ifd: "GPS",   src: "GPSLongitudeRef",         dst: "GPSLongitudeRef",         render: false),
