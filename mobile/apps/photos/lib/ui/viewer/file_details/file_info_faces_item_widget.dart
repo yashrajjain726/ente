@@ -23,7 +23,6 @@ import "package:photos/services/machine_learning/face_ml/person/person_service.d
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
-import "package:photos/ui/components/buttons/icon_button_widget.dart";
 import "package:photos/ui/components/models/button_type.dart";
 import "package:photos/ui/viewer/file_details/file_info_face_widget.dart";
 import "package:photos/ui/viewer/people/add_files_to_person_page.dart";
@@ -44,7 +43,7 @@ class FacesItemWidget extends StatefulWidget {
 }
 
 class _FacesItemWidgetState extends State<FacesItemWidget> {
-  static const double _kHeaderActionHeight = 48;
+  static const double _kHeaderActionHeight = 36;
   static const double _kFaceThumbnailSize = 60;
   bool _isEditMode = false;
   bool _showRemainingFaces = false;
@@ -424,9 +423,14 @@ class _FacesItemWidgetState extends State<FacesItemWidget> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (hasSelection) ...[
-            IconButtonWidget(
-              icon: Icons.person_off_outlined,
-              iconButtonType: IconButtonType.secondary,
+            IconButtonComponent(
+              icon: HugeIcon(
+                icon: HugeIcons.strokeRoundedUserBlock01,
+                size: IconSizes.small,
+                color: context.componentColors.textLight,
+              ),
+              variant: IconButtonComponentVariant.secondary,
+              shouldSurfaceExecutionStates: false,
               onTap: _onIgnoreSelectedFaces,
             ),
             const SizedBox(width: 8),
