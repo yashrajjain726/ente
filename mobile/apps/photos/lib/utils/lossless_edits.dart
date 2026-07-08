@@ -13,7 +13,7 @@ final _logger = Logger("lossless_edits");
 
 Future<Uint8List?> tryRotateFileLossless(EnteFile src, int turns) async {
   try {
-    return _rotateFileLossless(src, turns);
+    return await _rotateFileLossless(src, turns);
   } catch (e, s) {
     _logger.warning("Failed to rotate file losslessly", e, s);
     return null;

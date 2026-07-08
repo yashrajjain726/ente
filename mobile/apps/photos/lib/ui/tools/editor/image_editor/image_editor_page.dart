@@ -87,7 +87,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     return result;
   }
 
-  Future<void> saveImage(Uint8List bytes) async {
+  Future<void> saveImage(ProImageEditorState editorState) async {
     final l10n = AppLocalizations.of(context);
     final dialog = createProgressDialog(context, l10n.saving);
     await dialog.show();
@@ -95,6 +95,14 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     bool hasStoppedChangeNotify = false;
 
     try {
+      final turns = getTurnsIfOnlyRotated(editorState);
+      final losslessBytes = turns == null
+          ? null
+          : await tryRotateFileLossless(widget.originalFile, turns);
+      final bytes =
+          losslessBytes ??
+          await compressImage(await editorState.captureEditorImage());
+
       final fileName =
           path.basenameWithoutExtension(widget.originalFile.title!) +
           "_edited_" +
@@ -345,20 +353,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
                         undo: () => editor.undoAction(),
                         configs: editor.configs,
                         done: () async {
-                          final editor = editorKey.currentState!;
-                          final turns = getTurnsIfOnlyRotated(editor);
-                          final losslessBytes = turns == null
-                              ? null
-                              : await tryRotateFileLossless(
-                                  widget.originalFile,
-                                  turns,
-                                );
-                          await saveImage(
-                            losslessBytes ??
-                                await compressImage(
-                                  await editor.captureEditorImage(),
-                                ),
-                          );
+                          await saveImage(editorKey.currentState!);
                         },
                         close: () {
                           _showExitConfirmationDialog(context);
