@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:logging/logging.dart';
 
 class EnteWatch extends Stopwatch {
   final String context;
@@ -6,8 +7,11 @@ class EnteWatch extends Stopwatch {
 
   EnteWatch(this.context) : super();
 
+  static final bool _shouldLog =
+      kDebugMode && Logger.root.isLoggable(Level.INFO);
+
   void log(String msg) {
-    if (kDebugMode) {
+    if (_shouldLog) {
       debugPrint(
         "[$context]: $msg took ${Duration(microseconds: elapsedMicroseconds - previousElapsed).inMilliseconds} ms  total: "
         "${elapsed.inMilliseconds} ms",
@@ -17,7 +21,7 @@ class EnteWatch extends Stopwatch {
   }
 
   void logAndReset(String msg) {
-    if (kDebugMode) {
+    if (_shouldLog) {
       debugPrint("[$context]: $msg took ${elapsed.inMilliseconds} ms");
     }
     reset();

@@ -167,10 +167,9 @@ class SuperLogging {
   /// The logger for SuperLogging
   static final $ = Logger('ente_logging');
 
-  static const _rootLogLevelDefine = String.fromEnvironment('ENTE_LOG_LEVEL');
-  static const _loggerPrefixDefine = String.fromEnvironment(
+  static final String _loggerPrefixDefine = const String.fromEnvironment(
     'ENTE_LOGGER_PREFIX',
-  );
+  ).trim().toLowerCase();
 
   /// The current super logging configuration
   static late LogConfig config;
@@ -413,32 +412,21 @@ class SuperLogging {
 
   static String _lastExtraLines = '';
 
-  static Level get rootLoggerLevel =>
-      _levelFromName(_rootLogLevelDefine) ??
+  static final Level rootLoggerLevel =
+      Level.LEVELS
+          .where(
+            (level) =>
+                level.name.toLowerCase() ==
+                const String.fromEnvironment(
+                  'ENTE_LOG_LEVEL',
+                ).trim().toLowerCase(),
+          )
+          .firstOrNull ??
       (kDebugMode ? Level.ALL : Level.INFO);
 
-  static String get loggerPrefixFilter => _loggerPrefixDefine.trim();
-
   static bool shouldLogRecord(LogRecord rec) {
-    final prefix = loggerPrefixFilter;
-    return prefix.isEmpty || rec.loggerName.startsWith(prefix);
-  }
-
-  static Level? _levelFromName(String name) {
-    return switch (name.trim().toUpperCase()) {
-      '' => null,
-      'ALL' => Level.ALL,
-      'SHOUT' => Level.SHOUT,
-      'SEVERE' || 'ERROR' => Level.SEVERE,
-      'WARNING' || 'WARN' => Level.WARNING,
-      'INFO' => Level.INFO,
-      'CONFIG' => Level.CONFIG,
-      'FINE' || 'DEBUG' => Level.FINE,
-      'FINER' => Level.FINER,
-      'FINEST' || 'TRACE' => Level.FINEST,
-      'OFF' => Level.OFF,
-      _ => null,
-    };
+    return _loggerPrefixDefine.isEmpty ||
+        rec.loggerName.toLowerCase().startsWith(_loggerPrefixDefine);
   }
 
   static Future onLogRecord(LogRecord rec) async {
