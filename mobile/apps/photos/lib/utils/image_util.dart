@@ -55,21 +55,76 @@ Future<ui.Image> convertImageToFlutterUi(img.Image image) async {
 }
 
 const _copiedExifFields = [
-  (ifd: "Image", source: "Make", dest: "Make"),
-  (ifd: "Image", source: "Model", dest: "Model"),
-  (ifd: "Image", source: "Orientation", dest: "Orientation"),
-  (ifd: "Image", source: "Artist", dest: "Artist"),
-  (ifd: "Image", source: "Copyright", dest: "Copyright"),
-  (ifd: "EXIF", source: "DateTimeOriginal", dest: "DateTimeOriginal"),
-  (ifd: "EXIF", source: "DateTimeDigitized", dest: "DateTimeDigitized"),
-  (ifd: "EXIF", source: "OffsetTimeOriginal", dest: "OffsetTimeOriginal"),
-  (ifd: "EXIF", source: "LensModel", dest: "LensModel"),
-  (ifd: "EXIF", source: "ExposureTime", dest: "ExposureTime"),
-  (ifd: "EXIF", source: "FNumber", dest: "FNumber"),
-  (ifd: "EXIF", source: "ISOSpeedRatings", dest: "ISOSpeed"), //ishowspeed
-  (ifd: "EXIF", source: "FocalLength", dest: "FocalLength"),
-  (ifd: "EXIF", source: "FocalLengthIn35mmFilm", dest: "FocalLengthIn35mmFilm"),
-  (ifd: "EXIF", source: "ColorSpace", dest: "ColorSpace"),
+  (ifd: "Image", source: "Make", dest: "Make", affectsRendering: false),
+  (ifd: "Image", source: "Model", dest: "Model", affectsRendering: false),
+  (
+    ifd: "Image",
+    source: "Orientation",
+    dest: "Orientation",
+    affectsRendering: true,
+  ),
+  (ifd: "Image", source: "Artist", dest: "Artist", affectsRendering: false),
+  (
+    ifd: "Image",
+    source: "Copyright",
+    dest: "Copyright",
+    affectsRendering: false,
+  ),
+  (
+    ifd: "EXIF",
+    source: "DateTimeOriginal",
+    dest: "DateTimeOriginal",
+    affectsRendering: false,
+  ),
+  (
+    ifd: "EXIF",
+    source: "DateTimeDigitized",
+    dest: "DateTimeDigitized",
+    affectsRendering: false,
+  ),
+  (
+    ifd: "EXIF",
+    source: "OffsetTimeOriginal",
+    dest: "OffsetTimeOriginal",
+    affectsRendering: false,
+  ),
+  (
+    ifd: "EXIF",
+    source: "LensModel",
+    dest: "LensModel",
+    affectsRendering: false,
+  ),
+  (
+    ifd: "EXIF",
+    source: "ExposureTime",
+    dest: "ExposureTime",
+    affectsRendering: false,
+  ),
+  (ifd: "EXIF", source: "FNumber", dest: "FNumber", affectsRendering: false),
+  (
+    ifd: "EXIF",
+    source: "ISOSpeedRatings",
+    dest: "ISOSpeed",
+    affectsRendering: false,
+  ), //ishowspeed
+  (
+    ifd: "EXIF",
+    source: "FocalLength",
+    dest: "FocalLength",
+    affectsRendering: false,
+  ),
+  (
+    ifd: "EXIF",
+    source: "FocalLengthIn35mmFilm",
+    dest: "FocalLengthIn35mmFilm",
+    affectsRendering: false,
+  ),
+  (
+    ifd: "EXIF",
+    source: "ColorSpace",
+    dest: "ColorSpace",
+    affectsRendering: false,
+  ),
 ];
 
 img.IfdValue? convertExifReaderValueToImageValue(exif.IfdTag? tag) {
@@ -112,9 +167,17 @@ img.IfdValue? convertExifReaderValueToImageValue(exif.IfdTag? tag) {
   };
 }
 
-Future<void> copyEXIF(EnteFile src, img.Image dest) async {
+// TODO: Move EXIF writes off the Dart image library to a Rust implementation.
+Future<void> copyEXIF(
+  EnteFile src,
+  img.Image dest, {
+  bool copyRenderingFields = true,
+}) async {
   final srcExif = await getExif(src);
   for (final field in _copiedExifFields) {
+    if (!copyRenderingFields && field.affectsRendering) {
+      continue;
+    }
     final destIfd = field.ifd == "Image"
         ? dest.exif.imageIfd
         : dest.exif.exifIfd;

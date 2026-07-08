@@ -85,7 +85,11 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
         try {
           final image = img.decodePng(bytes);
           if (image != null) {
-            await copyEXIF(widget.originalFile, image);
+            await copyEXIF(
+              widget.originalFile,
+              image,
+              copyRenderingFields: false,
+            );
             result = img.encodeJpg(image, quality: 95);
           }
         } catch (e, s) {
