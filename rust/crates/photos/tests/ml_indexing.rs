@@ -2,7 +2,7 @@ mod support;
 
 use anyhow::Result;
 use support::ml_indexing::{
-    ComparisonStats, MlIndexingTestContext, fail_if_any, prefetch_only, run_with_large_stack,
+    ComparisonStats, MlIndexingTestContext, fail_if_any, run_with_large_stack,
 };
 
 #[test]
@@ -12,9 +12,6 @@ fn rust_ml_matches_python_goldens() {
 
 fn run_ml_indexing_test() -> Result<()> {
     let context = MlIndexingTestContext::load()?;
-    if prefetch_only() {
-        return context.prefetch_all_fixtures();
-    }
     let runtime = context.prepare_runtime()?;
 
     let mut failures = context.validate_manifest_expectations()?;

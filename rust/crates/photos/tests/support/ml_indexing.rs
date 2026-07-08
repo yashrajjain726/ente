@@ -25,7 +25,6 @@ const CLIP_EMBEDDING_DIM: usize = 512;
 const FACE_EMBEDDING_DIM: usize = 192;
 const FLOAT_TOLERANCE: f64 = 1e-8;
 const PRINT_STATS_ENV: &str = "ENTE_ML_INDEXING_PRINT_STATS";
-const PREFETCH_ONLY_ENV: &str = "ENTE_ML_ASSETS_PREFETCH_ONLY";
 const DOWNLOAD_MAX_ATTEMPTS: usize = 4;
 const DOWNLOAD_RETRY_BASE_DELAY_MS: u64 = 500;
 
@@ -156,15 +155,7 @@ struct MetricObservation {
 }
 
 fn should_print_stats() -> bool {
-    env_flag(PRINT_STATS_ENV)
-}
-
-pub(crate) fn prefetch_only() -> bool {
-    env_flag(PREFETCH_ONLY_ENV)
-}
-
-fn env_flag(name: &str) -> bool {
-    let Ok(value) = std::env::var(name) else {
+    let Ok(value) = std::env::var(PRINT_STATS_ENV) else {
         return false;
     };
     let value = value.trim();
@@ -179,7 +170,6 @@ pub(crate) struct MlIndexingTestContext {
     cache_dir: PathBuf,
     client: Client,
     golden_results: HashMap<String, ComparableResult>,
-    local_assets_root: Option<PathBuf>,
     manifest: FixtureManifest,
     runtime_config: MlRuntimeConfig,
 }
@@ -189,22 +179,15 @@ impl MlIndexingTestContext {
         let repo_root = repo_root()?;
         let asset_lock = load_asset_lock(&repo_root)?;
         let cache_dir = cache_dir(&repo_root);
-        let local_assets_root = std::env::var_os("ENTE_ML_ASSETS_REPO_DIR").map(PathBuf::from);
         let client = Client::builder()
             .user_agent("ente-rust-ml-indexing-test")
             .build()
             .context("build HTTP client")?;
 
-        let manifest_path = resolve_document_asset(
-            &client,
-            local_assets_root.as_deref(),
-            &cache_dir,
-            "manifest",
-            &asset_lock.manifest,
-        )?;
+        let manifest_path =
+            resolve_document_asset(&client, &cache_dir, "manifest", &asset_lock.manifest)?;
         let golden_path = resolve_document_asset(
             &client,
-            local_assets_root.as_deref(),
             &cache_dir,
             "python-golden",
             &asset_lock.python_golden,
@@ -233,7 +216,6 @@ impl MlIndexingTestContext {
             cache_dir,
             client,
             golden_results,
-            local_assets_root,
             manifest,
             runtime_config,
         })
@@ -359,13 +341,6 @@ impl MlIndexingTestContext {
         Ok(())
     }
 
-    pub(crate) fn prefetch_all_fixtures(&self) -> Result<()> {
-        for fixture in &self.manifest.files {
-            self.resolve_fixture(fixture)?;
-        }
-        Ok(())
-    }
-
     fn manifest_file_ids(&self) -> Result<BTreeSet<String>> {
         let mut ids = BTreeSet::new();
         for file in &self.manifest.files {
@@ -380,7 +355,6 @@ impl MlIndexingTestContext {
     fn resolve_fixture(&self, fixture: &FixtureFile) -> Result<PathBuf> {
         resolve_fixture_asset(
             &self.client,
-            self.local_assets_root.as_deref(),
             &self.cache_dir,
             &self.asset_lock.fixture_base_url,
             fixture,
@@ -513,9 +487,7 @@ fn repo_root() -> Result<PathBuf> {
 }
 
 fn cache_dir(repo_root: &Path) -> PathBuf {
-    std::env::var_os("ENTE_ML_ASSETS_CACHE_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| repo_root.join("rust/target/ml-assets-cache"))
+    repo_root.join("rust/.cache")
 }
 
 fn load_asset_lock(repo_root: &Path) -> Result<AssetLock> {
@@ -569,31 +541,21 @@ fn file_id_for_manifest_path(path: &str) -> Result<String> {
 
 fn resolve_document_asset(
     client: &Client,
-    local_assets_root: Option<&Path>,
     cache_dir: &Path,
     label: &str,
     asset: &DocumentAsset,
 ) -> Result<PathBuf> {
-    if let Some(root) = local_assets_root {
-        return require_local_asset(root, &asset.path, &asset.sha256, label);
-    }
-
     let target = cache_path_for(cache_dir, "documents", &asset.path, &asset.sha256)?;
     ensure_remote_asset(client, &asset.url, &asset.sha256, &target, label)
 }
 
 fn resolve_fixture_asset(
     client: &Client,
-    local_assets_root: Option<&Path>,
     cache_dir: &Path,
     fixture_base_url: &str,
     fixture: &FixtureFile,
 ) -> Result<PathBuf> {
     let file_id = file_id_for_manifest_path(&fixture.path)?;
-    if let Some(root) = local_assets_root {
-        return require_local_asset(root, &fixture.path, &fixture.sha256, &file_id);
-    }
-
     let url = Url::parse(fixture_base_url)
         .with_context(|| format!("parse fixture base URL '{fixture_base_url}'"))?
         .join(&fixture.path)
@@ -750,23 +712,6 @@ fn resolve_model_asset(
 ) -> Result<PathBuf> {
     let target = cache_path_for(cache_dir, "models", &asset.file_name, &asset.sha256)?;
     ensure_remote_asset(client, &asset.url, &asset.sha256, &target, label)
-}
-
-fn require_local_asset(
-    local_assets_root: &Path,
-    relative_path: &str,
-    expected_sha256: &str,
-    label: &str,
-) -> Result<PathBuf> {
-    let path = local_assets_root.join(relative_path);
-    if !path.is_file() {
-        bail!(
-            "{label} is missing from local asset repo at {}",
-            path.display()
-        );
-    }
-    verify_file_sha256(&path, expected_sha256, label)?;
-    Ok(path)
 }
 
 enum DownloadAttemptError {

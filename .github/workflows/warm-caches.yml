@@ -30,7 +30,6 @@ jobs:
                 working-directory: rust
         env:
             RUSTFLAGS: -D warnings
-            ENTE_ML_ASSETS_CACHE_DIR: ${{ github.workspace }}/.ml-assets-cache
         steps:
             - name: Checkout
               uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -45,16 +44,11 @@ jobs:
               with:
                   workspaces: rust
                   shared-key: rust-workspace
-                  cache-directories: .ml-assets-cache
+                  cache-directories: rust/.cache
 
             - run: cargo clippy --all-targets --locked
 
-            - run: cargo test --locked --workspace --features ente-photos/ml-assets --no-run
-
-            # Downloads (or verifies) the ML test assets without running inference.
-            - run: cargo test --locked -p ente-photos --test ml_indexing --features ml-assets
-              env:
-                  ENTE_ML_ASSETS_PREFETCH_ONLY: "1"
+            - run: cargo test --locked --workspace --features ente-photos/ml-assets
 
             - run: cargo install cargo-audit --version 0.22.2 --locked
 
