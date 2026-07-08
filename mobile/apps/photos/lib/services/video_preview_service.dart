@@ -50,6 +50,15 @@ const _maxRetryCount = 3;
 const _maxFfmpegOutputLines = 24;
 const _maxFfmpegOutputChars = 4000;
 
+class _VideoPreviewUnsupportedError implements Exception {
+  const _VideoPreviewUnsupportedError(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class VideoPreviewService {
   final _logger = Logger("VideoPreviewService");
   final LinkedHashMap<int, PreviewItem> _items = LinkedHashMap();
@@ -495,9 +504,25 @@ class VideoPreviewService {
       props ??= await getVideoPropsAsync(file);
       final fileSize = enteFile.fileSize ?? file.lengthSync();
 
-      final videoData = List.from(
-        props?.propData?["streams"] ?? [],
-      ).firstWhereOrNull((e) => e["type"] == "video");
+      final videoData = _getVideoStream(props);
+      if (videoData == null) {
+        final streams = props?.propData?["streams"];
+        final streamTypes = streams is Iterable
+            ? streams.whereType<Map>().map((stream) => stream["type"]).toList()
+            : null;
+        final streamCount = streams is Iterable ? streams.length : null;
+        error = _VideoPreviewUnsupportedError(
+          "No video stream found in FFprobe metadata for "
+          "fileID=${enteFile.uploadedFileID}, "
+          "hasProps=${props != null}, "
+          "streamCount=$streamCount, "
+          "streamTypes=$streamTypes, "
+          "size=${enteFile.fileSize}, "
+          "duration=${enteFile.duration}",
+        );
+        _logger.warning(error.toString());
+        return;
+      }
 
       final codec = videoData["codec_name"]?.toString().toLowerCase();
       final isH264 = codec?.contains("h264") ?? false;
@@ -779,6 +804,11 @@ class VideoPreviewService {
     if (_isNetworkError(error)) {
       _logger.fine(
         "Network error detected, marking file as failed instead of retrying",
+      );
+      shouldRetry = false;
+    } else if (error is _VideoPreviewUnsupportedError) {
+      _logger.fine(
+        "Non-retryable video preview error detected, marking file as failed",
       );
       shouldRetry = false;
     }
@@ -1218,9 +1248,10 @@ class VideoPreviewService {
         file = await getFile(enteFile, isOrigin: true);
         if (file != null) {
           props = await getVideoPropsAsync(file);
-          final videoData = List.from(
-            props?.propData?["streams"] ?? [],
-          ).firstWhereOrNull((e) => e["type"] == "video");
+          final videoData = _getVideoStream(props);
+          if (videoData == null) {
+            return (props, skipFile, file);
+          }
           final codec = videoData["codec_name"]?.toString().toLowerCase();
           skipFile = codec?.contains("h264") ?? false;
 
@@ -1240,6 +1271,13 @@ class VideoPreviewService {
       _logger.warning("Failed to check props", e, sT);
     }
     return (props, skipFile, file);
+  }
+
+  Map<dynamic, dynamic>? _getVideoStream(FFProbeProps? props) {
+    final streams = props?.propData?["streams"];
+    return streams is Iterable
+        ? streams.whereType<Map>().firstWhereOrNull((e) => e["type"] == "video")
+        : null;
   }
 
   // generate stream for all files after cutoff date
