@@ -195,7 +195,7 @@ class _FileDetailsWidgetState extends State<FileDetailsWidget> {
     if (hasGrantedMLConsent) {
       sections.add(_sectionPadding(FacesItemWidget(file)));
       if (flagService.petEnabled && localSettings.petRecognitionEnabled) {
-        sections.add(_sectionPadding(PetsItemWidget(file)));
+        sections.add(PetsItemWidget(file));
       }
     }
 

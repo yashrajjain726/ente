@@ -138,7 +138,10 @@ class _PetsItemWidgetState extends State<PetsItemWidget> {
     if (!_isLoading && _petFaces.isEmpty) {
       return const SizedBox.shrink();
     }
-    return _buildContent(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.xxl),
+      child: _buildContent(context),
+    );
   }
 
   Widget _buildContent(BuildContext context) {

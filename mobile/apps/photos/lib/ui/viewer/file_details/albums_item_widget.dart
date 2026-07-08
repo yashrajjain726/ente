@@ -14,23 +14,21 @@ import "package:photos/services/collections_service.dart";
 import "package:photos/ui/collections/collection_action_sheet.dart";
 import "package:photos/ui/viewer/gallery/collection_page.dart";
 
-class AlbumsItemWidget extends StatelessWidget {
+class AlbumsItemWidget extends StatefulWidget {
   final EnteFile file;
   final int currentUserID;
   const AlbumsItemWidget(this.file, this.currentUserID, {super.key});
 
   @override
+  State<AlbumsItemWidget> createState() => _AlbumsItemWidgetState();
+}
+
+class _AlbumsItemWidgetState extends State<AlbumsItemWidget> {
+  Future<List<Widget>>? _chipsFuture;
+
+  @override
   Widget build(BuildContext context) {
-    final fileIsBackedup = file.uploadedFileID == null ? false : true;
-    late Future<Set<int>> allCollectionIDsOfFile;
-    final Future<Set<String>> allDeviceFoldersOfFile = Future.sync(
-      () => {file.deviceFolder ?? ''},
-    );
-    if (fileIsBackedup) {
-      allCollectionIDsOfFile = FilesDB.instance.getAllCollectionIDsOfFile(
-        file.uploadedFileID!,
-      );
-    }
+    _chipsFuture ??= _buildChips(context);
     return Column(
       key: const ValueKey("Albums"),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,13 +37,7 @@ class AlbumsItemWidget extends StatelessWidget {
         Text(AppLocalizations.of(context).albums, style: TextStyles.h2),
         const SizedBox(height: Spacing.lg),
         FutureBuilder<List<Widget>>(
-          future: fileIsBackedup
-              ? _collectionsListOfFile(
-                  context,
-                  allCollectionIDsOfFile,
-                  currentUserID,
-                )
-              : _deviceFoldersListOfFile(context, allDeviceFoldersOfFile),
+          future: _chipsFuture,
           builder: (context, snapshot) {
             final chips = snapshot.data ?? const <Widget>[];
             return Wrap(
@@ -56,6 +48,21 @@ class AlbumsItemWidget extends StatelessWidget {
           },
         ),
       ],
+    );
+  }
+
+  Future<List<Widget>> _buildChips(BuildContext context) {
+    final file = widget.file;
+    if (file.uploadedFileID != null) {
+      return _collectionsListOfFile(
+        context,
+        FilesDB.instance.getAllCollectionIDsOfFile(file.uploadedFileID!),
+        widget.currentUserID,
+      );
+    }
+    return _deviceFoldersListOfFile(
+      context,
+      Future.sync(() => {file.deviceFolder ?? ''}),
     );
   }
 
@@ -104,7 +111,7 @@ class AlbumsItemWidget extends StatelessWidget {
                 context,
                 CollectionPage(
                   CollectionWithThumbnail(c, null),
-                  fileToJumpTo: file,
+                  fileToJumpTo: widget.file,
                 ),
               );
             },
@@ -122,7 +129,7 @@ class AlbumsItemWidget extends StatelessWidget {
           shouldSurfaceExecutionStates: false,
           onTap: () {
             final selectedFiles = SelectedFiles();
-            selectedFiles.files.add(file);
+            selectedFiles.files.add(widget.file);
             showCollectionActionSheet(
               context,
               selectedFiles: selectedFiles,
