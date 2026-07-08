@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:exif_reader/exif_reader.dart' as exif;
 import 'package:flutter/widgets.dart';
@@ -21,113 +20,27 @@ Future<ImageInfo> getImageInfo(ImageProvider imageProvider) {
   return completer.future;
 }
 
-Future<ui.Image> convertImageToFlutterUi(img.Image image) async {
-  if (image.format != img.Format.uint8 || image.numChannels != 4) {
-    final cmd = img.Command()
-      ..image(image)
-      ..convert(format: img.Format.uint8, numChannels: 4);
-    final rgba8 = await cmd.getImageThread();
-    if (rgba8 != null) {
-      image = rgba8;
-    }
-  }
-
-  final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(
-    image.toUint8List(),
-  );
-
-  final ui.ImageDescriptor id = ui.ImageDescriptor.raw(
-    buffer,
-    height: image.height,
-    width: image.width,
-    pixelFormat: ui.PixelFormat.rgba8888,
-  );
-
-  final ui.Codec codec = await id.instantiateCodec(
-    targetHeight: image.height,
-    targetWidth: image.width,
-  );
-
-  final ui.FrameInfo fi = await codec.getNextFrame();
-  final ui.Image uiImage = fi.image;
-
-  return uiImage;
-}
-
+// dart format off
 const _copiedExifFields = [
-  (ifd: "Image", source: "Make", dest: "Make", affectsRendering: false),
-  (ifd: "Image", source: "Model", dest: "Model", affectsRendering: false),
-  (
-    ifd: "Image",
-    source: "Orientation",
-    dest: "Orientation",
-    affectsRendering: true,
-  ),
-  (ifd: "Image", source: "Artist", dest: "Artist", affectsRendering: false),
-  (
-    ifd: "Image",
-    source: "Copyright",
-    dest: "Copyright",
-    affectsRendering: false,
-  ),
-  (
-    ifd: "EXIF",
-    source: "DateTimeOriginal",
-    dest: "DateTimeOriginal",
-    affectsRendering: false,
-  ),
-  (
-    ifd: "EXIF",
-    source: "DateTimeDigitized",
-    dest: "DateTimeDigitized",
-    affectsRendering: false,
-  ),
-  (
-    ifd: "EXIF",
-    source: "OffsetTimeOriginal",
-    dest: "OffsetTimeOriginal",
-    affectsRendering: false,
-  ),
-  (
-    ifd: "EXIF",
-    source: "LensModel",
-    dest: "LensModel",
-    affectsRendering: false,
-  ),
-  (
-    ifd: "EXIF",
-    source: "ExposureTime",
-    dest: "ExposureTime",
-    affectsRendering: false,
-  ),
-  (ifd: "EXIF", source: "FNumber", dest: "FNumber", affectsRendering: false),
-  (
-    ifd: "EXIF",
-    source: "ISOSpeedRatings",
-    dest: "ISOSpeed",
-    affectsRendering: false,
-  ), //ishowspeed
-  (
-    ifd: "EXIF",
-    source: "FocalLength",
-    dest: "FocalLength",
-    affectsRendering: false,
-  ),
-  (
-    ifd: "EXIF",
-    source: "FocalLengthIn35mmFilm",
-    dest: "FocalLengthIn35mmFilm",
-    affectsRendering: false,
-  ),
-  (
-    ifd: "EXIF",
-    source: "ColorSpace",
-    dest: "ColorSpace",
-    affectsRendering: false,
-  ),
+  (ifd: "Image", src: "Make",                    dst: "Make",                    render: false),
+  (ifd: "Image", src: "Model",                   dst: "Model",                   render: false),
+  (ifd: "Image", src: "Orientation",             dst: "Orientation",             render: true),
+  (ifd: "Image", src: "Artist",                  dst: "Artist",                  render: false),
+  (ifd: "Image", src: "Copyright",               dst: "Copyright",               render: false),
+  (ifd: "EXIF",  src: "DateTimeOriginal",        dst: "DateTimeOriginal",        render: false),
+  (ifd: "EXIF",  src: "DateTimeDigitized",       dst: "DateTimeDigitized",       render: false),
+  (ifd: "EXIF",  src: "OffsetTimeOriginal",      dst: "OffsetTimeOriginal",      render: false),
+  (ifd: "EXIF",  src: "LensModel",               dst: "LensModel",               render: false),
+  (ifd: "EXIF",  src: "ExposureTime",            dst: "ExposureTime",            render: false),
+  (ifd: "EXIF",  src: "FNumber",                 dst: "FNumber",                 render: false),
+  (ifd: "EXIF",  src: "ISOSpeedRatings",         dst: "ISOSpeed",                render: false), //ishowspeed
+  (ifd: "EXIF",  src: "FocalLength",             dst: "FocalLength",             render: false),
+  (ifd: "EXIF",  src: "FocalLengthIn35mmFilm",   dst: "FocalLengthIn35mmFilm",   render: false),
+  (ifd: "EXIF",  src: "ColorSpace",              dst: "ColorSpace",              render: false),
 ];
+// dart format on
 
-img.IfdValue? convertExifReaderValueToImageValue(exif.IfdTag? tag) {
+img.IfdValue? _convertExifReaderValueToImageValue(exif.IfdTag? tag) {
   final values = tag?.values;
   if (tag == null || values == null || values is exif.IfdNone) {
     return null;
@@ -175,17 +88,17 @@ Future<void> copyEXIF(
 }) async {
   final srcExif = await getExif(src);
   for (final field in _copiedExifFields) {
-    if (!copyRenderingFields && field.affectsRendering) {
+    if (!copyRenderingFields && field.render) {
       continue;
     }
     final destIfd = field.ifd == "Image"
         ? dest.exif.imageIfd
         : dest.exif.exifIfd;
-    final value = convertExifReaderValueToImageValue(
-      srcExif["${field.ifd} ${field.source}"],
+    final value = _convertExifReaderValueToImageValue(
+      srcExif["${field.ifd} ${field.src}"],
     );
     if (value != null) {
-      destIfd[field.dest] = value;
+      destIfd[field.dst] = value;
     }
   }
 }
