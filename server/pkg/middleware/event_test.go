@@ -17,6 +17,17 @@ func TestShouldSkipBodyLogForEvents(t *testing.T) {
 	require.False(t, shouldSkipBodyLog(http.MethodGet, "/events"))
 }
 
+func TestShouldSkipBodyLogForSpaceKeyRoutes(t *testing.T) {
+	require.True(t, shouldSkipBodyLog(http.MethodPost, "/account/space"))
+	require.True(t, shouldSkipBodyLog(http.MethodPost, "/account/space/sessions"))
+	require.True(t, shouldSkipBodyLog(http.MethodPost, "/user-entity/key"))
+	require.True(t, shouldSkipBodyLog(http.MethodPost, "/user-entity/key/ensure"))
+	require.True(t, shouldSkipBodyLog(http.MethodPost, "/spaces/space-id/posts"))
+
+	require.False(t, shouldSkipBodyLog(http.MethodGet, "/account/space"))
+	require.False(t, shouldSkipBodyLog(http.MethodGet, "/user-entity/key"))
+}
+
 func TestEventsUse120PerHourGlobalRateLimit(t *testing.T) {
 	limit := util.NewRateLimiter("120-H")
 	rateLimiter := &RateLimitMiddleware{limit120ReqPerHour: limit}
