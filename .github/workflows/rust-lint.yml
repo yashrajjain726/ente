@@ -15,6 +15,7 @@ concurrency:
 
 env:
     RUSTFLAGS: -D warnings
+    ENTE_ML_ASSETS_CACHE_DIR: ${{ github.workspace }}/.ml-assets-cache
 
 jobs:
     lint:
@@ -38,6 +39,7 @@ jobs:
                   workspaces: rust
                   shared-key: rust-workspace
                   save-if: false
+                  cache-directories: .ml-assets-cache
 
             - run: cargo fmt --check
 
