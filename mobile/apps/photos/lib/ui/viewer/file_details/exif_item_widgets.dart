@@ -4,7 +4,6 @@ import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
-import "package:photos/theme/colors.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/file/exif_info_dialog.dart";
 
@@ -57,13 +56,9 @@ class AllExifItemWidget extends StatelessWidget {
       onTap = null;
     } else if (exif!.isNotEmpty) {
       subtitle = l10n.viewAllExifData;
-      onTap = () => showDialog(
-        useRootNavigator: false,
+      onTap = () => showBottomSheetComponent(
         context: context,
-        builder: (BuildContext context) {
-          return ExifInfoDialog(file);
-        },
-        barrierColor: backdropFaintDark,
+        builder: (context) => ExifInfoDialog(file),
       );
     } else {
       subtitle = l10n.noExifData;
