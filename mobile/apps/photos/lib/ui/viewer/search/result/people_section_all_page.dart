@@ -62,6 +62,7 @@ class _PeopleSectionAllPageState extends State<PeopleSectionAllPage> {
             selectedPeople: _selectedPeople,
             showSearchBar: true,
             startInSearchMode: widget.startInSearchMode,
+            includeEmptyPersons: true,
           ),
           bottomNavigationBar: hasSelection
               ? PeopleBottomActionBarWidget(
@@ -81,12 +82,14 @@ class PeopleSectionAllSelectionWrapper extends StatefulWidget {
   final SelectedPeople selectedPeople;
   final bool showSearchBar;
   final bool startInSearchMode;
+  final bool includeEmptyPersons;
 
   const PeopleSectionAllSelectionWrapper({
     super.key,
     required this.selectedPeople,
     this.showSearchBar = false,
     this.startInSearchMode = false,
+    this.includeEmptyPersons = false,
   });
 
   @override
@@ -102,6 +105,7 @@ class _PeopleSectionAllSelectionWrapperState
       selectedPeople: widget.selectedPeople,
       showSearchBar: widget.showSearchBar,
       startInSearchMode: widget.startInSearchMode,
+      includeEmptyPersons: widget.includeEmptyPersons,
     );
   }
 }
@@ -319,12 +323,14 @@ class PeopleSectionAllWidget extends StatefulWidget {
     this.namedOnly = false,
     this.showSearchBar = false,
     this.startInSearchMode = false,
+    this.includeEmptyPersons = false,
   });
 
   final SelectedPeople? selectedPeople;
   final bool namedOnly;
   final bool showSearchBar;
   final bool startInSearchMode;
+  final bool includeEmptyPersons;
 
   @override
   State<PeopleSectionAllWidget> createState() => _PeopleSectionAllWidgetState();
@@ -489,6 +495,7 @@ class _PeopleSectionAllWidgetState extends State<PeopleSectionAllWidget> {
       null,
       minClusterSize: kMinimumClusterSizeAllFaces,
       showIgnoredOnly: _showingIgnoredPeople,
+      includeEmptyPersons: widget.includeEmptyPersons,
     );
     normalFaces.clear();
     extraFaces.clear();
