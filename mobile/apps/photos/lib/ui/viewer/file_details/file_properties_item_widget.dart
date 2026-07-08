@@ -53,7 +53,7 @@ class _FilePropertiesItemWidgetState extends State<FilePropertiesItemWidget> {
           trailing: canEdit
               ? IconButtonComponent(
                   icon: HugeIcon(
-                    icon: HugeIcons.strokeRoundedEdit02,
+                    icon: HugeIcons.strokeRoundedEdit03,
                     size: IconSizes.small,
                     color: colors.textLight,
                   ),
