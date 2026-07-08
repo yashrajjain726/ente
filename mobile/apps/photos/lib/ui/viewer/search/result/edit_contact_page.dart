@@ -134,60 +134,74 @@ class _EditContactPageState extends State<EditContactPage> {
         backgroundColor: colors.backgroundBase,
         body: Column(
           children: [
-            _EditContactHeader(
-              title: l10n.editContact,
-              onBack: () {
-                Navigator.of(context).maybePop();
-              },
-            ),
             Expanded(
-              child: ListView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-                children: [
-                  Center(
-                    child: SizedBox(
-                      width: _avatarSize,
-                      height: _avatarSize,
-                      child: GestureDetector(
-                        onTap: _openAvatarEditor,
-                        child: Stack(
-                          clipBehavior: Clip.none,
+              child: NotificationListener<ScrollStartNotification>(
+                onNotification: (_) {
+                  if (_nameFocusNode.hasFocus) {
+                    _nameFocusNode.unfocus();
+                  }
+                  return false;
+                },
+                child: AppBarComponent(
+                  title: l10n.editContact,
+                  onBack: () {
+                    Navigator.of(context).maybePop();
+                  },
+                  physics: const BouncingScrollPhysics(),
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+                      sliver: SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            _buildAvatar(context, size: _avatarSize),
-                            Positioned(
-                              right: 0,
-                              bottom: 0,
-                              child: _AvatarActionButton(
-                                size: _editBadgeSize,
-                                isUnlink: _hasLinkedPersonDraft,
-                                onTap: _hasLinkedPersonDraft
-                                    ? _draftUnlinkPerson
-                                    : _openAvatarEditor,
+                            Center(
+                              child: SizedBox(
+                                width: _avatarSize,
+                                height: _avatarSize,
+                                child: GestureDetector(
+                                  onTap: _openAvatarEditor,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      _buildAvatar(context, size: _avatarSize),
+                                      Positioned(
+                                        right: 0,
+                                        bottom: 0,
+                                        child: _AvatarActionButton(
+                                          size: _editBadgeSize,
+                                          isUnlink: _hasLinkedPersonDraft,
+                                          onTap: _hasLinkedPersonDraft
+                                              ? _draftUnlinkPerson
+                                              : _openAvatarEditor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
+                            ),
+                            const SizedBox(height: 20),
+                            _ReadOnlyContactTextInput(
+                              label: l10n.email,
+                              value: widget.email,
+                            ),
+                            const SizedBox(height: 20),
+                            TextInputComponent(
+                              label: l10n.name,
+                              hintText: l10n.enterName,
+                              controller: _nameController,
+                              focusNode: _nameFocusNode,
+                              isRequired: true,
+                              textCapitalization: TextCapitalization.words,
+                              onSubmit: _canSave ? (_) => _saveContact() : null,
                             ),
                           ],
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  _ReadOnlyContactTextInput(
-                    label: l10n.email,
-                    value: widget.email,
-                  ),
-                  const SizedBox(height: 20),
-                  TextInputComponent(
-                    label: l10n.name,
-                    hintText: l10n.enterName,
-                    controller: _nameController,
-                    focusNode: _nameFocusNode,
-                    isRequired: true,
-                    textCapitalization: TextCapitalization.words,
-                    onSubmit: _canSave ? (_) => _saveContact() : null,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             Padding(
@@ -651,86 +665,6 @@ class _EditContactPageState extends State<EditContactPage> {
       actionSheetType: ActionSheetType.defaultActionSheet,
     );
     return actionResult?.action;
-  }
-}
-
-class _EditContactHeader extends StatelessWidget {
-  const _EditContactHeader({required this.title, required this.onBack});
-
-  final String title;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final topPadding = MediaQuery.paddingOf(context).top;
-    final colors = context.componentColors;
-    final height = topPadding + 76;
-
-    return SizedBox(
-      width: double.infinity,
-      height: height,
-      child: Padding(
-        padding: EdgeInsets.only(top: topPadding),
-        child: ColoredBox(
-          color: colors.backgroundBase,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
-            child: _expandedContent(context),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _expandedContent(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: Spacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _BackButton(onBack: onBack),
-          const SizedBox(height: 8),
-          Text(title, style: _titleStyle(context)),
-        ],
-      ),
-    );
-  }
-
-  TextStyle _titleStyle(BuildContext context) {
-    return TextStyles.display2.copyWith(
-      color: context.componentColors.textBase,
-    );
-  }
-}
-
-class _BackButton extends StatelessWidget {
-  const _BackButton({required this.onBack});
-
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final tooltip = MaterialLocalizations.of(context).backButtonTooltip;
-    return Semantics(
-      button: true,
-      label: tooltip,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onBack,
-        child: SizedBox(
-          width: 40,
-          height: 20,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Icon(
-              Icons.arrow_back,
-              size: 24,
-              color: getEnteColorScheme(context).textBase,
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 

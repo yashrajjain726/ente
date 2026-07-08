@@ -284,8 +284,7 @@ class _ContactResultPageState extends State<ContactResultPage> {
   Widget? _buildPageHeader(BuildContext context) {
     final sections = <Widget?>[
       _buildContactHeader(context),
-      if (collections.isNotEmpty)
-        _AlbumsSection(context: context, collections: collections),
+      if (collections.isNotEmpty) _AlbumsSection(collections: collections),
     ].whereType<Widget>().toList();
     if (sections.isEmpty) {
       return null;
@@ -448,9 +447,8 @@ class _SavedContactAppBar extends StatelessWidget {
 }
 
 class _AlbumsSection extends StatelessWidget {
-  const _AlbumsSection({required this.context, required this.collections});
+  const _AlbumsSection({required this.collections});
 
-  final BuildContext context;
   final List<Collection> collections;
 
   @override

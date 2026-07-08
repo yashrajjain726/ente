@@ -227,17 +227,11 @@ class ContactRecommendation extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            ClipOval(
-              child: SizedBox(
-                width: ContactRecommendation._avatarSize,
-                height: ContactRecommendation._avatarSize,
-                child: ContactAvatarWidget(
-                  contactUserId: contactUserId,
-                  email: contactEmail,
-                  personId: personId,
-                  size: ContactRecommendation._avatarSize,
-                ),
-              ),
+            ContactAvatarWidget(
+              contactUserId: contactUserId,
+              email: contactEmail,
+              personId: personId,
+              size: ContactRecommendation._avatarSize,
             ),
             const SizedBox(height: 10),
             Text(
