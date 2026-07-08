@@ -89,6 +89,7 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
       }
 
       return _filterStripeForUI().then((value) {
+        if (!mounted) return;
         _syncOnboardingSelection();
         _hasLoadedData = true;
         setState(() {});
