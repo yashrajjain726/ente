@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import subprocess
 from typing import Any, Mapping
 
 from _paths import repo_root, resolve_repo_relative
@@ -17,18 +16,9 @@ from ground_truth.schema import dump_results_document
 
 DEFAULT_ASSET_LOCK = "infra/ml/test/ml_indexing/assets.json"
 
-
-def _git_revision(default: str = "local") -> str:
-    try:
-        completed = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except (subprocess.SubprocessError, FileNotFoundError):
-        return default
-    return completed.stdout.strip() or default
+# Keep the golden byte-stable across regenerations: embedding the generating
+# commit would change the file's SHA-256 even when results are identical.
+GOLDEN_CODE_REVISION = "ml-indexing-golden"
 
 
 def _sha256(path: Path) -> str:
@@ -176,7 +166,7 @@ def main() -> int:
         manifest=manifest,
         model_cache_dir=model_cache_dir,
         model_base_url=args.model_base_url,
-        code_revision=_git_revision(),
+        code_revision=GOLDEN_CODE_REVISION,
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

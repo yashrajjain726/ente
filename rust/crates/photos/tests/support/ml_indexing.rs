@@ -16,10 +16,7 @@ use ente_photos::ml::{
     types::FaceResult as RustFaceResult,
 };
 use flate2::read::GzDecoder;
-use reqwest::{
-    StatusCode, Url,
-    blocking::{Client, Response},
-};
+use reqwest::{StatusCode, Url, blocking::Client};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
@@ -28,6 +25,7 @@ const CLIP_EMBEDDING_DIM: usize = 512;
 const FACE_EMBEDDING_DIM: usize = 192;
 const FLOAT_TOLERANCE: f64 = 1e-8;
 const PRINT_STATS_ENV: &str = "ENTE_ML_INDEXING_PRINT_STATS";
+const PREFETCH_ONLY_ENV: &str = "ENTE_ML_ASSETS_PREFETCH_ONLY";
 const DOWNLOAD_MAX_ATTEMPTS: usize = 4;
 const DOWNLOAD_RETRY_BASE_DELAY_MS: u64 = 500;
 
@@ -158,7 +156,15 @@ struct MetricObservation {
 }
 
 fn should_print_stats() -> bool {
-    let Ok(value) = std::env::var(PRINT_STATS_ENV) else {
+    env_flag(PRINT_STATS_ENV)
+}
+
+pub(crate) fn prefetch_only() -> bool {
+    env_flag(PREFETCH_ONLY_ENV)
+}
+
+fn env_flag(name: &str) -> bool {
+    let Ok(value) = std::env::var(name) else {
         return false;
     };
     let value = value.trim();
@@ -350,6 +356,13 @@ impl MlIndexingTestContext {
             );
         }
 
+        Ok(())
+    }
+
+    pub(crate) fn prefetch_all_fixtures(&self) -> Result<()> {
+        for fixture in &self.manifest.files {
+            self.resolve_fixture(fixture)?;
+        }
         Ok(())
     }
 
@@ -756,6 +769,11 @@ fn require_local_asset(
     Ok(path)
 }
 
+enum DownloadAttemptError {
+    Fatal(anyhow::Error),
+    Retryable(anyhow::Error),
+}
+
 fn ensure_remote_asset(
     client: &Client,
     url: &str,
@@ -774,75 +792,97 @@ fn ensure_remote_asset(
     fs::create_dir_all(parent)
         .with_context(|| format!("create cache directory {}", parent.display()))?;
 
-    let mut response = download_with_retries(client, url, label)?;
+    let mut last_error = None;
+    for attempt in 1..=DOWNLOAD_MAX_ATTEMPTS {
+        match download_asset_once(client, url, expected_sha256, target, parent, label) {
+            Ok(path) => return Ok(path),
+            Err(DownloadAttemptError::Fatal(error)) => return Err(error),
+            Err(DownloadAttemptError::Retryable(error)) => {
+                last_error = Some(error);
+                if attempt < DOWNLOAD_MAX_ATTEMPTS {
+                    std::thread::sleep(download_retry_delay(attempt));
+                }
+            }
+        }
+    }
+
+    Err(last_error.expect("retry loop records an error before exhausting attempts")).with_context(
+        || format!("download {label} from {url} after {DOWNLOAD_MAX_ATTEMPTS} attempt(s)"),
+    )
+}
+
+fn download_asset_once(
+    client: &Client,
+    url: &str,
+    expected_sha256: &str,
+    target: &Path,
+    parent: &Path,
+    label: &str,
+) -> Result<PathBuf, DownloadAttemptError> {
+    let mut response = match client.get(url).send() {
+        Ok(response) if response.status().is_success() => response,
+        Ok(response) => {
+            let status = response.status();
+            let error = anyhow!("download {label} from {url}: HTTP status {status}");
+            return Err(if is_retryable_download_status(status) {
+                DownloadAttemptError::Retryable(error)
+            } else {
+                DownloadAttemptError::Fatal(error)
+            });
+        }
+        Err(error) => {
+            return Err(DownloadAttemptError::Retryable(
+                anyhow::Error::new(error).context(format!("download {label} from {url}")),
+            ));
+        }
+    };
 
     let mut temp_file = tempfile::NamedTempFile::new_in(parent)
-        .with_context(|| format!("create temp file in {}", parent.display()))?;
+        .map_err(|error| fatal_io(error, format!("create temp file in {}", parent.display())))?;
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 1024 * 1024];
     loop {
-        let read = response
-            .read(&mut buffer)
-            .with_context(|| format!("read {label} response body"))?;
+        let read = match response.read(&mut buffer) {
+            Ok(read) => read,
+            Err(error) => {
+                return Err(DownloadAttemptError::Retryable(
+                    anyhow::Error::new(error)
+                        .context(format!("read {label} response body from {url}")),
+                ));
+            }
+        };
         if read == 0 {
             break;
         }
         hasher.update(&buffer[..read]);
         temp_file
             .write_all(&buffer[..read])
-            .with_context(|| format!("write cached {label}"))?;
+            .map_err(|error| fatal_io(error, format!("write cached {label}")))?;
     }
 
-    let digest = hasher.finalize();
-    let actual_sha256 = hex_digest(&digest);
+    let actual_sha256 = hex_digest(&hasher.finalize());
     if actual_sha256 != normalize_sha256(expected_sha256) {
-        bail!(
-            "{label} SHA-256 mismatch after download: expected {}, got {}",
-            normalize_sha256(expected_sha256),
-            actual_sha256
-        );
+        return Err(DownloadAttemptError::Retryable(anyhow!(
+            "{label} SHA-256 mismatch after download: expected {}, got {actual_sha256}",
+            normalize_sha256(expected_sha256)
+        )));
     }
 
     temp_file
         .flush()
-        .with_context(|| format!("flush cached {label}"))?;
+        .map_err(|error| fatal_io(error, format!("flush cached {label}")))?;
     temp_file.persist(target).map_err(|error| {
-        anyhow!(
+        DownloadAttemptError::Fatal(anyhow!(
             "persist cached {label} to {}: {}",
             target.display(),
             error.error
-        )
+        ))
     })?;
     Ok(target.to_path_buf())
 }
 
-fn download_with_retries(client: &Client, url: &str, label: &str) -> Result<Response> {
-    for attempt in 1..=DOWNLOAD_MAX_ATTEMPTS {
-        match client.get(url).send() {
-            Ok(response) if response.status().is_success() => return Ok(response),
-            Ok(response) => {
-                let status = response.status();
-                if attempt < DOWNLOAD_MAX_ATTEMPTS && is_retryable_download_status(status) {
-                    std::thread::sleep(download_retry_delay(attempt));
-                    continue;
-                }
-                bail!(
-                    "download {label} from {url}: HTTP status {status} after {attempt} attempt(s)"
-                );
-            }
-            Err(error) => {
-                if attempt < DOWNLOAD_MAX_ATTEMPTS {
-                    std::thread::sleep(download_retry_delay(attempt));
-                    continue;
-                }
-                return Err(error).with_context(|| {
-                    format!("download {label} from {url} after {attempt} attempt(s)")
-                });
-            }
-        }
-    }
-
-    unreachable!("download retry loop always returns or bails")
+fn fatal_io(error: std::io::Error, context: String) -> DownloadAttemptError {
+    DownloadAttemptError::Fatal(anyhow::Error::new(error).context(context))
 }
 
 fn is_retryable_download_status(status: StatusCode) -> bool {

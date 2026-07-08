@@ -69,6 +69,12 @@ ENTE_ML_ASSETS_REPO_DIR=/path/to/test-fixtures/ml/indexing/v1 \
   cargo test -p ente-photos --test ml_indexing --features ml-assets -- --nocapture
 ```
 
+Optional env vars:
+
+- `ENTE_ML_ASSETS_CACHE_DIR`: override the download cache location (defaults to `rust/target/ml-assets-cache/`; CI points this at a persisted cache directory).
+- `ENTE_ML_ASSETS_PREFETCH_ONLY=1`: download and verify all assets, then exit without running inference (used by the nightly cache-warming workflow).
+- `ENTE_ML_INDEXING_PRINT_STATS=1`: print a per-metric comparison summary (count, max observed value, threshold) even when the test passes; on failure the summary is always appended to the failure message.
+
 `infra/ml/test/ml_indexing/assets.json` locks the external manifest, Python
 golden, model URLs, expected unsupported decode files, and thresholds. The
 current RAW/CR2 fixture is expected to fail Rust decode; the test verifies that
