@@ -365,6 +365,7 @@ class _BodyState extends State<_Body> {
       return;
     }
     final fetchedThumbnail = await getThumbnail(file);
+    if (!mounted) return;
     Navigator.of(context)
         .push(
           MaterialPageRoute(
