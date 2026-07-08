@@ -43,9 +43,21 @@ class ContactPersonPickerPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: colors.backgroundBase,
-      body: CustomScrollView(
+      body: AppBarComponent(
+        title: l10n.selectPerson,
+        subtitle: l10n.selectPersonToLinkToThisContact,
+        actions: [
+          IconButtonComponent(
+            variant: IconButtonComponentVariant.primary,
+            shouldSurfaceExecutionStates: false,
+            tooltip: l10n.setAContactPhoto,
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedImageAdd02),
+            onTap: () {
+              Navigator.of(context).pop(const ContactPersonPickerPickPhoto());
+            },
+          ),
+        ],
         slivers: [
-          SliverToBoxAdapter(child: _buildHeader(context, l10n)),
           if (persons.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
@@ -58,54 +70,6 @@ class ContactPersonPickerPage extends StatelessWidget {
             )
           else
             _buildGrid(persons),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context, AppLocalizations l10n) {
-    final colors = context.componentColors;
-    final topPadding = MediaQuery.paddingOf(context).top;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        _horizontalPadding,
-        topPadding + 24,
-        _horizontalPadding,
-        20,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.selectPerson,
-                  style: TextStyles.h1Bold.copyWith(
-                    color: colors.textBase,
-                    height: 1.12,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.selectPersonToLinkToThisContact,
-                  style: TextStyles.body.copyWith(color: colors.textLight),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: Spacing.md),
-          IconButtonComponent(
-            variant: IconButtonComponentVariant.primary,
-            shouldSurfaceExecutionStates: false,
-            tooltip: l10n.setAContactPhoto,
-            icon: const HugeIcon(icon: HugeIcons.strokeRoundedImageAdd02),
-            onTap: () {
-              Navigator.of(context).pop(const ContactPersonPickerPickPhoto());
-            },
-          ),
         ],
       ),
     );

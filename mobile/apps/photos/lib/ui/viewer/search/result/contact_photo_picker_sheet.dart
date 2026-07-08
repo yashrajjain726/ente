@@ -66,135 +66,71 @@ class _ContactPhotoPickerSheetState extends State<_ContactPhotoPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final colors = context.componentColors;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final sheetHeight = math.min(screenHeight * 0.78, screenHeight - 80);
 
-    return Container(
+    return SizedBox(
       height: sheetHeight,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: colors.backgroundBase,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(Radii.bottomSheet),
-        ),
-        border: Border.all(color: colors.strokeDark),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            _ContactPhotoSheetHeader(title: l10n.setAContactPhoto),
-            Expanded(
-              child: GalleryFilesState(
-                child: Gallery(
-                  asyncLoader:
-                      (creationStartTime, creationEndTime, {limit, asc}) async {
-                        final files = await SearchService.instance
-                            .getAllFilesForContactPhotoPicker();
-                        return FileLoadResult(files, false);
-                      },
-                  tagPrefix: "pick_contact_photo_gallery",
-                  selectedFiles: _selectedFiles,
-                  limitSelectionToOne: true,
-                  showSelectAll: false,
-                  disablePinnedGroupHeader: true,
-                  disableVerticalPaddingForScrollbar: true,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Spacing.xl,
-                Spacing.lg,
-                Spacing.xl,
-                Spacing.xl,
-              ),
-              child: ListenableBuilder(
-                listenable: _selectedFiles,
-                builder: (context, _) {
-                  final isFileSelected = _selectedFiles.files.isNotEmpty;
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ButtonComponent(
-                        label: l10n.setSelectedPhoto,
-                        isDisabled: !isFileSelected,
-                        shouldSurfaceExecutionStates: false,
-                        onTap: isFileSelected
-                            ? () {
-                                Navigator.pop(
-                                  context,
-                                  ContactPhotoPickerFile(
-                                    _selectedFiles.files.first,
-                                  ),
-                                );
-                              }
-                            : null,
-                      ),
-                      if (widget.canRemovePhoto) ...[
-                        const SizedBox(height: Spacing.md),
-                        ButtonComponent(
-                          label: l10n.removeContactPhoto,
-                          variant: ButtonComponentVariant.secondary,
-                          shouldSurfaceExecutionStates: false,
-                          onTap: () {
-                            Navigator.pop(
-                              context,
-                              const ContactPhotoPickerRemove(),
-                            );
-                          },
-                        ),
-                      ],
-                    ],
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ContactPhotoSheetHeader extends StatelessWidget {
-  const _ContactPhotoSheetHeader({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.componentColors;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        Spacing.xl,
-        Spacing.xl,
-        Spacing.xl,
-        Spacing.lg,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyles.h1.copyWith(color: colors.textBase),
+      child: BottomSheetComponent(
+        title: l10n.setAContactPhoto,
+        content: Expanded(
+          child: GalleryFilesState(
+            child: Gallery(
+              asyncLoader:
+                  (creationStartTime, creationEndTime, {limit, asc}) async {
+                    final files = await SearchService.instance
+                        .getAllFilesForContactPhotoPicker();
+                    return FileLoadResult(files, false);
+                  },
+              tagPrefix: "pick_contact_photo_gallery",
+              selectedFiles: _selectedFiles,
+              limitSelectionToOne: true,
+              showSelectAll: false,
+              disablePinnedGroupHeader: true,
+              disableVerticalPaddingForScrollbar: true,
             ),
           ),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: colors.fillLight,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.close, color: colors.textLightest, size: 20),
-            ),
+        ),
+        actions: [
+          ListenableBuilder(
+            listenable: _selectedFiles,
+            builder: (context, _) {
+              final isFileSelected = _selectedFiles.files.isNotEmpty;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ButtonComponent(
+                    label: l10n.setSelectedPhoto,
+                    isDisabled: !isFileSelected,
+                    shouldSurfaceExecutionStates: false,
+                    onTap: isFileSelected
+                        ? () {
+                            Navigator.pop(
+                              context,
+                              ContactPhotoPickerFile(
+                                _selectedFiles.files.first,
+                              ),
+                            );
+                          }
+                        : null,
+                  ),
+                  if (widget.canRemovePhoto) ...[
+                    const SizedBox(height: Spacing.md),
+                    ButtonComponent(
+                      label: l10n.removeContactPhoto,
+                      variant: ButtonComponentVariant.secondary,
+                      shouldSurfaceExecutionStates: false,
+                      onTap: () {
+                        Navigator.pop(
+                          context,
+                          const ContactPhotoPickerRemove(),
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ],
       ),

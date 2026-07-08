@@ -1,6 +1,7 @@
 import 'dart:async';
 import "dart:math" as math;
 
+import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
 import "package:flutter_animate/flutter_animate.dart";
@@ -545,10 +546,8 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
     required PersonEntity person,
     required String clusterId,
   }) {
-    return showModalBottomSheet<bool>(
+    return showBottomSheetComponent<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (context) =>
           _MergePersonConfirmationSheet(person: person, clusterId: clusterId),
     );
@@ -859,68 +858,47 @@ class _MergePersonConfirmationSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final textTheme = getEnteTextTheme(context);
-    final colorScheme = getEnteColorScheme(context);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.backgroundElevated2,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-        border: Border.all(
-          color: colorScheme.strokeMuted.withValues(alpha: 0.2),
-        ),
+    return BottomSheetComponent(
+      closeResult: false,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _MergeFacePair(clusterId: clusterId, personId: person.remoteID),
+          const SizedBox(height: Spacing.xl),
+          Text(
+            l10n.mergeWithPersonTitle(name: person.data.name),
+            style: textTheme.largeBold.copyWith(
+              fontSize: 20,
+              height: 20 / 20,
+              letterSpacing: -0.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 11),
+          Text(
+            l10n.mergeWithPersonDescription(name: person.data.name),
+            style: textTheme.smallMuted.copyWith(
+              height: 20 / 14,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
-      child: SafeArea(
-        top: false,
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 56, 24, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _MergeFacePair(
-                    clusterId: clusterId,
-                    personId: person.remoteID,
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    l10n.mergeWithPersonTitle(name: person.data.name),
-                    style: textTheme.largeBold.copyWith(
-                      fontSize: 20,
-                      height: 20 / 20,
-                      letterSpacing: -0.4,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 11),
-                  Text(
-                    l10n.mergeWithPersonDescription(name: person.data.name),
-                    style: textTheme.smallMuted.copyWith(
-                      height: 20 / 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  _MergeSheetActionButton(
-                    label: l10n.merge,
-                    onTap: () => Navigator.of(context).pop(true),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              top: 16,
-              right: 16,
-              child: _MergeSheetCloseButton(
-                onTap: () => Navigator.of(context).pop(false),
-              ),
-            ),
-          ],
+      actions: [
+        ButtonComponent(
+          label: l10n.merge,
+          shouldSurfaceExecutionStates: false,
+          onTap: () => Navigator.of(context).pop(true),
         ),
+      ],
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.xl,
+        Spacing.lg,
+        Spacing.xl,
+        Spacing.xl,
       ),
     );
   }
@@ -1002,67 +980,6 @@ class _MergeFaceThumbnail extends StatelessWidget {
           useFullFile: false,
           cachedPixelWidth: cachedPixelWidth,
         ),
-      ),
-    );
-  }
-}
-
-class _MergeSheetActionButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-
-  const _MergeSheetActionButton({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
-    final borderRadius = BorderRadius.circular(14);
-
-    return SizedBox(
-      height: 52,
-      width: double.infinity,
-      child: Material(
-        color: colorScheme.primary500,
-        borderRadius: borderRadius,
-        child: InkWell(
-          borderRadius: borderRadius,
-          onTap: onTap,
-          child: Center(
-            child: Text(
-              label,
-              style: textTheme.smallBold.copyWith(
-                color: Colors.white,
-                height: 20 / 14,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MergeSheetCloseButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _MergeSheetCloseButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    const double size = 40;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: colorScheme.fillFaint,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(Icons.close, size: 20, color: colorScheme.textBase),
       ),
     );
   }

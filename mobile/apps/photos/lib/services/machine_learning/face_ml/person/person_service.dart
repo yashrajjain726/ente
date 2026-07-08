@@ -641,12 +641,6 @@ class PersonService {
   }) async {
     final person = (await getPerson(id))!;
     final trimmedName = name?.trim();
-    if (syncLinkedContactName &&
-        trimmedName != null &&
-        trimmedName.isNotEmpty &&
-        trimmedName != person.data.name.trim()) {
-      await _updateLinkedContactNameBeforePerson(person, trimmedName);
-    }
     var updatedData = person.data.copyWith(
       name: name,
       avatarFaceId: avatarFaceId,
@@ -664,6 +658,12 @@ class PersonService {
       updatedData = updatedData.copyWith(userID: userID as int?);
     }
     final updatedPerson = person.copyWith(data: updatedData);
+    if (syncLinkedContactName &&
+        trimmedName != null &&
+        trimmedName.isNotEmpty &&
+        trimmedName != person.data.name.trim()) {
+      await _updateLinkedContactNameBeforePerson(updatedPerson, trimmedName);
+    }
     await updatePerson(updatedPerson);
     await refreshPersonCache();
     if (hideFromMemories != null &&
