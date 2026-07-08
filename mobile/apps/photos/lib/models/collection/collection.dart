@@ -1,14 +1,12 @@
 import 'dart:core';
 
-import "package:logging/logging.dart";
+import 'package:flutter/foundation.dart';
 import "package:photos/core/configuration.dart";
 import "package:photos/extensions/user_extension.dart";
 import "package:photos/gateways/collections/models/public_url.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/metadata/collection_magic.dart";
 import "package:photos/models/metadata/common_keys.dart";
-
-final _logger = Logger("Collection");
 
 class Collection {
   final int id;
@@ -349,7 +347,7 @@ CollectionType typeFromString(String type) {
     case "unknown":
       return CollectionType.unknown;
   }
-  _logger.warning("unexpected collection type $type");
+  debugPrint("unexpected collection type $type");
   return CollectionType.unknown;
 }
 

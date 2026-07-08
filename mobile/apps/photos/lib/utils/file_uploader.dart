@@ -196,7 +196,7 @@ class FileUploader {
       _totalCountInUploadSession--;
       return item.completer.future;
     }
-    _logger.info(
+    debugPrint(
       "Wait on another upload on same local ID to finish before "
       "adding it to new collection",
     );
@@ -644,7 +644,7 @@ class FileUploader {
         );
         final isMappedToExistingUpload = result.item1;
         if (isMappedToExistingUpload) {
-          _logger.info(
+          debugPrint(
             "File success mapped to existing uploaded ${file.toString()}",
           );
           // treat as completed so _onUploadDone clears the source export

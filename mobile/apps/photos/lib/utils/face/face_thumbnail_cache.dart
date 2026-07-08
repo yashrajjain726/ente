@@ -289,7 +289,7 @@ Future<Uint8List?> precomputeClusterFaceCrop(
     );
     w?.log('getCoverFaceForPerson');
     if (face == null) {
-      _logger.info(
+      debugPrint(
         "No cover face for cluster $clusterID and recentFile ${file.uploadedFileID}",
       );
       return null;

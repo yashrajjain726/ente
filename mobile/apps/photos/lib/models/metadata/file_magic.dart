@@ -1,6 +1,6 @@
 import "dart:convert";
 
-import "package:logging/logging.dart";
+import "package:flutter/cupertino.dart";
 import 'package:photos/models/metadata/common_keys.dart';
 
 const editTimeKey = 'editedTime';
@@ -46,8 +46,6 @@ class MagicMetadata {
 }
 
 class PubMagicMetadata {
-  static final Logger _logger = Logger("PubMagicMetadata");
-
   int? editedTime;
   String? editedName;
   String? caption;
@@ -142,7 +140,7 @@ class PubMagicMetadata {
     if (value == null) return null;
     if (value is int) return value;
     if (value is String) return int.tryParse(value);
-    _logger.warning("PubMagicMetadata key: $key Unexpected value: $value");
+    debugPrint("PubMagicMetadata key: $key Unexpected value: $value");
     return null;
   }
 
@@ -150,7 +148,7 @@ class PubMagicMetadata {
     if (value == null) return null;
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value);
-    _logger.warning("PubMagicMetadata key: $key Unexpected value: $value");
+    debugPrint("PubMagicMetadata key: $key Unexpected value: $value");
     return null;
   }
 }

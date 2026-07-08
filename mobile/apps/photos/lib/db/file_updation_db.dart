@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -65,7 +66,7 @@ class FileUpdationDB {
     final Directory documentsDirectory =
         await getApplicationDocumentsDirectory();
     final String path = join(documentsDirectory.path, _databaseName);
-    _logger.info("DB path $path");
+    debugPrint("DB path " + path);
     return await openDatabaseWithMigration(path, dbConfig);
   }
 

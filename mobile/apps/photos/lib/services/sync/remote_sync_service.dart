@@ -466,7 +466,7 @@ class RemoteSyncService {
         existingMapping,
       );
       if (commonElements.isNotEmpty) {
-        _logger.info(
+        debugPrint(
           "${commonElements.length} files already existing in "
           "collection $collectionID for ${deviceCollection.name}",
         );
@@ -477,7 +477,7 @@ class RemoteSyncService {
       // new file entries, where we can store mapping for localID and
       // corresponding collection ID
       if (localIDsToSync.isNotEmpty) {
-        _logger.info(
+        debugPrint(
           'Adding new entries for ${localIDsToSync.length} files'
           ' for ${deviceCollection.name}',
         );

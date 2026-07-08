@@ -174,7 +174,8 @@ void main() {
   final logger = Logger("VideoEditorIntegrationTest");
   Logger.root.level = Level.INFO;
   Logger.root.onRecord.listen((record) {
-    stdout.writeln('[${record.level.name}] ${record.time}: ${record.message}');
+    // ignore: avoid_print
+    print('[${record.level.name}] ${record.time}: ${record.message}');
   });
 
   // TEST CONFIGURATION - Update this list with your files and combinations

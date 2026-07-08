@@ -442,7 +442,7 @@ Future<void> _saveLivePhotoOnDroid(
   File video,
   EnteFile enteFile,
 ) async {
-  _logger.info("Downloading LivePhoto on Droid");
+  debugPrint("Downloading LivePhoto on Droid");
   final imageTitle = _getGallerySaveTitle(enteFile, image.path);
   AssetEntity? savedAsset =
       await (PhotoManager.editor.saveImageWithPath(

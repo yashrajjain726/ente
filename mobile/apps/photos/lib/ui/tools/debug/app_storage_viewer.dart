@@ -131,7 +131,7 @@ class _AppStorageViewerState extends State<AppStorageViewer> {
 
   @override
   Widget build(BuildContext context) {
-    _logger.info("$runtimeType building");
+    debugPrint("$runtimeType building");
 
     return Scaffold(
       body: CustomScrollView(

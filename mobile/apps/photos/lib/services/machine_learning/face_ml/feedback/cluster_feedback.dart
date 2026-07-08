@@ -2100,7 +2100,7 @@ class ClusterFeedbackService<T> {
     bool onlySortBigSuggestions = true,
   }) async {
     if (suggestions.isEmpty) {
-      _logger.info('No suggestions to sort');
+      debugPrint('No suggestions to sort');
       return;
     }
     if (onlySortBigSuggestions) {
@@ -2110,7 +2110,7 @@ class ClusterFeedbackService<T> {
           )
           .toList();
       if (bigSuggestions.isEmpty) {
-        _logger.info('No big suggestions to sort');
+        debugPrint('No big suggestions to sort');
         return;
       }
     }
@@ -2173,7 +2173,7 @@ class ClusterFeedbackService<T> {
       });
       w?.log('sorted files for cluster $clusterID');
 
-      _logger.info(
+      debugPrint(
         "[${_logger.name}] Sorted suggestions for cluster $clusterID based on distance to person: ${suggestion.filesInCluster.map((e) => fileIdToDistanceMap[e.uploadedFileID]).toList()}",
       );
     }

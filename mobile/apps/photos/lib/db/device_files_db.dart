@@ -1,4 +1,5 @@
 import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photos/db/files_db.dart';
@@ -20,7 +21,7 @@ extension DeviceFiles on FilesDB {
     Map<String, Set<String>> mappingToAdd, {
     ConflictAlgorithm conflictAlgorithm = ConflictAlgorithm.ignore,
   }) async {
-    _logger.info("Inserting missing PathIDToLocalIDMapping");
+    debugPrint("Inserting missing PathIDToLocalIDMapping");
     final parameterSets = <List<Object?>>[];
     int batchCounter = 0;
     for (MapEntry e in mappingToAdd.entries) {
@@ -44,7 +45,7 @@ extension DeviceFiles on FilesDB {
   Future<void> deletePathIDToLocalIDMapping(
     Map<String, Set<String>> mappingsToRemove,
   ) async {
-    _logger.info("removing PathIDToLocalIDMapping");
+    debugPrint("removing PathIDToLocalIDMapping");
     final parameterSets = <List<Object?>>[];
     int batchCounter = 0;
     for (MapEntry e in mappingsToRemove.entries) {
@@ -403,7 +404,7 @@ extension DeviceFiles on FilesDB {
   Future<List<DeviceCollection>> getDeviceCollections({
     bool includeCoverThumbnail = false,
   }) async {
-    _logger.info(
+    debugPrint(
       "Fetching DeviceCollections From DB with thumbnail = "
       "$includeCoverThumbnail",
     );
@@ -465,7 +466,7 @@ extension DeviceFiles on FilesDB {
   }
 
   Future<EnteFile?> getDeviceCollectionThumbnail(String pathID) async {
-    _logger.info("Call fallback method to get potential thumbnail");
+    debugPrint("Call fallback method to get potential thumbnail");
     final db = await sqliteAsyncDB;
     final fileRows = await db.getAll(
       '''SELECT * FROM FILES  f JOIN device_files df on f.local_id = df.id

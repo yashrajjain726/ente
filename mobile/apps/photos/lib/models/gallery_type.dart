@@ -1,7 +1,5 @@
-import "package:logging/logging.dart";
+import "package:flutter/foundation.dart";
 import 'package:photos/models/collection/collection.dart';
-
-final _logger = Logger("GalleryType");
 
 enum GalleryType {
   homepage,
@@ -470,7 +468,7 @@ GalleryType getGalleryType(Collection c, int userID) {
   } else if (c.isHidden()) {
     return GalleryType.hiddenOwnedCollection;
   }
-  _logger.info(
+  debugPrint(
     "Unknown gallery type for collection ${c.id}, falling back to "
     "default",
   );

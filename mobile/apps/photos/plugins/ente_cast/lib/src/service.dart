@@ -1,14 +1,13 @@
 import "dart:async";
+import "dart:developer" as dev;
 import "dart:io";
 
 import "package:cast/cast.dart";
 import "package:ente_cast/src/model.dart";
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
-import "package:logging/logging.dart";
 
 class CastService {
-  final _logger = Logger("CastService");
   final String _appId = "F5BCEC64";
   final String _pairRequestNamespace = "urn:x-cast:pair-request";
 
@@ -40,27 +39,30 @@ class CastService {
 
     session.messageStream.listen((message) {
       if (message["type"] == "RECEIVER_STATUS") {
-        _logger.info("got RECEIVER_STATUS, Send request to pair");
+        dev.log(
+          "got RECEIVER_STATUS, Send request to pair",
+          name: "CastService",
+        );
         session.sendMessage(_pairRequestNamespace, {
           "collectionID": collectionID,
         });
       } else if (onMessage != null && message.containsKey("code")) {
         onMessage({CastMessageType.pairCode: message});
       } else if (kDebugMode) {
-        _logger.info("receive message: $message");
+        print("receive message: $message");
       }
     });
 
     session.stateStream.listen((state) {
       if (state == CastSessionState.connected) {
-        _logger.info("Send request to pair");
+        debugPrint("Send request to pair");
         session.sendMessage(_pairRequestNamespace, {});
       } else if (state == CastSessionState.closed) {
-        _logger.info("Session closed");
+        dev.log("Session closed", name: "CastService");
       }
     });
 
-    _logger.info("Send request to launch");
+    debugPrint("Send request to launch");
     session.sendMessage(CastSession.kNamespaceReceiver, {
       "type": "LAUNCH",
       "appId": _appId,
@@ -74,7 +76,7 @@ class CastService {
 
     final sessions = CastSessionManager().sessions;
     for (final session in sessions) {
-      _logger.info("send close message for ${session.sessionId}");
+      debugPrint("send close message for ${session.sessionId}");
       unawaited(
         Future(() {
           session.sendMessage(CastSession.kNamespaceConnection, {
@@ -83,11 +85,11 @@ class CastService {
         }).timeout(
           const Duration(seconds: 5),
           onTimeout: () {
-            _logger.warning("sendMessage timed out after 5 seconds");
+            debugPrint("sendMessage timed out after 5 seconds");
           },
         ),
       );
-      _logger.info("close session ${session.sessionId}");
+      debugPrint("close session ${session.sessionId}");
       unawaited(session.close());
     }
     CastSessionManager().sessions.clear();

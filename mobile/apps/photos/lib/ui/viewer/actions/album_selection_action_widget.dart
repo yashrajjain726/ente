@@ -284,7 +284,7 @@ class _AlbumSelectionActionWidgetState
         nonEmptyCollection,
       );
       if (result == false) {
-        _logger.warning("Failed to delete collection");
+        debugPrint("Failed to delete collection");
       }
     }
     if (hasFavorites) {

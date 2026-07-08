@@ -8,6 +8,7 @@ import "package:crypto/crypto.dart";
 import "package:ente_crypto/src/models/derived_key_result.dart";
 import "package:ente_crypto/src/models/encryption_result.dart";
 import "package:ente_crypto/src/models/errors.dart";
+import "package:flutter/foundation.dart";
 import "package:flutter_sodium/flutter_sodium.dart";
 import "package:logging/logging.dart";
 
@@ -408,7 +409,7 @@ Future<FileEncryptResult> chachaEncryptFileWithVerification(
     final partsInfo = multiPartChunkSizeInBytes != null
         ? " Parts: ${partMd5s.length}"
         : "";
-    logger.info(
+    debugPrint(
       "FileEncryption: Time: ${encryptionTimeSeconds}s "
       "Total encrypted: $totalEncryptedBytes bytes$partsInfo",
     );

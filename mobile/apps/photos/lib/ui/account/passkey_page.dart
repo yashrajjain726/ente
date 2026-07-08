@@ -196,8 +196,8 @@ class _PasskeyPageState extends State<PasskeyPage> {
               onTap: () async {
                 try {
                   await checkStatus();
-                } catch (e, s) {
-                  _logger.warning('failed to check status', e, s);
+                } catch (e) {
+                  debugPrint('failed to check status $e');
                   showGenericErrorBottomSheet(
                     context: context,
                     error: e,

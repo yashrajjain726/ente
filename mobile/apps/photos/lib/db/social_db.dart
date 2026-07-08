@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -122,7 +123,7 @@ class SocialDB {
     );
 
     if (rows.isEmpty) {
-      _logger.info('deleteComment: Comment $id does not exist');
+      debugPrint('deleteComment: Comment $id does not exist');
       return null;
     }
 

@@ -6,7 +6,6 @@ import 'package:ente_components/theme/spacing.dart';
 import 'package:ente_components/theme/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import "package:logging/logging.dart";
 import 'package:photos/core/event_bus.dart';
 import 'package:photos/events/tab_changed_event.dart';
 import "package:photos/models/selected_albums.dart";
@@ -35,8 +34,6 @@ class HomeBottomNavigationBar extends StatefulWidget {
 }
 
 class _HomeBottomNavigationBarState extends State<HomeBottomNavigationBar> {
-  final _logger = Logger("_HomeBottomNavigationBarState");
-
   static const int _searchTabIndex = 3;
   static const Duration _doubleTapWindow = Duration(milliseconds: 350);
   late StreamSubscription<TabChangedEvent> _tabChangedEventSubscription;
@@ -54,7 +51,7 @@ class _HomeBottomNavigationBarState extends State<HomeBottomNavigationBar> {
       event,
     ) {
       if (event.source != TabChangedEventSource.tabBar) {
-        _logger.info(
+        debugPrint(
           '${(TabChangedEvent).toString()} index changed  from '
           '$currentTabIndex to ${event.selectedIndex} via ${event.source}',
         );
@@ -95,7 +92,7 @@ class _HomeBottomNavigationBarState extends State<HomeBottomNavigationBar> {
     if (mode == "OnPressed") {
       _handleSearchTabDoubleTap(index);
     }
-    _logger.info("_TabChanged called via method $mode");
+    debugPrint("_TabChanged called via method $mode");
     Bus.instance.fire(TabChangedEvent(index, TabChangedEventSource.tabBar));
   }
 

@@ -28,7 +28,7 @@ class UpdateService {
   UpdateService(SharedPreferences prefs, PackageInfo packageInfo)
     : _prefs = prefs,
       _packageInfo = packageInfo {
-    _logger.info("UpdateService constructor");
+    debugPrint("UpdateService constructor");
   }
 
   Future<bool> shouldShowChangeLog() async {

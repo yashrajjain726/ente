@@ -426,7 +426,7 @@ class FilesDB with SqlDbBase {
 
   Future<void> deleteDB() async {
     if (kDebugMode) {
-      _logger.info("Deleting files db");
+      debugPrint("Deleting files db");
       final Directory documentsDirectory =
           await getApplicationDocumentsDirectory();
       final String path = join(documentsDirectory.path, _databaseName);

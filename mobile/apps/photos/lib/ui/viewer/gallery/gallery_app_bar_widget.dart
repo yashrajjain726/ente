@@ -1055,7 +1055,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       if (result == true) {
         Navigator.of(context).pop();
       } else {
-        _logger.info("No pop");
+        debugPrint("No pop");
       }
     }
   }

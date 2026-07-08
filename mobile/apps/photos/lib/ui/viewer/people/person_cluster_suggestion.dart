@@ -374,7 +374,7 @@ class _PersonClustersState extends State<PersonReviewClusterSuggestion> {
 
   // Method to fetch cluster suggestions
   void _fetchClusterSuggestions() {
-    _logger.info("Fetching suggestions for ${widget.person.data.name}");
+    debugPrint("Fetching suggestions for ${widget.person.data.name}");
     futureClusterSuggestions = ClusterFeedbackService.instance
         .getSuggestionForPerson(widget.person);
   }
@@ -539,9 +539,7 @@ class _PersonClustersState extends State<PersonReviewClusterSuggestion> {
         );
         compCount += computeHere;
         if (compCount >= maxPrecomputations) {
-          _logger.info(
-            'Prefetching $compCount face thumbnails for suggestions',
-          );
+          debugPrint('Prefetching $compCount face thumbnails for suggestions');
           break outerLoop;
         }
       }
