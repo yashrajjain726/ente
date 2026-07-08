@@ -3,6 +3,7 @@ use std::{
     fs,
     io::{Read, Write},
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -15,7 +16,10 @@ use ente_photos::ml::{
     types::FaceResult as RustFaceResult,
 };
 use flate2::read::GzDecoder;
-use reqwest::{Url, blocking::Client};
+use reqwest::{
+    StatusCode, Url,
+    blocking::{Client, Response},
+};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
@@ -23,6 +27,9 @@ const ASSET_LOCK_PATH: &str = "infra/ml/test/ml_indexing/assets.json";
 const CLIP_EMBEDDING_DIM: usize = 512;
 const FACE_EMBEDDING_DIM: usize = 192;
 const FLOAT_TOLERANCE: f64 = 1e-8;
+const PRINT_STATS_ENV: &str = "ENTE_ML_INDEXING_PRINT_STATS";
+const DOWNLOAD_MAX_ATTEMPTS: usize = 4;
+const DOWNLOAD_RETRY_BASE_DELAY_MS: u64 = 500;
 
 pub(crate) fn run_with_large_stack(name: &str, test: fn() -> Result<()>) {
     let result = std::thread::Builder::new()
@@ -39,17 +46,126 @@ pub(crate) fn run_with_large_stack(name: &str, test: fn() -> Result<()>) {
     }
 }
 
-pub(crate) fn fail_if_any(mut failures: Vec<String>) -> Result<()> {
+pub(crate) fn fail_if_any(mut failures: Vec<String>, stats: &ComparisonStats) -> Result<()> {
     if failures.is_empty() {
         return Ok(());
     }
 
     failures.sort();
-    bail!(
+    let mut message = format!(
         "Rust ML indexing test failed with {} finding(s):\n{}",
         failures.len(),
         failures.join("\n")
     );
+    if stats.has_observations() {
+        message.push_str("\n\n");
+        message.push_str(&stats.format_report());
+    }
+
+    bail!("{message}");
+}
+
+#[derive(Default)]
+pub(crate) struct ComparisonStats {
+    files_compared: usize,
+    faces_compared: usize,
+    clip_cosine_distance: MetricStats,
+    face_box_iou_error: MetricStats,
+    face_embedding_cosine_distance: MetricStats,
+    landmark_error: MetricStats,
+    score_delta: MetricStats,
+}
+
+impl ComparisonStats {
+    pub(crate) fn print_if_requested(&self) {
+        if should_print_stats() {
+            println!("{}", self.format_report());
+        }
+    }
+
+    fn record_file(&mut self) {
+        self.files_compared += 1;
+    }
+
+    fn record_face(&mut self) {
+        self.faces_compared += 1;
+    }
+
+    fn has_observations(&self) -> bool {
+        self.files_compared > 0
+    }
+
+    fn format_report(&self) -> String {
+        [
+            "ML indexing Python comparison summary:".to_string(),
+            format!(
+                "files_compared={} faces_compared={}",
+                self.files_compared, self.faces_compared
+            ),
+            self.clip_cosine_distance
+                .format_line("clip_cosine_distance"),
+            self.face_box_iou_error.format_line("face_box_iou_error"),
+            self.face_embedding_cosine_distance
+                .format_line("face_embedding_cosine_distance"),
+            self.landmark_error.format_line("landmark_error"),
+            self.score_delta.format_line("score_delta"),
+        ]
+        .join("\n")
+    }
+}
+
+#[derive(Default)]
+struct MetricStats {
+    count: usize,
+    max: Option<MetricObservation>,
+    threshold: Option<f64>,
+}
+
+impl MetricStats {
+    fn record(&mut self, file_id: &str, value: f64, threshold: f64) {
+        self.count += 1;
+        self.threshold = Some(threshold);
+        let should_replace = match &self.max {
+            Some(observation) => value > observation.value,
+            None => true,
+        };
+        if should_replace {
+            self.max = Some(MetricObservation {
+                file_id: file_id.to_owned(),
+                value,
+            });
+        }
+    }
+
+    fn format_line(&self, name: &str) -> String {
+        let threshold = self
+            .threshold
+            .map(|value| format!("{value:.15}"))
+            .unwrap_or_else(|| "n/a".to_string());
+        match &self.max {
+            Some(max) => format!(
+                "{name}: count={} max={:.15} file={} threshold={}",
+                self.count, max.value, max.file_id, threshold
+            ),
+            None => format!("{name}: count=0 max=n/a file=n/a threshold={threshold}"),
+        }
+    }
+}
+
+struct MetricObservation {
+    file_id: String,
+    value: f64,
+}
+
+fn should_print_stats() -> bool {
+    let Ok(value) = std::env::var(PRINT_STATS_ENV) else {
+        return false;
+    };
+    let value = value.trim();
+    !(value.is_empty()
+        || value == "0"
+        || value.eq_ignore_ascii_case("false")
+        || value.eq_ignore_ascii_case("no"))
 }
 
 pub(crate) struct MlIndexingTestContext {
@@ -190,6 +306,7 @@ impl MlIndexingTestContext {
         &self,
         rust_results: &HashMap<String, ComparableResult>,
         failures: &mut Vec<String>,
+        stats: &mut ComparisonStats,
     ) -> Result<()> {
         let expected_unsupported = self.unsupported_decode_file_ids();
         let supported_manifest_ids = self
@@ -223,7 +340,14 @@ impl MlIndexingTestContext {
             let Some(rust) = rust_results.get(file_id) else {
                 continue;
             };
-            compare_results(file_id, golden, rust, &self.asset_lock.thresholds, failures);
+            compare_results(
+                file_id,
+                golden,
+                rust,
+                &self.asset_lock.thresholds,
+                failures,
+                stats,
+            );
         }
 
         Ok(())
@@ -650,12 +774,7 @@ fn ensure_remote_asset(
     fs::create_dir_all(parent)
         .with_context(|| format!("create cache directory {}", parent.display()))?;
 
-    let mut response = client
-        .get(url)
-        .send()
-        .with_context(|| format!("download {label} from {url}"))?
-        .error_for_status()
-        .with_context(|| format!("download {label} from {url}"))?;
+    let mut response = download_with_retries(client, url, label)?;
 
     let mut temp_file = tempfile::NamedTempFile::new_in(parent)
         .with_context(|| format!("create temp file in {}", parent.display()))?;
@@ -695,6 +814,45 @@ fn ensure_remote_asset(
         )
     })?;
     Ok(target.to_path_buf())
+}
+
+fn download_with_retries(client: &Client, url: &str, label: &str) -> Result<Response> {
+    for attempt in 1..=DOWNLOAD_MAX_ATTEMPTS {
+        match client.get(url).send() {
+            Ok(response) if response.status().is_success() => return Ok(response),
+            Ok(response) => {
+                let status = response.status();
+                if attempt < DOWNLOAD_MAX_ATTEMPTS && is_retryable_download_status(status) {
+                    std::thread::sleep(download_retry_delay(attempt));
+                    continue;
+                }
+                bail!(
+                    "download {label} from {url}: HTTP status {status} after {attempt} attempt(s)"
+                );
+            }
+            Err(error) => {
+                if attempt < DOWNLOAD_MAX_ATTEMPTS {
+                    std::thread::sleep(download_retry_delay(attempt));
+                    continue;
+                }
+                return Err(error).with_context(|| {
+                    format!("download {label} from {url} after {attempt} attempt(s)")
+                });
+            }
+        }
+    }
+
+    unreachable!("download retry loop always returns or bails")
+}
+
+fn is_retryable_download_status(status: StatusCode) -> bool {
+    status == StatusCode::TOO_MANY_REQUESTS
+        || status == StatusCode::REQUEST_TIMEOUT
+        || status.is_server_error()
+}
+
+fn download_retry_delay(attempt: usize) -> Duration {
+    Duration::from_millis(DOWNLOAD_RETRY_BASE_DELAY_MS * 2_u64.pow((attempt - 1) as u32))
 }
 
 fn cache_path_for(
@@ -819,16 +977,24 @@ fn compare_results(
     candidate: &ComparableResult,
     thresholds: &Thresholds,
     failures: &mut Vec<String>,
+    stats: &mut ComparisonStats,
 ) {
+    stats.record_file();
     validate_result(file_id, "python golden", reference, thresholds, failures);
     validate_result(file_id, "rust", candidate, thresholds, failures);
 
     match cosine_distance(&reference.clip.embedding, &candidate.clip.embedding) {
-        Ok(distance) if distance > thresholds.clip_cosine_distance => failures.push(format!(
-            "{file_id}: CLIP cosine distance {distance:.6} exceeded threshold {:.6}",
-            thresholds.clip_cosine_distance
-        )),
-        Ok(_) => {}
+        Ok(distance) => {
+            stats
+                .clip_cosine_distance
+                .record(file_id, distance, thresholds.clip_cosine_distance);
+            if distance > thresholds.clip_cosine_distance {
+                failures.push(format!(
+                    "{file_id}: CLIP cosine distance {distance:.6} exceeded threshold {:.6}",
+                    thresholds.clip_cosine_distance
+                ));
+            }
+        }
         Err(error) => failures.push(format!("{file_id}: CLIP cosine distance failed: {error:#}")),
     }
 
@@ -922,8 +1088,13 @@ fn compare_results(
     }
 
     for face_match in relevant_matches {
+        stats.record_face();
         let reference_face = &reference_faces[face_match.reference_index];
         let candidate_face = &candidate_faces[face_match.candidate_index];
+        let face_box_iou_error = (thresholds.box_iou - face_match.iou).max(0.0);
+        stats
+            .face_box_iou_error
+            .record(file_id, face_box_iou_error, 0.0);
 
         if face_match.iou < thresholds.box_iou {
             failures.push(format!(
@@ -936,17 +1107,26 @@ fn compare_results(
         }
 
         match landmark_error(&reference_face.landmarks, &candidate_face.landmarks) {
-            Ok(error) if error > thresholds.landmark_error => failures.push(format!(
-                "{file_id}: landmark error {error:.6} exceeded threshold {:.6}",
-                thresholds.landmark_error
-            )),
-            Ok(_) => {}
+            Ok(error) => {
+                stats
+                    .landmark_error
+                    .record(file_id, error, thresholds.landmark_error);
+                if error > thresholds.landmark_error {
+                    failures.push(format!(
+                        "{file_id}: landmark error {error:.6} exceeded threshold {:.6}",
+                        thresholds.landmark_error
+                    ));
+                }
+            }
             Err(error) => {
                 failures.push(format!("{file_id}: landmark comparison failed: {error:#}"))
             }
         }
 
         let score_delta = (reference_face.score - candidate_face.score).abs();
+        stats
+            .score_delta
+            .record(file_id, score_delta, thresholds.score_delta);
         if score_delta > thresholds.score_delta {
             failures.push(format!(
                 "{file_id}: face score delta {score_delta:.6} exceeded threshold {:.6}",
@@ -955,13 +1135,19 @@ fn compare_results(
         }
 
         match cosine_distance(&reference_face.embedding, &candidate_face.embedding) {
-            Ok(distance) if distance > thresholds.face_embedding_cosine_distance => failures.push(
-                format!(
-                    "{file_id}: face embedding cosine distance {distance:.6} exceeded threshold {:.6}",
-                    thresholds.face_embedding_cosine_distance
-                ),
-            ),
-            Ok(_) => {}
+            Ok(distance) => {
+                stats.face_embedding_cosine_distance.record(
+                    file_id,
+                    distance,
+                    thresholds.face_embedding_cosine_distance,
+                );
+                if distance > thresholds.face_embedding_cosine_distance {
+                    failures.push(format!(
+                        "{file_id}: face embedding cosine distance {distance:.6} exceeded threshold {:.6}",
+                        thresholds.face_embedding_cosine_distance
+                    ));
+                }
+            }
             Err(error) => failures.push(format!(
                 "{file_id}: face embedding cosine distance failed: {error:#}"
             )),
