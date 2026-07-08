@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
   "dataset": "ml-indexing/v1",
-  "fixture_base_url": "https://raw.githubusercontent.com/laurenspriem/test-fixtures/ml_more_test_data/ml/indexing/v1/",
+  "fixture_base_url": "https://raw.githubusercontent.com/ente/test-fixtures/main/ml/indexing/v1/",
   "manifest": {
     "path": "manifest.json",
-    "url": "https://raw.githubusercontent.com/laurenspriem/test-fixtures/ml_more_test_data/ml/indexing/v1/manifest.json",
-    "sha256": "b9a3b648740b38aa1259a8123fd08f8d1a445ae87549f0406edddc1b7a9025ac"
+    "url": "https://raw.githubusercontent.com/ente/test-fixtures/main/ml/indexing/v1/manifest.json",
+    "sha256": "fa4a2dcd1787825a77b85343aace954572e0f4d9080e4cb3031179159af9011c"
   },
   "python_golden": {
     "path": "goldens/python/results.json",
-    "url": "https://raw.githubusercontent.com/laurenspriem/test-fixtures/ml_more_test_data/ml/indexing/v1/goldens/python/results.json",
-    "sha256": "7acb061809e7daea1992d20252ce444d5e15919df7217e7a98adc3a218f76c12"
+    "url": "https://raw.githubusercontent.com/ente/test-fixtures/main/ml/indexing/v1/goldens/python/results.json",
+    "sha256": "2def6506e098234abc2e6e10febd820b8e3e66d6ad4c9525cb4f1cec3418f9b6"
   },
   "onnx_runtime": {
     "version": "1.18.1",
