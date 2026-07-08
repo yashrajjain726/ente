@@ -1,8 +1,14 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:exif_reader/exif_reader.dart' as exif;
 import 'package:flutter/widgets.dart';
 import 'package:image/image.dart' as img;
+// ignore: implementation_imports
+import 'package:image/src/util/rational.dart' as img_util;
+import "package:photos/models/file/file.dart";
+import "package:photos/utils/exif_util.dart";
 
 Future<ImageInfo> getImageInfo(ImageProvider imageProvider) {
   final completer = Completer<ImageInfo>();
@@ -46,4 +52,77 @@ Future<ui.Image> convertImageToFlutterUi(img.Image image) async {
   final ui.Image uiImage = fi.image;
 
   return uiImage;
+}
+
+const _copiedExifFields = [
+  (ifd: "Image", source: "Make", dest: "Make"),
+  (ifd: "Image", source: "Model", dest: "Model"),
+  (ifd: "Image", source: "Orientation", dest: "Orientation"),
+  (ifd: "Image", source: "Artist", dest: "Artist"),
+  (ifd: "Image", source: "Copyright", dest: "Copyright"),
+  (ifd: "EXIF", source: "DateTimeOriginal", dest: "DateTimeOriginal"),
+  (ifd: "EXIF", source: "DateTimeDigitized", dest: "DateTimeDigitized"),
+  (ifd: "EXIF", source: "OffsetTimeOriginal", dest: "OffsetTimeOriginal"),
+  (ifd: "EXIF", source: "LensModel", dest: "LensModel"),
+  (ifd: "EXIF", source: "ExposureTime", dest: "ExposureTime"),
+  (ifd: "EXIF", source: "FNumber", dest: "FNumber"),
+  (ifd: "EXIF", source: "ISOSpeedRatings", dest: "ISOSpeed"), //ishowspeed
+  (ifd: "EXIF", source: "FocalLength", dest: "FocalLength"),
+  (ifd: "EXIF", source: "FocalLengthIn35mmFilm", dest: "FocalLengthIn35mmFilm"),
+  (ifd: "EXIF", source: "ColorSpace", dest: "ColorSpace"),
+];
+
+img.IfdValue? convertExifReaderValueToImageValue(exif.IfdTag? tag) {
+  final values = tag?.values;
+  if (tag == null || values == null || values is exif.IfdNone) {
+    return null;
+  }
+
+  List<int> ints() => values.toList().cast<int>();
+  List<double> doubles() =>
+      values.toList().map((value) => (value as num).toDouble()).toList();
+  List<img_util.Rational> ratios() {
+    return values
+        .toList()
+        .cast<exif.Ratio>()
+        .map((value) => img_util.Rational(value.numerator, value.denominator))
+        .toList();
+  }
+
+  return switch (tag.tagType) {
+    "Byte" => img.IfdByteValue.list(Uint8List.fromList(ints())),
+    "ASCII" => img.IfdValueAscii(
+      String.fromCharCodes(ints().takeWhile((byte) => byte != 0)),
+    ),
+    "Short" => img.IfdValueShort.list(ints()),
+    "Long" || "IFD" => img.IfdValueLong.list(ints()),
+    "Signed Byte" => img.IfdValueSByte.list(ints()),
+    "Undefined" => img.IfdValueUndefined.list(ints()),
+    "Signed Short" => img.IfdValueSShort.list(ints()),
+    "Signed Long" => img.IfdValueSLong.list(ints()),
+    "Ratio" => img.IfdValueRational.list(ratios()),
+    "Signed Ratio" => img.IfdValueSRational.list(ratios()),
+    "Single-Precision Floating Point (32-bit)" => img.IfdValueSingle.list(
+      doubles(),
+    ),
+    "Double-Precision Floating Point (64-bit)" => img.IfdValueDouble.list(
+      doubles(),
+    ),
+    _ => null,
+  };
+}
+
+Future<void> copyEXIF(EnteFile src, img.Image dest) async {
+  final srcExif = await getExif(src);
+  for (final field in _copiedExifFields) {
+    final destIfd = field.ifd == "Image"
+        ? dest.exif.imageIfd
+        : dest.exif.exifIfd;
+    final value = convertExifReaderValueToImageValue(
+      srcExif["${field.ifd} ${field.source}"],
+    );
+    if (value != null) {
+      destIfd[field.dest] = value;
+    }
+  }
 }
