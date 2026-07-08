@@ -250,16 +250,12 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
   }
 
   Future<dynamic> _editPerson(BuildContext context) async {
-    if (person.data.assigned.isEmpty) {
-      return;
-    }
+    final clusterID = person.data.assigned.isEmpty
+        ? null
+        : person.data.assigned.first.id;
     final result = await routeToPage(
       context,
-      SaveOrEditPerson(
-        person.data.assigned.first.id,
-        person: person,
-        isEditing: true,
-      ),
+      SaveOrEditPerson(clusterID, person: person, isEditing: true),
     );
     if (result is PersonEntity) {
       _appBarTitle = result.data.name;
@@ -299,15 +295,14 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
 
     if (!isIgnored) {
       items.addAll([
-        if (hasAssignedCluster)
-          EntePopupMenuOption(
-            value: PeoplePopupAction.rename,
-            label: AppLocalizations.of(context).edit,
-            leadingWidget: galleryAppBarMenuIcon(
-              HugeIcons.strokeRoundedPencilEdit01,
-              iconColor,
-            ),
+        EntePopupMenuOption(
+          value: PeoplePopupAction.rename,
+          label: AppLocalizations.of(context).edit,
+          leadingWidget: galleryAppBarMenuIcon(
+            HugeIcons.strokeRoundedPencilEdit01,
+            iconColor,
           ),
+        ),
         if (hasAssignedCluster)
           EntePopupMenuOption(
             value: PeoplePopupAction.reviewSuggestions,
@@ -377,15 +372,14 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
       ]);
     } else {
       items.addAll([
-        if (hasAssignedCluster)
-          EntePopupMenuOption(
-            value: PeoplePopupAction.rename,
-            label: AppLocalizations.of(context).edit,
-            leadingWidget: galleryAppBarMenuIcon(
-              HugeIcons.strokeRoundedPencilEdit01,
-              iconColor,
-            ),
+        EntePopupMenuOption(
+          value: PeoplePopupAction.rename,
+          label: AppLocalizations.of(context).edit,
+          leadingWidget: galleryAppBarMenuIcon(
+            HugeIcons.strokeRoundedPencilEdit01,
+            iconColor,
           ),
+        ),
         if (hasAssignedCluster)
           EntePopupMenuOption(
             value: PeoplePopupAction.reviewSuggestions,

@@ -126,7 +126,7 @@ class _PeopleSelectionActionWidgetState
             selectedPersonIds.every(
               (id) => (personMap[id]?.data.name ?? "").isNotEmpty,
             );
-        final bool showEditAction = onlySelectedPersonHasAssignedCluster;
+        final bool showEditAction = onlyOnePerson;
         final bool showReviewAction = onlySelectedPersonHasAssignedCluster;
         final bool showMergeAction = onlyIgnoredPersonsSelected
             ? false
@@ -321,15 +321,13 @@ class _PeopleSelectionActionWidgetState
     final personID = selectedPersonIds.first;
     final person = personMap[personID];
     if (person == null) return;
-    if (person.data.assigned.isEmpty) return;
+    final clusterID = person.data.assigned.isEmpty
+        ? null
+        : person.data.assigned.first.id;
 
     await routeToPage(
       context,
-      SaveOrEditPerson(
-        person.data.assigned.first.id,
-        person: person,
-        isEditing: true,
-      ),
+      SaveOrEditPerson(clusterID, person: person, isEditing: true),
     );
     widget.selectedPeople.clearAll();
   }
