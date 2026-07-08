@@ -57,12 +57,12 @@ class IsolateLogger {
   final Queue<IsolateLogString> fileQueueEntries = Queue();
 
   Future onLogRecordInIsolate(LogRecord rec) async {
-    if (!SuperLogging.shouldLogRecord(rec)) return;
-
     final str = rec.toPrettyString(null, true);
 
     // write to stdout
-    SuperLogging.printLog(str);
+    if (SuperLogging.shouldPrintLogRecord(rec)) {
+      SuperLogging.printLog(str);
+    }
 
     // push to log queue
     fileQueueEntries.add(

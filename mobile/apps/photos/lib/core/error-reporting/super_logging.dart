@@ -412,7 +412,9 @@ class SuperLogging {
 
   static String _lastExtraLines = '';
 
-  static final Level rootLoggerLevel =
+  static const Level rootLoggerLevel = kDebugMode ? Level.ALL : Level.INFO;
+
+  static final Level _terminalLoggerLevel =
       Level.LEVELS
           .where(
             (level) =>
@@ -422,16 +424,16 @@ class SuperLogging {
                 ).trim().toLowerCase(),
           )
           .firstOrNull ??
-      (kDebugMode ? Level.ALL : Level.INFO);
+      rootLoggerLevel;
 
-  static bool shouldLogRecord(LogRecord rec) {
-    return _loggerPrefixDefine.isEmpty ||
+  static bool shouldPrintLogRecord(LogRecord rec) {
+    final matchesPrefix =
+        _loggerPrefixDefine.isEmpty ||
         rec.loggerName.toLowerCase().startsWith(_loggerPrefixDefine);
+    return matchesPrefix && rec.level.value >= _terminalLoggerLevel.value;
   }
 
   static Future onLogRecord(LogRecord rec) async {
-    if (!shouldLogRecord(rec)) return;
-
     // log misc info if it changed
     String? extraLines = "app version: '$appVersion'\n";
     if (extraLines != _lastExtraLines) {
@@ -443,7 +445,9 @@ class SuperLogging {
     final str = (config.prefix) + " " + rec.toPrettyString(extraLines);
 
     // write to stdout
-    printLog(str);
+    if (shouldPrintLogRecord(rec)) {
+      printLog(str);
+    }
 
     saveLogString(str, rec.error, rec: rec);
   }
