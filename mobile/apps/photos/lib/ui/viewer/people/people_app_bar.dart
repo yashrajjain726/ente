@@ -29,6 +29,7 @@ import "package:photos/ui/viewer/people/person_cluster_suggestion.dart";
 import "package:photos/ui/viewer/people/person_selection_action_widgets.dart";
 import "package:photos/ui/viewer/people/save_or_edit_person.dart";
 import "package:photos/utils/dialog_util.dart";
+import "package:photos/utils/person_contact_linking_util.dart";
 
 const kShowUnnamedIgnoredPersonEventSource =
     "_AppBarWidgetState._showPersonUnnamedDelete";
@@ -125,7 +126,10 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     required PersonEntity sourcePerson,
     required String? title,
   }) {
-    if (sourcePerson.data.email == Configuration.instance.getEmail()) {
+    if (isCurrentUserContactLink(
+      email: sourcePerson.data.email,
+      userID: sourcePerson.data.userID,
+    )) {
       if (title == null) {
         return context.l10n.me;
       }
@@ -185,7 +189,8 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     if (oldWidget.title != widget.title ||
         oldWidget.person.remoteID != widget.person.remoteID ||
         oldWidget.person.data.name != widget.person.data.name ||
-        oldWidget.person.data.email != widget.person.data.email) {
+        oldWidget.person.data.email != widget.person.data.email ||
+        oldWidget.person.data.userID != widget.person.data.userID) {
       person = widget.person;
       _appBarTitle = _resolveAppBarTitle(
         sourcePerson: person,
@@ -341,8 +346,10 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
             iconColor,
           ),
         ),
-        if (person.data.email != null &&
-            (person.data.email == Configuration.instance.getEmail()))
+        if (isCurrentUserContactLink(
+          email: person.data.email,
+          userID: person.data.userID,
+        ))
           EntePopupMenuOption(
             value: PeoplePopupAction.reassignMe,
             label: context.l10n.reassignMe,

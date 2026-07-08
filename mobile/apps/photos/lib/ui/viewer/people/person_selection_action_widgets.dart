@@ -511,7 +511,10 @@ class _LinkContactToPersonSelectionPageState
     required String emailToLink,
     required PersonEntity personEntity,
   }) async {
-    final linkedPerson = await findPersonLinkedToEmail(emailToLink);
+    final linkedPerson = await findPersonLinkedToEmail(
+      emailToLink,
+      excludedPersonId: personEntity.remoteID,
+    );
     if (linkedPerson != null) {
       await showAlreadyLinkedEmailDialog(
         context,
@@ -603,7 +606,8 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
     _personEntities = PersonService.instance.getPersons().then((persons) async {
       final List<PersonEntity> result = [];
       for (final person in persons) {
-        if ((person.data.email != null && person.data.email!.isNotEmpty) ||
+        if (person.data.userID != null ||
+            (person.data.email != null && person.data.email!.isNotEmpty) ||
             (person.data.isIgnored)) {
           continue;
         }
@@ -714,10 +718,12 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
   }) async {
     try {
       final email = Configuration.instance.getEmail();
+      final userID = Configuration.instance.getUserID();
 
       final updatedPerson1 = await PersonService.instance.updateAttributes(
         currentPersonID,
-        email: '',
+        email: null,
+        userID: null,
       );
       Bus.instance.fire(
         PeopleChangedEvent(
@@ -730,6 +736,7 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
       final updatedPerson2 = await PersonService.instance.updateAttributes(
         newPersonID,
         email: email,
+        userID: userID,
       );
       Bus.instance.fire(
         PeopleChangedEvent(

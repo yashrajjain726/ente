@@ -315,7 +315,10 @@ class _LinkEmailScreen extends State<LinkEmailScreen> {
     String personID,
     BuildContext context,
   ) async {
-    final linkedPerson = await findPersonLinkedToEmail(email);
+    final linkedPerson = await findPersonLinkedToEmail(
+      email,
+      excludedPersonId: personID,
+    );
     if (linkedPerson != null) {
       await showAlreadyLinkedEmailDialog(
         context,

@@ -686,7 +686,10 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
       final emailToSave = _emailToSave;
       if (emailToSave != null &&
           emailToSave != _trimEmptyToNull(person!.data.email)) {
-        final linkedPerson = await findPersonLinkedToEmail(emailToSave);
+        final linkedPerson = await findPersonLinkedToEmail(
+          emailToSave,
+          excludedPersonId: person!.remoteID,
+        );
         if (linkedPerson != null) {
           await showAlreadyLinkedEmailDialog(
             context,

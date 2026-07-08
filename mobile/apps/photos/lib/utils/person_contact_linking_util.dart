@@ -59,14 +59,34 @@ Future<PersonEntity?> findPersonLinkedToContact({
   );
 }
 
-Future<PersonEntity?> findPersonLinkedToEmail(String? email) async {
+Future<PersonEntity?> findPersonLinkedToEmail(
+  String? email, {
+  String? excludedPersonId,
+}) async {
   final normalizedEmail = normalizeContactLinkEmail(email);
   if (normalizedEmail == null) {
     return null;
   }
   final persons = await PersonService.instance.getPersons();
+  bool includePerson(PersonEntity person) =>
+      person.remoteID != excludedPersonId;
+  if (isCurrentUserContactLinkEmail(normalizedEmail)) {
+    final currentUserMatch = persons.firstWhereOrNull(
+      (person) =>
+          includePerson(person) &&
+          isCurrentUserContactLink(
+            email: person.data.email,
+            userID: person.data.userID,
+          ),
+    );
+    if (currentUserMatch != null) {
+      return currentUserMatch;
+    }
+  }
   return persons.firstWhereOrNull(
-    (person) => contactLinkEmailMatches(person.data.email, normalizedEmail),
+    (person) =>
+        includePerson(person) &&
+        contactLinkEmailMatches(person.data.email, normalizedEmail),
   );
 }
 
