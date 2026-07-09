@@ -496,8 +496,16 @@ class VideoPreviewService {
       props ??= await getVideoPropsAsync(file);
       final fileSize = enteFile.fileSize ?? file.lengthSync();
 
+      if (props == null) {
+        error =
+            "Failed to read FFprobe metadata for ${enteFile.displayName} "
+            "(fileID=${enteFile.uploadedFileID})";
+        _logger.warning(error);
+        return;
+      }
+
       final videoData = List.from(
-        props?.propData?["streams"] ?? [],
+        props.propData?["streams"] ?? [],
       ).firstWhereOrNull((e) => e["type"] == "video");
       if (videoData == null) {
         error =
@@ -510,8 +518,8 @@ class VideoPreviewService {
       final codec = videoData["codec_name"]?.toString().toLowerCase();
       final isH264 = codec?.contains("h264") ?? false;
 
-      final bitrate = props?.duration?.inSeconds != null
-          ? (fileSize * 8) / props!.duration!.inSeconds
+      final bitrate = props.duration?.inSeconds != null
+          ? (fileSize * 8) / props.duration!.inSeconds
           : null;
 
       final colorTransfer = videoData["color_transfer"]
@@ -546,7 +554,7 @@ class VideoPreviewService {
           !(isH264 && bitrate != null && bitrate <= 4000 * 1000);
       final rescaleVideo = !(bitrate != null && bitrate <= 2000 * 1000);
       final needsTonemap = isHDR;
-      final applyFPS = (double.tryParse(props?.fps ?? "") ?? 100) > 30;
+      final applyFPS = (double.tryParse(props.fps ?? "") ?? 100) > 30;
 
       String filters = "";
 
