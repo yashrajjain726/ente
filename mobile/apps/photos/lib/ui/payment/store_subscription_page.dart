@@ -92,31 +92,31 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
               purchase.verificationData.serverVerificationData,
             );
             await InAppPurchase.instance.completePurchase(purchase);
-            if (!mounted) {
-              await _dialog.hide();
-              return;
-            }
-            String text = l10n.thankYouForSubscribing;
-            if (!widget.isOnboarding) {
-              final isUpgrade =
-                  _hasActiveSubscription &&
-                  newSubscription.storage > _currentSubscription!.storage;
-              final isDowngrade =
-                  _hasActiveSubscription &&
-                  newSubscription.storage < _currentSubscription!.storage;
-              if (isUpgrade) {
-                text = l10n.yourPlanWasSuccessfullyUpgraded;
-              } else if (isDowngrade) {
-                text = l10n.yourPlanWasSuccessfullyDowngraded;
-              }
-            }
-            showShortToast(context, text);
+            final wasActiveSubscription = _hasActiveSubscription;
+            final previousSubscription = _currentSubscription;
             _currentSubscription = newSubscription;
             _hasActiveSubscription = _currentSubscription!.isValid();
-            setState(() {});
-            await _dialog.hide();
             Bus.instance.fire(SubscriptionPurchasedEvent());
-            if (widget.isOnboarding) {
+            if (mounted) {
+              String text = l10n.thankYouForSubscribing;
+              if (!widget.isOnboarding && previousSubscription != null) {
+                final isUpgrade =
+                    wasActiveSubscription &&
+                    newSubscription.storage > previousSubscription.storage;
+                final isDowngrade =
+                    wasActiveSubscription &&
+                    newSubscription.storage < previousSubscription.storage;
+                if (isUpgrade) {
+                  text = l10n.yourPlanWasSuccessfullyUpgraded;
+                } else if (isDowngrade) {
+                  text = l10n.yourPlanWasSuccessfullyDowngraded;
+                }
+              }
+              showShortToast(context, text);
+              setState(() {});
+              await _dialog.hide();
+            }
+            if (mounted && widget.isOnboarding) {
               Navigator.of(context).popUntil((route) => route.isFirst);
             }
           } on SubscriptionAlreadyClaimedError catch (e) {
