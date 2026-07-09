@@ -495,22 +495,26 @@ class VideoPreviewService {
       props ??= await getVideoPropsAsync(file);
       final fileSize = enteFile.fileSize ?? file.lengthSync();
 
-      final videoData = _getVideoStream(props);
+      final videoData = List.from(
+        props?.propData?["streams"] ?? [],
+      ).firstWhereOrNull((e) => e["type"] == "video");
       if (videoData == null) {
         _logger.warning(
           "No video stream found in FFprobe metadata for "
-          "fileID=${enteFile.uploadedFileID}; trying ffmpeg with defaults",
+          "fileID=${enteFile.uploadedFileID}; skipping preview creation",
         );
+        removeFile = true;
+        return;
       }
 
-      final codec = videoData?["codec_name"]?.toString().toLowerCase();
+      final codec = videoData["codec_name"]?.toString().toLowerCase();
       final isH264 = codec?.contains("h264") ?? false;
 
-      final bitrate = videoData != null && props?.duration?.inSeconds != null
+      final bitrate = props?.duration?.inSeconds != null
           ? (fileSize * 8) / props!.duration!.inSeconds
           : null;
 
-      final colorTransfer = videoData?["color_transfer"]
+      final colorTransfer = videoData["color_transfer"]
           ?.toString()
           .toLowerCase();
       final isHDR =
@@ -1222,11 +1226,10 @@ class VideoPreviewService {
         file = await getFile(enteFile, isOrigin: true);
         if (file != null) {
           props = await getVideoPropsAsync(file);
-          final videoData = _getVideoStream(props);
-          if (videoData == null) {
-            return (props, skipFile, file);
-          }
-          final codec = videoData["codec_name"]?.toString().toLowerCase();
+          final videoData = List.from(
+            props?.propData?["streams"] ?? [],
+          ).firstWhereOrNull((e) => e["type"] == "video");
+          final codec = videoData?["codec_name"]?.toString().toLowerCase();
           skipFile = codec?.contains("h264") ?? false;
 
           if (skipFile) {
@@ -1245,13 +1248,6 @@ class VideoPreviewService {
       _logger.warning("Failed to check props", e, sT);
     }
     return (props, skipFile, file);
-  }
-
-  Map<dynamic, dynamic>? _getVideoStream(FFProbeProps? props) {
-    final streams = props?.propData?["streams"];
-    return streams is Iterable
-        ? streams.whereType<Map>().firstWhereOrNull((e) => e["type"] == "video")
-        : null;
   }
 
   // generate stream for all files after cutoff date
