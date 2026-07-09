@@ -111,7 +111,9 @@ final class EnsuLogging {
     func readLogText(fileURL: URL? = nil) -> String {
         start()
         let url = fileURL ?? todayLogFileURL()
-        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        return queue.sync {
+            (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        }
     }
 
     func createLogsArchive() throws -> URL {
