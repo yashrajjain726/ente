@@ -13,7 +13,7 @@ use std::sync::{PoisonError, RwLock};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 
-use reqwest::header::{HeaderName, HeaderValue, USER_AGENT};
+use reqwest::header::{HeaderName, HeaderValue};
 use reqwest::{Method, Url};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -219,13 +219,26 @@ pub struct ApiConfig {
     /// The Ente API origin: scheme, host, and port, e.g. `https://api.ente.com`.
     pub origin: String,
     /// The client package, sent as `X-Client-Package` (e.g. `io.ente.photos`).
-    pub client_package: String,
+    pub client_package: Option<String>,
     /// The client version, sent as `X-Client-Version`.
     pub client_version: Option<String>,
-    /// The user agent to send.
+    /// The user agent to send. Ignored on wasm.
     pub user_agent: Option<String>,
     /// The authentication to start with, or `None` to start unauthenticated.
     pub auth: Option<Auth>,
+}
+
+impl ApiConfig {
+    /// Config with only the origin set.
+    pub fn new(origin: String) -> Self {
+        Self {
+            origin,
+            client_package: None,
+            client_version: None,
+            user_agent: None,
+            auth: None,
+        }
+    }
 }
 
 /// An Ente API client, bound to a single origin.
@@ -235,8 +248,9 @@ pub struct ApiConfig {
 pub struct Api {
     http: Http,
     origin: String,
-    client_package: String,
+    client_package: Option<String>,
     client_version: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
     user_agent: Option<String>,
     auth: RwLock<Option<Auth>>,
 }
@@ -249,6 +263,7 @@ impl Api {
             origin: config.origin,
             client_package: config.client_package,
             client_version: config.client_version,
+            #[cfg(not(target_arch = "wasm32"))]
             user_agent: config.user_agent,
             auth: RwLock::new(config.auth),
         }
@@ -308,12 +323,15 @@ impl Api {
             // reqwest hits the same parse failure, and reports it at send time.
             Err(_) => self.http.client.request(method, self.origin.as_str()),
         };
-        builder = builder.header(CLIENT_PACKAGE, &self.client_package);
+        if let Some(client_package) = &self.client_package {
+            builder = builder.header(CLIENT_PACKAGE, client_package);
+        }
         if let Some(version) = &self.client_version {
             builder = builder.header(CLIENT_VERSION, version);
         }
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(user_agent) = &self.user_agent {
-            builder = builder.header(USER_AGENT, user_agent);
+            builder = builder.header(reqwest::header::USER_AGENT, user_agent);
         }
         if let Some(auth) = &*self.auth.read().unwrap_or_else(PoisonError::into_inner) {
             builder = auth.apply(builder);
@@ -459,7 +477,7 @@ mod tests {
             Http::new().unwrap(),
             ApiConfig {
                 origin: server.url(),
-                client_package: "io.ente.test".into(),
+                client_package: Some("io.ente.test".into()),
                 client_version: Some("1.0".into()),
                 user_agent: None,
                 auth,
@@ -705,16 +723,7 @@ mod tests {
 
     #[tokio::test]
     async fn malformed_origin_fails_at_send() {
-        let api = Api::new(
-            Http::new().unwrap(),
-            ApiConfig {
-                origin: "not a url".into(),
-                client_package: "io.ente.test".into(),
-                client_version: None,
-                user_agent: None,
-                auth: None,
-            },
-        );
+        let api = Api::new(Http::new().unwrap(), ApiConfig::new("not a url".into()));
         let err = api.get("/ping").send().await.unwrap_err();
         assert!(matches!(err, Error::Network(_)));
     }
@@ -730,13 +739,7 @@ mod tests {
 
         let api = Api::new(
             Http::new().unwrap(),
-            ApiConfig {
-                origin: format!("{}/", server.url()),
-                client_package: "io.ente.test".into(),
-                client_version: None,
-                user_agent: None,
-                auth: None,
-            },
+            ApiConfig::new(format!("{}/", server.url())),
         );
         api.ping().await.unwrap();
 
