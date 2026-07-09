@@ -52,6 +52,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       showShortToast(context, AppLocalizations.of(context).somethingWentWrong);
     }
   }

@@ -278,6 +278,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   }
 
   void _onInteractionLockChanged(bool shouldLock) {
+    if (!mounted) return;
     if (_isZooming != shouldLock) {
       setState(() {
         _isZooming = shouldLock;
@@ -637,6 +638,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
           }
         })
         .onError((error, stackTrace) {
+          if (!mounted) return;
           showErrorDialog(
             context,
             AppLocalizations.of(context).error,

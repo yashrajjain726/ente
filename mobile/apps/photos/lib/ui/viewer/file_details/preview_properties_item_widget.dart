@@ -41,6 +41,7 @@ class _PreviewPropertiesItemWidgetState
   }
 
   Future<void> _getSection() async {
+    if (!mounted) return;
     final textStyle = getEnteTextTheme(context).miniMuted;
     final subSectionWidgets = <Widget>[];
 
@@ -51,9 +52,11 @@ class _PreviewPropertiesItemWidgetState
           return null;
         });
 
-    if (data!.width != null && data.height != null) {
+    if (!mounted || data == null) return;
+
+    if (data.width != null && data.height != null) {
       subSectionWidgets.add(
-        Text("${data.width!}x${data.height!}", style: textStyle),
+        Text("${data.width}x${data.height}", style: textStyle),
       );
     }
 

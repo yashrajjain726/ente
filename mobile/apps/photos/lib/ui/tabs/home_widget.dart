@@ -381,6 +381,9 @@ class _HomeWidgetState extends State<HomeWidget> {
 
       final Collection? collection = await CollectionsService.instance
           .getCollectionFromPublicLink(context, uri);
+      if (!mounted) {
+        return;
+      }
       if (collection == null) {
         return;
       }

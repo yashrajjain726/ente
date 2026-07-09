@@ -49,6 +49,7 @@ class _CollageCreatorPageState extends State<CollageCreatorPage> {
 
     _clearSwapSelection?.call();
     await Future<void>.delayed(const Duration(milliseconds: 16));
+    if (!mounted) return;
 
     setState(() {
       _isSaving = true;
@@ -80,6 +81,7 @@ class _CollageCreatorPageState extends State<CollageCreatorPage> {
           }));
       final newFile = await EnteFile.fromAsset("ente Collages", newAsset);
       SyncService.instance.sync().ignore();
+      if (!mounted) return;
       showShortToast(context, AppLocalizations.of(context).collageSaved);
       replacePage(
         context,
@@ -88,6 +90,7 @@ class _CollageCreatorPageState extends State<CollageCreatorPage> {
       );
     } catch (e, s) {
       _logger.severe("Failed to create collage", e, s);
+      if (!mounted) return;
       showShortToast(context, AppLocalizations.of(context).somethingWentWrong);
     } finally {
       if (mounted) {

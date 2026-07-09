@@ -262,12 +262,15 @@ class _AlbumSelectionActionWidgetState
         continue;
       }
       count = await FilesDB.instance.collectionFileCount(collection.id);
+      if (!mounted) return;
       final bool isEmptyCollection = count == 0;
       if (isEmptyCollection) {
         try {
           await CollectionsService.instance.trashEmptyCollection(collection);
+          if (!mounted) return;
         } catch (e, s) {
           _logger.warning("failed to trash collection", e, s);
+          if (!mounted) return;
           errors.add(e);
         }
       } else {
@@ -276,6 +279,7 @@ class _AlbumSelectionActionWidgetState
     }
     if (errors.isNotEmpty) {
       await showGenericErrorDialog(context: context, error: errors.first);
+      if (!mounted) return;
     }
 
     if (nonEmptyCollection.isNotEmpty) {
@@ -287,6 +291,7 @@ class _AlbumSelectionActionWidgetState
         debugPrint("Failed to delete collection");
       }
     }
+    if (!mounted) return;
     if (hasFavorites) {
       _showFavToast();
     }
