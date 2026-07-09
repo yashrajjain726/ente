@@ -157,7 +157,7 @@ class _WrappedViewerPageState extends State<WrappedViewerPage>
       _didRegisterWillPop = true;
     });
     unawaited(_initBackgroundMusic());
-    EnteWakeLockService.instance.updateWakeLock(
+    wakeLockService.updateWakeLock(
       enable: true,
       wakeLockFor: WakeLockFor.rewindViewer,
     );
@@ -181,7 +181,7 @@ class _WrappedViewerPageState extends State<WrappedViewerPage>
     _pageController.dispose();
     unawaited(_playerStateSubscription?.cancel());
     unawaited(_audioPlayer.dispose());
-    EnteWakeLockService.instance.updateWakeLock(
+    wakeLockService.updateWakeLock(
       enable: false,
       wakeLockFor: WakeLockFor.rewindViewer,
     );

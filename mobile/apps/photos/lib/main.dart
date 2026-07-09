@@ -59,7 +59,6 @@ import 'package:photos/services/sync/local_sync_service.dart';
 import 'package:photos/services/sync/remote_sync_service.dart';
 import "package:photos/services/sync/sync_service.dart";
 import "package:photos/services/video_preview_service.dart";
-import "package:photos/services/wake_lock_service.dart";
 import "package:photos/src/rust/frb_generated.dart";
 import "package:photos/utils/device_info.dart";
 import "package:photos/utils/email_util.dart";
@@ -427,6 +426,7 @@ Future<void> _init(
       NetworkClient.instance.downloadDio,
       packageInfo,
     );
+    wakeLockService.init(isBackground: isBackground);
 
     _logger.info("Configuration init $tlog");
     await Configuration.instance.init(preferences);
@@ -518,7 +518,6 @@ Future<void> _init(
     if (!isBackground && flagService.enableContact) {
       unawaited(_warmContactsCacheInBackground());
     }
-    EnteWakeLockService.instance.init(preferences);
     wrappedService.scheduleInitialLoad();
     logLocalSettings();
     initComplete = true;
