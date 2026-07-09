@@ -58,17 +58,15 @@
       "sha256": "ef54ec66c687603eb4dd303e20d9b67e81069d3133b1c69a70028c76718b7752"
     }
   },
-  "expected_unsupported_decode_file_ids": [
-    "IMG_8905.CR2"
-  ],
+  "expected_unsupported_decode_file_ids": ["IMG_8905.CR2"],
   "thresholds": {
     "clip_cosine_distance": 0.015,
     "face_embedding_cosine_distance": 0.015,
     "box_iou": 0.8,
     "face_duplicate_iou": 0.8,
     "face_match_iou_floor": 0.05,
-    "landmark_error": 0.03,
-    "score_delta": 0.05,
+    "landmark_error": 0.01,
+    "score_delta": 0.01,
     "min_face_score_for_comparison": 0.8,
     "embedding_norm_tolerance": 0.001
   }
