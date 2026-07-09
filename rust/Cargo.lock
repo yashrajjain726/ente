@@ -2413,6 +2413,7 @@ dependencies = [
  "image",
  "jxl-oxide",
  "kamadak-exif",
+ "moxcms",
  "thiserror 2.0.18",
  "tiff 0.10.3",
 ]
@@ -3559,13 +3560,14 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 [[package]]
 name = "heic_decoder"
 version = "0.1.0"
-source = "git+https://github.com/ente/heic-decoder.git?rev=019b2fd8ee6af99579f26e424a6a0b9016a73fdc#019b2fd8ee6af99579f26e424a6a0b9016a73fdc"
+source = "git+https://github.com/ente/heic-decoder.git?rev=547e514a0beb83aa6c556c2f80eeba2da635a5cb#547e514a0beb83aa6c556c2f80eeba2da635a5cb"
 dependencies = [
  "archmage",
  "brotli",
  "flate2",
  "image",
  "libc",
+ "moxcms",
  "png 0.18.1",
  "rav1d",
  "safe_unaligned_simd",

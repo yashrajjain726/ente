@@ -4,11 +4,12 @@ edition = "2024"
 
 [dependencies]
 fast_image_resize = { version = "5.5.0", features = ["image"] }
-image = { version = "0.25.5", default-features = true }
+image = { version = "0.25.10", default-features = true }
 jxl-oxide = { version = "0.12.6", features = ["image"] }
 kamadak-exif = "0.6.1"
-ente_heic = { package = "heic_decoder", git = "https://github.com/ente/heic-decoder.git", rev = "019b2fd8ee6af99579f26e424a6a0b9016a73fdc", features = [
+ente_heic = { package = "heic_decoder", git = "https://github.com/ente/heic-decoder.git", rev = "547e514a0beb83aa6c556c2f80eeba2da635a5cb", features = [
     "image-integration",
 ] }
+moxcms = "0.8.1"
 thiserror.workspace = true
 tiff = "0.10.3"
