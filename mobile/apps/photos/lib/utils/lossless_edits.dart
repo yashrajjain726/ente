@@ -11,16 +11,28 @@ import "package:pro_image_editor/pro_image_editor.dart";
 
 final _logger = Logger("lossless_edits");
 
-Future<Uint8List?> tryRotateFileLossless(EnteFile src, int turns) async {
+const _flipXOrientation = [0, 2, 1, 4, 3, 8, 7, 6, 5];
+const _flipYOrientation = [0, 4, 3, 2, 1, 6, 5, 8, 7];
+const _rotateCwOrientation = [0, 6, 5, 8, 7, 4, 3, 2, 1];
+
+typedef LosslessEditTransform = ({bool flipX, bool flipY, int turns});
+
+Future<Uint8List?> tryTransformFileLossless(
+  EnteFile src,
+  LosslessEditTransform transform,
+) async {
   try {
-    return await _rotateFileLossless(src, turns);
+    return await _transformFileLossless(src, transform);
   } catch (e, s) {
-    _logger.warning("Failed to rotate file losslessly", e, s);
+    _logger.warning("Failed to transform file losslessly", e, s);
     return null;
   }
 }
 
-Future<Uint8List> _rotateFileLossless(EnteFile src, int turns) async {
+Future<Uint8List> _transformFileLossless(
+  EnteFile src,
+  LosslessEditTransform transform,
+) async {
   File? f;
   try {
     f = await getFile(src, isOrigin: true);
@@ -32,7 +44,7 @@ Future<Uint8List> _rotateFileLossless(EnteFile src, int turns) async {
     if (exif == null) {
       throw Exception("Failed to decode JPEG EXIF");
     }
-    _applyRotationToExif(exif, turns);
+    _applyTransformToExif(exif, transform);
     final out = img.injectJpgExif(bytes, exif);
     if (out == null) {
       throw Exception("Failed to inject JPEG EXIF");
@@ -45,36 +57,21 @@ Future<Uint8List> _rotateFileLossless(EnteFile src, int turns) async {
   }
 }
 
-void _applyRotationToExif(img.ExifData exif, int turns) {
-  final originalTurns = _orientationToTurns(exif.imageIfd.orientation);
-  if (originalTurns == null) {
+void _applyTransformToExif(img.ExifData exif, LosslessEditTransform transform) {
+  var orientation = exif.imageIfd.orientation ?? 1;
+  if (orientation < 1 || orientation > 8) {
     throw Exception("Unsupported EXIF orientation");
   }
-  final updatedTurns = (originalTurns + turns) % 4;
-  final updatedOrientation = _turnsToOrientation(updatedTurns);
-  exif.imageIfd.orientation = updatedOrientation;
+
+  if (transform.flipX) orientation = _flipXOrientation[orientation];
+  if (transform.flipY) orientation = _flipYOrientation[orientation];
+  for (var i = 0; i < (transform.turns % 4 + 4) % 4; i++) {
+    orientation = _rotateCwOrientation[orientation];
+  }
+  exif.imageIfd.orientation = orientation;
 }
 
-int? _orientationToTurns(int? orientation) {
-  return switch (orientation ?? 1) {
-    1 => 0,
-    6 => 1,
-    3 => 2,
-    8 => 3,
-    _ => null,
-  };
-}
-
-int _turnsToOrientation(int turns) {
-  return switch ((turns % 4 + 4) % 4) {
-    1 => 6,
-    2 => 3,
-    3 => 8,
-    _ => 1,
-  };
-}
-
-bool isTransformOnlyRotation(TransformConfigs t) {
+bool isTransformOnlyLossless(TransformConfigs t) {
   final fullImageRect = Rect.fromLTWH(
     0,
     0,
@@ -82,26 +79,24 @@ bool isTransformOnlyRotation(TransformConfigs t) {
     t.originalSize.height,
   );
 
-  final isRotationOnly =
+  final isLosslessTransformOnly =
       t.originalSize.width.isFinite &&
       t.originalSize.height.isFinite &&
       t.cropRect.left.isFinite &&
       t.cropRect.top.isFinite &&
       t.cropRect.right.isFinite &&
       t.cropRect.bottom.isFinite &&
-      t.angle != 0 &&
+      (t.angle != 0 || t.flipX || t.flipY) &&
       t.isRectangularCropper &&
       _isSameRect(t.cropRect, fullImageRect) &&
       _isSameDouble(t.scaleUser, 1) &&
       t.aspectRatio == -1 &&
-      t.flipX == false &&
-      t.flipY == false &&
       _isSameOffset(t.offset, Offset.zero);
 
-  return isRotationOnly;
+  return isLosslessTransformOnly;
 }
 
-int? getTurnsIfOnlyRotated(ProImageEditorState editorState) {
+LosslessEditTransform? getLosslessTransform(ProImageEditorState editorState) {
   final stateManager = editorState.stateManager;
 
   if (stateManager.activeLayers.isNotEmpty) {
@@ -117,7 +112,7 @@ int? getTurnsIfOnlyRotated(ProImageEditorState editorState) {
     return null;
   }
 
-  if (!isTransformOnlyRotation(transformConfigs)) return null;
+  if (!isTransformOnlyLossless(transformConfigs)) return null;
 
   const quarterTurn = pi / 2;
   final rotations = transformConfigs.angle / quarterTurn;
@@ -126,7 +121,16 @@ int? getTurnsIfOnlyRotated(ProImageEditorState editorState) {
     return null;
   }
 
-  return rotations.toInt();
+  final transform = (
+    turns: rotations.toInt(),
+    flipX: transformConfigs.flipX,
+    flipY: transformConfigs.flipY,
+  );
+  if (transform.turns == 0 && !transform.flipX && !transform.flipY) {
+    return null;
+  }
+
+  return transform;
 }
 
 bool _isSameDouble(double a, double b) {

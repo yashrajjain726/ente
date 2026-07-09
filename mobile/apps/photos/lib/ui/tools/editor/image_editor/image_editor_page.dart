@@ -95,10 +95,13 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     bool hasStoppedChangeNotify = false;
 
     try {
-      final turns = getTurnsIfOnlyRotated(editorState);
-      final losslessBytes = turns == null
+      final losslessTransform = getLosslessTransform(editorState);
+      final losslessBytes = losslessTransform == null
           ? null
-          : await tryRotateFileLossless(widget.originalFile, turns);
+          : await tryTransformFileLossless(
+              widget.originalFile,
+              losslessTransform,
+            );
       final bytes =
           losslessBytes ??
           await compressImage(await editorState.captureEditorImage());
