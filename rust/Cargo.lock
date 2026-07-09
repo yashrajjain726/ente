@@ -2422,8 +2422,10 @@ dependencies = [
 name = "ente-photos"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "ente-image",
  "fast_image_resize",
+ "flate2",
  "half",
  "html-escape",
  "image",
@@ -2434,6 +2436,11 @@ dependencies = [
  "plsfix",
  "quick-xml",
  "regex",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tar",
  "tempfile",
  "thiserror 2.0.18",
  "usearch",
@@ -6919,6 +6926,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "encoding_rs",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2",
