@@ -2229,27 +2229,28 @@ class CollectionsService {
       getCollectionKey(destCollectionID),
     );
 
-    localFileToUpload.encryptedKey = CryptoUtil.bin2base64(
-      encryptedKeyData.encryptedData!,
-    );
-    localFileToUpload.keyDecryptionNonce = CryptoUtil.bin2base64(
-      encryptedKeyData.nonce!,
-    );
+    final encryptedKey = CryptoUtil.bin2base64(encryptedKeyData.encryptedData!);
+    final keyDecryptionNonce = CryptoUtil.bin2base64(encryptedKeyData.nonce!);
 
     final fileItems = [
-      CollectionFileItem(
-        uploadedFileID,
-        localFileToUpload.encryptedKey!,
-        localFileToUpload.keyDecryptionNonce!,
-      ),
+      CollectionFileItem(uploadedFileID, encryptedKey, keyDecryptionNonce),
     ];
 
     try {
       await collectionFilesGateway.addFiles(destCollectionID, fileItems);
-      localFileToUpload.collectionID = destCollectionID;
-      localFileToUpload.uploadedFileID = uploadedFileID;
-      await _filesDB.insertMultiple([localFileToUpload]);
-      return localFileToUpload;
+      final linkedFile = existingUploadedFile.copyWith(
+        uploadedFileID: uploadedFileID,
+        collectionID: destCollectionID,
+        encryptedKey: encryptedKey,
+        keyDecryptionNonce: keyDecryptionNonce,
+      );
+      linkedFile.generatedID = localFileToUpload.generatedID;
+      linkedFile.localID = localFileToUpload.localID;
+      linkedFile.deviceFolder =
+          localFileToUpload.deviceFolder ?? linkedFile.deviceFolder;
+      linkedFile.addedTime = localFileToUpload.addedTime;
+      await _filesDB.insertMultiple([linkedFile]);
+      return linkedFile;
     } catch (e) {
       rethrow;
     }

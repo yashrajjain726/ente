@@ -255,21 +255,13 @@ Future<File?> downloadAndDecrypt(
             duration: const Duration(milliseconds: 5000),
           )
         : null;
-    final fileDecryptionHeader = file.fileDecryptionHeader;
-    if (fileDecryptionHeader == null) {
-      _logger.warning("$logPrefix missing file decryption header");
-      if (throwOnFailure) {
-        throw DownloadFailedError("Missing file decryption header");
-      }
-      return null;
-    }
     try {
       // Start the periodic callback after initial 5 seconds
       fakeProgress?.start();
       await CryptoUtil.decryptFile(
         encryptedFilePath,
         decryptedFilePath,
-        CryptoUtil.base642bin(fileDecryptionHeader),
+        CryptoUtil.base642bin(file.fileDecryptionHeader!),
         getFileKey(file),
       );
       fakeProgress?.stop();
