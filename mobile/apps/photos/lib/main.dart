@@ -3,6 +3,7 @@ import 'dart:io';
 
 import "package:adaptive_theme/adaptive_theme.dart";
 import "package:computer/computer.dart";
+import "package:ente_account_deletion/account_deletion.dart";
 import "package:ente_components/ente_components.dart" as components;
 import 'package:ente_crypto/ente_crypto.dart';
 import "package:ente_crypto_api/ente_crypto_api.dart" show registerCryptoApi;
@@ -80,6 +81,7 @@ const kBGPushTimeout = Duration(seconds: 28);
 const kFGTaskDeathTimeoutInMicroseconds = 5000000;
 bool isProcessBg = true;
 bool _stopHearBeat = false;
+bool _isSyncInitialized = false;
 bool _isRustInitialized = false;
 Future<void>? _rustInitFuture;
 
@@ -309,6 +311,7 @@ Future<void> _runMinimally(String taskId, TimeLogger tlog) async {
     await LocalSyncService.instance.init(prefs);
     RemoteSyncService.instance.init(prefs);
     await SyncService.instance.init(prefs);
+    _isSyncInitialized = true;
 
     // Misc Services
     await UserService.instance.init();
@@ -438,6 +441,10 @@ Future<void> _init(
       appLogoAsset: 'assets/ente-branding.svg',
       appLogoHeight: 18,
     );
+    AccountDeletionSettings.instance.init(
+      host: Configuration.instance,
+      enteDio: NetworkClient.instance.enteDio,
+    );
 
     await MemoryShareService.instance.init();
 
@@ -482,6 +489,7 @@ Future<void> _init(
 
     _logger.info("SyncService init $tlog");
     await SyncService.instance.init(preferences);
+    _isSyncInitialized = true;
     _logger.info("SyncService init done $tlog");
 
     if (!isBackground && flagService.internalUser) {
@@ -679,7 +687,11 @@ Future<void> _handleBackgroundPush(Object message) async {
         DateTime.now().microsecondsSinceEpoch,
       );
 
-      await _init(true, via: 'firebasePush');
+      if (!_isSyncInitialized) {
+        await _init(true, via: 'firebasePush');
+      } else {
+        _logger.info("Skipping background init; sync already initialized");
+      }
       if (PushService.shouldSync(message)) {
         await _sync('firebaseBgSyncNoActiveProcess');
       }

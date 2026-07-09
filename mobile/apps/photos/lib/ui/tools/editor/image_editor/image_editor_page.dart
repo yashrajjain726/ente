@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
 import "package:flutter_image_compress/flutter_image_compress.dart";
 import "package:hugeicons/hugeicons.dart";
+import 'package:image/image.dart' as img;
 import "package:logging/logging.dart";
 import 'package:path/path.dart' as path;
 import "package:photo_manager/photo_manager.dart";
@@ -18,6 +19,7 @@ import "package:photos/events/local_photos_updated_event.dart";
 import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart' as ente;
 import "package:photos/models/location/location.dart";
+import "package:photos/service_locator.dart";
 import "package:photos/services/sync/sync_service.dart";
 import "package:photos/ui/components/action_sheet_widget.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
@@ -33,6 +35,7 @@ import "package:photos/ui/tools/editor/image_editor/image_editor_text_bar.dart";
 import "package:photos/ui/tools/editor/image_editor/image_editor_tune_bar.dart";
 import "package:photos/ui/viewer/file/detail_page.dart";
 import "package:photos/utils/dialog_util.dart";
+import "package:photos/utils/image_util.dart";
 import 'package:pro_image_editor/pro_image_editor.dart';
 
 class ImageEditorPage extends StatefulWidget {
@@ -71,13 +74,28 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
 
     try {
       final ui.Image decodedResult = await decodeImageFromList(bytes);
-      final result = await FlutterImageCompress.compressWithList(
+      var result = await FlutterImageCompress.compressWithList(
         bytes,
         minWidth: decodedResult.width,
         minHeight: decodedResult.height,
         quality: 95,
         format: CompressFormat.jpeg,
       );
+      if (flagService.internalUser) {
+        try {
+          final image = img.decodePng(bytes);
+          if (image != null) {
+            await copyEXIF(
+              widget.originalFile,
+              image,
+              copyRenderingFields: false,
+            );
+            result = img.encodeJpg(image, quality: 95);
+          }
+        } catch (e, s) {
+          _logger.warning("Image Editor: copyEXIF failed", e, s);
+        }
+      }
       _logger.info('Size after compression = ${result.length}');
       final Duration diff = DateTime.now().difference(start);
       _logger.info('image_editor time : $diff');

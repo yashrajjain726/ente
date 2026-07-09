@@ -38,12 +38,13 @@ jobs:
                   workspaces: rust
                   shared-key: rust-workspace
                   save-if: false
+                  cache-directories: rust/.cache
 
             - run: cargo fmt --check
 
             - run: cargo clippy --all-targets --locked
 
-            - run: cargo test --locked --workspace
+            - run: cargo test --locked --workspace --features ente-photos/ml-assets
 
             - run: cargo install cargo-audit --version 0.22.2 --locked
 

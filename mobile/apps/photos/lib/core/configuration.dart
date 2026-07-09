@@ -4,10 +4,12 @@ import "dart:io";
 
 import 'package:backup_exclusion/backup_exclusion.dart';
 import 'package:bip39/bip39.dart' as bip39;
+import 'package:ente_account_deletion/account_deletion.dart';
 import 'package:ente_contacts/contacts.dart';
 import "package:ente_crypto/ente_crypto.dart";
 import 'package:ente_lock_screen/lock_screen_host.dart';
 import "package:flutter/services.dart";
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
@@ -50,7 +52,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import "package:tuple/tuple.dart";
 import 'package:uuid/uuid.dart';
 
-class Configuration implements LockScreenHost {
+class Configuration implements LockScreenHost, AccountDeletionHost {
   Configuration._privateConstructor();
 
   static final Configuration instance = Configuration._privateConstructor();
@@ -233,6 +235,13 @@ class Configuration implements LockScreenHost {
     // Clear all in-memory caches
     ThumbnailInMemoryLruCache.clearAll();
     FileLruCache.clearAll();
+
+    // Clear image cache
+    try {
+      await DefaultCacheManager().emptyCache();
+    } catch (e) {
+      _logger.warning("Failed to clear image cache", e);
+    }
 
     // Clear video cache
     try {
@@ -566,6 +575,16 @@ class Configuration implements LockScreenHost {
     } else {
       return KeyAttributes.fromJson(jsonValue);
     }
+  }
+
+  @override
+  String decryptDeleteChallenge(String encryptedChallenge) {
+    final challenge = CryptoUtil.openSealSync(
+      CryptoUtil.base642bin(encryptedChallenge),
+      CryptoUtil.base642bin(getKeyAttributes()!.publicKey),
+      getSecretKey()!,
+    );
+    return utf8.decode(challenge);
   }
 
   Future<void> setKey(String? key) async {

@@ -2,6 +2,10 @@
 name = "ente-photos"
 edition = "2024"
 
+[features]
+default = []
+ml-assets = []
+
 [dependencies]
 ente-image.workspace = true
 quick-xml = "0.41"
@@ -45,4 +49,16 @@ ort = { git = "https://github.com/pykeio/ort.git", tag = "v2.0.0-rc.4", default-
 ] }
 
 [dev-dependencies]
+anyhow = "1"
+flate2 = "1.1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls-webpki-roots"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tar = "0.4"
 tempfile = "3.12"
+
+[[test]]
+name = "ml_indexing"
+path = "tests/ml_indexing.rs"
+required-features = ["ml-assets"]

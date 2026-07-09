@@ -49,3 +49,4 @@ mac:
     category: public.app-category.photography
     hardenedRuntime: true
     mergeASARs: false
+    x64ArchFiles: "**/node_modules/onnxruntime-node/bin/napi-v6/darwin/**"

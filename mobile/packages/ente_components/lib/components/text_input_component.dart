@@ -43,6 +43,7 @@ class TextInputComponent extends StatefulWidget {
     this.isEmptyNotifier,
     this.inputFormatters,
     this.keyboardType,
+    this.textInputAction,
     this.enableFillColor = true,
     this.autocorrect = true,
     this.enableSuggestions = true,
@@ -53,6 +54,7 @@ class TextInputComponent extends StatefulWidget {
     this.messageType = TextInputComponentMessageType.helper,
     this.messageIcon,
     this.isDisabled = false,
+    this.readOnly = false,
     this.autofillHints,
     this.maxLines,
     this.minLines,
@@ -88,6 +90,10 @@ class TextInputComponent extends StatefulWidget {
   final ValueNotifier<bool>? isEmptyNotifier;
   final List<TextInputFormatter>? inputFormatters;
   final TextInputType? keyboardType;
+
+  /// Platform IME action. When set to [TextInputAction.next], completing the
+  /// field moves focus to the next node instead of doing nothing.
+  final TextInputAction? textInputAction;
   final bool enableFillColor;
   final bool autocorrect;
   final bool enableSuggestions;
@@ -96,7 +102,9 @@ class TextInputComponent extends StatefulWidget {
   /// Caller-owned leading widget. Pass explicit color and size when needed.
   final Widget? prefix;
 
-  /// Caller-owned trailing widget. Multiline fields pin this slot to the top.
+  /// Caller-owned trailing widget. Sits in an icon slot that is at least
+  /// [IconSizes.medium] square and grows to fit wider content (e.g. a row of
+  /// affordances). Multiline fields pin this slot to the top.
   final Widget? suffix;
 
   /// Optional tap handler for [suffix]. When provided, the trailing affordance
@@ -105,6 +113,11 @@ class TextInputComponent extends StatefulWidget {
   final TextInputComponentMessageType messageType;
   final IconData? messageIcon;
   final bool isDisabled;
+
+  /// When true the field is non-editable but keeps the enabled visual style
+  /// (unlike [isDisabled], which also mutes the text and disables the suffix
+  /// tap). Text stays selectable and the soft keyboard is suppressed.
+  final bool readOnly;
   final Iterable<String>? autofillHints;
   final int? maxLines;
   final int? minLines;
@@ -290,6 +303,7 @@ class _TextInputComponentState extends State<TextInputComponent> {
                             controller: _controller,
                             focusNode: _focusNode,
                             enabled: !widget.isDisabled,
+                            readOnly: widget.readOnly,
                             autofocus: widget.autofocus,
                             obscureText: _obscureText,
                             maxLines: widget.isPasswordInput
@@ -299,6 +313,7 @@ class _TextInputComponentState extends State<TextInputComponent> {
                                 ? null
                                 : widget.minLines,
                             keyboardType: widget.keyboardType,
+                            textInputAction: widget.textInputAction,
                             textCapitalization: widget.textCapitalization,
                             inputFormatters: _inputFormatters,
                             autofillHints:
@@ -534,9 +549,12 @@ class _TextInputComponentState extends State<TextInputComponent> {
   }
 
   Widget _slot(Widget child) {
-    return SizedBox.square(
-      dimension: _kIconContainerSize,
-      child: Center(child: child),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(
+        minWidth: _kIconContainerSize,
+        minHeight: _kIconContainerSize,
+      ),
+      child: Center(widthFactor: 1, heightFactor: 1, child: child),
     );
   }
 
@@ -571,7 +589,9 @@ class _TextInputComponentState extends State<TextInputComponent> {
       TextInput.finishAutofillContext();
     }
     if (widget.onSubmit == null) {
-      if (widget.shouldUnfocusOnClearOrSubmit) {
+      if (widget.textInputAction == TextInputAction.next) {
+        _focusNode.nextFocus();
+      } else if (widget.shouldUnfocusOnClearOrSubmit) {
         FocusScope.of(context).unfocus();
       }
       return;
