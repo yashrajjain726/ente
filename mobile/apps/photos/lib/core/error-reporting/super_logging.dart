@@ -208,6 +208,7 @@ class SuperLogging {
     }
 
     Logger.root.level = rootLoggerLevel;
+    EnteWatch.setLogLevel(_terminalLoggerLevel);
     Logger.root.onRecord.listen(onLogRecord);
 
     if (_preferences.getBool("enable_db_logging") ?? kDebugMode) {
@@ -414,17 +415,20 @@ class SuperLogging {
 
   static const Level rootLoggerLevel = kDebugMode ? Level.ALL : Level.INFO;
 
-  static final Level _terminalLoggerLevel =
-      Level.LEVELS
-          .where(
-            (level) =>
-                level.name.toLowerCase() ==
-                const String.fromEnvironment(
-                  'ENTE_LOG_LEVEL',
-                ).trim().toLowerCase(),
-          )
-          .firstOrNull ??
-      rootLoggerLevel;
+  static const _logLevelDefine = String.fromEnvironment('ENTE_LOG_LEVEL');
+
+  static final Level _terminalLoggerLevel = _levelFromEnv(
+    _logLevelDefine,
+    rootLoggerLevel,
+  );
+
+  static Level _levelFromEnv(String value, Level fallback) {
+    final levelName = value.trim().toLowerCase();
+    return Level.LEVELS.firstWhere(
+      (level) => level.name.toLowerCase() == levelName,
+      orElse: () => fallback,
+    );
+  }
 
   static bool shouldPrintLogRecord(LogRecord rec) {
     final matchesPrefix =

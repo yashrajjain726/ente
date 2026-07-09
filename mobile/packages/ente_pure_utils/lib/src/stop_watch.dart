@@ -7,8 +7,11 @@ class EnteWatch extends Stopwatch {
 
   EnteWatch(this.context) : super();
 
-  static final bool _shouldLog =
-      kDebugMode && Logger.root.isLoggable(Level.INFO);
+  static bool _shouldLog = kDebugMode && Logger.root.isLoggable(Level.INFO);
+
+  static void setLogLevel(Level level) {
+    _shouldLog = kDebugMode && Level.INFO.value >= level.value;
+  }
 
   void log(String msg) {
     if (_shouldLog) {
