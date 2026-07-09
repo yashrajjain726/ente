@@ -226,13 +226,57 @@ fn profile_is_effectively_srgb(profile: &ColorProfile) -> bool {
 }
 
 fn profile_uses_hdr_transfer(profile: &ColorProfile) -> bool {
-    matches!(
+    if matches!(
         profile
             .cicp
             .as_ref()
             .map(|cicp| cicp.transfer_characteristics),
         Some(TransferCharacteristics::Smpte2084 | TransferCharacteristics::Hlg)
-    )
+    ) {
+        return true;
+    }
+
+    match profile.color_space {
+        DataColorSpace::Rgb => [
+            profile.red_trc.as_ref(),
+            profile.green_trc.as_ref(),
+            profile.blue_trc.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        .any(tone_curve_is_hdr_transfer),
+        DataColorSpace::Gray => profile
+            .gray_trc
+            .as_ref()
+            .is_some_and(tone_curve_is_hdr_transfer),
+        _ => false,
+    }
+}
+
+fn tone_curve_is_hdr_transfer(candidate: &ToneReprCurve) -> bool {
+    tone_curve_matches_transfer(candidate, TransferCharacteristics::Smpte2084)
+        || tone_curve_matches_transfer(candidate, TransferCharacteristics::Hlg)
+}
+
+fn tone_curve_matches_transfer(
+    candidate: &ToneReprCurve,
+    transfer: TransferCharacteristics,
+) -> bool {
+    if let Ok(reference) = ToneReprCurve::try_from(transfer) {
+        if tone_curve_matches_reference(candidate, &reference, 0.01) {
+            return true;
+        }
+    }
+
+    let profile_reference = match transfer {
+        TransferCharacteristics::Smpte2084 => ColorProfile::new_bt2020_pq().red_trc,
+        TransferCharacteristics::Hlg => ColorProfile::new_bt2020_hlg().red_trc,
+        _ => None,
+    };
+
+    profile_reference
+        .as_ref()
+        .is_some_and(|reference| tone_curve_matches_reference(candidate, reference, 0.01))
 }
 
 fn rgb_profile_is_effectively_srgb(profile: &ColorProfile) -> bool {
@@ -271,14 +315,22 @@ fn tone_curve_matches_srgb(
         return false;
     };
 
-    if candidate == srgb {
+    tone_curve_matches_reference(candidate, srgb, 0.002)
+}
+
+fn tone_curve_matches_reference(
+    candidate: &ToneReprCurve,
+    reference: &ToneReprCurve,
+    tolerance: f32,
+) -> bool {
+    if candidate == reference {
         return true;
     }
 
     let Ok(candidate_evaluator) = candidate.make_linear_evaluator() else {
         return false;
     };
-    let Ok(srgb_evaluator) = srgb.make_linear_evaluator() else {
+    let Ok(reference_evaluator) = reference.make_linear_evaluator() else {
         return false;
     };
 
@@ -288,8 +340,9 @@ fn tone_curve_matches_srgb(
     ];
 
     SAMPLES.iter().copied().all(|value| {
-        (candidate_evaluator.evaluate_value(value) - srgb_evaluator.evaluate_value(value)).abs()
-            <= 0.002
+        (candidate_evaluator.evaluate_value(value) - reference_evaluator.evaluate_value(value))
+            .abs()
+            <= tolerance
     })
 }
 
@@ -335,6 +388,32 @@ mod tests {
             DynamicImage::ImageRgb8(ImageBuffer::from_raw(1, 1, vec![200, 200, 200]).unwrap());
 
         let transformed = apply_icc_profile_to_srgb(image, Some(&display_p3_pq_icc));
+
+        assert_eq!(transformed.into_rgb8().into_raw(), vec![200, 200, 200]);
+    }
+
+    #[test]
+    fn skips_hdr_pq_profiles_without_cicp_tag() {
+        let mut display_p3_pq = ColorProfile::new_display_p3_pq();
+        display_p3_pq.cicp = None;
+        let display_p3_pq_icc = display_p3_pq.encode().unwrap();
+        let image =
+            DynamicImage::ImageRgb8(ImageBuffer::from_raw(1, 1, vec![200, 200, 200]).unwrap());
+
+        let transformed = apply_icc_profile_to_srgb(image, Some(&display_p3_pq_icc));
+
+        assert_eq!(transformed.into_rgb8().into_raw(), vec![200, 200, 200]);
+    }
+
+    #[test]
+    fn skips_hdr_hlg_profiles_without_cicp_tag() {
+        let mut bt2020_hlg = ColorProfile::new_bt2020_hlg();
+        bt2020_hlg.cicp = None;
+        let bt2020_hlg_icc = bt2020_hlg.encode().unwrap();
+        let image =
+            DynamicImage::ImageRgb8(ImageBuffer::from_raw(1, 1, vec![200, 200, 200]).unwrap());
+
+        let transformed = apply_icc_profile_to_srgb(image, Some(&bt2020_hlg_icc));
 
         assert_eq!(transformed.into_rgb8().into_raw(), vec![200, 200, 200]);
     }
