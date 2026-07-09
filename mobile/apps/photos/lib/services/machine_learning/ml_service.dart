@@ -5,9 +5,7 @@ import "dart:math" show min;
 import "dart:typed_data" show Uint8List;
 
 import "package:flutter/foundation.dart" show kDebugMode;
-import "package:flutter_cache_manager/flutter_cache_manager.dart";
 import "package:logging/logging.dart";
-import "package:photos/core/cache/video_cache_manager.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
@@ -33,6 +31,7 @@ import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/services/machine_learning/semantic_search/semantic_search_service.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/services/video_preview_service.dart";
+import "package:photos/utils/file_util.dart";
 import "package:photos/utils/isolate/isolate_operations.dart";
 import "package:photos/utils/ml_util.dart";
 import "package:photos/utils/network_util.dart";
@@ -754,8 +753,6 @@ class MLService {
 
     final mlDataDB = _dbForMode(instruction.mode);
     String? pathToDeleteAfterMLProcessing;
-    final bool shouldEvictRemoteCacheAfterMLProcessing =
-        _shouldEvictRemoteCacheAfterMLProcessing(instruction.file);
     try {
       final String filePath = await getImagePathForML(instruction.file);
       if (_shouldDeleteAfterMLProcessing(instruction.file)) {
@@ -984,9 +981,7 @@ class MLService {
           );
         }
       }
-      if (shouldEvictRemoteCacheAfterMLProcessing) {
-        await _evictRemoteCacheAfterMLProcessing(instruction.file);
-      }
+      await _evictRemoteCacheAfterMLProcessing(instruction.file);
     }
   }
 
@@ -1001,25 +996,17 @@ class MLService {
   }
 
   Future<void> _evictRemoteCacheAfterMLProcessing(EnteFile file) async {
+    if (!_shouldEvictRemoteCacheAfterMLProcessing(file)) {
+      return;
+    }
     try {
-      await DefaultCacheManager().removeFile(file.downloadUrl);
+      await removeFromDownloadCache(file);
     } catch (e, s) {
       _logger.warning(
-        "Failed to evict remote image file cached for ML for fileID ${file.uploadedFileID}",
+        "Failed to evict remote file cached for ML for fileID ${file.uploadedFileID}",
         e,
         s,
       );
-    }
-    if (file.fileType == FileType.livePhoto) {
-      try {
-        await VideoCacheManager.instance.removeFile(file.downloadUrl);
-      } catch (e, s) {
-        _logger.warning(
-          "Failed to evict remote live photo video cached for ML for fileID ${file.uploadedFileID}",
-          e,
-          s,
-        );
-      }
     }
   }
 
