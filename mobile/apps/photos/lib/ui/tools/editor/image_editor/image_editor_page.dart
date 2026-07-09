@@ -146,7 +146,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
         await dialog.hide();
         return;
       }
-      showShortToast(context, AppLocalizations.of(context).editsSaved);
+      showShortToast(context, l10n.editsSaved);
       _logger.info("Original file " + widget.originalFile.toString());
       _logger.info("Saved edits to file " + newFile.toString());
       final files = widget.detailPageConfig.files;
