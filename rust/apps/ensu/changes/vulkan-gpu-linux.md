@@ -1,0 +1,1 @@
+- Chat responses are now GPU-accelerated on Linux via Vulkan, roughly 3x faster. Thanks @bjorn!

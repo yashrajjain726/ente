@@ -41,9 +41,7 @@ llama-cpp-2 = { version = "=0.1.144", default-features = false, features = ["mtm
 
 # Desktop Linux enables the Vulkan GPU backend, which runs on AMD, Intel and
 # NVIDIA GPUs through the system Vulkan loader (no vendor SDK required). The
-# build needs a Vulkan loader plus "glslc" to compile the compute shaders. GPU
-# offload is opt-in at runtime via the ENSU_N_GPU_LAYERS env variable; with it
-# unset the app still runs entirely on the CPU.
+# build needs a Vulkan loader plus "glslc" to compile the compute shaders.
 [target.'cfg(target_os = "linux")'.dependencies]
 llama-cpp-2 = { version = "=0.1.144", features = ["mtmd", "vulkan"] }
 
