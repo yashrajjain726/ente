@@ -262,10 +262,10 @@ fn tone_curve_matches_transfer(
     candidate: &ToneReprCurve,
     transfer: TransferCharacteristics,
 ) -> bool {
-    if let Ok(reference) = ToneReprCurve::try_from(transfer) {
-        if tone_curve_matches_reference(candidate, &reference, 0.01) {
-            return true;
-        }
+    if let Ok(reference) = ToneReprCurve::try_from(transfer)
+        && tone_curve_matches_reference(candidate, &reference, 0.01)
+    {
+        return true;
     }
 
     let profile_reference = match transfer {
