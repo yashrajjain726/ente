@@ -1,4 +1,4 @@
-use image::{DynamicImage, ImageBuffer};
+use image::{DynamicImage, ImageBuffer, Pixel};
 use moxcms::{
     ColorProfile, DataColorSpace, Layout, ToneReprCurve, TransferCharacteristics, TransformOptions,
     Xyzd,
@@ -44,157 +44,105 @@ fn apply_profile_to_image(
     image: DynamicImage,
     source_profile: &ColorProfile,
 ) -> Result<DynamicImage, (DynamicImage, String)> {
+    use DynamicImage::*;
+    use Layout::{Gray, GrayAlpha, Rgb, Rgba};
+
     match image {
-        DynamicImage::ImageLuma8(buffer) => {
-            let (width, height) = buffer.dimensions();
-            match transform_pixels_u8(buffer.as_raw(), source_profile, Layout::Gray) {
-                Ok(data) => Ok(DynamicImage::ImageLuma8(
-                    ImageBuffer::from_raw(width, height, data)
-                        .expect("transformed Luma8 buffer length should match dimensions"),
-                )),
-                Err(err) => Err((DynamicImage::ImageLuma8(buffer), err)),
-            }
-        }
-        DynamicImage::ImageLumaA8(buffer) => {
-            let (width, height) = buffer.dimensions();
-            match transform_pixels_u8(buffer.as_raw(), source_profile, Layout::GrayAlpha) {
-                Ok(data) => Ok(DynamicImage::ImageLumaA8(
-                    ImageBuffer::from_raw(width, height, data)
-                        .expect("transformed LumaA8 buffer length should match dimensions"),
-                )),
-                Err(err) => Err((DynamicImage::ImageLumaA8(buffer), err)),
-            }
-        }
-        DynamicImage::ImageRgb8(buffer) => {
-            let (width, height) = buffer.dimensions();
-            match transform_pixels_u8(buffer.as_raw(), source_profile, Layout::Rgb) {
-                Ok(data) => Ok(DynamicImage::ImageRgb8(
-                    ImageBuffer::from_raw(width, height, data)
-                        .expect("transformed Rgb8 buffer length should match dimensions"),
-                )),
-                Err(err) => Err((DynamicImage::ImageRgb8(buffer), err)),
-            }
-        }
-        DynamicImage::ImageRgba8(buffer) => {
-            let (width, height) = buffer.dimensions();
-            match transform_pixels_u8(buffer.as_raw(), source_profile, Layout::Rgba) {
-                Ok(data) => Ok(DynamicImage::ImageRgba8(
-                    ImageBuffer::from_raw(width, height, data)
-                        .expect("transformed Rgba8 buffer length should match dimensions"),
-                )),
-                Err(err) => Err((DynamicImage::ImageRgba8(buffer), err)),
-            }
-        }
-        DynamicImage::ImageLuma16(buffer) => {
-            let (width, height) = buffer.dimensions();
-            match transform_pixels_u16(buffer.as_raw(), source_profile, Layout::Gray) {
-                Ok(data) => Ok(DynamicImage::ImageLuma16(
-                    ImageBuffer::from_raw(width, height, data)
-                        .expect("transformed Luma16 buffer length should match dimensions"),
-                )),
-                Err(err) => Err((DynamicImage::ImageLuma16(buffer), err)),
-            }
-        }
-        DynamicImage::ImageLumaA16(buffer) => {
-            let (width, height) = buffer.dimensions();
-            match transform_pixels_u16(buffer.as_raw(), source_profile, Layout::GrayAlpha) {
-                Ok(data) => Ok(DynamicImage::ImageLumaA16(
-                    ImageBuffer::from_raw(width, height, data)
-                        .expect("transformed LumaA16 buffer length should match dimensions"),
-                )),
-                Err(err) => Err((DynamicImage::ImageLumaA16(buffer), err)),
-            }
-        }
-        DynamicImage::ImageRgb16(buffer) => {
-            let (width, height) = buffer.dimensions();
-            match transform_pixels_u16(buffer.as_raw(), source_profile, Layout::Rgb) {
-                Ok(data) => Ok(DynamicImage::ImageRgb16(
-                    ImageBuffer::from_raw(width, height, data)
-                        .expect("transformed Rgb16 buffer length should match dimensions"),
-                )),
-                Err(err) => Err((DynamicImage::ImageRgb16(buffer), err)),
-            }
-        }
-        DynamicImage::ImageRgba16(buffer) => {
-            let (width, height) = buffer.dimensions();
-            match transform_pixels_u16(buffer.as_raw(), source_profile, Layout::Rgba) {
-                Ok(data) => Ok(DynamicImage::ImageRgba16(
-                    ImageBuffer::from_raw(width, height, data)
-                        .expect("transformed Rgba16 buffer length should match dimensions"),
-                )),
-                Err(err) => Err((DynamicImage::ImageRgba16(buffer), err)),
-            }
-        }
-        DynamicImage::ImageRgb32F(buffer) => {
-            let (width, height) = buffer.dimensions();
-            match transform_pixels_f32(buffer.as_raw(), source_profile, Layout::Rgb) {
-                Ok(data) => Ok(DynamicImage::ImageRgb32F(
-                    ImageBuffer::from_raw(width, height, data)
-                        .expect("transformed Rgb32F buffer length should match dimensions"),
-                )),
-                Err(err) => Err((DynamicImage::ImageRgb32F(buffer), err)),
-            }
-        }
-        DynamicImage::ImageRgba32F(buffer) => {
-            let (width, height) = buffer.dimensions();
-            match transform_pixels_f32(buffer.as_raw(), source_profile, Layout::Rgba) {
-                Ok(data) => Ok(DynamicImage::ImageRgba32F(
-                    ImageBuffer::from_raw(width, height, data)
-                        .expect("transformed Rgba32F buffer length should match dimensions"),
-                )),
-                Err(err) => Err((DynamicImage::ImageRgba32F(buffer), err)),
-            }
-        }
+        ImageLuma8(buffer) => transform_buffer(buffer, source_profile, Gray, ImageLuma8),
+        ImageLumaA8(buffer) => transform_buffer(buffer, source_profile, GrayAlpha, ImageLumaA8),
+        ImageRgb8(buffer) => transform_buffer(buffer, source_profile, Rgb, ImageRgb8),
+        ImageRgba8(buffer) => transform_buffer(buffer, source_profile, Rgba, ImageRgba8),
+        ImageLuma16(buffer) => transform_buffer(buffer, source_profile, Gray, ImageLuma16),
+        ImageLumaA16(buffer) => transform_buffer(buffer, source_profile, GrayAlpha, ImageLumaA16),
+        ImageRgb16(buffer) => transform_buffer(buffer, source_profile, Rgb, ImageRgb16),
+        ImageRgba16(buffer) => transform_buffer(buffer, source_profile, Rgba, ImageRgba16),
+        ImageRgb32F(buffer) => transform_buffer(buffer, source_profile, Rgb, ImageRgb32F),
+        ImageRgba32F(buffer) => transform_buffer(buffer, source_profile, Rgba, ImageRgba32F),
         other => Ok(other),
     }
 }
 
-fn transform_pixels_u8(
-    pixels: &[u8],
+fn transform_buffer<P>(
+    buffer: ImageBuffer<P, Vec<P::Subpixel>>,
     source_profile: &ColorProfile,
     layout: Layout,
-) -> Result<Vec<u8>, String> {
-    let target_profile = target_profile_for_layout(layout);
-    let transform = source_profile
-        .create_transform_8bit(layout, &target_profile, layout, transform_options())
-        .map_err(|err| err.to_string())?;
-    let mut transformed = vec![0; pixels.len()];
-    transform
-        .transform(pixels, &mut transformed)
-        .map_err(|err| err.to_string())?;
-    Ok(transformed)
+    into_dynamic: fn(ImageBuffer<P, Vec<P::Subpixel>>) -> DynamicImage,
+) -> Result<DynamicImage, (DynamicImage, String)>
+where
+    P: Pixel,
+    P::Subpixel: TransformSubpixel,
+{
+    let (width, height) = buffer.dimensions();
+    match P::Subpixel::transform_to_srgb(buffer.as_raw(), source_profile, layout) {
+        Ok(data) => Ok(into_dynamic(
+            ImageBuffer::from_raw(width, height, data)
+                .expect("transformed buffer length should match source dimensions"),
+        )),
+        Err(err) => Err((into_dynamic(buffer), err)),
+    }
 }
 
-fn transform_pixels_u16(
-    pixels: &[u16],
-    source_profile: &ColorProfile,
-    layout: Layout,
-) -> Result<Vec<u16>, String> {
-    let target_profile = target_profile_for_layout(layout);
-    let transform = source_profile
-        .create_transform_16bit(layout, &target_profile, layout, transform_options())
-        .map_err(|err| err.to_string())?;
-    let mut transformed = vec![0; pixels.len()];
-    transform
-        .transform(pixels, &mut transformed)
-        .map_err(|err| err.to_string())?;
-    Ok(transformed)
+/// Subpixel types for which moxcms can transform pixel buffers to sRGB.
+trait TransformSubpixel: Copy {
+    fn transform_to_srgb(
+        pixels: &[Self],
+        source_profile: &ColorProfile,
+        layout: Layout,
+    ) -> Result<Vec<Self>, String>;
 }
 
-fn transform_pixels_f32(
-    pixels: &[f32],
-    source_profile: &ColorProfile,
-    layout: Layout,
-) -> Result<Vec<f32>, String> {
-    let target_profile = target_profile_for_layout(layout);
-    let transform = source_profile
-        .create_transform_f32(layout, &target_profile, layout, transform_options())
-        .map_err(|err| err.to_string())?;
-    let mut transformed = vec![0.0; pixels.len()];
-    transform
-        .transform(pixels, &mut transformed)
-        .map_err(|err| err.to_string())?;
-    Ok(transformed)
+impl TransformSubpixel for u8 {
+    fn transform_to_srgb(
+        pixels: &[Self],
+        source_profile: &ColorProfile,
+        layout: Layout,
+    ) -> Result<Vec<Self>, String> {
+        let target_profile = target_profile_for_layout(layout);
+        let transform = source_profile
+            .create_transform_8bit(layout, &target_profile, layout, transform_options())
+            .map_err(|err| err.to_string())?;
+        let mut transformed = vec![0; pixels.len()];
+        transform
+            .transform(pixels, &mut transformed)
+            .map_err(|err| err.to_string())?;
+        Ok(transformed)
+    }
+}
+
+impl TransformSubpixel for u16 {
+    fn transform_to_srgb(
+        pixels: &[Self],
+        source_profile: &ColorProfile,
+        layout: Layout,
+    ) -> Result<Vec<Self>, String> {
+        let target_profile = target_profile_for_layout(layout);
+        let transform = source_profile
+            .create_transform_16bit(layout, &target_profile, layout, transform_options())
+            .map_err(|err| err.to_string())?;
+        let mut transformed = vec![0; pixels.len()];
+        transform
+            .transform(pixels, &mut transformed)
+            .map_err(|err| err.to_string())?;
+        Ok(transformed)
+    }
+}
+
+impl TransformSubpixel for f32 {
+    fn transform_to_srgb(
+        pixels: &[Self],
+        source_profile: &ColorProfile,
+        layout: Layout,
+    ) -> Result<Vec<Self>, String> {
+        let target_profile = target_profile_for_layout(layout);
+        let transform = source_profile
+            .create_transform_f32(layout, &target_profile, layout, transform_options())
+            .map_err(|err| err.to_string())?;
+        let mut transformed = vec![0.0; pixels.len()];
+        transform
+            .transform(pixels, &mut transformed)
+            .map_err(|err| err.to_string())?;
+        Ok(transformed)
+    }
 }
 
 fn transform_options() -> TransformOptions {
@@ -416,6 +364,48 @@ mod tests {
         let transformed = apply_icc_profile_to_srgb(image, Some(&bt2020_hlg_icc));
 
         assert_eq!(transformed.into_rgb8().into_raw(), vec![200, 200, 200]);
+    }
+
+    #[test]
+    fn falls_back_to_original_pixels_for_invalid_icc_profile() {
+        let image =
+            DynamicImage::ImageRgb8(ImageBuffer::from_raw(1, 1, vec![128, 64, 32]).unwrap());
+
+        let transformed = apply_icc_profile_to_srgb(image, Some(b"not an icc profile"));
+
+        assert_eq!(transformed.into_rgb8().into_raw(), vec![128, 64, 32]);
+    }
+
+    #[test]
+    fn converts_gray_gamma_luma8_to_srgb() {
+        let gray_icc = ColorProfile::new_gray_with_gamma(1.8).encode().unwrap();
+        let image = DynamicImage::ImageLuma8(ImageBuffer::from_raw(1, 1, vec![128]).unwrap());
+
+        let transformed = apply_icc_profile_to_srgb(image, Some(&gray_icc));
+        let DynamicImage::ImageLuma8(buffer) = transformed else {
+            panic!("expected Luma8 output");
+        };
+
+        assert!(
+            buffer.into_raw()[0] > 128,
+            "expected gamma 1.8 gray to brighten when re-encoded as sRGB"
+        );
+    }
+
+    #[test]
+    fn converts_gray_gamma_luma16_to_srgb() {
+        let gray_icc = ColorProfile::new_gray_with_gamma(1.8).encode().unwrap();
+        let image = DynamicImage::ImageLuma16(ImageBuffer::from_raw(1, 1, vec![32768u16]).unwrap());
+
+        let transformed = apply_icc_profile_to_srgb(image, Some(&gray_icc));
+        let DynamicImage::ImageLuma16(buffer) = transformed else {
+            panic!("expected Luma16 output");
+        };
+
+        assert!(
+            buffer.into_raw()[0] > 32768,
+            "expected gamma 1.8 gray to brighten when re-encoded as sRGB"
+        );
     }
 
     #[test]
