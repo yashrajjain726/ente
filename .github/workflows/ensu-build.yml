@@ -143,10 +143,10 @@ jobs:
                   sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
                   # The llama.cpp Vulkan backend needs the Vulkan loader and the
                   # glslc shader compiler at build time. Ubuntu 22.04 has no
-                  # glslc package, so use the LunarG SDK repository (the same
-                  # approach as llama.cpp's own CI).
-                  wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc >/dev/null
-                  sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+                  # glslc package, so use the LunarG SDK repository (which
+                  # llama.cpp's own CI also uses).
+                  sudo wget -qO /usr/share/keyrings/lunarg.asc https://packages.lunarg.com/lunarg-signing-key-pub.asc
+                  echo "deb [signed-by=/usr/share/keyrings/lunarg.asc] https://packages.lunarg.com/vulkan jammy main" | sudo tee /etc/apt/sources.list.d/lunarg-vulkan-jammy.list >/dev/null
                   sudo apt-get update
                   sudo apt-get install -y vulkan-sdk
 
