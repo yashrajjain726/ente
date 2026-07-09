@@ -506,32 +506,20 @@ class VideoPreviewService {
 
       final videoData = _getVideoStream(props);
       if (videoData == null) {
-        final streams = props?.propData?["streams"];
-        final streamTypes = streams is Iterable
-            ? streams.whereType<Map>().map((stream) => stream["type"]).toList()
-            : null;
-        final streamCount = streams is Iterable ? streams.length : null;
-        error = _VideoPreviewUnsupportedError(
-          "No video stream found in FFprobe metadata for "
-          "fileID=${enteFile.uploadedFileID}, "
-          "hasProps=${props != null}, "
-          "streamCount=$streamCount, "
-          "streamTypes=$streamTypes, "
-          "size=${enteFile.fileSize}, "
-          "duration=${enteFile.duration}",
+        _logger.warning(
+          "${_missingVideoStreamMetadataMessage(enteFile, props)}; "
+          "trying ffmpeg with defaults",
         );
-        _logger.warning(error.toString());
-        return;
       }
 
-      final codec = videoData["codec_name"]?.toString().toLowerCase();
+      final codec = videoData?["codec_name"]?.toString().toLowerCase();
       final isH264 = codec?.contains("h264") ?? false;
 
-      final bitrate = props?.duration?.inSeconds != null
+      final bitrate = videoData != null && props?.duration?.inSeconds != null
           ? (fileSize * 8) / props!.duration!.inSeconds
           : null;
 
-      final colorTransfer = videoData["color_transfer"]
+      final colorTransfer = videoData?["color_transfer"]
           ?.toString()
           .toLowerCase();
       final isHDR =
@@ -647,10 +635,6 @@ class VideoPreviewService {
 
           final playlistFile = File("$prefix/output.m3u8");
           final previewFile = File("$prefix/output.ts");
-          final result = await _uploadPreviewVideo(enteFile, previewFile);
-
-          objectId = result.$1;
-          objectSize = result.$2;
 
           // Fetch resolution of generated stream by decrypting a single frame
           final playlistFrameResult = await ffmpegService
@@ -681,28 +665,45 @@ class VideoPreviewService {
             _logger.warning("Failed to fetch resolution of stream", err, sT);
           }
 
-          await _reportVideoPreview(
-            enteFile,
-            playlistFile,
-            objectId: objectId,
-            objectSize: objectSize,
-            width: width,
-            height: height,
-          );
+          if (videoData == null && (width == null || height == null)) {
+            error = _VideoPreviewUnsupportedError(
+              "${_missingVideoStreamMetadataMessage(enteFile, props)}; "
+              "ffmpeg did not produce a video frame",
+            );
+            _logger.warning(error.toString());
+          } else {
+            final result = await _uploadPreviewVideo(enteFile, previewFile);
 
-          _logger.info("Video preview uploaded for $enteFile");
+            objectId = result.$1;
+            objectSize = result.$2;
+
+            await _reportVideoPreview(
+              enteFile,
+              playlistFile,
+              objectId: objectId,
+              objectSize: objectSize,
+              width: width,
+              height: height,
+            );
+
+            _logger.info("Video preview uploaded for $enteFile");
+          }
         } catch (err, sT) {
           error = "Failed to upload video preview\nError: $err";
           _logger.shout("Something went wrong with preview upload", err, sT);
         }
       } else {
         final output = playlistGenResult["output"] as String?;
+        final outputSummary = _summarizeFfmpegOutput(output);
         _logger.warning(
           "FFmpeg command failed with return code $playlistGenReturnCode\n"
-          "${_summarizeFfmpegOutput(output)}",
+          "$outputSummary",
         );
-        error =
+        final errorMessage =
             "Failed to generate video preview (return code $playlistGenReturnCode)";
+        error = _hasNoVideoStreamFfmpegOutput(output)
+            ? _VideoPreviewUnsupportedError("$errorMessage\n$outputSummary")
+            : errorMessage;
       }
 
       if (error == null) {
@@ -1509,4 +1510,32 @@ String _summarizeFfmpegOutput(String? output) {
   return wasTruncated
       ? "FFmpeg output (truncated):\n$summary"
       : "FFmpeg output:\n$summary";
+}
+
+String _missingVideoStreamMetadataMessage(
+  EnteFile enteFile,
+  FFProbeProps? props,
+) {
+  final streams = props?.propData?["streams"];
+  final streamTypes = streams is Iterable
+      ? streams.whereType<Map>().map((stream) => stream["type"]).toList()
+      : null;
+  final streamCount = streams is Iterable ? streams.length : null;
+  return "No video stream found in FFprobe metadata for "
+      "fileID=${enteFile.uploadedFileID}, "
+      "hasProps=${props != null}, "
+      "streamCount=$streamCount, "
+      "streamTypes=$streamTypes, "
+      "size=${enteFile.fileSize}, "
+      "duration=${enteFile.duration}";
+}
+
+bool _hasNoVideoStreamFfmpegOutput(String? output) {
+  final normalizedOutput = output?.toLowerCase();
+  if (normalizedOutput == null) return false;
+  return normalizedOutput.contains("does not contain any stream") ||
+      normalizedOutput.contains("matches no streams") ||
+      normalizedOutput.contains(
+        "cannot find a matching stream for unlabeled input pad",
+      );
 }
