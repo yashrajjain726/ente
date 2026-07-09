@@ -33,11 +33,29 @@ class SyncService {
   Completer<bool>? _existingSync;
   late SharedPreferences _prefs;
   SyncStatusUpdate? _lastSyncStatusEvent;
+  bool _isInitialized = false;
 
   static const kLastStorageLimitExceededNotificationPushTime =
       "last_storage_limit_exceeded_notification_push_time";
 
-  SyncService._privateConstructor() {
+  SyncService._privateConstructor();
+
+  static final SyncService instance = SyncService._privateConstructor();
+
+  Future<void> init(SharedPreferences preferences) async {
+    _prefs = preferences;
+    if (Platform.isIOS) {
+      _logger.info("Clearing file cache");
+      await PhotoManager.clearFileCache();
+      _logger.info("Cleared file cache");
+    }
+    if (!_isInitialized) {
+      _isInitialized = true;
+      _registerListeners();
+    }
+  }
+
+  void _registerListeners() {
     Bus.instance.on<SubscriptionPurchasedEvent>().listen((event) {
       _uploader.clearQueue(SilentlyCancelUploadsError());
       sync();
@@ -85,17 +103,6 @@ class SyncService {
     });
   }
 
-  static final SyncService instance = SyncService._privateConstructor();
-
-  Future<void> init(SharedPreferences preferences) async {
-    _prefs = preferences;
-    if (Platform.isIOS) {
-      _logger.info("Clearing file cache");
-      await PhotoManager.clearFileCache();
-      _logger.info("Cleared file cache");
-    }
-  }
-
   // Note: Do not use this future for anything except log out.
   // This is prone to bugs due to any potential race conditions
   Future<bool> existingSync() async {
@@ -103,6 +110,10 @@ class SyncService {
   }
 
   Future<bool> sync() async {
+    if (!_isInitialized) {
+      _logger.warning("Sync requested before init, skipping");
+      return false;
+    }
     _syncStopRequested = false;
     if (_existingSync != null) {
       _logger.warning("Sync already in progress, skipping.");
@@ -193,6 +204,12 @@ class SyncService {
   }
 
   Future<void> onPermissionGranted() async {
+    if (!_isInitialized) {
+      _logger.warning(
+        "Permission-granted sync requested before init, skipping",
+      );
+      return;
+    }
     _doSync().ignore();
   }
 
