@@ -66,7 +66,7 @@ int? _orientationToTurns(int? orientation) {
 }
 
 int _turnsToOrientation(int turns) {
-  return switch (turns % 4) {
+  return switch ((turns % 4 + 4) % 4) {
     1 => 6,
     2 => 3,
     3 => 8,
