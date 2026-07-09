@@ -95,7 +95,9 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
     bool hasStoppedChangeNotify = false;
 
     try {
-      final losslessTransform = getLosslessTransform(editorState);
+      final losslessTransform = flagService.internalUser
+          ? getLosslessTransform(editorState)
+          : null;
       final losslessBytes = losslessTransform == null
           ? null
           : await tryTransformFileLossless(
