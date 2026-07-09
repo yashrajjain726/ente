@@ -49,6 +49,7 @@ import "package:photos/utils/network_util.dart";
 const _maxRetryCount = 3;
 const _maxFfmpegOutputLines = 24;
 const _maxFfmpegOutputChars = 4000;
+const _missingVideoStreamError = "No video stream found in FFprobe metadata";
 
 class VideoPreviewService {
   final _logger = Logger("VideoPreviewService");
@@ -499,11 +500,10 @@ class VideoPreviewService {
         props?.propData?["streams"] ?? [],
       ).firstWhereOrNull((e) => e["type"] == "video");
       if (videoData == null) {
-        _logger.warning(
-          "No video stream found in FFprobe metadata for "
-          "fileID=${enteFile.uploadedFileID}; skipping preview creation",
-        );
-        removeFile = true;
+        error =
+            "$_missingVideoStreamError for ${enteFile.displayName} "
+            "(fileID=${enteFile.uploadedFileID})";
+        _logger.warning("$error; skipping preview creation");
         return;
       }
 
@@ -789,6 +789,9 @@ class VideoPreviewService {
         "Network error detected, marking file as failed instead of retrying",
       );
       shouldRetry = false;
+    } else if (error is String && error.startsWith(_missingVideoStreamError)) {
+      shouldRetry = false;
+      uploadLocksDB.removeFromStreamQueue(enteFile.uploadedFileID!).ignore();
     }
 
     if (!_items.containsKey(enteFile.uploadedFileID!)) return;
