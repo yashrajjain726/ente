@@ -13,7 +13,7 @@ use std::sync::{PoisonError, RwLock};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 
-use reqwest::header::{HeaderName, HeaderValue, USER_AGENT};
+use reqwest::header::{HeaderName, HeaderValue};
 use reqwest::{Method, Url};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -222,7 +222,7 @@ pub struct ApiConfig {
     pub client_package: Option<String>,
     /// The client version, sent as `X-Client-Version`.
     pub client_version: Option<String>,
-    /// The user agent to send.
+    /// The user agent to send. Ignored on wasm.
     pub user_agent: Option<String>,
     /// The authentication to start with, or `None` to start unauthenticated.
     pub auth: Option<Auth>,
@@ -250,6 +250,7 @@ pub struct Api {
     origin: String,
     client_package: Option<String>,
     client_version: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
     user_agent: Option<String>,
     auth: RwLock<Option<Auth>>,
 }
@@ -262,6 +263,7 @@ impl Api {
             origin: config.origin,
             client_package: config.client_package,
             client_version: config.client_version,
+            #[cfg(not(target_arch = "wasm32"))]
             user_agent: config.user_agent,
             auth: RwLock::new(config.auth),
         }
@@ -327,8 +329,9 @@ impl Api {
         if let Some(version) = &self.client_version {
             builder = builder.header(CLIENT_VERSION, version);
         }
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(user_agent) = &self.user_agent {
-            builder = builder.header(USER_AGENT, user_agent);
+            builder = builder.header(reqwest::header::USER_AGENT, user_agent);
         }
         if let Some(auth) = &*self.auth.read().unwrap_or_else(PoisonError::into_inner) {
             builder = auth.apply(builder);
@@ -473,10 +476,11 @@ mod tests {
         Api::new(
             Http::new().unwrap(),
             ApiConfig {
+                origin: server.url(),
                 client_package: Some("io.ente.test".into()),
                 client_version: Some("1.0".into()),
+                user_agent: None,
                 auth,
-                ..ApiConfig::new(server.url())
             },
         )
     }

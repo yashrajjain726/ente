@@ -1,5 +1,6 @@
 //! FRB bindings for contacts APIs.
 
+use std::fmt::Write as _;
 use std::sync::Arc;
 
 use ente_contacts::{
@@ -62,24 +63,22 @@ pub enum ContactsError {
     MissingEncryptedKey,
     /// Contact profile picture does not exist.
     ProfilePictureNotFound,
+    /// A recovery is already in progress for this kit.
+    ActiveRecoverySession,
 }
 
 impl From<CoreContactsError> for ContactsError {
     fn from(value: CoreContactsError) -> Self {
         match value {
-            CoreContactsError::Http(ente_core::http_legacy::Error::Http {
-                status,
-                message,
-                ..
-            }) => ContactsError::Http { message, status },
-            CoreContactsError::Http(ente_core::http_legacy::Error::Network(message)) => {
-                ContactsError::Network { message }
-            }
-            CoreContactsError::Http(ente_core::http_legacy::Error::Parse(message)) => {
-                ContactsError::Parse { message }
-            }
-            CoreContactsError::Http(ente_core::http_legacy::Error::InvalidUrl(message)) => {
-                ContactsError::InvalidUrl { message }
+            CoreContactsError::Http(error) => {
+                let message = error_chain(&error);
+                match error {
+                    ente_core::http::Error::Http { status, .. } => {
+                        ContactsError::Http { message, status }
+                    }
+                    ente_core::http::Error::Network(_) => ContactsError::Network { message },
+                    ente_core::http::Error::Parse(_) => ContactsError::Parse { message },
+                }
             }
             CoreContactsError::Crypto(message) => ContactsError::Crypto {
                 message: message.to_string(),
@@ -91,8 +90,19 @@ impl From<CoreContactsError> for ContactsError {
             CoreContactsError::MissingEncryptedData => ContactsError::MissingEncryptedData,
             CoreContactsError::MissingEncryptedKey => ContactsError::MissingEncryptedKey,
             CoreContactsError::ProfilePictureNotFound => ContactsError::ProfilePictureNotFound,
+            CoreContactsError::ActiveRecoverySession => ContactsError::ActiveRecoverySession,
         }
     }
+}
+
+fn error_chain(error: &dyn std::error::Error) -> String {
+    let mut message = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        let _ = write!(message, ": {cause}");
+        source = cause.source();
+    }
+    message
 }
 
 #[frb]
