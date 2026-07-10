@@ -1,13 +1,18 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:exif_reader/exif_reader.dart' as exif;
 import 'package:flutter/widgets.dart';
 import 'package:image/image.dart' as img;
 // ignore: implementation_imports
 import 'package:image/src/util/rational.dart' as img_util;
+import 'package:logging/logging.dart';
 import "package:photos/models/file/file.dart";
 import "package:photos/utils/exif_util.dart";
+
+final _logger = Logger("ImageUtil");
 
 Future<ImageInfo> getImageInfo(ImageProvider imageProvider) {
   final completer = Completer<ImageInfo>();
@@ -18,6 +23,32 @@ Future<ImageInfo> getImageInfo(ImageProvider imageProvider) {
   imageStream.addListener(listener);
   completer.future.whenComplete(() => imageStream.removeListener(listener));
   return completer.future;
+}
+
+Future<({int width, int height})?> getImageDimensions({
+  String? imagePath,
+  Uint8List? imageBytes,
+}) async {
+  if (imagePath == null && imageBytes == null) {
+    throw ArgumentError("imagePath and imageBytes cannot be null");
+  }
+  try {
+    late Uint8List bytes;
+    if (imagePath != null) {
+      bytes = await File(imagePath).readAsBytes();
+    } else {
+      bytes = imageBytes!;
+    }
+    final ui.Codec codec = await ui.instantiateImageCodec(bytes);
+    final ui.FrameInfo frameInfo = await codec.getNextFrame();
+    if (frameInfo.image.width == 0 || frameInfo.image.height == 0) {
+      return null;
+    }
+    return (width: frameInfo.image.width, height: frameInfo.image.height);
+  } catch (e) {
+    _logger.severe("Failed to get image size", e);
+    return null;
+  }
 }
 
 // dart format off
