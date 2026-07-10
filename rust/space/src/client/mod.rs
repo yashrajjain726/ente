@@ -34,9 +34,8 @@ use crate::transport::{
 };
 use ente_core::{
     crypto::{decode_b64, encode_b64},
-    http_legacy::{HttpClient, HttpConfig},
+    http::{Api, ApiConfig, Auth, Http},
 };
-const SPACE_SESSION_TOKEN_HEADER: &str = "X-Space-Session-Token";
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
 const UPLOAD_PURPOSE_COVER: &str = "cover";
 const MESSAGE_KIND_REGULAR: &str = "regular";
@@ -85,7 +84,7 @@ pub(crate) struct SpaceIdentity {
 }
 
 pub struct AccountSpaceCtx {
-    client: HttpClient,
+    api: Api,
     space_root_key: Vec<u8>,
     space_root_key_cache: Mutex<Option<Option<Vec<u8>>>>,
     space_identity_cache: Mutex<BTreeMap<String, SpaceIdentity>>,
@@ -95,16 +94,15 @@ pub struct AccountSpaceCtx {
 
 impl AccountSpaceCtx {
     pub fn open(input: OpenAccountSpaceCtxInput) -> Result<Self> {
-        let client = build_http_client(
+        let api = build_api(
             &input.base_url,
-            None,
             input.space_session_token,
             input.user_agent,
             input.client_package,
             input.client_version,
         )?;
         Ok(Self {
-            client,
+            api,
             space_root_key: input.space_root_key,
             space_root_key_cache: Mutex::new(None),
             space_identity_cache: Mutex::new(BTreeMap::new()),
@@ -113,8 +111,8 @@ impl AccountSpaceCtx {
         })
     }
 
-    pub fn client(&self) -> &HttpClient {
-        &self.client
+    pub fn api(&self) -> &Api {
+        &self.api
     }
 
     pub fn space_root_key(&self) -> &[u8] {
@@ -137,17 +135,27 @@ impl AccountSpaceCtx {
             return Ok(value);
         }
         let spaces: Vec<SpaceKeyResponse> = self
-            .client
-            .get_json("/account/space", &[])
-            .await
-            .map_err(SpaceError::from)?;
+            .api
+            .get("/account/space")
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
         *cache_lock(&self.owned_spaces_cache, "owned spaces")? = Some(spaces.clone());
         Ok(spaces)
     }
 
     pub async fn list_friend_shares(&self, space_id: &str) -> Result<Vec<FriendShareResponse>> {
         let path = format!("/spaces/{space_id}/friends/shares");
-        self.client.get_json(&path, &[]).await.map_err(Into::into)
+        Ok(self
+            .api
+            .get(&path)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub(crate) fn decrypt_space_identity(&self, space: &SpaceKeyResponse) -> Result<SpaceIdentity> {
@@ -300,8 +308,13 @@ impl AccountSpaceCtx {
             referred_by_space_id: referred_by_space_id.map(str::to_owned),
         };
         let response = self
-            .client
-            .post_json::<SpaceKeyResponse, _>("/account/space", &request)
+            .api
+            .post("/account/space")
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<SpaceKeyResponse>()
             .await?;
         self.cache_created_owned_space(SpaceKeyResponse {
             space_id: response.space_id.clone(),
@@ -331,7 +344,14 @@ impl AccountSpaceCtx {
 
     pub async fn lookup_space_by_slug(&self, space_slug: &str) -> Result<SpaceLookupResponse> {
         let path = format!("/space/public/by-slug/{}", urlencoding::encode(space_slug));
-        self.client.get_json(&path, &[]).await.map_err(Into::into)
+        Ok(self
+            .api
+            .get(&path)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn update_space_slug(
@@ -343,7 +363,15 @@ impl AccountSpaceCtx {
         let request = UpdateSpaceSlugRequest {
             space_slug: space_slug.to_owned(),
         };
-        let response = self.client.put_json(&path, &request).await?;
+        let response = self
+            .api
+            .put(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
         self.clear_owned_space_cache()?;
         Ok(response)
     }
@@ -643,27 +671,23 @@ fn post_response_from_feed_item(item: &FeedItem) -> PostResponse {
     }
 }
 
-pub(super) fn build_http_client(
+pub(super) fn build_api(
     base_url: &str,
-    auth_token: Option<String>,
     space_session_token: Option<String>,
     user_agent: Option<String>,
     client_package: Option<String>,
     client_version: Option<String>,
-) -> Result<HttpClient> {
-    let extra_auth_headers = space_session_token
-        .map(|token| vec![(SPACE_SESSION_TOKEN_HEADER.to_owned(), token)])
-        .unwrap_or_default();
-    HttpClient::new_with_config(HttpConfig {
-        base_url: base_url.to_owned(),
-        auth_token,
-        extra_auth_headers,
-        user_agent,
-        client_package,
-        client_version,
-        ..HttpConfig::default()
-    })
-    .map_err(SpaceError::from)
+) -> Result<Api> {
+    Ok(Api::new(
+        Http::new()?,
+        ApiConfig {
+            origin: base_url.to_owned(),
+            auth: space_session_token.map(Auth::SpaceSession),
+            user_agent,
+            client_package,
+            client_version,
+        },
+    ))
 }
 
 fn cache_lock<'a, T>(cache: &'a Mutex<T>, name: &str) -> Result<MutexGuard<'a, T>> {

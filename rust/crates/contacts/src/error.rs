@@ -1,10 +1,10 @@
-use ente_core::{auth::AuthError, crypto, http_legacy::Error as HttpError};
+use ente_core::{auth::AuthError, crypto, http};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ContactsError {
     #[error(transparent)]
-    Http(#[from] HttpError),
+    Http(#[from] http::Error),
 
     #[error(transparent)]
     Crypto(#[from] crypto::Error),
@@ -23,6 +23,9 @@ pub enum ContactsError {
 
     #[error("profile picture not found")]
     ProfilePictureNotFound,
+
+    #[error("a recovery is already in progress")]
+    ActiveRecoverySession,
 }
 
 pub type Result<T> = std::result::Result<T, ContactsError>;

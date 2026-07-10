@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use ente_core::{crypto::decode_b64, http_legacy::Error as HttpError};
+use ente_core::{crypto::decode_b64, http::Error as HttpError};
 use ente_space::{
     AccountSpaceCtx, CreatedSpace, DecryptedMessage, DecryptedPost, DecryptedSpaceProfile,
     MessageConversationActivity, MessageResponse, OpenAccountSpaceCtxInput, PostResponse,
@@ -45,7 +45,6 @@ impl From<CoreSpaceError> for WasmSpaceError {
     fn from(e: CoreSpaceError) -> Self {
         let (code, status) = match &e {
             CoreSpaceError::Http(HttpError::Http { status, .. }) => ("http", Some(*status)),
-            CoreSpaceError::Http(HttpError::InvalidUrl(_)) => ("invalid_url", None),
             CoreSpaceError::Http(HttpError::Network(_)) => ("network", None),
             CoreSpaceError::Http(HttpError::Parse(_)) => ("parse", None),
             CoreSpaceError::Crypto(_) => ("crypto", None),

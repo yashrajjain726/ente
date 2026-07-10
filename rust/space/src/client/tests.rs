@@ -16,7 +16,7 @@ use mockito::{Matcher, Server};
 use serde_json::json;
 
 #[tokio::test]
-async fn account_http_client_sends_space_session_token_header() {
+async fn account_api_sends_space_session_token_header() {
     let mut server = Server::new_async().await;
     let request = server
         .mock("GET", "/account/space")
@@ -25,17 +25,25 @@ async fn account_http_client_sends_space_session_token_header() {
         .with_body("{}")
         .create_async()
         .await;
-    let client = build_http_client(
+    let api = build_api(
         &server.url(),
-        None,
         Some("space-session-token".to_owned()),
         None,
         None,
         None,
     )
-    .expect("http client");
+    .expect("API client");
 
-    let _: serde_json::Value = client.get_json("/account/space", &[]).await.unwrap();
+    let _: serde_json::Value = api
+        .get("/account/space")
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
 
     request.assert_async().await;
 }

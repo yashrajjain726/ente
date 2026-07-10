@@ -3,6 +3,7 @@ import "dart:convert";
 import "dart:io";
 
 import "package:app_links/app_links.dart";
+import "package:ente_components/ente_components.dart";
 import "package:ente_crypto/ente_crypto.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
@@ -11,7 +12,6 @@ import "package:flutter/services.dart";
 import "package:flutter_local_notifications/flutter_local_notifications.dart";
 import "package:logging/logging.dart";
 import "package:media_extension/media_extension_action_types.dart";
-import "package:modal_bottom_sheet/modal_bottom_sheet.dart";
 import "package:move_to_background/move_to_background.dart";
 import "package:package_info_plus/package_info_plus.dart";
 import "package:photos/core/configuration.dart";
@@ -56,7 +56,6 @@ import "package:photos/services/sync/local_sync_service.dart";
 import "package:photos/services/sync/remote_sync_service.dart";
 import "package:photos/services/update_service.dart";
 import "package:photos/states/user_details_state.dart";
-import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/collection_action_sheet.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
@@ -381,6 +380,9 @@ class _HomeWidgetState extends State<HomeWidget> {
 
       final Collection? collection = await CollectionsService.instance
           .getCollectionFromPublicLink(context, uri);
+      if (!mounted) {
+        return;
+      }
       if (collection == null) {
         return;
       }
@@ -1224,6 +1226,7 @@ class _HomeWidgetState extends State<HomeWidget> {
         locale: Localizations.localeOf(context),
         isLocalGallery: isLocalGalleryMode,
         isSignedIn: Configuration.instance.isLoggedIn(),
+        isAndroid: Platform.isAndroid,
       );
       if (!mounted || action == ChangeLogAction.skip) {
         return;
@@ -1232,27 +1235,9 @@ class _HomeWidgetState extends State<HomeWidget> {
         updateService.hideChangeLog().ignore();
         return;
       }
-      final colorScheme = getEnteColorScheme(context);
-      final sheetAction = await showBarModalBottomSheet<ChangeLogPageAction>(
-        topControl: const SizedBox.shrink(),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(5),
-            topRight: Radius.circular(5),
-          ),
-        ),
-        backgroundColor: colorScheme.backgroundElevated,
-        enableDrag: false,
-        barrierColor: backdropFaintDark,
+      final sheetAction = await showBottomSheetComponent<ChangeLogPageAction>(
         context: context,
-        builder: (BuildContext context) {
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: const ChangeLogPage(),
-          );
-        },
+        builder: (context) => const ChangeLogPage(),
       );
       // Do not show change dialog again
       await updateService.hideChangeLog();

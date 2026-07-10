@@ -543,7 +543,10 @@ class _TextInputWidgetV2State extends State<TextInputWidgetV2>
       _exception = e is Exception ? e : Exception(e.toString());
       if (e.toString().contains('Incorrect password')) {
         _logger.warning('Incorrect password');
+        _executionState = ExecutionState.idle;
+        _syncLoadingController();
         _surfaceWrongPasswordState();
+        return;
       }
       if (!widget.popNavAfterSubmission) {
         rethrow;

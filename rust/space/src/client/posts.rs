@@ -57,8 +57,13 @@ impl AccountSpaceCtx {
         };
         let path = format!("/spaces/{space_id}/posts");
         let response = self
-            .client()
-            .post_json::<CreatePostResponse, _>(&path, &request)
+            .api()
+            .post(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<CreatePostResponse>()
             .await?;
         Ok((response.post_id, post_key_bytes))
     }
@@ -81,10 +86,15 @@ impl AccountSpaceCtx {
             query.push(("limit", value.to_string()));
         }
         let path = format!("/spaces/{space_id}/posts");
-        self.client()
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .query(&query)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn list_feed(
@@ -101,15 +111,27 @@ impl AccountSpaceCtx {
             query.push(("limit", value.to_string()));
         }
         let path = format!("/spaces/{space_id}/feed");
-        self.client()
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .query(&query)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn unread_status(&self, space_id: &str) -> Result<SpaceUnreadStatusResponse> {
         let path = format!("/spaces/{space_id}/unread");
-        self.client().get_json(&path, &[]).await.map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn mark_notifications_read(
@@ -128,10 +150,15 @@ impl AccountSpaceCtx {
             ));
         }
         let path = format!("/spaces/{space_id}/friends/{friend_space_id}/read");
-        self.client()
-            .post_json(&path, &serde_json::json!({}))
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .post(&path)
+            .json(&serde_json::json!({}))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn get_post(
@@ -145,10 +172,15 @@ impl AccountSpaceCtx {
         if let Some(value) = viewer_space_id.filter(|value| !value.trim().is_empty()) {
             query.push(("viewerSpaceId", value.to_owned()));
         }
-        self.client()
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .query(&query)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn fetch_post_decrypted(
@@ -333,18 +365,19 @@ impl AccountSpaceCtx {
             },
         };
         let path = format!("/spaces/{space_id}/posts/{post_id}/caption");
-        self.client()
-            .post_empty(&path, &request)
-            .await
-            .map_err(Into::into)
+        self.api()
+            .post(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(())
     }
 
     pub async fn delete_post(&self, space_id: &str, post_id: i64) -> Result<()> {
         let path = format!("/spaces/{space_id}/posts/{post_id}");
-        self.client()
-            .delete_empty(&path, &[])
-            .await
-            .map_err(Into::into)
+        self.api().delete(&path).send().await?.error_for_status()?;
+        Ok(())
     }
 
     pub async fn like_post(
@@ -355,15 +388,24 @@ impl AccountSpaceCtx {
     ) -> Result<LikePostResponse> {
         let path = format!("/spaces/{space_id}/posts/{post_id}/like");
         if like {
-            self.client()
-                .put_json(&path, &serde_json::json!({}))
-                .await
-                .map_err(Into::into)
+            Ok(self
+                .api()
+                .put(&path)
+                .json(&serde_json::json!({}))
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?)
         } else {
-            self.client()
-                .delete_json(&path, &[])
-                .await
-                .map_err(Into::into)
+            Ok(self
+                .api()
+                .delete(&path)
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?)
         }
     }
 }

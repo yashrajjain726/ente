@@ -23,7 +23,14 @@ use ente_core::crypto::{decode_b64, encode_b64};
 impl AccountSpaceCtx {
     pub async fn list_conversations(&self, space_id: &str) -> Result<ConversationsResponse> {
         let path = format!("/spaces/{space_id}/conversations");
-        self.client().get_json(&path, &[]).await.map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn list_message_thread(
@@ -41,10 +48,15 @@ impl AccountSpaceCtx {
             query.push(("limit", value.to_string()));
         }
         let path = format!("/spaces/{viewer_space_id}/friends/{space_id}/messages");
-        self.client()
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .query(&query)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn send_message(
@@ -65,10 +77,15 @@ impl AccountSpaceCtx {
             .message_request_for_payload(sender_space_id, &friend.public_key, &payload, None)
             .await?;
         let path = format!("/spaces/{sender_space_id}/friends/{space_id}/messages");
-        self.client()
-            .post_json(&path, &request)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .post(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn reply_to_message(
@@ -99,10 +116,15 @@ impl AccountSpaceCtx {
             )
             .await?;
         let path = format!("/spaces/{sender_space_id}/friends/{space_id}/messages");
-        self.client()
-            .post_json(&path, &request)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .post(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn reply_to_post(
@@ -138,10 +160,15 @@ impl AccountSpaceCtx {
             .message_request_for_payload(sender_space_id, &post.author.public_key, &payload, None)
             .await?;
         let path = format!("/spaces/{sender_space_id}/posts/{post_id}/reply");
-        self.client()
-            .post_json(&path, &request)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .post(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn decrypt_message(
@@ -178,15 +205,24 @@ impl AccountSpaceCtx {
         }
         let path = format!("/spaces/{space_id}/messages/{message_id}/like");
         if like {
-            self.client()
-                .put_json(&path, &serde_json::json!({}))
-                .await
-                .map_err(Into::into)
+            Ok(self
+                .api()
+                .put(&path)
+                .json(&serde_json::json!({}))
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?)
         } else {
-            self.client()
-                .delete_json(&path, &[])
-                .await
-                .map_err(Into::into)
+            Ok(self
+                .api()
+                .delete(&path)
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?)
         }
     }
 
@@ -196,10 +232,8 @@ impl AccountSpaceCtx {
             return Err(SpaceError::InvalidInput("message id is required".into()));
         }
         let path = format!("/spaces/{space_id}/messages/{message_id}");
-        self.client()
-            .delete_empty(&path, &[])
-            .await
-            .map_err(Into::into)
+        self.api().delete(&path).send().await?.error_for_status()?;
+        Ok(())
     }
 
     pub(crate) async fn friend_actor_for_space(

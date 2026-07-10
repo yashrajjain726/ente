@@ -36,10 +36,15 @@ impl AccountSpaceCtx {
             purpose: None,
         };
         let path = format!("/spaces/{space_id}/uploads/presign");
-        self.client()
-            .post_json(&path, &request)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .post(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn presign_avatar_upload(
@@ -55,10 +60,15 @@ impl AccountSpaceCtx {
             purpose: Some(UPLOAD_PURPOSE_AVATAR.to_owned()),
         };
         let path = format!("/spaces/{space_id}/uploads/presign");
-        self.client()
-            .post_json(&path, &request)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .post(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn presign_cover_upload(
@@ -74,23 +84,28 @@ impl AccountSpaceCtx {
             purpose: Some(UPLOAD_PURPOSE_COVER.to_owned()),
         };
         let path = format!("/spaces/{space_id}/uploads/presign");
-        self.client()
-            .post_json(&path, &request)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .post(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn upload_bytes(&self, presign: &PresignUploadResponse, body: &[u8]) -> Result<()> {
-        let headers: Vec<(&str, String)> = presign
-            .headers
-            .iter()
-            .map(|(key, value)| (key.as_str(), value.clone()))
-            .collect();
-        self.client()
-            .object_store()
-            .put_bytes(&presign.url, body, &headers)
-            .await
-            .map_err(Into::into)
+        let request = presign.headers.iter().fold(
+            self.api().http().put(&presign.url),
+            |request, (name, value)| request.header(name, value),
+        );
+        request
+            .body(body.to_vec())
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(())
     }
 
     pub async fn upload_post_asset(
@@ -210,10 +225,15 @@ impl AccountSpaceCtx {
             query.push(("viewerSpaceId", value.to_owned()));
         }
         let path = format!("/spaces/{space_id}/assets/redirect");
-        self.client()
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .query(&query)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn download_profile_asset(
@@ -228,9 +248,13 @@ impl AccountSpaceCtx {
             .get_profile_asset_url(space_id, viewer_space_id, asset_type, object_id)
             .await?;
         let encrypted = self
-            .client()
-            .object_store()
-            .get_bytes(&download.url)
+            .api()
+            .http()
+            .get(&download.url)
+            .send()
+            .await?
+            .error_for_status()?
+            .bytes()
             .await?;
         crate::crypto::decrypt_asset_payload(key, &encrypted)
     }
@@ -246,10 +270,15 @@ impl AccountSpaceCtx {
             query.push(("viewerSpaceId", value.to_owned()));
         }
         let path = format!("/spaces/{space_id}/assets/redirect");
-        self.client()
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .query(&query)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn download_encrypted_asset(
@@ -261,11 +290,15 @@ impl AccountSpaceCtx {
         let download = self
             .get_asset_url(space_id, viewer_space_id, object_key)
             .await?;
-        self.client()
-            .object_store()
-            .get_bytes(&download.url)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .http()
+            .get(&download.url)
+            .send()
+            .await?
+            .error_for_status()?
+            .bytes()
+            .await?)
     }
 
     pub async fn download_decrypted_asset(

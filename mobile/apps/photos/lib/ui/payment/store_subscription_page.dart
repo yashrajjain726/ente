@@ -74,8 +74,14 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
     _purchaseUpdateSubscription = InAppPurchase.instance.purchaseStream.listen((
       purchases,
     ) async {
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
       if (!_dialog.isShowing()) {
         await _dialog.show();
+      }
+      if (!mounted) {
+        await _dialog.hide();
+        return;
       }
       for (final purchase in purchases) {
         _logger.info("Purchase status " + purchase.status.toString());
@@ -86,56 +92,56 @@ class _StoreSubscriptionPageState extends State<StoreSubscriptionPage> {
               purchase.verificationData.serverVerificationData,
             );
             await InAppPurchase.instance.completePurchase(purchase);
-            String text = AppLocalizations.of(context).thankYouForSubscribing;
-            if (!widget.isOnboarding) {
-              final isUpgrade =
-                  _hasActiveSubscription &&
-                  newSubscription.storage > _currentSubscription!.storage;
-              final isDowngrade =
-                  _hasActiveSubscription &&
-                  newSubscription.storage < _currentSubscription!.storage;
-              if (isUpgrade) {
-                text = AppLocalizations.of(
-                  context,
-                ).yourPlanWasSuccessfullyUpgraded;
-              } else if (isDowngrade) {
-                text = AppLocalizations.of(
-                  context,
-                ).yourPlanWasSuccessfullyDowngraded;
-              }
-            }
-            showShortToast(context, text);
+            final wasActiveSubscription = _hasActiveSubscription;
+            final previousSubscription = _currentSubscription;
             _currentSubscription = newSubscription;
             _hasActiveSubscription = _currentSubscription!.isValid();
-            setState(() {});
-            await _dialog.hide();
             Bus.instance.fire(SubscriptionPurchasedEvent());
-            if (widget.isOnboarding) {
+            if (mounted) {
+              String text = l10n.thankYouForSubscribing;
+              if (!widget.isOnboarding && previousSubscription != null) {
+                final isUpgrade =
+                    wasActiveSubscription &&
+                    newSubscription.storage > previousSubscription.storage;
+                final isDowngrade =
+                    wasActiveSubscription &&
+                    newSubscription.storage < previousSubscription.storage;
+                if (isUpgrade) {
+                  text = l10n.yourPlanWasSuccessfullyUpgraded;
+                } else if (isDowngrade) {
+                  text = l10n.yourPlanWasSuccessfullyDowngraded;
+                }
+              }
+              showShortToast(context, text);
+              setState(() {});
+              await _dialog.hide();
+            }
+            if (mounted && widget.isOnboarding) {
               Navigator.of(context).popUntil((route) => route.isFirst);
             }
           } on SubscriptionAlreadyClaimedError catch (e) {
             _logger.warning("subscription is already claimed ", e);
             await _dialog.hide();
+            if (!mounted) return;
             final String title = Platform.isAndroid
-                ? AppLocalizations.of(context).playstoreSubscription
-                : AppLocalizations.of(context).appstoreSubscription;
+                ? l10n.playstoreSubscription
+                : l10n.appstoreSubscription;
             final String id = Platform.isAndroid
-                ? AppLocalizations.of(context).googlePlayId
-                : AppLocalizations.of(context).appleId;
-            final String message = AppLocalizations.of(
-              context,
-            ).subAlreadyLinkedErrMessage(id: id);
+                ? l10n.googlePlayId
+                : l10n.appleId;
+            final String message = l10n.subAlreadyLinkedErrMessage(id: id);
             // ignore: unawaited_futures
             showErrorDialog(context, title, message);
             return;
           } catch (e) {
             _logger.warning("Could not complete payment ", e);
             await _dialog.hide();
+            if (!mounted) return;
             // ignore: unawaited_futures
             showErrorDialog(
               context,
-              AppLocalizations.of(context).paymentFailed,
-              AppLocalizations.of(context).paymentFailedTalkToProvider(
+              l10n.paymentFailed,
+              l10n.paymentFailedTalkToProvider(
                 providerName: Platform.isAndroid ? "PlayStore" : "AppStore",
               ),
             );

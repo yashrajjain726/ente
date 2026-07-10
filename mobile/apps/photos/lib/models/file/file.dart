@@ -349,6 +349,12 @@ class EnteFile {
     fileDecryptionHeader = uploadedFile.fileDecryptionHeader;
     thumbnailDecryptionHeader = uploadedFile.thumbnailDecryptionHeader;
     metadataDecryptionHeader = uploadedFile.metadataDecryptionHeader;
+    if (uploadedFile.metadataVersion != null) {
+      metadataVersion = uploadedFile.metadataVersion;
+    }
+    if (uploadedFile.fileSize != null) {
+      fileSize = uploadedFile.fileSize;
+    }
   }
 
   @override

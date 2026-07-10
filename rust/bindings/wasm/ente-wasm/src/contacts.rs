@@ -42,6 +42,7 @@ impl From<CoreContactsError> for ContactsError {
             CoreContactsError::MissingEncryptedData => "missing_encrypted_data",
             CoreContactsError::MissingEncryptedKey => "missing_encrypted_key",
             CoreContactsError::ProfilePictureNotFound => "profile_picture_not_found",
+            CoreContactsError::ActiveRecoverySession => "active_recovery_session",
         }
         .to_string();
 

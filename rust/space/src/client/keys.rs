@@ -26,10 +26,15 @@ impl AccountSpaceCtx {
             query.push(("viewerSpaceId", value.to_owned()));
         }
         let path = format!("/spaces/{space_id}/versions");
-        self.client()
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .query(&query)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub fn build_space_key_history(
@@ -117,8 +122,13 @@ impl AccountSpaceCtx {
         };
         let path = format!("/spaces/{space_id}/rotate");
         let response = self
-            .client()
-            .post_json::<SpaceKeyResponse, _>(&path, &request)
+            .api()
+            .post(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<SpaceKeyResponse>()
             .await?;
         self.clear_owned_space_cache()?;
         Ok(CreatedSpace {

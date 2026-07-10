@@ -1,5 +1,5 @@
 use ente_core::crypto::{Key, Nonce, decode_b64, encode_b64, secretbox};
-use ente_core::http_legacy::Error as HttpError;
+use ente_core::http::Error as HttpError;
 use ente_rs::models::account::App;
 use ente_space::{AccountSpaceCtx, OpenAccountSpaceCtxInput, SpaceError};
 use serde::Deserialize;

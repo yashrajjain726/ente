@@ -31,10 +31,15 @@ impl AccountSpaceCtx {
             query.push(("version", value.to_string()));
         }
         let path = format!("/spaces/{space_id}/profile");
-        self.client()
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .query(&query)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn get_space_profile_decrypted(
@@ -101,10 +106,14 @@ impl AccountSpaceCtx {
         };
         let path = format!("/spaces/{space_id}/profile");
         let response = self
-            .client()
-            .post_json(&path, &request)
-            .await
-            .map_err(SpaceError::from)?;
+            .api()
+            .post(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
         self.update_cached_owned_space_profile(space_id, request.encrypted_profile)?;
         Ok(response)
     }

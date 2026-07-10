@@ -43,10 +43,14 @@ impl AccountSpaceCtx {
         };
         let path = format!("/spaces/{}/friends/add", requester_space.space_id);
         let response: FriendStatusResponse = self
-            .client()
-            .post_json(&path, &payload)
-            .await
-            .map_err(SpaceError::from)?;
+            .api()
+            .post(&path)
+            .json(&payload)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
         if response.status == "friend" {
             self.clear_friend_share_cache()?;
         }
@@ -69,7 +73,14 @@ impl AccountSpaceCtx {
         space_id: &str,
     ) -> Result<Vec<SpaceFriendRequestResponse>> {
         let path = format!("/spaces/{space_id}/friends/requests");
-        self.client().get_json(&path, &[]).await.map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn confirm_friend_request(
@@ -104,7 +115,15 @@ impl AccountSpaceCtx {
             "/spaces/{}/friends/requests/{request_id}/confirm",
             target_space.space_id
         );
-        let response = self.client().post_json(&path, &payload).await?;
+        let response = self
+            .api()
+            .post(&path)
+            .json(&payload)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
         self.clear_friend_share_cache()?;
         Ok(response)
     }
@@ -116,10 +135,8 @@ impl AccountSpaceCtx {
             ));
         }
         let path = format!("/spaces/{space_id}/friends/requests/{request_id}");
-        self.client()
-            .delete_empty(&path, &[])
-            .await
-            .map_err(Into::into)
+        self.api().delete(&path).send().await?.error_for_status()?;
+        Ok(())
     }
 
     pub async fn unfriend_by_space(&self, actor_space_id: &str, space_id: &str) -> Result<()> {
@@ -128,7 +145,12 @@ impl AccountSpaceCtx {
             target_space_id: Some(space_id.to_owned()),
         };
         let path = format!("/spaces/{actor_space_id}/friends/unfriend");
-        self.client().post_empty(&path, &request).await?;
+        self.api()
+            .post(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?;
         self.clear_friend_share_cache()?;
         Ok(())
     }
@@ -139,14 +161,26 @@ impl AccountSpaceCtx {
             target_space_id: None,
         };
         let path = format!("/spaces/{actor_space_id}/friends/unfriend");
-        self.client().post_empty(&path, &request).await?;
+        self.api()
+            .post(&path)
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?;
         self.clear_friend_share_cache()?;
         Ok(())
     }
 
     pub async fn list_space_friends(&self, space_id: &str) -> Result<Vec<SpaceFriendResponse>> {
         let path = format!("/spaces/{space_id}/friends");
-        self.client().get_json(&path, &[]).await.map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn get_relationship(
@@ -156,10 +190,15 @@ impl AccountSpaceCtx {
     ) -> Result<FriendRelationshipResponse> {
         let query = vec![("targetSpaceId", target_space_id.to_owned())];
         let path = format!("/spaces/{space_id}/friends/relationship");
-        self.client()
-            .get_json(&path, &query)
-            .await
-            .map_err(Into::into)
+        Ok(self
+            .api()
+            .get(&path)
+            .query(&query)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
     pub async fn refresh_friend_shares(&self, space_id: &str) -> Result<usize> {
@@ -191,7 +230,12 @@ impl AccountSpaceCtx {
         };
         let updated = payload.shares.len();
         let path = format!("/spaces/{space_id}/friends/shares/refresh");
-        self.client().post_empty(&path, &payload).await?;
+        self.api()
+            .post(&path)
+            .json(&payload)
+            .send()
+            .await?
+            .error_for_status()?;
         self.clear_friend_share_cache()?;
         Ok(updated)
     }

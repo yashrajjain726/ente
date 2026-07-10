@@ -10,18 +10,22 @@ use super::AccountSpaceCtx;
 use crate::error::{Result, SpaceError};
 use crate::transport::{CreateEntityKeyRequest, EntityKeyPayload, EntityKeyResponse};
 use ente_core::crypto::{decode_b64, encode_b64};
-use ente_core::http_legacy::Error as HttpError;
 
 const SPACE_ENTITY_KEY_HEADER_BYTES: usize = 24;
 
 impl AccountSpaceCtx {
     pub async fn get_entity_key(&self, key_type: &str) -> Result<Option<EntityKeyPayload>> {
         let query = vec![("type", key_type.to_owned())];
-        let payload = self
-            .client()
-            .get_json_optional::<EntityKeyResponse>("/user-entity/key", &query)
+        let response = self
+            .api()
+            .get("/user-entity/key")
+            .query(&query)
+            .send()
             .await?;
-        payload.map(combine_entity_key_response).transpose()
+        if response.status() == 404 {
+            return Ok(None);
+        }
+        combine_entity_key_response(response.error_for_status()?.json().await?).map(Some)
     }
 
     pub async fn create_entity_key(
@@ -35,11 +39,17 @@ impl AccountSpaceCtx {
             encrypted_key,
             header,
         };
-        match self.client().post_empty("/user-entity/key", &request).await {
-            Ok(_) => Ok(()),
-            Err(HttpError::Http { status: 409, .. }) => Err(SpaceError::EntityKeyConflict),
-            Err(err) => Err(err.into()),
+        let response = self
+            .api()
+            .post("/user-entity/key")
+            .json(&request)
+            .send()
+            .await?;
+        if response.status() == 409 {
+            return Err(SpaceError::EntityKeyConflict);
         }
+        response.error_for_status()?;
+        Ok(())
     }
 
     pub async fn ensure_entity_key(
@@ -54,8 +64,13 @@ impl AccountSpaceCtx {
             header,
         };
         let response = self
-            .client()
-            .post_json::<EntityKeyResponse, _>("/user-entity/key/ensure", &request)
+            .api()
+            .post("/user-entity/key/ensure")
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<EntityKeyResponse>()
             .await?;
         combine_entity_key_response(response)
     }
