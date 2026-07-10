@@ -1,7 +1,11 @@
 import { isTauriRuntime } from "@/services/tauri-runtime";
 import { secureStorageGet, secureStorageSet } from "../secure-storage";
 import { ensureCryptoInit, enteWasm } from "../wasm";
-import { hasRetiredLocalChatStore, promoteLocalChatKey } from "./compatibility";
+import {
+    hasRetiredLocalChatStore,
+    promoteLocalChatKey,
+    retiredBrowserChatKey,
+} from "./compatibility";
 
 const LOCAL_KEY = "ensu.chatKey.local";
 const CURRENT_SECURE_KEY = "localChatKey.v2";
@@ -32,8 +36,12 @@ export const initChatKeyStore = async () => {
     return _initPromise;
 };
 
-export const cachedLocalChatKey = () =>
-    isTauriRuntime() ? _localKey : localGet(LOCAL_KEY);
+export const cachedLocalChatKey = () => {
+    if (isTauriRuntime()) return _localKey;
+    const key = localGet(LOCAL_KEY) ?? retiredBrowserChatKey();
+    if (key) localStorage.setItem(LOCAL_KEY, key);
+    return key;
+};
 
 const persistLocalKey = async (key: string) => {
     if (isTauriRuntime()) {

@@ -30,6 +30,7 @@ const OLD_INDEXED_DB = "ensu.chat.db";
 const MIGRATION_DONE = "ensu.chat.localMigration.v3";
 const OLD_LOCAL_SECURE_KEY = "localChatKey";
 const OLD_LOCAL_BROWSER_KEY = "ensu.chatKey.local";
+const OLD_REMOTE_BROWSER_KEY = "ensu.chatKey";
 const KEY_FILE = "chat-keys.json";
 const LEGACY_ATTACHMENT_SECURE_KEY = "legacyAttachmentKey.v2";
 
@@ -124,47 +125,59 @@ const retiredUserID = () => {
     }
 };
 
-const finalizeLocalChatMigration = async (deleteOldLocalKeys: boolean) => {
+export const retiredBrowserChatKey = () => {
+    if (typeof localStorage === "undefined") return undefined;
     const userID = retiredUserID();
-    localStorage.removeItem(LOCAL_STORAGE_STORE);
-    const secureKeys = [
-        "masterKey",
-        "remoteChatKey",
-        ...(userID
-            ? [`remoteChatKey.${userID}`, `remoteChatKey.v2.${userID}`]
-            : []),
+    const names = [
+        OLD_REMOTE_BROWSER_KEY,
+        ...(userID ? [`${OLD_REMOTE_BROWSER_KEY}.${userID}`] : []),
+        ...Object.keys(localStorage).filter(
+            (key) =>
+                key.startsWith(`${OLD_REMOTE_BROWSER_KEY}.`) &&
+                key !== OLD_LOCAL_BROWSER_KEY,
+        ),
     ];
-    if (deleteOldLocalKeys) {
-        secureKeys.push(OLD_LOCAL_SECURE_KEY, LEGACY_ATTACHMENT_SECURE_KEY);
-    }
-    await Promise.all(secureKeys.map(secureStorageDelete));
+    return names.map(localGet).find(Boolean);
+};
 
-    if (deleteOldLocalKeys) {
+const finalizeLocalChatMigration = async () => {
+    try {
+        const userID = retiredUserID();
+        localStorage.removeItem(LOCAL_STORAGE_STORE);
+        await Promise.all(
+            [
+                "masterKey",
+                "remoteChatKey",
+                ...(userID
+                    ? [`remoteChatKey.${userID}`, `remoteChatKey.v2.${userID}`]
+                    : []),
+                OLD_LOCAL_SECURE_KEY,
+                LEGACY_ATTACHMENT_SECURE_KEY,
+            ].map(secureStorageDelete),
+        );
+
         const [{ exists, remove }, { appDataDir, join }] = await Promise.all([
             import("@tauri-apps/plugin-fs"),
             import("@tauri-apps/api/path"),
         ]);
         const keyFile = await join(await appDataDir(), KEY_FILE);
         if (await exists(keyFile)) await remove(keyFile);
-    }
 
-    for (const key of Object.keys(localStorage)) {
-        if (
-            key.startsWith("ensu.chatKey") &&
-            (deleteOldLocalKeys || key !== OLD_LOCAL_BROWSER_KEY)
-        ) {
-            localStorage.removeItem(key);
+        for (const key of Object.keys(localStorage)) {
+            if (key.startsWith("ensu.chatKey")) localStorage.removeItem(key);
         }
+        [
+            "user",
+            "srpAttributes",
+            "keyAttributes",
+            "originalKeyAttributes",
+            "isFirstLogin",
+            "ensu.chat.nativeMigration.v2",
+        ].forEach((key) => localStorage.removeItem(key));
+        await removeKV("token");
+    } catch (error) {
+        log.warn("Could not finish cleaning up old chat storage", error);
     }
-    [
-        "user",
-        "srpAttributes",
-        "keyAttributes",
-        "originalKeyAttributes",
-        "isFirstLogin",
-        "ensu.chat.nativeMigration.v2",
-    ].forEach((key) => localStorage.removeItem(key));
-    await removeKV("token");
     localStorage.setItem(MIGRATION_DONE, "1");
 };
 
@@ -192,19 +205,24 @@ const liveStore = (
 const localStorageStore = (): BrowserStore => {
     const json = localStorage.getItem(LOCAL_STORAGE_STORE);
     if (!json) return { sessions: [], messages: [], attachmentBytes: [] };
-    const parsed = JSON.parse(json) as Partial<{
-        sessions: OldSession[];
-        messages: OldMessage[];
-        attachmentBytes: { id: string; data: string }[];
-    }>;
-    return liveStore(
-        parsed.sessions ?? [],
-        parsed.messages ?? [],
-        (parsed.attachmentBytes ?? []).map(({ id, data }) => ({
-            id,
-            data: base64ToBytes(data),
-        })),
-    );
+    try {
+        const parsed = JSON.parse(json) as Partial<{
+            sessions: OldSession[];
+            messages: OldMessage[];
+            attachmentBytes: { id: string; data: string }[];
+        }>;
+        return liveStore(
+            parsed.sessions ?? [],
+            parsed.messages ?? [],
+            (parsed.attachmentBytes ?? []).map(({ id, data }) => ({
+                id,
+                data: base64ToBytes(data),
+            })),
+        );
+    } catch (error) {
+        log.warn("Ignoring an unreadable old local chat store", error);
+        return { sessions: [], messages: [], attachmentBytes: [] };
+    }
 };
 
 const hasLocalStorageStore = () => !!localStorage.getItem(LOCAL_STORAGE_STORE);
@@ -247,9 +265,9 @@ const removeCurrentBrowserTombstones = async () => {
     );
     const tx = db.transaction(["sessions", "messages"], "readwrite");
     await Promise.all([
-        ...deletedSessions
-            .values()
-            .map((id) => tx.objectStore("sessions").delete(id)),
+        ...[...deletedSessions].map((id) =>
+            tx.objectStore("sessions").delete(id),
+        ),
         ...deletedMessages.map(({ messageUuid }) =>
             tx.objectStore("messages").delete(messageUuid),
         ),
@@ -258,15 +276,18 @@ const removeCurrentBrowserTombstones = async () => {
     localStorage.setItem(TOMBSTONE_MIGRATION, "1");
 };
 
-const hasIndexedDb = async (name: string) => {
-    return (await indexedDB.databases()).some(
-        (database) => database.name === name,
-    );
-};
-
 const readOldIndexedDb = async () => {
-    if (!(await hasIndexedDb(OLD_INDEXED_DB))) return undefined;
-    const source = await openDB<OldIndexedDb>(OLD_INDEXED_DB);
+    let created = false;
+    const source = await openDB<OldIndexedDb>(OLD_INDEXED_DB, undefined, {
+        upgrade: () => {
+            created = true;
+        },
+    });
+    if (created) {
+        source.close();
+        await deleteDB(OLD_INDEXED_DB);
+        return undefined;
+    }
     try {
         return liveStore(
             await source.getAll("sessions"),
@@ -278,44 +299,22 @@ const readOldIndexedDb = async () => {
     }
 };
 
-const hasChatData = ({ sessions, messages }: BrowserStore) =>
-    sessions.length > 0 || messages.length > 0;
-
-const cleanupOldBrowserStores = () => {
-    try {
-        localStorage.removeItem(LOCAL_STORAGE_STORE);
-    } catch (error) {
-        log.warn("Failed to remove the old local chat store", error);
-    }
-    void deleteDB(OLD_INDEXED_DB, {
-        blocked: () => log.warn("Waiting for the old chat DB to close"),
-    }).catch((error: unknown) =>
-        log.warn("Failed to remove the old chat DB", error),
-    );
-};
-
 const importOldBrowserStores = async () => {
-    const current = await chatDb();
-    const [sessions, messages] = await Promise.all([
-        current.getAll("sessions"),
-        current.getAll("messages"),
-    ]);
-    if (sessions.length || messages.length) {
-        cleanupOldBrowserStores();
+    if (isLocalChatMigrationDone()) return;
+    if (hasLocalStorageStore()) {
+        await writeBrowserStore(localStorageStore());
+        localStorage.removeItem(LOCAL_STORAGE_STORE);
         return;
     }
 
-    const indexedDbStore = await readOldIndexedDb();
-    const source =
-        indexedDbStore && hasChatData(indexedDbStore)
-            ? indexedDbStore
-            : hasLocalStorageStore()
-              ? localStorageStore()
-              : undefined;
-    if (source && hasChatData(source)) {
+    const source = await readOldIndexedDb();
+    if (source) {
         await writeBrowserStore(source);
+        await deleteDB(OLD_INDEXED_DB, {
+            blocked: () => log.warn("Waiting for the old chat DB to close"),
+        });
     }
-    cleanupOldBrowserStores();
+    localStorage.setItem(MIGRATION_DONE, "1");
 };
 
 const localStorageSourceKey = async (
@@ -405,12 +404,64 @@ const decryptAttachmentWith = async (
     return undefined;
 };
 
+const reencryptAttachment = async (
+    id: string,
+    sessionUuid: string,
+    chatKey: string,
+    candidates: string[],
+) => {
+    const stagingID = `${id}.migrating`;
+    if (await attachmentBytesExists(stagingID)) {
+        const staged = await readAttachmentBytes(stagingID);
+        if (await decryptAttachmentWith(staged, [chatKey], sessionUuid)) {
+            await writeAttachmentBytes(id, staged);
+            await decryptAttachmentBytes(
+                await readAttachmentBytes(id),
+                chatKey,
+                sessionUuid,
+            );
+            await deleteAttachmentBytes(stagingID);
+            return;
+        }
+        await deleteAttachmentBytes(stagingID);
+    }
+    if (!(await attachmentBytesExists(id))) return;
+
+    const decrypted = await decryptAttachmentWith(
+        await readAttachmentBytes(id),
+        candidates,
+        sessionUuid,
+    );
+    if (!decrypted) {
+        log.warn(`No stored key can decrypt attachment ${id}`);
+        return;
+    }
+    const [plaintext, key] = decrypted;
+    if (key === chatKey) return;
+
+    await writeAttachmentBytes(
+        stagingID,
+        await encryptAttachmentBytes(plaintext, chatKey, sessionUuid),
+    );
+    const staged = await readAttachmentBytes(stagingID);
+    await decryptAttachmentBytes(staged, chatKey, sessionUuid);
+    await writeAttachmentBytes(id, staged);
+    await decryptAttachmentBytes(
+        await readAttachmentBytes(id),
+        chatKey,
+        sessionUuid,
+    );
+    await deleteAttachmentBytes(stagingID);
+};
+
 const reencryptAttachments = async (chatKey: string, sourceKeys: string[]) => {
-    const candidates = distinctKeys([
-        ...sourceKeys,
-        await secureStorageGet(LEGACY_ATTACHMENT_SECURE_KEY),
-    ]);
-    let allCurrent = true;
+    const legacyAttachmentKey = await secureStorageGet(
+        LEGACY_ATTACHMENT_SECURE_KEY,
+    ).catch((error: unknown) => {
+        log.warn("Could not read the old attachment key", error);
+        return undefined;
+    });
+    const candidates = distinctKeys([...sourceKeys, legacyAttachmentKey]);
 
     for (const { sessionUuid } of await invokeChat<{ sessionUuid: string }[]>(
         "chat_db_list_sessions",
@@ -421,54 +472,16 @@ const reencryptAttachments = async (chatKey: string, sourceKeys: string[]) => {
                 { sessionUuid },
             )
         ).flatMap(({ attachments }) => attachments ?? [])) {
-            const stagingID = `${id}.migrating`;
-            if (await attachmentBytesExists(stagingID)) {
-                const staged = await readAttachmentBytes(stagingID);
-                if (
-                    await decryptAttachmentWith(staged, [chatKey], sessionUuid)
-                ) {
-                    await writeAttachmentBytes(id, staged);
-                    await decryptAttachmentBytes(
-                        await readAttachmentBytes(id),
-                        chatKey,
-                        sessionUuid,
-                    );
-                    await deleteAttachmentBytes(stagingID);
-                    continue;
-                }
-                await deleteAttachmentBytes(stagingID);
-            }
-            if (!(await attachmentBytesExists(id))) continue;
-
-            const decrypted = await decryptAttachmentWith(
-                await readAttachmentBytes(id),
-                candidates,
+            await reencryptAttachment(
+                id,
                 sessionUuid,
-            );
-            if (!decrypted) {
-                allCurrent = false;
-                log.warn(`No stored key can decrypt attachment ${id}`);
-                continue;
-            }
-            const [plaintext, key] = decrypted;
-            if (key === chatKey) continue;
-
-            await writeAttachmentBytes(
-                stagingID,
-                await encryptAttachmentBytes(plaintext, chatKey, sessionUuid),
-            );
-            const staged = await readAttachmentBytes(stagingID);
-            await decryptAttachmentBytes(staged, chatKey, sessionUuid);
-            await writeAttachmentBytes(id, staged);
-            await decryptAttachmentBytes(
-                await readAttachmentBytes(id),
                 chatKey,
-                sessionUuid,
+                candidates,
+            ).catch((error: unknown) =>
+                log.warn(`Could not migrate attachment ${id}`, error),
             );
-            await deleteAttachmentBytes(stagingID);
         }
     }
-    return allCurrent;
 };
 
 export const openChatStoreWithCompatibility = async (chatKey: string) => {
@@ -483,11 +496,18 @@ export const openChatStoreWithCompatibility = async (chatKey: string) => {
         });
         if (migrationPending) {
             if (hasLocalStorageStore()) {
-                await importLocalStorageToNative(sourceKeys);
+                try {
+                    await importLocalStorageToNative(sourceKeys);
+                } catch (error) {
+                    log.warn(
+                        "Could not import the old local chat store",
+                        error,
+                    );
+                    return;
+                }
             }
-            await finalizeLocalChatMigration(
-                await reencryptAttachments(chatKey, sourceKeys),
-            );
+            await reencryptAttachments(chatKey, sourceKeys);
+            await finalizeLocalChatMigration();
         }
     } else {
         await removeCurrentBrowserTombstones();

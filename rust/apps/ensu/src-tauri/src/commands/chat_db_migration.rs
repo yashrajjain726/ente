@@ -32,7 +32,9 @@ pub(super) fn prepare(
 ) -> Result<(), ApiError> {
     let source_db = root.join(SOURCE_DB);
     if exists(&source_db)? {
-        let source_key = select_source_key(&source_db, &recovery_keys)?;
+        let Ok(source_key) = select_source_key(&source_db, &recovery_keys) else {
+            return Ok(());
+        };
         import(
             &source_db,
             &root.join(SOURCE_ATTACHMENTS),
@@ -42,7 +44,8 @@ pub(super) fn prepare(
             target_key,
         )?;
     }
-    cleanup(root)
+    let _ = cleanup(root);
+    Ok(())
 }
 
 fn select_source_key(path: &Path, keys: &[Vec<u8>]) -> Result<Vec<u8>, ApiError> {
@@ -106,16 +109,14 @@ fn import(
             for attachment in message.attachments {
                 let from = source_attachments.join(&attachment.id);
                 let to = target_attachments.join(&attachment.id);
-                if exists(&from)? && !exists(&to)? {
-                    copy_attachment(&from, &to)?;
+                if from.exists() && !to.exists() {
+                    let _ = copy_attachment(&from, &to);
                 }
             }
         }
     }
-    for session in target.list_sessions().map_err(ApiError::from)? {
-        target.get_messages(session.uuid).map_err(ApiError::from)?;
-    }
-    sync_dir(target_attachments)
+    let _ = sync_dir(target_attachments);
+    Ok(())
 }
 
 fn copy_attachment(source: &Path, target: &Path) -> Result<(), ApiError> {
@@ -241,21 +242,60 @@ mod tests {
     }
 
     #[test]
-    fn failed_key_recovery_preserves_the_source() {
+    fn attachment_io_failure_does_not_block_chat_import() {
+        let source_key = vec![7; 32];
+        let target_key = vec![8; 32];
+        let (root, session, _) = fixture(&source_key);
+        let target_db = root.join("target.db");
+        let target_attachments = root.join("not-a-directory");
+        fs::write(&target_attachments, b"file").unwrap();
+
+        prepare(
+            &root,
+            &target_db,
+            &target_attachments,
+            target_key.clone(),
+            vec![source_key],
+        )
+        .unwrap();
+
+        let target = ChatDb::open_sqlite_with_defaults(target_db, target_key).unwrap();
+        assert_eq!(
+            target.get_messages(session).unwrap()[0].text,
+            "Migrated message"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn failed_key_recovery_preserves_the_source_without_blocking_target() {
         let source_key = vec![10; 32];
         let (root, _, attachment) = fixture(&source_key);
+        let target_key = vec![11; 32];
+        let target_db = root.join("target.db");
         let target_attachments = root.join("target-attachments");
         fs::create_dir(&target_attachments).unwrap();
+        let target = ChatDb::open_sqlite_with_defaults(&target_db, target_key.clone()).unwrap();
+        let target_session = target.create_session("Current chat").unwrap();
+        drop(target);
 
-        assert!(
-            prepare(
-                &root,
-                &root.join("target.db"),
-                &target_attachments,
-                vec![11; 32],
-                vec![vec![12; 32]],
-            )
-            .is_err()
+        prepare(
+            &root,
+            &target_db,
+            &target_attachments,
+            target_key.clone(),
+            vec![vec![12; 32]],
+        )
+        .unwrap();
+
+        let target = ChatDb::open_sqlite_with_defaults(target_db, target_key).unwrap();
+        assert_eq!(
+            target
+                .get_session(target_session.uuid)
+                .unwrap()
+                .unwrap()
+                .title,
+            "Current chat"
         );
         assert!(root.join(SOURCE_DB).exists());
         assert!(root.join(SOURCE_ATTACHMENTS).join(attachment).exists());

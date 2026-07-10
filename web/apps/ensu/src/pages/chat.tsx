@@ -756,27 +756,21 @@ const Page: React.FC = () => {
     );
 
     const refreshLocalChatKey = useCallback(async () => {
-        await initChatKeyStore();
-
-        const cachedLocal = cachedLocalChatKey();
-        if (cachedLocal) {
-            log.info("Using cached local chat key");
-            setChatKey(cachedLocal);
-            return;
-        }
-
         try {
+            await initChatKeyStore();
+            const cachedLocal = cachedLocalChatKey();
+            if (cachedLocal) {
+                log.info("Using cached local chat key");
+                setChatKey(cachedLocal);
+                return;
+            }
             log.info("Generating new local chat key");
             setChatKey(await getOrCreateLocalChatKey());
         } catch (error) {
             log.error("Failed to initialize local chat key", error);
-            showMiniDialog({
-                title: "Encryption error",
-                message:
-                    "We could not initialize encryption. Please refresh the page.",
-            });
+            onGenericError(error);
         }
-    }, [showMiniDialog]);
+    }, [onGenericError]);
 
     useEffect(() => {
         chatKeyInitCancelledRef.current = false;
@@ -812,12 +806,7 @@ const Page: React.FC = () => {
                 if (!cancelled) setIsChatStoreBridgeReady(true);
             } catch (error) {
                 log.error("Failed to initialize chat persistence", error);
-                if (!cancelled)
-                    showMiniDialog({
-                        title: "Chat data unavailable",
-                        message:
-                            "Ensu could not safely open your local chats. Your existing data has not been removed.",
-                    });
+                if (!cancelled) onGenericError(error);
             }
         };
         void run();
@@ -826,7 +815,7 @@ const Page: React.FC = () => {
             cancelled = true;
             setIsChatStoreBridgeReady(false);
         };
-    }, [chatKey, showMiniDialog]);
+    }, [chatKey, onGenericError]);
 
     useEffect(() => {
         isDraftSessionRef.current = isDraftSession;
