@@ -8,7 +8,6 @@ import {
 const LOCAL_STORE = "ensu.chat.store.v1";
 const MIGRATION_DONE = "ensu.chat.localMigration.v3";
 const OLD_LOCAL_SECURE_KEY = "localChatKey";
-const OLD_ATTACHMENT_SECURE_KEY = "legacyAttachmentKey.v2";
 const KEY_FILE = "chat-keys.json";
 
 const localGet = (key: string) => localStorage.getItem(key) ?? undefined;
@@ -38,19 +37,30 @@ const readKeyFile = async () => {
 
 export const isLocalChatMigrationDone = () => localGet(MIGRATION_DONE) === "1";
 
+export interface LocalChatKeyPromotion {
+    key?: string;
+    sourceKeys: string[];
+}
+
 export const promoteLocalChatKey = async (
     current: string | undefined,
     currentSecureKey: string,
     browserKey: string,
-) => {
-    if (isLocalChatMigrationDone()) return current;
+): Promise<LocalChatKeyPromotion> => {
+    if (isLocalChatMigrationDone()) {
+        return { key: current, sourceKeys: current ? [current] : [] };
+    }
     const [oldSecure, file] = await Promise.all([
         secureStorageGet(OLD_LOCAL_SECURE_KEY),
         readKeyFile(),
     ]);
-    const key = current ?? localGet(browserKey) ?? oldSecure ?? file;
+    const sourceKeys = [current, localGet(browserKey), oldSecure, file].filter(
+        (key, index, keys): key is string =>
+            !!key && keys.indexOf(key) === index,
+    );
+    const key = sourceKeys[0];
     if (key && key !== current) await secureStorageSet(currentSecureKey, key);
-    return key;
+    return { key, sourceKeys };
 };
 
 export const hasRetiredLocalChatStore = () => !!localGet(LOCAL_STORE);
@@ -68,13 +78,10 @@ const retiredUserID = () => {
 
 export const finalizeLocalChatMigration = async () => {
     const userID = retiredUserID();
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("chat_db_cleanup_v1");
     localStorage.removeItem(LOCAL_STORE);
     await Promise.all(
         [
             OLD_LOCAL_SECURE_KEY,
-            OLD_ATTACHMENT_SECURE_KEY,
             "masterKey",
             "remoteChatKey",
             ...(userID

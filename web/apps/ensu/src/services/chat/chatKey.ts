@@ -7,6 +7,7 @@ const LOCAL_KEY = "ensu.chatKey.local";
 const CURRENT_SECURE_KEY = "localChatKey.v2";
 
 let _localKey: string | undefined;
+let _migrationSourceKeys: string[] = [];
 let _initPromise: Promise<void> | undefined;
 
 const localGet = (key: string) =>
@@ -20,11 +21,13 @@ export const initChatKeyStore = async () => {
 
     _initPromise = (async () => {
         const current = await secureStorageGet(CURRENT_SECURE_KEY);
-        _localKey = await promoteLocalChatKey(
+        const promotion = await promoteLocalChatKey(
             current,
             CURRENT_SECURE_KEY,
             LOCAL_KEY,
         );
+        _localKey = promotion.key;
+        _migrationSourceKeys = promotion.sourceKeys;
     })().catch((error: unknown) => {
         _initPromise = undefined;
         throw error;
@@ -34,6 +37,8 @@ export const initChatKeyStore = async () => {
 
 export const cachedLocalChatKey = () =>
     isTauriRuntime() ? _localKey : localGet(LOCAL_KEY);
+
+export const localChatMigrationSourceKeys = () => _migrationSourceKeys;
 
 const persistLocalKey = async (key: string) => {
     if (isTauriRuntime()) {

@@ -1,5 +1,5 @@
-use std::fs::{self, File};
-use std::path::{Path, PathBuf};
+use std::fs;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use ente_core::crypto;
@@ -9,6 +9,7 @@ use tauri::async_runtime;
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
+use crate::commands::chat_db_migration;
 use crate::commands::common::{ApiError, app_data_dir};
 use crate::logging;
 
@@ -18,15 +19,11 @@ pub struct ChatDbState {
 }
 
 struct ChatDbHolder {
-    key_b64: String,
     db: Arc<ChatDb<SqliteBackend>>,
 }
 
 const CHAT_DB_FILE_NAME: &str = "ensu_llmchat_v2.db";
 const ATTACHMENTS_DIR_NAME: &str = "ensu_llmchat_attachments_v2";
-const V1_CHAT_DB_FILE_NAME: &str = "ensu_llmchat.db";
-const V1_ATTACHMENTS_DB_FILE_NAME: &str = "llmchat_sync.db";
-const V1_ATTACHMENTS_DIR_NAME: &str = "ensu_llmchat_attachments";
 
 fn chat_db_thread_error() -> ApiError {
     ApiError::new("db_thread", "Chat DB task failed")
@@ -228,17 +225,16 @@ pub struct ChatMessageUpsertInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ChatDbImportV1Input {
+pub struct ChatDbOpenInput {
     key_b64: String,
+    recovery_keys_b64: Vec<String>,
 }
 
 #[tauri::command]
 pub async fn chat_db_list_sessions(
     state: State<'_, ChatDbState>,
-    app: AppHandle,
-    key_b64: String,
 ) -> Result<Vec<ChatSessionDto>, ApiError> {
-    with_chat_db_async(&state, app, key_b64, |db| {
+    with_chat_db_async(&state, |db| {
         Ok(db
             .list_sessions()?
             .into_iter()
@@ -251,10 +247,8 @@ pub async fn chat_db_list_sessions(
 #[tauri::command]
 pub async fn chat_db_list_sessions_with_preview(
     state: State<'_, ChatDbState>,
-    app: AppHandle,
-    key_b64: String,
 ) -> Result<Vec<ChatSessionPreviewDto>, ApiError> {
-    with_chat_db_async(&state, app, key_b64, |db| {
+    with_chat_db_async(&state, |db| {
         Ok(db
             .list_sessions_with_preview()?
             .into_iter()
@@ -267,12 +261,10 @@ pub async fn chat_db_list_sessions_with_preview(
 #[tauri::command]
 pub async fn chat_db_get_session(
     state: State<'_, ChatDbState>,
-    app: AppHandle,
-    key_b64: String,
     session_uuid: String,
 ) -> Result<Option<ChatSessionDto>, ApiError> {
     let uuid = parse_uuid(&session_uuid)?;
-    with_chat_db_async(&state, app, key_b64, move |db| {
+    with_chat_db_async(&state, move |db| {
         Ok(db.get_session(uuid)?.map(ChatSessionDto::from))
     })
     .await
@@ -281,11 +273,9 @@ pub async fn chat_db_get_session(
 #[tauri::command]
 pub async fn chat_db_create_session(
     state: State<'_, ChatDbState>,
-    app: AppHandle,
-    key_b64: String,
     title: String,
 ) -> Result<ChatSessionDto, ApiError> {
-    with_chat_db_async(&state, app, key_b64, move |db| {
+    with_chat_db_async(&state, move |db| {
         Ok(ChatSessionDto::from(db.create_session(&title)?))
     })
     .await
@@ -294,38 +284,29 @@ pub async fn chat_db_create_session(
 #[tauri::command]
 pub async fn chat_db_update_session_title(
     state: State<'_, ChatDbState>,
-    app: AppHandle,
-    key_b64: String,
     session_uuid: String,
     title: String,
 ) -> Result<(), ApiError> {
     let uuid = parse_uuid(&session_uuid)?;
-    with_chat_db_async(&state, app, key_b64, move |db| {
-        db.update_session_title(uuid, &title)
-    })
-    .await
+    with_chat_db_async(&state, move |db| db.update_session_title(uuid, &title)).await
 }
 
 #[tauri::command]
 pub async fn chat_db_delete_session(
     state: State<'_, ChatDbState>,
-    app: AppHandle,
-    key_b64: String,
     session_uuid: String,
 ) -> Result<Vec<String>, ApiError> {
     let uuid = parse_uuid(&session_uuid)?;
-    with_chat_db_async(&state, app, key_b64, move |db| db.delete_session(uuid)).await
+    with_chat_db_async(&state, move |db| db.delete_session(uuid)).await
 }
 
 #[tauri::command]
 pub async fn chat_db_get_messages(
     state: State<'_, ChatDbState>,
-    app: AppHandle,
-    key_b64: String,
     session_uuid: String,
 ) -> Result<Vec<ChatMessageDto>, ApiError> {
     let uuid = parse_uuid(&session_uuid)?;
-    with_chat_db_async(&state, app, key_b64, move |db| {
+    with_chat_db_async(&state, move |db| {
         Ok(db
             .get_messages(uuid)?
             .into_iter()
@@ -338,15 +319,13 @@ pub async fn chat_db_get_messages(
 #[tauri::command]
 pub async fn chat_db_insert_message(
     state: State<'_, ChatDbState>,
-    app: AppHandle,
-    key_b64: String,
     input: ChatMessageInsertInput,
 ) -> Result<ChatMessageDto, ApiError> {
     let session_uuid = parse_uuid(&input.session_uuid)?;
     let parent = optional_uuid(&input.parent_message_uuid)?;
     let sender = normalize_sender(&input.sender)?;
     let attachments = convert_attachments(input.attachments)?;
-    with_chat_db_async(&state, app, key_b64, move |db| {
+    with_chat_db_async(&state, move |db| {
         Ok(ChatMessageDto::from(db.insert_message(
             session_uuid,
             sender,
@@ -361,27 +340,20 @@ pub async fn chat_db_insert_message(
 #[tauri::command]
 pub async fn chat_db_update_message_text(
     state: State<'_, ChatDbState>,
-    app: AppHandle,
-    key_b64: String,
     message_uuid: String,
     text: String,
 ) -> Result<(), ApiError> {
     let uuid = parse_uuid(&message_uuid)?;
-    with_chat_db_async(&state, app, key_b64, move |db| {
-        db.update_message_text(uuid, &text)
-    })
-    .await
+    with_chat_db_async(&state, move |db| db.update_message_text(uuid, &text)).await
 }
 
 #[tauri::command]
 pub async fn chat_db_upsert_session(
     state: State<'_, ChatDbState>,
-    app: AppHandle,
-    key_b64: String,
     input: ChatSessionUpsertInput,
 ) -> Result<ChatSessionDto, ApiError> {
     let uuid = parse_uuid(&input.session_uuid)?;
-    with_chat_db_async(&state, app, key_b64, move |db| {
+    with_chat_db_async(&state, move |db| {
         Ok(ChatSessionDto::from(db.upsert_session(
             uuid,
             &input.title,
@@ -395,8 +367,6 @@ pub async fn chat_db_upsert_session(
 #[tauri::command]
 pub async fn chat_db_insert_message_with_uuid(
     state: State<'_, ChatDbState>,
-    app: AppHandle,
-    key_b64: String,
     input: ChatMessageUpsertInput,
 ) -> Result<ChatMessageDto, ApiError> {
     let message_uuid = parse_uuid(&input.message_uuid)?;
@@ -404,7 +374,7 @@ pub async fn chat_db_insert_message_with_uuid(
     let parent = optional_uuid(&input.parent_message_uuid)?;
     let sender = normalize_sender(&input.sender)?;
     let attachments = convert_attachments(input.attachments)?;
-    with_chat_db_async(&state, app, key_b64, move |db| {
+    with_chat_db_async(&state, move |db| {
         Ok(ChatMessageDto::from(db.insert_message_with_uuid(
             message_uuid,
             session_uuid,
@@ -419,43 +389,52 @@ pub async fn chat_db_insert_message_with_uuid(
 }
 
 #[tauri::command]
-pub async fn chat_db_import_v1(app: AppHandle, input: ChatDbImportV1Input) -> Result<(), ApiError> {
-    async_runtime::spawn_blocking(move || import_v1_chat_db(&app, &input))
-        .await
-        .map_err(|_| chat_db_thread_error())?
-}
-
-#[tauri::command]
-pub fn chat_db_cleanup_v1(app: AppHandle) -> Result<(), ApiError> {
-    cleanup_v1_chat_artifacts(&app)
+pub async fn chat_db_open(
+    state: State<'_, ChatDbState>,
+    app: AppHandle,
+    input: ChatDbOpenInput,
+) -> Result<(), ApiError> {
+    let inner = state.inner.clone();
+    async_runtime::spawn_blocking(move || {
+        let root = app_data_dir(&app)?;
+        let path = chat_db_path(&app)?;
+        let attachments = attachments_dir_path(&app)?;
+        let key = crypto::decode_b64(&input.key_b64).map_err(ApiError::from)?;
+        let recovery_keys = input
+            .recovery_keys_b64
+            .iter()
+            .filter_map(|value| crypto::decode_b64(value).ok())
+            .collect::<Vec<_>>();
+        chat_db_migration::prepare(&root, &path, &attachments, key.clone(), recovery_keys)?;
+        open_chat_db(&inner, path, key)
+    })
+    .await
+    .map_err(|_| chat_db_thread_error())?
 }
 
 #[tauri::command]
 pub fn chat_db_has_existing_store(app: AppHandle) -> Result<bool, ApiError> {
     let root = app_data_dir(&app)?;
-    for name in [CHAT_DB_FILE_NAME, V1_CHAT_DB_FILE_NAME] {
-        if root
-            .join(name)
-            .try_exists()
-            .map_err(|error| ApiError::new("io", error.to_string()))?
-        {
-            return Ok(true);
-        }
+    if root
+        .join(CHAT_DB_FILE_NAME)
+        .try_exists()
+        .map_err(|error| ApiError::new("io", error.to_string()))?
+        || chat_db_migration::has_store(&root)?
+    {
+        return Ok(true);
     }
-    for name in [ATTACHMENTS_DIR_NAME, V1_ATTACHMENTS_DIR_NAME] {
-        let path = root.join(name);
-        if path
-            .try_exists()
+    let attachments = root.join(ATTACHMENTS_DIR_NAME);
+    if attachments
+        .try_exists()
+        .map_err(|error| ApiError::new("io", error.to_string()))?
+        && fs::read_dir(attachments)
             .map_err(|error| ApiError::new("io", error.to_string()))?
-            && fs::read_dir(path)
-                .map_err(|error| ApiError::new("io", error.to_string()))?
-                .next()
-                .transpose()
-                .map_err(|error| ApiError::new("io", error.to_string()))?
-                .is_some()
-        {
-            return Ok(true);
-        }
+            .next()
+            .transpose()
+            .map_err(|error| ApiError::new("io", error.to_string()))?
+            .is_some()
+    {
+        return Ok(true);
     }
     Ok(false)
 }
@@ -512,292 +491,46 @@ fn attachments_dir_path(app: &AppHandle) -> Result<PathBuf, ApiError> {
     Ok(path)
 }
 
-fn v1_chat_db_path(app: &AppHandle) -> Result<PathBuf, ApiError> {
-    Ok(app_data_dir(app)?.join(V1_CHAT_DB_FILE_NAME))
-}
-
-fn v1_attachments_db_path(app: &AppHandle) -> Result<PathBuf, ApiError> {
-    Ok(app_data_dir(app)?.join(V1_ATTACHMENTS_DB_FILE_NAME))
-}
-
-fn v1_attachments_dir_path(app: &AppHandle) -> Result<PathBuf, ApiError> {
-    Ok(app_data_dir(app)?.join(V1_ATTACHMENTS_DIR_NAME))
-}
-
-fn remove_sqlite_files(path: &Path) -> Result<(), ApiError> {
-    for candidate in [
-        path.to_path_buf(),
-        PathBuf::from(format!("{}-wal", path.display())),
-        PathBuf::from(format!("{}-shm", path.display())),
-    ] {
-        if candidate
-            .try_exists()
-            .map_err(|error| ApiError::new("io", error.to_string()))?
-        {
-            fs::remove_file(candidate).map_err(|error| ApiError::new("io", error.to_string()))?;
-        }
-    }
-    Ok(())
-}
-
-fn cleanup_v1_chat_artifacts(app: &AppHandle) -> Result<(), ApiError> {
-    remove_sqlite_files(&v1_chat_db_path(app)?)?;
-    remove_sqlite_files(&v1_attachments_db_path(app)?)?;
-    let attachments_dir = v1_attachments_dir_path(app)?;
-    if attachments_dir
-        .try_exists()
-        .map_err(|error| ApiError::new("io", error.to_string()))?
-    {
-        fs::remove_dir_all(attachments_dir)
-            .map_err(|error| ApiError::new("io", error.to_string()))?;
-    }
-    Ok(())
-}
-
-fn copy_v1_attachment(source: &Path, destination: &Path) -> Result<(), ApiError> {
-    if destination
-        .try_exists()
-        .map_err(|error| ApiError::new("io", error.to_string()))?
-    {
-        return Ok(());
-    }
-    let temporary = destination.with_extension("migrating");
-    fs::copy(source, &temporary).map_err(|error| ApiError::new("io", error.to_string()))?;
-    File::open(&temporary)
-        .and_then(|file| file.sync_all())
-        .map_err(|error| ApiError::new("io", error.to_string()))?;
-    fs::rename(temporary, destination).map_err(|error| ApiError::new("io", error.to_string()))
-}
-
-#[cfg(unix)]
-fn sync_dir(path: &Path) -> Result<(), ApiError> {
-    File::open(path)
-        .and_then(|file| file.sync_all())
-        .map_err(|error| ApiError::new("io", error.to_string()))
-}
-
-#[cfg(not(unix))]
-fn sync_dir(_path: &Path) -> Result<(), ApiError> {
-    Ok(())
-}
-
-fn import_v1_chat_db(app: &AppHandle, input: &ChatDbImportV1Input) -> Result<(), ApiError> {
-    let v1_db_path = v1_chat_db_path(app)?;
-    if !v1_db_path
-        .try_exists()
-        .map_err(|error| ApiError::new("io", error.to_string()))?
-    {
-        return Ok(());
-    }
-
-    let key = crypto::decode_b64(&input.key_b64).map_err(ApiError::from)?;
-    import_v1_chat_db_paths(
-        &v1_db_path,
-        &v1_attachments_dir_path(app)?,
-        &chat_db_path(app)?,
-        &attachments_dir_path(app)?,
-        key,
-    )
-}
-
-fn import_v1_chat_db_paths(
-    v1_db_path: &Path,
-    v1_attachments_dir: &Path,
-    target_db_path: &Path,
-    target_attachments_dir: &Path,
+fn open_chat_db(
+    inner: &Arc<Mutex<Option<ChatDbHolder>>>,
+    path: PathBuf,
     key: Vec<u8>,
 ) -> Result<(), ApiError> {
-    let v1_db =
-        ChatDb::open_sqlite_with_defaults(&v1_db_path, key.clone()).map_err(ApiError::from)?;
-    let target = ChatDb::open_sqlite_with_defaults(target_db_path, key).map_err(ApiError::from)?;
-
-    for session in v1_db.list_sessions().map_err(ApiError::from)? {
-        target
-            .upsert_session(
-                session.uuid,
-                &session.title,
-                session.created_at,
-                session.updated_at,
-            )
-            .map_err(ApiError::from)?;
-
-        for message in v1_db.get_messages(session.uuid).map_err(ApiError::from)? {
-            target
-                .insert_message_with_uuid(
-                    message.uuid,
-                    message.session_uuid,
-                    message.sender.as_str(),
-                    &message.text,
-                    message.parent_message_uuid,
-                    message.attachments.clone(),
-                    message.created_at,
-                )
-                .map_err(ApiError::from)?;
-
-            for attachment in message.attachments {
-                let source = v1_attachments_dir.join(&attachment.id);
-                let destination = target_attachments_dir.join(&attachment.id);
-                if source
-                    .try_exists()
-                    .map_err(|error| ApiError::new("io", error.to_string()))?
-                {
-                    copy_v1_attachment(&source, &destination)?;
-                }
-            }
-        }
-    }
-    sync_dir(&target_attachments_dir)?;
+    logging::log("ChatDb", format!("opening chat DB db={}", path.display()));
+    let db = ChatDb::open_sqlite_with_defaults(path, key).map_err(|error| {
+        logging::log("ChatDb", format!("failed to open chat DB error={error}"));
+        ApiError::from(error)
+    })?;
+    db.list_sessions().map_err(ApiError::from)?;
+    *inner
+        .lock()
+        .map_err(|_| ApiError::new("lock", "Failed to lock chat DB state"))? =
+        Some(ChatDbHolder { db: Arc::new(db) });
+    logging::log("ChatDb", "chat DB opened");
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use ente_ensu::db::{AttachmentKind, AttachmentMeta};
-
-    fn migration_fixture() -> PathBuf {
-        let root = std::env::temp_dir().join(format!("ensu-import-{}", Uuid::new_v4()));
-        fs::create_dir_all(root.join("source-attachments")).unwrap();
-        fs::create_dir_all(root.join("target-attachments")).unwrap();
-        root
-    }
-
-    fn seed_source(root: &Path, key: &[u8]) -> (Uuid, String) {
-        let source =
-            ChatDb::open_sqlite_with_defaults(root.join("source.db"), key.to_vec()).unwrap();
-        let session = source.create_session("Migrated chat").unwrap();
-        let attachment_id = Uuid::new_v4().to_string();
-        source
-            .insert_message(
-                session.uuid,
-                "self",
-                "Migrated message",
-                None,
-                vec![AttachmentMeta {
-                    id: attachment_id.clone(),
-                    kind: AttachmentKind::Document,
-                    size: 7,
-                    name: "note.txt".to_string(),
-                }],
-            )
-            .unwrap();
-        fs::write(
-            root.join("source-attachments").join(&attachment_id),
-            b"payload",
-        )
-        .unwrap();
-        (session.uuid, attachment_id)
-    }
-
-    fn import_fixture(root: &Path, key: Vec<u8>) -> Result<(), ApiError> {
-        import_v1_chat_db_paths(
-            &root.join("source.db"),
-            &root.join("source-attachments"),
-            &root.join("target.db"),
-            &root.join("target-attachments"),
-            key,
-        )
-    }
-
-    #[test]
-    fn v1_import_is_restart_safe() {
-        let root = migration_fixture();
-        let key = vec![7; 32];
-        let (session_id, attachment_id) = seed_source(&root, &key);
-
-        import_fixture(&root, key.clone()).unwrap();
-        import_fixture(&root, key.clone()).unwrap();
-
-        let target = ChatDb::open_sqlite_with_defaults(root.join("target.db"), key).unwrap();
-        assert_eq!(target.list_sessions().unwrap()[0].title, "Migrated chat");
-        let messages = target.get_messages(session_id).unwrap();
-        assert_eq!(messages.len(), 1);
-        assert_eq!(messages[0].text, "Migrated message");
-        assert_eq!(messages[0].attachments[0].name, "note.txt");
-        assert_eq!(
-            fs::read(root.join("target-attachments").join(attachment_id)).unwrap(),
-            b"payload"
-        );
-        assert!(root.join("source.db").exists());
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn v1_import_recovers_after_wrong_key() {
-        let root = migration_fixture();
-        let key = vec![8; 32];
-        let (session_id, attachment_id) = seed_source(&root, &key);
-
-        assert!(import_fixture(&root, vec![9; 32]).is_err());
-        assert!(root.join("source.db").exists());
-        assert!(
-            root.join("source-attachments")
-                .join(&attachment_id)
-                .exists()
-        );
-
-        import_fixture(&root, key.clone()).unwrap();
-        let target = ChatDb::open_sqlite_with_defaults(root.join("target.db"), key).unwrap();
-        assert_eq!(target.get_messages(session_id).unwrap().len(), 1);
-        fs::remove_dir_all(root).unwrap();
-    }
-}
-
-fn with_chat_db<T, F>(
-    inner: &Arc<Mutex<Option<ChatDbHolder>>>,
-    app: &AppHandle,
-    key_b64: &str,
-    operation: F,
-) -> Result<T, ApiError>
+fn with_chat_db<T, F>(inner: &Arc<Mutex<Option<ChatDbHolder>>>, operation: F) -> Result<T, ApiError>
 where
     F: FnOnce(&ChatDb<SqliteBackend>) -> Result<T, DbError>,
 {
-    let db = {
-        let mut guard = inner
-            .lock()
-            .map_err(|_| ApiError::new("lock", "Failed to lock chat DB state"))?;
-        let needs_open = guard
-            .as_ref()
-            .map(|holder| holder.key_b64 != key_b64)
-            .unwrap_or(true);
-
-        if needs_open {
-            let key = crypto::decode_b64(key_b64).map_err(ApiError::from)?;
-            let path = chat_db_path(app)?;
-            logging::log("ChatDb", format!("opening chat DB db={}", path.display()));
-            let db = ChatDb::open_sqlite_with_defaults(path, key).map_err(|error| {
-                logging::log("ChatDb", format!("failed to open chat DB error={error}"));
-                ApiError::from(error)
-            })?;
-            *guard = Some(ChatDbHolder {
-                key_b64: key_b64.to_string(),
-                db: Arc::new(db),
-            });
-            logging::log("ChatDb", "chat DB opened");
-        }
-
-        guard
-            .as_ref()
-            .ok_or_else(|| ApiError::new("db", "Chat DB not initialized"))?
-            .db
-            .clone()
-    };
-
+    let db = inner
+        .lock()
+        .map_err(|_| ApiError::new("lock", "Failed to lock chat DB state"))?
+        .as_ref()
+        .ok_or_else(|| ApiError::new("db", "Chat DB not initialized"))?
+        .db
+        .clone();
     operation(db.as_ref()).map_err(ApiError::from)
 }
 
-async fn with_chat_db_async<T, F>(
-    state: &ChatDbState,
-    app: AppHandle,
-    key_b64: String,
-    operation: F,
-) -> Result<T, ApiError>
+async fn with_chat_db_async<T, F>(state: &ChatDbState, operation: F) -> Result<T, ApiError>
 where
     T: Send + 'static,
     F: FnOnce(&ChatDb<SqliteBackend>) -> Result<T, DbError> + Send + 'static,
 {
     let inner = state.inner.clone();
-    async_runtime::spawn_blocking(move || with_chat_db(&inner, &app, &key_b64, operation))
+    async_runtime::spawn_blocking(move || with_chat_db(&inner, operation))
         .await
         .map_err(|_| chat_db_thread_error())?
 }

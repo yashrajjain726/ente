@@ -2,20 +2,18 @@ import { base64ToBytes } from "@/services/base64";
 import { isTauriRuntime } from "@/services/tauri-runtime";
 import log from "ente-base/log";
 import { deleteDB, openDB, type DBSchema } from "idb";
-import { decryptAttachmentBytes } from "./attachments";
+import { localChatMigrationSourceKeys } from "./chatKey";
 import {
     finalizeLocalChatMigration,
     isLocalChatMigrationDone,
 } from "./keyMigration";
 import {
-    attachmentBytesExists,
     chatDb,
     decryptMessageTextStrict,
     decryptSessionTitleStrict,
     deserializeAttachmentsStrict,
     invokeChat,
     pruneOrphanedAttachmentBytes,
-    readAttachmentBytes,
     writeAttachmentBytes,
     type StoredAttachment,
     type StoredMessage,
@@ -200,16 +198,35 @@ const importOldBrowserStores = async () => {
     cleanupOldBrowserStores();
 };
 
-const importLocalStorageToNative = async (chatKey: string) => {
+const localStorageSourceKey = async (
+    source: BrowserStore,
+    sourceKeys: string[],
+) => {
+    for (const key of sourceKeys) {
+        try {
+            if (source.sessions[0]) {
+                await decryptSessionTitleStrict(source.sessions[0], key);
+            } else if (source.messages[0]) {
+                await decryptMessageTextStrict(source.messages[0], key);
+            }
+            return key;
+        } catch {
+            // Try the next migration-only key.
+        }
+    }
+    throw new Error("No stored key could decrypt the old local chat store");
+};
+
+const importLocalStorageToNative = async (sourceKeys: string[]) => {
     const source = localStorageStore();
+    const sourceKey = await localStorageSourceKey(source, sourceKeys);
     for (const session of source.sessions.sort(
         (left, right) => left.createdAt - right.createdAt,
     )) {
         await invokeChat("chat_db_upsert_session", {
-            keyB64: chatKey,
             input: {
                 sessionUuid: session.sessionUuid,
-                title: await decryptSessionTitleStrict(session, chatKey),
+                title: await decryptSessionTitleStrict(session, sourceKey),
                 createdAt: session.createdAt,
                 updatedAt: session.updatedAt,
             },
@@ -220,16 +237,15 @@ const importLocalStorageToNative = async (chatKey: string) => {
     )) {
         const attachments = await deserializeAttachmentsStrict(
             message.attachments,
-            chatKey,
+            sourceKey,
         );
         await invokeChat("chat_db_insert_message_with_uuid", {
-            keyB64: chatKey,
             input: {
                 messageUuid: message.messageUuid,
                 sessionUuid: message.sessionUuid,
                 parentMessageUuid: message.parentMessageUuid ?? null,
                 sender: message.sender,
-                text: await decryptMessageTextStrict(message, chatKey),
+                text: await decryptMessageTextStrict(message, sourceKey),
                 createdAt: message.createdAt,
                 attachments: attachments.map(({ id, kind, name, size }) => ({
                     id,
@@ -245,41 +261,26 @@ const importLocalStorageToNative = async (chatKey: string) => {
     }
 };
 
-const verifyNativeAttachments = async (chatKey: string) => {
-    const sessions = await invokeChat<{ sessionUuid: string }[]>(
-        "chat_db_list_sessions",
-        { keyB64: chatKey },
+const distinctKeys = (keys: (string | undefined)[]) =>
+    keys.filter(
+        (key, index, values): key is string =>
+            !!key && values.indexOf(key) === index,
     );
-    const seen = new Set<string>();
-    for (const { sessionUuid } of sessions) {
-        const messages = await invokeChat<{ attachments?: { id: string }[] }[]>(
-            "chat_db_get_messages",
-            { keyB64: chatKey, sessionUuid },
-        );
-        for (const { id } of messages.flatMap(
-            ({ attachments }) => attachments ?? [],
-        )) {
-            if (seen.has(id) || !(await attachmentBytesExists(id))) continue;
-            seen.add(id);
-            await decryptAttachmentBytes(
-                await readAttachmentBytes(id),
-                chatKey,
-                sessionUuid,
-            );
-        }
-    }
-};
 
 const migrate = async (chatKey: string) => {
     if (isTauriRuntime()) {
-        if (!isLocalChatMigrationDone()) {
-            await invokeChat("chat_db_import_v1", {
-                input: { keyB64: chatKey },
-            });
+        const migrationPending = !isLocalChatMigrationDone();
+        const sourceKeys = distinctKeys([
+            chatKey,
+            ...(migrationPending ? localChatMigrationSourceKeys() : []),
+        ]);
+        await invokeChat("chat_db_open", {
+            input: { keyB64: chatKey, recoveryKeysB64: sourceKeys },
+        });
+        if (migrationPending) {
             if (hasLocalStorageStore()) {
-                await importLocalStorageToNative(chatKey);
+                await importLocalStorageToNative(sourceKeys);
             }
-            await verifyNativeAttachments(chatKey);
             await finalizeLocalChatMigration();
         }
     } else {
@@ -287,7 +288,7 @@ const migrate = async (chatKey: string) => {
         await importOldBrowserStores();
     }
     try {
-        await pruneOrphanedAttachmentBytes(chatKey);
+        await pruneOrphanedAttachmentBytes();
     } catch (error) {
         log.warn("Failed to prune orphaned attachment payloads", error);
     }

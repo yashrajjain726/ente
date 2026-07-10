@@ -367,17 +367,16 @@ export const deserializeAttachmentsStrict = async (
         })),
     );
 
-export const pruneOrphanedAttachmentBytes = async (chatKey: string) => {
+export const pruneOrphanedAttachmentBytes = async () => {
     if (isTauriRuntime()) {
         const sessions = await invokeChat<NativeSession[]>(
             "chat_db_list_sessions",
-            { keyB64: chatKey },
         );
         const referenced = new Set<string>();
         for (const session of sessions) {
             const messages = await invokeChat<NativeMessage[]>(
                 "chat_db_get_messages",
-                { keyB64: chatKey, sessionUuid: session.sessionUuid },
+                { sessionUuid: session.sessionUuid },
             );
             for (const attachment of messages.flatMap(
                 ({ attachments }) => attachments ?? [],
@@ -436,10 +435,9 @@ export const invokeChat = async <T>(
     return invoke<T>(command, args);
 };
 
-const listSessionsNative = async (chatKey: string): Promise<ChatSession[]> => {
+const listSessionsNative = async (): Promise<ChatSession[]> => {
     const sessions = await invokeChat<NativeSession[]>(
         "chat_db_list_sessions_with_preview",
-        { keyB64: chatKey },
     );
 
     return sessions.map((session) => ({
@@ -455,10 +453,8 @@ const listSessionsNative = async (chatKey: string): Promise<ChatSession[]> => {
 
 const listMessagesNative = async (
     sessionUuid: string,
-    chatKey: string,
 ): Promise<ChatMessage[]> => {
     const messages = await invokeChat<NativeMessage[]>("chat_db_get_messages", {
-        keyB64: chatKey,
         sessionUuid,
     });
 
@@ -478,36 +474,25 @@ const listMessagesNative = async (
     }));
 };
 
-const createSessionNative = async (chatKey: string) => {
+const createSessionNative = async () => {
     const session = await invokeChat<NativeSession>("chat_db_create_session", {
-        keyB64: chatKey,
         title: "New chat",
     });
     return session.sessionUuid;
 };
 
-const updateSessionTitleNative = async (
-    chatKey: string,
-    sessionUuid: string,
-    title: string,
-) => {
-    await invokeChat("chat_db_update_session_title", {
-        keyB64: chatKey,
-        sessionUuid,
-        title,
-    });
+const updateSessionTitleNative = async (sessionUuid: string, title: string) => {
+    await invokeChat("chat_db_update_session_title", { sessionUuid, title });
 };
 
 const addMessageNative = async (
     sessionUuid: string,
     sender: "self" | "assistant",
     text: string,
-    chatKey: string,
     parentMessageUuid?: string,
     attachments: ChatAttachment[] = [],
 ): Promise<ChatMessage> => {
     const message = await invokeChat<NativeMessage>("chat_db_insert_message", {
-        keyB64: chatKey,
         input: {
             sessionUuid,
             sender,
@@ -526,14 +511,14 @@ const addMessageNative = async (
         try {
             const session = await invokeChat<NativeSession | null>(
                 "chat_db_get_session",
-                { keyB64: chatKey, sessionUuid },
+                { sessionUuid },
             );
             if (
                 session &&
                 safeTitle(session.title).toLowerCase() === "new chat"
             ) {
                 const title = sessionTitleFromText(text, "New chat");
-                await updateSessionTitleNative(chatKey, sessionUuid, title);
+                await updateSessionTitleNative(sessionUuid, title);
             }
         } catch (error) {
             log.error("Failed to update native session title", error);
@@ -556,21 +541,12 @@ const addMessageNative = async (
     };
 };
 
-const updateMessageNative = async (
-    messageUuid: string,
-    text: string,
-    chatKey: string,
-) => {
-    await invokeChat("chat_db_update_message_text", {
-        keyB64: chatKey,
-        messageUuid,
-        text,
-    });
+const updateMessageNative = async (messageUuid: string, text: string) => {
+    await invokeChat("chat_db_update_message_text", { messageUuid, text });
 };
 
-const deleteSessionNative = async (sessionUuid: string, chatKey: string) => {
+const deleteSessionNative = async (sessionUuid: string) => {
     const attachmentIds = await invokeChat<string[]>("chat_db_delete_session", {
-        keyB64: chatKey,
         sessionUuid,
     });
     for (const id of attachmentIds) {
@@ -585,7 +561,7 @@ const deleteSessionNative = async (sessionUuid: string, chatKey: string) => {
 export const listSessions = async (chatKey: string): Promise<ChatSession[]> => {
     if (isTauriRuntime()) {
         try {
-            return await listSessionsNative(chatKey);
+            return await listSessionsNative();
         } catch (error) {
             log.error(
                 `Failed to list native sessions: ${formatLogError(error)}`,
@@ -643,7 +619,7 @@ export const listMessages = async (
 ): Promise<ChatMessage[]> => {
     if (isTauriRuntime()) {
         try {
-            return await listMessagesNative(sessionUuid, chatKey);
+            return await listMessagesNative(sessionUuid);
         } catch (error) {
             log.error(
                 `Failed to list native messages: ${formatLogError(error)}`,
@@ -680,7 +656,7 @@ export const listMessages = async (
 
 export const createSession = async (chatKey: string) => {
     if (isTauriRuntime()) {
-        return createSessionNative(chatKey);
+        return createSessionNative();
     }
 
     const db = await chatDb();
@@ -714,7 +690,6 @@ export const addMessage = async (
             sessionUuid,
             sender,
             text,
-            chatKey,
             parentMessageUuid,
             attachments,
         );
@@ -776,7 +751,7 @@ export const updateSessionTitle = async (
 ) => {
     const safe = sessionTitleFromText(title, "New chat");
     if (isTauriRuntime()) {
-        await updateSessionTitleNative(chatKey, sessionUuid, safe);
+        await updateSessionTitleNative(sessionUuid, safe);
         return;
     }
 
@@ -797,7 +772,7 @@ export const updateMessage = async (
     chatKey: string,
 ) => {
     if (isTauriRuntime()) {
-        await updateMessageNative(messageUuid, text, chatKey);
+        await updateMessageNative(messageUuid, text);
         return;
     }
 
@@ -853,9 +828,9 @@ export const setBranchSelection = async (
 export const deleteBranchSelections = (rootSessionUuid: string) =>
     removeKV(branchSelectionsKey(rootSessionUuid));
 
-export const deleteSession = async (sessionUuid: string, chatKey: string) => {
+export const deleteSession = async (sessionUuid: string) => {
     if (isTauriRuntime()) {
-        await deleteSessionNative(sessionUuid, chatKey);
+        await deleteSessionNative(sessionUuid);
         await deleteBranchSelections(sessionUuid);
         return;
     }
@@ -920,8 +895,7 @@ export const writeAttachmentBytes = async (
 ) => {
     if (isTauriRuntime()) {
         const { writeFile } = await import("@tauri-apps/plugin-fs");
-        const path = await attachmentPath(id);
-        await writeFile(path, data);
+        await writeFile(await attachmentPath(id), data);
         return;
     }
 

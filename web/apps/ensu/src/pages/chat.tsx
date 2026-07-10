@@ -2314,7 +2314,7 @@ const Page: React.FC = () => {
                 lastGenerationRef.current = null;
             }
 
-            await deleteSession(sessionId, chatKey);
+            await deleteSession(sessionId);
             removeSessionFromState(sessionId);
         },
         [chatKey, removeSessionFromState],
