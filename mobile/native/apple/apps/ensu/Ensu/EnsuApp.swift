@@ -6,7 +6,6 @@ struct EnsuApp: App {
 
     init() {
         EnsuLogging.shared.start()
-        LegacyDataCleanup.run()
     }
 
     var body: some Scene {

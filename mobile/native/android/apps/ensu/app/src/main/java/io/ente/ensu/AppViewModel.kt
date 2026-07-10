@@ -15,10 +15,8 @@ import io.ente.ensu.config.loadConfigDefaults
 import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.storage.CredentialStore
-import io.ente.ensu.storage.LegacyDataCleanup
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.AppStore
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
@@ -56,10 +54,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         val launchMessage = "App launched app=$appVersion device=${Build.MANUFACTURER} ${Build.MODEL} os=${Build.VERSION.RELEASE} (sdk=${Build.VERSION.SDK_INT})"
         logRepository.log(LogLevel.Info, launchMessage, tag = "App")
-
-        viewModelScope.launch(Dispatchers.IO) {
-            runCatching { LegacyDataCleanup.run(getApplication(), credentialStore) }
-        }
 
         viewModelScope.launch {
             val initialSettings = runCatching {

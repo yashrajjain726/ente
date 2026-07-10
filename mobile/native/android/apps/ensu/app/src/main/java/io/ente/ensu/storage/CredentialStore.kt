@@ -24,30 +24,10 @@ class CredentialStore(context: Context) {
             if (decoded != null && decoded.size == 32) return decoded
         }
 
-        val fromMaster = prefs.getString(KEY_MASTER_KEY, null)
-            ?.let { runCatching { decode(it) }.getOrNull() }
-        if (fromMaster != null && fromMaster.size == 32) {
-            prefs.edit().putString(KEY_CHAT_DB_KEY, encode(fromMaster)).apply()
-            return fromMaster
-        }
-
         val generated = ByteArray(32)
         java.security.SecureRandom().nextBytes(generated)
         prefs.edit().putString(KEY_CHAT_DB_KEY, encode(generated)).apply()
         return generated
-    }
-
-    fun removeLegacyCredentials() {
-        // Ensures the chat DB key no longer needs the master key fallback.
-        getOrCreateChatDbKey()
-        prefs.edit()
-            .remove("email")
-            .remove("user_id")
-            .remove("last_user_id")
-            .remove("secret_key")
-            .remove("token")
-            .remove(KEY_MASTER_KEY)
-            .apply()
     }
 
     private fun encode(bytes: ByteArray): String {
@@ -59,7 +39,6 @@ class CredentialStore(context: Context) {
     }
 
     companion object {
-        private const val KEY_MASTER_KEY = "master_key"
         private const val KEY_CHAT_DB_KEY = "chat_db_key"
     }
 }

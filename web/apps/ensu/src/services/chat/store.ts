@@ -1,8 +1,4 @@
 import { base64ToBytes } from "@/services/base64";
-import {
-    secureStorageDelete,
-    secureStorageGet,
-} from "@/services/secure-storage";
 import { isTauriRuntime } from "@/services/tauri-runtime";
 import { getKV, removeKV, setKV } from "ente-base/kv";
 import log from "ente-base/log";
@@ -811,64 +807,6 @@ const migrateLegacyNativeChatStoreToV2 = async (
     return false;
 };
 
-/**
- * One-shot removal of data written by the retired login and sync builds, so
- * that credentials and chat copies the user can no longer see or delete do not
- * linger.
- *
- * Added Jul 2026, v0.1.19. Remove once old installs age out (tag: Migration).
- */
-const cleanupLegacyData = async () => {
-    if (isTauriRuntime()) {
-        // The legacy keyring entries are potential decryption keys for a
-        // not-yet-migrated legacy DB, and potential sources of the v2 chat
-        // key. Only delete them once the legacy DB migration has completed
-        // and the v2 key is durably in the OS keyring.
-        if (!isNativeMigrationDone()) return;
-        if (!(await secureStorageGet("localChatKey.v2"))) return;
-
-        const entries = ["masterKey", "localChatKey", "remoteChatKey"];
-        const userID = legacyUserID();
-        if (userID) {
-            entries.push(
-                `remoteChatKey.v2.${userID}`,
-                `remoteChatKey.${userID}`,
-            );
-        }
-        for (const entry of entries) await secureStorageDelete(entry);
-
-        const [{ exists, remove }, { appDataDir, join }] = await Promise.all([
-            import("@tauri-apps/plugin-fs"),
-            import("@tauri-apps/api/path"),
-        ]);
-        const syncMetaDir = await join(await appDataDir(), "sync_meta");
-        if (await exists(syncMetaDir)) {
-            await remove(syncMetaDir, { recursive: true });
-        }
-    }
-
-    [
-        "user",
-        "srpAttributes",
-        "keyAttributes",
-        "originalKeyAttributes",
-        "isFirstLogin",
-    ].forEach((key) => localStorage.removeItem(key));
-
-    await removeKV("token");
-};
-
-const legacyUserID = () => {
-    try {
-        const raw = localStorage.getItem("user");
-        if (!raw) return undefined;
-        const id = (JSON.parse(raw) as { id?: unknown }).id;
-        return typeof id === "number" ? id : undefined;
-    } catch {
-        return undefined;
-    }
-};
-
 export const initializeChatStorePersistence = async (chatKey: string) => {
     if (_chatPersistenceInitKey === chatKey && _chatPersistenceInitPromise) {
         return _chatPersistenceInitPromise;
@@ -892,10 +830,6 @@ export const initializeChatStorePersistence = async (chatKey: string) => {
         } else {
             await migrateLegacyIndexedDbChatStore();
         }
-
-        void cleanupLegacyData().catch((error: unknown) =>
-            log.error("Failed to clean up legacy data", error),
-        );
     })().catch((error: unknown) => {
         if (_chatPersistenceInitPromise === initPromise) {
             _chatPersistenceInitPromise = undefined;

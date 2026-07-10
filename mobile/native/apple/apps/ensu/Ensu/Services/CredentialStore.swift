@@ -9,28 +9,12 @@ final class CredentialStore {
     private let keychainService = "io.ente.ensu"
 
     private enum KeychainAccount {
-        static let masterKey = "ensu.masterKey"
         static let chatDbKey = "ensu.chatDbKey"
-    }
-
-    func removeLegacyCredentials() {
-        let chatDbKey = getOrCreateChatDbKey()
-        guard let persisted = try? KeychainStore.get(service: keychainService, account: KeychainAccount.chatDbKey), persisted == chatDbKey else {
-            return
-        }
-        for account in ["ensu.token", "ensu.secretKey", KeychainAccount.masterKey] {
-            try? KeychainStore.delete(service: keychainService, account: account)
-        }
     }
 
     func getOrCreateChatDbKey() -> Data {
         if let existing = try? KeychainStore.get(service: keychainService, account: KeychainAccount.chatDbKey), existing.count == 32 {
             return existing
-        }
-
-        if let master = try? KeychainStore.get(service: keychainService, account: KeychainAccount.masterKey), master.count == 32 {
-            try? KeychainStore.set(master, service: keychainService, account: KeychainAccount.chatDbKey)
-            return master
         }
 
         var bytes = [UInt8](repeating: 0, count: 32)
