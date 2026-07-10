@@ -29,7 +29,17 @@ pub enum ContactsError {
 
 impl From<ContactsError> for JsValue {
     fn from(e: ContactsError) -> Self {
-        swb::to_value(&e).unwrap_or_else(|err| JsValue::from_str(&err.to_string()))
+        let object = match swb::to_value(&e) {
+            Ok(object) => object,
+            Err(err) => return JsValue::from_str(&err.to_string()),
+        };
+        let message = Reflect::get(&object, &JsValue::from_str("message"))
+            .ok()
+            .and_then(|message| message.as_string())
+            .unwrap_or_default();
+        let error = js_sys::Error::new(&message);
+        Object::assign(error.as_ref(), object.unchecked_ref());
+        error.into()
     }
 }
 
