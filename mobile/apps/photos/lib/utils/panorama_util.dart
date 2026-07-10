@@ -1,3 +1,6 @@
+import "dart:io";
+
+import "package:exif_reader/exif_reader.dart";
 import "package:logging/logging.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
@@ -10,6 +13,10 @@ import "package:photos/utils/file_util.dart";
 
 final _logger = Logger("PanoramaUtil");
 
+Future<Map<String, dynamic>> getXmp(File file) async {
+  return extractXmp(filePath: file.path);
+}
+
 /// Check if the file is a panorama image.
 Future<bool> checkIfPanorama(EnteFile enteFile) async {
   if (enteFile.fileType != FileType.image) {
@@ -20,24 +27,25 @@ Future<bool> checkIfPanorama(EnteFile enteFile) async {
     return false;
   }
   try {
-    final result = await extractXmp(filePath: file.path);
-    if (checkPanoramaFromXMP(result)) {
+    final xmpData = await getXmp(file);
+    if (checkPanoramaFromXMP(xmpData)) {
       return true;
     }
   } catch (_) {}
 
-  final result = await readExifAsync(file);
+  final exifData = await readExifAsync(file);
+  return checkPanoramaFromEXIF(exifData) ?? false;
+}
 
-  final element = result["EXIF CustomRendered"];
+bool? checkPanoramaFromEXIF(Map<String, IfdTag>? exifData) {
+  final element = exifData?["EXIF CustomRendered"];
+  if (element?.printable == null) return null;
   return element?.printable == "6";
 }
 
 bool checkPanoramaFromXMP(Map<String, dynamic> xmpData) {
-  if (xmpData["GPano:ProjectionType"] == "cylindrical" ||
-      xmpData["GPano:ProjectionType"] == "equirectangular") {
-    return true;
-  }
-  return false;
+  final projectionType = xmpData["GPano:ProjectionType"];
+  return projectionType == "cylindrical" || projectionType == "equirectangular";
 }
 
 // guardedCheckPanorama() method is used to check if the file is a panorama image.

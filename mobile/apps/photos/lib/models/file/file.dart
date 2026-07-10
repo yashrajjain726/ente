@@ -215,7 +215,6 @@ class EnteFile {
     }
     if (mediaUploadData.exifData != null) {
       mediaUploadData.isPanorama = checkPanoramaFromEXIF(
-        null,
         mediaUploadData.exifData,
       );
     }

@@ -12,7 +12,6 @@ import "package:photos/models/location/location.dart";
 import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/services/isolated_ffmpeg_service.dart";
 import "package:photos/services/location_service.dart";
-import "package:photos/src/rust/api/motion_photo_api.dart";
 import 'package:photos/utils/file_util.dart';
 import 'package:random_access_source/random_access_source.dart';
 
@@ -69,10 +68,6 @@ Future<Map<String, IfdTag>?> tryExifFromFile(File originFile) async {
   }
 }
 
-Future<Map<String, dynamic>> getXmp(File file) async {
-  return extractXmp(filePath: file.path);
-}
-
 Future<FFProbeProps?> getVideoPropsAsync(File originalFile) async {
   try {
     final stopwatch = Stopwatch()..start();
@@ -93,12 +88,6 @@ Future<FFProbeProps?> getVideoPropsAsync(File originalFile) async {
     _logger.severe("Failed to getVideoProps", e, s);
     return null;
   }
-}
-
-bool? checkPanoramaFromEXIF(File? file, Map<String, IfdTag>? exifData) {
-  final element = exifData?["EXIF CustomRendered"];
-  if (element?.printable == null) return null;
-  return element?.printable == "6";
 }
 
 class ParsedExifDateTime {
