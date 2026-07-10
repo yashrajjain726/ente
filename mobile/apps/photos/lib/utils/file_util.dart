@@ -19,7 +19,6 @@ import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
 import 'package:photos/utils/file_download_util.dart';
-import 'package:photos/utils/thumbnail_util.dart';
 
 final _logger = Logger("FileUtil");
 
@@ -136,14 +135,6 @@ String getSharedMediaPathFromLocalID(String localID) {
   return Configuration.instance.getSharedMediaDirectory() +
       "/" +
       localID.replaceAll(sharedMediaIdentifier, '');
-}
-
-void preloadThumbnail(EnteFile file) {
-  if (file.isRemoteOnlyFile) {
-    getThumbnailFromServer(file);
-  } else {
-    getThumbnailFromLocal(file);
-  }
 }
 
 final Map<String, Future<File?>> _fileDownloadsInProgress =
