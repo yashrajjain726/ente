@@ -27,8 +27,6 @@ thiserror.workspace = true
 # per-target feature sets are declared here.
 [target.'cfg(target_os = "ios")'.dependencies]
 ort = { workspace = true, features = [
-    # "std" is implied by "load-dynamic" on the other targets, but iOS links
-    # ORT statically, so it must be enabled explicitly here.
     "std",
     "ndarray",
     "half",
@@ -36,6 +34,11 @@ ort = { workspace = true, features = [
     # when both Dart ONNXRuntime and Rust ONNXRuntime are linked.
     # Re-enable once we move to a single shared ORT runtime.
     # "coreml",
+    "api-27",
+    # Link the revision-pinned crate's verified 1.27 archive directly into the
+    # Rust ML library.
+    "download-binaries",
+    "tls-native",
     "xnnpack",
 ] }
 
@@ -43,6 +46,7 @@ ort = { workspace = true, features = [
 ort = { workspace = true, features = [
     "ndarray",
     "half",
+    "api-27",
     "load-dynamic",
     "copy-dylibs",
     "coreml",

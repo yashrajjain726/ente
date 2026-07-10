@@ -32,14 +32,22 @@ A new Flutter FFI plugin project.
     :script => 'sh "$PODS_TARGET_SRCROOT/../cargokit/build_pod.sh" ../../../../../rust/bindings/frb/photos ente_photos_rust',
     :execution_position => :before_compile,
     :input_files => ['${BUILT_PRODUCTS_DIR}/cargokit_phony'],
-    # Let XCode know that the static library referenced in -force_load below is
-    # created by this build step.
+    # Let Xcode know that the static library linked below is created by this
+    # build step.
     :output_files => ["${BUILT_PRODUCTS_DIR}/libente_photos_rust.a"],
   }
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     # Flutter.framework does not contain a i386 slice.
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
-    'OTHER_LDFLAGS' => '-force_load ${BUILT_PRODUCTS_DIR}/libente_photos_rust.a -lc++',
+    # Root the primary Flutter Rust Bridge dispatcher so the linker pulls in
+    # the bridge and its transitive FFI exports without force-loading ONNX
+    # Runtime's duplicate protobuf objects.
+    'OTHER_LDFLAGS' => [
+      '$(inherited)',
+      '${BUILT_PRODUCTS_DIR}/libente_photos_rust.a',
+      '-lc++',
+      '-Wl,-u,_frb_pde_ffi_dispatcher_primary',
+    ].join(' '),
   }
 end
