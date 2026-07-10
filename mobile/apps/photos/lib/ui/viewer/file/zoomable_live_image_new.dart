@@ -223,10 +223,10 @@ class _ZoomableLiveImageNewState extends State<ZoomableLiveImageNew>
           ? await _getLivePhotoVideo()
           : await _getMotionPhotoVideo();
 
+      if (!mounted) return;
       if (videoFile != null && videoFile.existsSync()) {
         await _setVideoController(videoFile.path);
       } else if (_enteFile.isLivePhoto) {
-        if (!mounted) return;
         showShortToast(context, AppLocalizations.of(context).downloadFailed);
       }
     } finally {
