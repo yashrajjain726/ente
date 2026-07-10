@@ -565,7 +565,7 @@ class _StripeSubscriptionPageState extends State<StripeSubscriptionPage> {
                 ).areYouSureYouWantToChangeYourPlan,
                 firstButtonLabel: AppLocalizations.of(context).yes,
               );
-              if (result!.action == ButtonAction.first) {
+              if (result?.action == ButtonAction.first) {
                 stripPurChaseAction = 'update';
               } else {
                 return;
