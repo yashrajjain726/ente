@@ -24,7 +24,6 @@ class ChatRepository(
     private val filePaths = FilePathManager(context)
     private val attachmentsDir = filePaths.attachmentsDir
     private val dbFile = filePaths.mainDbFile
-    private val attachmentsDbFile = filePaths.attachmentsDbFile
     private val dbKey = credentialStore.getOrCreateChatDbKey()
     private var db: EnsuDb = openDb(dbFile, dbKey)
 
@@ -141,13 +140,12 @@ class ChatRepository(
     private fun openDb(dbFile: File, key: ByteArray): EnsuDb {
         return EnsuDb.open(
             dbFile.absolutePath,
-            attachmentsDbFile.absolutePath,
             key
         )
     }
 
     private fun <T> withDbRecovery(block: () -> T): T {
-        if (!attachmentsDbFile.exists() || !dbFile.exists()) {
+        if (!dbFile.exists()) {
             reopenDb()
         }
         return try {
@@ -163,9 +161,7 @@ class ChatRepository(
 
     private fun reopenDb() {
         dbFile.parentFile?.mkdirs()
-        attachmentsDbFile.parentFile?.mkdirs()
         dbFile.setWritable(true)
-        attachmentsDbFile.setWritable(true)
         db = openDb(dbFile, dbKey)
     }
 

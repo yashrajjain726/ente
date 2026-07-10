@@ -10,16 +10,15 @@ import { ensureCryptoInit, enteWasm } from "../wasm";
 const LOCAL_CHAT_KEY_LOCAL_STORAGE_KEY = "ensu.chatKey.local";
 const CHAT_KEY_FILE_NAME = "chat-keys.json";
 const LOCAL_CHAT_KEY_SECURE_STORAGE_KEY = "localChatKey.v2";
-const LEGACY_ATTACHMENT_KEY_SECURE_STORAGE_KEY = "legacyAttachmentKey.v2";
-const LEGACY_LOCAL_CHAT_KEY_SECURE_STORAGE_KEY = "localChatKey";
+const V1_ATTACHMENT_KEY_SECURE_STORAGE_KEY = "legacyAttachmentKey.v2";
+const V1_LOCAL_CHAT_KEY_SECURE_STORAGE_KEY = "localChatKey";
 
 type NativeChatKeys = { localChatKey?: string };
 
 let _localChatKey: string | undefined;
-let _legacyLocalChatKey: string | undefined;
-let _legacyAttachmentChatKey: string | undefined;
-/** All distinct keys discovered during init, before any cleanup. */
-let _allDiscoveredLocalChatKeys: string[] = [];
+let _v1LocalChatKey: string | undefined;
+let _v1AttachmentChatKey: string | undefined;
+let _v1ChatKeyCandidates: string[] = [];
 let _chatKeyStoreInitPromise: Promise<void> | undefined;
 
 const readLocalStorageKey = (key: string) => {
@@ -88,7 +87,7 @@ const persistNativeChatKeysSoon = () => {
     });
 };
 
-const cleanupLegacyChatKeyCopies = async () => {
+const cleanupV1ChatKeyCopies = async () => {
     removeLocalStorageKey(LOCAL_CHAT_KEY_LOCAL_STORAGE_KEY);
 
     try {
@@ -96,7 +95,7 @@ const cleanupLegacyChatKeyCopies = async () => {
         const path = await nativeChatKeyPath();
         await remove(path);
     } catch {
-        // ignore missing legacy file
+        // The v1 key file may not exist.
     }
 };
 
@@ -108,40 +107,37 @@ export const initChatKeyStore = async () => {
     _chatKeyStoreInitPromise = (async () => {
         const [
             secureLocalChatKey,
-            secureLegacyAttachmentKey,
-            legacySecureLocalChatKey,
+            secureV1AttachmentKey,
+            secureV1LocalChatKey,
             nativeKeys,
         ] = await Promise.all([
             secureStorageGet(LOCAL_CHAT_KEY_SECURE_STORAGE_KEY).catch(
                 () => undefined,
             ),
-            secureStorageGet(LEGACY_ATTACHMENT_KEY_SECURE_STORAGE_KEY).catch(
+            secureStorageGet(V1_ATTACHMENT_KEY_SECURE_STORAGE_KEY).catch(
                 () => undefined,
             ),
-            secureStorageGet(LEGACY_LOCAL_CHAT_KEY_SECURE_STORAGE_KEY).catch(
+            secureStorageGet(V1_LOCAL_CHAT_KEY_SECURE_STORAGE_KEY).catch(
                 () => undefined,
             ),
             readNativeChatKeys(),
         ]);
-        // Prefer localStorage over legacy secure storage for the local key.
+        // Prefer localStorage over v1 secure storage for the local key.
         // Pre-v0.1.12 builds only used localStorage, so when both exist the
-        // localStorage value is the key that actually encrypted the legacy DB.
+        // localStorage value is the key that actually encrypted the v1 DB.
         // Stale OS keyring entries from a previous v0.1.12 install can shadow
         // the correct localStorage key if secure storage is checked first.
-        const legacyLocalChatKey =
+        const v1LocalChatKey =
             readLocalStorageKey(LOCAL_CHAT_KEY_LOCAL_STORAGE_KEY) ??
-            legacySecureLocalChatKey ??
+            secureV1LocalChatKey ??
             nativeKeys.localChatKey;
-        const localChatKey = secureLocalChatKey ?? legacyLocalChatKey;
+        const localChatKey = secureLocalChatKey ?? v1LocalChatKey;
 
         _localChatKey = localChatKey;
-        _legacyLocalChatKey = legacyLocalChatKey;
-        _legacyAttachmentChatKey = secureLegacyAttachmentKey;
+        _v1LocalChatKey = v1LocalChatKey;
+        _v1AttachmentChatKey = secureV1AttachmentKey;
 
-        // Capture every distinct local chat key found across all sources
-        // *before* cleanup deletes legacy copies. The migration needs all
-        // of these because the ?? chains above can shadow the correct key
-        // when stale entries exist in the OS keyring.
+        // Capture v1 candidates before cleanup removes their old copies.
         {
             const rawLocalStorage = readLocalStorageKey(
                 LOCAL_CHAT_KEY_LOCAL_STORAGE_KEY,
@@ -150,7 +146,7 @@ export const initChatKeyStore = async () => {
             const all: string[] = [];
             for (const k of [
                 secureLocalChatKey,
-                legacySecureLocalChatKey,
+                secureV1LocalChatKey,
                 nativeKeys.localChatKey,
                 rawLocalStorage,
             ]) {
@@ -159,7 +155,7 @@ export const initChatKeyStore = async () => {
                     all.push(k);
                 }
             }
-            _allDiscoveredLocalChatKeys = all;
+            _v1ChatKeyCandidates = all;
         }
 
         if (secureLocalChatKey !== localChatKey) {
@@ -175,9 +171,9 @@ export const initChatKeyStore = async () => {
         }
 
         try {
-            await cleanupLegacyChatKeyCopies();
+            await cleanupV1ChatKeyCopies();
         } catch (error) {
-            log.warn("Failed to clean up legacy chat key copies", error);
+            log.warn("Failed to clean up v1 chat key copies", error);
         }
     })().catch((error: unknown) => {
         _chatKeyStoreInitPromise = undefined;
@@ -208,23 +204,18 @@ export const cachedLocalChatKey = (): string | undefined => {
     return readLocalStorageKey(LOCAL_CHAT_KEY_LOCAL_STORAGE_KEY);
 };
 
-export const legacyLocalChatKey = (): string | undefined => {
+export const v1LocalChatKey = (): string | undefined => {
     if (isTauriRuntime()) {
-        return _legacyLocalChatKey;
+        return _v1LocalChatKey;
     }
 
     return readLocalStorageKey(LOCAL_CHAT_KEY_LOCAL_STORAGE_KEY);
 };
 
 /**
- * Return all distinct legacy key candidates that might decrypt a legacy DB.
- *
- * Unlike {@link legacyLocalChatKey}, this returns every key found across all
- * legacy storage locations so the migration can try each one. This is needed
- * because stale keys in the OS keyring can shadow the correct key in
- * localStorage.
+ * Return every key candidate that might decrypt the v1 DB.
  */
-export const allLegacyKeyCandidates = (): string[] => {
+export const v1ChatKeyCandidates = (): string[] => {
     const seen = new Set<string>();
     const keys: string[] = [];
     const add = (k: string | undefined) => {
@@ -233,28 +224,22 @@ export const allLegacyKeyCandidates = (): string[] => {
             keys.push(k);
         }
     };
-    add(_legacyLocalChatKey);
+    add(_v1LocalChatKey);
     add(_localChatKey);
-    // Include every local chat key discovered during init (before cleanup
-    // deleted legacy copies). This ensures we try the raw localStorage key
-    // even when stale OS keyring entries shadowed it in the ?? chains.
-    for (const k of _allDiscoveredLocalChatKeys) add(k);
+    for (const k of _v1ChatKeyCandidates) add(k);
     return keys;
 };
 
-export const legacyAttachmentChatKey = (): string | undefined =>
-    _legacyAttachmentChatKey;
+export const v1AttachmentChatKey = (): string | undefined =>
+    _v1AttachmentChatKey;
 
-export const setLegacyAttachmentChatKey = async (chatKey?: string) => {
-    _legacyAttachmentChatKey = chatKey;
+export const setV1AttachmentChatKey = async (chatKey?: string) => {
+    _v1AttachmentChatKey = chatKey;
     if (!isTauriRuntime()) return;
     if (chatKey) {
-        await secureStorageSet(
-            LEGACY_ATTACHMENT_KEY_SECURE_STORAGE_KEY,
-            chatKey,
-        );
+        await secureStorageSet(V1_ATTACHMENT_KEY_SECURE_STORAGE_KEY, chatKey);
     } else {
-        await secureStorageDelete(LEGACY_ATTACHMENT_KEY_SECURE_STORAGE_KEY);
+        await secureStorageDelete(V1_ATTACHMENT_KEY_SECURE_STORAGE_KEY);
     }
 };
 

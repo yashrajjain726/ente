@@ -5,11 +5,11 @@ import log from "ente-base/log";
 import { deleteDB, openDB, type DBSchema, type IDBPDatabase } from "idb";
 import { decryptAttachmentBytes, encryptAttachmentBytes } from "./attachments";
 import {
-    allLegacyKeyCandidates,
     cachedLocalChatKey,
-    legacyAttachmentChatKey,
-    legacyLocalChatKey,
-    setLegacyAttachmentChatKey,
+    setV1AttachmentChatKey,
+    v1AttachmentChatKey,
+    v1ChatKeyCandidates,
+    v1LocalChatKey,
 } from "./chatKey";
 import {
     decryptChatField,
@@ -19,9 +19,10 @@ import {
 } from "./crypto";
 
 const STORAGE_KEY = "ensu.chat.store.v1";
-const NATIVE_MIGRATION_KEY = "ensu.chat.nativeMigration.v2";
+const NATIVE_V1_IMPORT_KEY = "ensu.chat.nativeMigration.v2";
+const LOCAL_SCHEMA_MIGRATION_KEY = "ensu.chat.localMigration.v2";
 const CHAT_DB_NAME = "ensu-chat";
-const LEGACY_WEB_CHAT_DB_NAME = "ensu.chat.db";
+const V1_WEB_CHAT_DB_NAME = "ensu.chat.db";
 
 export type AttachmentKind = "image" | "document";
 
@@ -31,7 +32,6 @@ export interface ChatAttachment {
     name: string;
     size: number;
     encryptedName?: string;
-    uploadedAt?: number;
 }
 
 interface StoredAttachment {
@@ -39,7 +39,6 @@ interface StoredAttachment {
     kind: AttachmentKind;
     size: number;
     encryptedName: string;
-    uploadedAt?: number | null;
 }
 
 interface StoredSession {
@@ -48,10 +47,6 @@ interface StoredSession {
     updatedAt: number;
     encryptedData: string;
     header: string;
-    remoteId?: string | null;
-    needsSync?: boolean;
-    deletedAt?: number | null;
-    isDeleted?: boolean;
 }
 
 interface StoredMessage {
@@ -63,10 +58,20 @@ interface StoredMessage {
     encryptedData: string;
     header: string;
     attachments?: StoredAttachment[];
-    remoteId?: string | null;
+}
+
+type OldStoredAttachment = StoredAttachment & { uploadedAt?: number | null };
+
+type OldStoredSession = StoredSession & {
     deletedAt?: number | null;
     isDeleted?: boolean;
-}
+};
+
+type OldStoredMessage = Omit<StoredMessage, "attachments"> & {
+    attachments?: OldStoredAttachment[];
+    deletedAt?: number | null;
+    isDeleted?: boolean;
+};
 
 interface StoredAttachmentBytes {
     id: string;
@@ -84,8 +89,8 @@ type ChatStoreName = keyof ChatDbSchema;
 type PersistedAttachmentBytes = { id: string; data: string };
 
 type PersistedChatStore = {
-    sessions: StoredSession[];
-    messages: StoredMessage[];
+    sessions: OldStoredSession[];
+    messages: OldStoredMessage[];
     attachmentBytes: PersistedAttachmentBytes[];
 };
 
@@ -153,9 +158,6 @@ interface NativeSession {
     title: string;
     createdAt: number;
     updatedAt: number;
-    remoteId?: string | null;
-    needsSync?: boolean;
-    deletedAt?: number | null;
     lastMessagePreview?: string | null;
 }
 
@@ -164,7 +166,6 @@ interface NativeAttachment {
     kind: AttachmentKind;
     name: string;
     size: number;
-    uploadedAt?: number | null;
 }
 
 interface NativeMessage {
@@ -175,11 +176,9 @@ interface NativeMessage {
     text: string;
     createdAt: number;
     attachments?: NativeAttachment[];
-    remoteId?: string | null;
-    deletedAt?: number | null;
 }
 
-interface NativeLegacyMigrationResult {
+interface NativeV1ImportResult {
     didMigrate: boolean;
     migratedSessions: number;
     migratedMessages: number;
@@ -219,23 +218,20 @@ const loadChatStoreState = (): ChatStoreState => {
 
     try {
         const parsed = JSON.parse(json) as Partial<PersistedChatStore>;
+        const sessions = (parsed.sessions ?? [])
+            .map(normalizeOldSession)
+            .filter((session): session is StoredSession => !!session);
+        const sessionIDs = new Set(
+            sessions.map((session) => session.sessionUuid),
+        );
         return {
-            sessions: (parsed.sessions ?? []).map((session) => ({
-                ...session,
-                remoteId: session.remoteId ?? null,
-                needsSync: session.needsSync ?? true,
-                deletedAt:
-                    session.deletedAt ??
-                    (session.isDeleted ? session.updatedAt : null),
-            })),
-            messages: (parsed.messages ?? []).map((message) => ({
-                ...message,
-                attachments: message.attachments ?? [],
-                remoteId: message.remoteId ?? null,
-                deletedAt:
-                    message.deletedAt ??
-                    (message.isDeleted ? message.createdAt : null),
-            })),
+            sessions,
+            messages: (parsed.messages ?? [])
+                .map(normalizeOldMessage)
+                .filter(
+                    (message): message is StoredMessage =>
+                        !!message && sessionIDs.has(message.sessionUuid),
+                ),
             attachmentBytes: (parsed.attachmentBytes ?? []).map(
                 (attachment) => ({
                     id: attachment.id,
@@ -275,37 +271,38 @@ let _chatDb: Promise<ChatDbLike> | undefined;
 let _chatPersistenceInitPromise: Promise<void> | undefined;
 let _chatPersistenceInitKey: string | undefined;
 
-const normalizeStoredSession = (session: StoredSession): StoredSession => ({
-    ...session,
-    remoteId: session.remoteId ?? null,
-    needsSync: session.needsSync ?? true,
-    deletedAt:
-        session.deletedAt ?? (session.isDeleted ? session.updatedAt : null),
-});
+const normalizeOldSession = (
+    session: OldStoredSession,
+): StoredSession | undefined => {
+    if (session.deletedAt || session.isDeleted) return undefined;
+    return {
+        sessionUuid: session.sessionUuid,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+        encryptedData: session.encryptedData,
+        header: session.header,
+    };
+};
 
-const normalizeStoredMessage = (message: StoredMessage): StoredMessage => ({
-    ...message,
-    attachments: message.attachments ?? [],
-    remoteId: message.remoteId ?? null,
-    deletedAt:
-        message.deletedAt ?? (message.isDeleted ? message.createdAt : null),
-});
-
-const normalizeStoreEntry = <K extends ChatStoreName>(
-    name: K,
-    value: ChatDbSchema[K],
-): ChatDbSchema[K] => {
-    if (name === "sessions") {
-        return normalizeStoredSession(
-            value as StoredSession,
-        ) as ChatDbSchema[K];
-    }
-    if (name === "messages") {
-        return normalizeStoredMessage(
-            value as StoredMessage,
-        ) as ChatDbSchema[K];
-    }
-    return value;
+const normalizeOldMessage = (
+    message: OldStoredMessage,
+): StoredMessage | undefined => {
+    if (message.deletedAt || message.isDeleted) return undefined;
+    return {
+        messageUuid: message.messageUuid,
+        sessionUuid: message.sessionUuid,
+        parentMessageUuid: message.parentMessageUuid,
+        sender: message.sender,
+        createdAt: message.createdAt,
+        encryptedData: message.encryptedData,
+        header: message.header,
+        attachments: message.attachments?.map((attachment) => ({
+            id: attachment.id,
+            kind: attachment.kind,
+            size: attachment.size,
+            encryptedName: attachment.encryptedName,
+        })),
+    };
 };
 
 const createIndexedDbChatDb = (
@@ -316,13 +313,11 @@ const createIndexedDbChatDb = (
             | ChatDbSchema[typeof name]
             | undefined;
         if (!entry) return undefined;
-        return cloneStoreEntry(name, normalizeStoreEntry(name, entry));
+        return cloneStoreEntry(name, entry);
     },
     getAll: async (name) => {
         const entries = (await db.getAll(name)) as ChatDbSchema[typeof name][];
-        return entries.map((entry) =>
-            cloneStoreEntry(name, normalizeStoreEntry(name, entry)),
-        );
+        return entries.map((entry) => cloneStoreEntry(name, entry));
     },
     put: async (name, value) => {
         await db.put(name, cloneStoreEntry(name, value));
@@ -338,18 +333,13 @@ const createIndexedDbChatDb = (
                         | ChatDbSchema[K]
                         | undefined;
                     if (!entry) return undefined;
-                    return cloneStoreEntry(
-                        name,
-                        normalizeStoreEntry(name, entry),
-                    );
+                    return cloneStoreEntry(name, entry);
                 },
                 getAll: async () => {
                     const entries = (await tx
                         .objectStore(name)
                         .getAll()) as ChatDbSchema[K][];
-                    return entries.map((entry) =>
-                        cloneStoreEntry(name, normalizeStoreEntry(name, entry)),
-                    );
+                    return entries.map((entry) => cloneStoreEntry(name, entry));
                 },
                 put: async (value: ChatDbSchema[K]) => {
                     await tx
@@ -366,6 +356,46 @@ const createIndexedDbChatDb = (
     close: () => db.close(),
 });
 
+const migrateIndexedDbToLocalOnly = async (
+    db: IDBPDatabase<IndexedChatDBSchema>,
+) => {
+    if (localStorage.getItem(LOCAL_SCHEMA_MIGRATION_KEY) === "1") return;
+
+    const [oldSessions, oldMessages] = await Promise.all([
+        db.getAll("sessions") as Promise<OldStoredSession[]>,
+        db.getAll("messages") as Promise<OldStoredMessage[]>,
+    ]);
+    const removedSessionIDs = new Set(
+        oldSessions
+            .filter((session) => !normalizeOldSession(session))
+            .map((session) => session.sessionUuid),
+    );
+    const tx = db.transaction(["sessions", "messages"], "readwrite");
+    const sessionStore = tx.objectStore("sessions");
+    const messageStore = tx.objectStore("messages");
+    const operations: Promise<unknown>[] = [];
+
+    for (const oldSession of oldSessions) {
+        const session = normalizeOldSession(oldSession);
+        operations.push(
+            session
+                ? sessionStore.put(session)
+                : sessionStore.delete(oldSession.sessionUuid),
+        );
+    }
+    for (const oldMessage of oldMessages) {
+        const message = normalizeOldMessage(oldMessage);
+        operations.push(
+            message && !removedSessionIDs.has(message.sessionUuid)
+                ? messageStore.put(message)
+                : messageStore.delete(oldMessage.messageUuid),
+        );
+    }
+
+    await Promise.all([...operations, tx.done]);
+    localStorage.setItem(LOCAL_SCHEMA_MIGRATION_KEY, "1");
+};
+
 const openChatDb = async () => {
     const db = await openDB<IndexedChatDBSchema>(CHAT_DB_NAME, 1, {
         upgrade(db) {
@@ -381,6 +411,7 @@ const openChatDb = async () => {
         },
     });
 
+    await migrateIndexedDbToLocalOnly(db);
     return createIndexedDbChatDb(db);
 };
 
@@ -445,7 +476,6 @@ const serializeAttachments = async (
             encryptedName:
                 attachment.encryptedName ??
                 (await encryptChatField(attachment.name, chatKey)),
-            uploadedAt: attachment.uploadedAt ?? null,
         })),
     );
 };
@@ -456,7 +486,7 @@ const deserializeAttachments = async (
 ): Promise<ChatAttachment[]> => {
     if (!attachments?.length || !isTauriRuntime()) return [];
 
-    const localKey = cachedLocalChatKey() ?? legacyLocalChatKey();
+    const localKey = cachedLocalChatKey() ?? v1LocalChatKey();
 
     return Promise.all(
         attachments.map(async (attachment) => {
@@ -471,7 +501,6 @@ const deserializeAttachments = async (
                     size: attachment.size,
                     name,
                     encryptedName: attachment.encryptedName,
-                    uploadedAt: attachment.uploadedAt ?? undefined,
                 } satisfies ChatAttachment;
             } catch (error) {
                 if (localKey && localKey !== chatKey) {
@@ -486,7 +515,6 @@ const deserializeAttachments = async (
                             size: attachment.size,
                             name,
                             encryptedName: undefined,
-                            uploadedAt: attachment.uploadedAt ?? undefined,
                         } satisfies ChatAttachment;
                     } catch (innerError) {
                         log.error(
@@ -503,14 +531,13 @@ const deserializeAttachments = async (
                     size: attachment.size,
                     name: "Attachment",
                     encryptedName: attachment.encryptedName,
-                    uploadedAt: attachment.uploadedAt ?? undefined,
                 } satisfies ChatAttachment;
             }
         }),
     );
 };
 
-const hasLegacyChatStore = () =>
+const hasLocalStorageChatStore = () =>
     typeof localStorage !== "undefined" && !!localStorage.getItem(STORAGE_KEY);
 
 const hasIndexedDbDatabase = async (name: string) => {
@@ -548,32 +575,32 @@ const hasIndexedDbDatabase = async (name: string) => {
     });
 };
 
-const isNativeMigrationDone = () =>
+const isNativeV1ImportDone = () =>
     typeof localStorage !== "undefined" &&
-    localStorage.getItem(NATIVE_MIGRATION_KEY) === "1";
+    localStorage.getItem(NATIVE_V1_IMPORT_KEY) === "1";
 
-const markNativeMigrationDone = () => {
+const markNativeV1ImportDone = () => {
     if (typeof localStorage === "undefined") return;
-    localStorage.setItem(NATIVE_MIGRATION_KEY, "1");
+    localStorage.setItem(NATIVE_V1_IMPORT_KEY, "1");
 };
 
-const migrateLegacyLocalChatStoreToIndexedDb = async () => {
+const importLocalStorageChatStoreToIndexedDb = async () => {
     if (typeof localStorage === "undefined") return;
 
-    const legacy = loadChatStoreState();
+    const localStorageStore = loadChatStoreState();
     if (
-        !legacy.sessions.length &&
-        !legacy.messages.length &&
-        !legacy.attachmentBytes.length
+        !localStorageStore.sessions.length &&
+        !localStorageStore.messages.length &&
+        !localStorageStore.attachmentBytes.length
     ) {
         localStorage.removeItem(STORAGE_KEY);
         return;
     }
 
-    log.info("Migrating legacy local chat store to IndexedDB", {
-        sessions: legacy.sessions.length,
-        messages: legacy.messages.length,
-        attachmentBytes: legacy.attachmentBytes.length,
+    log.info("Migrating localStorage chat store to IndexedDB", {
+        sessions: localStorageStore.sessions.length,
+        messages: localStorageStore.messages.length,
+        attachmentBytes: localStorageStore.attachmentBytes.length,
     });
 
     const db = await chatDb();
@@ -582,15 +609,15 @@ const migrateLegacyLocalChatStoreToIndexedDb = async () => {
         "readwrite",
     );
 
-    for (const session of legacy.sessions) {
-        await tx.objectStore("sessions").put(normalizeStoredSession(session));
+    for (const session of localStorageStore.sessions) {
+        await tx.objectStore("sessions").put(session);
     }
 
-    for (const message of legacy.messages) {
-        await tx.objectStore("messages").put(normalizeStoredMessage(message));
+    for (const message of localStorageStore.messages) {
+        await tx.objectStore("messages").put(message);
     }
 
-    for (const attachment of legacy.attachmentBytes) {
+    for (const attachment of localStorageStore.attachmentBytes) {
         await tx
             .objectStore("attachmentBytes")
             .put({ id: attachment.id, data: new Uint8Array(attachment.data) });
@@ -598,30 +625,42 @@ const migrateLegacyLocalChatStoreToIndexedDb = async () => {
 
     await tx.done;
     localStorage.removeItem(STORAGE_KEY);
-    log.info("Finished migrating legacy local chat store to IndexedDB");
+    log.info("Finished migrating localStorage chat store to IndexedDB");
 };
 
-const migrateLegacyIndexedDbChatStore = async () => {
+const importV1IndexedDbChatStore = async () => {
     if (typeof indexedDB === "undefined") return;
-    if (!(await hasIndexedDbDatabase(LEGACY_WEB_CHAT_DB_NAME))) return;
+    if (!(await hasIndexedDbDatabase(V1_WEB_CHAT_DB_NAME))) return;
 
-    log.info("Migrating legacy IndexedDB chat store", {
-        from: LEGACY_WEB_CHAT_DB_NAME,
+    log.info("Migrating v1 IndexedDB chat store", {
+        from: V1_WEB_CHAT_DB_NAME,
         to: CHAT_DB_NAME,
     });
 
-    const [legacyDb, db] = await Promise.all([
-        openDB<IndexedChatDBSchema>(LEGACY_WEB_CHAT_DB_NAME),
+    const [v1Db, db] = await Promise.all([
+        openDB<IndexedChatDBSchema>(V1_WEB_CHAT_DB_NAME),
         chatDb(),
     ]);
 
     let migratedAnyEntries: boolean;
     try {
-        const [sessions, messages, attachmentBytes] = await Promise.all([
-            legacyDb.getAll("sessions"),
-            legacyDb.getAll("messages"),
-            legacyDb.getAll("attachmentBytes"),
+        const [oldSessions, oldMessages, attachmentBytes] = await Promise.all([
+            v1Db.getAll("sessions") as Promise<OldStoredSession[]>,
+            v1Db.getAll("messages") as Promise<OldStoredMessage[]>,
+            v1Db.getAll("attachmentBytes"),
         ]);
+        const sessions = oldSessions
+            .map(normalizeOldSession)
+            .filter((session): session is StoredSession => !!session);
+        const sessionIDs = new Set(
+            sessions.map((session) => session.sessionUuid),
+        );
+        const messages = oldMessages
+            .map(normalizeOldMessage)
+            .filter(
+                (message): message is StoredMessage =>
+                    !!message && sessionIDs.has(message.sessionUuid),
+            );
         migratedAnyEntries =
             sessions.length > 0 ||
             messages.length > 0 ||
@@ -633,15 +672,11 @@ const migrateLegacyIndexedDbChatStore = async () => {
         );
 
         for (const session of sessions) {
-            await tx
-                .objectStore("sessions")
-                .put(normalizeStoredSession(session));
+            await tx.objectStore("sessions").put(session);
         }
 
         for (const message of messages) {
-            await tx
-                .objectStore("messages")
-                .put(normalizeStoredMessage(message));
+            await tx.objectStore("messages").put(message);
         }
 
         for (const attachment of attachmentBytes) {
@@ -655,44 +690,42 @@ const migrateLegacyIndexedDbChatStore = async () => {
 
         await tx.done;
     } finally {
-        legacyDb.close();
+        v1Db.close();
     }
 
-    await deleteDB(LEGACY_WEB_CHAT_DB_NAME, {
+    await deleteDB(V1_WEB_CHAT_DB_NAME, {
         blocked() {
-            log.warn(
-                "Waiting for an existing client to close the legacy chat DB",
-            );
+            log.warn("Waiting for an existing client to close the v1 chat DB");
         },
     });
 
     log.info(
         migratedAnyEntries
-            ? "Finished migrating legacy IndexedDB chat store"
-            : "Removed empty legacy IndexedDB chat store",
+            ? "Finished migrating v1 IndexedDB chat store"
+            : "Removed empty v1 IndexedDB chat store",
     );
 };
 
-const migrateLegacyChatStoreToNative = async (chatKey: string) => {
+const importLocalStorageChatStoreToNative = async (chatKey: string) => {
     if (!isTauriRuntime() || typeof localStorage === "undefined") return;
 
-    const legacy = loadChatStoreState();
+    const localStorageStore = loadChatStoreState();
     if (
-        !legacy.sessions.length &&
-        !legacy.messages.length &&
-        !legacy.attachmentBytes.length
+        !localStorageStore.sessions.length &&
+        !localStorageStore.messages.length &&
+        !localStorageStore.attachmentBytes.length
     ) {
         localStorage.removeItem(STORAGE_KEY);
         return;
     }
 
-    log.info("Migrating legacy local chat store to native DB", {
-        sessions: legacy.sessions.length,
-        messages: legacy.messages.length,
-        attachmentBytes: legacy.attachmentBytes.length,
+    log.info("Migrating localStorage chat store to native DB", {
+        sessions: localStorageStore.sessions.length,
+        messages: localStorageStore.messages.length,
+        attachmentBytes: localStorageStore.attachmentBytes.length,
     });
 
-    const sessions = [...legacy.sessions].sort(
+    const sessions = [...localStorageStore.sessions].sort(
         (left, right) => left.createdAt - right.createdAt,
     );
     for (const session of sessions) {
@@ -704,14 +737,11 @@ const migrateLegacyChatStoreToNative = async (chatKey: string) => {
                 title,
                 createdAt: session.createdAt,
                 updatedAt: session.updatedAt,
-                remoteId: session.remoteId ?? null,
-                needsSync: session.needsSync ?? false,
-                deletedAt: session.deletedAt ?? null,
             },
         });
     }
 
-    const messages = [...legacy.messages].sort(
+    const messages = [...localStorageStore.messages].sort(
         (left, right) => left.createdAt - right.createdAt,
     );
     for (const message of messages) {
@@ -719,16 +749,6 @@ const migrateLegacyChatStoreToNative = async (chatKey: string) => {
             message.attachments,
             chatKey,
         );
-
-        if (!message.remoteId) {
-            const existing = await invokeChat<NativeMessage | null>(
-                "chat_db_get_message",
-                { keyB64: chatKey, messageUuid: message.messageUuid },
-            );
-            if (existing) {
-                continue;
-            }
-        }
 
         await invokeChat("chat_db_insert_message_with_uuid", {
             keyB64: chatKey,
@@ -739,53 +759,47 @@ const migrateLegacyChatStoreToNative = async (chatKey: string) => {
                 sender: message.sender,
                 text: await decryptMessageText(message, chatKey),
                 createdAt: message.createdAt,
-                remoteId: message.remoteId ?? null,
-                deletedAt: message.deletedAt ?? null,
                 attachments: attachments.map((attachment) => ({
                     id: attachment.id,
                     kind: attachment.kind,
                     name: attachment.name,
                     size: attachment.size,
-                    uploadedAt: attachment.uploadedAt ?? null,
                 })),
             },
         });
     }
 
-    for (const attachment of legacy.attachmentBytes) {
+    for (const attachment of localStorageStore.attachmentBytes) {
         await writeAttachmentBytes(attachment.id, attachment.data);
     }
 
     localStorage.removeItem(STORAGE_KEY);
-    log.info("Finished migrating legacy local chat store to native DB");
+    log.info("Finished migrating localStorage chat store to native DB");
 };
 
-const migrateLegacyNativeChatStoreToV2 = async (
-    chatKey: string,
-): Promise<boolean> => {
+const importNativeV1ChatStore = async (chatKey: string): Promise<boolean> => {
     if (!isTauriRuntime()) return true;
 
-    // Collect all known key candidates. allLegacyKeyCandidates returns every
-    // key found across secure storage, native file, AND localStorage. This is
-    // important because stale OS keyring entries from a previous install can
-    // shadow the correct localStorage key in the normal prioritized lookup.
-    const candidateKeys = allLegacyKeyCandidates();
+    const candidateKeys = v1ChatKeyCandidates();
+    const previousAttachmentKey = v1AttachmentChatKey();
     const seen = new Set<string>(candidateKeys);
     if (chatKey && !seen.has(chatKey)) {
         candidateKeys.push(chatKey);
     }
 
     for (const candidateKey of candidateKeys) {
+        await setV1AttachmentChatKey(
+            candidateKey === chatKey ? undefined : candidateKey,
+        );
         try {
-            const result = await invokeChat<NativeLegacyMigrationResult>(
-                "chat_db_migrate_legacy",
-                { input: { keyB64: chatKey, legacyKeyB64: candidateKey } },
+            const result = await invokeChat<NativeV1ImportResult>(
+                "chat_db_import_v1",
+                { input: { keyB64: chatKey, v1KeyB64: candidateKey } },
             );
             if (result.didMigrate) {
-                await setLegacyAttachmentChatKey(
-                    candidateKey === chatKey ? undefined : candidateKey,
-                );
-                log.info("Migrated legacy native chat store to v2 DB", result);
+                log.info("Migrated v1 native chat store", result);
+            } else {
+                await setV1AttachmentChatKey(previousAttachmentKey);
             }
             return true;
         } catch (error) {
@@ -795,6 +809,7 @@ const migrateLegacyNativeChatStoreToV2 = async (
                 code === "db_invalid_blob_length" ||
                 code === "db_invalid_encrypted_field"
             ) {
+                await setV1AttachmentChatKey(previousAttachmentKey);
                 continue;
             }
             throw error;
@@ -802,7 +817,7 @@ const migrateLegacyNativeChatStoreToV2 = async (
     }
 
     log.warn(
-        "Skipping legacy native chat migration because the available legacy keys could not decrypt the legacy DB",
+        "Skipping v1 native chat migration because no v1 key could decrypt the DB",
     );
     return false;
 };
@@ -815,20 +830,20 @@ export const initializeChatStorePersistence = async (chatKey: string) => {
     _chatPersistenceInitKey = chatKey;
     const initPromise = (async () => {
         if (isTauriRuntime()) {
-            if (!isNativeMigrationDone()) {
-                const didResolveNativeMigration =
-                    await migrateLegacyNativeChatStoreToV2(chatKey);
-                if (hasLegacyChatStore()) {
-                    await migrateLegacyChatStoreToNative(chatKey);
+            if (!isNativeV1ImportDone()) {
+                const didResolveNativeV1Import =
+                    await importNativeV1ChatStore(chatKey);
+                if (hasLocalStorageChatStore()) {
+                    await importLocalStorageChatStoreToNative(chatKey);
                 }
-                if (didResolveNativeMigration) {
-                    markNativeMigrationDone();
+                if (didResolveNativeV1Import) {
+                    markNativeV1ImportDone();
                 }
             }
-        } else if (hasLegacyChatStore()) {
-            await migrateLegacyLocalChatStoreToIndexedDb();
+        } else if (hasLocalStorageChatStore()) {
+            await importLocalStorageChatStoreToIndexedDb();
         } else {
-            await migrateLegacyIndexedDbChatStore();
+            await importV1IndexedDbChatStore();
         }
     })().catch((error: unknown) => {
         if (_chatPersistenceInitPromise === initPromise) {
@@ -866,9 +881,7 @@ const listSessionsNative = async (chatKey: string): Promise<ChatSession[]> => {
         { keyB64: chatKey },
     );
 
-    const activeSessions = sessions.filter((session) => !session.deletedAt);
-
-    return activeSessions.map((session) => ({
+    return sessions.map((session) => ({
         sessionUuid: session.sessionUuid,
         rootSessionUuid: session.sessionUuid,
         branchFromMessageUuid: undefined,
@@ -888,23 +901,20 @@ const listMessagesNative = async (
         sessionUuid,
     });
 
-    return messages
-        .filter((message) => !message.deletedAt)
-        .map((message) => ({
-            messageUuid: message.messageUuid,
-            sessionUuid: message.sessionUuid,
-            parentMessageUuid: message.parentMessageUuid ?? undefined,
-            sender: message.sender,
-            text: message.text,
-            createdAt: message.createdAt,
-            attachments: message.attachments?.map((attachment) => ({
-                id: attachment.id,
-                kind: attachment.kind,
-                name: attachment.name,
-                size: attachment.size,
-                uploadedAt: attachment.uploadedAt ?? undefined,
-            })),
-        }));
+    return messages.map((message) => ({
+        messageUuid: message.messageUuid,
+        sessionUuid: message.sessionUuid,
+        parentMessageUuid: message.parentMessageUuid ?? undefined,
+        sender: message.sender,
+        text: message.text,
+        createdAt: message.createdAt,
+        attachments: message.attachments?.map((attachment) => ({
+            id: attachment.id,
+            kind: attachment.kind,
+            name: attachment.name,
+            size: attachment.size,
+        })),
+    }));
 };
 
 const createSessionNative = async (chatKey: string) => {
@@ -947,7 +957,6 @@ const addMessageNative = async (
                 kind: attachment.kind,
                 name: attachment.name,
                 size: attachment.size,
-                uploadedAt: attachment.uploadedAt ?? null,
             })),
         },
     });
@@ -982,7 +991,6 @@ const addMessageNative = async (
             kind: attachment.kind,
             name: attachment.name,
             size: attachment.size,
-            uploadedAt: attachment.uploadedAt ?? undefined,
         })),
     };
 };
@@ -1021,13 +1029,12 @@ export const listSessions = async (chatKey: string): Promise<ChatSession[]> => {
     try {
         const { sessions, messages } = await fetchStore();
 
-        const activeSessions = sessions
-            .filter((session) => !session.deletedAt && !session.isDeleted)
-            .sort((a, b) => b.updatedAt - a.updatedAt);
+        const activeSessions = sessions.sort(
+            (a, b) => b.updatedAt - a.updatedAt,
+        );
 
         const bySession = new Map<string, StoredMessage[]>();
         for (const message of messages) {
-            if (message.deletedAt || message.isDeleted) continue;
             const list = bySession.get(message.sessionUuid) ?? [];
             list.push(message);
             bySession.set(message.sessionUuid, list);
@@ -1080,12 +1087,7 @@ export const listMessages = async (
     try {
         const { messages } = await fetchStore();
         const sessionMessages = messages
-            .filter(
-                (message) =>
-                    message.sessionUuid === sessionUuid &&
-                    !message.deletedAt &&
-                    !message.isDeleted,
-            )
+            .filter((message) => message.sessionUuid === sessionUuid)
             .sort((a, b) => a.createdAt - b.createdAt);
 
         return Promise.all(
@@ -1125,9 +1127,6 @@ export const createSession = async (chatKey: string) => {
         updatedAt: now,
         encryptedData: encrypted.encryptedData,
         header: encrypted.header,
-        remoteId: null,
-        needsSync: true,
-        deletedAt: null,
     };
 
     await db.put("sessions", session);
@@ -1169,8 +1168,6 @@ export const addMessage = async (
         encryptedData: encrypted.encryptedData,
         header: encrypted.header,
         attachments: storedAttachments,
-        remoteId: null,
-        deletedAt: null,
     };
 
     const tx = db.transaction(["sessions", "messages"], "readwrite");
@@ -1180,7 +1177,6 @@ export const addMessage = async (
     const session = await sessionStore.get(sessionUuid);
     if (session) {
         session.updatedAt = now;
-        session.needsSync = true;
 
         const currentTitle = await decryptSessionTitle(session, chatKey);
         if (sender === "self" && currentTitle.toLowerCase() === "new chat") {
@@ -1224,7 +1220,6 @@ export const updateSessionTitle = async (
     session.encryptedData = updated.encryptedData;
     session.header = updated.header;
     session.updatedAt = nowMicros();
-    session.needsSync = true;
     await db.put("sessions", session);
 };
 
@@ -1256,7 +1251,6 @@ export const updateMessage = async (
     const session = await sessionStore.get(message.sessionUuid);
     if (session) {
         session.updatedAt = nowMicros();
-        session.needsSync = true;
         await sessionStore.put(session);
     }
 
@@ -1299,27 +1293,16 @@ export const deleteSession = async (sessionUuid: string, chatKey: string) => {
     }
 
     const db = await chatDb();
-    const now = nowMicros();
+    const messages = await db.getAll("messages");
     const tx = db.transaction(["sessions", "messages"], "readwrite");
-
     const sessionStore = tx.objectStore("sessions");
-    const session = await sessionStore.get(sessionUuid);
-    if (session) {
-        session.deletedAt = now;
-        session.needsSync = true;
-        await sessionStore.put(session);
-    }
-
     const messageStore = tx.objectStore("messages");
-    const messages = await messageStore.getAll();
-    await Promise.all(
-        messages
+    await Promise.all([
+        sessionStore.delete(sessionUuid),
+        ...messages
             .filter((message) => message.sessionUuid === sessionUuid)
-            .map((message) => {
-                message.deletedAt = now;
-                return messageStore.put(message);
-            }),
-    );
+            .map((message) => messageStore.delete(message.messageUuid)),
+    ]);
 
     await tx.done;
     await deleteBranchSelections(sessionUuid);
@@ -1404,9 +1387,9 @@ export const readDecryptedAttachmentBytes = async (
         return await decryptAttachmentBytes(encrypted, chatKey, sessionUuid);
     } catch (error) {
         for (const fallbackKey of [
-            legacyAttachmentChatKey(),
+            v1AttachmentChatKey(),
             cachedLocalChatKey(),
-            legacyLocalChatKey(),
+            v1LocalChatKey(),
         ]) {
             if (!fallbackKey || fallbackKey === chatKey) continue;
             try {
@@ -1416,7 +1399,7 @@ export const readDecryptedAttachmentBytes = async (
                     sessionUuid,
                 );
             } catch {
-                // Try the next known legacy key.
+                // Try the next v1 key.
             }
         }
         throw error;

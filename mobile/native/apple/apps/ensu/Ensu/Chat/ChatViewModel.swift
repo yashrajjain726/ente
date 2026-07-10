@@ -82,7 +82,6 @@ final class ChatViewModel: ObservableObject {
     private var chatDb: EnsuDb
     private let attachmentsDir: URL
     private let chatDbPath: String
-    private let attachmentsDbPath: String
     private let chatDbKey: Data
     private let modelSettings = ModelSettingsStore.shared
 
@@ -136,11 +135,10 @@ final class ChatViewModel: ObservableObject {
 
         let chatDbKey = CredentialStore.shared.getOrCreateChatDbKey()
         let chatDbPath = dbDir.appendingPathComponent("llmchat.db").path
-        let attachmentsDbPath = dbDir.appendingPathComponent("llmchat_sync.db").path
 
         let chatDb: EnsuDb
         do {
-            chatDb = try EnsuDb.open(mainDbPath: chatDbPath, attachmentsDbPath: attachmentsDbPath, key: chatDbKey)
+            chatDb = try EnsuDb.open(mainDbPath: chatDbPath, key: chatDbKey)
         } catch {
             fatalError("Failed to open chat DB: \(error)")
         }
@@ -155,7 +153,6 @@ final class ChatViewModel: ObservableObject {
         self.chatDb = chatDb
         self.attachmentsDir = attachmentsDir
         self.chatDbPath = chatDbPath
-        self.attachmentsDbPath = attachmentsDbPath
         self.chatDbKey = chatDbKey
         self.sessionSummaries = summaries
 
@@ -215,9 +212,8 @@ final class ChatViewModel: ObservableObject {
         "You can view existing chats, but can't send new messages."
 
     private func reopenChatStoreIfNeeded(force: Bool = false) {
-        let hasAttachmentsDb = FileManager.default.fileExists(atPath: attachmentsDbPath)
         let hasChatDb = FileManager.default.fileExists(atPath: chatDbPath)
-        if !force && hasAttachmentsDb && hasChatDb {
+        if !force && hasChatDb {
             return
         }
 
@@ -230,7 +226,6 @@ final class ChatViewModel: ObservableObject {
 
             chatDb = try EnsuDb.open(
                 mainDbPath: chatDbPath,
-                attachmentsDbPath: attachmentsDbPath,
                 key: chatDbKey
             )
         } catch {
