@@ -278,10 +278,12 @@ async fn upload_post_photo_asset_attaches_photo_metadata() {
             "space_owner_main",
             &post_key,
             TEST_WEBP_BYTES,
-            Some(4032),
-            Some(3024),
-            Some("image/webp".to_owned()),
-            Some("thumbhash-test".to_owned()),
+            PostPhotoAssetOptions {
+                width: Some(4032),
+                height: Some(3024),
+                media_type: Some("image/webp".to_owned()),
+                thumb_hash: Some("thumbhash-test".to_owned()),
+            },
         )
         .await
         .expect("photo upload should succeed");
@@ -310,10 +312,12 @@ async fn upload_post_photo_asset_rejects_video_media_type() {
             "space_owner_main",
             &generate_key(),
             TEST_WEBP_BYTES,
-            Some(4032),
-            Some(3024),
-            Some("video/mp4".to_owned()),
-            None,
+            PostPhotoAssetOptions {
+                width: Some(4032),
+                height: Some(3024),
+                media_type: Some("video/mp4".to_owned()),
+                thumb_hash: None,
+            },
         )
         .await
         .expect_err("video media type should fail before upload");
@@ -331,10 +335,12 @@ async fn upload_post_photo_asset_rejects_video_bytes() {
             "space_owner_main",
             &generate_key(),
             TEST_MP4_BYTES,
-            Some(1920),
-            Some(1080),
-            Some("image/webp".to_owned()),
-            None,
+            PostPhotoAssetOptions {
+                width: Some(1920),
+                height: Some(1080),
+                media_type: Some("image/webp".to_owned()),
+                thumb_hash: None,
+            },
         )
         .await
         .expect_err("video bytes should fail before upload");

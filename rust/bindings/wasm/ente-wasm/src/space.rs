@@ -5,8 +5,9 @@ use std::collections::BTreeMap;
 use ente_core::{crypto::decode_b64, http::Error as HttpError};
 use ente_space::{
     AccountSpaceCtx, CreatedSpace, DecryptedMessage, DecryptedPost, DecryptedSpaceProfile,
-    MessageConversationActivity, MessageResponse, OpenAccountSpaceCtxInput, PostResponse,
-    ProfileAvatarResponse, ProfileCoverResponse, SpaceActorResponse, SpaceError as CoreSpaceError,
+    MessageConversationActivity, MessageResponse, OpenAccountSpaceCtxInput, PostPhotoAssetOptions,
+    PostResponse, ProfileAvatarResponse, ProfileCoverResponse, SpaceActorResponse,
+    SpaceError as CoreSpaceError,
 };
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen as swb;
@@ -746,6 +747,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Create a single-photo post with optional caption.
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_photo_post(
         &self,
         space_id: String,
@@ -763,10 +765,12 @@ impl SpaceAccountCtxHandle {
                 &space_id,
                 &post_key,
                 &photo_bytes,
-                width,
-                height,
-                media_type,
-                thumb_hash,
+                PostPhotoAssetOptions {
+                    width,
+                    height,
+                    media_type,
+                    thumb_hash,
+                },
             )
             .await?;
         let (post_id, _) = self

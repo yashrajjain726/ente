@@ -402,7 +402,10 @@ export const SpaceFileViewer: React.FC<SpaceFileViewerProps> = ({
         (!onPublishDraftPost && !canQueueDraftPostPublish);
     const isReplyActionRunning = replyActionPhase != null;
     const canReplyToPost = Boolean(
-        !isDraftPost && activePhoto.spaceId && activePhoto.postId && onReplyToPost,
+        !isDraftPost &&
+        activePhoto.spaceId &&
+        activePhoto.postId &&
+        onReplyToPost,
     );
     const isReplyMode =
         canReplyToPost &&

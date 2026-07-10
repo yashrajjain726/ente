@@ -13,6 +13,7 @@ mod test_support;
 mod tests;
 
 use std::{
+    cmp::Reverse,
     collections::BTreeMap,
     sync::{Mutex, MutexGuard},
 };
@@ -55,6 +56,14 @@ pub const MAX_SPACE_MESSAGE_TEXT_BYTES: usize = 4 * 1024;
 pub const MAX_SPACE_MESSAGE_CIPHER_DECODED_BYTES: usize = 6 * 1024;
 pub const MAX_SPACE_MESSAGE_PAYLOAD_BYTES: usize =
     MAX_SPACE_MESSAGE_CIPHER_DECODED_BYTES - SECRETBOX_PAYLOAD_OVERHEAD_BYTES;
+
+#[derive(Debug, Clone, Default)]
+pub struct PostPhotoAssetOptions {
+    pub width: Option<i32>,
+    pub height: Option<i32>,
+    pub media_type: Option<String>,
+    pub thumb_hash: Option<String>,
+}
 
 fn profile_object_id_from_key(object_key: &str) -> Result<String> {
     object_key
@@ -729,7 +738,7 @@ pub(super) fn build_space_key_history_map(
     let mut history = BTreeMap::new();
     history.insert(current_version, current_key.to_vec());
     let mut ordered = versions.to_vec();
-    ordered.sort_by(|left, right| right.version.cmp(&left.version));
+    ordered.sort_by_key(|entry| Reverse(entry.version));
     for entry in ordered {
         if entry.wrapped_prev_key.is_empty() || entry.version <= 1 {
             continue;

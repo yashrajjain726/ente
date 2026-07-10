@@ -7,9 +7,9 @@
 //! upload (posts are photo-only).
 
 use super::{
-    AccountSpaceCtx, UPLOAD_PURPOSE_AVATAR, UPLOAD_PURPOSE_COVER, encrypt_post_object_metadata,
-    ensure_space_upload_size, ensure_supported_photo_bytes, ensure_supported_photo_media_type,
-    profile_object_id_from_key,
+    AccountSpaceCtx, PostPhotoAssetOptions, UPLOAD_PURPOSE_AVATAR, UPLOAD_PURPOSE_COVER,
+    encrypt_post_object_metadata, ensure_space_upload_size, ensure_supported_photo_bytes,
+    ensure_supported_photo_media_type, profile_object_id_from_key,
 };
 use crate::crypto::{content_md5_base64, encrypt_asset_payload};
 use crate::error::{Result, SpaceError};
@@ -134,13 +134,10 @@ impl AccountSpaceCtx {
         space_id: &str,
         post_key: &[u8],
         plaintext: &[u8],
-        width: Option<i32>,
-        height: Option<i32>,
-        media_type: Option<String>,
-        thumb_hash: Option<String>,
+        options: PostPhotoAssetOptions,
     ) -> Result<PostObjectPayload> {
         let inferred_media_type = ensure_supported_photo_bytes(plaintext)?;
-        let media_type = ensure_supported_photo_media_type(media_type.as_deref())?
+        let media_type = ensure_supported_photo_media_type(options.media_type.as_deref())?
             .unwrap_or_else(|| inferred_media_type.to_owned());
         let mut object = self
             .upload_post_asset(space_id, post_key, plaintext, Some(0))
@@ -148,10 +145,10 @@ impl AccountSpaceCtx {
         object.metadata_cipher = Some(encrypt_post_object_metadata(
             post_key,
             &PostObjectMetadata {
-                width: width.filter(|value| *value > 0),
-                height: height.filter(|value| *value > 0),
+                width: options.width.filter(|value| *value > 0),
+                height: options.height.filter(|value| *value > 0),
                 media_type: Some(media_type),
-                thumb_hash,
+                thumb_hash: options.thumb_hash,
                 ..Default::default()
             },
         )?);

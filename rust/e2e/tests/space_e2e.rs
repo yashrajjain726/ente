@@ -2,7 +2,7 @@
 mod space;
 mod support;
 
-use ente_space::AccountSpaceCtx;
+use ente_space::{AccountSpaceCtx, PostPhotoAssetOptions};
 
 use support::auth;
 
@@ -136,10 +136,12 @@ async fn space_bootstrap_posts_and_friend_share_suite() {
             &owner_space.space_id,
             &post_key,
             TEST_WEBP_BYTES,
-            Some(320),
-            Some(240),
-            Some("image/webp".to_owned()),
-            None,
+            PostPhotoAssetOptions {
+                width: Some(320),
+                height: Some(240),
+                media_type: Some("image/webp".to_owned()),
+                thumb_hash: None,
+            },
         )
         .await
         .expect("post asset upload should succeed");
@@ -336,10 +338,12 @@ async fn space_unfriend_revokes_reciprocal_account_access_suite() {
             &owner_space.space_id,
             &post_key,
             TEST_WEBP_BYTES,
-            Some(320),
-            Some(240),
-            Some("image/webp".to_owned()),
-            None,
+            PostPhotoAssetOptions {
+                width: Some(320),
+                height: Some(240),
+                media_type: Some("image/webp".to_owned()),
+                thumb_hash: None,
+            },
         )
         .await
         .expect("post asset upload should succeed");
@@ -596,10 +600,12 @@ async fn space_rotation_history_and_refresh_suite() {
             &owner_space.space_id,
             &post_key_v1,
             TEST_WEBP_BYTES,
-            Some(320),
-            Some(240),
-            Some("image/webp".to_owned()),
-            None,
+            PostPhotoAssetOptions {
+                width: Some(320),
+                height: Some(240),
+                media_type: Some("image/webp".to_owned()),
+                thumb_hash: None,
+            },
         )
         .await
         .expect("v1 post asset upload should succeed");
@@ -657,10 +663,12 @@ async fn space_rotation_history_and_refresh_suite() {
             &owner_space.space_id,
             &post_key_v2,
             TEST_WEBP_BYTES,
-            Some(320),
-            Some(240),
-            Some("image/webp".to_owned()),
-            None,
+            PostPhotoAssetOptions {
+                width: Some(320),
+                height: Some(240),
+                media_type: Some("image/webp".to_owned()),
+                thumb_hash: None,
+            },
         )
         .await
         .expect("v2 post asset upload should succeed");
