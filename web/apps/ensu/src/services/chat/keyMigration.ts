@@ -8,7 +8,9 @@ import {
 const LOCAL_STORE = "ensu.chat.store.v1";
 const MIGRATION_DONE = "ensu.chat.localMigration.v3";
 const OLD_LOCAL_SECURE_KEY = "localChatKey";
+const OLD_LOCAL_BROWSER_KEY = "ensu.chatKey.local";
 const KEY_FILE = "chat-keys.json";
+export const LEGACY_ATTACHMENT_SECURE_KEY = "legacyAttachmentKey.v2";
 
 const localGet = (key: string) => localStorage.getItem(key) ?? undefined;
 
@@ -76,30 +78,39 @@ const retiredUserID = () => {
     }
 };
 
-export const finalizeLocalChatMigration = async () => {
+export const finalizeLocalChatMigration = async (
+    deleteOldLocalKeys: boolean,
+) => {
     const userID = retiredUserID();
     localStorage.removeItem(LOCAL_STORE);
-    await Promise.all(
-        [
-            OLD_LOCAL_SECURE_KEY,
-            "masterKey",
-            "remoteChatKey",
-            ...(userID
-                ? [`remoteChatKey.${userID}`, `remoteChatKey.v2.${userID}`]
-                : []),
-        ].map(secureStorageDelete),
-    );
+    const secureKeys = [
+        "masterKey",
+        "remoteChatKey",
+        ...(userID
+            ? [`remoteChatKey.${userID}`, `remoteChatKey.v2.${userID}`]
+            : []),
+    ];
+    if (deleteOldLocalKeys) {
+        secureKeys.push(OLD_LOCAL_SECURE_KEY, LEGACY_ATTACHMENT_SECURE_KEY);
+    }
+    await Promise.all(secureKeys.map(secureStorageDelete));
 
-    const [{ exists, remove }, { appDataDir, join }] = await Promise.all([
-        import("@tauri-apps/plugin-fs"),
-        import("@tauri-apps/api/path"),
-    ]);
-    const root = await appDataDir();
-    const keyFile = await join(root, KEY_FILE);
-    if (await exists(keyFile)) await remove(keyFile);
+    if (deleteOldLocalKeys) {
+        const [{ exists, remove }, { appDataDir, join }] = await Promise.all([
+            import("@tauri-apps/plugin-fs"),
+            import("@tauri-apps/api/path"),
+        ]);
+        const keyFile = await join(await appDataDir(), KEY_FILE);
+        if (await exists(keyFile)) await remove(keyFile);
+    }
 
     for (const key of Object.keys(localStorage)) {
-        if (key.startsWith("ensu.chatKey")) localStorage.removeItem(key);
+        if (
+            key.startsWith("ensu.chatKey") &&
+            (deleteOldLocalKeys || key !== OLD_LOCAL_BROWSER_KEY)
+        ) {
+            localStorage.removeItem(key);
+        }
     }
     [
         "user",

@@ -367,57 +367,6 @@ export const deserializeAttachmentsStrict = async (
         })),
     );
 
-export const pruneOrphanedAttachmentBytes = async () => {
-    if (isTauriRuntime()) {
-        const sessions = await invokeChat<NativeSession[]>(
-            "chat_db_list_sessions",
-        );
-        const referenced = new Set<string>();
-        for (const session of sessions) {
-            const messages = await invokeChat<NativeMessage[]>(
-                "chat_db_get_messages",
-                { sessionUuid: session.sessionUuid },
-            );
-            for (const attachment of messages.flatMap(
-                ({ attachments }) => attachments ?? [],
-            )) {
-                referenced.add(attachment.id);
-            }
-        }
-
-        const { readDir } = await import("@tauri-apps/plugin-fs");
-        for (const entry of await readDir(await attachmentDir())) {
-            if (entry.isFile && !referenced.has(entry.name)) {
-                await deleteAttachmentBytes(entry.name);
-            }
-        }
-        return;
-    }
-
-    const db = await chatDb();
-    const [messages, attachments] = await Promise.all([
-        db.getAll("messages"),
-        db.getAll("attachmentBytes"),
-    ]);
-    const referenced = new Set(
-        messages.flatMap((message) =>
-            (message.attachments ?? []).map((attachment) => attachment.id),
-        ),
-    );
-    const orphaned = attachments.filter(
-        (attachment) => !referenced.has(attachment.id),
-    );
-    if (!orphaned.length) return;
-
-    const tx = db.transaction(["attachmentBytes"], "readwrite");
-    await Promise.all(
-        orphaned.map((attachment) =>
-            tx.objectStore("attachmentBytes").delete(attachment.id),
-        ),
-    );
-    await tx.done;
-};
-
 const fetchStore = async () => {
     const db = await chatDb();
     const [sessions, messages] = await Promise.all([

@@ -1,19 +1,24 @@
 import { base64ToBytes } from "@/services/base64";
+import { secureStorageGet } from "@/services/secure-storage";
 import { isTauriRuntime } from "@/services/tauri-runtime";
 import log from "ente-base/log";
 import { deleteDB, openDB, type DBSchema } from "idb";
+import { decryptAttachmentBytes, encryptAttachmentBytes } from "./attachments";
 import { localChatMigrationSourceKeys } from "./chatKey";
 import {
     finalizeLocalChatMigration,
     isLocalChatMigrationDone,
+    LEGACY_ATTACHMENT_SECURE_KEY,
 } from "./keyMigration";
 import {
+    attachmentBytesExists,
     chatDb,
     decryptMessageTextStrict,
     decryptSessionTitleStrict,
+    deleteAttachmentBytes,
     deserializeAttachmentsStrict,
     invokeChat,
-    pruneOrphanedAttachmentBytes,
+    readAttachmentBytes,
     writeAttachmentBytes,
     type StoredAttachment,
     type StoredMessage,
@@ -267,6 +272,90 @@ const distinctKeys = (keys: (string | undefined)[]) =>
             !!key && values.indexOf(key) === index,
     );
 
+const decryptAttachmentWith = async (
+    encrypted: Uint8Array,
+    keys: string[],
+    sessionUuid: string,
+) => {
+    for (const key of keys) {
+        try {
+            return [
+                await decryptAttachmentBytes(encrypted, key, sessionUuid),
+                key,
+            ] as const;
+        } catch {
+            // Try the next migration-only key.
+        }
+    }
+    return undefined;
+};
+
+const reencryptAttachments = async (chatKey: string, sourceKeys: string[]) => {
+    const candidates = distinctKeys([
+        ...sourceKeys,
+        await secureStorageGet(LEGACY_ATTACHMENT_SECURE_KEY),
+    ]);
+    let allCurrent = true;
+
+    for (const { sessionUuid } of await invokeChat<{ sessionUuid: string }[]>(
+        "chat_db_list_sessions",
+    )) {
+        for (const { id } of (
+            await invokeChat<{ attachments?: { id: string }[] }[]>(
+                "chat_db_get_messages",
+                { sessionUuid },
+            )
+        ).flatMap(({ attachments }) => attachments ?? [])) {
+            const stagingID = `${id}.migrating`;
+            if (await attachmentBytesExists(stagingID)) {
+                const staged = await readAttachmentBytes(stagingID);
+                if (
+                    await decryptAttachmentWith(staged, [chatKey], sessionUuid)
+                ) {
+                    await writeAttachmentBytes(id, staged);
+                    await decryptAttachmentBytes(
+                        await readAttachmentBytes(id),
+                        chatKey,
+                        sessionUuid,
+                    );
+                    await deleteAttachmentBytes(stagingID);
+                    continue;
+                }
+                await deleteAttachmentBytes(stagingID);
+            }
+            if (!(await attachmentBytesExists(id))) continue;
+
+            const decrypted = await decryptAttachmentWith(
+                await readAttachmentBytes(id),
+                candidates,
+                sessionUuid,
+            );
+            if (!decrypted) {
+                allCurrent = false;
+                log.warn(`No stored key can decrypt attachment ${id}`);
+                continue;
+            }
+            const [plaintext, key] = decrypted;
+            if (key === chatKey) continue;
+
+            await writeAttachmentBytes(
+                stagingID,
+                await encryptAttachmentBytes(plaintext, chatKey, sessionUuid),
+            );
+            const staged = await readAttachmentBytes(stagingID);
+            await decryptAttachmentBytes(staged, chatKey, sessionUuid);
+            await writeAttachmentBytes(id, staged);
+            await decryptAttachmentBytes(
+                await readAttachmentBytes(id),
+                chatKey,
+                sessionUuid,
+            );
+            await deleteAttachmentBytes(stagingID);
+        }
+    }
+    return allCurrent;
+};
+
 const migrate = async (chatKey: string) => {
     if (isTauriRuntime()) {
         const migrationPending = !isLocalChatMigrationDone();
@@ -281,16 +370,13 @@ const migrate = async (chatKey: string) => {
             if (hasLocalStorageStore()) {
                 await importLocalStorageToNative(sourceKeys);
             }
-            await finalizeLocalChatMigration();
+            await finalizeLocalChatMigration(
+                await reencryptAttachments(chatKey, sourceKeys),
+            );
         }
     } else {
         await removeCurrentBrowserTombstones();
         await importOldBrowserStores();
-    }
-    try {
-        await pruneOrphanedAttachmentBytes();
-    } catch (error) {
-        log.warn("Failed to prune orphaned attachment payloads", error);
     }
 };
 
