@@ -52,6 +52,8 @@ class _PreviewPropertiesItemWidgetState
   }
 
   Future<void> _getSection() async {
+    if (!mounted) return;
+
     final parts = <String>[];
 
     final data = await VideoPreviewService.instance
@@ -60,6 +62,8 @@ class _PreviewPropertiesItemWidgetState
           return null;
         });
     if (data == null) return;
+
+    if (!mounted) return;
 
     if (data.width != null && data.height != null) {
       parts.add("${data.width!}x${data.height!}");

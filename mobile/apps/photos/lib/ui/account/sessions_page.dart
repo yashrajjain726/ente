@@ -25,6 +25,7 @@ class _SessionsPageState extends State<SessionsPage> {
   @override
   void initState() {
     _fetchActiveSessions().onError((error, stackTrace) {
+      if (!mounted) return;
       showToast(
         context,
         AppLocalizations.of(context).failedToFetchActiveSessions,

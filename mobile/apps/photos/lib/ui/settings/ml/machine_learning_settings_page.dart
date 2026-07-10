@@ -43,7 +43,7 @@ class _MachineLearningSettingsPageState
   @override
   void initState() {
     super.initState();
-    EnteWakeLockService.instance.updateWakeLock(
+    wakeLockService.updateWakeLock(
       enable: true,
       wakeLockFor: WakeLockFor.machineLearningSettingsScreen,
     );
@@ -65,7 +65,7 @@ class _MachineLearningSettingsPageState
   @override
   void dispose() {
     super.dispose();
-    EnteWakeLockService.instance.updateWakeLock(
+    wakeLockService.updateWakeLock(
       enable: false,
       wakeLockFor: WakeLockFor.machineLearningSettingsScreen,
     );

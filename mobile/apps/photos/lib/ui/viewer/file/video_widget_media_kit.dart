@@ -138,7 +138,7 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
             }
           }
         });
-    EnteWakeLockService.instance.updateWakeLock(
+    wakeLockService.updateWakeLock(
       enable: true,
       wakeLockFor: WakeLockFor.videoPlayback,
     );
@@ -203,13 +203,13 @@ class _VideoWidgetMediaKitState extends State<VideoWidgetMediaKit>
     player.dispose();
     _captionUpdatedSubscription.cancel();
     _transformationController.dispose();
-    if (EnteWakeLockService.instance.shouldKeepAppAwakeAcrossSessions) {
-      EnteWakeLockService.instance.updateWakeLock(
+    if (wakeLockService.shouldKeepAppAwakeAcrossSessions) {
+      wakeLockService.updateWakeLock(
         enable: true,
         wakeLockFor: WakeLockFor.handlingMediaKitEdgeCase,
       );
     } else {
-      EnteWakeLockService.instance.updateWakeLock(
+      wakeLockService.updateWakeLock(
         enable: false,
         wakeLockFor: WakeLockFor.videoPlayback,
       );

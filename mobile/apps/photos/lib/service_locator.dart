@@ -40,6 +40,7 @@ import "package:photos/services/storage_bonus_service.dart";
 import "package:photos/services/sync/trash_sync_service.dart";
 import "package:photos/services/text_embeddings_cache_service.dart";
 import "package:photos/services/update_service.dart";
+import "package:photos/services/wake_lock_service.dart";
 import "package:photos/services/wrapped/wrapped_cache_service.dart";
 import "package:photos/services/wrapped/wrapped_service.dart";
 import "package:photos/settings/backup_settings.dart";
@@ -55,6 +56,7 @@ class ServiceLocator {
   late final EndpointConfig endpointConfig;
   late final LocalSettings localSettings;
   late final BackupSettings backupSettings;
+  late final EnteWakeLockService wakeLockService;
 
   // instance
   ServiceLocator._privateConstructor();
@@ -76,6 +78,7 @@ class ServiceLocator {
     endpointConfig = EndpointConfig(prefs);
     localSettings = LocalSettings(prefs);
     backupSettings = BackupSettings(prefs);
+    wakeLockService = EnteWakeLockService(prefs);
   }
 }
 
@@ -101,6 +104,9 @@ CastService get castService {
 LocalSettings get localSettings => ServiceLocator.instance.localSettings;
 
 BackupSettings get backupSettings => ServiceLocator.instance.backupSettings;
+
+EnteWakeLockService get wakeLockService =>
+    ServiceLocator.instance.wakeLockService;
 
 /// Whether the app is currently showing the no-account local gallery experience.
 ///

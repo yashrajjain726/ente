@@ -381,6 +381,9 @@ class _HomeWidgetState extends State<HomeWidget> {
 
       final Collection? collection = await CollectionsService.instance
           .getCollectionFromPublicLink(context, uri);
+      if (!mounted) {
+        return;
+      }
       if (collection == null) {
         return;
       }
@@ -1224,6 +1227,7 @@ class _HomeWidgetState extends State<HomeWidget> {
         locale: Localizations.localeOf(context),
         isLocalGallery: isLocalGalleryMode,
         isSignedIn: Configuration.instance.isLoggedIn(),
+        isAndroid: Platform.isAndroid,
       );
       if (!mounted || action == ChangeLogAction.skip) {
         return;
