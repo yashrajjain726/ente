@@ -195,7 +195,7 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
   }
 
   Future<void> _handlePaymentFailure(String reason) async {
-    await showDialog(
+    final shouldContactSupport = await showDialog<bool>(
       useRootNavigator: false,
       context: context,
       barrierDismissible: false,
@@ -205,18 +205,15 @@ class _PaymentWebPageState extends State<PaymentWebPage> {
         actions: <Widget>[
           TextButton(
             child: Text(AppLocalizations.of(context).contactSupport),
-            onPressed: () async {
-              Navigator.of(context).pop('dialog');
-              await sendEmail(
-                context,
-                to: supportEmail,
-                subject: "Billing issue",
-              );
-            },
+            onPressed: () => Navigator.of(context).pop(true),
           ),
         ],
       ),
     );
+    if (!mounted) return;
+    if (shouldContactSupport == true) {
+      await sendEmail(context, to: supportEmail, subject: "Billing issue");
+    }
     if (!mounted) return;
     Navigator.of(context).pop(true);
   }

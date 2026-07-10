@@ -376,12 +376,15 @@ Future<bool> deleteLocalFiles(
     final tooManyAssets = localAssetIDs.length > largeCountThreshold;
     final bool shouldDeleteInBatches =
         await isAndroidSDKVersionLowerThan(android11SDKINT) || tooManyAssets;
-    if (shouldDeleteInBatches) {
+    if (!context.mounted) {
+      _logger.info(
+        "Skipping platform asset deletion after the initiating page was disposed",
+      );
+    } else if (shouldDeleteInBatches) {
       if (tooManyAssets) {
         _logger.info(
           "Too many assets (${localAssetIDs.length}) to delete in one shot, deleting in batches",
         );
-        if (!context.mounted) return false;
         await _recursivelyReduceBatchSizeAndRetryDeletion(
           batchSize: largeCountThreshold,
           context: context,
@@ -390,14 +393,12 @@ Future<bool> deleteLocalFiles(
         );
       } else {
         _logger.info("Deleting in batches");
-        if (!context.mounted) return false;
         deletedIDs.addAll(
           await deleteLocalFilesInBatches(context, localAssetIDs),
         );
       }
     } else {
       _logger.info("Deleting in one shot");
-      if (!context.mounted) return false;
       deletedIDs.addAll(
         await _deleteLocalFilesInOneShot(context, localAssetIDs),
       );
@@ -469,15 +470,17 @@ Future<bool> deleteLocalFilesAfterRemovingAlreadyDeletedIDs(
     final bool shouldDeleteInBatches = await isAndroidSDKVersionLowerThan(
       android11SDKINT,
     );
-    if (shouldDeleteInBatches) {
+    if (!context.mounted) {
+      _logger.info(
+        "Skipping platform asset deletion after the initiating page was disposed",
+      );
+    } else if (shouldDeleteInBatches) {
       _logger.info("Deleting in batches");
-      if (!context.mounted) return false;
       deletedIDs.addAll(
         await deleteLocalFilesInBatches(context, localAssetIDs),
       );
     } else {
       _logger.info("Deleting in one shot");
-      if (!context.mounted) return false;
       deletedIDs.addAll(
         await _deleteLocalFilesInOneShot(context, localAssetIDs),
       );
@@ -557,15 +560,17 @@ Future<bool> retryFreeUpSpaceAfterRemovingAssetsNonExistingInDisk(
     final bool shouldDeleteInBatches = await isAndroidSDKVersionLowerThan(
       android11SDKINT,
     );
-    if (shouldDeleteInBatches) {
+    if (!context.mounted) {
+      _logger.info(
+        "Skipping platform asset deletion after the initiating page was disposed",
+      );
+    } else if (shouldDeleteInBatches) {
       _logger.info("Deleting in batches");
-      if (!context.mounted) return false;
       deletedIDs.addAll(
         await deleteLocalFilesInBatches(context, localAssetIDs),
       );
     } else {
       _logger.info("Deleting in one shot");
-      if (!context.mounted) return false;
       deletedIDs.addAll(
         await _deleteLocalFilesInOneShot(context, localAssetIDs),
       );

@@ -140,11 +140,10 @@ class _SmartAlbumPeopleState extends State<SmartAlbumPeople> {
                                     .getCollectionByID(widget.collectionId);
 
                                 if (files?.isNotEmpty ?? false) {
-                                  if (!context.mounted) return;
                                   await CollectionActions(
                                     CollectionsService.instance,
                                   ).moveFilesFromCurrentCollection(
-                                    context,
+                                    null,
                                     collection!,
                                     enteFiles[widget.collectionId] ?? [],
                                     isHidden: collection.isHidden(),

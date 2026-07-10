@@ -124,7 +124,7 @@ class _AllLinksPageState extends State<AllLinksPage> {
     for (final link in List<Collection>.of(_selectedQuickLinks)) {
       await CollectionActions(
         CollectionsService.instance,
-      ).trashCollectionKeepingPhotos(link, context);
+      ).trashCollectionKeepingPhotos(link);
       if (!mounted) return;
       setState(() {
         widget.quickLinks.remove(link);

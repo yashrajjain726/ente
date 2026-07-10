@@ -181,9 +181,8 @@ class FavoritesService {
       await _collectionsService.addOrCopyToCollection(collectionID, files);
     } else {
       final Collection? favCollection = await getFavoritesCollection();
-      if (!context.mounted) return;
       await _collectionActions.moveFilesFromCurrentCollection(
-        context,
+        null,
         favCollection!,
         files,
       );
@@ -217,9 +216,8 @@ class FavoritesService {
           "Failed to resolve favorites entry for file ${file.uploadedFileID}",
         );
       }
-      if (!context.mounted) return;
       await _collectionActions.moveFilesFromCurrentCollection(
-        context,
+        null,
         favCollection,
         [favFile],
       );

@@ -77,7 +77,7 @@ class CollectionActions {
           onTap: () async {
             // for quickLink collection, we need to trash the collection
             if (collection.isQuickLinkCollection() && !collection.hasSharees) {
-              await trashCollectionKeepingPhotos(collection, context);
+              await trashCollectionKeepingPhotos(collection);
             } else {
               await CollectionsService.instance.disableShareUrl(collection);
             }
@@ -148,9 +148,7 @@ class CollectionActions {
         if (e is SharingNotPermittedForFreeAccountsError) {
           if (newCollection.isQuickLinkCollection() &&
               !newCollection.hasSharees) {
-            if (context.mounted) {
-              await trashCollectionKeepingPhotos(newCollection, context);
-            }
+            await trashCollectionKeepingPhotos(newCollection);
           }
           rethrow;
         }
@@ -368,7 +366,7 @@ class CollectionActions {
       keepPhotos: () async {
         for (final collection in collections) {
           try {
-            await trashCollectionKeepingPhotos(collection, context);
+            await trashCollectionKeepingPhotos(collection);
           } catch (e, s) {
             logger.severe("Failed to keep photos & delete collection", e, s);
             rethrow;
@@ -413,7 +411,7 @@ class CollectionActions {
       message: AppLocalizations.of(bContext).deleteAlbumDialog,
       keepPhotos: () async {
         try {
-          await trashCollectionKeepingPhotos(collection, bContext);
+          await trashCollectionKeepingPhotos(collection);
         } catch (e, s) {
           logger.severe("Failed to keep photos & delete collection", e, s);
           rethrow;
@@ -521,16 +519,12 @@ class CollectionActions {
     return error is Exception ? error : Exception(error.toString());
   }
 
-  Future<void> trashCollectionKeepingPhotos(
-    Collection collection,
-    BuildContext bContext,
-  ) async {
+  Future<void> trashCollectionKeepingPhotos(Collection collection) async {
     final List<EnteFile> files = await FilesDB.instance.getAllFilesCollection(
       collection.id,
     );
-    if (!bContext.mounted) return;
     await moveFilesFromCurrentCollection(
-      bContext,
+      null,
       collection,
       files,
       isHidden: collection.isHidden() && !collection.isDefaultHidden(),
@@ -594,7 +588,7 @@ class CollectionActions {
   we will just remove (not move) the files from the given collection.
   */
   Future<void> moveFilesFromCurrentCollection(
-    BuildContext context,
+    BuildContext? context,
     Collection collection,
     Iterable<EnteFile> files, {
     bool isHidden = false,
@@ -638,11 +632,12 @@ class CollectionActions {
     }
 
     if (!isCollectionOwner && split.ownedByOtherUsers.isNotEmpty) {
-      if (!context.mounted) return;
-      showShortToast(
-        context,
-        AppLocalizations.of(context).canOnlyRemoveFilesOwnedByYou,
-      );
+      if (context != null && context.mounted) {
+        showShortToast(
+          context,
+          AppLocalizations.of(context).canOnlyRemoveFilesOwnedByYou,
+        );
+      }
       return;
     }
 
