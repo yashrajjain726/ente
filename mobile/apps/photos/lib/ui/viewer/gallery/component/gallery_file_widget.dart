@@ -287,6 +287,7 @@ class _GalleryFileWidgetState extends State<GalleryFileWidget> {
   void _routeToDetailPage(EnteFile file, BuildContext context) {
     final galleryFiles = GalleryFilesState.of(context).galleryFiles;
     final selectedIndex = galleryFiles.indexOf(file);
+    // A refresh can make the tapped tile stale.
     if (selectedIndex < 0) {
       return;
     }

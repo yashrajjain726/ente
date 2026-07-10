@@ -159,9 +159,12 @@ class _BodyState extends State<_Body> {
     super.initState();
     _files = widget.config.files;
 
-    final selectedIndex = _initialSelectedIndex();
-    _selectedIndexNotifier.value = selectedIndex ?? -1;
-    _pageController = PageController(initialPage: selectedIndex ?? 0);
+    final configuredIndex = widget.config.selectedIndex;
+    final selectedIndex = _fileAt(configuredIndex) == null
+        ? -1
+        : configuredIndex;
+    _selectedIndexNotifier.value = selectedIndex;
+    _pageController = PageController(initialPage: max(0, selectedIndex));
     _guestViewEventSubscription = Bus.instance.on<GuestViewEvent>().listen((
       event,
     ) {
@@ -611,18 +614,6 @@ class _BodyState extends State<_Body> {
     if (_selectedFile?.uploadedFileID == fileID) {
       notifier.value = isShared;
     }
-  }
-
-  int? _initialSelectedIndex() {
-    final files = _files;
-    if (files == null || files.isEmpty) {
-      return null;
-    }
-    final selectedIndex = widget.config.selectedIndex;
-    if (selectedIndex < 0 || selectedIndex >= files.length) {
-      return null;
-    }
-    return selectedIndex;
   }
 
   EnteFile? get _selectedFile => _fileAt(_selectedIndexNotifier.value);
