@@ -10,53 +10,54 @@ use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen as swb;
 use wasm_bindgen::prelude::*;
 
-/// Contacts error.
-#[wasm_bindgen]
-pub struct ContactsError {
-    code: String,
-    message: String,
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ContactsError {
+    Network { message: String },
+    Http { status: u16, message: String },
+    Parse { message: String },
+    Crypto { message: String },
+    Auth { message: String },
+    InvalidInput { message: String },
+    MissingEncryptedData { message: String },
+    MissingEncryptedKey { message: String },
+    ProfilePictureNotFound { message: String },
+    ActiveRecoverySession { message: String },
+    Serde { message: String },
+    Decode { message: String },
 }
 
-#[wasm_bindgen]
-impl ContactsError {
-    /// Machine-readable error code.
-    #[wasm_bindgen(getter)]
-    pub fn code(&self) -> String {
-        self.code.clone()
-    }
-
-    /// Human-readable error message.
-    #[wasm_bindgen(getter)]
-    pub fn message(&self) -> String {
-        self.message.clone()
+impl From<ContactsError> for JsValue {
+    fn from(e: ContactsError) -> Self {
+        swb::to_value(&e).unwrap_or_else(|err| JsValue::from_str(&err.to_string()))
     }
 }
 
 impl From<CoreContactsError> for ContactsError {
     fn from(e: CoreContactsError) -> Self {
-        let code = match &e {
-            CoreContactsError::Http(_) => "http",
-            CoreContactsError::Crypto(_) => "crypto",
-            CoreContactsError::Auth(_) => "auth",
-            CoreContactsError::InvalidInput(_) => "invalid_input",
-            CoreContactsError::MissingEncryptedData => "missing_encrypted_data",
-            CoreContactsError::MissingEncryptedKey => "missing_encrypted_key",
-            CoreContactsError::ProfilePictureNotFound => "profile_picture_not_found",
-            CoreContactsError::ActiveRecoverySession => "active_recovery_session",
-        }
-        .to_string();
-
-        Self {
-            code,
-            message: ente_core::error::chain(&e),
+        use ente_contacts::ErrorKind as K;
+        let message = ente_core::error::chain(&e);
+        match e.kind() {
+            K::Network => Self::Network { message },
+            K::Http => Self::Http {
+                status: e.status().unwrap_or_default(),
+                message,
+            },
+            K::Parse => Self::Parse { message },
+            K::Crypto => Self::Crypto { message },
+            K::Auth => Self::Auth { message },
+            K::InvalidInput => Self::InvalidInput { message },
+            K::MissingEncryptedData => Self::MissingEncryptedData { message },
+            K::MissingEncryptedKey => Self::MissingEncryptedKey { message },
+            K::ProfilePictureNotFound => Self::ProfilePictureNotFound { message },
+            K::ActiveRecoverySession => Self::ActiveRecoverySession { message },
         }
     }
 }
 
 impl From<swb::Error> for ContactsError {
     fn from(e: swb::Error) -> Self {
-        Self {
-            code: "serde".to_string(),
+        Self::Serde {
             message: e.to_string(),
         }
     }
@@ -117,10 +118,10 @@ impl From<ente_contacts::ContactRecord> for ContactRecordJs {
 #[wasm_bindgen]
 pub async fn contacts_open_ctx(input: JsValue) -> Result<JsValue, ContactsError> {
     let input: OpenContactsCtxJsInput = swb::from_value(input)?;
-    let master_key = crypto::decode_b64(&input.master_key_b64).map_err(|e| ContactsError {
-        code: "decode".to_string(),
-        message: e.to_string(),
-    })?;
+    let master_key =
+        crypto::decode_b64(&input.master_key_b64).map_err(|e| ContactsError::Decode {
+            message: e.to_string(),
+        })?;
 
     let result = ContactsCtx::open(OpenContactsCtxInput {
         base_url: input.base_url,
