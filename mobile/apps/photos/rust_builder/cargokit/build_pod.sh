@@ -41,9 +41,9 @@ if [[ -n "$PODS_ROOT" ]] && [[ -d "$PODS_ROOT/onnxruntime-c/onnxruntime.xcframew
   ORT_XCFWK_LOCATION="$PODS_ROOT/onnxruntime-c/onnxruntime.xcframework"
   export ORT_IOS_XCFWK_LOCATION="$ORT_XCFWK_LOCATION"
 
-  # ort-sys 2.0.0-rc.4 (used in this repo) only respects ORT_LIB_LOCATION.
-  # Build a per-target static archive named libonnxruntime.a so it can link
-  # against ONNX Runtime from the CocoaPods xcframework.
+  # Keep ORT_LIB_LOCATION as a fallback for targets that ort-sys cannot link
+  # directly from the xcframework (for example, an x86_64 iOS simulator).
+  # Build a per-target static archive named libonnxruntime.a for that path.
   ORT_ARCHIVE_SOURCE=""
   ORT_ARCHIVE_ARCH=""
   if [[ "$CARGOKIT_DARWIN_PLATFORM_NAME" == "iphoneos" ]]; then

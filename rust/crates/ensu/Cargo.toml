@@ -43,7 +43,7 @@ llama-cpp-2 = { version = "=0.1.144", default-features = false, features = ["mtm
 llama-cpp-2 = { version = "=0.1.144", features = ["mtmd"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
-ort = { version = "=2.0.0-rc.12", default-features = false, features = ["load-dynamic"], optional = true }
+ort = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb82705288347697e468fb3", default-features = false, features = ["load-dynamic"], optional = true }
 
 [features]
 default = ["sqlite"]

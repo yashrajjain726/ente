@@ -23,11 +23,11 @@ html-escape = "0.2.13"
 plsfix = "0.1.8"
 thiserror.workspace = true
 
-# Photos stays on ORT rc.4 while Ensu transcription uses rc.12. Cargo cannot
-# resolve both prereleases from crates.io in one workspace, so Photos pins rc.4
-# from the upstream tag as a distinct source.
+# Pin ORT to the workspace-wide upstream revision. The crates.io patch in the
+# workspace manifest also keeps transitive ORT users on this same commit.
 [target.'cfg(target_os = "ios")'.dependencies]
-ort = { git = "https://github.com/pykeio/ort.git", tag = "v2.0.0-rc.4", default-features = false, features = [
+ort = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb82705288347697e468fb3", default-features = false, features = [
+    "std",
     "ndarray",
     "half",
     # Temporarily disabled to avoid iOS duplicate ObjC class collisions
@@ -38,7 +38,7 @@ ort = { git = "https://github.com/pykeio/ort.git", tag = "v2.0.0-rc.4", default-
 ] }
 
 [target.'cfg(not(target_os = "ios"))'.dependencies]
-ort = { git = "https://github.com/pykeio/ort.git", tag = "v2.0.0-rc.4", default-features = false, features = [
+ort = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb82705288347697e468fb3", default-features = false, features = [
     "ndarray",
     "half",
     "load-dynamic",

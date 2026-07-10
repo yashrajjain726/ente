@@ -33,3 +33,9 @@ serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.18"
 uniffi = { version = "0.31.0" }
 wasm-bindgen = "0.2.125"
+
+# Keep transitive ORT users (notably transcribe-rs) on the same upstream
+# revision as the workspace's direct ORT dependencies.
+[patch.crates-io]
+ort = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb82705288347697e468fb3" }
+ort-sys = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb82705288347697e468fb3" }

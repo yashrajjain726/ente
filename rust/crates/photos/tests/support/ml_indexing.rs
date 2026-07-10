@@ -197,9 +197,9 @@ impl MlIndexingTestContext {
 
         let onnx_runtime_library =
             resolve_onnx_runtime_library(&client, &cache_dir, &asset_lock.onnx_runtime)?;
-        ort::init_from(onnx_runtime_library.to_string_lossy())
-            .commit()
-            .context("initialize ONNX Runtime dynamic library")?;
+        let _ = ort::init_from(&onnx_runtime_library)
+            .context("load ONNX Runtime dynamic library")?
+            .commit();
 
         let runtime_config = MlRuntimeConfig {
             model_paths: resolve_model_paths(&client, &cache_dir, &asset_lock.models)?,
