@@ -85,6 +85,7 @@ interface ChatDbLike {
         key: string,
     ) => Promise<ChatDbSchema[K] | undefined>;
     getAll: <K extends ChatStoreName>(name: K) => Promise<ChatDbSchema[K][]>;
+    getAllKeys: (name: ChatStoreName) => Promise<string[]>;
     put: <K extends ChatStoreName>(
         name: K,
         value: ChatDbSchema[K],
@@ -192,6 +193,7 @@ const createIndexedDbChatDb = (
         const entries = (await db.getAll(name)) as ChatDbSchema[typeof name][];
         return entries.map((entry) => cloneStoreEntry(name, entry));
     },
+    getAllKeys: async (name) => db.getAllKeys(name),
     put: async (name, value) => {
         await db.put(name, cloneStoreEntry(name, value));
     },

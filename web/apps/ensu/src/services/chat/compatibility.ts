@@ -229,20 +229,30 @@ const hasLocalStorageStore = () => !!localStorage.getItem(LOCAL_STORAGE_STORE);
 
 const writeBrowserStore = async (source: BrowserStore) => {
     const db = await chatDb();
+    const [sessions, messages, attachmentKeys] = await Promise.all([
+        db.getAll("sessions"),
+        db.getAll("messages"),
+        db.getAllKeys("attachmentBytes"),
+    ]);
+    const sessionIDs = new Set(sessions.map(({ sessionUuid }) => sessionUuid));
+    const messageIDs = new Set(messages.map(({ messageUuid }) => messageUuid));
+    const attachmentIDs = new Set(attachmentKeys);
     const tx = db.transaction(
         ["sessions", "messages", "attachmentBytes"],
         "readwrite",
     );
     await Promise.all([
-        ...source.sessions.map((session) =>
-            tx.objectStore("sessions").put(session),
-        ),
-        ...source.messages.map((message) =>
-            tx.objectStore("messages").put(message),
-        ),
-        ...source.attachmentBytes.map((attachment) =>
-            tx.objectStore("attachmentBytes").put(attachment),
-        ),
+        ...source.sessions
+            .filter(({ sessionUuid }) => !sessionIDs.has(sessionUuid))
+            .map((session) => tx.objectStore("sessions").put(session)),
+        ...source.messages
+            .filter(({ messageUuid }) => !messageIDs.has(messageUuid))
+            .map((message) => tx.objectStore("messages").put(message)),
+        ...source.attachmentBytes
+            .filter(({ id }) => !attachmentIDs.has(id))
+            .map((attachment) =>
+                tx.objectStore("attachmentBytes").put(attachment),
+            ),
         tx.done,
     ]);
 };
@@ -283,7 +293,7 @@ const readOldIndexedDb = async () => {
             created = true;
         },
     });
-    if (created) {
+    if (created || !source.objectStoreNames.contains("sessions")) {
         source.close();
         await deleteDB(OLD_INDEXED_DB);
         return undefined;
@@ -491,10 +501,11 @@ export const openChatStoreWithCompatibility = async (chatKey: string) => {
             chatKey,
             ...(migrationPending ? _migrationSourceKeys : []),
         ]);
-        await invokeChat("chat_db_open", {
+        const migrated = await invokeChat<boolean>("chat_db_open", {
             input: { keyB64: chatKey, recoveryKeysB64: sourceKeys },
         });
         if (migrationPending) {
+            if (!migrated) return;
             if (hasLocalStorageStore()) {
                 try {
                     await importLocalStorageToNative(sourceKeys);
@@ -510,7 +521,7 @@ export const openChatStoreWithCompatibility = async (chatKey: string) => {
             await finalizeLocalChatMigration();
         }
     } else {
-        await removeCurrentBrowserTombstones();
         await importOldBrowserStores();
+        await removeCurrentBrowserTombstones();
     }
 };

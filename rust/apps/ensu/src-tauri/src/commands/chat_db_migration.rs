@@ -29,23 +29,27 @@ pub(super) fn prepare(
     target_attachments: &Path,
     target_key: Vec<u8>,
     recovery_keys: Vec<Vec<u8>>,
-) -> Result<(), ApiError> {
+) -> Result<bool, ApiError> {
     let source_db = root.join(SOURCE_DB);
     if exists(&source_db)? {
         let Ok(source_key) = select_source_key(&source_db, &recovery_keys) else {
-            return Ok(());
+            return Ok(false);
         };
-        import(
+        if import(
             &source_db,
             &root.join(SOURCE_ATTACHMENTS),
             target_db,
             target_attachments,
             source_key,
             target_key,
-        )?;
+        )
+        .is_err()
+        {
+            return Ok(false);
+        }
     }
     let _ = cleanup(root);
-    Ok(())
+    Ok(true)
 }
 
 fn select_source_key(path: &Path, keys: &[Vec<u8>]) -> Result<Vec<u8>, ApiError> {
@@ -279,7 +283,7 @@ mod tests {
         let target_session = target.create_session("Current chat").unwrap();
         drop(target);
 
-        prepare(
+        let migrated = prepare(
             &root,
             &target_db,
             &target_attachments,
@@ -287,6 +291,7 @@ mod tests {
             vec![vec![12; 32]],
         )
         .unwrap();
+        assert!(!migrated);
 
         let target = ChatDb::open_sqlite_with_defaults(target_db, target_key).unwrap();
         assert_eq!(

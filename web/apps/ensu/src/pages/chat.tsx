@@ -768,9 +768,13 @@ const Page: React.FC = () => {
             setChatKey(await getOrCreateLocalChatKey());
         } catch (error) {
             log.error("Failed to initialize local chat key", error);
-            onGenericError(error);
+            showMiniDialog({
+                title: "Encryption error",
+                message:
+                    "We could not initialize encryption. Please refresh the page.",
+            });
         }
-    }, [onGenericError]);
+    }, [showMiniDialog]);
 
     useEffect(() => {
         chatKeyInitCancelledRef.current = false;

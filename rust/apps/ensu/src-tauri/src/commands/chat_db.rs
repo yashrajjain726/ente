@@ -393,7 +393,7 @@ pub async fn chat_db_open(
     state: State<'_, ChatDbState>,
     app: AppHandle,
     input: ChatDbOpenInput,
-) -> Result<(), ApiError> {
+) -> Result<bool, ApiError> {
     let inner = state.inner.clone();
     async_runtime::spawn_blocking(move || {
         let root = app_data_dir(&app)?;
@@ -405,8 +405,10 @@ pub async fn chat_db_open(
             .iter()
             .filter_map(|value| crypto::decode_b64(value).ok())
             .collect::<Vec<_>>();
-        chat_db_migration::prepare(&root, &path, &attachments, key.clone(), recovery_keys)?;
-        open_chat_db(&inner, path, key)
+        let migrated =
+            chat_db_migration::prepare(&root, &path, &attachments, key.clone(), recovery_keys)?;
+        open_chat_db(&inner, path, key)?;
+        Ok(migrated)
     })
     .await
     .map_err(|_| chat_db_thread_error())?
