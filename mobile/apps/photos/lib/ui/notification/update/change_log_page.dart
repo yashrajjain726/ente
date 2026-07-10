@@ -52,10 +52,7 @@ class _ChangeLogPageState extends State<ChangeLogPage> {
           variant: ButtonComponentVariant.secondary,
           size: ButtonComponentSize.large,
           label: isLocalGallery ? l10n.rateUs : l10n.changeLogReferralCta,
-          leading: Icon(
-            Icons.favorite_rounded,
-            color: colors.primary,
-          ),
+          leading: Icon(Icons.favorite_rounded, color: colors.primary),
           shouldSurfaceExecutionStates: false,
           onTap: () async {
             if (isLocalGallery) {
