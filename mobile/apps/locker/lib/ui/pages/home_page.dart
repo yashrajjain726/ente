@@ -29,6 +29,7 @@ import "package:locker/ui/drawer/drawer_page.dart";
 import 'package:locker/ui/mixins/search_mixin.dart';
 import 'package:locker/ui/pages/save_page.dart';
 import 'package:locker/ui/pages/uploader_page.dart';
+import "package:locker/ui/utils/legacy_utils.dart";
 import "package:locker/ui/viewer/actions/file_selection_overlay_bar.dart";
 import "package:locker/utils/bottom_sheet_illustration.dart";
 import 'package:locker/utils/collection_sort_util.dart';
@@ -749,7 +750,11 @@ class _HomePageState extends UploaderPageState<HomePage>
             ? Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: HomeEmptyStateWidget(isLoading: _isSyncing),
+                  child: HomeEmptyStateWidget(
+                    isLoading: _isSyncing,
+                    onSetupLegacy: () => openLegacyPage(context),
+                    onSaveToLocker: _openSavePage,
+                  ),
                 ),
               )
             : SingleChildScrollView(

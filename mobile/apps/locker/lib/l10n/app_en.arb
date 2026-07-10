@@ -272,6 +272,14 @@
   "yourTrashIsEmpty": "Your trash is empty",
   "homeLockerEmptyTitle": "Your Locker is empty",
   "homeLockerEmptySubtitle": "Click the + button to get started",
+  "homeEmptyStateLegacyDescription": "Setup your Legacy so loved ones can access important information, in your absence",
+  "@homeEmptyStateLegacyDescription": {
+    "description": "Description shown in the empty Locker home state above the Legacy setup action"
+  },
+  "setupYourLegacy": "Setup your Legacy",
+  "@setupYourLegacy": {
+    "description": "Action that opens Legacy setup from the empty Locker home state"
+  },
   "uploadDocument": "Upload document",
   "items": "{count} items",
   "@items": {

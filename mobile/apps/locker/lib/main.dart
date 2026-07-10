@@ -42,6 +42,7 @@ import 'package:locker/services/update_service.dart';
 import 'package:locker/ui/pages/home_page.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:rive/rive.dart' as rive;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
@@ -52,6 +53,7 @@ Future<void>? _rustInitFuture;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await rive.RiveNative.init();
   registerCryptoApi(const EnteCryptoDartAdapter());
 
   if (PlatformDetector.isDesktop()) {
