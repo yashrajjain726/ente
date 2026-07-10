@@ -1,13 +1,12 @@
 import { isTauriRuntime } from "@/services/tauri-runtime";
 import { secureStorageGet, secureStorageSet } from "../secure-storage";
 import { ensureCryptoInit, enteWasm } from "../wasm";
-import { hasRetiredLocalChatStore, promoteLocalChatKey } from "./keyMigration";
+import { hasRetiredLocalChatStore, promoteLocalChatKey } from "./compatibility";
 
 const LOCAL_KEY = "ensu.chatKey.local";
 const CURRENT_SECURE_KEY = "localChatKey.v2";
 
 let _localKey: string | undefined;
-let _migrationSourceKeys: string[] = [];
 let _initPromise: Promise<void> | undefined;
 
 const localGet = (key: string) =>
@@ -21,13 +20,11 @@ export const initChatKeyStore = async () => {
 
     _initPromise = (async () => {
         const current = await secureStorageGet(CURRENT_SECURE_KEY);
-        const promotion = await promoteLocalChatKey(
+        _localKey = await promoteLocalChatKey(
             current,
             CURRENT_SECURE_KEY,
             LOCAL_KEY,
         );
-        _localKey = promotion.key;
-        _migrationSourceKeys = promotion.sourceKeys;
     })().catch((error: unknown) => {
         _initPromise = undefined;
         throw error;
@@ -37,8 +34,6 @@ export const initChatKeyStore = async () => {
 
 export const cachedLocalChatKey = () =>
     isTauriRuntime() ? _localKey : localGet(LOCAL_KEY);
-
-export const localChatMigrationSourceKeys = () => _migrationSourceKeys;
 
 const persistLocalKey = async (key: string) => {
     if (isTauriRuntime()) {

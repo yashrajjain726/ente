@@ -1,4 +1,6 @@
 mod migrations;
+#[cfg(feature = "sqlite")]
+mod retired_storage;
 mod schema;
 
 use std::collections::BTreeSet;
@@ -388,7 +390,7 @@ impl ChatDb<crate::db::backend::sqlite::SqliteBackend> {
         let path = path.as_ref();
         let backend = crate::db::backend::sqlite::SqliteBackend::open(path)?;
         let db = Self::new(backend, key, clock, uuid_gen)?;
-        cleanup_obsolete_sync_storage(path);
+        retired_storage::cleanup(path);
         Ok(db)
     }
 
@@ -396,31 +398,12 @@ impl ChatDb<crate::db::backend::sqlite::SqliteBackend> {
         path: impl AsRef<std::path::Path>,
         key: Vec<u8>,
     ) -> Result<Self> {
-        let path = path.as_ref();
-        let backend = crate::db::backend::sqlite::SqliteBackend::open(path)?;
-        let db = Self::new_with_defaults(backend, key)?;
-        cleanup_obsolete_sync_storage(path);
-        Ok(db)
+        Self::open_sqlite(path, key, Arc::new(SystemClock), Arc::new(RandomUuidGen))
     }
 
     pub fn open_in_memory(key: Vec<u8>) -> Result<Self> {
         let backend = crate::db::backend::sqlite::SqliteBackend::open_in_memory()?;
         Self::new_with_defaults(backend, key)
-    }
-}
-
-#[cfg(feature = "sqlite")]
-fn cleanup_obsolete_sync_storage(db_path: &std::path::Path) {
-    let Some(root) = db_path.parent() else {
-        return;
-    };
-    for name in ["llmchat_sync.db", "llmchat_sync_v2.db", "llmchat_online.db"] {
-        for suffix in ["", "-wal", "-shm"] {
-            let _ = std::fs::remove_file(root.join(format!("{name}{suffix}")));
-        }
-    }
-    for name in ["llmchat", "sync_meta"] {
-        let _ = std::fs::remove_dir_all(root.join(name));
     }
 }
 
@@ -604,31 +587,6 @@ mod tests {
 
         assert!(db.get_session(session_id).unwrap().is_none());
         assert!(db.get_message(message_id).unwrap().is_none());
-    }
-
-    #[test]
-    fn sqlite_open_removes_obsolete_sync_storage() {
-        let root = std::env::temp_dir().join(format!("ensu-db-{}", Uuid::new_v4()));
-        std::fs::create_dir_all(root.join("sync_meta")).unwrap();
-        std::fs::create_dir_all(root.join("llmchat")).unwrap();
-        for name in [
-            "llmchat_sync.db",
-            "llmchat_sync.db-wal",
-            "llmchat_sync_v2.db",
-            "llmchat_online.db",
-        ] {
-            std::fs::write(root.join(name), b"obsolete").unwrap();
-        }
-
-        ChatDb::open_sqlite_with_defaults(root.join("llmchat.db"), vec![1u8; KEY_BYTES]).unwrap();
-
-        assert!(!root.join("llmchat_sync.db").exists());
-        assert!(!root.join("llmchat_sync.db-wal").exists());
-        assert!(!root.join("llmchat_sync_v2.db").exists());
-        assert!(!root.join("llmchat_online.db").exists());
-        assert!(!root.join("sync_meta").exists());
-        assert!(!root.join("llmchat").exists());
-        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

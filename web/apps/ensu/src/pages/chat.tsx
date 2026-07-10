@@ -15,7 +15,7 @@ import {
     getOrCreateLocalChatKey,
     initChatKeyStore,
 } from "@/services/chat/chatKey";
-import { initializeChatStorePersistence } from "@/services/chat/migration";
+import { initializeChatStorePersistence } from "@/services/chat/persistence";
 import {
     addMessage,
     createSession,
