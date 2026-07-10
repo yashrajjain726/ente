@@ -9,8 +9,8 @@
 //!
 //! The interface mirrors reqwest, so if you know reqwest you will feel at home.
 
+use std::future::Future;
 use std::sync::{PoisonError, RwLock};
-#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 
 use reqwest::header::{HeaderName, HeaderValue};
@@ -508,6 +508,62 @@ pub struct PingResponse {
     pub id: String,
 }
 
+/// How persistently to retry a failed request.
+///
+/// Both profiles make one original attempt and up to three retries. The
+/// delays match the web client's retry schedules.
+#[derive(Clone, Copy, Debug)]
+pub enum RetryProfile {
+    /// For requests a user is waiting on. Retries after 2, 5, and 10 seconds.
+    Interactive,
+    /// For unattended work, where waiting longer handles remote hiccups
+    /// better. Retries after 10, 30, and 120 seconds.
+    Background,
+}
+
+impl RetryProfile {
+    fn delays(self) -> [Duration; 3] {
+        match self {
+            RetryProfile::Interactive => [2, 5, 10].map(Duration::from_secs),
+            RetryProfile::Background => [10, 30, 120].map(Duration::from_secs),
+        }
+    }
+}
+
+/// Run `operation`, retrying failures per `profile`.
+///
+/// A failure is retried when [`Error::is_retryable`] says so: the request
+/// failed in transit, or the server answered with a 429 or a 5xx status.
+/// Any other error returns immediately.
+///
+/// Each retry runs the whole closure again, so wrap only operations that
+/// are safe to repeat.
+pub async fn retry<T, F, Fut>(profile: RetryProfile, operation: F) -> Result<T, Error>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, Error>>,
+{
+    retry_with_delays(&profile.delays(), operation).await
+}
+
+async fn retry_with_delays<T, F, Fut>(delays: &[Duration], mut operation: F) -> Result<T, Error>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, Error>>,
+{
+    let mut delays = delays.iter();
+    loop {
+        match operation().await {
+            Ok(value) => return Ok(value),
+            Err(error) if error.is_retryable() => match delays.next() {
+                Some(delay) => futures_timer::Delay::new(*delay).await,
+                None => return Err(error),
+            },
+            Err(error) => return Err(error),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use futures_core::Stream;
@@ -862,6 +918,76 @@ mod tests {
         );
         api.ping().await.unwrap();
 
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn retry_retries_retryable_failures() {
+        let mut server = Server::new_async().await;
+        let failure = server
+            .mock("GET", "/x")
+            .with_status(500)
+            .expect(1)
+            .create_async()
+            .await;
+        let success = server
+            .mock("GET", "/x")
+            .with_body("ok")
+            .expect(1)
+            .create_async()
+            .await;
+
+        let api = api(&server, None);
+        let body = retry_with_delays(&[Duration::ZERO; 3], || async {
+            api.get("/x").send().await?.error_for_status()?.text().await
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(body, "ok");
+        failure.assert_async().await;
+        success.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn retry_returns_non_retryable_failures_immediately() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("GET", "/x")
+            .with_status(404)
+            .expect(1)
+            .create_async()
+            .await;
+
+        let api = api(&server, None);
+        let err = retry_with_delays(&[Duration::ZERO; 3], || async {
+            api.get("/x").send().await?.error_for_status()?.text().await
+        })
+        .await
+        .unwrap_err();
+
+        assert_eq!(err.status_code(), Some(404));
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn retry_gives_up_once_the_delays_are_exhausted() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("GET", "/x")
+            .with_status(500)
+            .expect(4)
+            .create_async()
+            .await;
+
+        let api = api(&server, None);
+        let err = retry_with_delays(&[Duration::ZERO; 3], || async {
+            api.get("/x").send().await?.error_for_status()?.text().await
+        })
+        .await
+        .unwrap_err();
+
+        assert_eq!(err.status_code(), Some(500));
         mock.assert_async().await;
     }
 }

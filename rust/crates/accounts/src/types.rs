@@ -1,27 +1,11 @@
 //! Shared reusable types for account clients.
 
 use ente_core::urls::PRODUCTION_API_BASE_URL;
-use futures_timer::Delay;
 use serde::{Deserialize, Serialize};
-use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 use zeroize::Zeroize;
 
 /// Default base URL for Ente's public API.
 pub const DEFAULT_API_BASE_URL: &str = PRODUCTION_API_BASE_URL;
-
-/// Boxed future returned by a configured sleep hook.
-pub type SleepFuture = Pin<Box<dyn Future<Output = ()> + 'static>>;
-
-/// Async sleep hook used by high-level account flows for retry/backoff waits.
-pub type SleepFn = Arc<dyn Fn(Duration) -> SleepFuture + 'static>;
-
-fn default_sleep_fn() -> SleepFn {
-    Arc::new(|duration| {
-        Box::pin(async move {
-            Delay::new(duration).await;
-        })
-    })
-}
 
 /// Configuration for constructing an [`crate::client::AccountsClient`].
 #[derive(Clone)]
@@ -36,7 +20,6 @@ pub struct AccountsClientConfig {
     pub client_version: Option<String>,
     /// Optional user agent.
     pub user_agent: Option<String>,
-    sleep_fn: SleepFn,
 }
 
 impl std::fmt::Debug for AccountsClientConfig {
@@ -50,7 +33,6 @@ impl std::fmt::Debug for AccountsClientConfig {
             .field("client_package", &self.client_package)
             .field("client_version", &self.client_version)
             .field("user_agent", &self.user_agent)
-            .field("sleep_fn", &"<configured>")
             .finish()
     }
 }
@@ -64,7 +46,6 @@ impl AccountsClientConfig {
             client_package: client_package.into(),
             client_version: None,
             user_agent: None,
-            sleep_fn: default_sleep_fn(),
         }
     }
 
@@ -90,20 +71,6 @@ impl AccountsClientConfig {
     pub fn with_user_agent(mut self, user_agent: impl Into<String>) -> Self {
         self.user_agent = Some(user_agent.into());
         self
-    }
-
-    /// Override the async sleep implementation used for retry/backoff waits.
-    pub fn with_sleep_fn<F, Fut>(mut self, sleep_fn: F) -> Self
-    where
-        F: Fn(Duration) -> Fut + 'static,
-        Fut: Future<Output = ()> + 'static,
-    {
-        self.sleep_fn = Arc::new(move |duration| Box::pin(sleep_fn(duration)));
-        self
-    }
-
-    pub(crate) fn sleep_fn(&self) -> SleepFn {
-        Arc::clone(&self.sleep_fn)
     }
 }
 
