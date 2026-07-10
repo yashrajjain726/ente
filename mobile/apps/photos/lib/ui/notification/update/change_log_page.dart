@@ -2,7 +2,6 @@ import 'dart:io';
 
 import "package:ente_components/ente_components.dart";
 import 'package:flutter/material.dart';
-import "package:hugeicons/hugeicons.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/service_locator.dart";
 import 'package:photos/ui/notification/update/change_log_entry.dart';
@@ -53,8 +52,8 @@ class _ChangeLogPageState extends State<ChangeLogPage> {
           variant: ButtonComponentVariant.secondary,
           size: ButtonComponentSize.large,
           label: isLocalGallery ? l10n.rateUs : l10n.changeLogReferralCta,
-          leading: HugeIcon(
-            icon: HugeIcons.strokeRoundedFavourite,
+          leading: Icon(
+            Icons.favorite_rounded,
             color: colors.primary,
           ),
           shouldSurfaceExecutionStates: false,
