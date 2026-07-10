@@ -8,6 +8,7 @@ import 'package:ente_crypto/ente_crypto.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart'
     show isFileSystemPathMissing;
 import 'package:logging/logging.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photos/core/cache/thumbnail_in_memory_cache.dart';
 import 'package:photos/core/configuration.dart';
@@ -15,16 +16,18 @@ import 'package:photos/core/constants.dart';
 import 'package:photos/core/errors.dart';
 import 'package:photos/core/network/network.dart';
 import 'package:photos/models/file/file.dart';
+import 'package:photos/models/file/file_type.dart';
 import "package:photos/module/download/file_url.dart";
 import "package:photos/services/collections_service.dart";
 import "package:photos/utils/file_key.dart";
-import 'package:photos/utils/file_uploader_util.dart';
 import 'package:photos/utils/file_util.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 final _logger = Logger("ThumbnailUtil");
 final _uploadIDToDownloadItem = <int, FileDownloadItem>{};
 final _downloadQueue = Queue<int>();
 const int kMaximumConcurrentDownloads = 500;
+const kMaximumThumbnailCompressionAttempts = 2;
 
 class FileDownloadItem {
   final EnteFile file;
@@ -40,6 +43,14 @@ Future<Uint8List?> getThumbnail(EnteFile file) async {
     return getThumbnailFromServer(file);
   } else {
     return getThumbnailFromLocal(file, size: thumbnailLargeSize);
+  }
+}
+
+void preloadThumbnail(EnteFile file) {
+  if (file.isRemoteOnlyFile) {
+    getThumbnailFromServer(file);
+  } else {
+    getThumbnailFromLocal(file);
   }
 }
 
@@ -176,6 +187,40 @@ Future<Uint8List?> getThumbnailFromLocal(
           });
     });
   }
+}
+
+Future<Uint8List?> getThumbnailFromInAppCacheFile(EnteFile file) async {
+  var localFile = File(getSharedMediaFilePath(file));
+  if (!localFile.existsSync()) {
+    return null;
+  }
+  if (file.fileType == FileType.video) {
+    try {
+      final thumbnailFilePath = await VideoThumbnail.thumbnailFile(
+        video: localFile.path,
+        imageFormat: ImageFormat.JPEG,
+        thumbnailPath: (await getTemporaryDirectory()).path,
+        maxWidth: thumbnailLargeSize,
+        quality: 80,
+      );
+      localFile = File(thumbnailFilePath!);
+    } catch (e) {
+      _logger.warning('Failed to generate video thumbnail', e);
+      return null;
+    }
+  }
+  var thumbnailData = await localFile.readAsBytes();
+  int compressionAttempts = 0;
+  while (thumbnailData.length > thumbnailDataLimit &&
+      compressionAttempts < kMaximumThumbnailCompressionAttempts) {
+    _logger.info("Thumbnail size " + thumbnailData.length.toString());
+    thumbnailData = await compressThumbnail(thumbnailData);
+    _logger.info(
+      "Compressed thumbnail size " + thumbnailData.length.toString(),
+    );
+    compressionAttempts++;
+  }
+  return thumbnailData;
 }
 
 void removePendingGetThumbnailRequestIfAny(EnteFile file) {

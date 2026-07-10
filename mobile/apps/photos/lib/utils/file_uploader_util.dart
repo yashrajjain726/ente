@@ -31,11 +31,11 @@ import "package:photos/src/rust/api/motion_photo_api.dart";
 import "package:photos/utils/apple_photos_errors.dart";
 import "package:photos/utils/exif_util.dart";
 import 'package:photos/utils/file_util.dart';
+import 'package:photos/utils/thumbnail_util.dart';
 import "package:uuid/uuid.dart";
 import 'package:video_thumbnail/video_thumbnail.dart';
 
 final _logger = Logger("FileUtil");
-const kMaximumThumbnailCompressionAttempts = 2;
 
 String? _extractPrintableExifValue(IfdTag? tag) {
   final printableValue = tag?.printable;
@@ -481,38 +481,4 @@ Future<Map<String, int>?> getImageHeightAndWith({
     _logger.severe("Failed to get image size", e);
     return null;
   }
-}
-
-Future<Uint8List?> getThumbnailFromInAppCacheFile(EnteFile file) async {
-  var localFile = File(getSharedMediaFilePath(file));
-  if (!localFile.existsSync()) {
-    return null;
-  }
-  if (file.fileType == FileType.video) {
-    try {
-      final thumbnailFilePath = await VideoThumbnail.thumbnailFile(
-        video: localFile.path,
-        imageFormat: ImageFormat.JPEG,
-        thumbnailPath: (await getTemporaryDirectory()).path,
-        maxWidth: thumbnailLargeSize,
-        quality: 80,
-      );
-      localFile = File(thumbnailFilePath!);
-    } catch (e) {
-      _logger.warning('Failed to generate video thumbnail', e);
-      return null;
-    }
-  }
-  var thumbnailData = await localFile.readAsBytes();
-  int compressionAttempts = 0;
-  while (thumbnailData.length > thumbnailDataLimit &&
-      compressionAttempts < kMaximumThumbnailCompressionAttempts) {
-    _logger.info("Thumbnail size " + thumbnailData.length.toString());
-    thumbnailData = await compressThumbnail(thumbnailData);
-    _logger.info(
-      "Compressed thumbnail size " + thumbnailData.length.toString(),
-    );
-    compressionAttempts++;
-  }
-  return thumbnailData;
 }

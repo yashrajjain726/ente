@@ -4,7 +4,7 @@ import "package:logging/logging.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/services/wrapped/models.dart";
-import "package:photos/utils/file_util.dart";
+import "package:photos/utils/thumbnail_util.dart";
 
 /// Preloads the media referenced by Wrapped cards so the viewer can render
 /// without waiting on database and thumbnail fetches.
