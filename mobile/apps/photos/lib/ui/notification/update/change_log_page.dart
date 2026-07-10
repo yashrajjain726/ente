@@ -111,10 +111,7 @@ class _ChangeLogPageState extends State<ChangeLogPage> {
                   entry.items.isNotEmpty,
             )
             .toList(growable: false);
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.5,
-      ),
+    return Flexible(
       child: Scrollbar(
         controller: _scrollController,
         thumbVisibility: true,
