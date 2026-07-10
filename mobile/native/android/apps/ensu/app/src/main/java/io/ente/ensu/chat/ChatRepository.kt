@@ -24,7 +24,7 @@ class ChatRepository(
     private val filePaths = FilePathManager(context)
     private val attachmentsDir = filePaths.attachmentsDir
     private val dbFile = filePaths.mainDbFile
-    private val dbKey = credentialStore.getOrCreateChatDbKey()
+    private val dbKey = credentialStore.getOrCreateChatDbKey(filePaths.hasChatData)
     private var db: EnsuDb = openDb(dbFile, dbKey)
 
     fun listSessions(): List<ChatSession> = withDbRecovery {

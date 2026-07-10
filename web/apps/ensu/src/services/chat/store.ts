@@ -5,11 +5,8 @@ import log from "ente-base/log";
 import { deleteDB, openDB, type DBSchema, type IDBPDatabase } from "idb";
 import { decryptAttachmentBytes, encryptAttachmentBytes } from "./attachments";
 import {
-    cachedLocalChatKey,
-    setV1AttachmentChatKey,
-    v1AttachmentChatKey,
-    v1ChatKeyCandidates,
-    v1LocalChatKey,
+    finalizeLocalChatMigration,
+    isLocalChatMigrationDone,
 } from "./chatKey";
 import {
     decryptChatField,
@@ -19,7 +16,6 @@ import {
 } from "./crypto";
 
 const STORAGE_KEY = "ensu.chat.store.v1";
-const NATIVE_V1_IMPORT_KEY = "ensu.chat.nativeMigration.v2";
 const LOCAL_SCHEMA_MIGRATION_KEY = "ensu.chat.localMigration.v2";
 const CHAT_DB_NAME = "ensu-chat";
 const V1_WEB_CHAT_DB_NAME = "ensu.chat.db";
@@ -178,13 +174,6 @@ interface NativeMessage {
     attachments?: NativeAttachment[];
 }
 
-interface NativeV1ImportResult {
-    didMigrate: boolean;
-    migratedSessions: number;
-    migratedMessages: number;
-    migratedAttachments: number;
-}
-
 const nowMicros = () => Date.now() * 1000;
 
 const formatLogError = (error: unknown) => {
@@ -198,12 +187,6 @@ const formatLogError = (error: unknown) => {
     } catch {
         return String(error);
     }
-};
-
-const getErrorCode = (error: unknown) => {
-    if (!error || typeof error !== "object") return undefined;
-    const code = (error as { code?: unknown }).code;
-    return typeof code === "string" ? code : undefined;
 };
 
 const loadChatStoreState = (): ChatStoreState => {
@@ -241,7 +224,7 @@ const loadChatStoreState = (): ChatStoreState => {
         };
     } catch (error) {
         log.error("Failed to parse chat store", error);
-        return { sessions: [], messages: [], attachmentBytes: [] };
+        throw error;
     }
 };
 
@@ -431,31 +414,39 @@ const safeTitle = (value: unknown) =>
         ? sessionTitleFromText(value, "New chat")
         : "New chat";
 
-const decryptSessionTitle = async (session: StoredSession, chatKey: string) => {
-    try {
-        const payload = (await decryptChatPayload(
-            { encryptedData: session.encryptedData, header: session.header },
-            chatKey,
-        )) as { title?: string };
-        return safeTitle(payload.title);
-    } catch (error) {
-        log.error("Failed to decrypt session payload", error);
-        return "New chat";
-    }
+const decryptSessionTitleStrict = async (
+    session: StoredSession,
+    chatKey: string,
+) => {
+    const payload = (await decryptChatPayload(
+        { encryptedData: session.encryptedData, header: session.header },
+        chatKey,
+    )) as { title?: string };
+    return safeTitle(payload.title);
 };
 
-const decryptMessageText = async (message: StoredMessage, chatKey: string) => {
-    try {
-        const payload = (await decryptChatPayload(
-            { encryptedData: message.encryptedData, header: message.header },
-            chatKey,
-        )) as { text?: string };
-        return typeof payload.text === "string" ? payload.text : "";
-    } catch (error) {
+const decryptSessionTitle = (session: StoredSession, chatKey: string) =>
+    decryptSessionTitleStrict(session, chatKey).catch((error: unknown) => {
+        log.error("Failed to decrypt session payload", error);
+        return "New chat";
+    });
+
+const decryptMessageTextStrict = async (
+    message: StoredMessage,
+    chatKey: string,
+) => {
+    const payload = (await decryptChatPayload(
+        { encryptedData: message.encryptedData, header: message.header },
+        chatKey,
+    )) as { text?: string };
+    return typeof payload.text === "string" ? payload.text : "";
+};
+
+const decryptMessageText = (message: StoredMessage, chatKey: string) =>
+    decryptMessageTextStrict(message, chatKey).catch((error: unknown) => {
         log.error("Failed to decrypt message payload", error);
         return "";
-    }
-};
+    });
 
 const serializeAttachments = async (
     attachments: ChatAttachment[] = [],
@@ -486,8 +477,6 @@ const deserializeAttachments = async (
 ): Promise<ChatAttachment[]> => {
     if (!attachments?.length || !isTauriRuntime()) return [];
 
-    const localKey = cachedLocalChatKey() ?? v1LocalChatKey();
-
     return Promise.all(
         attachments.map(async (attachment) => {
             try {
@@ -503,27 +492,6 @@ const deserializeAttachments = async (
                     encryptedName: attachment.encryptedName,
                 } satisfies ChatAttachment;
             } catch (error) {
-                if (localKey && localKey !== chatKey) {
-                    try {
-                        const name = await decryptChatField(
-                            attachment.encryptedName,
-                            localKey,
-                        );
-                        return {
-                            id: attachment.id,
-                            kind: attachment.kind,
-                            size: attachment.size,
-                            name,
-                            encryptedName: undefined,
-                        } satisfies ChatAttachment;
-                    } catch (innerError) {
-                        log.error(
-                            "Failed to decrypt attachment name with local key",
-                            innerError,
-                        );
-                    }
-                }
-
                 log.error("Failed to decrypt attachment name", error);
                 return {
                     id: attachment.id,
@@ -536,6 +504,19 @@ const deserializeAttachments = async (
         }),
     );
 };
+
+const deserializeAttachmentsStrict = async (
+    attachments: StoredAttachment[] | undefined,
+    chatKey: string,
+): Promise<ChatAttachment[]> =>
+    Promise.all(
+        (attachments ?? []).map(async (attachment) => ({
+            id: attachment.id,
+            kind: attachment.kind,
+            size: attachment.size,
+            name: await decryptChatField(attachment.encryptedName, chatKey),
+        })),
+    );
 
 const hasLocalStorageChatStore = () =>
     typeof localStorage !== "undefined" && !!localStorage.getItem(STORAGE_KEY);
@@ -573,15 +554,6 @@ const hasIndexedDbDatabase = async (name: string) => {
 
         request.onerror = () => reject(request.error);
     });
-};
-
-const isNativeV1ImportDone = () =>
-    typeof localStorage !== "undefined" &&
-    localStorage.getItem(NATIVE_V1_IMPORT_KEY) === "1";
-
-const markNativeV1ImportDone = () => {
-    if (typeof localStorage === "undefined") return;
-    localStorage.setItem(NATIVE_V1_IMPORT_KEY, "1");
 };
 
 const importLocalStorageChatStoreToIndexedDb = async () => {
@@ -715,7 +687,6 @@ const importLocalStorageChatStoreToNative = async (chatKey: string) => {
         !localStorageStore.messages.length &&
         !localStorageStore.attachmentBytes.length
     ) {
-        localStorage.removeItem(STORAGE_KEY);
         return;
     }
 
@@ -729,12 +700,11 @@ const importLocalStorageChatStoreToNative = async (chatKey: string) => {
         (left, right) => left.createdAt - right.createdAt,
     );
     for (const session of sessions) {
-        const title = await decryptSessionTitle(session, chatKey);
         await invokeChat("chat_db_upsert_session", {
             keyB64: chatKey,
             input: {
                 sessionUuid: session.sessionUuid,
-                title,
+                title: await decryptSessionTitleStrict(session, chatKey),
                 createdAt: session.createdAt,
                 updatedAt: session.updatedAt,
             },
@@ -745,11 +715,10 @@ const importLocalStorageChatStoreToNative = async (chatKey: string) => {
         (left, right) => left.createdAt - right.createdAt,
     );
     for (const message of messages) {
-        const attachments = await deserializeAttachments(
+        const attachments = await deserializeAttachmentsStrict(
             message.attachments,
             chatKey,
         );
-
         await invokeChat("chat_db_insert_message_with_uuid", {
             keyB64: chatKey,
             input: {
@@ -757,7 +726,7 @@ const importLocalStorageChatStoreToNative = async (chatKey: string) => {
                 sessionUuid: message.sessionUuid,
                 parentMessageUuid: message.parentMessageUuid ?? null,
                 sender: message.sender,
-                text: await decryptMessageText(message, chatKey),
+                text: await decryptMessageTextStrict(message, chatKey),
                 createdAt: message.createdAt,
                 attachments: attachments.map((attachment) => ({
                     id: attachment.id,
@@ -773,53 +742,33 @@ const importLocalStorageChatStoreToNative = async (chatKey: string) => {
         await writeAttachmentBytes(attachment.id, attachment.data);
     }
 
-    localStorage.removeItem(STORAGE_KEY);
     log.info("Finished migrating localStorage chat store to native DB");
 };
 
-const importNativeV1ChatStore = async (chatKey: string): Promise<boolean> => {
-    if (!isTauriRuntime()) return true;
-
-    const candidateKeys = v1ChatKeyCandidates();
-    const previousAttachmentKey = v1AttachmentChatKey();
-    const seen = new Set<string>(candidateKeys);
-    if (chatKey && !seen.has(chatKey)) {
-        candidateKeys.push(chatKey);
-    }
-
-    for (const candidateKey of candidateKeys) {
-        await setV1AttachmentChatKey(
-            candidateKey === chatKey ? undefined : candidateKey,
+const verifyNativeAttachments = async (chatKey: string) => {
+    const sessions = await invokeChat<NativeSession[]>(
+        "chat_db_list_sessions",
+        { keyB64: chatKey },
+    );
+    const seen = new Set<string>();
+    for (const session of sessions) {
+        const messages = await invokeChat<NativeMessage[]>(
+            "chat_db_get_messages",
+            { keyB64: chatKey, sessionUuid: session.sessionUuid },
         );
-        try {
-            const result = await invokeChat<NativeV1ImportResult>(
-                "chat_db_import_v1",
-                { input: { keyB64: chatKey, v1KeyB64: candidateKey } },
+        for (const attachment of messages.flatMap(
+            ({ attachments }) => attachments ?? [],
+        )) {
+            if (seen.has(attachment.id)) continue;
+            seen.add(attachment.id);
+            if (!(await attachmentBytesExists(attachment.id))) continue;
+            await decryptAttachmentBytes(
+                await readAttachmentBytes(attachment.id),
+                chatKey,
+                session.sessionUuid,
             );
-            if (result.didMigrate) {
-                log.info("Migrated v1 native chat store", result);
-            } else {
-                await setV1AttachmentChatKey(previousAttachmentKey);
-            }
-            return true;
-        } catch (error) {
-            const code = getErrorCode(error);
-            if (
-                code === "db_crypto" ||
-                code === "db_invalid_blob_length" ||
-                code === "db_invalid_encrypted_field"
-            ) {
-                await setV1AttachmentChatKey(previousAttachmentKey);
-                continue;
-            }
-            throw error;
         }
     }
-
-    log.warn(
-        "Skipping v1 native chat migration because no v1 key could decrypt the DB",
-    );
-    return false;
 };
 
 export const initializeChatStorePersistence = async (chatKey: string) => {
@@ -830,15 +779,15 @@ export const initializeChatStorePersistence = async (chatKey: string) => {
     _chatPersistenceInitKey = chatKey;
     const initPromise = (async () => {
         if (isTauriRuntime()) {
-            if (!isNativeV1ImportDone()) {
-                const didResolveNativeV1Import =
-                    await importNativeV1ChatStore(chatKey);
+            if (!isLocalChatMigrationDone()) {
+                await invokeChat("chat_db_import_v1", {
+                    input: { keyB64: chatKey },
+                });
                 if (hasLocalStorageChatStore()) {
                     await importLocalStorageChatStoreToNative(chatKey);
                 }
-                if (didResolveNativeV1Import) {
-                    markNativeV1ImportDone();
-                }
+                await verifyNativeAttachments(chatKey);
+                await finalizeLocalChatMigration();
             }
         } else if (hasLocalStorageChatStore()) {
             await importLocalStorageChatStoreToIndexedDb();
@@ -1383,27 +1332,7 @@ export const readDecryptedAttachmentBytes = async (
     sessionUuid: string,
 ): Promise<Uint8Array<ArrayBuffer>> => {
     const encrypted = await readAttachmentBytes(id);
-    try {
-        return await decryptAttachmentBytes(encrypted, chatKey, sessionUuid);
-    } catch (error) {
-        for (const fallbackKey of [
-            v1AttachmentChatKey(),
-            cachedLocalChatKey(),
-            v1LocalChatKey(),
-        ]) {
-            if (!fallbackKey || fallbackKey === chatKey) continue;
-            try {
-                return await decryptAttachmentBytes(
-                    encrypted,
-                    fallbackKey,
-                    sessionUuid,
-                );
-            } catch {
-                // Try the next v1 key.
-            }
-        }
-        throw error;
-    }
+    return decryptAttachmentBytes(encrypted, chatKey, sessionUuid);
 };
 
 export const attachmentBytesExists = async (id: string): Promise<boolean> => {

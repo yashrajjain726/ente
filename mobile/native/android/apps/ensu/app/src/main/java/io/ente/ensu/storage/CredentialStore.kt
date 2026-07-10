@@ -18,15 +18,17 @@ class CredentialStore(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    fun getOrCreateChatDbKey(): ByteArray {
-        prefs.getString(KEY_CHAT_DB_KEY, null)?.let { existing ->
-            val decoded = runCatching { decode(existing) }.getOrNull()
-            if (decoded != null && decoded.size == 32) return decoded
+    fun getOrCreateChatDbKey(hasChatData: Boolean): ByteArray {
+        prefs.getString(KEY_CHAT_DB_KEY, null)?.let { encoded ->
+            val decoded = decode(encoded)
+            check(decoded.size == 32) { "Stored chat DB key has invalid length" }
+            return decoded
         }
+        check(!hasChatData) { "Existing chat data has no encryption key" }
 
         val generated = ByteArray(32)
         java.security.SecureRandom().nextBytes(generated)
-        prefs.edit().putString(KEY_CHAT_DB_KEY, encode(generated)).apply()
+        check(prefs.edit().putString(KEY_CHAT_DB_KEY, encode(generated)).commit())
         return generated
     }
 

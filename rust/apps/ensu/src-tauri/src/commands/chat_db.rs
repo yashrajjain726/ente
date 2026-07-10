@@ -1,5 +1,4 @@
-use std::collections::{HashMap, HashSet};
-use std::fs;
+use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -231,16 +230,6 @@ pub struct ChatMessageUpsertInput {
 #[serde(rename_all = "camelCase")]
 pub struct ChatDbImportV1Input {
     key_b64: String,
-    v1_key_b64: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatDbImportV1Result {
-    did_migrate: bool,
-    migrated_sessions: i64,
-    migrated_messages: i64,
-    migrated_attachments: i64,
 }
 
 #[tauri::command]
@@ -430,13 +419,45 @@ pub async fn chat_db_insert_message_with_uuid(
 }
 
 #[tauri::command]
-pub async fn chat_db_import_v1(
-    app: AppHandle,
-    input: ChatDbImportV1Input,
-) -> Result<ChatDbImportV1Result, ApiError> {
+pub async fn chat_db_import_v1(app: AppHandle, input: ChatDbImportV1Input) -> Result<(), ApiError> {
     async_runtime::spawn_blocking(move || import_v1_chat_db(&app, &input))
         .await
         .map_err(|_| chat_db_thread_error())?
+}
+
+#[tauri::command]
+pub fn chat_db_cleanup_v1(app: AppHandle) -> Result<(), ApiError> {
+    cleanup_v1_chat_artifacts(&app)
+}
+
+#[tauri::command]
+pub fn chat_db_has_existing_store(app: AppHandle) -> Result<bool, ApiError> {
+    let root = app_data_dir(&app)?;
+    for name in [CHAT_DB_FILE_NAME, V1_CHAT_DB_FILE_NAME] {
+        if root
+            .join(name)
+            .try_exists()
+            .map_err(|error| ApiError::new("io", error.to_string()))?
+        {
+            return Ok(true);
+        }
+    }
+    for name in [ATTACHMENTS_DIR_NAME, V1_ATTACHMENTS_DIR_NAME] {
+        let path = root.join(name);
+        if path
+            .try_exists()
+            .map_err(|error| ApiError::new("io", error.to_string()))?
+            && fs::read_dir(path)
+                .map_err(|error| ApiError::new("io", error.to_string()))?
+                .next()
+                .transpose()
+                .map_err(|error| ApiError::new("io", error.to_string()))?
+                .is_some()
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 #[tauri::command]
@@ -509,7 +530,10 @@ fn remove_sqlite_files(path: &Path) -> Result<(), ApiError> {
         PathBuf::from(format!("{}-wal", path.display())),
         PathBuf::from(format!("{}-shm", path.display())),
     ] {
-        if candidate.exists() {
+        if candidate
+            .try_exists()
+            .map_err(|error| ApiError::new("io", error.to_string()))?
+        {
             fs::remove_file(candidate).map_err(|error| ApiError::new("io", error.to_string()))?;
         }
     }
@@ -520,94 +544,61 @@ fn cleanup_v1_chat_artifacts(app: &AppHandle) -> Result<(), ApiError> {
     remove_sqlite_files(&v1_chat_db_path(app)?)?;
     remove_sqlite_files(&v1_attachments_db_path(app)?)?;
     let attachments_dir = v1_attachments_dir_path(app)?;
-    if attachments_dir.exists() {
+    if attachments_dir
+        .try_exists()
+        .map_err(|error| ApiError::new("io", error.to_string()))?
+    {
         fs::remove_dir_all(attachments_dir)
             .map_err(|error| ApiError::new("io", error.to_string()))?;
     }
     Ok(())
 }
 
-fn verify_migrated_chat_db(
-    target: &ChatDb<SqliteBackend>,
-    session_ids: &[Uuid],
-    message_ids: &HashMap<Uuid, Vec<Uuid>>,
-    attachments_dir: &Path,
-    attachment_ids: &[String],
-) -> Result<(), ApiError> {
-    let target_sessions = target
-        .list_sessions()
-        .map_err(ApiError::from)?
-        .into_iter()
-        .map(|session| session.uuid)
-        .collect::<HashSet<_>>();
-    for uuid in session_ids {
-        if !target_sessions.contains(uuid) {
-            return Err(ApiError::new(
-                "db_migration_verification",
-                format!("Missing migrated session {uuid}"),
-            ));
-        }
+fn copy_v1_attachment(source: &Path, destination: &Path) -> Result<(), ApiError> {
+    if destination
+        .try_exists()
+        .map_err(|error| ApiError::new("io", error.to_string()))?
+    {
+        return Ok(());
     }
+    let temporary = destination.with_extension("migrating");
+    fs::copy(source, &temporary).map_err(|error| ApiError::new("io", error.to_string()))?;
+    File::open(&temporary)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| ApiError::new("io", error.to_string()))?;
+    fs::rename(temporary, destination).map_err(|error| ApiError::new("io", error.to_string()))
+}
 
-    for (session_uuid, expected) in message_ids {
-        let actual = target
-            .get_messages(*session_uuid)
-            .map_err(ApiError::from)?
-            .into_iter()
-            .map(|message| message.uuid)
-            .collect::<HashSet<_>>();
-        for uuid in expected {
-            if !actual.contains(uuid) {
-                return Err(ApiError::new(
-                    "db_migration_verification",
-                    format!("Missing migrated message {uuid}"),
-                ));
-            }
-        }
-    }
+#[cfg(unix)]
+fn sync_dir(path: &Path) -> Result<(), ApiError> {
+    File::open(path)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| ApiError::new("io", error.to_string()))
+}
 
-    for id in attachment_ids {
-        if !attachments_dir.join(id).exists() {
-            return Err(ApiError::new(
-                "db_migration_verification",
-                format!("Missing migrated attachment {id}"),
-            ));
-        }
-    }
+#[cfg(not(unix))]
+fn sync_dir(_path: &Path) -> Result<(), ApiError> {
     Ok(())
 }
 
-fn import_v1_chat_db(
-    app: &AppHandle,
-    input: &ChatDbImportV1Input,
-) -> Result<ChatDbImportV1Result, ApiError> {
+fn import_v1_chat_db(app: &AppHandle, input: &ChatDbImportV1Input) -> Result<(), ApiError> {
     let v1_db_path = v1_chat_db_path(app)?;
-    if !v1_db_path.exists() {
-        return Ok(ChatDbImportV1Result {
-            did_migrate: false,
-            migrated_sessions: 0,
-            migrated_messages: 0,
-            migrated_attachments: 0,
-        });
+    if !v1_db_path
+        .try_exists()
+        .map_err(|error| ApiError::new("io", error.to_string()))?
+    {
+        return Ok(());
     }
 
     let v1_attachments_dir = v1_attachments_dir_path(app)?;
     let target_attachments_dir = attachments_dir_path(app)?;
-    let v1_key = crypto::decode_b64(&input.v1_key_b64).map_err(ApiError::from)?;
     let key = crypto::decode_b64(&input.key_b64).map_err(ApiError::from)?;
-    let v1_db = ChatDb::open_sqlite_with_defaults(&v1_db_path, v1_key).map_err(ApiError::from)?;
+    let v1_db =
+        ChatDb::open_sqlite_with_defaults(&v1_db_path, key.clone()).map_err(ApiError::from)?;
     let target =
         ChatDb::open_sqlite_with_defaults(chat_db_path(app)?, key).map_err(ApiError::from)?;
 
-    let mut migrated_sessions = 0;
-    let mut migrated_messages = 0;
-    let mut migrated_attachments = 0;
-    let mut session_ids = Vec::new();
-    let mut message_ids = HashMap::new();
-    let mut attachment_ids = Vec::new();
-
     for session in v1_db.list_sessions().map_err(ApiError::from)? {
-        session_ids.push(session.uuid);
         target
             .upsert_session(
                 session.uuid,
@@ -616,13 +607,8 @@ fn import_v1_chat_db(
                 session.updated_at,
             )
             .map_err(ApiError::from)?;
-        migrated_sessions += 1;
 
         for message in v1_db.get_messages(session.uuid).map_err(ApiError::from)? {
-            message_ids
-                .entry(session.uuid)
-                .or_insert_with(Vec::new)
-                .push(message.uuid);
             target
                 .insert_message_with_uuid(
                     message.uuid,
@@ -638,35 +624,17 @@ fn import_v1_chat_db(
             for attachment in message.attachments {
                 let source = v1_attachments_dir.join(&attachment.id);
                 let destination = target_attachments_dir.join(&attachment.id);
-                if source.exists() && !destination.exists() {
-                    fs::copy(&source, &destination)
-                        .map_err(|error| ApiError::new("io", error.to_string()))?;
-                    migrated_attachments += 1;
-                }
-                if source.exists() {
-                    attachment_ids.push(attachment.id);
+                if source
+                    .try_exists()
+                    .map_err(|error| ApiError::new("io", error.to_string()))?
+                {
+                    copy_v1_attachment(&source, &destination)?;
                 }
             }
-            migrated_messages += 1;
         }
     }
-
-    verify_migrated_chat_db(
-        &target,
-        &session_ids,
-        &message_ids,
-        &target_attachments_dir,
-        &attachment_ids,
-    )?;
-    drop(v1_db);
-    cleanup_v1_chat_artifacts(app)?;
-
-    Ok(ChatDbImportV1Result {
-        did_migrate: true,
-        migrated_sessions,
-        migrated_messages,
-        migrated_attachments,
-    })
+    sync_dir(&target_attachments_dir)?;
+    Ok(())
 }
 
 fn with_chat_db<T, F>(

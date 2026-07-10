@@ -808,12 +808,15 @@ const Page: React.FC = () => {
         const run = async () => {
             try {
                 await initializeChatStorePersistence(chatKey);
+                if (!cancelled) setIsChatStoreBridgeReady(true);
             } catch (error) {
                 log.error("Failed to initialize chat persistence", error);
-            } finally {
-                if (!cancelled) {
-                    setIsChatStoreBridgeReady(true);
-                }
+                if (!cancelled)
+                    showMiniDialog({
+                        title: "Chat data unavailable",
+                        message:
+                            "Ensu could not safely open your local chats. Your existing data has not been removed.",
+                    });
             }
         };
         void run();
@@ -822,7 +825,7 @@ const Page: React.FC = () => {
             cancelled = true;
             setIsChatStoreBridgeReady(false);
         };
-    }, [chatKey]);
+    }, [chatKey, showMiniDialog]);
 
     useEffect(() => {
         isDraftSessionRef.current = isDraftSession;

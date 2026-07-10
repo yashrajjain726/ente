@@ -133,8 +133,15 @@ final class ChatViewModel: ObservableObject {
         let attachmentsDir = dbDir.appendingPathComponent("chat_attachments", isDirectory: true)
         try? FileManager.default.createDirectory(at: attachmentsDir, withIntermediateDirectories: true, attributes: nil)
 
-        let chatDbKey = CredentialStore.shared.getOrCreateChatDbKey()
         let chatDbPath = dbDir.appendingPathComponent("llmchat.db").path
+        let hasChatData = FileManager.default.fileExists(atPath: chatDbPath) ||
+            (try? FileManager.default.contentsOfDirectory(atPath: attachmentsDir.path).isEmpty) != true
+        let chatDbKey: Data
+        do {
+            chatDbKey = try CredentialStore.shared.getOrCreateChatDbKey(hasChatData: hasChatData)
+        } catch {
+            fatalError("Failed to load chat DB key: \(error)")
+        }
 
         let chatDb: EnsuDb
         do {
