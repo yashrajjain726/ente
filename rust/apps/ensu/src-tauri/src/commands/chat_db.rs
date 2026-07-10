@@ -312,7 +312,7 @@ pub async fn chat_db_delete_session(
     app: AppHandle,
     key_b64: String,
     session_uuid: String,
-) -> Result<(), ApiError> {
+) -> Result<Vec<String>, ApiError> {
     let uuid = parse_uuid(&session_uuid)?;
     with_chat_db_async(&state, app, key_b64, move |db| db.delete_session(uuid)).await
 }
@@ -590,13 +590,26 @@ fn import_v1_chat_db(app: &AppHandle, input: &ChatDbImportV1Input) -> Result<(),
         return Ok(());
     }
 
-    let v1_attachments_dir = v1_attachments_dir_path(app)?;
-    let target_attachments_dir = attachments_dir_path(app)?;
     let key = crypto::decode_b64(&input.key_b64).map_err(ApiError::from)?;
+    import_v1_chat_db_paths(
+        &v1_db_path,
+        &v1_attachments_dir_path(app)?,
+        &chat_db_path(app)?,
+        &attachments_dir_path(app)?,
+        key,
+    )
+}
+
+fn import_v1_chat_db_paths(
+    v1_db_path: &Path,
+    v1_attachments_dir: &Path,
+    target_db_path: &Path,
+    target_attachments_dir: &Path,
+    key: Vec<u8>,
+) -> Result<(), ApiError> {
     let v1_db =
         ChatDb::open_sqlite_with_defaults(&v1_db_path, key.clone()).map_err(ApiError::from)?;
-    let target =
-        ChatDb::open_sqlite_with_defaults(chat_db_path(app)?, key).map_err(ApiError::from)?;
+    let target = ChatDb::open_sqlite_with_defaults(target_db_path, key).map_err(ApiError::from)?;
 
     for session in v1_db.list_sessions().map_err(ApiError::from)? {
         target
@@ -635,6 +648,99 @@ fn import_v1_chat_db(app: &AppHandle, input: &ChatDbImportV1Input) -> Result<(),
     }
     sync_dir(&target_attachments_dir)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ente_ensu::db::{AttachmentKind, AttachmentMeta};
+
+    fn migration_fixture() -> PathBuf {
+        let root = std::env::temp_dir().join(format!("ensu-import-{}", Uuid::new_v4()));
+        fs::create_dir_all(root.join("source-attachments")).unwrap();
+        fs::create_dir_all(root.join("target-attachments")).unwrap();
+        root
+    }
+
+    fn seed_source(root: &Path, key: &[u8]) -> (Uuid, String) {
+        let source =
+            ChatDb::open_sqlite_with_defaults(root.join("source.db"), key.to_vec()).unwrap();
+        let session = source.create_session("Migrated chat").unwrap();
+        let attachment_id = Uuid::new_v4().to_string();
+        source
+            .insert_message(
+                session.uuid,
+                "self",
+                "Migrated message",
+                None,
+                vec![AttachmentMeta {
+                    id: attachment_id.clone(),
+                    kind: AttachmentKind::Document,
+                    size: 7,
+                    name: "note.txt".to_string(),
+                }],
+            )
+            .unwrap();
+        fs::write(
+            root.join("source-attachments").join(&attachment_id),
+            b"payload",
+        )
+        .unwrap();
+        (session.uuid, attachment_id)
+    }
+
+    fn import_fixture(root: &Path, key: Vec<u8>) -> Result<(), ApiError> {
+        import_v1_chat_db_paths(
+            &root.join("source.db"),
+            &root.join("source-attachments"),
+            &root.join("target.db"),
+            &root.join("target-attachments"),
+            key,
+        )
+    }
+
+    #[test]
+    fn v1_import_is_restart_safe() {
+        let root = migration_fixture();
+        let key = vec![7; 32];
+        let (session_id, attachment_id) = seed_source(&root, &key);
+
+        import_fixture(&root, key.clone()).unwrap();
+        import_fixture(&root, key.clone()).unwrap();
+
+        let target = ChatDb::open_sqlite_with_defaults(root.join("target.db"), key).unwrap();
+        assert_eq!(target.list_sessions().unwrap()[0].title, "Migrated chat");
+        let messages = target.get_messages(session_id).unwrap();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].text, "Migrated message");
+        assert_eq!(messages[0].attachments[0].name, "note.txt");
+        assert_eq!(
+            fs::read(root.join("target-attachments").join(attachment_id)).unwrap(),
+            b"payload"
+        );
+        assert!(root.join("source.db").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn v1_import_recovers_after_wrong_key() {
+        let root = migration_fixture();
+        let key = vec![8; 32];
+        let (session_id, attachment_id) = seed_source(&root, &key);
+
+        assert!(import_fixture(&root, vec![9; 32]).is_err());
+        assert!(root.join("source.db").exists());
+        assert!(
+            root.join("source-attachments")
+                .join(&attachment_id)
+                .exists()
+        );
+
+        import_fixture(&root, key.clone()).unwrap();
+        let target = ChatDb::open_sqlite_with_defaults(root.join("target.db"), key).unwrap();
+        assert_eq!(target.get_messages(session_id).unwrap().len(), 1);
+        fs::remove_dir_all(root).unwrap();
+    }
 }
 
 fn with_chat_db<T, F>(

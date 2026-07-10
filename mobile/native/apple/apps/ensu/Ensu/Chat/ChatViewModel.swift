@@ -151,7 +151,15 @@ final class ChatViewModel: ObservableObject {
         }
 
         // Load sessions/messages.
-        let loaded = (try? chatDb.listSessions()) ?? []
+        let loadedResult = try? chatDb.listSessions()
+        if let loadedResult {
+            Self.pruneOrphanedAttachments(
+                sessions: loadedResult,
+                chatDb: chatDb,
+                attachmentsDir: attachmentsDir
+            )
+        }
+        let loaded = loadedResult ?? []
         let sessions = Self.buildSessions(from: loaded, chatDb: chatDb, summaries: summaries)
 
         // Stored properties.
@@ -204,6 +212,7 @@ final class ChatViewModel: ObservableObject {
         downloadProgressMonitorTask?.cancel()
         sharedModelReadyTask?.cancel()
         clearSharedModelReadyTask()
+        discardUnstoredAttachments(draftAttachments)
         editingMessageId = nil
         draftText = ""
         draftAttachments = []
@@ -309,6 +318,7 @@ final class ChatViewModel: ObservableObject {
 
         resetGenerationState()
         cancelVoiceInput()
+        discardUnstoredAttachments(draftAttachments)
         draftText = ""
         draftAttachments = []
         editingMessageId = nil
@@ -337,7 +347,15 @@ final class ChatViewModel: ObservableObject {
             }
         }
         logger.info("Session deleted", details: "id=\(session.id.uuidString)")
-        try? chatDb.deleteSession(uuid: session.id.uuidString)
+        guard let attachmentIds = try? chatDb.deleteSession(uuid: session.id.uuidString) else {
+            return
+        }
+        if currentSessionId == session.id {
+            discardUnstoredAttachments(draftAttachments)
+        }
+        for id in attachmentIds {
+            try? FileManager.default.removeItem(at: attachmentsDir.appendingPathComponent(id))
+        }
         sessionSummaries.removeValue(forKey: sessionSummaryKey(session.id))
         persistSessionSummaries()
 
@@ -370,6 +388,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     func cancelEditing() {
+        discardUnstoredAttachments(draftAttachments)
         editingMessageId = nil
         draftText = ""
         draftAttachments = []
@@ -542,6 +561,41 @@ final class ChatViewModel: ObservableObject {
 
     func removeAttachment(_ attachment: ChatAttachment) {
         draftAttachments.removeAll { $0.id == attachment.id }
+        discardUnstoredAttachments([attachment])
+    }
+
+    private func discardUnstoredAttachments(_ attachments: [ChatAttachment]) {
+        let storedIds = Set(messageStore.values.flatMap { messages in
+            messages.flatMap { $0.attachments.map(\.id) }
+        })
+        for attachment in attachments where !storedIds.contains(attachment.id) {
+            if let url = attachment.url {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+    }
+
+    private static func pruneOrphanedAttachments(
+        sessions: [DbSession],
+        chatDb: EnsuDb,
+        attachmentsDir: URL
+    ) {
+        let referenced: Set<String>
+        do {
+            referenced = Set(try sessions.flatMap { session in
+                try chatDb.getMessages(sessionUuid: session.uuid)
+                    .flatMap { $0.attachments.map(\.id) }
+            })
+        } catch {
+            return
+        }
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: attachmentsDir,
+            includingPropertiesForKeys: nil
+        ) else { return }
+        for file in files where !referenced.contains(file.lastPathComponent) {
+            try? FileManager.default.removeItem(at: file)
+        }
     }
 
     func sendDraft() {

@@ -15,12 +15,13 @@ import {
     getOrCreateLocalChatKey,
     initChatKeyStore,
 } from "@/services/chat/chatKey";
+import { initializeChatStorePersistence } from "@/services/chat/migration";
 import {
     addMessage,
     createSession,
+    deleteAttachmentBytes,
     deleteSession,
     getBranchSelections,
-    initializeChatStorePersistence,
     listMessages,
     listSessions,
     readDecryptedAttachmentBytes,
@@ -3707,6 +3708,27 @@ const Page: React.FC = () => {
             trimmed.replace(/\u0000/g, ""),
             pendingDocuments,
         );
+        const persistedAttachmentIds = new Set(
+            (editingMessage?.attachments ?? []).map(({ id }) => id),
+        );
+        const newAttachmentIds = [
+            ...pendingDocuments.map(({ id }) => id),
+            ...pendingImages.map(({ id }) => id),
+        ].filter((id) => !persistedAttachmentIds.has(id));
+        const cleanupUnstoredAttachments = async () => {
+            await Promise.all(
+                newAttachmentIds.map(async (id) => {
+                    try {
+                        await deleteAttachmentBytes(id);
+                    } catch (error) {
+                        log.warn(
+                            `Failed to clean up attachment payload ${id}`,
+                            error,
+                        );
+                    }
+                }),
+            );
+        };
         let inferenceImagePaths: string[] = [];
 
         let attachments: ChatAttachment[] = [];
@@ -3759,6 +3781,7 @@ const Page: React.FC = () => {
                 );
                 attachments = [...documentAttachments, ...imageAttachments];
             } catch (error) {
+                await cleanupUnstoredAttachments();
                 log.error("Failed to store attachments", error);
                 showMiniDialog({
                     title: "Attachment error",
@@ -3772,6 +3795,7 @@ const Page: React.FC = () => {
             try {
                 inferenceImagePaths = await writeInferenceImages(pendingImages);
             } catch (error) {
+                await cleanupUnstoredAttachments();
                 log.error("Failed to prepare images for inference", error);
                 showMiniDialog({
                     title: "Attachment error",
@@ -3789,6 +3813,7 @@ const Page: React.FC = () => {
 
         setInput("");
 
+        let messageStored = false;
         try {
             if (editingMessage) {
                 const parentUuid = editingMessage.parentMessageUuid;
@@ -3805,6 +3830,7 @@ const Page: React.FC = () => {
                     parentUuid,
                     attachments,
                 );
+                messageStored = true;
 
                 void updateBranchSelectionState(
                     selectionKey,
@@ -3840,6 +3866,7 @@ const Page: React.FC = () => {
                 parentUuid,
                 attachments,
             );
+            messageStored = true;
 
             void updateBranchSelectionState(
                 selectionKey,
@@ -3859,6 +3886,7 @@ const Page: React.FC = () => {
                 mediaMarker: MEDIA_MARKER,
             });
         } catch (error) {
+            if (!messageStored) await cleanupUnstoredAttachments();
             log.error("Failed to store chat message", error);
         } finally {
             await cleanupInferenceImages(inferenceImagePaths);

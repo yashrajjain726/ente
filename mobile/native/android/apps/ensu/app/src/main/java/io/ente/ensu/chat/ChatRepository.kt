@@ -27,6 +27,10 @@ class ChatRepository(
     private val dbKey = credentialStore.getOrCreateChatDbKey(filePaths.hasChatData)
     private var db: EnsuDb = openDb(dbFile, dbKey)
 
+    init {
+        pruneOrphanedAttachments()
+    }
+
     fun listSessions(): List<ChatSession> = withDbRecovery {
         val sessions = db.listSessions()
         sessions.map { session ->
@@ -55,7 +59,9 @@ class ChatRepository(
     }
 
     fun deleteSession(sessionId: String) = withDbRecovery {
-        db.deleteSession(sessionId)
+        db.deleteSession(sessionId).forEach { id ->
+            File(attachmentsDir, id).delete()
+        }
     }
 
     fun getMessages(sessionId: String): List<ChatMessage> = withDbRecovery {
@@ -163,6 +169,19 @@ class ChatRepository(
         dbFile.parentFile?.mkdirs()
         dbFile.setWritable(true)
         db = openDb(dbFile, dbKey)
+    }
+
+    private fun pruneOrphanedAttachments() {
+        val referenced = try {
+            db.listSessions().flatMap { session -> db.getMessages(session.uuid) }
+                .flatMap { message -> message.attachments }
+                .mapTo(mutableSetOf()) { attachment -> attachment.id }
+        } catch (_: DbException) {
+            return
+        }
+        attachmentsDir.listFiles()?.forEach { file ->
+            if (file.isFile && file.name !in referenced) file.delete()
+        }
     }
 
     private fun isReadonlyDbError(error: DbException): Boolean {

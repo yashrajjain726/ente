@@ -124,6 +124,7 @@ internal class ChatStoreActions(
         if (state.value.chat.isDownloading) return
 
         resetGenerationState()
+        attachmentActions.discardAttachments(state.value.chat.attachments)
         state.update { appState ->
             appState.copy(
                 chat = appState.chat.copy(
@@ -165,6 +166,7 @@ internal class ChatStoreActions(
         }
 
         chatRepository.deleteSession(sessionId)
+        if (isCurrent) attachmentActions.discardAttachments(currentState.chat.attachments)
         removeSessionCaches(sessionId)
         attachmentActions.purgeAttachmentDownloads(sessionId)
         sessionSummaries.remove(sessionKey(sessionId))
@@ -271,6 +273,7 @@ internal class ChatStoreActions(
     }
 
     fun cancelEditing() {
+        attachmentActions.discardAttachments(state.value.chat.attachments)
         state.update { appState ->
             appState.copy(
                 chat = appState.chat.copy(

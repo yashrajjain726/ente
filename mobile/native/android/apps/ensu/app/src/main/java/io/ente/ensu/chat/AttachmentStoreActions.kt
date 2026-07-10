@@ -39,6 +39,7 @@ internal class AttachmentStoreActions(
     }
 
     fun addAttachment(attachment: Attachment) {
+        var accepted = false
         state.update { appState ->
             val chat = appState.chat
             val imageLimitReached = attachment.type == AttachmentType.Image &&
@@ -53,6 +54,7 @@ internal class AttachmentStoreActions(
                     chat = chat.copy(isProcessingAttachments = false)
                 )
             } else {
+                accepted = true
                 appState.copy(
                     chat = chat.copy(
                         attachments = chat.attachments + attachment,
@@ -61,6 +63,7 @@ internal class AttachmentStoreActions(
                 )
             }
         }
+        if (!accepted) deleteIfUnstored(attachment)
     }
 
     fun removeAttachment(attachment: Attachment) {
@@ -71,6 +74,11 @@ internal class AttachmentStoreActions(
                 )
             )
         }
+        deleteIfUnstored(attachment)
+    }
+
+    fun discardAttachments(attachments: List<Attachment>) {
+        attachments.forEach(::deleteIfUnstored)
     }
 
     fun cancelAttachmentDownload(attachmentId: String) {
@@ -141,6 +149,13 @@ internal class AttachmentStoreActions(
 
     fun refreshAttachmentDownloadState() {
         updateAttachmentDownloadState()
+    }
+
+    private fun deleteIfUnstored(attachment: Attachment) {
+        val stored = messageStore.values.any { messages ->
+            messages.any { message -> message.attachments.any { it.id == attachment.id } }
+        }
+        if (!stored) attachment.localPath?.let { File(it).delete() }
     }
 
     private fun queueAttachmentDownloads(items: List<AttachmentDownloadItem>) {

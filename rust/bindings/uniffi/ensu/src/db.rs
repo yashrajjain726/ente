@@ -232,7 +232,7 @@ impl EnsuDb {
         Ok(self.inner.get_session(uuid)?.map(to_session))
     }
 
-    pub fn delete_session(&self, uuid: String) -> Result<(), DbError> {
+    pub fn delete_session(&self, uuid: String) -> Result<Vec<String>, DbError> {
         let uuid = Uuid::parse_str(&uuid).map_err(invalid_uuid)?;
         Ok(self.inner.delete_session(uuid)?)
     }

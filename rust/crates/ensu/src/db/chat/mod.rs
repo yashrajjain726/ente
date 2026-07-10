@@ -1,6 +1,7 @@
 pub mod migrations;
 pub mod schema;
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use uuid::Uuid;
@@ -110,12 +111,26 @@ impl<B: Backend> ChatDb<B> {
         ensure_row_updated(affected, EntityType::Session, uuid)
     }
 
-    pub fn delete_session(&self, uuid: Uuid) -> Result<()> {
-        let affected = self.backend.execute(
-            "DELETE FROM sessions WHERE session_uuid = ?",
-            &[Value::Text(uuid.to_string())],
-        )?;
-        ensure_row_updated(affected, EntityType::Session, uuid)
+    pub fn delete_session(&self, uuid: Uuid) -> Result<Vec<String>> {
+        self.backend.transaction(|tx| {
+            let rows = tx.query(
+                "SELECT attachments FROM messages WHERE session_uuid = ?",
+                &[Value::Text(uuid.to_string())],
+            )?;
+            let mut attachment_ids = BTreeSet::new();
+            for row in rows {
+                for attachment in parse_stored_attachments(row.get_optional_string(0)?)? {
+                    attachment_ids.insert(attachment.id);
+                }
+            }
+
+            let affected = tx.execute(
+                "DELETE FROM sessions WHERE session_uuid = ?",
+                &[Value::Text(uuid.to_string())],
+            )?;
+            ensure_row_updated(affected, EntityType::Session, uuid)?;
+            Ok(attachment_ids.into_iter().collect())
+        })
     }
 
     pub fn upsert_session(
@@ -383,21 +398,42 @@ impl ChatDb<crate::db::backend::sqlite::SqliteBackend> {
         clock: Arc<dyn Clock>,
         uuid_gen: Arc<dyn UuidGen>,
     ) -> Result<Self> {
+        let path = path.as_ref();
         let backend = crate::db::backend::sqlite::SqliteBackend::open(path)?;
-        Self::new(backend, key, clock, uuid_gen)
+        let db = Self::new(backend, key, clock, uuid_gen)?;
+        cleanup_obsolete_sync_storage(path);
+        Ok(db)
     }
 
     pub fn open_sqlite_with_defaults(
         path: impl AsRef<std::path::Path>,
         key: Vec<u8>,
     ) -> Result<Self> {
+        let path = path.as_ref();
         let backend = crate::db::backend::sqlite::SqliteBackend::open(path)?;
-        Self::new_with_defaults(backend, key)
+        let db = Self::new_with_defaults(backend, key)?;
+        cleanup_obsolete_sync_storage(path);
+        Ok(db)
     }
 
     pub fn open_in_memory(key: Vec<u8>) -> Result<Self> {
         let backend = crate::db::backend::sqlite::SqliteBackend::open_in_memory()?;
         Self::new_with_defaults(backend, key)
+    }
+}
+
+#[cfg(feature = "sqlite")]
+fn cleanup_obsolete_sync_storage(db_path: &std::path::Path) {
+    let Some(root) = db_path.parent() else {
+        return;
+    };
+    for name in ["llmchat_sync.db", "llmchat_sync_v2.db", "llmchat_online.db"] {
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(root.join(format!("{name}{suffix}")));
+        }
+    }
+    for name in ["llmchat", "sync_meta"] {
+        let _ = std::fs::remove_dir_all(root.join(name));
     }
 }
 
@@ -561,12 +597,96 @@ mod tests {
         let db = make_db(vec![session_id, message_id], Arc::new(StepClock::new(1, 1)));
 
         db.create_session("title").unwrap();
-        db.insert_message(session_id, "other", "hi", None, Vec::new())
-            .unwrap();
-        db.delete_session(session_id).unwrap();
+        db.insert_message(
+            session_id,
+            "other",
+            "hi",
+            None,
+            vec![AttachmentMeta {
+                id: "attachment".to_string(),
+                kind: AttachmentKind::Document,
+                size: 1,
+                name: "note.txt".to_string(),
+            }],
+        )
+        .unwrap();
+        assert_eq!(
+            db.delete_session(session_id).unwrap(),
+            vec!["attachment".to_string()]
+        );
 
         assert!(db.get_session(session_id).unwrap().is_none());
         assert!(db.get_message(message_id).unwrap().is_none());
+    }
+
+    #[test]
+    fn sqlite_open_removes_obsolete_sync_storage() {
+        let root = std::env::temp_dir().join(format!("ensu-db-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("sync_meta")).unwrap();
+        std::fs::create_dir_all(root.join("llmchat")).unwrap();
+        for name in [
+            "llmchat_sync.db",
+            "llmchat_sync.db-wal",
+            "llmchat_sync_v2.db",
+            "llmchat_online.db",
+        ] {
+            std::fs::write(root.join(name), b"obsolete").unwrap();
+        }
+
+        ChatDb::open_sqlite_with_defaults(root.join("llmchat.db"), vec![1u8; KEY_BYTES]).unwrap();
+
+        assert!(!root.join("llmchat_sync.db").exists());
+        assert!(!root.join("llmchat_sync.db-wal").exists());
+        assert!(!root.join("llmchat_sync_v2.db").exists());
+        assert!(!root.join("llmchat_online.db").exists());
+        assert!(!root.join("sync_meta").exists());
+        assert!(!root.join("llmchat").exists());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn on_disk_v4_migration_survives_reopen() {
+        let root = std::env::temp_dir().join(format!("ensu-v4-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("llmchat.db");
+        let key = vec![2u8; KEY_BYTES];
+        let (session_id, message_id) = {
+            let db = ChatDb::open_sqlite_with_defaults(&path, key.clone()).unwrap();
+            let session = db.create_session("Before migration").unwrap();
+            let message = db
+                .insert_message(session.uuid, "self", "Still here", None, Vec::new())
+                .unwrap();
+            (session.uuid, message.uuid)
+        };
+        {
+            let backend = SqliteBackend::open(&path).unwrap();
+            backend
+                .execute_batch(
+                    "ALTER TABLE sessions ADD COLUMN server_updated_at INTEGER;
+                     ALTER TABLE sessions ADD COLUMN remote_id TEXT;
+                     ALTER TABLE sessions ADD COLUMN needs_sync INTEGER NOT NULL DEFAULT 1;
+                     ALTER TABLE sessions ADD COLUMN deleted_at INTEGER;
+                     ALTER TABLE messages ADD COLUMN remote_id TEXT;
+                     ALTER TABLE messages ADD COLUMN server_updated_at INTEGER;
+                     ALTER TABLE messages ADD COLUMN needs_sync INTEGER NOT NULL DEFAULT 1;
+                     ALTER TABLE messages ADD COLUMN deleted_at INTEGER;
+                     PRAGMA user_version = 4;",
+                )
+                .unwrap();
+        }
+
+        for _ in 0..2 {
+            let db = ChatDb::open_sqlite_with_defaults(&path, key.clone()).unwrap();
+            assert_eq!(
+                db.get_session(session_id).unwrap().unwrap().title,
+                "Before migration"
+            );
+            assert_eq!(
+                db.get_message(message_id).unwrap().unwrap().text,
+                "Still here"
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
