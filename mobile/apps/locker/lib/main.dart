@@ -37,6 +37,7 @@ import 'package:locker/services/files/download/service_locator.dart';
 import 'package:locker/services/files/links/links_client.dart';
 import 'package:locker/services/files/links/links_service.dart';
 import 'package:locker/services/files/offline/offline_files_service.dart';
+import 'package:locker/services/local_settings.dart';
 import 'package:locker/services/trash/trash_service.dart';
 import 'package:locker/services/update_service.dart';
 import 'package:locker/ui/pages/home_page.dart';
@@ -188,6 +189,8 @@ Future<void> _init(bool bool, {String? via}) async {
   try {
     final SharedPreferences preferences = await SharedPreferences.getInstance();
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+
+    LocalSettings.instance.init(preferences);
 
     await CryptoUtil.init();
 

@@ -23,6 +23,7 @@ import 'package:locker/services/files/sync/models/file.dart';
 import "package:locker/states/user_details_state.dart";
 import "package:locker/ui/components/empty_state_widget.dart";
 import "package:locker/ui/components/home_empty_state_widget.dart";
+import "package:locker/ui/components/legacy_setup_banner.dart";
 import 'package:locker/ui/components/recents_section_widget.dart';
 import 'package:locker/ui/components/search_result_view.dart';
 import "package:locker/ui/drawer/drawer_page.dart";
@@ -723,6 +724,7 @@ class _HomePageState extends UploaderPageState<HomePage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const LegacySetupBanner(),
                     RecentsSectionWidget(
                       collections: _collections,
                       recentFiles: _recentFiles,
