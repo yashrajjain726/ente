@@ -33,6 +33,7 @@ import "package:photos/models/user_details.dart";
 import 'package:photos/module/upload/model/media_upload_data.dart';
 import 'package:photos/module/upload/model/upload_url.dart';
 import "package:photos/module/upload/service/multipart.dart";
+import "package:photos/module/upload/upload_metadata.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/account/user_service.dart";
 import 'package:photos/services/collections_service.dart';
@@ -827,7 +828,8 @@ class FileUploader {
           ? await tryParseExifDateTime(null, mediaUploadData.exifData)
           : null;
       file.metadataVersion = EnteFile.kCurrentMetadataVersion;
-      final metadata = await file.getMetadataForUpload(
+      final metadata = await buildUploadMetadata(
+        file,
         mediaUploadData,
         exifTime,
       );
@@ -918,7 +920,7 @@ class FileUploader {
         );
         MetadataRequest? pubMetadataRequest;
         if (pubMetadata.isNotEmpty) {
-          pubMetadataRequest = await getPubMetadataRequest(
+          pubMetadataRequest = await buildPublicMetadataRequest(
             file,
             pubMetadata,
             fileAttributes.key,
