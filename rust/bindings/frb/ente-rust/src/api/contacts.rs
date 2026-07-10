@@ -1,6 +1,5 @@
 //! FRB bindings for contacts APIs.
 
-use std::fmt::Write as _;
 use std::sync::Arc;
 
 use ente_contacts::{
@@ -71,7 +70,7 @@ impl From<CoreContactsError> for ContactsError {
     fn from(value: CoreContactsError) -> Self {
         match value {
             CoreContactsError::Http(error) => {
-                let message = error_chain(&error);
+                let message = ente_core::error::chain(&error);
                 match error {
                     ente_core::http::Error::Http { status, .. }
                     | ente_core::http::Error::Api { status, .. } => {
@@ -94,16 +93,6 @@ impl From<CoreContactsError> for ContactsError {
             CoreContactsError::ActiveRecoverySession => ContactsError::ActiveRecoverySession,
         }
     }
-}
-
-fn error_chain(error: &dyn std::error::Error) -> String {
-    let mut message = error.to_string();
-    let mut source = error.source();
-    while let Some(cause) = source {
-        let _ = write!(message, ": {cause}");
-        source = cause.source();
-    }
-    message
 }
 
 #[frb]
