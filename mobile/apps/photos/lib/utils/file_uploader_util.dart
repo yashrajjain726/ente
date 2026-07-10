@@ -1,7 +1,6 @@
 import 'dart:async';
 import "dart:io";
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import "package:archive/archive_io.dart";
 import "package:computer/computer.dart";
@@ -29,23 +28,12 @@ import "package:photos/utils/apple_photos_errors.dart";
 import "package:photos/utils/embedded_media_location.dart";
 import "package:photos/utils/exif_util.dart";
 import 'package:photos/utils/file_util.dart';
+import "package:photos/utils/image_util.dart";
 import 'package:photos/utils/thumbnail_util.dart';
 import "package:uuid/uuid.dart";
 import 'package:video_thumbnail/video_thumbnail.dart';
 
 final _logger = Logger("FileUtil");
-
-String? _extractPrintableExifValue(IfdTag? tag) {
-  final printableValue = tag?.printable;
-  final printable = printableValue?.trim();
-  if (printable == null || printable.isEmpty) {
-    return null;
-  }
-  if (printable.toLowerCase() == 'null') {
-    return null;
-  }
-  return printable;
-}
 
 Future<MediaUploadData> getUploadDataFromEnteFile(
   EnteFile file, {
@@ -119,8 +107,8 @@ Future<MediaUploadData> _getMediaUploadDataFromAssetFile(
     if (parseExif && shouldReadExif(file)) {
       exifData = await tryExifFromFile(sourceFile);
       if (exifData != null) {
-        cameraMake = _extractPrintableExifValue(exifData['Image Make']);
-        cameraModel = _extractPrintableExifValue(exifData['Image Model']);
+        cameraMake = extractPrintableExifValue(exifData['Image Make']);
+        cameraModel = extractPrintableExifValue(exifData['Image Model']);
       }
     }
     // h4ck to fetch location data if missing (thank you Android Q+) lazily only during uploads
@@ -169,7 +157,7 @@ Future<MediaUploadData> _getMediaUploadDataFromAssetFile(
       h = asset.height;
       if (Platform.isAndroid &&
           file.fileType == FileType.image &&
-          _shouldSwapDimensionsForExifOrientation(exifData)) {
+          shouldSwapDimensionsForExifOrientation(exifData)) {
         final temp = w;
         w = h;
         h = temp;
@@ -203,12 +191,6 @@ Future<MediaUploadData> _getMediaUploadDataFromAssetFile(
     }
     rethrow;
   }
-}
-
-bool _shouldSwapDimensionsForExifOrientation(Map<String, IfdTag>? exifData) {
-  final orientation = exifData?['Image Orientation']?.values.firstAsInt() ?? 1;
-  // EXIF orientations 5-8 are rotated 90/270 variants and require w/h swap.
-  return orientation >= 5 && orientation <= 8;
 }
 
 Future<int?> motionVideoIndex(Map<String, dynamic> args) async {
@@ -362,13 +344,13 @@ Future<MediaUploadData> _getMediaUploadDataFromAppCache(
     final fileHash = CryptoUtil.bin2base64(
       await CryptoUtil.getHash(sourceFile),
     );
-    Map<String, int>? dimensions;
+    ({int width, int height})? dimensions;
     if (file.fileType == FileType.image) {
-      dimensions = await getImageHeightAndWith(imagePath: localPath);
+      dimensions = await getImageDimensions(imagePath: localPath);
       exifData = await tryExifFromFile(sourceFile);
       if (exifData != null) {
-        cameraMake = _extractPrintableExifValue(exifData['Image Make']);
-        cameraModel = _extractPrintableExifValue(exifData['Image Model']);
+        cameraMake = extractPrintableExifValue(exifData['Image Make']);
+        cameraModel = extractPrintableExifValue(exifData['Image Model']);
         if (!file.hasLocation) {
           final exifLocation = locationFromExif(exifData);
           if (Location.isValidLocation(exifLocation)) {
@@ -385,7 +367,7 @@ Future<MediaUploadData> _getMediaUploadDataFromAppCache(
         thumbnailPath: (await getTemporaryDirectory()).path,
         quality: 10,
       );
-      dimensions = await getImageHeightAndWith(imagePath: thumbnailFilePath);
+      dimensions = await getImageDimensions(imagePath: thumbnailFilePath);
     }
 
     if (!file.hasLocation && file.isVideo && Platform.isAndroid) {
@@ -399,8 +381,8 @@ Future<MediaUploadData> _getMediaUploadDataFromAppCache(
       thumbnailData,
       isDeleted,
       FileHashData(fileHash),
-      height: dimensions?['height'],
-      width: dimensions?['width'],
+      height: dimensions?.height,
+      width: dimensions?.width,
       cameraMake: cameraMake,
       cameraModel: cameraModel,
       exifData: exifData,
@@ -411,33 +393,5 @@ Future<MediaUploadData> _getMediaUploadDataFromAppCache(
       "thumbnail failed for appCache fileType: ${file.fileType.toString()}",
       InvalidReason.thumbnailMissing,
     );
-  }
-}
-
-Future<Map<String, int>?> getImageHeightAndWith({
-  String? imagePath,
-  Uint8List? imageBytes,
-}) async {
-  if (imagePath == null && imageBytes == null) {
-    throw ArgumentError("imagePath and imageBytes cannot be null");
-  }
-  try {
-    late Uint8List bytes;
-    if (imagePath != null) {
-      final File imageFile = File(imagePath);
-      bytes = await imageFile.readAsBytes();
-    } else {
-      bytes = imageBytes!;
-    }
-    final ui.Codec codec = await ui.instantiateImageCodec(bytes);
-    final ui.FrameInfo frameInfo = await codec.getNextFrame();
-    if (frameInfo.image.width == 0 || frameInfo.image.height == 0) {
-      return null;
-    } else {
-      return {"width": frameInfo.image.width, "height": frameInfo.image.height};
-    }
-  } catch (e) {
-    _logger.severe("Failed to get image size", e);
-    return null;
   }
 }
