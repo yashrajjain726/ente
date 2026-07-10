@@ -13,6 +13,16 @@ final class CredentialStore {
         static let chatDbKey = "ensu.chatDbKey"
     }
 
+    func removeLegacyCredentials() {
+        let chatDbKey = getOrCreateChatDbKey()
+        guard let persisted = try? KeychainStore.get(service: keychainService, account: KeychainAccount.chatDbKey), persisted == chatDbKey else {
+            return
+        }
+        for account in ["ensu.token", "ensu.secretKey", KeychainAccount.masterKey] {
+            try? KeychainStore.delete(service: keychainService, account: account)
+        }
+    }
+
     func getOrCreateChatDbKey() -> Data {
         if let existing = try? KeychainStore.get(service: keychainService, account: KeychainAccount.chatDbKey), existing.count == 32 {
             return existing

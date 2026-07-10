@@ -53,7 +53,6 @@ fn main() {
             commands::chat_db::chat_db_upsert_session,
             commands::chat_db::chat_db_insert_message_with_uuid,
             commands::chat_db::chat_db_compress_attachment_image_file,
-            commands::chat_db::chat_db_reset,
             commands::chat_db::chat_db_migrate_legacy,
             commands::llm::llm_init_backend,
             commands::llm::llm_load_model,

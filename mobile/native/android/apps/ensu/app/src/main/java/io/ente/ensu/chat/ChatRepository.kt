@@ -18,14 +18,14 @@ import java.io.File
 
 class ChatRepository(
     context: Context,
-    private val credentialStore: CredentialStore
+    credentialStore: CredentialStore
 ) {
 
     private val filePaths = FilePathManager(context)
     private val attachmentsDir = filePaths.attachmentsDir
     private val dbFile = filePaths.mainDbFile
     private val attachmentsDbFile = filePaths.attachmentsDbFile
-    private var dbKey = credentialStore.getOrCreateChatDbKey()
+    private val dbKey = credentialStore.getOrCreateChatDbKey()
     private var db: EnsuDb = openDb(dbFile, dbKey)
 
     fun listSessions(): List<ChatSession> = withDbRecovery {
@@ -138,20 +138,6 @@ class ChatRepository(
         db.updateSessionTitle(sessionId, title)
     }
 
-    fun deleteAllData() {
-        // Full reset removes current storage plus legacy sync leftovers.
-        dbFile.delete()
-        attachmentsDbFile.delete()
-        filePaths.legacyOnlineDbFile.delete()
-        filePaths.legacySyncDir.deleteRecursively()
-        filePaths.attachmentsDir.deleteRecursively()
-
-        filePaths.attachmentsDir.mkdirs()
-
-        dbKey = credentialStore.getOrCreateChatDbKey()
-        db = openDb(dbFile, dbKey)
-    }
-
     private fun openDb(dbFile: File, key: ByteArray): EnsuDb {
         return EnsuDb.open(
             dbFile.absolutePath,
@@ -171,10 +157,6 @@ class ChatRepository(
                 reopenDb()
                 return block()
             }
-            if (shouldResetDb(error)) {
-                resetDb()
-                return block()
-            }
             throw error
         }
     }
@@ -187,19 +169,7 @@ class ChatRepository(
         db = openDb(dbFile, dbKey)
     }
 
-    private fun shouldResetDb(error: DbException): Boolean {
-        return error is DbException.Crypto ||
-            error is DbException.InvalidBlobLength ||
-            error is DbException.InvalidEncryptedField
-    }
-
     private fun isReadonlyDbError(error: DbException): Boolean {
         return error is DbException.ReadonlyDatabase
-    }
-
-    private fun resetDb() {
-        dbFile.delete()
-        attachmentsDbFile.delete()
-        db = openDb(dbFile, dbKey)
     }
 }

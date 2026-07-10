@@ -13,6 +13,7 @@ import io.ente.ensu.llm.LlmProvider
 import io.ente.ensu.chat.Attachment
 import io.ente.ensu.chat.ChatMessage
 import io.ente.ensu.chat.ChatSession
+import io.ente.ensu.bindings.DbException
 import io.ente.ensu.bindings.LlmException
 import io.ente.ensu.bindings.ConfigDefaults
 import io.ente.ensu.logging.LogLevel
@@ -396,7 +397,19 @@ internal class ChatStoreActions(
     fun loadSessionsFromDb() {
         val scope = scope ?: return
         scope.launch(Dispatchers.IO) {
-            val sessions = chatRepository.listSessions().map { session ->
+            val loaded = try {
+                chatRepository.listSessions()
+            } catch (error: DbException) {
+                logRepository.log(
+                    LogLevel.Error,
+                    "Failed to load sessions",
+                    details = error.message,
+                    tag = "Chat",
+                    throwable = error
+                )
+                return@launch
+            }
+            val sessions = loaded.map { session ->
                 val summary = sessionSummaries[sessionKey(session.id)]
                 if (!summary.isNullOrBlank()) {
                     session.copy(title = summary)

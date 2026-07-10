@@ -1,4 +1,8 @@
 import { base64ToBytes } from "@/services/base64";
+import {
+    secureStorageDelete,
+    secureStorageGet,
+} from "@/services/secure-storage";
 import { isTauriRuntime } from "@/services/tauri-runtime";
 import { getKV, removeKV, setKV } from "ente-base/kv";
 import log from "ente-base/log";
@@ -205,45 +209,6 @@ const getErrorCode = (error: unknown) => {
     if (!error || typeof error !== "object") return undefined;
     const code = (error as { code?: unknown }).code;
     return typeof code === "string" ? code : undefined;
-};
-
-const shouldResetDbError = (error: unknown) => {
-    const code = getErrorCode(error);
-    return (
-        code === "db_crypto" ||
-        code === "db_invalid_blob_length" ||
-        code === "db_invalid_encrypted_field"
-    );
-};
-
-let lastDbResetAt = 0;
-
-const withNativeDbRecovery = async <T>(
-    label: string,
-    operation: () => Promise<T>,
-): Promise<T> => {
-    try {
-        return await operation();
-    } catch (error) {
-        if (!shouldResetDbError(error)) {
-            throw error;
-        }
-        const now = Date.now();
-        if (now - lastDbResetAt < 1000) {
-            throw error;
-        }
-        lastDbResetAt = now;
-        log.warn(
-            `Chat DB error while ${label}, resetting local store: ${formatLogError(error)}`,
-        );
-        try {
-            await resetChatStore();
-        } catch (resetError) {
-            log.error("Failed to reset chat store after DB error", resetError);
-            throw error;
-        }
-        return await operation();
-    }
 };
 
 const loadChatStoreState = (): ChatStoreState => {
@@ -846,6 +811,64 @@ const migrateLegacyNativeChatStoreToV2 = async (
     return false;
 };
 
+/**
+ * One-shot removal of data written by the retired login and sync builds, so
+ * that credentials and chat copies the user can no longer see or delete do not
+ * linger.
+ *
+ * Added Jul 2026, v0.1.19. Remove once old installs age out (tag: Migration).
+ */
+const cleanupLegacyData = async () => {
+    if (isTauriRuntime()) {
+        // The legacy keyring entries are potential decryption keys for a
+        // not-yet-migrated legacy DB, and potential sources of the v2 chat
+        // key. Only delete them once the legacy DB migration has completed
+        // and the v2 key is durably in the OS keyring.
+        if (!isNativeMigrationDone()) return;
+        if (!(await secureStorageGet("localChatKey.v2"))) return;
+
+        const entries = ["masterKey", "localChatKey", "remoteChatKey"];
+        const userID = legacyUserID();
+        if (userID) {
+            entries.push(
+                `remoteChatKey.v2.${userID}`,
+                `remoteChatKey.${userID}`,
+            );
+        }
+        for (const entry of entries) await secureStorageDelete(entry);
+
+        const [{ exists, remove }, { appDataDir, join }] = await Promise.all([
+            import("@tauri-apps/plugin-fs"),
+            import("@tauri-apps/api/path"),
+        ]);
+        const syncMetaDir = await join(await appDataDir(), "sync_meta");
+        if (await exists(syncMetaDir)) {
+            await remove(syncMetaDir, { recursive: true });
+        }
+    }
+
+    [
+        "user",
+        "srpAttributes",
+        "keyAttributes",
+        "originalKeyAttributes",
+        "isFirstLogin",
+    ].forEach((key) => localStorage.removeItem(key));
+
+    await removeKV("token");
+};
+
+const legacyUserID = () => {
+    try {
+        const raw = localStorage.getItem("user");
+        if (!raw) return undefined;
+        const id = (JSON.parse(raw) as { id?: unknown }).id;
+        return typeof id === "number" ? id : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
 export const initializeChatStorePersistence = async (chatKey: string) => {
     if (_chatPersistenceInitKey === chatKey && _chatPersistenceInitPromise) {
         return _chatPersistenceInitPromise;
@@ -864,15 +887,15 @@ export const initializeChatStorePersistence = async (chatKey: string) => {
                     markNativeMigrationDone();
                 }
             }
-            return;
-        }
-
-        if (hasLegacyChatStore()) {
+        } else if (hasLegacyChatStore()) {
             await migrateLegacyLocalChatStoreToIndexedDb();
-            return;
+        } else {
+            await migrateLegacyIndexedDbChatStore();
         }
 
-        await migrateLegacyIndexedDbChatStore();
+        void cleanupLegacyData().catch((error: unknown) =>
+            log.error("Failed to clean up legacy data", error),
+        );
     })().catch((error: unknown) => {
         if (_chatPersistenceInitPromise === initPromise) {
             _chatPersistenceInitPromise = undefined;
@@ -904,131 +927,36 @@ const invokeChat = async <T>(
 };
 
 const listSessionsNative = async (chatKey: string): Promise<ChatSession[]> => {
-    return withNativeDbRecovery("listing sessions", async () => {
-        const sessions = await invokeChat<NativeSession[]>(
-            "chat_db_list_sessions_with_preview",
-            { keyB64: chatKey },
-        );
+    const sessions = await invokeChat<NativeSession[]>(
+        "chat_db_list_sessions_with_preview",
+        { keyB64: chatKey },
+    );
 
-        const activeSessions = sessions.filter((session) => !session.deletedAt);
+    const activeSessions = sessions.filter((session) => !session.deletedAt);
 
-        return activeSessions.map((session) => ({
-            sessionUuid: session.sessionUuid,
-            rootSessionUuid: session.sessionUuid,
-            branchFromMessageUuid: undefined,
-            title: safeTitle(session.title),
-            createdAt: session.createdAt,
-            updatedAt: session.updatedAt,
-            lastMessagePreview: session.lastMessagePreview ?? undefined,
-        }));
-    });
+    return activeSessions.map((session) => ({
+        sessionUuid: session.sessionUuid,
+        rootSessionUuid: session.sessionUuid,
+        branchFromMessageUuid: undefined,
+        title: safeTitle(session.title),
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+        lastMessagePreview: session.lastMessagePreview ?? undefined,
+    }));
 };
 
 const listMessagesNative = async (
     sessionUuid: string,
     chatKey: string,
 ): Promise<ChatMessage[]> => {
-    return withNativeDbRecovery("listing messages", async () => {
-        const messages = await invokeChat<NativeMessage[]>(
-            "chat_db_get_messages",
-            { keyB64: chatKey, sessionUuid },
-        );
-
-        return messages
-            .filter((message) => !message.deletedAt)
-            .map((message) => ({
-                messageUuid: message.messageUuid,
-                sessionUuid: message.sessionUuid,
-                parentMessageUuid: message.parentMessageUuid ?? undefined,
-                sender: message.sender,
-                text: message.text,
-                createdAt: message.createdAt,
-                attachments: message.attachments?.map((attachment) => ({
-                    id: attachment.id,
-                    kind: attachment.kind,
-                    name: attachment.name,
-                    size: attachment.size,
-                    uploadedAt: attachment.uploadedAt ?? undefined,
-                })),
-            }));
+    const messages = await invokeChat<NativeMessage[]>("chat_db_get_messages", {
+        keyB64: chatKey,
+        sessionUuid,
     });
-};
 
-const createSessionNative = async (chatKey: string) => {
-    return withNativeDbRecovery("creating session", async () => {
-        const session = await invokeChat<NativeSession>(
-            "chat_db_create_session",
-            { keyB64: chatKey, title: "New chat" },
-        );
-        return session.sessionUuid;
-    });
-};
-
-const updateSessionTitleNative = async (
-    chatKey: string,
-    sessionUuid: string,
-    title: string,
-) => {
-    await withNativeDbRecovery("updating session title", async () => {
-        await invokeChat("chat_db_update_session_title", {
-            keyB64: chatKey,
-            sessionUuid,
-            title,
-        });
-    });
-};
-
-const addMessageNative = async (
-    sessionUuid: string,
-    sender: "self" | "assistant",
-    text: string,
-    chatKey: string,
-    parentMessageUuid?: string,
-    attachments: ChatAttachment[] = [],
-): Promise<ChatMessage> => {
-    return withNativeDbRecovery("adding message", async () => {
-        const message = await invokeChat<NativeMessage>(
-            "chat_db_insert_message",
-            {
-                keyB64: chatKey,
-                input: {
-                    sessionUuid,
-                    sender,
-                    text,
-                    parentMessageUuid,
-                    attachments: attachments.map((attachment) => ({
-                        id: attachment.id,
-                        kind: attachment.kind,
-                        name: attachment.name,
-                        size: attachment.size,
-                        uploadedAt: attachment.uploadedAt ?? null,
-                    })),
-                },
-            },
-        );
-
-        if (sender === "self") {
-            try {
-                const session = await invokeChat<NativeSession | null>(
-                    "chat_db_get_session",
-                    { keyB64: chatKey, sessionUuid },
-                );
-                if (
-                    session &&
-                    safeTitle(session.title).toLowerCase() === "new chat"
-                ) {
-                    const title = sessionTitleFromText(text, "New chat");
-                    await updateSessionTitleNative(chatKey, sessionUuid, title);
-                }
-            } catch (error) {
-                if (shouldResetDbError(error)) {
-                    throw error;
-                }
-                log.error("Failed to update native session title", error);
-            }
-        }
-
-        return {
+    return messages
+        .filter((message) => !message.deletedAt)
+        .map((message) => ({
             messageUuid: message.messageUuid,
             sessionUuid: message.sessionUuid,
             parentMessageUuid: message.parentMessageUuid ?? undefined,
@@ -1042,8 +970,87 @@ const addMessageNative = async (
                 size: attachment.size,
                 uploadedAt: attachment.uploadedAt ?? undefined,
             })),
-        };
+        }));
+};
+
+const createSessionNative = async (chatKey: string) => {
+    const session = await invokeChat<NativeSession>("chat_db_create_session", {
+        keyB64: chatKey,
+        title: "New chat",
     });
+    return session.sessionUuid;
+};
+
+const updateSessionTitleNative = async (
+    chatKey: string,
+    sessionUuid: string,
+    title: string,
+) => {
+    await invokeChat("chat_db_update_session_title", {
+        keyB64: chatKey,
+        sessionUuid,
+        title,
+    });
+};
+
+const addMessageNative = async (
+    sessionUuid: string,
+    sender: "self" | "assistant",
+    text: string,
+    chatKey: string,
+    parentMessageUuid?: string,
+    attachments: ChatAttachment[] = [],
+): Promise<ChatMessage> => {
+    const message = await invokeChat<NativeMessage>("chat_db_insert_message", {
+        keyB64: chatKey,
+        input: {
+            sessionUuid,
+            sender,
+            text,
+            parentMessageUuid,
+            attachments: attachments.map((attachment) => ({
+                id: attachment.id,
+                kind: attachment.kind,
+                name: attachment.name,
+                size: attachment.size,
+                uploadedAt: attachment.uploadedAt ?? null,
+            })),
+        },
+    });
+
+    if (sender === "self") {
+        try {
+            const session = await invokeChat<NativeSession | null>(
+                "chat_db_get_session",
+                { keyB64: chatKey, sessionUuid },
+            );
+            if (
+                session &&
+                safeTitle(session.title).toLowerCase() === "new chat"
+            ) {
+                const title = sessionTitleFromText(text, "New chat");
+                await updateSessionTitleNative(chatKey, sessionUuid, title);
+            }
+        } catch (error) {
+            log.error("Failed to update native session title", error);
+        }
+    }
+
+    return {
+        messageUuid: message.messageUuid,
+        sessionUuid: message.sessionUuid,
+        parentMessageUuid: message.parentMessageUuid ?? undefined,
+        sender: message.sender,
+        text: message.text,
+        createdAt: message.createdAt,
+        attachments: message.attachments?.map((attachment) => ({
+            id: attachment.id,
+            kind: attachment.kind,
+            name: attachment.name,
+            size: attachment.size,
+            uploadedAt: attachment.uploadedAt ?? undefined,
+        })),
+    };
 };
 
 const updateMessageNative = async (
@@ -1051,21 +1058,17 @@ const updateMessageNative = async (
     text: string,
     chatKey: string,
 ) => {
-    await withNativeDbRecovery("updating message", async () => {
-        await invokeChat("chat_db_update_message_text", {
-            keyB64: chatKey,
-            messageUuid,
-            text,
-        });
+    await invokeChat("chat_db_update_message_text", {
+        keyB64: chatKey,
+        messageUuid,
+        text,
     });
 };
 
 const deleteSessionNative = async (sessionUuid: string, chatKey: string) => {
-    await withNativeDbRecovery("deleting session", async () => {
-        await invokeChat("chat_db_delete_session", {
-            keyB64: chatKey,
-            sessionUuid,
-        });
+    await invokeChat("chat_db_delete_session", {
+        keyB64: chatKey,
+        sessionUuid,
     });
 };
 
@@ -1339,26 +1342,6 @@ export const getBranchSelections = async (rootSessionUuid: string) => {
                 typeof entry[0] === "string" && typeof entry[1] === "string",
         ),
     );
-};
-
-export const resetChatStore = async () => {
-    if (typeof window === "undefined") return;
-
-    localStorage.removeItem(STORAGE_KEY);
-
-    if (isTauriRuntime()) {
-        await invokeChat("chat_db_reset");
-        return;
-    }
-    try {
-        if (_chatDb) {
-            (await _chatDb).close();
-        }
-    } catch (error) {
-        log.error("Failed to close chat IndexedDB before reset", error);
-    }
-    _chatDb = undefined;
-    await deleteDB("ensu-chat");
 };
 
 export const setBranchSelection = async (

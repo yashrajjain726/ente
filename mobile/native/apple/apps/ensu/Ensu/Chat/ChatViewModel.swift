@@ -356,19 +356,6 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
-    func deleteAllData() async {
-        await Task.detached { ChatDataCleaner.deleteAllData() }.value
-        sessions = []
-        messages = []
-        currentSessionId = nil
-        messageStore.removeAll()
-        branchSelections.removeAll()
-        childrenByParentCache.removeAll()
-        attachmentDownloads = []
-        currentSessionMissingAttachments = []
-        refreshAttachmentDownloadState()
-    }
-
     func beginEditing(message: RenderedChatMessage) {
         guard !isChatUnsupported else {
             showUnsupportedDeviceDialog = true

@@ -571,45 +571,6 @@ pub async fn chat_db_insert_message_with_uuid(
 }
 
 #[tauri::command]
-pub async fn chat_db_reset(state: State<'_, ChatDbState>, app: AppHandle) -> Result<(), ApiError> {
-    let inner = state.inner.clone();
-    async_runtime::spawn_blocking(move || {
-        {
-            let mut guard = inner
-                .lock()
-                .map_err(|_| ApiError::new("lock", "Failed to lock chat DB state"))?;
-            *guard = None;
-        }
-
-        let path = chat_db_path(&app)?;
-        let wal_path = PathBuf::from(format!("{}-wal", path.display()));
-        let shm_path = PathBuf::from(format!("{}-shm", path.display()));
-        let attachments_db_path = attachments_db_path(&app)?;
-        let attachments_db_wal_path =
-            PathBuf::from(format!("{}-wal", attachments_db_path.display()));
-        let attachments_db_shm_path =
-            PathBuf::from(format!("{}-shm", attachments_db_path.display()));
-
-        for candidate in [
-            path,
-            wal_path,
-            shm_path,
-            attachments_db_path,
-            attachments_db_wal_path,
-            attachments_db_shm_path,
-        ] {
-            if candidate.exists() {
-                fs::remove_file(&candidate).map_err(|err| ApiError::new("io", err.to_string()))?;
-            }
-        }
-
-        Ok(())
-    })
-    .await
-    .map_err(|_| chat_db_thread_error())?
-}
-
-#[tauri::command]
 pub async fn chat_db_migrate_legacy(
     app: AppHandle,
     input: ChatDbMigrateLegacyInput,

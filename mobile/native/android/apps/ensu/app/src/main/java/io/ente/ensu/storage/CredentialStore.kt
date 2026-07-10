@@ -37,6 +37,19 @@ class CredentialStore(context: Context) {
         return generated
     }
 
+    fun removeLegacyCredentials() {
+        // Ensures the chat DB key no longer needs the master key fallback.
+        getOrCreateChatDbKey()
+        prefs.edit()
+            .remove("email")
+            .remove("user_id")
+            .remove("last_user_id")
+            .remove("secret_key")
+            .remove("token")
+            .remove(KEY_MASTER_KEY)
+            .apply()
+    }
+
     private fun encode(bytes: ByteArray): String {
         return Base64.encodeToString(bytes, Base64.NO_WRAP or Base64.URL_SAFE)
     }

@@ -408,7 +408,7 @@ const detectTauriRuntime = () => detectTauriAppRuntime();
 
 const Page: React.FC = () => {
     const router = useRouter();
-    const { showMiniDialog } = useBaseContext();
+    const { showMiniDialog, onGenericError } = useBaseContext();
     const theme = useTheme();
     const isSmall = useMediaQuery(theme.breakpoints.down("md"));
     const assetBasePath = router.basePath ?? "";
@@ -2322,9 +2322,14 @@ const Page: React.FC = () => {
 
     const handleConfirmDeleteSession = useCallback(async () => {
         if (!deleteSessionId) return;
-        await handleDeleteSession(deleteSessionId);
-        setDeleteSessionId(null);
-    }, [deleteSessionId, handleDeleteSession]);
+        try {
+            await handleDeleteSession(deleteSessionId);
+        } catch (error) {
+            onGenericError(error);
+        } finally {
+            setDeleteSessionId(null);
+        }
+    }, [deleteSessionId, handleDeleteSession, onGenericError]);
 
     const handleCancelDeleteSession = useCallback(() => {
         setDeleteSessionId(null);
@@ -3681,7 +3686,12 @@ const Page: React.FC = () => {
 
         let activeSessionId = currentSessionId;
         if (!activeSessionId) {
-            activeSessionId = await createSession(chatKey);
+            try {
+                activeSessionId = await createSession(chatKey);
+            } catch (error) {
+                onGenericError(error);
+                return;
+            }
             setCurrentSessionId(activeSessionId);
             currentSessionIdRef.current = activeSessionId;
             setIsDraftSession(false);
@@ -3861,6 +3871,7 @@ const Page: React.FC = () => {
         pendingDocuments,
         pendingImages,
         showMiniDialog,
+        onGenericError,
         slicePathUntil,
         startGeneration,
         writeInferenceImages,
