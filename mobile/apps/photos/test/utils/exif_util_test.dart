@@ -220,7 +220,7 @@ void main() {
       final parsed = await tryParseExifDateTime(null, {
         kDateTimeOriginal: _ifdTag(
           const IfdNone(),
-          printable: "2025:02:30 08:00:00.945",
+          printable: "2025:12:13 14:24:60",
         ),
       });
 

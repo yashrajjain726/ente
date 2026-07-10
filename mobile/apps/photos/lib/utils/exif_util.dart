@@ -143,8 +143,8 @@ Future<ParsedExifDateTime?> tryParseExifDateTime(
     }
     try {
       return getDateTimeInDeviceTimezone(exifTime, exifOffsetTime);
-    } on FormatException catch (e) {
-      _logger.warning("Ignoring invalid EXIF date time", e);
+    } on FormatException {
+      _logger.warning("Ignoring invalid EXIF date time: $exifTime");
     }
   } catch (e, s) {
     _logger.severe("failed to getCreationTimeFromEXIF", e, s);
