@@ -101,13 +101,18 @@ class LockerHomeHeader extends StatelessWidget {
               ),
               _LockerHeaderAction(
                 onTap: onLegacyTapped,
-                child: SvgPicture.asset(
-                  'assets/svg/legacy_heartbeat_icon.svg',
-                  width: 20,
-                  height: 20,
-                  colorFilter: ColorFilter.mode(
-                    colors.textBase,
-                    BlendMode.srcIn,
+                child: SizedBox.square(
+                  dimension: 24,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(3, 4, 3, 3.5),
+                    child: SvgPicture.asset(
+                      'assets/svg/legacy_heartbeat_icon.svg',
+                      fit: BoxFit.fill,
+                      colorFilter: ColorFilter.mode(
+                        colors.textBase,
+                        BlendMode.srcIn,
+                      ),
+                    ),
                   ),
                 ),
               ),
