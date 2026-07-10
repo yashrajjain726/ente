@@ -4,7 +4,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use ente_core::{
     auth::{SrpAttributes as CoreSrpAttributes, SrpSession},
     crypto::SecretVec,
-    http_legacy::{Error as HttpError, HttpClient},
+    http::{self, Api, ApiConfig, Auth, Http},
 };
 use std::time::Duration;
 
@@ -52,9 +52,9 @@ fn require_srp_m2(auth_response: &AuthResponse) -> Result<&str> {
         .ok_or_else(|| Error::AuthenticationFailed("Missing server proof".to_string()))
 }
 
-/// Shared account client built on `ente_core::http_legacy::HttpClient`.
+/// Shared account client built on `ente_core::http::Api`.
 pub struct AccountsClient {
-    http: HttpClient,
+    api: Api,
     client_package: String,
     sleep_fn: SleepFn,
 }
@@ -62,19 +62,27 @@ pub struct AccountsClient {
 impl AccountsClient {
     /// Construct a client from a config.
     pub fn new(config: AccountsClientConfig) -> Result<Self> {
-        let client_package = config.client_package.clone();
         let sleep_fn = config.sleep_fn();
-        let http = HttpClient::new_with_config(config.into())?;
+        let api = Api::new(
+            Http::new()?,
+            ApiConfig {
+                origin: config.base_url,
+                client_package: Some(config.client_package.clone()),
+                client_version: config.client_version,
+                user_agent: config.user_agent,
+                auth: config.auth_token.map(Auth::User),
+            },
+        );
         Ok(Self {
-            http,
-            client_package,
+            api,
+            client_package: config.client_package,
             sleep_fn,
         })
     }
 
     /// Replace the auth token used for authenticated requests.
     pub fn set_auth_token(&self, auth_token: Option<String>) {
-        self.http.set_auth_token(auth_token);
+        self.api.set_auth(auth_token.map(Auth::User));
     }
 
     /// Return the client package associated with this client.
@@ -86,21 +94,17 @@ impl AccountsClient {
         (self.sleep_fn)(duration).await;
     }
 
-    fn should_retry(error: &HttpError, policy: RetryPolicy) -> bool {
+    fn should_retry(error: &http::Error, policy: RetryPolicy) -> bool {
         match policy {
             RetryPolicy::NoRetry => false,
-            RetryPolicy::Default => match error {
-                HttpError::Network(_) => true,
-                HttpError::Http { status, .. } => *status == 429 || *status >= 500,
-                HttpError::Parse(_) | HttpError::InvalidUrl(_) => false,
-            },
+            RetryPolicy::Default => error.is_retryable(),
         }
     }
 
     async fn execute<T, F, Fut>(&self, policy: RetryPolicy, mut operation: F) -> Result<T>
     where
         F: FnMut() -> Fut,
-        Fut: std::future::Future<Output = std::result::Result<T, HttpError>>,
+        Fut: std::future::Future<Output = std::result::Result<T, http::Error>>,
     {
         if policy == RetryPolicy::NoRetry {
             return operation().await.map_err(Error::from);
@@ -134,8 +138,16 @@ impl AccountsClient {
     pub async fn get_srp_attributes(&self, email: &str) -> Result<SrpAttributes> {
         let query = [("email", email.to_string())];
         let response: GetSrpAttributesResponse = self
-            .execute(RetryPolicy::Default, || {
-                self.http.get_json("/users/srp/attributes", &query)
+            .execute(RetryPolicy::Default, || async {
+                self.api
+                    .get("/users/srp/attributes")
+                    .query(&query)
+                    .send()
+                    .await?
+                    .error_for_code()
+                    .await?
+                    .json()
+                    .await
             })
             .await?;
         Ok(response.attributes)
@@ -194,8 +206,16 @@ impl AccountsClient {
             srp_user_id: srp_user_id.to_string(),
             srp_a: STANDARD.encode(client_public),
         };
-        self.execute(RetryPolicy::Default, || {
-            self.http.post_json("/users/srp/create-session", &request)
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .post("/users/srp/create-session")
+                .json(&request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
@@ -212,8 +232,16 @@ impl AccountsClient {
             session_id: session_id.to_string(),
             srp_m1: STANDARD.encode(client_proof),
         };
-        self.execute(RetryPolicy::NoRetry, || {
-            self.http.post_json("/users/srp/verify-session", &request)
+        self.execute(RetryPolicy::NoRetry, || async {
+            self.api
+                .post("/users/srp/verify-session")
+                .json(&request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
@@ -224,8 +252,15 @@ impl AccountsClient {
             email: email.to_string(),
             purpose: purpose.to_string(),
         };
-        self.execute(RetryPolicy::Default, || {
-            self.http.post_empty("/users/ott", &request)
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .post("/users/ott")
+                .json(&request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?;
+            Ok(())
         })
         .await
     }
@@ -242,8 +277,16 @@ impl AccountsClient {
             ott: ott.to_string(),
             source: source.map(str::to_string),
         };
-        self.execute(RetryPolicy::NoRetry, || {
-            self.http.post_json("/users/verify-email", &request)
+        self.execute(RetryPolicy::NoRetry, || async {
+            self.api
+                .post("/users/verify-email")
+                .json(&request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
@@ -251,24 +294,46 @@ impl AccountsClient {
     /// Upload user key attributes.
     pub async fn set_user_key_attributes(&self, key_attributes: KeyAttributes) -> Result<()> {
         let request = SetUserAttributesRequest { key_attributes };
-        self.execute(RetryPolicy::Default, || {
-            self.http.put_empty("/users/attributes", &request)
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .put("/users/attributes")
+                .json(&request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?;
+            Ok(())
         })
         .await
     }
 
     /// Upload recovery-key attributes.
     pub async fn set_recovery_key_attributes(&self, request: SetRecoveryKeyRequest) -> Result<()> {
-        self.execute(RetryPolicy::Default, || {
-            self.http.put_empty("/users/recovery-key", &request)
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .put("/users/recovery-key")
+                .json(&request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?;
+            Ok(())
         })
         .await
     }
 
     /// Start SRP setup for an authenticated user.
     pub async fn setup_srp(&self, request: &SetupSrpRequest) -> Result<SetupSrpResponse> {
-        self.execute(RetryPolicy::Default, || {
-            self.http.post_json("/users/srp/setup", request)
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .post("/users/srp/setup")
+                .json(request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
@@ -283,8 +348,16 @@ impl AccountsClient {
             setup_id: setup_id.to_string(),
             srp_m1: srp_m1.to_string(),
         };
-        self.execute(RetryPolicy::NoRetry, || {
-            self.http.post_json("/users/srp/complete", &request)
+        self.execute(RetryPolicy::NoRetry, || async {
+            self.api
+                .post("/users/srp/complete")
+                .json(&request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
@@ -294,16 +367,31 @@ impl AccountsClient {
         &self,
         request: &UpdateSrpAndKeysRequest,
     ) -> Result<UpdateSrpAndKeysResponse> {
-        self.execute(RetryPolicy::NoRetry, || {
-            self.http.post_json("/users/srp/update", request)
+        self.execute(RetryPolicy::NoRetry, || async {
+            self.api
+                .post("/users/srp/update")
+                .json(request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
 
     /// Get session validity and optional remote key attributes.
     pub async fn get_session_validity(&self) -> Result<SessionValidityResponse> {
-        self.execute(RetryPolicy::Default, || {
-            self.http.get_json("/users/session-validity/v2", &[])
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .get("/users/session-validity/v2")
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
@@ -311,8 +399,15 @@ impl AccountsClient {
     /// Change the authenticated user's email.
     pub async fn change_email(&self, email: &str, ott: &str) -> Result<()> {
         let body = serde_json::json!({ "email": email, "ott": ott });
-        self.execute(RetryPolicy::NoRetry, || {
-            self.http.post_empty("/users/change-email", &body)
+        self.execute(RetryPolicy::NoRetry, || async {
+            self.api
+                .post("/users/change-email")
+                .json(&body)
+                .send()
+                .await?
+                .error_for_code()
+                .await?;
+            Ok(())
         })
         .await
     }
@@ -320,8 +415,15 @@ impl AccountsClient {
     /// Logout the current authenticated session.
     pub async fn logout(&self) -> Result<()> {
         let body = serde_json::json!({});
-        self.execute(RetryPolicy::Default, || {
-            self.http.post_empty("/users/logout", &body)
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .post("/users/logout")
+                .json(&body)
+                .send()
+                .await?
+                .error_for_code()
+                .await?;
+            Ok(())
         })
         .await
     }
@@ -329,8 +431,15 @@ impl AccountsClient {
     /// Return whether two-factor is enabled.
     pub async fn get_two_factor_status(&self) -> Result<bool> {
         let response: TwoFactorStatusResponse = self
-            .execute(RetryPolicy::Default, || {
-                self.http.get_json("/users/two-factor/status", &[])
+            .execute(RetryPolicy::Default, || async {
+                self.api
+                    .get("/users/two-factor/status")
+                    .send()
+                    .await?
+                    .error_for_code()
+                    .await?
+                    .json()
+                    .await
             })
             .await?;
         Ok(response.status)
@@ -339,16 +448,31 @@ impl AccountsClient {
     /// Start TOTP setup.
     pub async fn setup_two_factor(&self) -> Result<TwoFactorSecret> {
         let body = serde_json::json!({});
-        self.execute(RetryPolicy::NoRetry, || {
-            self.http.post_json("/users/two-factor/setup", &body)
+        self.execute(RetryPolicy::NoRetry, || async {
+            self.api
+                .post("/users/two-factor/setup")
+                .json(&body)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
 
     /// Enable TOTP two-factor with encrypted recovery material.
     pub async fn enable_two_factor(&self, request: &EnableTwoFactorRequest) -> Result<()> {
-        self.execute(RetryPolicy::NoRetry, || {
-            self.http.post_empty("/users/two-factor/enable", request)
+        self.execute(RetryPolicy::NoRetry, || async {
+            self.api
+                .post("/users/two-factor/enable")
+                .json(request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?;
+            Ok(())
         })
         .await
     }
@@ -356,8 +480,15 @@ impl AccountsClient {
     /// Disable TOTP two-factor.
     pub async fn disable_two_factor(&self) -> Result<()> {
         let body = serde_json::json!({});
-        self.execute(RetryPolicy::Default, || {
-            self.http.post_empty("/users/two-factor/disable", &body)
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .post("/users/two-factor/disable")
+                .json(&body)
+                .send()
+                .await?
+                .error_for_code()
+                .await?;
+            Ok(())
         })
         .await
     }
@@ -368,8 +499,16 @@ impl AccountsClient {
             session_id: session_id.to_string(),
             code: code.to_string(),
         };
-        self.execute(RetryPolicy::NoRetry, || {
-            self.http.post_json("/users/two-factor/verify", &request)
+        self.execute(RetryPolicy::NoRetry, || async {
+            self.api
+                .post("/users/two-factor/verify")
+                .json(&request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
@@ -390,8 +529,16 @@ impl AccountsClient {
                 },
             ),
         ];
-        self.execute(RetryPolicy::Default, || {
-            self.http.get_json("/users/two-factor/recover", &query)
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .get("/users/two-factor/recover")
+                .query(&query)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
@@ -401,16 +548,31 @@ impl AccountsClient {
         &self,
         request: &RemoveTwoFactorRequest,
     ) -> Result<TwoFactorAuthorizationResponse> {
-        self.execute(RetryPolicy::NoRetry, || {
-            self.http.post_json("/users/two-factor/remove", request)
+        self.execute(RetryPolicy::NoRetry, || async {
+            self.api
+                .post("/users/two-factor/remove")
+                .json(request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
 
     /// Get passkey recovery status.
     pub async fn get_two_factor_recovery_status(&self) -> Result<TwoFactorRecoveryStatusResponse> {
-        self.execute(RetryPolicy::Default, || {
-            self.http.get_json("/users/two-factor/recovery-status", &[])
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .get("/users/two-factor/recovery-status")
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
@@ -420,9 +582,15 @@ impl AccountsClient {
         &self,
         request: &ConfigurePasskeyRecoveryRequest,
     ) -> Result<()> {
-        self.execute(RetryPolicy::Default, || {
-            self.http
-                .post_empty("/users/two-factor/passkeys/configure-recovery", request)
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .post("/users/two-factor/passkeys/configure-recovery")
+                .json(request)
+                .send()
+                .await?
+                .error_for_code()
+                .await?;
+            Ok(())
         })
         .await
     }
@@ -430,17 +598,31 @@ impl AccountsClient {
     /// Poll passkey verification completion.
     pub async fn check_passkey_status(&self, session_id: &str) -> Result<AuthResponse> {
         let query = [("sessionID", session_id.to_string())];
-        self.execute(RetryPolicy::Default, || {
-            self.http
-                .get_json("/users/two-factor/passkeys/get-token", &query)
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .get("/users/two-factor/passkeys/get-token")
+                .query(&query)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
 
     /// Fetch accounts-app broker token and URL.
     pub async fn get_accounts_token(&self) -> Result<AccountsTokenResponse> {
-        self.execute(RetryPolicy::Default, || {
-            self.http.get_json("/users/accounts-token", &[])
+        self.execute(RetryPolicy::Default, || async {
+            self.api
+                .get("/users/accounts-token")
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
         })
         .await
     }
