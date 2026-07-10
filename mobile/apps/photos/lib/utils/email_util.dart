@@ -347,8 +347,10 @@ Future<bool> sendComposedEmail(
       if (!context.mounted) return false;
       await showCupertinoModalPopup(
         context: context,
-        builder: (_) => CupertinoActionSheet(
-          title: Text(AppLocalizations.of(context).selectMailApp + " \n $to"),
+        builder: (sheetContext) => CupertinoActionSheet(
+          title: Text(
+            AppLocalizations.of(sheetContext).selectMailApp + " \n $to",
+          ),
           actions: [
             for (final app in result.options)
               CupertinoActionSheetAction(
@@ -358,16 +360,16 @@ Future<bool> sendComposedEmail(
                     mailApp: app,
                     emailContent: emailContent,
                   );
-                  if (context.mounted) {
-                    Navigator.of(context).pop();
+                  if (sheetContext.mounted) {
+                    Navigator.of(sheetContext).pop();
                   }
                 },
               ),
           ],
           cancelButton: CupertinoActionSheetAction(
-            child: Text(AppLocalizations.of(context).cancel),
+            child: Text(AppLocalizations.of(sheetContext).cancel),
             onPressed: () {
-              Navigator.of(context).pop();
+              Navigator.of(sheetContext).pop();
             },
           ),
         ),
