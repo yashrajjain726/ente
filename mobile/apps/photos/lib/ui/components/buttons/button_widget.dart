@@ -213,6 +213,7 @@ class _ButtonChildWidgetState extends State<ButtonChildWidget> {
   ///to be used as width for the button when the loading/succes states comes.
   double? widthOfButton;
   final _debouncer = Debouncer(const Duration(milliseconds: 300));
+  Timer? _successResetTimer;
   ExecutionState executionState = ExecutionState.idle;
   Exception? _exception;
 
@@ -231,19 +232,24 @@ class _ButtonChildWidgetState extends State<ButtonChildWidget> {
   @override
   void dispose() {
     _debouncer.cancelDebounceTimer();
+    _successResetTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (executionState == ExecutionState.successful) {
-      Future.delayed(Duration(seconds: widget.isInAlert ? 1 : 2), () {
-        if (mounted) {
+    if (executionState == ExecutionState.successful &&
+        _successResetTimer == null) {
+      _successResetTimer = Timer(
+        Duration(seconds: widget.isInAlert ? 1 : 2),
+        () {
+          _successResetTimer = null;
+          if (!mounted) return;
           setState(() {
             executionState = ExecutionState.idle;
           });
-        }
-      });
+        },
+      );
     }
     return GestureDetector(
       onTap: _shouldRegisterGestures ? _onTap : null,
