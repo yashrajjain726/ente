@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
@@ -11,9 +9,6 @@ import 'package:photos/models/file/file_type.dart';
 import 'package:photos/models/location/location.dart';
 import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/module/download/file_url.dart";
-import 'package:photos/module/upload/model/media_upload_data.dart';
-import 'package:photos/utils/exif_util.dart';
-import "package:photos/utils/panorama_util.dart";
 
 //Todo: files with no location data have lat and long set to 0.0. This should ideally be null.
 class EnteFile {
@@ -194,63 +189,6 @@ class EnteFile {
           '${metadata['imageHash']}$kLivePhotoHashSeparator${metadata['videoHash']}';
     }
     metadataVersion = metadata["version"] ?? 0;
-  }
-
-  Future<Map<String, dynamic>> getMetadataForUpload(
-    MediaUploadData mediaUploadData,
-    ParsedExifDateTime? exifTime,
-  ) async {
-    final asset = await getAsset;
-    // asset can be null for files shared to app
-    if (asset != null) {
-      fileSubType = asset.subtype;
-      if (fileType == FileType.video) {
-        duration = asset.duration;
-      }
-    }
-    bool hasExifTime = false;
-    if (exifTime != null && exifTime.time != null) {
-      hasExifTime = true;
-      creationTime = exifTime.time!.microsecondsSinceEpoch;
-    }
-    if (mediaUploadData.exifData != null) {
-      mediaUploadData.isPanorama = checkPanoramaFromEXIF(
-        mediaUploadData.exifData,
-      );
-    }
-    if (mediaUploadData.isPanorama != true &&
-        fileType == FileType.image &&
-        mediaUploadData.sourceFile != null) {
-      try {
-        final xmpData = await getXmp(mediaUploadData.sourceFile!);
-        mediaUploadData.isPanorama = checkPanoramaFromXMP(xmpData);
-      } catch (_) {}
-      mediaUploadData.isPanorama ??= false;
-    }
-
-    // Try to get the timestamp from fileName. In case of iOS, file names are
-    // generic IMG_XXXX, so only parse it on Android devices
-    if (!hasExifTime && Platform.isAndroid && title != null) {
-      final timeFromFileName = parseDateTimeFromFileNameV2(title!);
-      if (timeFromFileName != null) {
-        // only use timeFromFileName if the existing creationTime and
-        // timeFromFilename belongs to different date.
-        // This is done because many times the fileTimeStamp will only give us
-        // the date, not time value but the photo_manager's creation time will
-        // contain the time.
-        final bool useFileTimeStamp =
-            creationTime == null ||
-            !areFromSameDay(
-              creationTime!,
-              timeFromFileName.microsecondsSinceEpoch,
-            );
-        if (useFileTimeStamp) {
-          creationTime = timeFromFileName.microsecondsSinceEpoch;
-        }
-      }
-    }
-    hash = mediaUploadData.hashData?.fileHash;
-    return metadata;
   }
 
   Map<String, dynamic> get metadata {

@@ -11,6 +11,7 @@ import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/location/location.dart";
 import "package:photos/module/upload/model/media_upload_data.dart";
+import "package:photos/module/upload/upload_metadata.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/utils/exif_util.dart";
 import "package:photos/utils/file_util.dart";
@@ -118,7 +119,7 @@ class OfflineImportMetadataService {
         null,
         exifData: exifData,
       );
-      await file.getMetadataForUpload(mediaUploadData, exifTime);
+      await buildUploadMetadata(file, mediaUploadData, exifTime);
 
       await _db.updateOfflineImportMetadataForLocalID(
         file.localID!,
