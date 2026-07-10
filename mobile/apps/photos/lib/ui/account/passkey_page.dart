@@ -93,11 +93,11 @@ class _PasskeyPageState extends State<PasskeyPage> {
   }
 
   Future<void> _handleDeeplink(Uri? uri) async {
-    if (!context.mounted ||
+    if (!mounted ||
         Configuration.instance.hasConfiguredAccount() ||
         uri == null) {
       _logger.warning(
-        'ignored deeplink: contextMounted ${context.mounted} hasConfiguredAccount ${Configuration.instance.hasConfiguredAccount()}',
+        'ignored deeplink: mounted $mounted hasConfiguredAccount ${Configuration.instance.hasConfiguredAccount()}',
       );
       return;
     }
