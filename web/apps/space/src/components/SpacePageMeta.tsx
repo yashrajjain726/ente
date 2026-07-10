@@ -4,8 +4,8 @@ import { onboardingDescription } from "screens/OnboardingScreen";
 
 const spacePreviewTitle = "Add me on Ente Space";
 const previewImages = {
-    home: "/images/meta.jpg",
-    invite: "/images/meta-invite.jpg",
+    home: "https://ente.space/images/meta.jpg",
+    invite: "https://ente.space/images/meta-invite.jpg",
 } as const;
 
 interface SpacePageMetaProps {
