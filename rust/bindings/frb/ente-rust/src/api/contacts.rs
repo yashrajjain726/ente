@@ -73,7 +73,8 @@ impl From<CoreContactsError> for ContactsError {
             CoreContactsError::Http(error) => {
                 let message = error_chain(&error);
                 match error {
-                    ente_core::http::Error::Http { status, .. } => {
+                    ente_core::http::Error::Http { status, .. }
+                    | ente_core::http::Error::Api { status, .. } => {
                         ContactsError::Http { message, status }
                     }
                     ente_core::http::Error::Network(_) => ContactsError::Network { message },

@@ -44,6 +44,18 @@ pub enum Error {
         path: String,
     },
 
+    /// The server responded with a non-2xx status, and its body carried an
+    /// Ente API error code.
+    #[error("HTTP {status} {code} at {path}")]
+    Api {
+        /// The HTTP status code.
+        status: u16,
+        /// The request path that failed, with its query stripped.
+        path: String,
+        /// The server's error code, e.g. `USER_NOT_REGISTERED`.
+        code: String,
+    },
+
     /// The response arrived, but its body was not the expected JSON.
     #[error(transparent)]
     Parse(ParseError),
@@ -77,10 +89,10 @@ impl Error {
         matches!(self, Error::Network(e) if e.0.is_timeout())
     }
 
-    /// The HTTP status code, if this is an [`Http`](Self::Http) error.
+    /// The HTTP status code, if the server responded with a non-2xx status.
     pub fn status_code(&self) -> Option<u16> {
         match self {
-            Error::Http { status, .. } => Some(*status),
+            Error::Http { status, .. } | Error::Api { status, .. } => Some(*status),
             _ => None,
         }
     }
@@ -90,7 +102,9 @@ impl Error {
     pub fn is_retryable(&self) -> bool {
         match self {
             Error::Network(e) => e.0.is_request() || e.0.is_body(),
-            Error::Http { status, .. } => *status == 429 || *status >= 500,
+            Error::Http { status, .. } | Error::Api { status, .. } => {
+                *status == 429 || *status >= 500
+            }
             Error::Parse(_) => false,
         }
     }
@@ -409,6 +423,29 @@ impl Response {
         }
     }
 
+    /// Return an [`Error::Api`] carrying the server's error code if the
+    /// status is not 2xx, otherwise the response.
+    ///
+    /// A variant of [`error_for_status`](Self::error_for_status) for call
+    /// sites that need to act on the error code that the Ente API includes
+    /// in its error responses. When the body does not carry a code, this
+    /// returns the same [`Error::Http`] that `error_for_status` would.
+    pub async fn error_for_code(self) -> Result<Self, Error> {
+        if self.0.status().is_success() {
+            return Ok(self);
+        }
+        let status = self.status();
+        let path = self.0.url().path().to_owned();
+        match serde_json::from_slice::<ApiErrorEnvelope>(&self.bytes().await?) {
+            Ok(envelope) => Err(Error::Api {
+                status,
+                path,
+                code: envelope.code,
+            }),
+            Err(_) => Err(Error::Http { status, path }),
+        }
+    }
+
     /// Read the whole body and deserialize it as JSON.
     pub async fn json<T: DeserializeOwned>(self) -> Result<T, Error> {
         serde_json::from_slice(&self.0.bytes().await?).map_err(|e| Error::Parse(ParseError(e)))
@@ -454,6 +491,12 @@ mod body_stream {
                 .map(|chunk| chunk.map(|chunk| chunk.map_err(Error::from)))
         }
     }
+}
+
+/// The Ente API's error body, e.g. `{"code": "USER_NOT_REGISTERED", ...}`.
+#[derive(Deserialize)]
+struct ApiErrorEnvelope {
+    code: String,
 }
 
 /// The reply from the `/ping` endpoint.
@@ -627,6 +670,82 @@ mod tests {
         assert_eq!(*status, 403);
         assert_eq!(path, "/download");
         assert!(!err.to_string().contains("secret"));
+    }
+
+    #[tokio::test]
+    async fn error_for_code_reads_the_code() {
+        let mut server = Server::new_async().await;
+        server
+            .mock("GET", "/x")
+            .with_status(401)
+            .with_body(r#"{"code":"SESSION_EXPIRED","message":"session expired"}"#)
+            .create_async()
+            .await;
+
+        let api = api(&server, None);
+        let err = api
+            .get("/x")
+            .send()
+            .await
+            .unwrap()
+            .error_for_code()
+            .await
+            .unwrap_err();
+
+        assert!(matches!(
+            &err,
+            Error::Api { status: 401, path, code }
+                if path == "/x" && code == "SESSION_EXPIRED"
+        ));
+        assert_eq!(err.to_string(), "HTTP 401 SESSION_EXPIRED at /x");
+        assert_eq!(err.status_code(), Some(401));
+    }
+
+    #[tokio::test]
+    async fn error_for_code_without_a_code_is_a_plain_http_error() {
+        let mut server = Server::new_async().await;
+        server
+            .mock("GET", "/x")
+            .with_status(502)
+            .with_body("<html>bad gateway</html>")
+            .create_async()
+            .await;
+
+        let api = api(&server, None);
+        let err = api
+            .get("/x")
+            .send()
+            .await
+            .unwrap()
+            .error_for_code()
+            .await
+            .unwrap_err();
+
+        assert!(matches!(
+            &err,
+            Error::Http { status: 502, path } if path == "/x"
+        ));
+    }
+
+    #[tokio::test]
+    async fn error_for_code_passes_a_2xx_through() {
+        let mut server = Server::new_async().await;
+        server
+            .mock("GET", "/x")
+            .with_body("ok")
+            .create_async()
+            .await;
+
+        let api = api(&server, None);
+        let response = api.get("/x").send().await.unwrap();
+        let body = response
+            .error_for_code()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+        assert_eq!(body, "ok");
     }
 
     #[tokio::test]
