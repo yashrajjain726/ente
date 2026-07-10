@@ -7,12 +7,12 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/files_updated_event.dart";
 import "package:photos/events/local_photos_updated_event.dart";
-import "package:photos/models/file/extensions/file_props.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/location/location.dart";
 import "package:photos/module/upload/model/media_upload_data.dart";
 import "package:photos/module/upload/upload_metadata.dart";
 import "package:photos/service_locator.dart";
+import "package:photos/utils/embedded_media_location.dart";
 import "package:photos/utils/exif_util.dart";
 import "package:photos/utils/file_util.dart";
 
@@ -166,18 +166,6 @@ class OfflineImportMetadataService {
       }
     }
 
-    if (!file.hasLocation && file.isVideo && Platform.isAndroid) {
-      final props = await getVideoPropsAsync(originFile);
-      if (props?.location != null) {
-        file.location = props!.location;
-      }
-    }
-
-    if (Platform.isAndroid && exifData != null) {
-      final exifLocation = locationFromExif(exifData);
-      if (Location.isValidLocation(exifLocation)) {
-        file.location = exifLocation;
-      }
-    }
+    await updateLocationFromEmbeddedMetadata(file, originFile, exifData);
   }
 }

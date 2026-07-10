@@ -26,6 +26,7 @@ import 'package:photos/module/upload/model/media_upload_data.dart';
 import "package:photos/services/sync/local_sync_service.dart";
 import "package:photos/src/rust/api/motion_photo_api.dart";
 import "package:photos/utils/apple_photos_errors.dart";
+import "package:photos/utils/embedded_media_location.dart";
 import "package:photos/utils/exif_util.dart";
 import 'package:photos/utils/file_util.dart';
 import 'package:photos/utils/thumbnail_util.dart';
@@ -323,19 +324,7 @@ Future<void> _decorateEnteFileData(
       longitude: latLong.longitude,
     );
   }
-  if (!file.hasLocation && file.isVideo && Platform.isAndroid) {
-    final FFProbeProps? props = await getVideoPropsAsync(sourceFile);
-    if (props != null && props.location != null) {
-      file.location = props.location;
-    }
-  }
-  if (Platform.isAndroid && exifData != null) {
-    //Fix for missing location data in lower android versions.
-    final Location? exifLocation = locationFromExif(exifData);
-    if (Location.isValidLocation(exifLocation)) {
-      file.location = exifLocation;
-    }
-  }
+  await updateLocationFromEmbeddedMetadata(file, sourceFile, exifData);
   if (Platform.isIOS) {
     final originalTitle = await asset.titleAsync;
     if (originalTitle.isNotEmpty) {
