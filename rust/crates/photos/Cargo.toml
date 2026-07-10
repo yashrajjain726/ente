@@ -23,10 +23,12 @@ html-escape = "0.2.13"
 plsfix = "0.1.8"
 thiserror.workspace = true
 
-# Pin ORT to the workspace-wide upstream revision. The crates.io patch in the
-# workspace manifest also keeps transitive ORT users on this same commit.
+# ORT source and revision are pinned once in the workspace manifest; only the
+# per-target feature sets are declared here.
 [target.'cfg(target_os = "ios")'.dependencies]
-ort = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb82705288347697e468fb3", default-features = false, features = [
+ort = { workspace = true, features = [
+    # "std" is implied by "load-dynamic" on the other targets, but iOS links
+    # ORT statically, so it must be enabled explicitly here.
     "std",
     "ndarray",
     "half",
@@ -38,7 +40,7 @@ ort = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb827
 ] }
 
 [target.'cfg(not(target_os = "ios"))'.dependencies]
-ort = { git = "https://github.com/pykeio/ort.git", rev = "31c8f1443bb579bfddb82705288347697e468fb3", default-features = false, features = [
+ort = { workspace = true, features = [
     "ndarray",
     "half",
     "load-dynamic",
