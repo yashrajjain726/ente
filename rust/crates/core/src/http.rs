@@ -13,6 +13,11 @@ use std::future::Future;
 use std::sync::{PoisonError, RwLock};
 use std::time::Duration;
 
+#[cfg(target_arch = "wasm32")]
+use gloo_timers::future::sleep;
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::time::sleep;
+
 use reqwest::header::{HeaderName, HeaderValue};
 use reqwest::{Method, Url};
 use serde::de::DeserializeOwned;
@@ -530,7 +535,7 @@ impl RetryProfile {
     }
 }
 
-/// Run `operation`, retrying failures per `profile`.
+/// Run `operation`, retrying failures per [`RetryProfile::Interactive`].
 ///
 /// A failure is retried when [`Error::is_retryable`] says so: the request
 /// failed in transit, or the server answered with a 429 or a 5xx status.
@@ -538,7 +543,16 @@ impl RetryProfile {
 ///
 /// Each retry runs the whole closure again, so wrap only operations that
 /// are safe to repeat.
-pub async fn retry<T, F, Fut>(profile: RetryProfile, operation: F) -> Result<T, Error>
+pub async fn retry<T, F, Fut>(operation: F) -> Result<T, Error>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, Error>>,
+{
+    retry_with_profile(RetryProfile::Interactive, operation).await
+}
+
+/// Like [`retry`](retry()), but with an explicitly chosen profile.
+pub async fn retry_with_profile<T, F, Fut>(profile: RetryProfile, operation: F) -> Result<T, Error>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, Error>>,
@@ -556,7 +570,10 @@ where
         match operation().await {
             Ok(value) => return Ok(value),
             Err(error) if error.is_retryable() => match delays.next() {
-                Some(delay) => futures_timer::Delay::new(*delay).await,
+                Some(delay) => {
+                    log::warn!("retrying in {delay:?}: {error}");
+                    sleep(*delay).await;
+                }
                 None => return Err(error),
             },
             Err(error) => return Err(error),

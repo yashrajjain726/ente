@@ -4,9 +4,8 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use ente_core::{
     auth::{SrpAttributes as CoreSrpAttributes, SrpSession},
     crypto::SecretVec,
-    http::{self, Api, ApiConfig, Auth, Http, RetryProfile},
+    http::{self, Api, ApiConfig, Auth, Http},
 };
-use std::time::Duration;
 
 use crate::{
     error::{Error, Result},
@@ -81,7 +80,7 @@ impl AccountsClient {
     /// Get SRP attributes for a user by email.
     pub async fn get_srp_attributes(&self, email: &str) -> Result<SrpAttributes> {
         let query = [("email", email.to_string())];
-        let response: GetSrpAttributesResponse = http::retry(RetryProfile::Interactive, || async {
+        let response: GetSrpAttributesResponse = http::retry(|| async {
             self.api
                 .get("/users/srp/attributes")
                 .query(&query)
@@ -122,8 +121,6 @@ impl AccountsClient {
             .create_srp_session(&srp_attrs.srp_user_id, &a_pub)
             .await?;
 
-        futures_timer::Delay::new(Duration::from_millis(100)).await;
-
         let server_b = STANDARD.decode(&session.srp_b)?;
         let proof = srp_session.compute_m1(&server_b)?;
         let auth_response = self
@@ -149,7 +146,7 @@ impl AccountsClient {
             srp_user_id: srp_user_id.to_string(),
             srp_a: STANDARD.encode(client_public),
         };
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .post("/users/srp/create-session")
                 .json(&request)
@@ -193,7 +190,7 @@ impl AccountsClient {
             email: email.to_string(),
             purpose: purpose.to_string(),
         };
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .post("/users/ott")
                 .json(&request)
@@ -233,7 +230,7 @@ impl AccountsClient {
     /// Upload user key attributes.
     pub async fn set_user_key_attributes(&self, key_attributes: KeyAttributes) -> Result<()> {
         let request = SetUserAttributesRequest { key_attributes };
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .put("/users/attributes")
                 .json(&request)
@@ -248,7 +245,7 @@ impl AccountsClient {
 
     /// Upload recovery-key attributes.
     pub async fn set_recovery_key_attributes(&self, request: SetRecoveryKeyRequest) -> Result<()> {
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .put("/users/recovery-key")
                 .json(&request)
@@ -263,7 +260,7 @@ impl AccountsClient {
 
     /// Start SRP setup for an authenticated user.
     pub async fn setup_srp(&self, request: &SetupSrpRequest) -> Result<SetupSrpResponse> {
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .post("/users/srp/setup")
                 .json(request)
@@ -318,7 +315,7 @@ impl AccountsClient {
 
     /// Get session validity and optional remote key attributes.
     pub async fn get_session_validity(&self) -> Result<SessionValidityResponse> {
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .get("/users/session-validity/v2")
                 .send()
@@ -347,7 +344,7 @@ impl AccountsClient {
     /// Logout the current authenticated session.
     pub async fn logout(&self) -> Result<()> {
         let body = serde_json::json!({});
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .post("/users/logout")
                 .json(&body)
@@ -362,7 +359,7 @@ impl AccountsClient {
 
     /// Return whether two-factor is enabled.
     pub async fn get_two_factor_status(&self) -> Result<bool> {
-        let response: TwoFactorStatusResponse = http::retry(RetryProfile::Interactive, || async {
+        let response: TwoFactorStatusResponse = http::retry(|| async {
             self.api
                 .get("/users/two-factor/status")
                 .send()
@@ -406,7 +403,7 @@ impl AccountsClient {
     /// Disable TOTP two-factor.
     pub async fn disable_two_factor(&self) -> Result<()> {
         let body = serde_json::json!({});
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .post("/users/two-factor/disable")
                 .json(&body)
@@ -453,7 +450,7 @@ impl AccountsClient {
                 },
             ),
         ];
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .get("/users/two-factor/recover")
                 .query(&query)
@@ -486,7 +483,7 @@ impl AccountsClient {
 
     /// Get passkey recovery status.
     pub async fn get_two_factor_recovery_status(&self) -> Result<TwoFactorRecoveryStatusResponse> {
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .get("/users/two-factor/recovery-status")
                 .send()
@@ -504,7 +501,7 @@ impl AccountsClient {
         &self,
         request: &ConfigurePasskeyRecoveryRequest,
     ) -> Result<()> {
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .post("/users/two-factor/passkeys/configure-recovery")
                 .json(request)
@@ -520,7 +517,7 @@ impl AccountsClient {
     /// Poll passkey verification completion.
     pub async fn check_passkey_status(&self, session_id: &str) -> Result<AuthResponse> {
         let query = [("sessionID", session_id.to_string())];
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .get("/users/two-factor/passkeys/get-token")
                 .query(&query)
@@ -536,7 +533,7 @@ impl AccountsClient {
 
     /// Fetch accounts-app broker token and URL.
     pub async fn get_accounts_token(&self) -> Result<AccountsTokenResponse> {
-        Ok(http::retry(RetryProfile::Interactive, || async {
+        Ok(http::retry(|| async {
             self.api
                 .get("/users/accounts-token")
                 .send()
