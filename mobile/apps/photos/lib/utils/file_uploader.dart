@@ -50,7 +50,6 @@ import "package:uuid/uuid.dart";
 class FileUploader {
   static const kMaximumConcurrentUploads = 4;
   static const kMaximumConcurrentVideoUploads = 2;
-  static const kMaximumThumbnailCompressionAttempts = 2;
   static const kMaximumUploadAttempts = 4;
   static const kMaxFileSize10Gib = 10737418240;
   static const kBlockedUploadsPollFrequency = Duration(seconds: 2);
@@ -1643,6 +1642,6 @@ class FileUploadItem {
   });
 }
 
-enum UploadStatus { notStarted, inProgress, inBackground, completed }
+enum UploadStatus { notStarted, inProgress, inBackground }
 
 enum ProcessType { background, foreground }

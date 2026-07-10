@@ -222,18 +222,6 @@ class LocalFileUpdateService {
     return mediaUploadData;
   }
 
-  Future<(MediaUploadData, int)> getUploadDataWithSizeSize(
-    EnteFile file,
-  ) async {
-    final mediaUploadData = await getUploadDataFromEnteFile(file);
-    final int size = await mediaUploadData.sourceFile!.length();
-    // delete the file from app's internal cache if it was copied to app
-    // for upload. Shared Media should only be cleared when the upload
-    // succeeds.
-    await _deleteCopiedIOSUploadFile(mediaUploadData.sourceFile);
-    return (mediaUploadData, size);
-  }
-
   Future<void> _deleteCopiedIOSUploadFile(File? sourceFile) async {
     if (!Platform.isIOS || sourceFile == null) {
       return;
