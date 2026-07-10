@@ -631,7 +631,7 @@ class _HomePageState extends UploaderPageState<HomePage>
                     ),
                   ],
                 ),
-                floatingActionButton: isSearchActive
+                floatingActionButton: isSearchActive || isHomeEmptyState
                     ? null
                     : ListenableBuilder(
                         listenable: _selectedFiles,
@@ -702,13 +702,15 @@ class _HomePageState extends UploaderPageState<HomePage>
         final scrollBottomPadding = MediaQuery.of(context).padding.bottom + 120;
 
         return _recentFiles.isEmpty
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: HomeEmptyStateWidget(
-                    isLoading: _isSyncing,
-                    onSetupLegacy: () => openLegacyPage(context),
-                    onSaveToLocker: _openSavePage,
+            ? SizedBox.expand(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: HomeEmptyStateWidget(
+                      isLoading: _isSyncing,
+                      onSetupLegacy: () => openLegacyPage(context),
+                      onSaveToLocker: _openSavePage,
+                    ),
                   ),
                 ),
               )
