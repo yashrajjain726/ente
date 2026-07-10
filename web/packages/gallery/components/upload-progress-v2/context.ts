@@ -1,4 +1,4 @@
-import type { SkippedFile } from "ente-base/types/ipc";
+import type { PreUploadSkippedFile } from "ente-base/types/ipc";
 import type { UploadPhase } from "ente-gallery/services/upload";
 import { createContext, useContext } from "react";
 import type {
@@ -29,7 +29,7 @@ export interface UploadProgressContextT {
     inProgressUploads: InProgressUpload[];
     uploadFileNames: UploadFileNames;
     finishedUploads: SegregatedFinishedUploads;
-    skippedFiles: SkippedFile[];
+    preUploadSkippedFiles: PreUploadSkippedFile[];
     hasLivePhotos: boolean;
     setExpanded: (expanded: boolean) => void;
     dragPosition: DragPosition | undefined;

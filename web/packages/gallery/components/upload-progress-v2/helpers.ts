@@ -1,5 +1,5 @@
 import { formattedListJoin } from "ente-base/i18n";
-import type { SkippedFile } from "ente-base/types/ipc";
+import type { PreUploadSkippedFile } from "ente-base/types/ipc";
 import type { UploadPhase } from "ente-gallery/services/upload";
 import { t } from "i18next";
 import {
@@ -32,7 +32,10 @@ export const finishedTypeReasonHintKeys: Partial<
     blocked: "upload_hint_blocked",
 };
 
-export const skippedFileReasonKeys: Record<SkippedFile["type"], string> = {
+export const preUploadSkippedFileReasonKeys: Record<
+    PreUploadSkippedFile["type"],
+    string
+> = {
     hiddenFile: "upload_reason_hidden_file",
     failedZip: "upload_reason_unreadable_zip",
 };
@@ -73,17 +76,20 @@ export const uploadCountsText = ({
     uploadPhase,
     uploadCounter,
     finishedUploads,
-    skippedFiles,
+    preUploadSkippedFiles,
 }: Pick<
     UploadProgressContextT,
-    "uploadPhase" | "uploadCounter" | "finishedUploads" | "skippedFiles"
+    | "uploadPhase"
+    | "uploadCounter"
+    | "finishedUploads"
+    | "preUploadSkippedFiles"
 >) => {
     if (uploadPhase == "done") {
         const {
             completed: count,
             skipped,
             failed,
-        } = uploadCompletionCounts(finishedUploads, skippedFiles);
+        } = uploadCompletionCounts(finishedUploads, preUploadSkippedFiles);
         const notCount = skipped + failed;
         const items: string[] = [];
         if (count) items.push(t("upload_done", { count }));

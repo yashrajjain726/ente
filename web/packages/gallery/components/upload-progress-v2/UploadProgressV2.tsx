@@ -1,4 +1,4 @@
-import type { SkippedFile } from "ente-base/types/ipc";
+import type { PreUploadSkippedFile } from "ente-base/types/ipc";
 import type { UploadPhase } from "ente-gallery/services/upload";
 import { useCallback, useMemo, useState } from "react";
 import { UploadCompletionV2 } from "../UploadCompletionV2";
@@ -23,12 +23,12 @@ interface UploadProgressProps {
     inProgressUploads: InProgressUpload[];
     uploadFileNames: UploadFileNames;
     finishedUploads: SegregatedFinishedUploads;
-    skippedFiles?: SkippedFile[];
+    preUploadSkippedFiles?: PreUploadSkippedFile[];
     hasLivePhotos: boolean;
     cancelUploads: () => void;
 }
 
-const emptySkippedFiles: SkippedFile[] = [];
+const emptyPreUploadSkippedFiles: PreUploadSkippedFile[] = [];
 
 export function UploadProgressV2(props: UploadProgressProps) {
     if (!props.open) return null;
@@ -53,7 +53,7 @@ function CompletedUploadProgress(props: UploadProgressProps) {
             onClose={props.onClose}
             onReviewFailed={handleReviewFailed}
             finishedUploads={props.finishedUploads}
-            skippedFiles={props.skippedFiles}
+            preUploadSkippedFiles={props.preUploadSkippedFiles}
         />
     );
 }
@@ -68,7 +68,7 @@ function UploadProgressView({
     hasLivePhotos,
     inProgressUploads,
     finishedUploads,
-    skippedFiles = emptySkippedFiles,
+    preUploadSkippedFiles = emptyPreUploadSkippedFiles,
     cancelUploads,
 }: UploadProgressProps) {
     /**
@@ -111,7 +111,7 @@ function UploadProgressView({
             inProgressUploads,
             uploadFileNames,
             finishedUploads,
-            skippedFiles,
+            preUploadSkippedFiles,
             hasLivePhotos,
             setExpanded,
             dragPosition,
@@ -125,7 +125,7 @@ function UploadProgressView({
             inProgressUploads,
             percentComplete,
             retryFailed,
-            skippedFiles,
+            preUploadSkippedFiles,
             uploadCounter,
             uploadFileNames,
             uploadPhase,

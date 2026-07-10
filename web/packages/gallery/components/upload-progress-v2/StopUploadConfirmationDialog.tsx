@@ -24,8 +24,12 @@ export function StopUploadConfirmationDialog({
     onClose,
     onConfirm,
 }: StopUploadConfirmationDialogProps) {
-    const { finishedUploads, skippedFiles } = useUploadProgressContext();
-    const counts = uploadCompletionCounts(finishedUploads, skippedFiles);
+    const { finishedUploads, preUploadSkippedFiles } =
+        useUploadProgressContext();
+    const counts = uploadCompletionCounts(
+        finishedUploads,
+        preUploadSkippedFiles,
+    );
 
     return (
         <Dialog

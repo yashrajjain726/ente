@@ -1115,7 +1115,7 @@ export const Upload: React.FC<UploadProps> = ({
                     hasLivePhotos={hasLivePhotos}
                     retryFailed={retryFailed}
                     finishedUploads={finishedUploads}
-                    skippedFiles={preUploadSkippedFiles}
+                    preUploadSkippedFiles={preUploadSkippedFiles}
                     cancelUploads={cancelUploads}
                 />
             ) : (

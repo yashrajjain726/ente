@@ -1,4 +1,4 @@
-import type { SkippedFile } from "ente-base/types/ipc";
+import type { PreUploadSkippedFile } from "ente-base/types/ipc";
 import type { UploadPhase, UploadResult } from "ente-gallery/services/upload";
 
 export interface UploadCounter {
@@ -58,7 +58,7 @@ export const statFinishedTypes: Record<FinishedStatKind, FinishedUploadType[]> =
 
 export const uploadCompletionCounts = (
     finishedUploads: SegregatedFinishedUploads,
-    skippedFiles: SkippedFile[],
+    preUploadSkippedFiles: PreUploadSkippedFile[],
 ): Record<FinishedStatKind, number> => {
     const countFinished = (types: FinishedUploadType[]) =>
         types.reduce(
@@ -68,7 +68,9 @@ export const uploadCompletionCounts = (
 
     return {
         completed: countFinished(statFinishedTypes.completed),
-        skipped: countFinished(statFinishedTypes.skipped) + skippedFiles.length,
+        skipped:
+            countFinished(statFinishedTypes.skipped) +
+            preUploadSkippedFiles.length,
         failed: countFinished(statFinishedTypes.failed),
     };
 };
@@ -78,13 +80,13 @@ export const uploadProgressStatCounts = ({
     uploadCounter,
     inProgressUploads,
     finishedUploads,
-    skippedFiles,
+    preUploadSkippedFiles,
 }: {
     uploadPhase: UploadPhase;
     uploadCounter: UploadCounter;
     inProgressUploads: InProgressUpload[];
     finishedUploads: SegregatedFinishedUploads;
-    skippedFiles: SkippedFile[];
+    preUploadSkippedFiles: PreUploadSkippedFile[];
 }): Record<UploadStatKind, number> => ({
     inProgress:
         uploadPhase == "done"
@@ -93,5 +95,5 @@ export const uploadProgressStatCounts = ({
                   inProgressUploads.length,
                   uploadCounter.total - uploadCounter.finished,
               ),
-    ...uploadCompletionCounts(finishedUploads, skippedFiles),
+    ...uploadCompletionCounts(finishedUploads, preUploadSkippedFiles),
 });

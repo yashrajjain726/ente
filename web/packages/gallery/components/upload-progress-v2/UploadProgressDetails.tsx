@@ -15,7 +15,7 @@ import {
     finishedTypeReasonHintKeys,
     finishedTypeReasonKeys,
     normalizePercent,
-    skippedFileReasonKeys,
+    preUploadSkippedFileReasonKeys,
     statConfigs,
     statEmptyMessageKeys,
 } from "./helpers";
@@ -32,7 +32,7 @@ export function UploadProgressDetails() {
         hasLivePhotos,
         inProgressUploads,
         retryFailed,
-        skippedFiles,
+        preUploadSkippedFiles,
         uploadCounter,
         uploadFileNames,
         uploadPhase,
@@ -47,7 +47,7 @@ export function UploadProgressDetails() {
         uploadCounter,
         inProgressUploads,
         finishedUploads,
-        skippedFiles,
+        preUploadSkippedFiles,
     });
     const failedCount = statCounts.failed;
     const activeStat =
@@ -74,10 +74,12 @@ export function UploadProgressDetails() {
                       }));
                   }),
                   ...(activeStat == "skipped"
-                      ? skippedFiles.map((file) => ({
+                      ? preUploadSkippedFiles.map((file) => ({
                             name: basename(file.name),
                             title: file.name,
-                            reason: t(skippedFileReasonKeys[file.type]),
+                            reason: t(
+                                preUploadSkippedFileReasonKeys[file.type],
+                            ),
                         }))
                       : []),
               ];

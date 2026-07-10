@@ -9,7 +9,7 @@ import {
     type DialogProps,
     type Theme,
 } from "@mui/material";
-import type { SkippedFile } from "ente-base/types/ipc";
+import type { PreUploadSkippedFile } from "ente-base/types/ipc";
 import { t } from "i18next";
 import {
     finishedStatKinds,
@@ -23,15 +23,18 @@ export function UploadCompletionV2({
     onClose,
     onReviewFailed,
     finishedUploads,
-    skippedFiles = [],
+    preUploadSkippedFiles = [],
 }: {
     open: boolean;
     onClose: () => void;
     onReviewFailed: () => void;
     finishedUploads: SegregatedFinishedUploads;
-    skippedFiles?: SkippedFile[];
+    preUploadSkippedFiles?: PreUploadSkippedFile[];
 }) {
-    const counts = uploadCompletionCounts(finishedUploads, skippedFiles);
+    const counts = uploadCompletionCounts(
+        finishedUploads,
+        preUploadSkippedFiles,
+    );
 
     const handleClose: DialogProps["onClose"] = (_, reason) => {
         if (reason != "backdropClick") onClose();
