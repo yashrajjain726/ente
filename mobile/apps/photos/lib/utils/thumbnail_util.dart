@@ -6,7 +6,7 @@ import "dart:typed_data";
 import 'package:dio/dio.dart';
 import 'package:ente_crypto/ente_crypto.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart'
-    show isFileSystemPathMissing;
+    show deleteFileSystemEntityIfPresent, isFileSystemPathMissing;
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -48,9 +48,9 @@ Future<Uint8List?> getThumbnail(EnteFile file) async {
 
 void preloadThumbnail(EnteFile file) {
   if (file.isRemoteOnlyFile) {
-    getThumbnailFromServer(file);
+    unawaited(getThumbnailFromServer(file));
   } else {
-    getThumbnailFromLocal(file);
+    unawaited(getThumbnailFromLocal(file));
   }
 }
 
@@ -191,36 +191,52 @@ Future<Uint8List?> getThumbnailFromLocal(
 
 Future<Uint8List?> getThumbnailFromInAppCacheFile(EnteFile file) async {
   var localFile = File(getSharedMediaFilePath(file));
-  if (!localFile.existsSync()) {
+  if (!await localFile.exists()) {
     return null;
   }
-  if (file.fileType == FileType.video) {
-    try {
-      final thumbnailFilePath = await VideoThumbnail.thumbnailFile(
-        video: localFile.path,
-        imageFormat: ImageFormat.JPEG,
-        thumbnailPath: (await getTemporaryDirectory()).path,
-        maxWidth: thumbnailLargeSize,
-        quality: 80,
+  File? generatedThumbnail;
+  try {
+    if (file.fileType == FileType.video) {
+      try {
+        final thumbnailFilePath = await VideoThumbnail.thumbnailFile(
+          video: localFile.path,
+          imageFormat: ImageFormat.JPEG,
+          thumbnailPath: (await getTemporaryDirectory()).path,
+          maxWidth: thumbnailLargeSize,
+          quality: 80,
+        );
+        if (thumbnailFilePath == null) {
+          _logger.warning('Video thumbnail generation returned no file');
+          return null;
+        }
+        generatedThumbnail = File(thumbnailFilePath);
+        localFile = generatedThumbnail;
+      } catch (e, s) {
+        _logger.warning('Failed to generate video thumbnail', e, s);
+        return null;
+      }
+    }
+    var thumbnailData = await localFile.readAsBytes();
+    int compressionAttempts = 0;
+    while (thumbnailData.length > thumbnailDataLimit &&
+        compressionAttempts < kMaximumThumbnailCompressionAttempts) {
+      _logger.info("Thumbnail size " + thumbnailData.length.toString());
+      thumbnailData = await compressThumbnail(thumbnailData);
+      _logger.info(
+        "Compressed thumbnail size " + thumbnailData.length.toString(),
       );
-      localFile = File(thumbnailFilePath!);
-    } catch (e) {
-      _logger.warning('Failed to generate video thumbnail', e);
-      return null;
+      compressionAttempts++;
+    }
+    return thumbnailData;
+  } finally {
+    if (generatedThumbnail != null) {
+      try {
+        await deleteFileSystemEntityIfPresent(generatedThumbnail);
+      } catch (e, s) {
+        _logger.warning('Failed to delete generated thumbnail', e, s);
+      }
     }
   }
-  var thumbnailData = await localFile.readAsBytes();
-  int compressionAttempts = 0;
-  while (thumbnailData.length > thumbnailDataLimit &&
-      compressionAttempts < kMaximumThumbnailCompressionAttempts) {
-    _logger.info("Thumbnail size " + thumbnailData.length.toString());
-    thumbnailData = await compressThumbnail(thumbnailData);
-    _logger.info(
-      "Compressed thumbnail size " + thumbnailData.length.toString(),
-    );
-    compressionAttempts++;
-  }
-  return thumbnailData;
 }
 
 void removePendingGetThumbnailRequestIfAny(EnteFile file) {
