@@ -1,9 +1,9 @@
-pub const CREATE_INDEXES: &str = "
+pub(super) const CREATE_INDEXES: &str = "
 CREATE INDEX IF NOT EXISTS idx_messages_order ON messages(session_uuid, created_at, message_uuid);
 CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at);
 ";
 
-pub const CREATE_ALL: &str = "
+pub(super) const CREATE_ALL: &str = "
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS sessions (

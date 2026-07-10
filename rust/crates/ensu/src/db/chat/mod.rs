@@ -1,5 +1,5 @@
-pub mod migrations;
-pub mod schema;
+mod migrations;
+mod schema;
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -281,19 +281,6 @@ impl<B: Backend> ChatDb<B> {
             let affected = tx.execute(
                 "UPDATE messages SET text = ? WHERE message_uuid = ?",
                 &[Value::Blob(encrypted_text), Value::Text(uuid.to_string())],
-            )?;
-            ensure_row_updated(affected, EntityType::Message, uuid)?;
-            self.touch_session(tx, session_uuid, updated_at)
-        })
-    }
-
-    pub fn delete_message(&self, uuid: Uuid) -> Result<()> {
-        let updated_at = self.clock.now_us();
-        self.backend.transaction(|tx| {
-            let session_uuid = message_session_uuid(tx, uuid)?;
-            let affected = tx.execute(
-                "DELETE FROM messages WHERE message_uuid = ?",
-                &[Value::Text(uuid.to_string())],
             )?;
             ensure_row_updated(affected, EntityType::Message, uuid)?;
             self.touch_session(tx, session_uuid, updated_at)

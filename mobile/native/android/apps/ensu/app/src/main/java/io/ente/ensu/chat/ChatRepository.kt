@@ -77,6 +77,7 @@ class ChatRepository(
                 text = message.text,
                 timestampMillis = message.createdAtUs / 1000,
                 attachments = message.attachments.map { meta ->
+                    val file = File(attachmentsDir, meta.id)
                     Attachment(
                         id = meta.id,
                         name = meta.name,
@@ -85,7 +86,7 @@ class ChatRepository(
                             DbAttachmentKind.IMAGE -> AttachmentType.Image
                             DbAttachmentKind.DOCUMENT -> AttachmentType.Document
                         },
-                        localPath = File(attachmentsDir, meta.id).absolutePath,
+                        localPath = file.takeIf { it.exists() }?.absolutePath,
                         isUploading = false
                     )
                 }
