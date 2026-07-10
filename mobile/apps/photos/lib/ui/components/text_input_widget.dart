@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -287,7 +289,9 @@ class _TextInputWidgetState extends State<TextInputWidget> {
       _exception = e is Exception ? e : Exception(e.toString());
       if (e.toString().contains("Incorrect password")) {
         _logger.warning("Incorrect password");
+        executionState = ExecutionState.idle;
         _surfaceWrongPasswordState();
+        return;
       }
       if (!widget.popNavAfterSubmission) {
         rethrow;
@@ -344,13 +348,15 @@ class _TextInputWidgetState extends State<TextInputWidget> {
       if (executionState == ExecutionState.error) {
         setState(() {
           executionState = ExecutionState.idle;
-          widget.popNavAfterSubmission
-              ? Future.delayed(
-                  const Duration(seconds: 0),
-                  () => _popNavigatorStack(context, e: _exception),
-                )
-              : null;
         });
+        if (widget.popNavAfterSubmission) {
+          unawaited(
+            Future.delayed(Duration.zero, () {
+              if (!mounted) return;
+              _popNavigatorStack(context, e: _exception);
+            }),
+          );
+        }
       }
     } else {
       if (widget.popNavAfterSubmission) {

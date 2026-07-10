@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "dataset": "ml-indexing/v1",
+  "fixture_base_url": "https://raw.githubusercontent.com/ente/test-fixtures/13c7cf83717140be20b32e6fbb178d5f15ea09ea/ml/indexing/v1/",
+  "manifest": {
+    "path": "manifest.json",
+    "url": "https://raw.githubusercontent.com/ente/test-fixtures/13c7cf83717140be20b32e6fbb178d5f15ea09ea/ml/indexing/v1/manifest.json",
+    "sha256": "fa4a2dcd1787825a77b85343aace954572e0f4d9080e4cb3031179159af9011c"
+  },
+  "python_golden": {
+    "path": "goldens/python/results.json",
+    "url": "https://raw.githubusercontent.com/ente/test-fixtures/13c7cf83717140be20b32e6fbb178d5f15ea09ea/ml/indexing/v1/goldens/python/results.json",
+    "sha256": "2def6506e098234abc2e6e10febd820b8e3e66d6ad4c9525cb4f1cec3418f9b6"
+  },
+  "onnx_runtime": {
+    "version": "1.18.1",
+    "archives": {
+      "aarch64-apple-darwin": {
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.18.1/onnxruntime-osx-arm64-1.18.1.tgz",
+        "sha256": "f3356203e9b6f5023168a12db74b1060ab397f8f3ce8f5cb2c2bd9e7f1195b01",
+        "library_path": "onnxruntime-osx-arm64-1.18.1/lib/libonnxruntime.1.18.1.dylib",
+        "library_sha256": "cf0c4da3d0ccae9b71cc854333e716d162869a3c42f9017b142408542fcec9b7"
+      },
+      "x86_64-apple-darwin": {
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.18.1/onnxruntime-osx-x86_64-1.18.1.tgz",
+        "sha256": "938198521ecccd6fca4cadd627a57966de092feb6ea9ecb579437898d04ebad8",
+        "library_path": "onnxruntime-osx-x86_64-1.18.1/lib/libonnxruntime.1.18.1.dylib",
+        "library_sha256": "b25f77bf7c58ef0fbcdd5fb090301df4e80f82cf0000ceed1042418729b6594d"
+      },
+      "x86_64-unknown-linux-gnu": {
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.18.1/onnxruntime-linux-x64-1.18.1.tgz",
+        "sha256": "a0994512ec1e1debc00c18bfc7a5f16249f6ebd6a6128ff2034464cc380ea211",
+        "library_path": "onnxruntime-linux-x64-1.18.1/lib/libonnxruntime.so.1.18.1",
+        "library_sha256": "1147caa734d19f7549f90a659aa9ca444366eeb80a596900d19d242145a9f4c9"
+      },
+      "aarch64-unknown-linux-gnu": {
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.18.1/onnxruntime-linux-aarch64-1.18.1.tgz",
+        "sha256": "c1dcd8ab29e8d227d886b6ee415c08aea893956acf98f0758a42a84f27c02851",
+        "library_path": "onnxruntime-linux-aarch64-1.18.1/lib/libonnxruntime.so.1.18.1",
+        "library_sha256": "006437cc7da2dd9a8a116e3fb0c96fe9c4ec8645fccbb731f3b02082a6fbf70e"
+      }
+    }
+  },
+  "models": {
+    "face_detection": {
+      "file_name": "yolov5s_face_640_640_dynamic.onnx",
+      "url": "https://models.ente.io/yolov5s_face_640_640_dynamic.onnx",
+      "sha256": "71a008707283b03db4881449a24f4da197f9dbd9ddaca5c91fcdb363fbf7e06f"
+    },
+    "face_embedding": {
+      "file_name": "mobilefacenet_opset15.onnx",
+      "url": "https://models.ente.io/mobilefacenet_opset15.onnx",
+      "sha256": "472a0f7e24d0b070cbbdc031b085bc2a06c70655b3bdefb87dbd69bc98662f45"
+    },
+    "clip_image": {
+      "file_name": "mobileclip_s2_image.onnx",
+      "url": "https://models.ente.io/mobileclip_s2_image.onnx",
+      "sha256": "ef54ec66c687603eb4dd303e20d9b67e81069d3133b1c69a70028c76718b7752"
+    }
+  },
+  "expected_unsupported_decode_file_ids": ["IMG_8905.CR2"],
+  "thresholds": {
+    "clip_cosine_distance": 0.015,
+    "face_embedding_cosine_distance": 0.015,
+    "box_iou": 0.8,
+    "face_duplicate_iou": 0.8,
+    "face_match_iou_floor": 0.05,
+    "landmark_error": 0.01,
+    "score_delta": 0.01,
+    "min_face_score_for_comparison": 0.8,
+    "embedding_norm_tolerance": 0.001
+  }
+}

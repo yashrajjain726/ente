@@ -250,14 +250,14 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
   }
 
   Future<dynamic> _editPerson(BuildContext context) async {
+    final clusterID = person.data.assigned.isEmpty
+        ? null
+        : person.data.assigned.first.id;
     final result = await routeToPage(
       context,
-      SaveOrEditPerson(
-        person.data.assigned.first.id,
-        person: person,
-        isEditing: true,
-      ),
+      SaveOrEditPerson(clusterID, person: person, isEditing: true),
     );
+    if (!mounted) return;
     if (result is PersonEntity) {
       _appBarTitle = result.data.name;
       person = result;
@@ -270,6 +270,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     final bool isIgnored = person.data.isIgnored;
     final bool isPinned = person.data.isPinned;
     final bool hideFromMemories = person.data.hideFromMemories;
+    final bool hasAssignedCluster = person.data.assigned.isNotEmpty;
     final List<Widget> actions = <Widget>[];
     // If the user has selected files, don't show any actions
     if (widget.selectedFiles.files.isNotEmpty ||
@@ -303,22 +304,24 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
             iconColor,
           ),
         ),
-        EntePopupMenuOption(
-          value: PeoplePopupAction.reviewSuggestions,
-          label: AppLocalizations.of(context).review,
-          leadingWidget: galleryAppBarMenuIcon(
-            HugeIcons.strokeRoundedSearch01,
-            iconColor,
+        if (hasAssignedCluster)
+          EntePopupMenuOption(
+            value: PeoplePopupAction.reviewSuggestions,
+            label: AppLocalizations.of(context).review,
+            leadingWidget: galleryAppBarMenuIcon(
+              HugeIcons.strokeRoundedSearch01,
+              iconColor,
+            ),
           ),
-        ),
-        EntePopupMenuOption(
-          value: PeoplePopupAction.setCover,
-          label: AppLocalizations.of(context).setCover,
-          leadingWidget: galleryAppBarMenuIcon(
-            HugeIcons.strokeRoundedImage01,
-            iconColor,
+        if (hasAssignedCluster)
+          EntePopupMenuOption(
+            value: PeoplePopupAction.setCover,
+            label: AppLocalizations.of(context).setCover,
+            leadingWidget: galleryAppBarMenuIcon(
+              HugeIcons.strokeRoundedImage01,
+              iconColor,
+            ),
           ),
-        ),
         EntePopupMenuOption(
           value: PeoplePopupAction.pinPerson,
           label: isPinned ? context.l10n.unpinPerson : context.l10n.pinPerson,
@@ -378,14 +381,15 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
             iconColor,
           ),
         ),
-        EntePopupMenuOption(
-          value: PeoplePopupAction.reviewSuggestions,
-          label: AppLocalizations.of(context).review,
-          leadingWidget: galleryAppBarMenuIcon(
-            HugeIcons.strokeRoundedSearch01,
-            iconColor,
+        if (hasAssignedCluster)
+          EntePopupMenuOption(
+            value: PeoplePopupAction.reviewSuggestions,
+            label: AppLocalizations.of(context).review,
+            leadingWidget: galleryAppBarMenuIcon(
+              HugeIcons.strokeRoundedSearch01,
+              iconColor,
+            ),
           ),
-        ),
         EntePopupMenuOption(
           value: PeoplePopupAction.unignore,
           label: AppLocalizations.of(context).showPerson,
@@ -469,9 +473,11 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
         person.remoteID,
         hideFromMemories: shouldHideFromMemories,
       );
-      setState(() {
-        person = updatedPerson;
-      });
+      if (mounted) {
+        setState(() {
+          person = updatedPerson;
+        });
+      }
       Bus.instance.fire(
         PeopleChangedEvent(
           type: PeopleEventType.saveOrEditPerson,
@@ -493,6 +499,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
       firstButtonOnTap: () async {
         try {
           await PersonService.instance.deletePerson(person.remoteID);
+          if (!context.mounted) return;
           Navigator.of(context).pop();
         } catch (e, s) {
           _logger.severe('Resetting person failed', e, s);
@@ -539,6 +546,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     if (!mounted || result?.action != ButtonAction.error) {
       return;
     }
+    if (!context.mounted) return;
     showShortToast(
       context,
       AppLocalizations.of(context).somethingWentWrongPleaseTryAgain,
@@ -596,6 +604,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
         !shouldCloseDetailPage) {
       return;
     }
+    if (!context.mounted) return;
     await Navigator.of(context).maybePop();
   }
 
@@ -603,9 +612,6 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
     final result = await showPersonAvatarPhotoSheet(context, person);
     if (result != null) {
       _logger.info('Person avatar updated');
-      setState(() {
-        person = result;
-      });
       Bus.instance.fire(
         PeopleChangedEvent(
           type: PeopleEventType.saveOrEditPerson,
@@ -613,6 +619,10 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
           person: result,
         ),
       );
+      if (!mounted) return;
+      setState(() {
+        person = result;
+      });
     }
   }
 

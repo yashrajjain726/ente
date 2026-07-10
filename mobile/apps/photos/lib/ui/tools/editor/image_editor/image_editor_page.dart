@@ -5,7 +5,6 @@ import 'dart:ui' as ui show Image, ImageByteFormat;
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
-import "package:exif_reader/exif_reader.dart";
 import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
 import "package:flutter_image_compress/flutter_image_compress.dart";
@@ -36,8 +35,7 @@ import "package:photos/ui/tools/editor/image_editor/image_editor_text_bar.dart";
 import "package:photos/ui/tools/editor/image_editor/image_editor_tune_bar.dart";
 import "package:photos/ui/viewer/file/detail_page.dart";
 import "package:photos/utils/dialog_util.dart";
-import "package:photos/utils/exif_util.dart";
-import 'package:photos/utils/file_util.dart';
+import "package:photos/utils/image_util.dart";
 import 'package:pro_image_editor/pro_image_editor.dart';
 
 class ImageEditorPage extends StatefulWidget {
@@ -84,20 +82,18 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
         format: CompressFormat.jpeg,
       );
       if (flagService.internalUser) {
-        final image = img.decodePng(bytes);
-        if (image != null) {
-          final originalExifTags = await _getOriginalExifTags(
-            widget.originalFile,
-          );
-          final originalImageExif = await _readOriginalImageExif(
-            widget.originalFile,
-          );
-          if (originalImageExif != null || originalExifTags.isNotEmpty) {
-            image.exif = originalImageExif ?? img.ExifData();
-            _clearEditorExifTags(image.exif);
-            _copyCameraExif(originalExifTags, image.exif);
+        try {
+          final image = img.decodePng(bytes);
+          if (image != null) {
+            await copyEXIF(
+              widget.originalFile,
+              image,
+              copyRenderingFields: false,
+            );
             result = img.encodeJpg(image, quality: 95);
           }
+        } catch (e, s) {
+          _logger.warning("Image Editor: copyEXIF failed", e, s);
         }
       }
       _logger.info('Size after compression = ${result.length}');
@@ -138,6 +134,10 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
       newFile.generatedID = await FilesDB.instance.insertAndGetId(newFile);
       Bus.instance.fire(LocalPhotosUpdatedEvent([newFile], source: "editSave"));
       unawaited(SyncService.instance.sync());
+      if (!mounted) {
+        await dialog.hide();
+        return;
+      }
       showShortToast(context, AppLocalizations.of(context).editsSaved);
       _logger.info("Original file " + widget.originalFile.toString());
       _logger.info("Saved edits to file " + newFile.toString());
@@ -153,6 +153,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
         selectionIndex = files.length - 1;
       }
       await dialog.hide();
+      if (!mounted) return;
       replacePage(
         context,
         DetailPage(
@@ -164,126 +165,14 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
       );
     } catch (e, s) {
       await dialog.hide();
-      showToast(context, AppLocalizations.of(context).oopsCouldNotSaveEdits);
+      if (mounted) {
+        showToast(context, AppLocalizations.of(context).oopsCouldNotSaveEdits);
+      }
       _logger.severe("Failed to save image edits", e, s);
     } finally {
       if (hasStoppedChangeNotify) {
         await PhotoManager.startChangeNotify();
       }
-    }
-  }
-
-  Future<Map<String, IfdTag>> _getOriginalExifTags(
-    ente.EnteFile enteFile,
-  ) async {
-    try {
-      return await getExif(enteFile);
-    } catch (e, s) {
-      _logger.warning("Image Editor: getExif failed", e, s);
-      return const {};
-    }
-  }
-
-  Future<img.ExifData?> _readOriginalImageExif(ente.EnteFile enteFile) async {
-    final file = await getFile(enteFile, isOrigin: true);
-    if (file == null) {
-      return null;
-    }
-    try {
-      final bytes = await file.readAsBytes();
-      final image = img.decodeImage(bytes);
-      return image?.exif;
-    } catch (e, s) {
-      _logger.warning("Image Editor: _readOriginalImageExif failed: ", e, s);
-      return null;
-    } finally {
-      if (!enteFile.isRemoteOnlyFile && Platform.isIOS) {
-        await file.delete();
-      }
-    }
-  }
-
-  void _clearEditorExifTags(img.ExifData exif) {
-    final imageIfdKeys = [
-      "Orientation",
-      "WhitePoint",
-      "PrimaryChromaticities",
-      "PhotometricInterpretation",
-      "BitsPerSample",
-      "SamplesPerPixel",
-      "Compression",
-      "ImageWidth",
-      "ImageHeight",
-      "YCbCrPositioning",
-      "YCbCrSubSampling",
-      "YCbCrCoefficients",
-      "ReferenceBlackWhite",
-      "XResolution",
-      "YResolution",
-      "ResolutionUnit",
-    ];
-    final thumbnailIfdKeys = [
-      "JPEGInterchangeFormat",
-      "JPEGInterchangeFormatLength",
-    ];
-    final exifIfdKeys = [
-      "ColorSpace",
-      "Gamma",
-      "ExifImageWidth",
-      "ExifImageHeight",
-      "ExifImageLength",
-      "ComponentsConfiguration",
-      "CustomRendered",
-      "SceneCaptureType",
-      "WhiteBalance",
-      "LightSource",
-      "Flash",
-      "GainControl",
-      "Contrast",
-      "Saturation",
-      "Sharpness",
-      "SubjectDistanceRange",
-    ];
-
-    void clear(img.IfdDirectory ifd, List<String> keys) {
-      for (final key in keys) {
-        ifd[key] = null;
-      }
-    }
-
-    clear(exif.imageIfd, imageIfdKeys);
-    clear(exif.thumbnailIfd, thumbnailIfdKeys);
-    clear(exif.exifIfd, exifIfdKeys);
-  }
-
-  void _copyCameraExif(Map<String, IfdTag> tags, img.ExifData exif) {
-    for (final entry in {
-      "Image Make": "Make",
-      "Image Model": "Model",
-    }.entries) {
-      final value = tags[entry.key]?.toString();
-      if (value != null) {
-        exif.imageIfd[entry.value] = value;
-      }
-    }
-
-    for (final entry in {
-      "EXIF FocalLength": "FocalLength",
-      "EXIF FNumber": "FNumber",
-      "EXIF ExposureTime": "ExposureTime",
-    }.entries) {
-      final value = tags[entry.key]?.values.toList().firstOrNull;
-      if (value is Ratio) {
-        exif.exifIfd[entry.value] = img.IfdValueRational(
-          value.numerator,
-          value.denominator,
-        );
-      }
-    }
-
-    final iso = tags["EXIF ISOSpeedRatings"]?.values;
-    if (iso != null && iso.length > 0) {
-      exif.exifIfd["ISOSpeed"] = iso.firstAsInt();
     }
   }
 
@@ -312,6 +201,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
       body: AppLocalizations.of(context).doYouWantToDiscardTheEditsYouHaveMade,
       actionSheetType: ActionSheetType.defaultActionSheet,
     );
+    if (!context.mounted) return;
     if (actionResult?.action != null &&
         actionResult!.action == ButtonAction.first) {
       replacePage(context, DetailPage(widget.detailPageConfig));

@@ -154,7 +154,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
           });
     }
 
-    EnteWakeLockService.instance.updateWakeLock(
+    wakeLockService.updateWakeLock(
       enable: true,
       wakeLockFor: WakeLockFor.videoPlayback,
     );
@@ -270,7 +270,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
     _debouncer.cancelDebounceTimer();
     _captionUpdatedSubscription.cancel();
     _transformationController.dispose();
-    EnteWakeLockService.instance.updateWakeLock(
+    wakeLockService.updateWakeLock(
       enable: false,
       wakeLockFor: WakeLockFor.videoPlayback,
     );
@@ -278,6 +278,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   }
 
   void _onInteractionLockChanged(bool shouldLock) {
+    if (!mounted) return;
     if (_isZooming != shouldLock) {
       setState(() {
         _isZooming = shouldLock;
@@ -637,6 +638,7 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
           }
         })
         .onError((error, stackTrace) {
+          if (!mounted) return;
           showErrorDialog(
             context,
             AppLocalizations.of(context).error,
@@ -661,12 +663,12 @@ class _VideoWidgetNativeState extends State<VideoWidgetNative>
   void _handleWakeLockOnPlaybackChanges() {
     final playbackStatus = _controller?.playbackStatus;
     if (playbackStatus == PlaybackStatus.playing) {
-      EnteWakeLockService.instance.updateWakeLock(
+      wakeLockService.updateWakeLock(
         enable: true,
         wakeLockFor: WakeLockFor.videoPlayback,
       );
     } else {
-      EnteWakeLockService.instance.updateWakeLock(
+      wakeLockService.updateWakeLock(
         enable: false,
         wakeLockFor: WakeLockFor.videoPlayback,
       );

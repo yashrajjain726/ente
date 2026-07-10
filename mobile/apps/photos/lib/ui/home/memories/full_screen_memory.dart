@@ -383,6 +383,7 @@ class _FullScreenMemoryState extends State<FullScreenMemory> {
 
     _detailSheetEventSubscription = Bus.instance.on<DetailsSheetEvent>().listen(
       (event) {
+        if (!mounted) return;
         final inheritedData = FullScreenMemoryData.of(context);
         if (inheritedData == null) return;
         final index = inheritedData.indexNotifier.value;
@@ -1075,6 +1076,7 @@ class _MemoryBlur extends StatelessWidget {
             imageFilter: ImageFilter.blur(sigmaX: 100, sigmaY: 100),
             child: ThumbnailWidget(
               currentFile,
+              placeholderColor: Colors.black,
               shouldShowSyncStatus: false,
               shouldShowFavoriteIcon: false,
               shouldShowVideoOverlayIcon: false,
