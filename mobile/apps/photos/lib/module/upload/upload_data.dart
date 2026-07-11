@@ -72,6 +72,10 @@ Future<MediaUploadData> _getMediaUploadDataFromAssetFile(
     throw InvalidFileError("", InvalidReason.assetDeleted);
   }
   _assertFileType(asset, file);
+  file.fileSubType = asset.subtype;
+  if (file.fileType == FileType.video) {
+    file.duration = asset.duration;
+  }
   if (Platform.isIOS) {
     trackOriginFetchForUploadOrML.put(file.localID!, true);
   }

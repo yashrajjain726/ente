@@ -1,14 +1,13 @@
 import "dart:convert";
-import "dart:io";
 import "dart:typed_data";
 
 import "package:ente_crypto/ente_crypto.dart";
-import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:photos/gateways/collections/models/metadata.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/metadata/file_magic.dart";
 import "package:photos/module/metadata/exif.dart";
+import "package:photos/module/metadata/local_file.dart";
 import 'package:photos/module/metadata/panorama.dart';
 import "package:photos/module/upload/model/media_upload_data.dart";
 
@@ -17,18 +16,7 @@ Future<Map<String, dynamic>> buildUploadMetadata(
   MediaUploadData mediaUploadData,
   ParsedExifDateTime? exifTime,
 ) async {
-  final asset = await file.getAsset;
-  // asset can be null for files shared to app
-  if (asset != null) {
-    file.fileSubType = asset.subtype;
-    if (file.fileType == FileType.video) {
-      file.duration = asset.duration;
-    }
-  }
-  final hasExifTime = exifTime != null;
-  if (exifTime != null) {
-    file.creationTime = exifTime.time.microsecondsSinceEpoch;
-  }
+  applyCreationTimeMetadata(file, exifTime);
   if (mediaUploadData.exifData != null) {
     mediaUploadData.isPanorama = isPanoramaFromExif(mediaUploadData.exifData);
   }
@@ -40,28 +28,6 @@ Future<Map<String, dynamic>> buildUploadMetadata(
       mediaUploadData.isPanorama = isPanoramaFromXmp(xmpData);
     } catch (_) {}
     mediaUploadData.isPanorama ??= false;
-  }
-
-  // Try to get the timestamp from fileName. In case of iOS, file names are
-  // generic IMG_XXXX, so only parse it on Android devices
-  if (!hasExifTime && Platform.isAndroid && file.title != null) {
-    final timeFromFileName = parseDateTimeFromFileNameV2(file.title!);
-    if (timeFromFileName != null) {
-      // only use timeFromFileName if the existing creationTime and
-      // timeFromFilename belongs to different date.
-      // This is done because many times the fileTimeStamp will only give us
-      // the date, not time value but the photo_manager's creation time will
-      // contain the time.
-      final bool useFileTimeStamp =
-          file.creationTime == null ||
-          !areFromSameDay(
-            file.creationTime!,
-            timeFromFileName.microsecondsSinceEpoch,
-          );
-      if (useFileTimeStamp) {
-        file.creationTime = timeFromFileName.microsecondsSinceEpoch;
-      }
-    }
   }
   file.hash = mediaUploadData.hashData?.fileHash;
   return file.metadata;

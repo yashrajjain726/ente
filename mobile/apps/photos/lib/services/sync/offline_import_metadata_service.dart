@@ -11,9 +11,8 @@ import "package:photos/models/file/file.dart";
 import "package:photos/models/location/location.dart";
 import "package:photos/module/download/file.dart";
 import "package:photos/module/metadata/exif.dart";
+import "package:photos/module/metadata/local_file.dart";
 import 'package:photos/module/metadata/location.dart';
-import "package:photos/module/upload/model/media_upload_data.dart";
-import "package:photos/module/upload/upload_metadata.dart";
 import "package:photos/service_locator.dart";
 
 class OfflineImportMetadataService {
@@ -112,14 +111,7 @@ class OfflineImportMetadataService {
 
       await _updateLocationForOfflineFile(file, originFile, exifData);
 
-      final mediaUploadData = MediaUploadData(
-        originFile,
-        null,
-        false,
-        null,
-        exifData: exifData,
-      );
-      await buildUploadMetadata(file, mediaUploadData, exifTime);
+      applyCreationTimeMetadata(file, exifTime);
 
       await _db.updateOfflineImportMetadataForLocalID(
         file.localID!,
