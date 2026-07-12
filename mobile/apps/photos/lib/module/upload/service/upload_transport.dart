@@ -3,6 +3,7 @@ import "dart:io";
 
 import "package:dio/dio.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
+import "package:flutter/foundation.dart";
 import "package:logging/logging.dart";
 import "package:path/path.dart";
 import "package:photos/core/constants.dart";
@@ -54,6 +55,9 @@ class UploadTransport {
 
   static const maximumAttempts = 4;
   static const apiRetryDelay = Duration(seconds: 3);
+  static const _maximumRecentUploadURLs = 5000;
+  static const _uploadURLRetention = Duration(hours: 1);
+  static const _uploadURLCleanupInterval = Duration(minutes: 5);
 
   final _logger = Logger("UploadTransport");
   final Dio _dio;
@@ -64,8 +68,17 @@ class UploadTransport {
   final UploadClock _clock;
   final Md5Computer _recomputeMd5;
   final Map<String, DateTime> _usedUploadURLs = {};
+  DateTime? _nextUploadURLCleanupAt;
+  int _uploadURLCleanupEntryChecks = 0;
 
-  void clearCachedUploadURLs() => _usedUploadURLs.clear();
+  @visibleForTesting
+  int get uploadURLCleanupEntryChecks => _uploadURLCleanupEntryChecks;
+
+  void clearCachedUploadURLs() {
+    _usedUploadURLs.clear();
+    _nextUploadURLCleanupAt = null;
+    _uploadURLCleanupEntryChecks = 0;
+  }
 
   Future<String> uploadSinglePart(
     File file,
@@ -136,24 +149,42 @@ class UploadTransport {
 
   UploadURL _registerUploadURLUsage(UploadURL uploadURL) {
     final now = _clock();
-    final existingTimestamp = _usedUploadURLs.putIfAbsent(
-      uploadURL.url,
-      () => now,
-    );
-    if (existingTimestamp != now) {
+    final existingTimestamp = _usedUploadURLs[uploadURL.url];
+    if (existingTimestamp != null) {
       throw DuplicateUploadURLError(
         firstUsedAt: existingTimestamp,
         duplicateUsedAt: now,
       );
     }
-    if (_usedUploadURLs.length > 5000) {
-      final oneHourAgo = now.subtract(const Duration(hours: 1));
-      _usedUploadURLs.removeWhere((key, value) => value.isBefore(oneHourAgo));
+
+    _usedUploadURLs[uploadURL.url] = now;
+    _cleanUsedUploadURLsIfDue(now);
+    return uploadURL;
+  }
+
+  void _cleanUsedUploadURLsIfDue(DateTime now) {
+    if (_usedUploadURLs.length <= _maximumRecentUploadURLs ||
+        (_nextUploadURLCleanupAt?.isAfter(now) ?? false)) {
+      return;
+    }
+
+    final oldestRetainedAt = now.subtract(_uploadURLRetention);
+    var removedCount = 0;
+    _usedUploadURLs.removeWhere((key, usedAt) {
+      _uploadURLCleanupEntryChecks++;
+      final shouldRemove = usedAt.isBefore(oldestRetainedAt);
+      if (shouldRemove) {
+        removedCount++;
+      }
+      return shouldRemove;
+    });
+    _nextUploadURLCleanupAt = now.add(_uploadURLCleanupInterval);
+    if (removedCount > 0) {
       _logger.info(
-        "Cleaned up used upload URLs, remaining: ${_usedUploadURLs.length}",
+        "Removed $removedCount expired upload URLs, "
+        "remaining: ${_usedUploadURLs.length}",
       );
     }
-    return uploadURL;
   }
 
   Future<String> _putFile(

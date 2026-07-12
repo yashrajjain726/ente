@@ -135,7 +135,6 @@ class FileUploader {
       clearQueue: clearQueue,
     );
     _multiPartUploader = MultiPartUploader(
-      _dio, // legacy parameter, not used by MultiPartUploader
       _dio,
       UploadLocksDB.instance,
       flagService,
