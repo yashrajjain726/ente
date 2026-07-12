@@ -2,6 +2,7 @@ import "dart:collection";
 import "dart:io";
 
 import "package:dio/dio.dart";
+import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter_test/flutter_test.dart";
 import "package:photos/core/constants.dart";
 import "package:photos/core/errors.dart";
@@ -280,9 +281,10 @@ void main() {
   });
 
   test("PUT reports digest errors without retrying", () async {
-    final fixture = _Fixture(recomputedMd5: "recomputed");
+    final fixture = _Fixture();
     fixture.gateway.uploadURLs.add(UploadURL("url", "key"));
     fixture.dio.putFailures.add(_dioError(statusCode: 400, data: "BadDigest"));
+    final expectedMd5 = await computeMd5(file.path);
 
     await expectLater(
       fixture.transport.uploadSinglePart(file, 4, contentMd5: "sent"),
@@ -290,13 +292,12 @@ void main() {
         isA<BadMD5DigestError>().having(
           (error) => error.message,
           "message",
-          contains("sent: sent, computed: recomputed"),
+          contains("sent: sent, computed: $expectedMd5"),
         ),
       ),
     );
 
     expect(fixture.dio.putPaths, hasLength(1));
-    expect(fixture.recomputedPaths, [file.path]);
     expect(fixture.gateway.uploadURLRequests, hasLength(1));
   });
 
@@ -612,7 +613,7 @@ const _expectedUpdateRequest = <String, dynamic>{
 };
 
 class _Fixture {
-  _Fixture({String recomputedMd5 = "recomputed", UploadClock? uploadClock}) {
+  _Fixture({UploadClock? uploadClock}) {
     transport = UploadTransport(
       dio,
       gateway,
@@ -620,10 +621,6 @@ class _Fixture {
       clearQueue: clearedErrors.add,
       delay: (duration) async => delays.add(duration),
       clock: uploadClock ?? clock.call,
-      recomputeMd5: (path) async {
-        recomputedPaths.add(path);
-        return recomputedMd5;
-      },
     );
   }
 
@@ -632,7 +629,6 @@ class _Fixture {
   final clock = _Clock();
   final clearedErrors = <Error>[];
   final delays = <Duration>[];
-  final recomputedPaths = <String>[];
   bool useProxy = false;
   late final UploadTransport transport;
 }

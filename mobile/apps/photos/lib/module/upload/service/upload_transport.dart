@@ -14,7 +14,6 @@ import "package:photos/module/upload/model/upload_url.dart";
 
 typedef UploadDelay = Future<void> Function(Duration duration);
 typedef UploadClock = DateTime Function();
-typedef Md5Computer = Future<String> Function(String path);
 
 class UploadCommitData {
   const UploadCommitData({
@@ -46,12 +45,10 @@ class UploadTransport {
     required void Function(Error) clearQueue,
     UploadDelay? delay,
     UploadClock? clock,
-    Md5Computer? recomputeMd5,
   }) : _shouldUseUploadProxy = shouldUseUploadProxy,
        _clearQueue = clearQueue,
        _delay = delay ?? Future<void>.delayed,
-       _clock = clock ?? DateTime.now,
-       _recomputeMd5 = recomputeMd5 ?? ((path) => computeMd5(path));
+       _clock = clock ?? DateTime.now;
 
   static const maximumAttempts = 4;
   static const apiRetryDelay = Duration(seconds: 3);
@@ -66,7 +63,6 @@ class UploadTransport {
   final void Function(Error) _clearQueue;
   final UploadDelay _delay;
   final UploadClock _clock;
-  final Md5Computer _recomputeMd5;
   final Map<String, DateTime> _usedUploadURLs = {};
   DateTime? _nextUploadURLCleanupAt;
   int _uploadURLCleanupEntryChecks = 0;
@@ -225,7 +221,7 @@ class UploadTransport {
       if (error.response?.statusCode == 400 &&
               error.response?.data.toString().contains("BadDigest") == true ||
           error.response?.data.toString().contains("InvalidDigest") == true) {
-        final recomputedMd5 = await _recomputeMd5(file.path);
+        final recomputedMd5 = await computeMd5(file.path);
         throw BadMD5DigestError(
           "Failed ${error.response?.data}, sent: $contentMd5, "
           "computed: $recomputedMd5",
