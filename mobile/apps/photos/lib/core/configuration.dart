@@ -34,7 +34,6 @@ import 'package:photos/events/user_logged_out_event.dart';
 import 'package:photos/gateways/users/models/key_attributes.dart';
 import 'package:photos/gateways/users/models/key_gen_result.dart';
 import 'package:photos/gateways/users/models/private_key_attributes.dart';
-import 'package:photos/module/upload/service/file_uploader.dart';
 import 'package:photos/module/upload/upload_artifact.dart';
 import 'package:photos/service_locator.dart';
 import 'package:photos/services/collections_service.dart';
@@ -287,7 +286,6 @@ class Configuration implements LockScreenHost, AccountDeletionHost {
 
     if (!autoLogout) {
       // Following services won't be initialized if it's the case of autoLogout
-      FileUploader.instance.clearCachedUploadURLs();
       CollectionsService.instance.clearCache();
       FavoritesService.instance.clearCache();
       SearchService.instance.clearCache();

@@ -8,7 +8,6 @@ import 'package:ente_crypto/ente_crypto.dart';
 import 'package:ente_pure_utils/ente_pure_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
-import "package:path/path.dart";
 import "package:permission_handler/permission_handler.dart";
 import 'package:photos/core/configuration.dart';
 import "package:photos/core/constants.dart";
@@ -21,7 +20,6 @@ import "package:photos/events/backup_updated_event.dart";
 import "package:photos/events/file_uploaded_event.dart";
 import 'package:photos/events/files_updated_event.dart';
 import 'package:photos/events/local_photos_updated_event.dart';
-import "package:photos/gateways/collections/models/metadata.dart";
 import "package:photos/gateways/files/file_upload_gateway.dart";
 import "package:photos/main.dart" show isProcessBg, kLastBGTaskHeartBeatTime;
 import "package:photos/models/backup/backup_item.dart";
@@ -30,10 +28,10 @@ import 'package:photos/models/file/file_type.dart';
 import "package:photos/models/user_details.dart";
 import "package:photos/module/metadata/exif.dart";
 import 'package:photos/module/upload/model/media_upload_data.dart';
-import 'package:photos/module/upload/model/upload_url.dart';
 import "package:photos/module/upload/service/multipart.dart";
 import 'package:photos/module/upload/service/upload_artifact_lifecycle.dart';
 import 'package:photos/module/upload/service/upload_queue.dart';
+import 'package:photos/module/upload/service/upload_transport.dart';
 import "package:photos/module/upload/upload_data.dart";
 import "package:photos/module/upload/upload_metadata.dart";
 import "package:photos/service_locator.dart";
@@ -52,7 +50,6 @@ import "package:uuid/uuid.dart";
 class FileUploader {
   static const kMaximumConcurrentUploads = 4;
   static const kMaximumConcurrentVideoUploads = 2;
-  static const kMaximumUploadAttempts = 4;
   static const kMaxFileSize10Gib = 10737418240;
   static const kBlockedUploadsPollFrequency = Duration(seconds: 2);
   static const kFileUploadTimeout = Duration(minutes: 50);
@@ -72,9 +69,6 @@ class FileUploader {
   );
   final kSafeBufferForLockExpiry = const Duration(hours: 4).inMicroseconds;
   final kBGTaskDeathTimeout = const Duration(seconds: 5).inMicroseconds;
-  // Track used upload URLs to detect race conditions
-  final Map<String, DateTime> _usedUploadURLs = {};
-
   Map<String, BackupItem> get allBackups => _queue.backupItems;
 
   /// Returns true if any file uploads are currently in progress
@@ -87,6 +81,7 @@ class FileUploader {
   bool _hasStartedBackgroundUploadPolling = false;
 
   late MultiPartUploader _multiPartUploader;
+  UploadTransport? _uploadTransport;
   StreamSubscription<LocalPhotosUpdatedEvent>? _localPhotosUpdatedSubscription;
 
   FileUploader._privateConstructor();
@@ -129,8 +124,17 @@ class FileUploader {
         _pollBackgroundUploadStatus();
       }
     }
+    _uploadTransport ??= UploadTransport(
+      _dio,
+      _gateway,
+      shouldUseUploadProxy: () =>
+          !flagService.disableCFWorker &&
+          (localSettings.cfUploadProxyEnabled ??
+              flagService.cloudflareUploadWorker) &&
+          endpointConfig.isProduction,
+      clearQueue: clearQueue,
+    );
     _multiPartUploader = MultiPartUploader(
-      _dio, // legacy parameter, not used by MultiPartUploader
       _dio,
       UploadLocksDB.instance,
       flagService,
@@ -205,10 +209,6 @@ class FileUploader {
 
   void clearQueue(final Error reason) {
     _queue.clear(reason);
-  }
-
-  void clearCachedUploadURLs() {
-    _usedUploadURLs.clear();
   }
 
   /// Validates that the user can upload before starting expensive encryption.
@@ -558,26 +558,18 @@ class FileUploader {
       late String thumbnailObjectKey;
 
       if (count <= 1) {
-        fileMd5 ??= await computeMd5(encryptedFilePath);
-        final thumbnailUploadURL = await _getUploadURL(
-          contentLength: encThumbSize,
-          contentMd5: thumbnailMd5,
+        final singlePartFileMd5 = fileMd5 ??= await computeMd5(
+          encryptedFilePath,
         );
-        thumbnailObjectKey = await _putFile(
-          thumbnailUploadURL,
+        thumbnailObjectKey = await _uploadTransport!.uploadSinglePart(
           encryptedThumbnailFile,
           encThumbSize,
           contentMd5: thumbnailMd5,
         );
-        final fileUploadURL = await _getUploadURL(
-          contentLength: encFileSize,
-          contentMd5: fileMd5,
-        );
-        fileObjectKey = await _putFile(
-          fileUploadURL,
+        fileObjectKey = await _uploadTransport!.uploadSinglePart(
           encryptedFile,
           encFileSize,
-          contentMd5: fileMd5,
+          contentMd5: singlePartFileMd5,
         );
       } else {
         isMultipartUpload = true;
@@ -631,12 +623,7 @@ class FileUploader {
         // re-uploading the thumbnail in case of failure.
         // In regular upload, always upload the thumbnail first to keep existing behaviour
         //
-        final thumbnailUploadURL = await _getUploadURL(
-          contentLength: encThumbSize,
-          contentMd5: thumbnailMd5,
-        );
-        thumbnailObjectKey = await _putFile(
-          thumbnailUploadURL,
+        thumbnailObjectKey = await _uploadTransport!.uploadSinglePart(
           encryptedThumbnailFile,
           encThumbSize,
           contentMd5: thumbnailMd5,
@@ -680,6 +667,16 @@ class FileUploader {
       }
 
       final pubMetadata = preparedMetadata.publicMetadata;
+      final commitData = UploadCommitData(
+        fileObjectKey: fileObjectKey,
+        fileDecryptionHeader: fileDecryptionHeader,
+        fileSize: encFileSize,
+        thumbnailObjectKey: thumbnailObjectKey,
+        thumbnailDecryptionHeader: thumbnailDecryptionHeader,
+        thumbnailSize: encThumbSize,
+        encryptedMetadata: encryptedMetadata,
+        metadataDecryptionHeader: metadataDecryptionHeader,
+      );
       EnteFile remoteFile;
       if (isUpdatedFile) {
         // Verify that the encrypted file can be decrypted before uploading
@@ -692,20 +689,13 @@ class FileUploader {
           CollectionsService.instance.getCollectionKey(collectionID),
           chunkLimit: 1, // Verify at least first chunk
         );
-        remoteFile = await _updateFile(
-          file,
-          fileObjectKey,
-          fileDecryptionHeader,
-          encFileSize,
-          thumbnailObjectKey,
-          thumbnailDecryptionHeader,
-          encThumbSize,
-          encryptedMetadata,
-          metadataDecryptionHeader,
+        remoteFile = await _uploadTransport!.updateFile(
+          file: file,
+          data: commitData,
         );
         // Update across all collections
         await FilesDB.instance.updateUploadedFileAcrossCollections(remoteFile);
-        // _updateFile does not carry public magic metadata, so derived values
+        // The update response does not carry public magic metadata, so derived values
         // (width/height, mediaType, exif, camera) that change when the file is
         // edited would stay stale. Refresh them here. updatePublicMagicMetadata
         // merges into the existing pub mmd, preserving user-editable keys
@@ -751,21 +741,13 @@ class FileUploader {
           chunkLimit: 1, // Verify at least first chunk
         );
 
-        remoteFile = await _uploadFile(
-          file,
-          collectionID,
-          encryptedKey,
-          keyDecryptionNonce,
-          fileAttributes,
-          fileObjectKey,
-          fileDecryptionHeader,
-          encFileSize,
-          thumbnailObjectKey,
-          thumbnailDecryptionHeader,
-          encThumbSize,
-          encryptedMetadata,
-          metadataDecryptionHeader,
-          pubMetadata: preparedPublicMetadata?.request,
+        remoteFile = await _uploadTransport!.createFile(
+          file: file,
+          collectionID: collectionID,
+          encryptedKey: encryptedKey,
+          keyDecryptionNonce: keyDecryptionNonce,
+          data: commitData,
+          pubMagicMetadata: preparedPublicMetadata?.request.toJson(),
         );
         if (preparedPublicMetadata != null) {
           remoteFile
@@ -1087,288 +1069,6 @@ class FileUploader {
       }
     } catch (e, s) {
       _logger.severe("Failed to handle invalid file error", e, s);
-    }
-  }
-
-  Future<EnteFile> _uploadFile(
-    EnteFile file,
-    int collectionID,
-    String encryptedKey,
-    String keyDecryptionNonce,
-    FileEncryptResult fileAttributes,
-    String fileObjectKey,
-    String fileDecryptionHeader,
-    int fileSize,
-    String thumbnailObjectKey,
-    String thumbnailDecryptionHeader,
-    int thumbnailSize,
-    String encryptedMetadata,
-    String metadataDecryptionHeader, {
-    MetadataRequest? pubMetadata,
-    int attempt = 1,
-  }) async {
-    try {
-      final data = await _gateway.createFile(
-        collectionID: collectionID,
-        encryptedKey: encryptedKey,
-        keyDecryptionNonce: keyDecryptionNonce,
-        fileObjectKey: fileObjectKey,
-        fileDecryptionHeader: fileDecryptionHeader,
-        fileSize: fileSize,
-        thumbnailObjectKey: thumbnailObjectKey,
-        thumbnailDecryptionHeader: thumbnailDecryptionHeader,
-        thumbnailSize: thumbnailSize,
-        encryptedMetadata: encryptedMetadata,
-        metadataDecryptionHeader: metadataDecryptionHeader,
-        pubMagicMetadata: pubMetadata?.toJson(),
-      );
-      file.uploadedFileID = data["id"];
-      file.collectionID = collectionID;
-      file.updationTime = data["updationTime"];
-      file.ownerID = data["ownerID"];
-      file.encryptedKey = encryptedKey;
-      file.keyDecryptionNonce = keyDecryptionNonce;
-      file.fileDecryptionHeader = fileDecryptionHeader;
-      file.thumbnailDecryptionHeader = thumbnailDecryptionHeader;
-      file.metadataDecryptionHeader = metadataDecryptionHeader;
-      return file;
-    } on DioException catch (e) {
-      final int statusCode = e.response?.statusCode ?? -1;
-      if (statusCode == 413) {
-        throw FileTooLargeForPlanError();
-      } else if (statusCode == 426) {
-        _onStorageLimitExceeded();
-      } else if (attempt < kMaximumUploadAttempts && statusCode == -1) {
-        // retry when DioException contains no response/status code
-        _logger.info(
-          "Upload file (${file.tag}) failed, will retry in 3 seconds",
-        );
-        await Future.delayed(const Duration(seconds: 3));
-        return _uploadFile(
-          file,
-          collectionID,
-          encryptedKey,
-          keyDecryptionNonce,
-          fileAttributes,
-          fileObjectKey,
-          fileDecryptionHeader,
-          fileSize,
-          thumbnailObjectKey,
-          thumbnailDecryptionHeader,
-          thumbnailSize,
-          encryptedMetadata,
-          metadataDecryptionHeader,
-          attempt: attempt + 1,
-          pubMetadata: pubMetadata,
-        );
-      } else {
-        _logger.severe("Failed to upload file ${file.tag}", e);
-      }
-      rethrow;
-    }
-  }
-
-  Future<EnteFile> _updateFile(
-    EnteFile file,
-    String fileObjectKey,
-    String fileDecryptionHeader,
-    int fileSize,
-    String thumbnailObjectKey,
-    String thumbnailDecryptionHeader,
-    int thumbnailSize,
-    String encryptedMetadata,
-    String metadataDecryptionHeader, {
-    int attempt = 1,
-  }) async {
-    try {
-      final data = await _gateway.updateFile(
-        fileID: file.uploadedFileID!,
-        fileObjectKey: fileObjectKey,
-        fileDecryptionHeader: fileDecryptionHeader,
-        fileSize: fileSize,
-        thumbnailObjectKey: thumbnailObjectKey,
-        thumbnailDecryptionHeader: thumbnailDecryptionHeader,
-        thumbnailSize: thumbnailSize,
-        encryptedMetadata: encryptedMetadata,
-        metadataDecryptionHeader: metadataDecryptionHeader,
-      );
-      file.uploadedFileID = data["id"];
-      file.updationTime = data["updationTime"];
-      file.fileDecryptionHeader = fileDecryptionHeader;
-      file.thumbnailDecryptionHeader = thumbnailDecryptionHeader;
-      file.metadataDecryptionHeader = metadataDecryptionHeader;
-      return file;
-    } on DioException catch (e) {
-      final int statusCode = e.response?.statusCode ?? -1;
-      if (statusCode == 426) {
-        _onStorageLimitExceeded();
-      } else if (attempt < kMaximumUploadAttempts && statusCode == -1) {
-        _logger.info(
-          "Update file (${file.tag}) failed, will retry in 3 seconds",
-        );
-        await Future.delayed(const Duration(seconds: 3));
-        return _updateFile(
-          file,
-          fileObjectKey,
-          fileDecryptionHeader,
-          fileSize,
-          thumbnailObjectKey,
-          thumbnailDecryptionHeader,
-          thumbnailSize,
-          encryptedMetadata,
-          metadataDecryptionHeader,
-          attempt: attempt + 1,
-        );
-      } else {
-        _logger.severe("Failed to update file ${file.tag}", e);
-      }
-      rethrow;
-    }
-  }
-
-  Future<UploadURL> _getUploadURL({
-    required int contentLength,
-    required String contentMd5,
-  }) async {
-    final uploadURL = await _requestChecksumProtectedUploadURL(
-      contentLength: contentLength,
-      contentMd5: contentMd5,
-    );
-    return _registerUploadURLUsage(uploadURL);
-  }
-
-  Future<UploadURL> _requestChecksumProtectedUploadURL({
-    required int contentLength,
-    required String contentMd5,
-  }) async {
-    if (contentMd5.isEmpty) {
-      throw StateError("Missing MD5 for checksum-protected upload URL");
-    }
-    try {
-      return await _gateway.getUploadUrl(
-        contentLength: contentLength,
-        contentMd5: contentMd5,
-      );
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 402) {
-        final error = NoActiveSubscriptionError();
-        clearQueue(error);
-        throw error;
-      } else if (e.response?.statusCode == 426) {
-        final error = StorageLimitExceededError();
-        clearQueue(error);
-        throw error;
-      }
-      rethrow;
-    }
-  }
-
-  UploadURL _registerUploadURLUsage(UploadURL uploadURL) {
-    // Atomic check-and-set to prevent race conditions in parallel uploads
-    final now = DateTime.now();
-    final existingTimestamp = _usedUploadURLs.putIfAbsent(
-      uploadURL.url,
-      () => now,
-    );
-
-    if (existingTimestamp != now) {
-      throw DuplicateUploadURLError(
-        firstUsedAt: existingTimestamp,
-        duplicateUsedAt: now,
-      );
-    }
-    // Clean up old entries to prevent memory growth (only when > 5000 entries)
-    if (_usedUploadURLs.length > 5000) {
-      final oneHourAgo = now.subtract(const Duration(hours: 1));
-      _usedUploadURLs.removeWhere((key, value) => value.isBefore(oneHourAgo));
-      _logger.info(
-        "Cleaned up used upload URLs, remaining: ${_usedUploadURLs.length}",
-      );
-    }
-
-    return uploadURL;
-  }
-
-  bool get _shouldUseCFUploadProxy =>
-      !flagService.disableCFWorker &&
-      (localSettings.cfUploadProxyEnabled ??
-          flagService.cloudflareUploadWorker) &&
-      endpointConfig.isProduction;
-
-  void _onStorageLimitExceeded() {
-    clearQueue(StorageLimitExceededError());
-    throw StorageLimitExceededError();
-  }
-
-  Future<String> _putFile(
-    UploadURL uploadURL,
-    File file,
-    int fileSize, {
-    required String contentMd5,
-    int attempt = 1,
-  }) async {
-    if (contentMd5.isEmpty) {
-      throw StateError("Missing MD5 for checksum-protected upload");
-    }
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-    final fileName = basename(file.path);
-    int bytesSent = 0;
-    try {
-      final useUploadProxy = _shouldUseCFUploadProxy;
-      final Map<String, dynamic> headers = {
-        Headers.contentLengthHeader: fileSize,
-      };
-      if (useUploadProxy) {
-        headers["UPLOAD-URL"] = uploadURL.url;
-      }
-      headers[useUploadProxy ? 'CONTENT-MD5' : 'Content-MD5'] = contentMd5;
-
-      await _dio.put(
-        useUploadProxy ? "$kUploadProxyEndpoint/file-upload" : uploadURL.url,
-        data: file.openRead(),
-        options: Options(headers: headers),
-        onSendProgress: (sent, total) {
-          bytesSent = sent;
-        },
-      );
-      _logger.info(
-        "Uploaded object $fileName of size: ${formatBytes(fileSize)} at speed: ${(fileSize / (DateTime.now().millisecondsSinceEpoch - startTime)).toStringAsFixed(2)} KB/s",
-      );
-
-      return uploadURL.objectKey;
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 400 &&
-              e.response?.data.toString().contains('BadDigest') == true ||
-          e.response?.data.toString().contains('InvalidDigest') == true) {
-        final String recomputedMd5 = await computeMd5(file.path);
-        throw BadMD5DigestError(
-          "Failed ${e.response?.data}, sent: $contentMd5, computed: $recomputedMd5",
-        );
-      } else if (e.message?.startsWith("HttpException: Content size") ??
-          false) {
-        rethrow;
-      } else if (attempt < kMaximumUploadAttempts) {
-        _logger.info(
-          "Upload failed for $fileName after sending ${formatBytes(bytesSent)} of ${formatBytes(fileSize)}, retrying attempt ${attempt + 1}",
-        );
-        final newUploadURL = await _getUploadURL(
-          contentLength: fileSize,
-          contentMd5: contentMd5,
-        );
-        return _putFile(
-          newUploadURL,
-          file,
-          fileSize,
-          contentMd5: contentMd5,
-          attempt: attempt + 1,
-        );
-      } else {
-        _logger.info(
-          "Failed to upload file ${basename(file.path)} after $attempt attempts",
-          e,
-        );
-        rethrow;
-      }
     }
   }
 
