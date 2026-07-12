@@ -47,7 +47,6 @@ class _BackupStatusScreenState extends State<BackupStatusScreen> {
             status: BackupItemStatus.uploaded,
             file: e,
             collectionID: e.collectionID ?? 0,
-            completer: null,
           );
         })
         .sorted(
@@ -63,7 +62,6 @@ class _BackupStatusScreenState extends State<BackupStatusScreen> {
           status: BackupItemStatus.uploaded,
           file: event.file,
           collectionID: event.file.collectionID ?? 0,
-          completer: null,
         ),
       );
       safeSetState();
@@ -122,9 +120,16 @@ class _BackupStatusScreenState extends State<BackupStatusScreen> {
               padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
               sliver: SliverList.builder(
                 itemBuilder: (context, index) {
+                  final file = allItems[index].file;
                   return BackupItemCard(
                     item: allItems[index],
-                    key: ValueKey(allItems[index].file.uploadedFileID),
+                    key: ValueKey(
+                      file.uploadedFileID != null
+                          ? ("uploaded", file.uploadedFileID)
+                          : file.localID != null
+                          ? ("local", file.localID)
+                          : ("generated", file.generatedID),
+                    ),
                   );
                 },
                 itemCount: allItems.length,
