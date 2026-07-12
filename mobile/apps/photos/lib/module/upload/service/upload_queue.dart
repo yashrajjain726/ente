@@ -48,7 +48,6 @@ class UploadQueue {
       status: BackupItemStatus.inQueue,
       file: file,
       collectionID: collectionID,
-      completer: completer,
     );
     _backupOwners[localID] = item;
     _notifyBackupItemsChanged(upserts: {localID: _backupItems[localID]!});
@@ -75,6 +74,7 @@ class UploadQueue {
         .toList();
     _removePendingUploads(pendingUploadIDs, reason);
     _sessionUploadCount -= pendingUploadIDs.length;
+    _resetSessionUploadCountIfEmpty();
     return pendingUploadIDs.length;
   }
 
@@ -131,6 +131,7 @@ class UploadQueue {
       return;
     }
     _items.remove(localID);
+    _resetSessionUploadCountIfEmpty();
     item.completer.complete(uploadedFile);
     _backupItems.remove(localID);
     _backupOwners.remove(localID);
@@ -153,6 +154,7 @@ class UploadQueue {
       return;
     }
     _items.remove(localID);
+    _resetSessionUploadCountIfEmpty();
     item.completer.completeError(error);
     _setBackupStatus(localID, item, BackupItemStatus.retry, error: error);
   }
@@ -264,6 +266,12 @@ class UploadQueue {
     _onBackupItemsChanged(
       BackupItemsChange(upserts: upserts, removedLocalIDs: removedLocalIDs),
     );
+  }
+
+  void _resetSessionUploadCountIfEmpty() {
+    if (_items.isEmpty) {
+      _sessionUploadCount = 0;
+    }
   }
 }
 

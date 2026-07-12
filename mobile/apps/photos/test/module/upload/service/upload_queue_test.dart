@@ -1,5 +1,3 @@
-import 'dart:collection';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photos/models/backup/backup_item.dart';
 import 'package:photos/models/backup/backup_item_status.dart';
@@ -9,21 +7,25 @@ import 'package:photos/models/file/file_type.dart';
 import 'package:photos/module/upload/service/upload_queue.dart';
 
 void main() {
-  test('shares requests and preserves session count semantics', () {
+  test('same-collection requests share one item and future', () {
     final changes = <BackupItemsChange>[];
     final queue = UploadQueue(changes.add);
     final file = _file('local-1');
 
     final added = queue.add(file, 10);
     final sameCollection = queue.add(file, 10);
-    final otherCollection = queue.add(file, 20);
 
     expect(added.disposition, UploadQueueDisposition.added);
     expect(sameCollection.disposition, UploadQueueDisposition.sameCollection);
-    expect(otherCollection.disposition, UploadQueueDisposition.otherCollection);
     expect(identical(added.item, sameCollection.item), isTrue);
-    expect(identical(added.item, otherCollection.item), isTrue);
-    expect(queue.sessionUploadCount, 2);
+    expect(
+      identical(
+        added.item.completer.future,
+        sameCollection.item.completer.future,
+      ),
+      isTrue,
+    );
+    expect(queue.sessionUploadCount, 1);
     expect(changes, hasLength(1));
     expect(changes.single.upserts.keys, ['local-1']);
     expect(changes.single.removedLocalIDs, isEmpty);
@@ -38,22 +40,65 @@ void main() {
     );
   });
 
-  test('selects FIFO work within total and video limits', () {
+  test('different-collection requests wait on the same queued item', () {
+    final queue = UploadQueue((_) {});
+    final file = _file('local-1');
+
+    final added = queue.add(file, 10);
+    final otherCollection = queue.add(file, 20);
+
+    expect(otherCollection.disposition, UploadQueueDisposition.otherCollection);
+    expect(otherCollection.item, same(added.item));
+    expect(
+      identical(
+        added.item.completer.future,
+        otherCollection.item.completer.future,
+      ),
+      isTrue,
+    );
+    expect(queue.sessionUploadCount, 2);
+  });
+
+  test('selects non-video work in FIFO order', () {
+    final queue = UploadQueue((_) {});
+    final first = queue.add(_file('first'), 1).item;
+    final second = queue.add(_file('second'), 1).item;
+    final third = queue.add(_file('third'), 1).item;
+
+    expect(_start(queue), same(first));
+    expect(_start(queue), same(second));
+    expect(_start(queue), same(third));
+  });
+
+  test('enforces total and video limits while allowing image bypass', () {
     final queue = UploadQueue((_) {});
     final firstVideo = queue.add(_file('video-1', FileType.video), 1).item;
     final secondVideo = queue.add(_file('video-2', FileType.video), 1).item;
     final thirdVideo = queue.add(_file('video-3', FileType.video), 1).item;
-    final image = queue.add(_file('image-1'), 1).item;
+    final firstImage = queue.add(_file('image-1'), 1).item;
+    final secondImage = queue.add(_file('image-2'), 1).item;
+    final thirdImage = queue.add(_file('image-3'), 1).item;
 
     expect(_start(queue), same(firstVideo));
     expect(_start(queue), same(secondVideo));
-    expect(_start(queue), same(image));
+    expect(_start(queue), same(firstImage));
+    expect(_start(queue), same(secondImage));
     expect(_start(queue), isNull);
 
     queue.finishAttempt(firstVideo);
     expect(_start(queue), same(thirdVideo));
+    expect(_start(queue), isNull);
+
+    queue.finishAttempt(firstImage);
+    expect(_start(queue), same(thirdImage));
     expect(queue.isUploading, isTrue);
     expect(queue.backupItems['video-3']!.status, BackupItemStatus.uploading);
+
+    queue.finishAttempt(secondVideo);
+    queue.finishAttempt(secondImage);
+    queue.finishAttempt(thirdVideo);
+    queue.finishAttempt(thirdImage);
+    expect(queue.isUploading, isFalse);
   });
 
   test('cancels pending items with one backup notification', () async {
@@ -153,7 +198,7 @@ void main() {
   });
 
   test('deltas reconstruct the authoritative ordered snapshot', () async {
-    final reducedItems = LinkedHashMap<String, BackupItem>();
+    final reducedItems = <String, BackupItem>{};
     late final UploadQueue queue;
     queue = UploadQueue((change) {
       for (final localID in change.removedLocalIDs) {
@@ -212,6 +257,91 @@ void main() {
       expect(queue.backupItems, hasLength(itemCount));
     });
   }
+
+  test('terminal completion resolves once and resets the session', () async {
+    final queue = UploadQueue((_) {});
+    final item = queue.add(_file('local-1'), 1).item;
+    expect(_start(queue), same(item));
+    var completionCount = 0;
+    final result = item.completer.future.then((file) {
+      completionCount++;
+      return file;
+    });
+    final uploadedFile = _file('uploaded');
+
+    queue.complete(item, uploadedFile);
+    queue.complete(item, _file('duplicate'));
+    queue.finishAttempt(item);
+
+    expect(await result, same(uploadedFile));
+    expect(completionCount, 1);
+    expect(queue.sessionUploadCount, 0);
+    expect(queue.hasPendingUploads, isFalse);
+    expect(queue.isUploading, isFalse);
+  });
+
+  test('background completion resets the session', () async {
+    final queue = UploadQueue((_) {});
+    final item = queue.add(_file('local-1'), 1).item;
+    expect(_start(queue), same(item));
+    final result = queue.moveToBackground(item);
+    queue.finishAttempt(item);
+
+    final uploadedFile = _file('uploaded');
+    queue.complete(item, uploadedFile);
+
+    expect(await result, same(uploadedFile));
+    expect(queue.backgroundItems, isEmpty);
+    expect(queue.sessionUploadCount, 0);
+  });
+
+  test('terminal failure resets the session and keeps retry details', () async {
+    final queue = UploadQueue((_) {});
+    final item = queue.add(_file('local-1'), 1).item;
+    expect(_start(queue), same(item));
+    final error = _QueueError();
+    final result = expectLater(item.completer.future, throwsA(same(error)));
+
+    queue.fail(item, error);
+    queue.finishAttempt(item);
+
+    expect(queue.sessionUploadCount, 0);
+    expect(queue.hasPendingUploads, isFalse);
+    expect(queue.isUploading, isFalse);
+    expect(queue.backupItems['local-1']!.status, BackupItemStatus.retry);
+    expect(queue.backupItems['local-1']!.error, same(error));
+    await result;
+  });
+
+  test('removing the final item clears deferred session intents', () async {
+    final queue = UploadQueue((_) {});
+    final item = queue.add(_file('local-1'), 1).item;
+    queue.add(item.file, 2);
+    final error = _QueueError();
+    final result = expectLater(item.completer.future, throwsA(same(error)));
+
+    expect(queue.removeWhere((_) => true, error), 1);
+
+    expect(queue.sessionUploadCount, 0);
+    expect(queue.hasPendingUploads, isFalse);
+    await result;
+  });
+
+  test('moving retry back to uploading clears its error', () async {
+    final queue = UploadQueue((_) {});
+    final item = queue.add(_file('local-1'), 1).item;
+    expect(_start(queue), same(item));
+    final error = _QueueError();
+    final result = expectLater(item.completer.future, throwsA(same(error)));
+    queue.fail(item, error);
+    queue.finishAttempt(item);
+    await result;
+
+    queue.markBackupUploading(item, 'local-1');
+
+    expect(queue.backupItems['local-1']!.status, BackupItemStatus.uploading);
+    expect(queue.backupItems['local-1']!.error, isNull);
+  });
 }
 
 UploadQueueItem? _start(UploadQueue queue) {

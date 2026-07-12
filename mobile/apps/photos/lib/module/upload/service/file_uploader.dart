@@ -148,15 +148,11 @@ class FileUploader {
         .listen((event) {
           if (event.type == EventType.deletedFromDevice ||
               event.type == EventType.deletedFromEverywhere) {
+            final deletedGeneratedIDs = event.updatedFiles
+                .map((file) => file.generatedID)
+                .toSet();
             removeFromQueueWhere(
-              (file) {
-                for (final updatedFile in event.updatedFiles) {
-                  if (file.generatedID == updatedFile.generatedID) {
-                    return true;
-                  }
-                }
-                return false;
-              },
+              (file) => deletedGeneratedIDs.contains(file.generatedID),
               InvalidFileError(
                 "File already deleted",
                 InvalidReason.assetDeletedEvent,
