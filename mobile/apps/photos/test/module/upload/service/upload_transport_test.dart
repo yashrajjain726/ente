@@ -34,88 +34,6 @@ void main() {
     expect(fixture.dio.putPaths, isEmpty);
   });
 
-  test("registers URL use and rejects a duplicate", () async {
-    final fixture = _Fixture();
-    fixture.gateway.uploadURLs.addAll([
-      UploadURL("same-url", "first"),
-      UploadURL("same-url", "second"),
-    ]);
-
-    final first = await fixture.transport.uploadSinglePart(
-      file,
-      4,
-      contentMd5: "md5",
-    );
-
-    expect(first, "first");
-    await expectLater(
-      fixture.transport.uploadSinglePart(file, 4, contentMd5: "md5"),
-      throwsA(isA<DuplicateUploadURLError>()),
-    );
-    fixture.transport.clearCachedUploadURLs();
-    fixture.gateway.uploadURLs.add(UploadURL("same-url", "third"));
-    expect(
-      await fixture.transport.uploadSinglePart(file, 4, contentMd5: "md5"),
-      "third",
-    );
-  });
-
-  test("rejects duplicate URLs with identical timestamps", () async {
-    final clock = _FixedRegistrationClock();
-    final fixture = _Fixture(uploadClock: clock.call);
-    fixture.gateway.uploadURLs.addAll([
-      UploadURL("same-url", "first"),
-      UploadURL("same-url", "second"),
-    ]);
-
-    expect(
-      await fixture.transport.uploadSinglePart(file, 4, contentMd5: "md5"),
-      "first",
-    );
-    await expectLater(
-      fixture.transport.uploadSinglePart(file, 4, contentMd5: "md5"),
-      throwsA(isA<DuplicateUploadURLError>()),
-    );
-  });
-
-  test("10000 URLs keep cleanup work linear and expire old entries", () async {
-    final clock = _FixedRegistrationClock();
-    final fixture = _Fixture(uploadClock: clock.call);
-    fixture.gateway.uploadURLs.addAll(
-      List.generate(10000, (index) => UploadURL("url-$index", "key-$index")),
-    );
-
-    String? lastObjectKey;
-    for (var index = 0; index < 10000; index++) {
-      lastObjectKey = await fixture.transport.uploadSinglePart(
-        file,
-        4,
-        contentMd5: "md5-$index",
-      );
-    }
-
-    expect(lastObjectKey, "key-9999");
-    expect(fixture.transport.uploadURLCleanupEntryChecks, 5001);
-
-    clock.advance(const Duration(hours: 1, seconds: 1));
-    fixture.gateway.uploadURLs.addAll([
-      UploadURL("cleanup-trigger", "trigger-key"),
-      UploadURL("url-0", "reused-key"),
-    ]);
-    expect(
-      await fixture.transport.uploadSinglePart(file, 4, contentMd5: "trigger"),
-      "trigger-key",
-    );
-    expect(
-      await fixture.transport.uploadSinglePart(file, 4, contentMd5: "reused"),
-      "reused-key",
-    );
-
-    expect(fixture.transport.uploadURLCleanupEntryChecks, 15002);
-    expect(fixture.gateway.uploadURLRequests, hasLength(10002));
-    expect(fixture.dio.putPaths, hasLength(10002));
-  });
-
   test("maps upload URL 402 and 426 responses and clears the queue", () async {
     for (final statusCode in [402, 426]) {
       final fixture = _Fixture();
@@ -613,47 +531,22 @@ const _expectedUpdateRequest = <String, dynamic>{
 };
 
 class _Fixture {
-  _Fixture({UploadClock? uploadClock}) {
+  _Fixture() {
     transport = UploadTransport(
       dio,
       gateway,
       shouldUseUploadProxy: () => useProxy,
       clearQueue: clearedErrors.add,
       delay: (duration) async => delays.add(duration),
-      clock: uploadClock ?? clock.call,
     );
   }
 
   final dio = _FakeDio();
   final gateway = _FakeGateway();
-  final clock = _Clock();
   final clearedErrors = <Error>[];
   final delays = <Duration>[];
   bool useProxy = false;
   late final UploadTransport transport;
-}
-
-class _Clock {
-  DateTime _value = DateTime.utc(2026);
-
-  DateTime call() {
-    _value = _value.add(const Duration(milliseconds: 1));
-    return _value;
-  }
-}
-
-class _FixedRegistrationClock {
-  var _value = DateTime.utc(2026);
-  var _calls = 0;
-
-  void advance(Duration duration) {
-    _value = _value.add(duration);
-  }
-
-  DateTime call() {
-    final phase = _calls++ % 3;
-    return phase == 2 ? _value.add(const Duration(milliseconds: 1)) : _value;
-  }
 }
 
 class _FakeDio extends Fake implements Dio {

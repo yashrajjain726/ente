@@ -211,10 +211,6 @@ class FileUploader {
     _queue.clear(reason);
   }
 
-  void clearCachedUploadURLs() {
-    _uploadTransport?.clearCachedUploadURLs();
-  }
-
   /// Validates that the user can upload before starting expensive encryption.
   /// Throws on 402 (no subscription) or 426 (storage exceeded).
   Future<void> validateUploadEligibility() async {

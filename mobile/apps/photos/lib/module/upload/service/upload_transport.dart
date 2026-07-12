@@ -3,7 +3,6 @@ import "dart:io";
 
 import "package:dio/dio.dart";
 import "package:ente_pure_utils/ente_pure_utils.dart";
-import "package:flutter/foundation.dart";
 import "package:logging/logging.dart";
 import "package:path/path.dart";
 import "package:photos/core/constants.dart";
@@ -13,7 +12,6 @@ import "package:photos/models/file/file.dart";
 import "package:photos/module/upload/model/upload_url.dart";
 
 typedef UploadDelay = Future<void> Function(Duration duration);
-typedef UploadClock = DateTime Function();
 
 class UploadCommitData {
   const UploadCommitData({
@@ -44,17 +42,12 @@ class UploadTransport {
     required bool Function() shouldUseUploadProxy,
     required void Function(Error) clearQueue,
     UploadDelay? delay,
-    UploadClock? clock,
   }) : _shouldUseUploadProxy = shouldUseUploadProxy,
        _clearQueue = clearQueue,
-       _delay = delay ?? Future<void>.delayed,
-       _clock = clock ?? DateTime.now;
+       _delay = delay ?? Future<void>.delayed;
 
   static const maximumAttempts = 4;
   static const apiRetryDelay = Duration(seconds: 3);
-  static const _maximumRecentUploadURLs = 5000;
-  static const _uploadURLRetention = Duration(hours: 1);
-  static const _uploadURLCleanupInterval = Duration(minutes: 5);
 
   final _logger = Logger("UploadTransport");
   final Dio _dio;
@@ -62,19 +55,6 @@ class UploadTransport {
   final bool Function() _shouldUseUploadProxy;
   final void Function(Error) _clearQueue;
   final UploadDelay _delay;
-  final UploadClock _clock;
-  final Map<String, DateTime> _usedUploadURLs = {};
-  DateTime? _nextUploadURLCleanupAt;
-  int _uploadURLCleanupEntryChecks = 0;
-
-  @visibleForTesting
-  int get uploadURLCleanupEntryChecks => _uploadURLCleanupEntryChecks;
-
-  void clearCachedUploadURLs() {
-    _usedUploadURLs.clear();
-    _nextUploadURLCleanupAt = null;
-    _uploadURLCleanupEntryChecks = 0;
-  }
 
   Future<String> uploadSinglePart(
     File file,
@@ -106,7 +86,7 @@ class UploadTransport {
         contentLength: contentLength,
         contentMd5: contentMd5,
       );
-      return _registerUploadURLUsage(uploadURL);
+      return uploadURL;
     } on DioException catch (error) {
       if (error.response?.statusCode == 402) {
         final subscriptionError = NoActiveSubscriptionError();
@@ -143,46 +123,6 @@ class UploadTransport {
     required UploadCommitData data,
   }) => _updateFile(file: file, data: data, attempt: 1);
 
-  UploadURL _registerUploadURLUsage(UploadURL uploadURL) {
-    final now = _clock();
-    final existingTimestamp = _usedUploadURLs[uploadURL.url];
-    if (existingTimestamp != null) {
-      throw DuplicateUploadURLError(
-        firstUsedAt: existingTimestamp,
-        duplicateUsedAt: now,
-      );
-    }
-
-    _usedUploadURLs[uploadURL.url] = now;
-    _cleanUsedUploadURLsIfDue(now);
-    return uploadURL;
-  }
-
-  void _cleanUsedUploadURLsIfDue(DateTime now) {
-    if (_usedUploadURLs.length <= _maximumRecentUploadURLs ||
-        (_nextUploadURLCleanupAt?.isAfter(now) ?? false)) {
-      return;
-    }
-
-    final oldestRetainedAt = now.subtract(_uploadURLRetention);
-    var removedCount = 0;
-    _usedUploadURLs.removeWhere((key, usedAt) {
-      _uploadURLCleanupEntryChecks++;
-      final shouldRemove = usedAt.isBefore(oldestRetainedAt);
-      if (shouldRemove) {
-        removedCount++;
-      }
-      return shouldRemove;
-    });
-    _nextUploadURLCleanupAt = now.add(_uploadURLCleanupInterval);
-    if (removedCount > 0) {
-      _logger.info(
-        "Removed $removedCount expired upload URLs, "
-        "remaining: ${_usedUploadURLs.length}",
-      );
-    }
-  }
-
   Future<String> _putFile(
     UploadURL uploadURL,
     File file,
@@ -193,7 +133,7 @@ class UploadTransport {
     if (contentMd5.isEmpty) {
       throw StateError("Missing MD5 for checksum-protected upload");
     }
-    final startTime = _clock().millisecondsSinceEpoch;
+    final startTime = DateTime.now().millisecondsSinceEpoch;
     final fileName = basename(file.path);
     var bytesSent = 0;
     try {
@@ -214,7 +154,7 @@ class UploadTransport {
       );
       _logger.info(
         "Uploaded object $fileName of size: ${formatBytes(fileSize)} at speed: "
-        "${(fileSize / (_clock().millisecondsSinceEpoch - startTime)).toStringAsFixed(2)} KB/s",
+        "${(fileSize / (DateTime.now().millisecondsSinceEpoch - startTime)).toStringAsFixed(2)} KB/s",
       );
       return uploadURL.objectKey;
     } on DioException catch (error) {
