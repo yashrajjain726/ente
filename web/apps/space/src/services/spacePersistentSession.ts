@@ -255,23 +255,14 @@ export const getOrCreateSpaceRootKey = async (
 
 export const revokeSpaceBrowserSessions = async () => {
     const sessionToken = savedSpaceSessionToken();
-    if (sessionToken) {
-        const res = await fetch(
-            await apiURL("/account/space/sessions/current"),
-            {
-                method: "DELETE",
-                headers: {
-                    ...publicRequestHeaders(),
-                    [spaceSessionTokenHeader]: sessionToken,
-                },
-            },
-        );
-        if (res.status == 401) {
-            await logoutRevokedSpaceSession();
-            return false;
-        }
-        ensureOk(res);
-    }
-    clearSpaceBrowserSession();
-    return true;
+    if (!sessionToken) return;
+
+    const res = await fetch(await apiURL("/account/space/sessions/current"), {
+        method: "DELETE",
+        headers: {
+            ...publicRequestHeaders(),
+            [spaceSessionTokenHeader]: sessionToken,
+        },
+    });
+    if (res.status != 401) ensureOk(res);
 };

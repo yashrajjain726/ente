@@ -1,6 +1,14 @@
 import { accountLogout } from "ente-accounts-rs/services/logout";
-import { revokeSpaceBrowserSessions } from "services/spacePersistentSession";
+import {
+    clearSpaceBrowserSession,
+    revokeSpaceBrowserSessions,
+} from "services/spacePersistentSession";
 
 export const spaceLogout = async () => {
-    if (await revokeSpaceBrowserSessions()) await accountLogout();
+    try {
+        await revokeSpaceBrowserSessions();
+    } finally {
+        clearSpaceBrowserSession();
+        await accountLogout();
+    }
 };
