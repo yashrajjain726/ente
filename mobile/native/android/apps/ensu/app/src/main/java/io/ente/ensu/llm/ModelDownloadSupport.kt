@@ -64,13 +64,11 @@ internal object ModelDownloadSupport {
     }
 
     private fun pathForUrl(modelDir: File, target: LlmModelTarget, url: String, fallback: String): File {
-        val baseDir = File(modelDir, "models")
         val filename = filenameForUrl(url, fallback)
         return if (target.id.startsWith("custom:")) {
-            val customDir = File(baseDir, "custom")
-            File(customDir, "${hash(url)}_$filename")
+            File(File(modelDir, "custom"), "${hash(url)}_$filename")
         } else {
-            File(baseDir, filename)
+            File(modelDir, filename)
         }
     }
 

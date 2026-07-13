@@ -17,6 +17,7 @@ import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.storage.CredentialStore
 import io.ente.ensu.logging.LogLevel
 import io.ente.ensu.AppStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
@@ -36,7 +37,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         context = application,
         modelDir = resolveModelDir(application),
         transcriber = transcriber,
-        legacyModelDir = File(application.filesDir, "llm"),
+        legacyModelDir = application.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.let { File(it, "llm") },
         deviceCapabilityProvider = deviceCapabilityProvider
     )
     private val chatRepository = ChatRepository(application, credentialStore)
@@ -54,6 +55,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         val launchMessage = "App launched app=$appVersion device=${Build.MANUFACTURER} ${Build.MODEL} os=${Build.VERSION.RELEASE} (sdk=${Build.VERSION.SDK_INT})"
         logRepository.log(LogLevel.Info, launchMessage, tag = "App")
+
+        viewModelScope.launch(Dispatchers.IO) {
+            llmProvider.migrateLegacyDownloads()
+        }
 
         viewModelScope.launch {
             val initialSettings = runCatching {
@@ -94,10 +99,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun resolveModelDir(application: Application): File {
-        val root = application.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-            ?: application.getExternalFilesDir(null)
-            ?: application.filesDir
-        return File(root, "llm")
+        return File(application.noBackupFilesDir, "models")
     }
 
 }

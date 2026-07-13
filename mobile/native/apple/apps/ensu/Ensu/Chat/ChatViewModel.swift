@@ -112,12 +112,15 @@ final class ChatViewModel: ObservableObject {
         let baseDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
 
-        // LLM model files.
-        let llmDir = baseDir.appendingPathComponent("llm", isDirectory: true)
+        let modelsDir = baseDir.appendingPathComponent("models", isDirectory: true)
         let transcriptionDir = baseDir.appendingPathComponent("transcription", isDirectory: true)
         try? FileManager.default.createDirectory(at: transcriptionDir, withIntermediateDirectories: true, attributes: nil)
         let transcriber = Transcriber(modelsDir: transcriptionDir.path)
-        let provider = LlmProvider(modelDir: llmDir, transcriber: transcriber)
+        let provider = LlmProvider(
+            modelDir: modelsDir,
+            legacyModelDir: baseDir.appendingPathComponent("llm", isDirectory: true),
+            transcriber: transcriber
+        )
         let voiceTranscriber = VoiceTranscriptionService(transcriber: transcriber)
 
         // Chat DB + attachments.

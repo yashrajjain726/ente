@@ -24,8 +24,6 @@ import io.ente.ensu.device.AndroidDeviceCapabilityProvider
 import io.ente.ensu.device.requireChatSupported
 import io.ente.ensu.format.formatBytes
 import java.io.File
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.locks.ReentrantLock
 import kotlin.coroutines.coroutineContext
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
@@ -60,8 +58,8 @@ class LlmProvider(
     @Volatile private var manualDownloadActive = false
     private var backendInitialized = false
     private val modelLoadMutex = Mutex()
-    private val migratedLegacyTargets = java.util.Collections.synchronizedSet(mutableSetOf<String>())
-    private val legacyMigrationLocks = ConcurrentHashMap<String, ReentrantLock>()
+    private val legacyMigrationLock = Any()
+    private var legacyMigrationDone = false
 
     init {
         uniffiEnsureInitialized()
@@ -146,8 +144,9 @@ class LlmProvider(
     val isManualDownloadActive: Boolean get() = manualDownloadActive
 
     fun isModelDownloaded(target: LlmModelTarget): Boolean {
-        migrateLegacyDownloads(target)
-        return ModelDownloadSupport.isTargetDownloaded(modelDir, target)
+        if (ModelDownloadSupport.isTargetDownloaded(modelDir, target)) return true
+        val legacyModels = legacyModelDir?.let { File(it, "models") } ?: return false
+        return ModelDownloadSupport.isTargetDownloaded(legacyModels, target)
     }
 
     suspend fun estimateModelDownloadSize(target: LlmModelTarget): Long? = withContext(ioDispatcher) {
@@ -247,7 +246,7 @@ class LlmProvider(
 
         unloadModel()
 
-        migrateLegacyDownloads(target)
+        migrateLegacyDownloads()
         val modelFile = ModelDownloadSupport.modelPathFor(modelDir, target)
         if (!ModelDownloadSupport.isTargetDownloaded(modelDir, target)) {
             awaitRustForegroundDownload(target, onProgress)
@@ -383,46 +382,35 @@ class LlmProvider(
         return DownloadProgress(percent, status)
     }
 
-    private fun migrateLegacyDownloads(target: LlmModelTarget) {
-        val legacyDir = legacyModelDir ?: return
-        if (legacyDir.absolutePath == modelDir.absolutePath) return
-        val migrationLock = legacyMigrationLocks.getOrPut(target.id) { ReentrantLock() }
-        migrationLock.lock()
-
-        try {
-            if (migratedLegacyTargets.contains(target.id)) {
+    internal fun migrateLegacyDownloads() {
+        synchronized(legacyMigrationLock) {
+            if (legacyMigrationDone) return
+            File(appContext.filesDir, "llm").deleteRecursively()
+            val legacyDir = legacyModelDir
+            if (legacyDir == null || !legacyDir.exists()) {
+                legacyMigrationDone = true
                 return
             }
-            val oldTargets = ModelDownloadSupport.expectedTargets(legacyDir, target)
-            val newTargets = ModelDownloadSupport.expectedTargets(modelDir, target)
-            oldTargets.zip(newTargets).forEach { (oldTarget, newTarget) ->
-                if (!ModelDownloadSupport.looksLikeGguf(oldTarget.destination)) {
-                    return@forEach
-                }
-                if (newTarget.destination.exists()) {
-                    return@forEach
-                }
 
-                newTarget.destination.parentFile?.mkdirs()
-                val moved = oldTarget.destination.renameTo(newTarget.destination)
-                if (!moved) {
-                    runCatching {
-                        oldTarget.destination.copyTo(newTarget.destination, overwrite = false)
-                        oldTarget.destination.delete()
-                    }.onFailure { error ->
-                        Log.w(
-                            "LlmProvider",
-                            "Legacy migration failed for ${oldTarget.destination.absolutePath}",
-                            error
-                        )
-                    }
+            var allMoved = true
+            val legacyModels = File(legacyDir, "models")
+            legacyModels.walkTopDown().filter { it.isFile }.forEach { file ->
+                val dest = File(modelDir, file.relativeTo(legacyModels).path)
+                if (dest.exists()) return@forEach
+                val staged = File(dest.parentFile, "${dest.name}.migrating")
+                dest.parentFile?.mkdirs()
+                runCatching {
+                    file.copyTo(staged, overwrite = true)
+                    check(staged.renameTo(dest)) { "rename to ${dest.absolutePath} failed" }
+                }.onFailure { error ->
+                    staged.delete()
+                    allMoved = false
+                    Log.w("LlmProvider", "Model migration failed for ${file.absolutePath}", error)
                 }
             }
-            migratedLegacyTargets.add(target.id)
-        } finally {
-            migrationLock.unlock()
-            if (!migrationLock.hasQueuedThreads()) {
-                legacyMigrationLocks.remove(target.id, migrationLock)
+            if (allMoved) {
+                legacyDir.deleteRecursively()
+                legacyMigrationDone = true
             }
         }
     }

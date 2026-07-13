@@ -124,10 +124,33 @@ final class LlmProvider {
     private var rustDownloadCancelled = false
     private let logger = EnsuLogging.shared.logger("LlmProvider")
 
-    init(modelDir: URL, transcriber: Transcriber) {
+    init(modelDir: URL, legacyModelDir: URL? = nil, transcriber: Transcriber) {
         self.modelDir = modelDir
         self.transcriber = transcriber
+        if let legacyModelDir {
+            Self.migrateLegacyModels(from: legacyModelDir, to: modelDir)
+        }
         try? FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true, attributes: nil)
+        var excludedDir = modelDir
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? excludedDir.setResourceValues(values)
+    }
+
+    static func migrateLegacyModels(from legacyDir: URL, to modelDir: URL) {
+        let fileManager = FileManager.default
+        let legacyModels = legacyDir.appendingPathComponent("models", isDirectory: true)
+        var migrated = true
+        if fileManager.fileExists(atPath: legacyModels.path) {
+            if fileManager.fileExists(atPath: modelDir.path) {
+                migrated = false
+            } else {
+                migrated = (try? fileManager.moveItem(at: legacyModels, to: modelDir)) != nil
+            }
+        }
+        if migrated {
+            try? fileManager.removeItem(at: legacyDir)
+        }
     }
 
     func ensureModelReady(
@@ -464,24 +487,22 @@ final class LlmProvider {
     }
 
     private func modelPathFor(target: LlmModelTarget) -> URL {
-        let base = modelDir.appendingPathComponent("models", isDirectory: true)
         let filename = URL(string: target.url)?.lastPathComponent ?? "model.gguf"
         if target.id.hasPrefix("custom:") {
-            let custom = base.appendingPathComponent("custom", isDirectory: true)
+            let custom = modelDir.appendingPathComponent("custom", isDirectory: true)
             return custom.appendingPathComponent("\(hash(target.url))_\(filename)")
         }
-        return base.appendingPathComponent(filename)
+        return modelDir.appendingPathComponent(filename)
     }
 
     private func mmprojPathFor(target: LlmModelTarget) -> URL? {
         guard let url = target.mmprojUrl else { return nil }
-        let base = modelDir.appendingPathComponent("models", isDirectory: true)
         let filename = URL(string: url)?.lastPathComponent ?? "mmproj.gguf"
         if target.id.hasPrefix("custom:") {
-            let custom = base.appendingPathComponent("custom", isDirectory: true)
+            let custom = modelDir.appendingPathComponent("custom", isDirectory: true)
             return custom.appendingPathComponent("\(hash(url))_\(filename)")
         }
-        return base.appendingPathComponent(filename)
+        return modelDir.appendingPathComponent(filename)
     }
 
     private func hash(_ value: String) -> String {

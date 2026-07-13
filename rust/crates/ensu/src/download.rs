@@ -1514,12 +1514,17 @@ fn prepare_cached_download(
     if !destination.exists() || validate(target, destination).is_err() {
         return false;
     }
-    if !metadata_path_for(destination).exists() {
+    let adopted = if !metadata_path_for(destination).exists() {
         let size = file_size(destination).unwrap_or(0);
         let _ = write_download_metadata(destination, target, size, None);
-        return true;
+        true
+    } else {
+        download_metadata_matches(destination, &target.url)
+    };
+    if adopted {
+        cleanup_range_download(destination);
     }
-    download_metadata_matches(destination, &target.url)
+    adopted
 }
 
 fn read_download_metadata(path: &Path) -> Option<DownloadMetadata> {
@@ -2493,6 +2498,35 @@ mod tests {
         );
 
         assert!(matches!(result, Err(Error::Cancelled)));
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn cached_download_adoption_removes_stale_partials() {
+        let test_dir = scratch_dir("cached-adoption");
+        let destination = test_dir.join("model.bin");
+        fs::write(&destination, b"complete-model").expect("write model");
+        fs::write(tmp_path_for(&destination), b"stale").expect("write tmp");
+        fs::write(range_metadata_path_for(&destination), "{}").expect("write ranges sidecar");
+        fs::write(partial_metadata_path_for(&destination), "{}").expect("write partial sidecar");
+
+        let result = fetch(
+            vec![Target {
+                label: "Model".to_string(),
+                url: "http://127.0.0.1:1/model.bin".to_string(),
+                destination_path: destination.display().to_string(),
+            }],
+            |_, _| Ok(()),
+            |_| {},
+            || false,
+        );
+
+        assert!(result.is_ok());
+        assert!(destination.exists());
+        assert!(!tmp_path_for(&destination).exists());
+        assert!(!range_metadata_path_for(&destination).exists());
+        assert!(!partial_metadata_path_for(&destination).exists());
 
         let _ = fs::remove_dir_all(test_dir);
     }
