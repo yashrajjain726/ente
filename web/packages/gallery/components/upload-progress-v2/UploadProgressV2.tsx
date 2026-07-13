@@ -91,7 +91,7 @@ function UploadProgress({
         cancelUploads();
     };
 
-    if (uploadPhase == "done" && !summaryMode) {
+    if (uploadPhase == "done" && expanded && !summaryMode) {
         return (
             <UploadCompletionV2
                 open
