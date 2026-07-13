@@ -66,12 +66,12 @@ func (r *SessionsRepository) GetBrowserSession(ctx context.Context, tokenHash []
 	return rec, nil
 }
 
-func (r *SessionsRepository) TouchBrowserSession(ctx context.Context, tokenHash []byte) error {
+func (r *SessionsRepository) TouchBrowserSession(ctx context.Context, tokenHash []byte, lastUsedBefore int64) error {
 	_, err := r.DB.ExecContext(ctx, `
 		UPDATE space_browser_sessions
 		SET last_used_at = $1
-		WHERE token_hash = $2
-	`, timeutil.Microseconds(), tokenHash)
+		WHERE token_hash = $2 AND last_used_at <= $3
+	`, timeutil.Microseconds(), tokenHash, lastUsedBefore)
 	return stacktrace.Propagate(err, "")
 }
 

@@ -131,6 +131,34 @@ func TestRequireSpaceBrowserSessionAcceptsValidHeader(t *testing.T) {
 	require.JSONEq(t, `{"userID":"`+strconv.FormatInt(userID, 10)+`"}`, recorder.Body.String())
 }
 
+func TestValidateSpaceBrowserSessionCoalescesLastUsedAtUpdates(t *testing.T) {
+	handlers, repos, userID := setupSpaceSessionAPITest(t)
+	token := "space-session-touch-token"
+	tokenHash := sha256.Sum256([]byte(token))
+	require.NoError(t, repos.Sessions.CreateBrowserSession(context.Background(), tokenHash[:], userID, "session-wrap-key", timeutil.NDaysFromNow(1)))
+	validate := func() {
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/space", nil)
+		_, err := handlers.Module.Sessions.ValidateBrowserSession(ctx, token)
+		require.NoError(t, err)
+	}
+
+	recent, err := repos.Sessions.GetBrowserSession(context.Background(), tokenHash[:])
+	require.NoError(t, err)
+	validate()
+	afterRecentValidation, err := repos.Sessions.GetBrowserSession(context.Background(), tokenHash[:])
+	require.NoError(t, err)
+	require.Equal(t, recent.LastUsedAt, afterRecentValidation.LastUsedAt)
+
+	oldLastUsedAt := timeutil.MicrosecondsBeforeMinutes(2)
+	_, err = repos.Sessions.DB.Exec(`UPDATE space_browser_sessions SET last_used_at = $1 WHERE token_hash = $2`, oldLastUsedAt, tokenHash[:])
+	require.NoError(t, err)
+	validate()
+	afterOldValidation, err := repos.Sessions.GetBrowserSession(context.Background(), tokenHash[:])
+	require.NoError(t, err)
+	require.Greater(t, afterOldValidation.LastUsedAt, oldLastUsedAt)
+}
+
 func TestRequireSpaceBrowserSessionRejectsInvalidHeader(t *testing.T) {
 	handlers, _, _ := setupSpaceSessionAPITest(t)
 	router := gin.New()

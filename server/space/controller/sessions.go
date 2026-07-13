@@ -15,7 +15,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const spaceBrowserSessionDurationDays = 365
+const (
+	spaceBrowserSessionDurationDays = 365
+	spaceBrowserSessionTouchMinutes = 1
+)
 const SpaceBrowserSessionTokenHeader = "X-Space-Session-Token"
 
 type SessionsController struct {
@@ -68,12 +71,16 @@ func validateBrowserSession(ctx *gin.Context, sessionsRepo *repo.SessionsReposit
 		}
 		return nil, err
 	}
-	if session.ExpiresAt <= timeutil.Microseconds() {
+	now := timeutil.Microseconds()
+	if session.ExpiresAt <= now {
 		_ = sessionsRepo.DeleteBrowserSession(ctx, sessionHash[:])
 		return nil, ente.ErrAuthenticationRequired
 	}
-	if err := sessionsRepo.TouchBrowserSession(ctx, sessionHash[:]); err != nil {
-		return nil, err
+	touchBefore := now - spaceBrowserSessionTouchMinutes*timeutil.MicroSecondsInOneMinute
+	if session.LastUsedAt <= touchBefore {
+		if err := sessionsRepo.TouchBrowserSession(ctx, sessionHash[:], touchBefore); err != nil {
+			return nil, err
+		}
 	}
 	return session, nil
 }
