@@ -15,7 +15,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 internal class ModelSettingsActions(
@@ -27,7 +26,6 @@ internal class ModelSettingsActions(
 ) {
     private var scope: CoroutineScope? = null
     private var modelDownloadJob: Job? = null
-    private var downloadProgressMonitorJob: Job? = null
 
     fun setScope(scope: CoroutineScope) {
         this.scope = scope
@@ -42,8 +40,6 @@ internal class ModelSettingsActions(
         if (downloadIdentityChanged(oldTarget, newTarget)) {
             modelDownloadJob?.cancel()
             modelDownloadJob = null
-            downloadProgressMonitorJob?.cancel()
-            downloadProgressMonitorJob = null
             llmProvider.cancelDownload()
         }
         refreshModelDownloadInfo()
@@ -65,7 +61,6 @@ internal class ModelSettingsActions(
 
     fun refreshModelDownloadInfo() {
         if (!state.value.chat.deviceCapability.isChatSupported()) {
-            downloadProgressMonitorJob?.cancel()
             modelDownloadJob?.cancel()
             llmProvider.cancelDownload()
             persistModelDownloadRequested(false)
@@ -86,7 +81,6 @@ internal class ModelSettingsActions(
         val target = resolveTarget(state.value.modelSettings)
         val isDownloaded = llmProvider.isModelDownloaded(target)
         if (isDownloaded) {
-            downloadProgressMonitorJob?.cancel()
             persistModelDownloadRequested(false)
         }
         state.update { appState ->
@@ -107,25 +101,7 @@ internal class ModelSettingsActions(
 
         val scope = scope ?: return
         scope.launch {
-            val progress = llmProvider.currentDownloadProgress(target)
-            if (progress != null) {
-                val isFailure = progress.phase == DownloadPhase.Failed
-                persistModelDownloadRequested(!isFailure)
-                state.update { appState ->
-                    appState.copy(
-                        chat = appState.chat.copy(
-                            isDownloading = !isFailure,
-                            downloadPercent = progress.percent,
-                            downloadStatus = progress.status,
-                            downloadPhase = progress.phase,
-                            hasRequestedModelDownload = !isFailure
-                        )
-                    )
-                }
-                if (!isFailure) {
-                    startDownloadProgressMonitor(target)
-                }
-            } else if (!llmProvider.isManualDownloadActive && modelDownloadJob?.isActive != true) {
+            if (!llmProvider.isManualDownloadActive && modelDownloadJob?.isActive != true) {
                 persistModelDownloadRequested(false)
                 state.update { appState ->
                     appState.copy(
@@ -197,7 +173,6 @@ internal class ModelSettingsActions(
 
         modelDownloadJob = scope.launch {
             var loggedComplete = false
-            startDownloadProgressMonitor(target)
             val progressTracker = DownloadProgressTracker(
                 initialPercent = if (isDownloaded) null else 0,
                 initialStatus = if (isDownloaded) null else "Starting download..."
@@ -306,7 +281,6 @@ internal class ModelSettingsActions(
     fun cancelModelDownload() {
         modelDownloadJob?.cancel()
         modelDownloadJob = null
-        downloadProgressMonitorJob?.cancel()
         llmProvider.cancelDownload()
         persistModelDownloadRequested(false)
         state.update { appState ->
@@ -321,46 +295,6 @@ internal class ModelSettingsActions(
             )
         }
         refreshModelDownloadInfo()
-    }
-
-    private fun startDownloadProgressMonitor(target: LlmModelTarget) {
-        val scope = scope ?: return
-        downloadProgressMonitorJob?.cancel()
-        downloadProgressMonitorJob = scope.launch {
-            var emptyPollCount = 0
-            while (isActive) {
-                val progress = llmProvider.currentDownloadProgress(target)
-                if (progress == null) {
-                    emptyPollCount += 1
-                    if (emptyPollCount >= 6) {
-                        break
-                    }
-                    delay(500)
-                    continue
-                }
-                emptyPollCount = 0
-                val isFailure = progress.phase == DownloadPhase.Failed
-                if (isFailure) {
-                    persistModelDownloadRequested(false)
-                }
-                state.update { appState ->
-                    appState.copy(
-                        chat = appState.chat.copy(
-                            isDownloading = !isFailure,
-                            downloadPercent = progress.percent,
-                            downloadStatus = progress.status,
-                            downloadPhase = progress.phase,
-                            hasRequestedModelDownload = if (isFailure) false else appState.chat.hasRequestedModelDownload
-                        )
-                    )
-                }
-                if (isFailure) {
-                    break
-                }
-                delay(500)
-            }
-            refreshModelDownloadInfo()
-        }
     }
 
     private fun persistModelDownloadRequested(requested: Boolean) {
@@ -428,8 +362,6 @@ internal class ModelSettingsActions(
         if (err is kotlinx.coroutines.CancellationException) return false
         if (err is LlmException.Cancelled) return false
         if (isOutOfStorageError(err)) return false
-        if (err is DownloadFailure.InvalidContent) return false
-        if (err is DownloadFailure.Http && err.status in NON_RETRYABLE_HTTP) return false
         if (err is LlmException.Download) {
             when (val error = err.error) {
                 is DownloadError.Validation -> return false
@@ -455,7 +387,6 @@ internal class ModelSettingsActions(
     private fun isOutOfStorageError(err: Throwable): Boolean {
         var current: Throwable? = err
         while (current != null) {
-            if (current is DownloadFailure.InsufficientSpace) return true
             if (current is LlmException.Download && current.error is DownloadError.StorageFull) {
                 return true
             }
