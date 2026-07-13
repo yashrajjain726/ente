@@ -1864,8 +1864,8 @@ packages:
     dependency: transitive
     description:
       path: "."
-      ref: bd1cce917e914690c00cc138b000b728742dde2b
-      resolved-ref: bd1cce917e914690c00cc138b000b728742dde2b
+      ref: "69780e0dab62db9def55ab07bcf52442ec0b9f94"
+      resolved-ref: "69780e0dab62db9def55ab07bcf52442ec0b9f94"
       url: "https://github.com/ente/mobile_ocr"
     source: git
     version: "1.0.0"
