@@ -51,6 +51,30 @@ pub enum Error {
     Generic(String),
 }
 
+impl From<ente_core::http::Error> for Error {
+    fn from(error: ente_core::http::Error) -> Self {
+        let message = error.to_string();
+        match error {
+            ente_core::http::Error::Http { status, .. } => Error::ApiError {
+                status,
+                code: None,
+                message,
+            },
+            ente_core::http::Error::Api { status, code, .. } => Error::ApiError {
+                status,
+                code: Some(code),
+                message,
+            },
+            ente_core::http::Error::Network(_) => {
+                Error::Generic(format!("Network error: {message}"))
+            }
+            ente_core::http::Error::Parse(_) => {
+                Error::Generic(format!("JSON parse error: {message}"))
+            }
+        }
+    }
+}
+
 impl From<crypto::Error> for Error {
     fn from(err: crypto::Error) -> Self {
         match err {
@@ -84,27 +108,7 @@ impl From<AuthError> for Error {
 impl From<AccountsError> for Error {
     fn from(err: AccountsError) -> Self {
         match err {
-            AccountsError::Http(error) => {
-                let message = error.to_string();
-                match error {
-                    ente_core::http::Error::Http { status, .. } => Error::ApiError {
-                        status,
-                        code: None,
-                        message,
-                    },
-                    ente_core::http::Error::Api { status, code, .. } => Error::ApiError {
-                        status,
-                        code: Some(code),
-                        message,
-                    },
-                    ente_core::http::Error::Network(_) => {
-                        Error::Generic(format!("Network error: {message}"))
-                    }
-                    ente_core::http::Error::Parse(_) => {
-                        Error::Generic(format!("JSON parse error: {message}"))
-                    }
-                }
-            }
+            AccountsError::Http(error) => Error::from(error),
             AccountsError::Serialization(source) => Error::Serialization(source),
             AccountsError::Crypto(message) => Error::Crypto(message),
             AccountsError::AuthenticationFailed(message) => Error::AuthenticationFailed(message),

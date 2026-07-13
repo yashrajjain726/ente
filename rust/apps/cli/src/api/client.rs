@@ -1,76 +1,19 @@
-#![allow(dead_code)]
-
-use crate::api::retry::RetryConfig;
-use crate::models::error::{Error, Result};
+use crate::models::error::Result;
+use ente_core::http::{self, Api, ApiConfig, Auth, Http, RetryProfile};
 use ente_core::urls::PRODUCTION_API_BASE_URL;
-use reqwest::{Client, RequestBuilder, Response, StatusCode};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
-use tokio::time::sleep;
 
-const TOKEN_HEADER: &str = "X-Auth-Token";
-const CLIENT_PKG_HEADER: &str = "X-Client-Package";
 const DEFAULT_CLIENT_PACKAGE: &str = "io.ente.photos";
 pub(crate) const USER_AGENT: &str = concat!("ente-rs/", env!("CARGO_PKG_VERSION"));
 
-/// Maximum number of retry attempts for failed requests
-const MAX_RETRIES: u32 = 3;
-/// Initial retry delay in milliseconds
-const INITIAL_RETRY_DELAY_MS: u64 = 1000;
-/// Maximum retry delay in milliseconds
-const MAX_RETRY_DELAY_MS: u64 = 20000;
-
-#[derive(Debug, Deserialize)]
-pub struct ApiError {
-    pub code: Option<String>,
-    pub message: Option<String>,
-}
-
-fn make_api_error(method: &str, path: &str, status: StatusCode, body: String) -> Error {
-    if status.is_server_error() {
-        log::error!("API request failed: status={status}");
-    } else if status == StatusCode::TOO_MANY_REQUESTS {
-        log::warn!("API request failed: status={status}");
-    } else {
-        log::debug!("API request failed: status={status}");
-    }
-
-    log::debug!("API request: {method} {path}");
-
-    if let Ok(error_json) = serde_json::from_str::<serde_json::Value>(&body) {
-        log::debug!(
-            "API error body: {}",
-            serde_json::to_string_pretty(&error_json).unwrap_or(body.clone())
-        );
-    } else {
-        log::debug!("API error body: {body}");
-    }
-
-    let message = serde_json::from_str::<ApiError>(&body)
-        .ok()
-        .and_then(|e| e.code.or(e.message))
-        .unwrap_or_else(|| status.to_string());
-
-    Error::ApiError {
-        status: status.as_u16(),
-        code: serde_json::from_str::<ApiError>(&body)
-            .ok()
-            .and_then(|e| e.code),
-        message,
-    }
-}
-
 pub struct ApiClient {
-    client: Client,
-    download_client: Client,
+    http: Http,
     pub(crate) base_url: String,
     client_package: String,
-    /// Token storage for multi-account support: account_id -> token
     tokens: Arc<RwLock<HashMap<String, String>>>,
-    /// Retry configuration
-    retry_config: RetryConfig,
 }
 
 impl ApiClient {
@@ -82,304 +25,171 @@ impl ApiClient {
     where
         S: Into<String>,
     {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .user_agent(USER_AGENT)
-            .build()?;
-
-        let download_client = Client::builder()
-            .timeout(Duration::from_secs(300))
-            .pool_idle_timeout(Duration::from_secs(90))
-            .pool_max_idle_per_host(10)
-            .user_agent(USER_AGENT)
-            .build()?;
-
         Ok(Self {
-            client,
-            download_client,
+            http: Http::new()?,
             base_url: base_url.unwrap_or_else(|| PRODUCTION_API_BASE_URL.to_string()),
             client_package: client_package.into(),
             tokens: Arc::new(RwLock::new(HashMap::new())),
-            retry_config: RetryConfig::default(),
         })
     }
 
-    /// Add or update authentication token for an account
     pub fn add_token(&self, account_id: &str, token: &str) {
         let mut tokens = self.tokens.write().unwrap();
         tokens.insert(account_id.to_string(), token.to_string());
     }
 
-    /// Remove authentication token for an account
     pub fn remove_token(&self, account_id: &str) {
         let mut tokens = self.tokens.write().unwrap();
         tokens.remove(account_id);
     }
 
-    /// Get authentication token for an account
     pub fn get_token(&self, account_id: &str) -> Option<String> {
         let tokens = self.tokens.read().unwrap();
         tokens.get(account_id).cloned()
     }
 
-    /// Set retry configuration
-    pub fn set_retry_config(&mut self, config: RetryConfig) {
-        self.retry_config = config;
-    }
-
-    /// Return the configured base URL.
     pub fn base_url(&self) -> &str {
         &self.base_url
     }
 
-    /// Return the configured client package.
     pub fn client_package(&self) -> &str {
         &self.client_package
     }
 
-    /// Build a request with common headers
-    fn build_request(&self, builder: RequestBuilder, account_id: Option<&str>) -> RequestBuilder {
-        let mut req = builder.header(CLIENT_PKG_HEADER, &self.client_package);
-
-        if let Some(id) = account_id {
-            if let Some(token) = self.get_token(id) {
-                log::debug!("Adding auth token for account {id}");
-                req = req.header(TOKEN_HEADER, token);
-            } else {
+    fn api(&self, account_id: Option<&str>) -> Api {
+        let auth = account_id.and_then(|id| {
+            let token = self.get_token(id);
+            if token.is_none() {
                 log::warn!("No token found for account {id}");
             }
-        }
-
-        req
+            token.map(Auth::User)
+        });
+        Api::new(
+            self.http.clone(),
+            ApiConfig {
+                origin: self.base_url.clone(),
+                client_package: Some(self.client_package.clone()),
+                client_version: None,
+                user_agent: Some(USER_AGENT.to_string()),
+                auth,
+            },
+        )
     }
 
-    /// Execute request with retry logic
-    async fn execute_with_retry(&self, request_builder: RequestBuilder) -> Result<Response> {
-        let mut retry_count = 0;
-        let mut delay_ms = INITIAL_RETRY_DELAY_MS;
-
-        loop {
-            let req = request_builder
-                .try_clone()
-                .ok_or_else(|| Error::Generic("Failed to clone request for retry".to_string()))?;
-
-            match req.send().await {
-                Ok(response) => {
-                    if (response.status() == StatusCode::TOO_MANY_REQUESTS
-                        || response.status().is_server_error())
-                        && retry_count < MAX_RETRIES
-                    {
-                        retry_count += 1;
-                        log::warn!(
-                            "Request failed with status {}, retry attempt {}/{}",
-                            response.status(),
-                            retry_count,
-                            MAX_RETRIES
-                        );
-
-                        sleep(Duration::from_millis(delay_ms)).await;
-                        delay_ms = (delay_ms * 2).min(MAX_RETRY_DELAY_MS);
-                        continue;
-                    }
-
-                    return Ok(response);
-                }
-                Err(e) => {
-                    if retry_count < MAX_RETRIES {
-                        retry_count += 1;
-                        log::warn!(
-                            "Request failed with error: {e}, retry attempt {retry_count}/{MAX_RETRIES}"
-                        );
-
-                        sleep(Duration::from_millis(delay_ms)).await;
-                        delay_ms = (delay_ms * 2).min(MAX_RETRY_DELAY_MS);
-                        continue;
-                    }
-                    return Err(e.into());
-                }
-            }
-        }
-    }
-
-    /// Make a GET request
-    pub async fn get<T>(&self, path: &str, account_id: Option<&str>) -> Result<T>
-    where
-        T: for<'de> Deserialize<'de>,
-    {
-        let url = format!("{}{}", self.base_url, path);
-        let request = self.client.get(&url);
-        let request = self.build_request(request, account_id);
-
-        let response = self.execute_with_retry(request).await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
+    pub async fn get<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        account_id: Option<&str>,
+    ) -> Result<T> {
+        let api = self.api(account_id);
+        Ok(http::retry(|| async {
+            api.get(path)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
                 .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(make_api_error("GET", path, status, body));
-        }
-
-        let text = response.text().await?;
-        serde_json::from_str(&text).map_err(|e| {
-            log::error!("Failed to deserialize response: {e}");
-            log::debug!(
-                "Response text (first 1000 chars): {}",
-                &text[..1000.min(text.len())]
-            );
-            Error::Generic(format!("Deserialization failed: {e}"))
         })
+        .await?)
     }
 
-    /// Make a POST request
     pub async fn post<T, B>(&self, path: &str, body: &B, account_id: Option<&str>) -> Result<T>
     where
-        T: for<'de> Deserialize<'de>,
+        T: DeserializeOwned,
         B: Serialize,
     {
-        let url = format!("{}{}", self.base_url, path);
-
-        let request = self.client.post(&url).json(body);
-        let request = self.build_request(request, account_id);
-
-        let response = self.execute_with_retry(request).await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
+        let api = self.api(account_id);
+        Ok(http::retry(|| async {
+            api.post(path)
+                .json(body)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
                 .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(make_api_error("POST", path, status, body));
-        }
-
-        let text = response.text().await?;
-        serde_json::from_str(&text).map_err(|e| {
-            log::error!("Failed to deserialize response: {e}");
-            log::debug!(
-                "Response text (first 1000 chars): {}",
-                &text[..1000.min(text.len())]
-            );
-            Error::Generic(format!("Deserialization failed: {e}"))
         })
+        .await?)
     }
 
-    /// Make a POST request that expects no response body
     pub async fn post_empty<B>(&self, path: &str, body: &B, account_id: Option<&str>) -> Result<()>
     where
         B: Serialize,
     {
-        let url = format!("{}{}", self.base_url, path);
-
-        let request = self.client.post(&url).json(body);
-        let request = self.build_request(request, account_id);
-
-        let response = self.execute_with_retry(request).await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(make_api_error("POST", path, status, body));
-        }
-
+        let api = self.api(account_id);
+        http::retry(|| async {
+            api.post(path)
+                .json(body)
+                .send()
+                .await?
+                .error_for_code()
+                .await?;
+            Ok(())
+        })
+        .await?;
         Ok(())
     }
 
-    /// Make a PUT request
     pub async fn put<T, B>(&self, path: &str, body: &B, account_id: Option<&str>) -> Result<T>
     where
-        T: for<'de> Deserialize<'de>,
+        T: DeserializeOwned,
         B: Serialize,
     {
-        let url = format!("{}{}", self.base_url, path);
-        let request = self.client.put(&url).json(body);
-        let request = self.build_request(request, account_id);
-
-        let response = self.execute_with_retry(request).await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
+        let api = self.api(account_id);
+        Ok(http::retry(|| async {
+            api.put(path)
+                .json(body)
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
                 .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(make_api_error("PUT", path, status, body));
-        }
-
-        let text = response.text().await?;
-        serde_json::from_str(&text).map_err(|e| {
-            log::error!("Failed to deserialize response: {e}");
-            log::debug!(
-                "Response text (first 1000 chars): {}",
-                &text[..1000.min(text.len())]
-            );
-            Error::Generic(format!("Deserialization failed: {e}"))
         })
+        .await?)
     }
 
-    /// Make a PUT request that expects no response body
     pub async fn put_empty<B>(&self, path: &str, body: &B, account_id: Option<&str>) -> Result<()>
     where
         B: Serialize,
     {
-        let url = format!("{}{}", self.base_url, path);
-        let request = self.client.put(&url).json(body);
-        let request = self.build_request(request, account_id);
-
-        let response = self.execute_with_retry(request).await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(make_api_error("PUT", path, status, body));
-        }
-
+        let api = self.api(account_id);
+        http::retry(|| async {
+            api.put(path)
+                .json(body)
+                .send()
+                .await?
+                .error_for_code()
+                .await?;
+            Ok(())
+        })
+        .await?;
         Ok(())
     }
 
-    /// Make a DELETE request
     pub async fn delete(&self, path: &str, account_id: Option<&str>) -> Result<()> {
-        let url = format!("{}{}", self.base_url, path);
-        let request = self.client.delete(&url);
-        let request = self.build_request(request, account_id);
-
-        let response = self.execute_with_retry(request).await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(make_api_error("DELETE", path, status, body));
-        }
-
+        let api = self.api(account_id);
+        http::retry(|| async {
+            api.delete(path).send().await?.error_for_code().await?;
+            Ok(())
+        })
+        .await?;
         Ok(())
     }
 
-    /// Download a file with the download client
     pub async fn download_file(&self, url: &str, account_id: Option<&str>) -> Result<Vec<u8>> {
-        let request = self.download_client.get(url);
-        let request = self.build_request(request, account_id);
-
-        let response = self.execute_with_retry(request).await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(make_api_error("GET", url, status, body));
-        }
-
-        Ok(response.bytes().await?.to_vec())
+        let token = account_id.and_then(|id| self.get_token(id));
+        Ok(
+            http::retry_with_profile(RetryProfile::Background, || async {
+                let mut request = self.http.get(url);
+                if let Some(token) = &token {
+                    // A header would ride the redirect to presigned storage; a query does not.
+                    request = request.query(&[("token", token)]);
+                }
+                request.send().await?.error_for_status()?.bytes().await
+            })
+            .await?,
+        )
     }
 }
