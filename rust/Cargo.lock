@@ -3574,8 +3574,8 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "heic_decoder"
-version = "0.1.0"
-source = "git+https://github.com/ente/heic-decoder.git?rev=3fd83f1c1f0c88b8c4b511355b4041c7bb2d393b#3fd83f1c1f0c88b8c4b511355b4041c7bb2d393b"
+version = "0.2.0"
+source = "git+https://github.com/ente/heic-decoder.git?rev=0998ddc52085b38fa359049d1fe28baf144fe79b#0998ddc52085b38fa359049d1fe28baf144fe79b"
 dependencies = [
  "archmage",
  "brotli",
