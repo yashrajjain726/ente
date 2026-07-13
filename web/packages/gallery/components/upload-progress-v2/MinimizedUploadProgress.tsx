@@ -66,9 +66,7 @@ export function MinimizedUploadProgress() {
                                 ? t("file_upload")
                                 : context.uploadPhase == "done"
                                   ? uploadStatusText(context.uploadPhase)
-                                  : t("percent_uploaded", {
-                                        percent: progress,
-                                    })}
+                                  : `${progress.toLocaleString()}% uploaded`}
                         </Typography>
                         <Typography sx={minimizedSubtitleSx}>
                             {context.uploadPhase == "cancelling"
@@ -77,7 +75,7 @@ export function MinimizedUploadProgress() {
                         </Typography>
                     </Stack>
                     <IconButton
-                        aria-label={t("expand")}
+                        aria-label="Expand"
                         onClick={handleExpand}
                         sx={minimizedIconButtonSx}
                     >

@@ -76,10 +76,10 @@ export function UploadCompletionV2({
                             component="h2"
                             sx={completionTitleSx}
                         >
-                            {t("upload_completion_done_title")}
+                            Your upload is done!
                         </Typography>
                         <Typography sx={completionSubtitleSx}>
-                            {t("upload_completion_upload_subtitle")}
+                            Uploaded items are now available on Ente.
                         </Typography>
                     </Stack>
                 </Stack>
@@ -97,7 +97,7 @@ export function UploadCompletionV2({
                                     }}
                                 />
                                 <Typography sx={completionStatLabelSx}>
-                                    {t(kind)}
+                                    {completionStatLabels[kind]}
                                 </Typography>
                             </Stack>
                             <Typography sx={completionStatValueSx}>
@@ -113,7 +113,7 @@ export function UploadCompletionV2({
                             onClick={onReviewFailed}
                             sx={primaryButtonSx}
                         >
-                            {t("review_failed_items")}
+                            Review failed items
                         </Button>
                     ) : null}
                     <Button
@@ -125,13 +125,19 @@ export function UploadCompletionV2({
                                 : primaryButtonSx
                         }
                     >
-                        {t("view_photos")}
+                        View photos
                     </Button>
                 </Stack>
             </Stack>
         </Dialog>
     );
 }
+
+const completionStatLabels = {
+    completed: "Completed",
+    skipped: "Skipped",
+    failed: "Failed",
+} as const;
 
 const completionDialogPaperSx = (theme: Theme) => ({
     width: "min(488px, calc(100svw - 32px))",

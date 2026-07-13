@@ -69,11 +69,13 @@ export function StopUploadConfirmationDialog({
                         id="stop-upload-confirmation-message"
                         sx={stopConfirmationSubtitleSx}
                     >
-                        {t("stop_uploads_v2_message")}
+                        {
+                            "You can upload later, we'll skip already uploaded items."
+                        }
                     </Typography>
                 </Stack>
                 <Stack direction="row" sx={stopConfirmationCountsSx}>
-                    {doneStatConfigs.map(({ kind, color, labelKey }) => (
+                    {doneStatConfigs.map(({ kind, color, label }) => (
                         <Stack key={kind} sx={stopConfirmationCountTileSx}>
                             <Stack
                                 direction="row"
@@ -86,7 +88,7 @@ export function StopUploadConfirmationDialog({
                                     }}
                                 />
                                 <Typography sx={stopConfirmationCountLabelSx}>
-                                    {t(labelKey)}
+                                    {label}
                                 </Typography>
                             </Stack>
                             <Typography sx={stopConfirmationCountValueSx}>
@@ -100,7 +102,7 @@ export function StopUploadConfirmationDialog({
                     onClick={onConfirm}
                     sx={stopConfirmationButtonSx}
                 >
-                    {t("stop_uploads")}
+                    Stop uploads
                 </Button>
             </Stack>
         </Dialog>

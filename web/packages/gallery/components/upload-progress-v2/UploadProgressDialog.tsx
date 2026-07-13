@@ -54,7 +54,7 @@ export function UploadProgressDialog({ closeOnly }: { closeOnly: boolean }) {
 function UploadProgressV2Header() {
     const { onClose, setExpanded, uploadPhase } = useUploadProgressContext();
     const isDone = uploadPhase == "done";
-    const title = isDone ? t("upload_details") : t("file_upload");
+    const title = isDone ? "Upload details" : t("file_upload");
 
     const handleMinimize = () => setExpanded(false);
 
@@ -65,7 +65,7 @@ function UploadProgressV2Header() {
                 sx={{ alignItems: "center", gap: 1, minWidth: 0 }}
             >
                 <IconButton
-                    aria-label={t("minimize")}
+                    aria-label="Minimize"
                     onClick={handleMinimize}
                     sx={headerIconButtonSx}
                 >
@@ -100,7 +100,7 @@ function UploadProgressV2Summary() {
             <Stack sx={{ gap: 2, minWidth: 0 }}>
                 <Stack sx={{ minWidth: 0, gap: "4px" }}>
                     <Typography component="p" sx={titleTextSx}>
-                        {t("percent_uploaded", { percent: progress })}
+                        {progress.toLocaleString()}% uploaded
                     </Typography>
                     <Typography sx={mutedBodySx}>
                         {uploadCountsText(context)}

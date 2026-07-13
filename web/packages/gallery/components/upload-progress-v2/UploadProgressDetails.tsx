@@ -12,12 +12,12 @@ import {
 import { useUploadProgressContext } from "./context";
 import {
     doneStatConfigs,
-    finishedTypeReasonHintKeys,
-    finishedTypeReasonKeys,
+    finishedTypeReasonHints,
+    finishedTypeReasons,
     normalizePercent,
-    preUploadSkippedFileReasonKeys,
+    preUploadSkippedFileReasons,
     statConfigs,
-    statEmptyMessageKeys,
+    statEmptyMessages,
 } from "./helpers";
 import {
     EmptyUploadRows,
@@ -66,21 +66,22 @@ export function UploadProgressDetails({ closeOnly }: { closeOnly: boolean }) {
             ? []
             : [
                   ...statFinishedTypes[activeStat].flatMap((type) => {
-                      const reasonKey = finishedTypeReasonKeys[type];
-                      const hintKey = finishedTypeReasonHintKeys[type];
+                      const reason =
+                          type == "uploadedWithStaticThumbnail"
+                              ? t("thumbnail_generation_failed")
+                              : finishedTypeReasons[type];
+                      const reasonHint = finishedTypeReasonHints[type];
                       return (finishedUploads.get(type) ?? []).map((id) => ({
                           name: uploadFileNames.get(id) ?? t("file"),
-                          reason: reasonKey && t(reasonKey),
-                          reasonHint: hintKey && t(hintKey),
+                          reason,
+                          reasonHint,
                       }));
                   }),
                   ...(activeStat == "skipped"
                       ? preUploadSkippedFiles.map((file) => ({
                             name: basename(file.name),
                             title: file.name,
-                            reason: t(
-                                preUploadSkippedFileReasonKeys[file.type],
-                            ),
+                            reason: preUploadSkippedFileReasons[file.type],
                         }))
                       : []),
               ];
@@ -120,13 +121,13 @@ export function UploadProgressDetails({ closeOnly }: { closeOnly: boolean }) {
             )}
             <Box sx={detailsCardSx}>
                 <Box sx={statsGridSx(isDone)}>
-                    {visibleStatConfigs.map(({ kind, color, labelKey }) => (
+                    {visibleStatConfigs.map(({ kind, color, label }) => (
                         <UploadStat
                             key={kind}
                             active={activeStat == kind}
                             color={color}
                             kind={kind}
-                            label={t(labelKey)}
+                            label={label}
                             value={statCounts[kind]}
                             onSelect={handleSelectStat}
                         />
@@ -179,7 +180,7 @@ export function UploadProgressDetails({ closeOnly }: { closeOnly: boolean }) {
                         />
                     ) : (
                         <EmptyUploadRows
-                            message={t(statEmptyMessageKeys[activeStat])}
+                            message={statEmptyMessages[activeStat]}
                         />
                     )}
                 </Box>

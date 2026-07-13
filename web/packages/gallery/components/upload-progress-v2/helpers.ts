@@ -12,65 +12,72 @@ import {
 } from "../uploadProgressStats";
 import type { UploadProgressContextT } from "./context";
 
-export const finishedTypeReasonKeys: Partial<
+export const finishedTypeReasons: Partial<Record<FinishedUploadType, string>> =
+    {
+        alreadyUploaded: "Already on Ente",
+        largerThanAvailableStorage: "Not enough storage",
+        tooLarge: "File over 10 GB",
+        unsupported: "File type not supported",
+        zeroSize: "Empty file",
+        blocked: "Upload blocked",
+        failed: "Upload failed",
+    };
+
+export const finishedTypeReasonHints: Partial<
     Record<FinishedUploadType, string>
 > = {
-    uploadedWithStaticThumbnail: "thumbnail_generation_failed",
-    alreadyUploaded: "upload_reason_already_uploaded",
-    largerThanAvailableStorage: "upload_reason_insufficient_storage",
-    tooLarge: "upload_reason_too_large",
-    unsupported: "upload_reason_unsupported",
-    zeroSize: "upload_reason_zero_size",
-    blocked: "upload_reason_blocked",
-    failed: "upload_reason_failed",
+    uploadedWithStaticThumbnail:
+        "The file was uploaded, but we could not generate a thumbnail for it.",
+    blocked:
+        "Your browser or an addon is preventing Ente from using eTags to upload large files.",
 };
 
-export const finishedTypeReasonHintKeys: Partial<
-    Record<FinishedUploadType, string>
-> = {
-    uploadedWithStaticThumbnail: "upload_hint_static_thumbnail",
-    blocked: "upload_hint_blocked",
-};
-
-export const preUploadSkippedFileReasonKeys: Record<
+export const preUploadSkippedFileReasons: Record<
     PreUploadSkippedFile["type"],
     string
-> = {
-    hiddenFile: "upload_reason_hidden_file",
-    failedZip: "upload_reason_unreadable_zip",
+> = { hiddenFile: "Hidden file", failedZip: "Unreadable zip" };
+
+const finishedStatLabels: Record<FinishedStatKind, string> = {
+    completed: "Completed",
+    skipped: "Skipped",
+    failed: "Failed",
 };
 
 export const statConfigs = [
-    { kind: "inProgress", color: "#d9d9d9", labelKey: "in_progress" },
+    { kind: "inProgress", color: "#d9d9d9", label: "In progress" },
     ...finishedStatKinds.map((kind) => ({
         kind,
         color: uploadStatColors[kind],
-        labelKey: kind,
+        label: finishedStatLabels[kind],
     })),
-] satisfies { kind: UploadStatKind; color: string; labelKey: string }[];
+] satisfies { kind: UploadStatKind; color: string; label: string }[];
 
 export const doneStatConfigs = statConfigs.slice(1) as {
     kind: FinishedStatKind;
     color: string;
-    labelKey: FinishedStatKind;
+    label: string;
 }[];
 
-export const statEmptyMessageKeys: Record<FinishedStatKind, string> = {
-    completed: "no_completed_uploads_yet",
-    skipped: "no_skipped_files_yet",
-    failed: "no_failed_uploads_yet",
+export const statEmptyMessages: Record<FinishedStatKind, string> = {
+    completed: "No completed uploads yet",
+    skipped: "No skipped files yet",
+    failed: "No failed uploads yet",
 };
 
-const uploadStatusTextKeys: Record<UploadPhase, string> = {
-    preparing: "preparing",
-    readingMetadata: "upload_reading_metadata_files",
-    uploading: "uploading",
-    cancelling: "upload_cancelling",
-    done: "upload_complete",
+export const uploadStatusText = (uploadPhase: UploadPhase) => {
+    switch (uploadPhase) {
+        case "preparing":
+            return t("preparing");
+        case "readingMetadata":
+            return t("upload_reading_metadata_files");
+        case "uploading":
+            return "Uploading";
+        case "cancelling":
+            return t("upload_cancelling");
+        case "done":
+            return "Upload complete";
+    }
 };
-
-export const uploadStatusText = (uploadPhase: UploadPhase) =>
-    t(uploadStatusTextKeys[uploadPhase]);
 
 export const uploadCountsText = ({
     uploadPhase,
@@ -99,10 +106,7 @@ export const uploadCountsText = ({
             : t("upload_done", { count });
     }
     return uploadCounter.total
-        ? t("upload_items_progress", {
-              finished: uploadCounter.finished,
-              total: uploadCounter.total,
-          })
+        ? `${uploadCounter.finished.toLocaleString()} of ${uploadCounter.total.toLocaleString()} items`
         : uploadStatusText(uploadPhase);
 };
 
