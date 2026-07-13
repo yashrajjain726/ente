@@ -20,7 +20,7 @@ import {
 } from "./helpers";
 import { UploadProgressDetails } from "./UploadProgressDetails";
 
-export function UploadProgressDialog() {
+export function UploadProgressDialog({ closeOnly }: { closeOnly: boolean }) {
     const { onClose, uploadPhase } = useUploadProgressContext();
     const isDone = uploadPhase == "done";
 
@@ -39,11 +39,11 @@ export function UploadProgressDialog() {
             <Box sx={uploadProgressDialogContentSx(isDone)}>
                 <UploadProgressV2Header />
                 {isDone ? (
-                    <UploadProgressDetails />
+                    <UploadProgressDetails closeOnly={closeOnly} />
                 ) : (
                     <Stack sx={{ gap: 3 }}>
                         <UploadProgressV2Summary />
-                        <UploadProgressDetails />
+                        <UploadProgressDetails closeOnly={closeOnly} />
                     </Stack>
                 )}
                 <Typography sx={{ ...mutedBodySx, textAlign: "center" }}>

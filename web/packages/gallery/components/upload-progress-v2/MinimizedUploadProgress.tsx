@@ -62,12 +62,18 @@ export function MinimizedUploadProgress() {
                     </Box>
                     <Stack sx={{ flex: 1, minWidth: 0, gap: 0.5 }}>
                         <Typography sx={minimizedTitleSx}>
-                            {context.uploadPhase == "done"
-                                ? uploadStatusText(context.uploadPhase)
-                                : t("percent_uploaded", { percent: progress })}
+                            {context.uploadPhase == "cancelling"
+                                ? t("file_upload")
+                                : context.uploadPhase == "done"
+                                  ? uploadStatusText(context.uploadPhase)
+                                  : t("percent_uploaded", {
+                                        percent: progress,
+                                    })}
                         </Typography>
                         <Typography sx={minimizedSubtitleSx}>
-                            {uploadCountsText(context)}
+                            {context.uploadPhase == "cancelling"
+                                ? uploadStatusText(context.uploadPhase)
+                                : uploadCountsText(context)}
                         </Typography>
                     </Stack>
                     <IconButton

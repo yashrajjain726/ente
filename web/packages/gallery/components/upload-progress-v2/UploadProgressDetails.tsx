@@ -26,7 +26,7 @@ import {
     type ListedFile,
 } from "./UploadFileList";
 
-export function UploadProgressDetails() {
+export function UploadProgressDetails({ closeOnly }: { closeOnly: boolean }) {
     const {
         finishedUploads,
         hasLivePhotos,
@@ -36,6 +36,7 @@ export function UploadProgressDetails() {
         uploadCounter,
         uploadFileNames,
         uploadPhase,
+        onClose,
     } = useUploadProgressContext();
     const isDone = uploadPhase == "done";
 
@@ -188,9 +189,13 @@ export function UploadProgressDetails() {
                     </Typography>
                 )}
             </Box>
-            {isDone && failedCount > 0 && (
-                <Button fullWidth onClick={retryFailed} sx={retryButtonSx}>
-                    {t("retry_failed_uploads")}
+            {isDone && (closeOnly || failedCount > 0) && (
+                <Button
+                    fullWidth
+                    onClick={closeOnly ? onClose : retryFailed}
+                    sx={retryButtonSx}
+                >
+                    {t(closeOnly ? "close" : "retry_failed_uploads")}
                 </Button>
             )}
         </Stack>
