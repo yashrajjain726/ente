@@ -1,6 +1,6 @@
 import type { PreUploadSkippedFile } from "ente-base/types/ipc";
 import type { UploadPhase } from "ente-gallery/services/upload";
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import { UploadCompletionV2 } from "../UploadCompletionV2";
 import type {
     InProgressUpload,
@@ -33,32 +33,10 @@ const emptyPreUploadSkippedFiles: PreUploadSkippedFile[] = [];
 export function UploadProgressV2(props: UploadProgressProps) {
     if (!props.open) return null;
 
-    return props.uploadPhase == "done" ? (
-        <CompletedUploadProgress {...props} />
-    ) : (
-        <UploadProgressView {...props} />
-    );
+    return <UploadProgress {...props} />;
 }
 
-function CompletedUploadProgress(props: UploadProgressProps) {
-    const [reviewFailures, setReviewFailures] = useState(false);
-
-    const handleReviewFailed = () => setReviewFailures(true);
-
-    return reviewFailures ? (
-        <UploadProgressView {...props} />
-    ) : (
-        <UploadCompletionV2
-            open
-            onClose={props.onClose}
-            onReviewFailed={handleReviewFailed}
-            finishedUploads={props.finishedUploads}
-            preUploadSkippedFiles={props.preUploadSkippedFiles}
-        />
-    );
-}
-
-function UploadProgressView({
+function UploadProgress({
     onClose,
     uploadCounter,
     uploadPhase,
@@ -84,57 +62,63 @@ function UploadProgressView({
     const [expanded, setExpanded] = useState(false);
     const [dragPosition, setDragPosition] = useState<DragPosition>();
     const [showStopConfirmation, setShowStopConfirmation] = useState(false);
+    const [summaryMode, setSummaryMode] = useState<"review" | "cancelling">();
 
-    const handleClose = useCallback(
-        () =>
-            uploadPhase == "done" ? onClose() : setShowStopConfirmation(true),
-        [onClose, uploadPhase],
-    );
+    const handleClose = () =>
+        uploadPhase == "done" ? onClose() : setShowStopConfirmation(true);
 
-    const handleStopConfirmationClose = useCallback(
-        () => setShowStopConfirmation(false),
-        [],
-    );
+    const handleReviewFailed = () => setSummaryMode("review");
 
-    const handleStopConfirmationConfirm = useCallback(() => {
+    const handleRetryFailed = () => {
+        setSummaryMode(undefined);
+        retryFailed();
+    };
+
+    const handleStopConfirmationClose = () => setShowStopConfirmation(false);
+
+    const handleStopConfirmationConfirm = () => {
         setShowStopConfirmation(false);
+        setExpanded(false);
+        setSummaryMode("cancelling");
         cancelUploads();
-    }, [cancelUploads]);
+    };
 
-    const contextValue = useMemo(
-        () => ({
-            onClose: handleClose,
-            uploadCounter,
-            uploadPhase,
-            percentComplete,
-            retryFailed,
-            inProgressUploads,
-            uploadFileNames,
-            finishedUploads,
-            preUploadSkippedFiles,
-            hasLivePhotos,
-            setExpanded,
-            dragPosition,
-            setDragPosition,
-        }),
-        [
-            dragPosition,
-            finishedUploads,
-            handleClose,
-            hasLivePhotos,
-            inProgressUploads,
-            percentComplete,
-            retryFailed,
-            preUploadSkippedFiles,
-            uploadCounter,
-            uploadFileNames,
-            uploadPhase,
-        ],
-    );
+    if (uploadPhase == "done" && !summaryMode) {
+        return (
+            <UploadCompletionV2
+                open
+                onClose={onClose}
+                onReviewFailed={handleReviewFailed}
+                finishedUploads={finishedUploads}
+                preUploadSkippedFiles={preUploadSkippedFiles}
+            />
+        );
+    }
+
+    const contextValue = {
+        onClose: handleClose,
+        uploadCounter,
+        uploadPhase,
+        percentComplete,
+        retryFailed: handleRetryFailed,
+        inProgressUploads,
+        uploadFileNames,
+        finishedUploads,
+        preUploadSkippedFiles,
+        hasLivePhotos,
+        setExpanded,
+        dragPosition,
+        setDragPosition,
+    };
 
     return (
         <UploadProgressContext.Provider value={contextValue}>
-            {expanded ? <UploadProgressDialog /> : <MinimizedUploadProgress />}
+            {expanded ||
+            (uploadPhase == "done" && summaryMode == "cancelling") ? (
+                <UploadProgressDialog closeOnly={summaryMode == "cancelling"} />
+            ) : (
+                <MinimizedUploadProgress />
+            )}
             <StopUploadConfirmationDialog
                 open={showStopConfirmation}
                 onClose={handleStopConfirmationClose}
