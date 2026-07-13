@@ -1,6 +1,6 @@
 import type { PreUploadSkippedFile } from "ente-base/types/ipc";
 import type { UploadPhase } from "ente-gallery/services/upload";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UploadCompletionV2 } from "../UploadCompletionV2";
 import type {
     InProgressUpload,
@@ -63,6 +63,10 @@ function UploadProgress({
     const [dragPosition, setDragPosition] = useState<DragPosition>();
     const [showStopConfirmation, setShowStopConfirmation] = useState(false);
     const [summaryMode, setSummaryMode] = useState<"review" | "cancelling">();
+
+    useEffect(() => {
+        if (uploadPhase == "preparing") setSummaryMode(undefined);
+    }, [uploadPhase]);
 
     const handleClose = () =>
         uploadPhase == "done" ? onClose() : setShowStopConfirmation(true);
