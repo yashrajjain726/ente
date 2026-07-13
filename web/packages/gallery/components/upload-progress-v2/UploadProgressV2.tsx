@@ -121,8 +121,7 @@ function UploadProgress({
 
     return (
         <UploadProgressContext.Provider value={contextValue}>
-            {expanded ||
-            (uploadPhase == "done" && summaryMode == "cancelling") ? (
+            {expanded ? (
                 <UploadProgressDialog closeOnly={summaryMode == "cancelling"} />
             ) : (
                 <MinimizedUploadProgress />
