@@ -1,5 +1,6 @@
 package io.ente.ensu.llm
 
+import android.content.Context
 import android.util.Log
 import io.ente.ensu.bindings.LlmChatMessage as NativeChatMessage
 import io.ente.ensu.bindings.LlmChatRequest
@@ -35,6 +36,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 
 class LlmProvider(
+    context: Context,
     private val modelDir: File,
     private val transcriber: Transcriber,
     private val deviceCapabilityProvider: AndroidDeviceCapabilityProvider,
@@ -47,6 +49,7 @@ class LlmProvider(
     )
 
     private val httpClient = OkHttpClient()
+    private val appContext = context.applicationContext
 
     @Volatile private var loadedModel: LlmModel? = null
     @Volatile private var loadedContext: LlmContext? = null
@@ -298,6 +301,7 @@ class LlmProvider(
         val downloadJob = coroutineContext[Job]
         manualDownloadCancelled = false
         manualDownloadActive = true
+        ModelDownloadJobService.begin(appContext) { manualDownloadCancelled = true }
         try {
             val targets = ModelDownloadSupport.expectedTargets(modelDir, target)
                 .map {
@@ -312,6 +316,11 @@ class LlmProvider(
                 object : LlmModelDownloadCallback {
                     override fun onProgress(progress: LlmModelDownloadProgress) {
                         logDownloadMetrics(progress)
+                        ModelDownloadJobService.update(
+                            appContext,
+                            progress.downloadedBytes,
+                            progress.totalBytes
+                        )
                         onProgress(progress.toDomainProgress())
                     }
 
@@ -321,6 +330,7 @@ class LlmProvider(
             )
         } finally {
             manualDownloadActive = false
+            ModelDownloadJobService.end(appContext)
         }
     }
 

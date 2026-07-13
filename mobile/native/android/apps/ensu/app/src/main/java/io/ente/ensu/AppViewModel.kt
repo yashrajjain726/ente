@@ -33,6 +33,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     val logRepository = FileLogRepository(application)
     private val llmProvider = LlmProvider(
+        context = application,
         modelDir = resolveModelDir(application),
         transcriber = transcriber,
         legacyModelDir = File(application.filesDir, "llm"),
