@@ -458,6 +458,7 @@ class FileUploader {
           fileHash: mediaUploadData.fileHash,
           fileToUpload: file,
           targetCollectionID: collectionID,
+          ownerID: Configuration.instance.getUserID(),
         );
         if (mappedFile != null) {
           debugPrint(

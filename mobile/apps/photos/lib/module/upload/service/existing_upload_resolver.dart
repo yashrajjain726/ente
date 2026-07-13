@@ -1,6 +1,5 @@
 import "package:collection/collection.dart";
 import "package:logging/logging.dart";
-import "package:photos/core/configuration.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/files_updated_event.dart";
@@ -15,7 +14,6 @@ typedef FindUploadedFiles =
       FileType fileType,
       int ownerID,
     );
-typedef GetOwnerID = int Function();
 typedef DeleteGeneratedFile = Future<void> Function(int generatedID);
 typedef UpdateUploadedFileLocalID =
     Future<void> Function(int uploadedFileID, String localID);
@@ -35,13 +33,11 @@ typedef EmitLocalPhotosUpdated = void Function(LocalPhotosUpdatedEvent event);
 class ExistingUploadResolver {
   ExistingUploadResolver({
     required FindUploadedFiles findUploadedFiles,
-    required GetOwnerID getOwnerID,
     required DeleteGeneratedFile deleteGeneratedFile,
     required UpdateUploadedFileLocalID updateUploadedFileLocalID,
     required LinkExistingUpload linkExistingUpload,
     required EmitLocalPhotosUpdated emitLocalPhotosUpdated,
   }) : _findUploadedFiles = findUploadedFiles,
-       _getOwnerID = getOwnerID,
        _deleteGeneratedFile = deleteGeneratedFile,
        _updateUploadedFileLocalID = updateUploadedFileLocalID,
        _linkExistingUpload = linkExistingUpload,
@@ -50,7 +46,6 @@ class ExistingUploadResolver {
   factory ExistingUploadResolver.forApp() => ExistingUploadResolver(
     findUploadedFiles: (hash, fileType, ownerID) =>
         FilesDB.instance.getUploadedFilesWithHash(hash, fileType, ownerID),
-    getOwnerID: () => Configuration.instance.getUserID()!,
     deleteGeneratedFile: (generatedID) =>
         FilesDB.instance.deleteByGeneratedID(generatedID),
     updateUploadedFileLocalID: (uploadedFileID, localID) =>
@@ -71,7 +66,6 @@ class ExistingUploadResolver {
 
   final _logger = Logger("ExistingUploadResolver");
   final FindUploadedFiles _findUploadedFiles;
-  final GetOwnerID _getOwnerID;
   final DeleteGeneratedFile _deleteGeneratedFile;
   final UpdateUploadedFileLocalID _updateUploadedFileLocalID;
   final LinkExistingUpload _linkExistingUpload;
@@ -82,6 +76,7 @@ class ExistingUploadResolver {
     required String fileHash,
     required EnteFile fileToUpload,
     required int targetCollectionID,
+    required int? ownerID,
   }) async {
     if (fileToUpload.uploadedFileID != null) {
       // This should never happen. Avoid mapping an already-uploaded row because
@@ -89,12 +84,15 @@ class ExistingUploadResolver {
       _logger.severe("Critical: file is already uploaded, skipped mapping");
       return null;
     }
+    if (ownerID == null) {
+      return null;
+    }
 
     final isSandboxFile = fileToUpload.isSharedMediaToAppSandbox;
     final existingUploadedFiles = await _findUploadedFiles(
       fileHash,
       fileToUpload.fileType,
-      _getOwnerID(),
+      ownerID,
     );
     if (existingUploadedFiles.isEmpty) {
       return null;
@@ -127,7 +125,6 @@ class ExistingUploadResolver {
         "fileMissingLocal: \n toUpload ${fileToUpload.tag} "
         "\n existing: ${fileMissingLocal.tag}",
       );
-      fileMissingLocal.localID = fileToUpload.localID;
       await _updateUploadedFileLocalID(
         fileMissingLocal.uploadedFileID!,
         fileToUpload.localID!,
@@ -136,6 +133,7 @@ class ExistingUploadResolver {
         await _deleteGeneratedFile(fileToUpload.generatedID!);
       }
       _emitDeletedEvent(fileToUpload, "fileMissingLocal");
+      fileMissingLocal.localID = fileToUpload.localID;
       return fileMissingLocal;
     }
 

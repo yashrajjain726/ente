@@ -13,7 +13,16 @@ void main() {
 
     expect(await fixture.resolve(pending), isNull);
     expect(fixture.calls, isEmpty);
-    expect(fixture.ownerIDCalls, 0);
+  });
+
+  test("missing owner skips lookup and mapping", () async {
+    final fixture = _Fixture();
+
+    expect(
+      await fixture.resolve(_file(localID: "local"), ownerID: null),
+      isNull,
+    );
+    expect(fixture.calls, isEmpty);
   });
 
   test("no hash matches continues uploading", () async {
@@ -21,7 +30,6 @@ void main() {
 
     expect(await fixture.resolve(_file(localID: "local")), isNull);
     expect(fixture.calls, ["find:hash:${FileType.image.index}:10"]);
-    expect(fixture.ownerIDCalls, 1);
   });
 
   test("hash lookup failure propagates without side effects", () async {
@@ -232,6 +240,7 @@ void main() {
       "find:hash:${FileType.image.index}:10",
       "update:12:local",
     ]);
+    expect(existing.localID, isNull);
     expect(fixture.events, isEmpty);
   });
 
@@ -288,10 +297,6 @@ class _Fixture {
         if (findError != null) throw findError!;
         return this.existingFiles;
       },
-      getOwnerID: () {
-        ownerIDCalls++;
-        return ownerID;
-      },
       deleteGeneratedFile: (generatedID) async {
         calls.add("delete:$generatedID");
         if (deleteError != null) throw deleteError!;
@@ -324,7 +329,7 @@ class _Fixture {
   }
 
   static const fileHash = "hash";
-  static const ownerID = 10;
+  static const defaultOwnerID = 10;
   static const targetCollectionID = 20;
 
   final List<EnteFile> existingFiles;
@@ -339,12 +344,14 @@ class _Fixture {
   Object? emitError;
   Object? updateError;
   Object? linkError;
-  var ownerIDCalls = 0;
-
-  Future<EnteFile?> resolve(EnteFile pending) => resolver.resolve(
+  Future<EnteFile?> resolve(
+    EnteFile pending, {
+    int? ownerID = defaultOwnerID,
+  }) => resolver.resolve(
     fileHash: fileHash,
     fileToUpload: pending,
     targetCollectionID: targetCollectionID,
+    ownerID: ownerID,
   );
 }
 
