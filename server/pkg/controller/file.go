@@ -694,15 +694,6 @@ func (c *FileController) GetDuplicates(userID int64) ([]ente.DuplicateFiles, err
 	return dupes, nil
 }
 
-// GetLargeThumbnailFiles returns the list of files whose thumbnail size is larger than threshold size
-func (c *FileController) GetLargeThumbnailFiles(userID int64, threshold int64) ([]int64, error) {
-	largeThumbnailFiles, err := c.FileRepo.GetLargeThumbnailFiles(userID, threshold)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	return largeThumbnailFiles, nil
-}
-
 // UpdateMagicMetadata updates the magic metadata for list of files
 func (c *FileController) UpdateMagicMetadata(ctx *gin.Context, req ente.UpdateMultipleMagicMetadataRequest, isPublicMetadata bool) error {
 	err := c.validateUpdateMetadataRequest(ctx, req, isPublicMetadata)
