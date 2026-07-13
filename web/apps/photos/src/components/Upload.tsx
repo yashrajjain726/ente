@@ -54,6 +54,7 @@ import type {
     ZipItem,
 } from "ente-base/types/ipc";
 import type { UploadTypeSelectorIntent } from "ente-gallery/components/Upload";
+import { UploadProgressV2 } from "ente-gallery/components/upload-progress-v2/UploadProgressV2";
 import { CanvasReadbackBlockedDialog } from "ente-gallery/components/upload/CanvasReadbackBlockedDialog";
 import { UploadProgress } from "ente-gallery/components/UploadProgress";
 import { useFileInput } from "ente-gallery/components/utils/use-file-input";
@@ -82,6 +83,7 @@ import { CollectionMappingChoice } from "ente-new/photos/components/CollectionMa
 import type { CollectionSelectorAttributes } from "ente-new/photos/components/CollectionSelector";
 import type { RemotePullOpts } from "ente-new/photos/components/gallery";
 import { downloadAppDialogAttributes } from "ente-new/photos/components/utils/download";
+import { useSettingsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
 import { suppressAutoLockOnBlurForTrustedPrompt } from "ente-new/photos/services/app-lock";
 import {
     addOrCopyToCollection,
@@ -189,6 +191,8 @@ export const Upload: React.FC<UploadProps> = ({
 }) => {
     const { showMiniDialog, onGenericError } = useBaseContext();
     const { showNotification, watchFolderView } = usePhotosAppContext();
+    const { isInternalUser } = useSettingsSnapshot();
+    const enableUploadProgressUIV2 = isInternalUser;
 
     const [uploadProgressView, setUploadProgressView] = useState(false);
     const [
@@ -1099,20 +1103,37 @@ export const Upload: React.FC<UploadProps> = ({
                 }
                 onSelect={handleUploadTypeSelect}
             />
-            <UploadProgress
-                open={uploadProgressView}
-                onClose={closeUploadProgress}
-                percentComplete={percentComplete}
-                uploadFileNames={uploadFileNames!}
-                uploadCounter={uploadCounter}
-                uploadPhase={uploadPhase}
-                inProgressUploads={inProgressUploads}
-                hasLivePhotos={hasLivePhotos}
-                retryFailed={retryFailed}
-                finishedUploads={finishedUploads}
-                preUploadSkippedFiles={preUploadSkippedFiles}
-                cancelUploads={cancelUploads}
-            />
+            {enableUploadProgressUIV2 ? (
+                <UploadProgressV2
+                    open={uploadProgressView}
+                    onClose={closeUploadProgress}
+                    percentComplete={percentComplete}
+                    uploadFileNames={uploadFileNames!}
+                    uploadCounter={uploadCounter}
+                    uploadPhase={uploadPhase}
+                    inProgressUploads={inProgressUploads}
+                    hasLivePhotos={hasLivePhotos}
+                    retryFailed={retryFailed}
+                    finishedUploads={finishedUploads}
+                    preUploadSkippedFiles={preUploadSkippedFiles}
+                    cancelUploads={cancelUploads}
+                />
+            ) : (
+                <UploadProgress
+                    open={uploadProgressView}
+                    onClose={closeUploadProgress}
+                    percentComplete={percentComplete}
+                    uploadFileNames={uploadFileNames!}
+                    uploadCounter={uploadCounter}
+                    uploadPhase={uploadPhase}
+                    inProgressUploads={inProgressUploads}
+                    hasLivePhotos={hasLivePhotos}
+                    retryFailed={retryFailed}
+                    finishedUploads={finishedUploads}
+                    preUploadSkippedFiles={preUploadSkippedFiles}
+                    cancelUploads={cancelUploads}
+                />
+            )}
             <CanvasReadbackBlockedDialog
                 open={showCanvasReadbackBlockedDialog}
                 onClose={() => setShowCanvasReadbackBlockedDialog(false)}
