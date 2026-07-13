@@ -2421,6 +2421,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-paste"
+version = "0.0.0"
+dependencies = [
+ "ente-core",
+ "mockito",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "ente-photos"
 version = "0.0.0"
 dependencies = [
@@ -2459,6 +2472,7 @@ dependencies = [
  "dirs 5.0.1",
  "ente-accounts",
  "ente-core",
+ "ente-paste",
  "ente-test-support",
  "env_logger 0.11.10",
  "futures",
@@ -2466,7 +2480,6 @@ dependencies = [
  "log",
  "mockito",
  "open",
- "reqwest 0.12.28",
  "rusqlite",
  "serde",
  "serde_json",
@@ -2474,6 +2487,7 @@ dependencies = [
  "srp",
  "thiserror 2.0.18",
  "tokio",
+ "url",
  "urlencoding",
  "uuid",
  "zeroize",

@@ -418,6 +418,11 @@ impl Response {
         self.0.headers().get(name).and_then(|v| v.to_str().ok())
     }
 
+    /// All the response headers.
+    pub fn headers(&self) -> &reqwest::header::HeaderMap {
+        self.0.headers()
+    }
+
     /// Return an [`Error::Http`] if the status is not 2xx, otherwise the response.
     pub fn error_for_status(self) -> Result<Self, Error> {
         if self.0.status().is_success() {

@@ -37,7 +37,6 @@ fn shared_client(
 fn to_shared_error(error: Error) -> shared::Error {
     match error {
         Error::Io(source) => shared::Error::Generic(source.to_string()),
-        Error::Network(source) => shared::Error::Generic(source.to_string()),
         Error::Serialization(source) => shared::Error::Serialization(source),
         Error::Database(source) => shared::Error::Generic(source.to_string()),
         Error::Crypto(message) => shared::Error::Crypto(message),
@@ -48,21 +47,7 @@ fn to_shared_error(error: Error) -> shared::Error {
         Error::Srp(message) => shared::Error::Srp(message),
         Error::Base64Decode(source) => shared::Error::Base64Decode(source),
         Error::Zip(source) => shared::Error::Generic(source.to_string()),
-        Error::ApiError {
-            status,
-            code,
-            message: _,
-        } => shared::Error::from(match code {
-            Some(code) => ente_core::http::Error::Api {
-                status,
-                path: String::new(),
-                code,
-            },
-            None => ente_core::http::Error::Http {
-                status,
-                path: String::new(),
-            },
-        }),
+        Error::Http(source) => shared::Error::Http(source),
         Error::Generic(message) => shared::Error::Generic(message),
     }
 }
