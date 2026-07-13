@@ -46,9 +46,6 @@ export function UploadProgressDialog({ closeOnly }: { closeOnly: boolean }) {
                         <UploadProgressDetails closeOnly={closeOnly} />
                     </Stack>
                 )}
-                <Typography sx={{ ...mutedBodySx, textAlign: "center" }}>
-                    {t("upload_resume_note")}
-                </Typography>
             </Box>
         </Dialog>
     );
@@ -176,6 +173,7 @@ const uploadProgressDialogPaperSx = (theme: Theme) => ({
 });
 const uploadProgressDialogContentSx = (isDone: boolean) => ({
     p: "20px",
+    pb: "28px",
     display: "flex",
     flexDirection: "column",
     gap: isDone ? "36px" : "20px",
