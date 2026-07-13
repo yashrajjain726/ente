@@ -133,11 +133,13 @@ pub struct Http {
 }
 
 impl Http {
-    /// Create a transport with a default connect timeout.
+    /// Create a transport with default connect and read timeouts.
     pub fn new() -> Result<Self, Error> {
         let builder = reqwest::Client::builder();
         #[cfg(not(target_arch = "wasm32"))]
-        let builder = builder.connect_timeout(Duration::from_secs(15));
+        let builder = builder
+            .connect_timeout(Duration::from_secs(15))
+            .read_timeout(Duration::from_secs(30));
         Ok(Http {
             client: builder.build()?,
         })
