@@ -53,7 +53,7 @@ pub enum Error {
 
 impl From<ente_core::http::Error> for Error {
     fn from(error: ente_core::http::Error) -> Self {
-        let message = error.to_string();
+        let message = ente_core::error::chain(&error);
         match error {
             ente_core::http::Error::Http { status, .. } => Error::ApiError {
                 status,

@@ -4,41 +4,65 @@ use crate::api::models::{
     GetThumbnailUrlResponse, UserDetails,
 };
 use crate::models::error::Result;
+use ente_core::http;
 use ente_core::urls::file_download_url;
 
 pub struct ApiMethods<'a> {
-    api: &'a ApiClient,
+    client: &'a ApiClient,
 }
 
 impl<'a> ApiMethods<'a> {
-    pub fn new(api: &'a ApiClient) -> Self {
-        Self { api }
+    pub fn new(client: &'a ApiClient) -> Self {
+        Self { client }
     }
-
-    // ========== User Methods ==========
 
     pub async fn get_user_details(&self, account_id: &str) -> Result<UserDetails> {
-        self.api.get("/users/details", Some(account_id)).await
+        let api = self.client.api(Some(account_id));
+        Ok(http::retry(|| async {
+            api.get("/users/details")
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
+        })
+        .await?)
     }
-
-    // ========== Collection Methods ==========
 
     pub async fn get_collections(
         &self,
         account_id: &str,
         since_time: i64,
     ) -> Result<Vec<Collection>> {
-        let url = format!("/collections/v2?sinceTime={since_time}");
-        let response: GetCollectionsResponse = self.api.get(&url, Some(account_id)).await?;
+        let api = self.client.api(Some(account_id));
+        let response: GetCollectionsResponse = http::retry(|| async {
+            api.get("/collections/v2")
+                .query(&[("sinceTime", since_time.to_string())])
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
+        })
+        .await?;
         Ok(response.collections)
     }
 
     pub async fn get_collection(&self, account_id: &str, collection_id: i64) -> Result<Collection> {
-        let url = format!("/collections/{collection_id}");
-        self.api.get(&url, Some(account_id)).await
+        let api = self.client.api(Some(account_id));
+        Ok(http::retry(|| async {
+            api.get(&format!("/collections/{collection_id}"))
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
+        })
+        .await?)
     }
-
-    // ========== File Methods ==========
 
     pub async fn get_collection_files(
         &self,
@@ -46,9 +70,21 @@ impl<'a> ApiMethods<'a> {
         collection_id: i64,
         since_time: i64,
     ) -> Result<(Vec<File>, bool)> {
-        let url =
-            format!("/collections/v2/diff?collectionID={collection_id}&sinceTime={since_time}");
-        let response: GetFilesResponse = self.api.get(&url, Some(account_id)).await?;
+        let api = self.client.api(Some(account_id));
+        let response: GetFilesResponse = http::retry(|| async {
+            api.get("/collections/v2/diff")
+                .query(&[
+                    ("collectionID", collection_id.to_string()),
+                    ("sinceTime", since_time.to_string()),
+                ])
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
+        })
+        .await?;
         Ok((response.diff, response.has_more))
     }
 
@@ -58,8 +94,21 @@ impl<'a> ApiMethods<'a> {
         collection_id: i64,
         file_id: i64,
     ) -> Result<File> {
-        let url = format!("/collections/file?collectionID={collection_id}&fileID={file_id}");
-        let response: GetFileResponse = self.api.get(&url, Some(account_id)).await?;
+        let api = self.client.api(Some(account_id));
+        let response: GetFileResponse = http::retry(|| async {
+            api.get("/collections/file")
+                .query(&[
+                    ("collectionID", collection_id.to_string()),
+                    ("fileID", file_id.to_string()),
+                ])
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
+        })
+        .await?;
         Ok(response.file)
     }
 
@@ -69,52 +118,97 @@ impl<'a> ApiMethods<'a> {
         since_time: i64,
         limit: i32,
     ) -> Result<(Vec<File>, bool)> {
-        let url = format!("/diff?sinceTime={since_time}&limit={limit}");
-        let response: GetDiffResponse = self.api.get(&url, Some(account_id)).await?;
+        let api = self.client.api(Some(account_id));
+        let response: GetDiffResponse = http::retry(|| async {
+            api.get("/diff")
+                .query(&[
+                    ("sinceTime", since_time.to_string()),
+                    ("limit", limit.to_string()),
+                ])
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
+        })
+        .await?;
         Ok((response.diff, response.has_more))
     }
 
     pub async fn get_file_url(&self, _account_id: &str, file_id: i64) -> Result<String> {
-        Ok(file_download_url(&self.api.base_url, file_id))
+        Ok(file_download_url(&self.client.base_url, file_id))
     }
 
     pub async fn get_thumbnail_url(&self, account_id: &str, file_id: i64) -> Result<String> {
-        let url = format!("/files/preview/{file_id}");
-        let response: GetThumbnailUrlResponse = self.api.get(&url, Some(account_id)).await?;
+        let api = self.client.api(Some(account_id));
+        let response: GetThumbnailUrlResponse = http::retry(|| async {
+            api.get(&format!("/files/preview/{file_id}"))
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
+        })
+        .await?;
         Ok(response.url)
     }
 
     pub async fn download_file(&self, account_id: &str, file_id: i64) -> Result<Vec<u8>> {
         let url = self.get_file_url(account_id, file_id).await?;
-        self.api.download_file(&url, Some(account_id)).await
+        self.client.download_file(&url, Some(account_id)).await
     }
 
     pub async fn download_thumbnail(&self, account_id: &str, file_id: i64) -> Result<Vec<u8>> {
         let url = self.get_thumbnail_url(account_id, file_id).await?;
-        self.api.download_file(&url, Some(account_id)).await
+        self.client.download_file(&url, Some(account_id)).await
     }
 
-    // ========== Trash Methods ==========
-
     pub async fn get_trash(&self, account_id: &str, since_time: i64) -> Result<(Vec<File>, bool)> {
-        let url = format!("/trash/v2?sinceTime={since_time}");
-        let response: GetDiffResponse = self.api.get(&url, Some(account_id)).await?;
+        let api = self.client.api(Some(account_id));
+        let response: GetDiffResponse = http::retry(|| async {
+            api.get("/trash/v2")
+                .query(&[("sinceTime", since_time.to_string())])
+                .send()
+                .await?
+                .error_for_code()
+                .await?
+                .json()
+                .await
+        })
+        .await?;
         Ok((response.diff, response.has_more))
     }
 
     pub async fn delete_from_trash(&self, account_id: &str, file_ids: &[i64]) -> Result<()> {
-        let body = serde_json::json!({
-            "fileIDs": file_ids
-        });
-        let _: serde_json::Value = self
-            .api
-            .post("/trash/delete", &body, Some(account_id))
-            .await?;
+        let api = self.client.api(Some(account_id));
+        let body = serde_json::json!({ "fileIDs": file_ids });
+        http::retry(|| async {
+            api.post("/trash/delete")
+                .json(&body)
+                .send()
+                .await?
+                .error_for_code()
+                .await?;
+            Ok(())
+        })
+        .await?;
         Ok(())
     }
 
     pub async fn empty_trash(&self, account_id: &str) -> Result<()> {
-        self.api.delete("/trash/empty", Some(account_id)).await
+        let api = self.client.api(Some(account_id));
+        http::retry(|| async {
+            api.delete("/trash/empty")
+                .send()
+                .await?
+                .error_for_code()
+                .await?;
+            Ok(())
+        })
+        .await?;
+        Ok(())
     }
 }
 

@@ -158,6 +158,7 @@ pub async fn run_export(account_email: Option<String>, filter: ExportFilter) -> 
     }
 
     // Export each account
+    let mut failures = 0;
     for account in accounts_to_export {
         println!("\n=== Exporting account: {} ===", account.email);
 
@@ -166,6 +167,7 @@ pub async fn run_export(account_email: Option<String>, filter: ExportFilter) -> 
         if let Err(e) = sync_account_before_export(&storage, &account).await {
             log::error!("Failed to sync account {}: {}", account.email, e);
             println!("❌ Sync failed: {e}");
+            failures += 1;
             continue;
         }
         println!("✅ Sync completed!");
@@ -173,11 +175,17 @@ pub async fn run_export(account_email: Option<String>, filter: ExportFilter) -> 
         if let Err(e) = export_account(&storage, &account, &filter).await {
             log::error!("Failed to export account {}: {}", account.email, e);
             println!("❌ Export failed: {e}");
+            failures += 1;
         } else {
             println!("✅ Export completed successfully!");
         }
     }
 
+    if failures > 0 {
+        return Err(crate::Error::Generic(format!(
+            "export failed for {failures} account(s)"
+        )));
+    }
     Ok(())
 }
 

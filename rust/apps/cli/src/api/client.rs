@@ -1,8 +1,6 @@
 use crate::models::error::Result;
 use ente_core::http::{self, Api, ApiConfig, Auth, Http, RetryProfile};
 use ente_core::urls::PRODUCTION_API_BASE_URL;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -56,7 +54,7 @@ impl ApiClient {
         &self.client_package
     }
 
-    fn api(&self, account_id: Option<&str>) -> Api {
+    pub(crate) fn api(&self, account_id: Option<&str>) -> Api {
         let auth = account_id.and_then(|id| {
             let token = self.get_token(id);
             if token.is_none() {
@@ -74,108 +72,6 @@ impl ApiClient {
                 auth,
             },
         )
-    }
-
-    pub async fn get<T: DeserializeOwned>(
-        &self,
-        path: &str,
-        account_id: Option<&str>,
-    ) -> Result<T> {
-        let api = self.api(account_id);
-        Ok(http::retry(|| async {
-            api.get(path)
-                .send()
-                .await?
-                .error_for_code()
-                .await?
-                .json()
-                .await
-        })
-        .await?)
-    }
-
-    pub async fn post<T, B>(&self, path: &str, body: &B, account_id: Option<&str>) -> Result<T>
-    where
-        T: DeserializeOwned,
-        B: Serialize,
-    {
-        let api = self.api(account_id);
-        Ok(http::retry(|| async {
-            api.post(path)
-                .json(body)
-                .send()
-                .await?
-                .error_for_code()
-                .await?
-                .json()
-                .await
-        })
-        .await?)
-    }
-
-    pub async fn post_empty<B>(&self, path: &str, body: &B, account_id: Option<&str>) -> Result<()>
-    where
-        B: Serialize,
-    {
-        let api = self.api(account_id);
-        http::retry(|| async {
-            api.post(path)
-                .json(body)
-                .send()
-                .await?
-                .error_for_code()
-                .await?;
-            Ok(())
-        })
-        .await?;
-        Ok(())
-    }
-
-    pub async fn put<T, B>(&self, path: &str, body: &B, account_id: Option<&str>) -> Result<T>
-    where
-        T: DeserializeOwned,
-        B: Serialize,
-    {
-        let api = self.api(account_id);
-        Ok(http::retry(|| async {
-            api.put(path)
-                .json(body)
-                .send()
-                .await?
-                .error_for_code()
-                .await?
-                .json()
-                .await
-        })
-        .await?)
-    }
-
-    pub async fn put_empty<B>(&self, path: &str, body: &B, account_id: Option<&str>) -> Result<()>
-    where
-        B: Serialize,
-    {
-        let api = self.api(account_id);
-        http::retry(|| async {
-            api.put(path)
-                .json(body)
-                .send()
-                .await?
-                .error_for_code()
-                .await?;
-            Ok(())
-        })
-        .await?;
-        Ok(())
-    }
-
-    pub async fn delete(&self, path: &str, account_id: Option<&str>) -> Result<()> {
-        let api = self.api(account_id);
-        http::retry(|| async {
-            api.delete(path).send().await?.error_for_code().await?;
-            Ok(())
-        })
-        .await?;
-        Ok(())
     }
 
     pub async fn download_file(&self, url: &str, account_id: Option<&str>) -> Result<Vec<u8>> {
