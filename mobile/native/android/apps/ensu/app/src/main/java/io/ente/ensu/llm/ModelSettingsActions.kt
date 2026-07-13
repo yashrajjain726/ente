@@ -21,6 +21,7 @@ internal class ModelSettingsActions(
     private val state: MutableStateFlow<AppState>,
     private val sessionPreferences: SessionPreferencesDataStore,
     private val llmProvider: LlmProvider,
+    private val modelDownloader: ModelDownloader,
     private val logRepository: FileLogRepository,
     private val configDefaults: ConfigDefaults
 ) {
@@ -40,7 +41,7 @@ internal class ModelSettingsActions(
         if (downloadIdentityChanged(oldTarget, newTarget)) {
             modelDownloadJob?.cancel()
             modelDownloadJob = null
-            llmProvider.cancelDownload()
+            modelDownloader.cancel()
         }
         refreshModelDownloadInfo()
     }
@@ -62,7 +63,7 @@ internal class ModelSettingsActions(
     fun refreshModelDownloadInfo() {
         if (!state.value.chat.deviceCapability.isChatSupported()) {
             modelDownloadJob?.cancel()
-            llmProvider.cancelDownload()
+            modelDownloader.cancel()
             persistModelDownloadRequested(false)
             state.update { appState ->
                 appState.copy(
@@ -79,7 +80,7 @@ internal class ModelSettingsActions(
             return
         }
         val target = resolveTarget(state.value.modelSettings)
-        val isDownloaded = llmProvider.isModelDownloaded(target)
+        val isDownloaded = modelDownloader.isDownloaded(target)
         if (isDownloaded) {
             persistModelDownloadRequested(false)
         }
@@ -101,7 +102,7 @@ internal class ModelSettingsActions(
 
         val scope = scope ?: return
         scope.launch {
-            if (!llmProvider.isManualDownloadActive && modelDownloadJob?.isActive != true) {
+            if (!modelDownloader.isDownloadActive && modelDownloadJob?.isActive != true) {
                 persistModelDownloadRequested(false)
                 state.update { appState ->
                     appState.copy(
@@ -116,7 +117,7 @@ internal class ModelSettingsActions(
                 }
             }
 
-            val size = llmProvider.estimateModelDownloadSize(target)
+            val size = modelDownloader.estimateDownloadSize(target)
             state.update { appState ->
                 appState.copy(
                     chat = appState.chat.copy(
@@ -136,7 +137,7 @@ internal class ModelSettingsActions(
         if (!userInitiated && !currentState.chat.hasRequestedModelDownload) return
 
         val target = resolveTarget(currentState.modelSettings)
-        val isDownloaded = llmProvider.isModelDownloaded(target)
+        val isDownloaded = modelDownloader.isDownloaded(target)
         if (isDownloaded) {
             state.update { appState ->
                 appState.copy(
@@ -262,7 +263,7 @@ internal class ModelSettingsActions(
         if (!currentState.chat.deviceCapability.isChatSupported()) return
 
         val target = resolveTarget(currentState.modelSettings)
-        if (!llmProvider.isModelDownloaded(target)) return
+        if (!modelDownloader.isDownloaded(target)) return
 
         scope.launch {
             try {
@@ -281,7 +282,7 @@ internal class ModelSettingsActions(
     fun cancelModelDownload() {
         modelDownloadJob?.cancel()
         modelDownloadJob = null
-        llmProvider.cancelDownload()
+        modelDownloader.cancel()
         persistModelDownloadRequested(false)
         state.update { appState ->
             appState.copy(

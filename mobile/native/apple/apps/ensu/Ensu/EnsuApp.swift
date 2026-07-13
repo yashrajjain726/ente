@@ -4,9 +4,7 @@ import SwiftUI
 struct EnsuApp: App {
     init() {
         EnsuLogging.shared.start()
-        if #available(iOS 26.0, *) {
-            ModelDownloadBackgroundTask.register()
-        }
+        ModelDownloader.registerBackgroundTask()
     }
 
     var body: some Scene {

@@ -3,7 +3,6 @@ package io.ente.ensu
 import android.app.Application
 import android.content.pm.PackageManager
 import android.os.Build
-import android.os.Environment
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.ente.ensu.settings.AdvancedSettingsDataStore
@@ -13,6 +12,7 @@ import io.ente.ensu.settings.SessionPreferencesDataStore
 import io.ente.ensu.chat.ChatRepository
 import io.ente.ensu.config.loadConfigDefaults
 import io.ente.ensu.llm.LlmProvider
+import io.ente.ensu.llm.ModelDownloader
 import io.ente.ensu.logging.FileLogRepository
 import io.ente.ensu.storage.CredentialStore
 import io.ente.ensu.logging.LogLevel
@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.io.File
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val sessionPreferences = SessionPreferencesDataStore(application)
@@ -33,11 +32,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val transcriber = (application as EnsuApplication).transcriber
 
     val logRepository = FileLogRepository(application)
+    private val modelDownloader = ModelDownloader(application)
     private val llmProvider = LlmProvider(
-        context = application,
-        modelDir = resolveModelDir(application),
+        downloader = modelDownloader,
         transcriber = transcriber,
-        legacyModelDir = application.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.let { File(it, "llm") },
         deviceCapabilityProvider = deviceCapabilityProvider
     )
     private val chatRepository = ChatRepository(application, credentialStore)
@@ -47,6 +45,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         sessionPreferences = sessionPreferences,
         chatRepository = chatRepository,
         llmProvider = llmProvider,
+        modelDownloader = modelDownloader,
         transcriber = transcriber,
         deviceCapabilityProvider = deviceCapabilityProvider,
         configDefaults = configDefaults,
@@ -57,7 +56,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         logRepository.log(LogLevel.Info, launchMessage, tag = "App")
 
         viewModelScope.launch(Dispatchers.IO) {
-            llmProvider.migrateLegacyDownloads()
+            modelDownloader.migrate()
         }
 
         viewModelScope.launch {
@@ -96,10 +95,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             packageInfo.versionCode.toLong()
         }
         return "$versionName+$versionCode"
-    }
-
-    private fun resolveModelDir(application: Application): File {
-        return File(application.noBackupFilesDir, "models")
     }
 
 }

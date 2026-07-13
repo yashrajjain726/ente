@@ -76,6 +76,7 @@ final class ChatViewModel: ObservableObject {
     @Published var draftCursorMoveToken = UUID()
 
     private let provider: LlmProvider
+    private let downloader: ModelDownloader
     private let voiceTranscriber: VoiceTranscriptionService
     private var chatDb: EnsuDb
     private let attachmentsDir: URL
@@ -112,15 +113,11 @@ final class ChatViewModel: ObservableObject {
         let baseDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
 
-        let modelsDir = baseDir.appendingPathComponent("models", isDirectory: true)
         let transcriptionDir = baseDir.appendingPathComponent("transcription", isDirectory: true)
         try? FileManager.default.createDirectory(at: transcriptionDir, withIntermediateDirectories: true, attributes: nil)
         let transcriber = Transcriber(modelsDir: transcriptionDir.path)
-        let provider = LlmProvider(
-            modelDir: modelsDir,
-            legacyModelDir: baseDir.appendingPathComponent("llm", isDirectory: true),
-            transcriber: transcriber
-        )
+        let downloader = ModelDownloader()
+        let provider = LlmProvider(downloader: downloader, transcriber: transcriber)
         let voiceTranscriber = VoiceTranscriptionService(transcriber: transcriber)
 
         // Chat DB + attachments.
@@ -160,6 +157,7 @@ final class ChatViewModel: ObservableObject {
 
         // Stored properties.
         self.provider = provider
+        self.downloader = downloader
         self.voiceTranscriber = voiceTranscriber
         self.chatDb = chatDb
         self.attachmentsDir = attachmentsDir
@@ -209,7 +207,7 @@ final class ChatViewModel: ObservableObject {
         editingMessageId = nil
         draftText = ""
         draftAttachments = []
-        provider.cancelDownload()
+        downloader.cancel()
     }
 
     func dismissUnsupportedDeviceDialog() {
@@ -461,7 +459,7 @@ final class ChatViewModel: ObservableObject {
         guard !isGenerating && !isDownloading else { return }
         guard !isChatUnsupported else { return }
         let target = modelSettings.currentTarget()
-        guard provider.isModelDownloaded(target: target) else { return }
+        guard downloader.isDownloaded(target: target) else { return }
 
         Task { [weak self] in
             guard let self else { return }
@@ -682,7 +680,7 @@ final class ChatViewModel: ObservableObject {
             return
         }
         let target = modelSettings.currentTarget()
-        isModelDownloaded = provider.isModelDownloaded(target: target)
+        isModelDownloaded = downloader.isDownloaded(target: target)
         if isModelDownloaded {
             clearDownloadProgressMemory()
             modelDownloadSizeBytes = nil
@@ -691,7 +689,7 @@ final class ChatViewModel: ObservableObject {
 
         Task { [weak self] in
             guard let self else { return }
-            let size = await provider.estimatedDownloadSize(target: target)
+            let size = await downloader.estimatedDownloadSize(target: target)
             await MainActor.run {
                 guard self.modelReadyKey(for: self.modelSettings.currentTarget()) == self.modelReadyKey(for: target) else {
                     return
@@ -729,7 +727,7 @@ final class ChatViewModel: ObservableObject {
 
         if let existingTask = sharedModelReadyTask, sharedModelReadyKey != modelKey {
             existingTask.cancel()
-            provider.cancelDownload()
+            downloader.cancel()
             clearSharedModelReadyTask()
         }
 
@@ -786,7 +784,7 @@ final class ChatViewModel: ObservableObject {
         }
 
         let target = modelSettings.currentTarget()
-        let isDownloaded = provider.isModelDownloaded(target: target)
+        let isDownloaded = downloader.isDownloaded(target: target)
         if isDownloaded {
             isModelDownloaded = true
             modelDownloadSizeBytes = nil
@@ -834,7 +832,7 @@ final class ChatViewModel: ObservableObject {
             return
         }
         let target = modelSettings.currentTarget()
-        let isDownloaded = provider.isModelDownloaded(target: target)
+        let isDownloaded = downloader.isDownloaded(target: target)
         isModelDownloaded = isDownloaded
         if !isDownloaded {
             return
@@ -869,7 +867,7 @@ final class ChatViewModel: ObservableObject {
         modelDownloadTask = nil
         sharedModelReadyTask?.cancel()
         clearSharedModelReadyTask()
-        provider.cancelDownload()
+        downloader.cancel()
         if modelDownloadLoggedStart {
             logger.info("Model download cancelled")
             modelDownloadLoggedStart = false
@@ -973,7 +971,7 @@ final class ChatViewModel: ObservableObject {
             } catch {
                 if isCancellation(error) {
                     self.sharedModelReadyTask?.cancel()
-                    self.provider.cancelDownload()
+                    self.downloader.cancel()
                     self.clearSharedModelReadyTask()
                     if self.activeGenerationId == generationId {
                         isGenerating = false
@@ -993,7 +991,7 @@ final class ChatViewModel: ObservableObject {
                     downloadToast = DownloadToastState(
                         phase: .errorDownload,
                         percent: nil,
-                        status: self.userFacingModelReadyError(error, wasDownloaded: self.provider.isModelDownloaded(target: target)),
+                        status: self.userFacingModelReadyError(error, wasDownloaded: self.downloader.isDownloaded(target: target)),
                         offerRetryDownload: true
                     )
                     activeGenerationId = nil

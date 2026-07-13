@@ -1,5 +1,4 @@
 import Foundation
-import CryptoKit
 
 struct LlmModelTarget: Equatable {
     let id: String
@@ -105,13 +104,7 @@ final class LlmProvider {
         let requestedContextLength: Int?
     }
 
-    private struct DownloadTarget {
-        let label: String
-        let url: String
-        let destination: URL
-    }
-
-    private let modelDir: URL
+    private let downloader: ModelDownloader
     private let transcriber: Transcriber
     private var loadedModel: LlmModel?
     private var loadedContext: LlmContext?
@@ -120,37 +113,10 @@ final class LlmProvider {
     private var backendInitialized = false
     private var currentJobId: Int64?
     private let modelLoadGate = AsyncSerialGate()
-    private let rustDownloadCancelLock = NSLock()
-    private var rustDownloadCancelled = false
-    private let logger = EnsuLogging.shared.logger("LlmProvider")
 
-    init(modelDir: URL, legacyModelDir: URL? = nil, transcriber: Transcriber) {
-        self.modelDir = modelDir
+    init(downloader: ModelDownloader, transcriber: Transcriber) {
+        self.downloader = downloader
         self.transcriber = transcriber
-        if let legacyModelDir {
-            Self.migrateLegacyModels(from: legacyModelDir, to: modelDir)
-        }
-        try? FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true, attributes: nil)
-        var excludedDir = modelDir
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        try? excludedDir.setResourceValues(values)
-    }
-
-    static func migrateLegacyModels(from legacyDir: URL, to modelDir: URL) {
-        let fileManager = FileManager.default
-        let legacyModels = legacyDir.appendingPathComponent("models", isDirectory: true)
-        var migrated = true
-        if fileManager.fileExists(atPath: legacyModels.path) {
-            if fileManager.fileExists(atPath: modelDir.path) {
-                migrated = false
-            } else {
-                migrated = (try? fileManager.moveItem(at: legacyModels, to: modelDir)) != nil
-            }
-        }
-        if migrated {
-            try? fileManager.removeItem(at: legacyDir)
-        }
     }
 
     func ensureModelReady(
@@ -183,41 +149,13 @@ final class LlmProvider {
             backendInitialized = true
         }
 
-        let modelPath = modelPathFor(target: target)
-        let mmprojPath = mmprojPathFor(target: target)
-
-        var expectedTargets: [DownloadTarget] = []
-        let modelExistsAtStart = FileManager.default.fileExists(atPath: modelPath.path)
-        if shouldRedownloadExistingFile(at: modelPath) || !modelExistsAtStart {
-            if modelExistsAtStart {
-                try? FileManager.default.removeItem(at: modelPath)
-            }
-        }
-        expectedTargets.append(DownloadTarget(label: "Model", url: target.url, destination: modelPath))
-
-        if let mmprojUrl = target.mmprojUrl, !mmprojUrl.isEmpty, let mmprojPath {
-            let mmprojExistsAtStart = FileManager.default.fileExists(atPath: mmprojPath.path)
-            if shouldRedownloadExistingFile(at: mmprojPath) || !mmprojExistsAtStart {
-                if mmprojExistsAtStart {
-                    try? FileManager.default.removeItem(at: mmprojPath)
-                }
-            }
-            expectedTargets.append(DownloadTarget(label: "Mmproj", url: mmprojUrl, destination: mmprojPath))
-        }
-
-        let downloads = expectedTargets.filter { !FileManager.default.fileExists(atPath: $0.destination.path) }
-
-        if !downloads.isEmpty {
-            onProgress(DownloadProgress(percent: 0, status: "Starting download..."))
-            try await downloadWithRust(expectedTargets, onProgress: onProgress)
-        }
+        let downloaded = try await downloader.download(target: target, onProgress: onProgress)
 
         onProgress(DownloadProgress(percent: 100, status: "Loading model...", phase: .loading))
         do {
-            try loadModel(target: target, modelPath: modelPath)
+            try loadModel(target: target, modelPath: downloader.modelPath(for: target))
         } catch {
-            if allowRecovery, downloads.isEmpty,
-               recoverFromCachedModelLoadFailure(modelPath: modelPath, mmprojPath: mmprojPath) {
+            if allowRecovery, !downloaded, downloader.removeDownloaded(target: target) {
                 onProgress(DownloadProgress(percent: 0, status: "Starting download..."))
                 try await ensureModelReadyLocked(target: target, onProgress: onProgress, allowRecovery: false)
                 return
@@ -248,7 +186,7 @@ final class LlmProvider {
             LlmChatMessage(role: $0.role.roleString, content: $0.text)
         }
 
-        let mmprojPath = imageFiles.isEmpty ? nil : mmprojPathFor(target: target)?.path
+        let mmprojPath = imageFiles.isEmpty ? nil : downloader.mmprojPath(for: target)?.path
         let clampedTemperature = min(max(temperature, 0.35), 0.7)
 
         let request = LlmChatRequest(
@@ -309,14 +247,14 @@ final class LlmProvider {
     }
 
     func prewarmImageInference(target: LlmModelTarget) async {
-        guard isModelDownloaded(target: target) else { return }
+        guard downloader.isDownloaded(target: target) else { return }
 
         do {
             try await Task.detached(priority: .utility) { [weak self] in
                 guard let self else { return }
                 try await self.modelLoadGate.withLock {
-                    guard self.isModelDownloaded(target: target) else { return }
-                    guard let mmprojPath = self.mmprojPathFor(target: target),
+                    guard self.downloader.isDownloaded(target: target) else { return }
+                    guard let mmprojPath = self.downloader.mmprojPath(for: target),
                           FileManager.default.fileExists(atPath: mmprojPath.path) else {
                         return
                     }
@@ -343,52 +281,6 @@ final class LlmProvider {
         let contextParams = LlmContextParams(contextSize: currentContextLength.map(Int32.init), nThreads: nil, nBatch: nil)
         loadedContext = nil
         loadedContext = try? model.newContext(params: contextParams)
-    }
-
-    func cancelDownload() {
-        setRustDownloadCancelled(true)
-    }
-
-    func isModelDownloaded(target: LlmModelTarget) -> Bool {
-        let modelPath = modelPathFor(target: target)
-        if !FileManager.default.fileExists(atPath: modelPath.path) {
-            return false
-        }
-        if let mmprojPath = mmprojPathFor(target: target),
-           let mmprojUrl = target.mmprojUrl,
-           !mmprojUrl.isEmpty,
-           !FileManager.default.fileExists(atPath: mmprojPath.path) {
-            return false
-        }
-        return true
-    }
-
-    func estimatedDownloadSize(target: LlmModelTarget) async -> Int64? {
-        let modelPath = modelPathFor(target: target)
-        let mmprojPath = mmprojPathFor(target: target)
-        let modelSize: Int64?
-        if FileManager.default.fileExists(atPath: modelPath.path) {
-            modelSize = fileSize(modelPath)
-        } else {
-            modelSize = await fetchContentLength(for: target.url)
-        }
-
-        let mmprojSize: Int64?
-        if let mmprojUrl = target.mmprojUrl, !mmprojUrl.isEmpty, let mmprojPath {
-            if FileManager.default.fileExists(atPath: mmprojPath.path) {
-                mmprojSize = fileSize(mmprojPath)
-            } else {
-                mmprojSize = await fetchContentLength(for: mmprojUrl)
-            }
-        } else {
-            mmprojSize = nil
-        }
-
-        let sizes = [modelSize, mmprojSize].compactMap { $0 }.filter { $0 > 0 }
-        if sizes.isEmpty {
-            return nil
-        }
-        return sizes.reduce(0, +)
     }
 
     func loadedContextLength(target: LlmModelTarget) -> Int? {
@@ -434,165 +326,6 @@ final class LlmProvider {
         }
         throw NSError(domain: "LlmProvider", code: -5, userInfo: [NSLocalizedDescriptionKey: "Failed to create context"])
     }
-
-    private func fetchContentLength(for urlString: String) async -> Int64? {
-        guard let url = URL(string: urlString) else { return nil }
-        var request = URLRequest(url: url)
-        request.httpMethod = "HEAD"
-
-        do {
-            let (_, response) = try await URLSession.shared.data(for: request)
-            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                return nil
-            }
-            if response.expectedContentLength > 0 {
-                return response.expectedContentLength
-            }
-            if let http = response as? HTTPURLResponse,
-               let header = http.value(forHTTPHeaderField: "Content-Length"),
-               let length = Int64(header) {
-                return length
-            }
-        } catch {
-            return nil
-        }
-        return nil
-    }
-
-    private func fileSize(_ url: URL) -> Int64 {
-        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
-        return (attrs?[.size] as? NSNumber)?.int64Value ?? 0
-    }
-
-    private func shouldRedownloadExistingFile(at url: URL) -> Bool {
-        guard FileManager.default.fileExists(atPath: url.path) else { return false }
-        let size = fileSize(url)
-        if size <= 0 {
-            return true
-        }
-        return !url.looksLikeGgufFile
-    }
-
-    private func recoverFromCachedModelLoadFailure(modelPath: URL, mmprojPath: URL?) -> Bool {
-        var removedAny = false
-        if FileManager.default.fileExists(atPath: modelPath.path) {
-            try? FileManager.default.removeItem(at: modelPath)
-            removedAny = true
-        }
-        if let mmprojPath, FileManager.default.fileExists(atPath: mmprojPath.path) {
-            try? FileManager.default.removeItem(at: mmprojPath)
-            removedAny = true
-        }
-        return removedAny
-    }
-
-    private func modelPathFor(target: LlmModelTarget) -> URL {
-        let filename = URL(string: target.url)?.lastPathComponent ?? "model.gguf"
-        if target.id.hasPrefix("custom:") {
-            let custom = modelDir.appendingPathComponent("custom", isDirectory: true)
-            return custom.appendingPathComponent("\(hash(target.url))_\(filename)")
-        }
-        return modelDir.appendingPathComponent(filename)
-    }
-
-    private func mmprojPathFor(target: LlmModelTarget) -> URL? {
-        guard let url = target.mmprojUrl else { return nil }
-        let filename = URL(string: url)?.lastPathComponent ?? "mmproj.gguf"
-        if target.id.hasPrefix("custom:") {
-            let custom = modelDir.appendingPathComponent("custom", isDirectory: true)
-            return custom.appendingPathComponent("\(hash(url))_\(filename)")
-        }
-        return modelDir.appendingPathComponent(filename)
-    }
-
-    private func hash(_ value: String) -> String {
-        let data = Data(value.utf8)
-        let hashed = SHA256.hash(data: data)
-        return hashed.map { String(format: "%02x", $0) }.joined()
-    }
-
-    private func downloadWithRust(
-        _ expectedTargets: [DownloadTarget],
-        onProgress: @escaping (DownloadProgress) -> Void
-    ) async throws {
-        setRustDownloadCancelled(false)
-        let targets = expectedTargets.map {
-            LlmModelDownloadTarget(label: $0.label, url: $0.url, destinationPath: $0.destination.path)
-        }
-
-        if #available(iOS 26.0, *) {
-            ModelDownloadBackgroundTask.begin { [weak self] in
-                self?.setRustDownloadCancelled(true)
-            }
-        }
-        defer {
-            if #available(iOS 26.0, *) {
-                ModelDownloadBackgroundTask.end()
-            }
-        }
-
-        let downloadTask = Task.detached(priority: .utility) { [weak self] in
-            guard let self else { return }
-            let callback = ModelDownloadCallbackSink(
-                onProgress: { progress in
-                    self.logDownloadMetrics(progress)
-                    if #available(iOS 26.0, *) {
-                        ModelDownloadBackgroundTask.update(
-                            downloadedBytes: progress.downloadedBytes,
-                            totalBytes: progress.totalBytes
-                        )
-                    }
-                    onProgress(progress.toInferenceProgress())
-                },
-                isCancelled: { [weak self] in
-                    (self?.isRustDownloadCancelled() ?? true) || Task.isCancelled
-                }
-            )
-            try llmDownloadModelFiles(targets: targets, callback: callback)
-        }
-
-        try await withTaskCancellationHandler {
-            try await downloadTask.value
-        } onCancel: {
-            self.setRustDownloadCancelled(true)
-            downloadTask.cancel()
-        }
-    }
-
-    private func setRustDownloadCancelled(_ cancelled: Bool) {
-        rustDownloadCancelLock.lock()
-        rustDownloadCancelled = cancelled
-        rustDownloadCancelLock.unlock()
-    }
-
-    private func isRustDownloadCancelled() -> Bool {
-        rustDownloadCancelLock.lock()
-        let cancelled = rustDownloadCancelled
-        rustDownloadCancelLock.unlock()
-        return cancelled
-    }
-
-    private func logDownloadMetrics(_ progress: LlmModelDownloadProgress) {
-        if progress.fileComplete {
-            logger.info(
-                "Model download file complete",
-                details: "label=\(progress.label) bytes=\(progress.fileDownloadedBytes) elapsedMs=\(progress.fileElapsedMs) rate=\(formatRate(progress.fileBytesPerSecond)) retries=\(progress.fileRetryCount)"
-            )
-        }
-        if progress.complete {
-            logger.info(
-                "Model download complete",
-                details: "bytes=\(progress.downloadedBytes) elapsedMs=\(progress.elapsedMs) rate=\(formatRate(progress.bytesPerSecond)) retries=\(progress.retryCount)"
-            )
-        }
-    }
-
-    private func formatRate(_ bytesPerSecond: Double) -> String {
-        guard bytesPerSecond.isFinite, bytesPerSecond > 0 else {
-            return "0 B/s"
-        }
-        return "\(Int64(bytesPerSecond).formattedFileSize)/s"
-    }
 }
 
 private final class CallbackSink: LlmGenerationEventCallback, @unchecked Sendable {
@@ -604,55 +337,5 @@ private final class CallbackSink: LlmGenerationEventCallback, @unchecked Sendabl
 
     func onEvent(event: LlmGenerationEvent) {
         handler(event)
-    }
-}
-
-private final class ModelDownloadCallbackSink: LlmModelDownloadCallback, @unchecked Sendable {
-    private let onProgressHandler: (LlmModelDownloadProgress) -> Void
-    private let isCancelledHandler: () -> Bool
-
-    init(
-        onProgress: @escaping (LlmModelDownloadProgress) -> Void,
-        isCancelled: @escaping () -> Bool
-    ) {
-        self.onProgressHandler = onProgress
-        self.isCancelledHandler = isCancelled
-    }
-
-    func onProgress(progress: LlmModelDownloadProgress) {
-        onProgressHandler(progress)
-    }
-
-    func isCancelled() -> Bool {
-        isCancelledHandler()
-    }
-}
-
-extension URL {
-    var looksLikeGgufFile: Bool {
-        guard let handle = try? FileHandle(forReadingFrom: self) else { return false }
-        let data = handle.readData(ofLength: 4)
-        try? handle.close()
-        guard data.count == 4 else { return false }
-        return String(decoding: data, as: UTF8.self) == "GGUF"
-    }
-}
-
-private extension LlmModelDownloadProgress {
-    func toInferenceProgress() -> DownloadProgress {
-        let total = totalBytes.flatMap { $0 > 0 ? $0 : nil }
-        let percent: Int
-        let status: String
-        if let total {
-            percent = min(99, max(0, Int((Double(downloadedBytes) / Double(total)) * 100.0)))
-            status = "Downloading... \(downloadedBytes.formattedFileSize) / \(total.formattedFileSize)"
-        } else if fileDownloadedBytes > 0 {
-            percent = 0
-            status = "Downloading \(label.lowercased())... \(fileDownloadedBytes.formattedFileSize)"
-        } else {
-            percent = 0
-            status = "Downloading \(label.lowercased())..."
-        }
-        return DownloadProgress(percent: percent, status: status)
     }
 }
