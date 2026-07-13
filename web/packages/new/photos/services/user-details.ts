@@ -55,9 +55,18 @@ export type Subscription = z.infer<typeof Subscription>;
 
 const FamilyMember = z.object({
     /**
+     * ID of the family membership. Older locally cached user details might not
+     * have this field.
+     */
+    id: z.string().nullish().transform(nullToUndefined),
+    /**
      * Email address of the family member.
      */
     email: z.string(),
+    status: z
+        .enum(["SELF", "INVITED", "ACCEPTED"])
+        .nullish()
+        .transform(nullToUndefined),
     /**
      * `true` if this is the admin.
      *
@@ -80,7 +89,7 @@ const FamilyMember = z.object({
     storageLimit: z.number().nullish().transform(nullToUndefined),
 });
 
-type FamilyMember = z.infer<typeof FamilyMember>;
+export type FamilyMember = z.infer<typeof FamilyMember>;
 
 /**
  * Zod schema for details about the family plan (if any) that the user is a part
@@ -527,43 +536,6 @@ export const familyUsage = (userDetails: UserDetails) =>
         (sum, { usage }) => sum + (usage ?? 0),
         0,
     );
-
-/**
- * Return a pre-authenticated URL for the families app, where the user can
- * manage their family plan.
- */
-export const getFamilyPortalRedirectURL = async () => {
-    const userDetails = userDetailsSnapshot();
-
-    const { familiesToken: token, familyUrl: familiesURL } =
-        await getFamiliesTokenAndURL();
-    const isFamilyCreated =
-        userDetails && isPartOfFamily(userDetails) ? "true" : "false";
-    const redirectURL = `${window.location.origin}/gallery`;
-    const params = new URLSearchParams({ token, isFamilyCreated, redirectURL });
-    return `${familiesURL}?${params.toString()}`;
-};
-
-/**
- * Fetch and return a one-time token that can be used to authenticate user's
- * requests to the families app, alongwith the URL of the families app.
- */
-const getFamiliesTokenAndURL = async () => {
-    const res = await fetch(await apiURL("/users/families-token"), {
-        headers: await authenticatedRequestHeaders(),
-    });
-    ensureOk(res);
-    return z
-        .object({
-            // The origin that serves the family dashboard which can be used to
-            // create or manage family plans.
-            familyUrl: z.string(),
-            // A token that can be used to authenticate with the family
-            // dashboard.
-            familiesToken: z.string(),
-        })
-        .parse(await res.json());
-};
 
 /**
  * Update remote to indicate that the user wants to leave the family plan that

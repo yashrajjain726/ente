@@ -102,8 +102,9 @@ apps:
     public-paste:
     # Default is https://cast.ente.com
     cast:
-    # Set this to the URL where your accounts web app is running, primarily used for
-    # passkey based 2FA.
+    # Set this to the URL where your accounts web app is running. It is used
+    # for passkey based 2FA and other cross-app flows like accepting family
+    # invites.
     #
     # Default is https://accounts.ente.com
     accounts:
