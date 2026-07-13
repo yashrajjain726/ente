@@ -439,11 +439,11 @@ func (c *FileController) GetPublicOrCastFileURL(ctx *gin.Context, fileID int64, 
 }
 
 func (c *FileController) DoesFileExistInCollection(ctx *gin.Context, fileID int64, collectionID int64) error {
-	accessible, err := c.CollectionRepo.DoesFileExistInCollections(fileID, []int64{collectionID})
+	state, err := c.CollectionRepo.GetCollectionFileState(ctx, collectionID, fileID)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if !accessible {
+	if state != repo.CollectionFileActive {
 		return stacktrace.Propagate(ente.ErrPermissionDenied, "")
 	}
 	return nil

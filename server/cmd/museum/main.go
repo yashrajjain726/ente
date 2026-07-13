@@ -297,13 +297,15 @@ func main() {
 	reactionsRepo := &socialrepo.ReactionsRepository{DB: db}
 	anonUsersRepo := &socialrepo.AnonUsersRepository{DB: db}
 	commentsController := &socialcontroller.CommentsController{
-		Repo:       commentsRepo,
-		AccessCtrl: accessCtrl,
+		Repo:           commentsRepo,
+		CollectionRepo: collectionRepo,
+		AccessCtrl:     accessCtrl,
 	}
 	reactionsController := &socialcontroller.ReactionsController{
-		Repo:         reactionsRepo,
-		CommentsRepo: commentsRepo,
-		AccessCtrl:   accessCtrl,
+		Repo:           reactionsRepo,
+		CommentsRepo:   commentsRepo,
+		CollectionRepo: collectionRepo,
+		AccessCtrl:     accessCtrl,
 	}
 	socialController := &socialcontroller.Controller{
 		CommentsRepo:   commentsRepo,
