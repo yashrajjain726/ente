@@ -67,7 +67,11 @@ function UploadProgress({
     const handleClose = () =>
         uploadPhase == "done" ? onClose() : setShowStopConfirmation(true);
 
-    const handleReviewFailed = () => setSummaryMode("review");
+    const handleReviewFailed = () => {
+        setShowStopConfirmation(false);
+        setExpanded(true);
+        setSummaryMode("review");
+    };
 
     const handleRetryFailed = () => {
         setSummaryMode(undefined);
