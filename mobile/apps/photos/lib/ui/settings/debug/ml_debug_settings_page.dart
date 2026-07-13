@@ -830,7 +830,7 @@ class _MLDebugSettingsPageState extends State<MLDebugSettingsPage> {
 
   Future<void> _onSyncPersonMappings(BuildContext context) async {
     try {
-      await faceRecognitionService.syncPersonFeedback();
+      await personFeedbackService.syncPersonFeedback();
       showShortToast(context, "Done");
     } catch (e, s) {
       logger.warning('sync person mappings failed ', e, s);

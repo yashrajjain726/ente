@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:isolate';
 
-import "package:dart_ui_isolate/dart_ui_isolate.dart";
 import "package:flutter/foundation.dart" show kDebugMode;
 import "package:flutter/services.dart";
 import "package:logging/logging.dart";
@@ -21,11 +20,10 @@ abstract class SuperIsolate {
   final _initIsolateLock = Lock();
   final _functionLock = Lock();
 
-  bool get isDartUiIsolate;
   bool get shouldAutomaticDispose;
   String get isolateName;
 
-  late dynamic _isolate;
+  late Isolate _isolate;
   late ReceivePort _receivePort;
   late SendPort _mainSendPort;
 
@@ -38,23 +36,17 @@ abstract class SuperIsolate {
 
       _receivePort = ReceivePort();
 
-      // Get the root token before spawning the isolate
       final rootToken = RootIsolateToken.instance;
-      if (rootToken == null && !isDartUiIsolate) {
+      if (rootToken == null) {
         logger.severe('Failed to get RootIsolateToken');
         return;
       }
 
       try {
-        _isolate = isDartUiIsolate
-            ? await DartUiIsolate.spawn(_isolateMain, [
-                _receivePort.sendPort,
-                null,
-              ])
-            : await Isolate.spawn(_isolateMain, [
-                _receivePort.sendPort,
-                rootToken,
-              ], debugName: isolateName);
+        _isolate = await Isolate.spawn(_isolateMain, [
+          _receivePort.sendPort,
+          rootToken,
+        ], debugName: isolateName);
         _mainSendPort = await _receivePort.first as SendPort;
 
         if (shouldAutomaticDispose) _resetInactivityTimer();
