@@ -55,18 +55,14 @@ export type Subscription = z.infer<typeof Subscription>;
 
 const FamilyMember = z.object({
     /**
-     * ID of the family membership. Older locally cached user details might not
-     * have this field.
+     * ID of the family membership.
      */
-    id: z.string().nullish().transform(nullToUndefined),
+    id: z.string(),
     /**
      * Email address of the family member.
      */
     email: z.string(),
-    status: z
-        .enum(["SELF", "INVITED", "ACCEPTED"])
-        .nullish()
-        .transform(nullToUndefined),
+    status: z.enum(["SELF", "INVITED", "ACCEPTED"]),
     /**
      * `true` if this is the admin.
      *
@@ -188,21 +184,20 @@ export const logoutUserDetails = () => {
 /**
  * Read in the locally persisted user details into memory and return them.
  *
- * If there are no locally persisted values, initiate a network requests to
- * fetch the latest values (but don't wait for it to complete).
+ * If there are no compatible locally persisted values, initiate a network
+ * request to fetch the latest values (but don't wait for it to complete).
  *
  * This assumes that the user is already logged in.
  */
 export const savedUserDetailsOrTriggerPull = async () => {
-    const saved = await getKV("userDetails");
-    if (saved) {
-        const userDetails = UserDetails.parse(saved);
-        setUserDetailsSnapshot(userDetails);
-        return userDetails;
-    } else {
-        void pullUserDetails();
-        return undefined;
+    const saved = UserDetails.safeParse(await getKV("userDetails"));
+    if (saved.success) {
+        setUserDetailsSnapshot(saved.data);
+        return saved.data;
     }
+
+    void pullUserDetails();
+    return undefined;
 };
 
 /**
