@@ -29,6 +29,13 @@ Future<Uint8List?> tryTransformFileLossless(
   }
 }
 
+bool _isJpegFile(Uint8List bytes) {
+  return bytes.length >= 3 &&
+      bytes[0] == 0xFF &&
+      bytes[1] == 0xD8 &&
+      bytes[2] == 0xFF;
+}
+
 Future<Uint8List> _transformFileLossless(
   EnteFile src,
   LosslessEditTransform transform,
@@ -40,7 +47,9 @@ Future<Uint8List> _transformFileLossless(
       throw Exception("Failed to get file");
     }
     final bytes = await f.readAsBytes();
-    final exif = img.decodeJpgExif(bytes);
+    final exif = _isJpegFile(bytes)
+        ? img.decodeJpgExif(bytes) ?? img.ExifData()
+        : null;
     if (exif == null) {
       throw Exception("Failed to decode JPEG EXIF");
     }
