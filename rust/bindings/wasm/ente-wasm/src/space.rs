@@ -46,6 +46,9 @@ impl From<CoreSpaceError> for WasmSpaceError {
     fn from(e: CoreSpaceError) -> Self {
         let (code, status) = match &e {
             CoreSpaceError::Http(HttpError::Http { status, .. }) => ("http", Some(*status)),
+            CoreSpaceError::Http(HttpError::Api { status, code, .. }) => {
+                (code.as_str(), Some(*status))
+            }
             CoreSpaceError::Http(HttpError::Network(_)) => ("network", None),
             CoreSpaceError::Http(HttpError::Parse(_)) => ("parse", None),
             CoreSpaceError::Crypto(_) => ("crypto", None),
