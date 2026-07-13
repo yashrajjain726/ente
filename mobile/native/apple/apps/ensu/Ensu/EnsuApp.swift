@@ -2,10 +2,11 @@ import SwiftUI
 
 @main
 struct EnsuApp: App {
-    @UIApplicationDelegateAdaptor(EnsuAppDelegate.self) private var appDelegate
-
     init() {
         EnsuLogging.shared.start()
+        if #available(iOS 26.0, *) {
+            ModelDownloadBackgroundTask.register()
+        }
     }
 
     var body: some Scene {

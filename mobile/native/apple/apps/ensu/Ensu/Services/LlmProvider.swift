@@ -12,7 +12,6 @@ struct LlmModelTarget: Equatable {
 struct DownloadProgress: Equatable {
     let percent: Int?
     let status: String
-    var failure: DownloadFailure? = nil
     var phase: DownloadPhase = .downloading
 }
 
@@ -20,32 +19,6 @@ enum DownloadPhase {
     case downloading
     case loading
     case ready
-    case failed
-}
-
-enum DownloadFailure: Error, Codable, Equatable, LocalizedError {
-    case http(Int)
-    case invalidContent(String)
-    case insufficientSpace
-    case timedOut
-    case failed(String)
-
-    var message: String {
-        switch self {
-        case let .http(status):
-            return "Download failed: HTTP \(status)"
-        case let .invalidContent(message):
-            return message
-        case .insufficientSpace:
-            return "Not enough storage space to download the model. Please free up space and try again."
-        case .timedOut:
-            return "Download timed out"
-        case let .failed(message):
-            return message
-        }
-    }
-
-    var errorDescription: String? { message }
 }
 
 extension Error {
@@ -140,7 +113,6 @@ final class LlmProvider {
 
     private let modelDir: URL
     private let transcriber: Transcriber
-    private let downloadManager = ModelDownloadManager.shared
     private var loadedModel: LlmModel?
     private var loadedContext: LlmContext?
     private var currentModelKey: LoadedModelKey?
@@ -214,20 +186,7 @@ final class LlmProvider {
 
         if !downloads.isEmpty {
             onProgress(DownloadProgress(percent: 0, status: "Starting download..."))
-            await downloadManager.cancelDownloads(for: downloads.map(downloadTarget(for:)))
-            do {
-                try await downloadWithRust(expectedTargets, onProgress: onProgress)
-            } catch {
-                if isDownloadCancellation(error) {
-                    throw error
-                }
-                logger.warning(
-                    "Rust model download failed; falling back to URLSession",
-                    details: "\(error.localizedDescription)"
-                )
-                await downloadManager.enqueueDownloads(downloads.map(downloadTarget(for:)))
-                try await waitForDownloads(expectedTargets, onProgress: onProgress)
-            }
+            try await downloadWithRust(expectedTargets, onProgress: onProgress)
         }
 
         onProgress(DownloadProgress(percent: 100, status: "Loading model...", phase: .loading))
@@ -365,16 +324,6 @@ final class LlmProvider {
 
     func cancelDownload() {
         setRustDownloadCancelled(true)
-        Task {
-            await downloadManager.cancelAllDownloads()
-        }
-    }
-
-    func cancelStaleDownloads(target: LlmModelTarget) {
-        let targets = expectedTargets(for: target).map(downloadTarget(for:))
-        Task {
-            await downloadManager.cancelDownloads(except: targets)
-        }
     }
 
     func isModelDownloaded(target: LlmModelTarget) -> Bool {
@@ -417,10 +366,6 @@ final class LlmProvider {
             return nil
         }
         return sizes.reduce(0, +)
-    }
-
-    func currentDownloadProgress(target: LlmModelTarget) async -> DownloadProgress? {
-        await downloadManager.progress(for: expectedTargets(for: target).map(downloadTarget(for:)))
     }
 
     func loadedContextLength(target: LlmModelTarget) -> Int? {
@@ -545,51 +490,6 @@ final class LlmProvider {
         return hashed.map { String(format: "%02x", $0) }.joined()
     }
 
-    private func expectedTargets(for target: LlmModelTarget) -> [DownloadTarget] {
-        let modelPath = modelPathFor(target: target)
-        let mmprojPath = mmprojPathFor(target: target)
-        var targets = [DownloadTarget(label: "Model", url: target.url, destination: modelPath)]
-
-        if let mmprojUrl = target.mmprojUrl, !mmprojUrl.isEmpty, let mmprojPath {
-            targets.append(DownloadTarget(label: "Mmproj", url: mmprojUrl, destination: mmprojPath))
-        }
-
-        return targets
-    }
-
-    private func downloadTarget(for target: DownloadTarget) -> ModelDownloadTarget {
-        ModelDownloadTarget(label: target.label, url: target.url, destination: target.destination)
-    }
-
-    private func waitForDownloads(
-        _ expectedTargets: [DownloadTarget],
-        onProgress: @escaping (DownloadProgress) -> Void
-    ) async throws {
-        let managerTargets = expectedTargets.map(downloadTarget(for:))
-        let maxPolls = 7_200
-        var pollCount = 0
-
-        while true {
-            try Task.checkCancellation()
-            if expectedTargets.allSatisfy({ FileManager.default.fileExists(atPath: $0.destination.path) }) {
-                return
-            }
-
-            if let progress = await downloadManager.progress(for: managerTargets) {
-                if let failure = progress.failure {
-                    throw failure
-                }
-                onProgress(progress)
-            }
-
-            pollCount += 1
-            if pollCount >= maxPolls {
-                throw DownloadFailure.timedOut
-            }
-            try await Task.sleep(nanoseconds: 500_000_000)
-        }
-    }
-
     private func downloadWithRust(
         _ expectedTargets: [DownloadTarget],
         onProgress: @escaping (DownloadProgress) -> Void
@@ -599,11 +499,28 @@ final class LlmProvider {
             LlmModelDownloadTarget(label: $0.label, url: $0.url, destinationPath: $0.destination.path)
         }
 
+        if #available(iOS 26.0, *) {
+            ModelDownloadBackgroundTask.begin { [weak self] in
+                self?.setRustDownloadCancelled(true)
+            }
+        }
+        defer {
+            if #available(iOS 26.0, *) {
+                ModelDownloadBackgroundTask.end()
+            }
+        }
+
         let downloadTask = Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
             let callback = ModelDownloadCallbackSink(
                 onProgress: { progress in
                     self.logDownloadMetrics(progress)
+                    if #available(iOS 26.0, *) {
+                        ModelDownloadBackgroundTask.update(
+                            downloadedBytes: progress.downloadedBytes,
+                            totalBytes: progress.totalBytes
+                        )
+                    }
                     onProgress(progress.toInferenceProgress())
                 },
                 isCancelled: { [weak self] in
@@ -632,12 +549,6 @@ final class LlmProvider {
         let cancelled = rustDownloadCancelled
         rustDownloadCancelLock.unlock()
         return cancelled
-    }
-
-    private func isDownloadCancellation(_ error: Error) -> Bool {
-        if case LlmError.Cancelled = error { return true }
-        if (error as? URLError)?.code == .cancelled { return true }
-        return error is CancellationError || isRustDownloadCancelled()
     }
 
     private func logDownloadMetrics(_ progress: LlmModelDownloadProgress) {
@@ -693,6 +604,16 @@ private final class ModelDownloadCallbackSink: LlmModelDownloadCallback, @unchec
 
     func isCancelled() -> Bool {
         isCancelledHandler()
+    }
+}
+
+extension URL {
+    var looksLikeGgufFile: Bool {
+        guard let handle = try? FileHandle(forReadingFrom: self) else { return false }
+        let data = handle.readData(ofLength: 4)
+        try? handle.close()
+        guard data.count == 4 else { return false }
+        return String(decoding: data, as: UTF8.self) == "GGUF"
     }
 }
 
