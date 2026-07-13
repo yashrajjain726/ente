@@ -23,8 +23,8 @@ class FaceThumbnailGenerator extends SuperIsolate {
       FaceThumbnailGenerator._privateConstructor();
   factory FaceThumbnailGenerator() => instance;
 
-  /// Generates face thumbnails for all [faceBoxes] in [imageData].
-  ///
+  /// Generates face thumbnails for all [faceBoxes] in the image at
+  /// [imagePath].
   Future<List<Uint8List>> generateFaceThumbnails(
     String imagePath,
     List<FaceBox> faceBoxes,

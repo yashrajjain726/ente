@@ -10,10 +10,10 @@ Future<Uint8List?> createSafeJpegDecodeFallbackBytes({
   required String imagePath,
 }) async {
   final imageData = await File(imagePath).readAsBytes();
-  return createSafeJpegDecodeFallbackBytesFromData(imageData);
+  return _createSafeJpegDecodeFallbackBytesFromData(imageData);
 }
 
-Uint8List? createSafeJpegDecodeFallbackBytesFromData(Uint8List imageData) {
+Uint8List? _createSafeJpegDecodeFallbackBytesFromData(Uint8List imageData) {
   try {
     final decoded = image.decodeImage(imageData);
     if (decoded == null) {

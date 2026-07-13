@@ -145,7 +145,7 @@ class MLComputer extends SuperIsolate {
           );
         }
 
-        if (_clipTextVocabPath != null && _clipTextModelPath != null) {
+        if (_clipTextModelPath != null) {
           return;
         }
 

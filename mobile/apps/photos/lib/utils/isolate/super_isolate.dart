@@ -62,16 +62,14 @@ abstract class SuperIsolate {
   @pragma('vm:entry-point')
   static void _isolateMain(List<dynamic> args) async {
     final SendPort mainSendPort = args[0] as SendPort;
-    final RootIsolateToken? rootToken = args[1] as RootIsolateToken?;
+    final RootIsolateToken rootToken = args[1] as RootIsolateToken;
 
     Logger.root.level = kDebugMode ? Level.ALL : Level.INFO;
     final IsolateLogger isolateLogger = IsolateLogger();
     Logger.root.onRecord.listen(isolateLogger.onLogRecordInIsolate);
     final receivePort = ReceivePort();
     mainSendPort.send(receivePort.sendPort);
-    if (rootToken != null) {
-      BackgroundIsolateBinaryMessenger.ensureInitialized(rootToken);
-    }
+    BackgroundIsolateBinaryMessenger.ensureInitialized(rootToken);
     final logger = Logger('SuperIsolate');
     logger.info('IsolateMain started');
 
