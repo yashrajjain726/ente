@@ -16,7 +16,6 @@ import 'package:photos/models/freeable_space_info.dart';
 import 'package:photos/models/location/location.dart';
 import "package:photos/models/metadata/common_keys.dart";
 import "package:photos/services/filter/db_filters.dart";
-import 'package:photos/utils/file_uploader_util.dart';
 import 'package:sqlite_async/sqlite_async.dart';
 
 class FilesDB with SqlDbBase {
@@ -1339,21 +1338,17 @@ class FilesDB with SqlDbBase {
     return Map.fromIterable(matchedFiles, key: (e) => e.hash);
   }
 
-  Future<List<EnteFile>> getUploadedFilesWithHashes(
-    FileHashData hashData,
+  Future<List<EnteFile>> getUploadedFilesWithHash(
+    String hash,
     FileType fileType,
     int ownerID,
   ) async {
-    String inParam = "'${hashData.fileHash}'";
-    if (fileType == FileType.livePhoto && hashData.zipHash != null) {
-      inParam += ",'${hashData.zipHash}'";
-    }
     final db = await instance.sqliteAsyncDB;
     final rows = await db.getAll(
       'SELECT * FROM $filesTable WHERE ($columnUploadedFileID != NULL OR '
       '$columnUploadedFileID != -1) AND $columnOwnerID = ? AND '
-      '$columnFileType = ? AND $columnHash IN ($inParam)',
-      [ownerID, getInt(fileType)],
+      '$columnFileType = ? AND $columnHash = ?',
+      [ownerID, getInt(fileType), hash],
     );
     return convertToFiles(rows);
   }
