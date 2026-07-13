@@ -5,28 +5,26 @@ import "package:computer/computer.dart";
 import 'package:exif_reader/exif_reader.dart';
 import 'package:intl/intl.dart';
 import 'package:logging/logging.dart';
-import "package:photos/models/ffmpeg/ffprobe_props.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/file/file_type.dart";
 import "package:photos/models/location/location.dart";
 import "package:photos/models/metadata/file_magic.dart";
-import "package:photos/services/isolated_ffmpeg_service.dart";
+import 'package:photos/module/download/file.dart';
 import "package:photos/services/location_service.dart";
-import "package:photos/src/rust/api/motion_photo_api.dart";
-import 'package:photos/utils/file_util.dart';
 import 'package:random_access_source/random_access_source.dart';
 
 const kDateTimeOriginal = "EXIF DateTimeOriginal";
-const kImageDateTime = "Image DateTime";
-const kExifOffSetKeys = [
+const _imageDateTime = "Image DateTime";
+const _exifOffsetKeys = [
   "EXIF OffsetTime",
   "EXIF OffsetTimeOriginal",
   "EXIF OffsetTimeDigitized",
 ];
-const kExifDateTimePattern = "yyyy:MM:dd HH:mm:ss";
-const kEmptyExifDateTime = "0000:00:00 00:00:00";
+const _exifDateTimePattern = "yyyy:MM:dd HH:mm:ss";
+const _emptyExifDateTime = "0000:00:00 00:00:00";
 
 final _logger = Logger("ExifUtil");
+
 final _standardExifDateTimePattern = RegExp(
   r'^(\d{4}:(0[1-9]|1[0-2]):(0[1-9]|[12]\d|3[01]) ([01]\d|2[0-3]):([0-5]\d):([0-5]\d))([\.:]\d+)?$',
 );
@@ -69,49 +67,32 @@ Future<Map<String, IfdTag>?> tryExifFromFile(File originFile) async {
   }
 }
 
-Future<Map<String, dynamic>> getXmp(File file) async {
-  return extractXmp(filePath: file.path);
-}
-
-Future<FFProbeProps?> getVideoPropsAsync(File originalFile) async {
-  try {
-    final stopwatch = Stopwatch()..start();
-
-    final mediaInfo = await IsolatedFfmpegService.instance.getVideoInfo(
-      originalFile.path,
-    );
-    if (mediaInfo.isEmpty) {
-      return null;
-    }
-
-    final properties = FFProbeProps.parseData(mediaInfo);
-    _logger.info("getVideoPropsAsync took ${stopwatch.elapsedMilliseconds}ms");
-
-    stopwatch.stop();
-    return properties;
-  } catch (e, s) {
-    _logger.severe("Failed to getVideoProps", e, s);
+String? extractPrintableExifValue(IfdTag? tag) {
+  final printable = tag?.printable.trim();
+  if (printable == null || printable.isEmpty) {
     return null;
   }
+  if (printable.toLowerCase() == 'null') {
+    return null;
+  }
+  return printable;
 }
 
-bool? checkPanoramaFromEXIF(File? file, Map<String, IfdTag>? exifData) {
-  final element = exifData?["EXIF CustomRendered"];
-  if (element?.printable == null) return null;
-  return element?.printable == "6";
+bool shouldSwapDimensionsForExifOrientation(Map<String, IfdTag>? exifData) {
+  final orientation = exifData?['Image Orientation']?.values.firstAsInt() ?? 1;
+  // EXIF orientations 5-8 are rotated 90/270 variants and require w/h swap.
+  return orientation >= 5 && orientation <= 8;
 }
 
 class ParsedExifDateTime {
-  late final DateTime? time;
-  late final String? dateTime;
-  late final String? offsetTime;
-  ParsedExifDateTime(DateTime this.time, String? dateTime, this.offsetTime) {
-    if (dateTime != null && dateTime.endsWith('Z')) {
-      this.dateTime = dateTime.substring(0, dateTime.length - 1);
-    } else {
-      this.dateTime = dateTime;
-    }
-  }
+  ParsedExifDateTime(this.time, String? dateTime, this.offsetTime)
+    : dateTime = dateTime != null && dateTime.endsWith('Z')
+          ? dateTime.substring(0, dateTime.length - 1)
+          : dateTime;
+
+  final DateTime time;
+  final String? dateTime;
+  final String? offsetTime;
 
   @override
   String toString() {
@@ -126,22 +107,24 @@ Future<ParsedExifDateTime?> tryParseExifDateTime(
   try {
     assert(file != null || exifData != null);
     final exif = exifData ?? await readExifAsync(file!);
-    final exifTime = exif.containsKey(kDateTimeOriginal)
-        ? exif[kDateTimeOriginal]!.printable
-        : exif.containsKey(kImageDateTime)
-        ? exif[kImageDateTime]!.printable
-        : null;
-    if (exifTime == null || exifTime == kEmptyExifDateTime) {
+    final exifTime =
+        exif[kDateTimeOriginal]?.printable ?? exif[_imageDateTime]?.printable;
+    if (exifTime == null || exifTime == _emptyExifDateTime) {
       return null;
     }
     String? exifOffsetTime;
-    for (final key in kExifOffSetKeys) {
-      if (exif.containsKey(key)) {
-        exifOffsetTime = exif[key]!.printable;
+    for (final key in _exifOffsetKeys) {
+      final offset = exif[key];
+      if (offset != null) {
+        exifOffsetTime = offset.printable;
         break;
       }
     }
-    return getDateTimeInDeviceTimezone(exifTime, exifOffsetTime);
+    try {
+      return getDateTimeInDeviceTimezone(exifTime, exifOffsetTime);
+    } on FormatException {
+      _logger.warning("Ignoring invalid EXIF date time: $exifTime");
+    }
   } catch (e, s) {
     _logger.severe("failed to getCreationTimeFromEXIF", e, s);
   }
@@ -172,7 +155,7 @@ ParsedExifDateTime _getStandardExifDateTimeInDeviceTimezone(
   final offsetTime = _normalizeOffset(offsetString);
   final hasOffset = offsetTime != null;
   final match = _standardExifDateTimePattern.firstMatch(exifTime)!;
-  final DateTime result = DateFormat(kExifDateTimePattern)
+  final DateTime result = DateFormat(_exifDateTimePattern)
       .parseStrict(match.group(1)!, hasOffset)
       .add(
         Duration(microseconds: _parseFractionalMicroseconds(match.group(7))),
@@ -314,8 +297,8 @@ Future<Map<String, IfdTag>> _readExifArgs(Map<String, dynamic> args) {
   });
 }
 
-Future<Map<String, IfdTag>> readExifAsync(File file) async {
-  return await Computer.shared().compute(
+Future<Map<String, IfdTag>> readExifAsync(File file) {
+  return Computer.shared().compute(
     _readExifArgs,
     param: {"file": file},
     taskName: "readExifAsync",
@@ -334,34 +317,23 @@ Map<String, IfdTag> _normalizeExifResult(dynamic result) {
 }
 
 GPSData gpsDataFromExif(Map<String, IfdTag> exif) {
-  final Map<String, dynamic> exifLocationData = {
-    "lat": null,
-    "long": null,
-    "latRef": null,
-    "longRef": null,
-  };
-  if (exif["GPS GPSLatitude"] != null) {
-    exifLocationData["lat"] = exif["GPS GPSLatitude"]!.values
-        .toList()
-        .map((e) => ((e as Ratio).numerator / e.denominator))
-        .toList();
-  }
-  if (exif["GPS GPSLongitude"] != null) {
-    exifLocationData["long"] = exif["GPS GPSLongitude"]!.values
-        .toList()
-        .map((e) => ((e as Ratio).numerator / e.denominator))
-        .toList();
-  }
-  if (exif["GPS GPSLatitudeRef"] != null) {
-    exifLocationData["latRef"] = exif["GPS GPSLatitudeRef"].toString();
-  }
-  if (exif["GPS GPSLongitudeRef"] != null) {
-    exifLocationData["longRef"] = exif["GPS GPSLongitudeRef"].toString();
-  }
+  final latitude = exif["GPS GPSLatitude"];
+  final longitude = exif["GPS GPSLongitude"];
   return GPSData(
-    exifLocationData["latRef"],
-    exifLocationData["lat"],
-    exifLocationData["longRef"],
-    exifLocationData["long"],
+    exif["GPS GPSLatitudeRef"]?.toString(),
+    latitude == null ? null : _gpsCoordinateParts(latitude),
+    exif["GPS GPSLongitudeRef"]?.toString(),
+    longitude == null ? null : _gpsCoordinateParts(longitude),
   );
+}
+
+List<double> _gpsCoordinateParts(IfdTag tag) {
+  return tag.values.toList().map(_gpsCoordinatePart).toList();
+}
+
+double _gpsCoordinatePart(dynamic value) {
+  if (value is Ratio) {
+    return value.numerator / value.denominator;
+  }
+  return (value as num).toDouble();
 }

@@ -22,12 +22,7 @@ class MultiPartUploader {
   late final Logger _logger = Logger("MultiPartUploader");
   FileUploadGateway get _gateway => fileUploadGateway;
 
-  MultiPartUploader(
-    Dio _, // unused, kept for backwards compatibility
-    this._s3Dio,
-    this._db,
-    this._featureFlagService,
-  );
+  MultiPartUploader(this._s3Dio, this._db, this._featureFlagService);
 
   Future<FileEncryptResult> getEncryptionResult(
     String localId,

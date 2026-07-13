@@ -6,7 +6,7 @@ import "dart:ui";
 import "package:image/image.dart" as img;
 import "package:logging/logging.dart";
 import "package:photos/models/file/file.dart";
-import "package:photos/utils/file_util.dart";
+import "package:photos/module/download/file.dart";
 import "package:pro_image_editor/pro_image_editor.dart";
 
 final _logger = Logger("lossless_edits");
