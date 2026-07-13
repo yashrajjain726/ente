@@ -13,6 +13,7 @@ void main() {
 
     expect(await fixture.resolve(pending), isNull);
     expect(fixture.calls, isEmpty);
+    expect(fixture.ownerIDCalls, 0);
   });
 
   test("no hash matches continues uploading", () async {
@@ -20,6 +21,18 @@ void main() {
 
     expect(await fixture.resolve(_file(localID: "local")), isNull);
     expect(fixture.calls, ["find:hash:${FileType.image.index}:10"]);
+    expect(fixture.ownerIDCalls, 1);
+  });
+
+  test("hash lookup failure propagates without side effects", () async {
+    final fixture = _Fixture()..findError = _Error();
+
+    await expectLater(
+      fixture.resolve(_file(localID: "local")),
+      throwsA(isA<_Error>()),
+    );
+    expect(fixture.calls, ["find:hash:${FileType.image.index}:10"]);
+    expect(fixture.events, isEmpty);
   });
 
   test("case a deletes pending row before emitting deletion", () async {
@@ -187,6 +200,26 @@ void main() {
     expect(fixture.events, isEmpty);
   });
 
+  test("event failure propagates after case a deletion", () async {
+    final existing = _file(
+      localID: "local",
+      uploadedFileID: 11,
+      collectionID: 20,
+    );
+    final fixture = _Fixture(existingFiles: [existing])..emitError = _Error();
+
+    await expectLater(
+      fixture.resolve(_file(localID: "local", generatedID: 7)),
+      throwsA(isA<_Error>()),
+    );
+    expect(fixture.calls, [
+      "find:hash:${FileType.image.index}:10",
+      "delete:7",
+      "event:deletedFromEverywhere:sameLocalSameCollection",
+    ]);
+    expect(fixture.events, hasLength(1));
+  });
+
   test("update failure prevents case b deletion and event", () async {
     final existing = _file(uploadedFileID: 12, collectionID: 30);
     final fixture = _Fixture(existingFiles: [existing])..updateError = _Error();
@@ -252,7 +285,12 @@ class _Fixture {
     resolver = ExistingUploadResolver(
       findUploadedFiles: (hash, fileType, ownerID) async {
         calls.add("find:$hash:${fileType.index}:$ownerID");
+        if (findError != null) throw findError!;
         return this.existingFiles;
+      },
+      getOwnerID: () {
+        ownerIDCalls++;
+        return ownerID;
       },
       deleteGeneratedFile: (generatedID) async {
         calls.add("delete:$generatedID");
@@ -280,6 +318,7 @@ class _Fixture {
       emitLocalPhotosUpdated: (event) {
         calls.add("event:${event.type.name}:${event.source}");
         events.add(event);
+        if (emitError != null) throw emitError!;
       },
     );
   }
@@ -296,14 +335,16 @@ class _Fixture {
   EnteFile? linkedLocalFile;
   EnteFile? linkedExistingFile;
   Object? deleteError;
+  Object? findError;
+  Object? emitError;
   Object? updateError;
   Object? linkError;
+  var ownerIDCalls = 0;
 
   Future<EnteFile?> resolve(EnteFile pending) => resolver.resolve(
     fileHash: fileHash,
     fileToUpload: pending,
     targetCollectionID: targetCollectionID,
-    ownerID: ownerID,
   );
 }
 
