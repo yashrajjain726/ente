@@ -25,4 +25,13 @@ pub enum SpaceError {
     EntityKeyConflict,
 }
 
+impl SpaceError {
+    pub fn is_unavailable_record(&self) -> bool {
+        matches!(
+            self,
+            Self::Crypto(_) | Self::InvalidInput(_) | Self::MissingFriendSealedSpaceKey
+        )
+    }
+}
+
 pub type Result<T> = std::result::Result<T, SpaceError>;

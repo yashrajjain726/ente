@@ -550,7 +550,11 @@ impl AccountSpaceCtx {
         let shares = self.list_friend_shares(space_id).await?;
         let mut value = Vec::with_capacity(shares.len());
         for share in shares {
-            value.push(self.decrypt_friend_share(space_id, &share).await?);
+            match self.decrypt_friend_share(space_id, &share).await {
+                Ok(share) => value.push(share),
+                Err(error) if error.is_unavailable_record() => {}
+                Err(error) => return Err(error),
+            }
         }
         cache_lock(&self.friend_shares_cache, "friend shares")?
             .insert(space_id.to_owned(), value.clone());

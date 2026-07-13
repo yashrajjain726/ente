@@ -245,7 +245,11 @@ impl AccountSpaceCtx {
         for (space_id, _) in &owned {
             let friends_records = self.list_friend_shares(space_id).await?;
             for record in &friends_records {
-                friends.push(self.decrypt_friend_share(space_id, record).await?);
+                match self.decrypt_friend_share(space_id, record).await {
+                    Ok(share) => friends.push(share),
+                    Err(error) if error.is_unavailable_record() => {}
+                    Err(error) => return Err(error),
+                }
             }
         }
 

@@ -971,13 +971,15 @@ export const loadCurrentSpacePost = async (
 ): Promise<SpacePost | null> => {
     const ctx = await ensureCurrentSpaceContext();
     try {
+        const response = (await ctx.get_post(
+            spaceId,
+            BigInt(postId),
+            viewerSpaceId ?? null,
+        )) as SpacePostResponse | null;
+        if (!response) return null;
         const post = await postFromAccountPost(
             ctx,
-            (await ctx.get_post(
-                spaceId,
-                BigInt(postId),
-                viewerSpaceId ?? null,
-            )) as SpacePostResponse,
+            response,
             true,
             viewerSpaceId,
         );

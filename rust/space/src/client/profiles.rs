@@ -57,14 +57,15 @@ impl AccountSpaceCtx {
                 viewer_space_id,
                 Some(profile.version),
             )
-            .await?
-            .ok_or_else(|| {
-                SpaceError::InvalidInput(format!(
-                    "no key available for space {space_id} version {}",
-                    profile.version
-                ))
-            })?;
-        decrypt_space_profile(&profile, &space_key)
+            .await?;
+        let Some(space_key) = space_key else {
+            return Ok(fallback_space_profile(profile));
+        };
+        match decrypt_space_profile(&profile, &space_key) {
+            Ok(profile) => Ok(profile),
+            Err(error) if error.is_unavailable_record() => Ok(fallback_space_profile(profile)),
+            Err(error) => Err(error),
+        }
     }
 
     pub async fn update_space_profile(
@@ -116,5 +117,18 @@ impl AccountSpaceCtx {
             .await?;
         self.update_cached_owned_space_profile(space_id, request.encrypted_profile)?;
         Ok(response)
+    }
+}
+
+fn fallback_space_profile(profile: SpaceProfileResponse) -> DecryptedSpaceProfile {
+    DecryptedSpaceProfile {
+        space_id: profile.space_id,
+        space_slug: profile.space_slug,
+        version: profile.version,
+        friends: profile.friends,
+        profile: Vec::new(),
+        avatar: profile.avatar,
+        cover: profile.cover,
+        updated_at: (!profile.updated_at.is_empty()).then_some(profile.updated_at),
     }
 }
