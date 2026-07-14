@@ -91,6 +91,27 @@ func TestCreateStoresReferralAttribution(t *testing.T) {
 	require.Equal(t, sql.NullString{String: aliceSpace.SpaceID, Valid: true}, referredBySpaceID)
 }
 
+func TestCreateRejectsAdditionalSpaceForOwner(t *testing.T) {
+	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
+	aliceID := insertSpaceControllerUser(t, repos, "alice-space-limit@example.com", "alice-public")
+
+	_, err := testCreateSpace(ctx, repos, aliceID, "alice_space_limit", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
+	require.NoError(t, err)
+
+	resp, err := module.Spaces.Create(newSpaceControllerContext(aliceID), models.CreateSpaceRequest{
+		SpaceSlug:           "another_space",
+		RootWrappedSpaceKey: base64.StdEncoding.EncodeToString([]byte("another-space-key")),
+		PublicKey:           base64.StdEncoding.EncodeToString([]byte("another-public")),
+		EncryptedSecretKey:  base64.StdEncoding.EncodeToString([]byte("another-secret")),
+	})
+
+	require.Nil(t, resp)
+	var apiErr *ente.ApiError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, ente.CONFLICT, apiErr.Code)
+	require.Equal(t, "space limit reached", apiErr.Message)
+}
+
 func TestGetProfileReturnsProfileAssetObjectIDs(t *testing.T) {
 	module, repos, _, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-assets-profile@example.com", "alice-assets-public")

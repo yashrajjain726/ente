@@ -3,11 +3,16 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 
 	"github.com/ente/museum/ente/base"
 	"github.com/ente/stacktrace"
 )
+
+const MaxSpacesPerOwner = 1
+
+var ErrSpaceOwnerLimitReached = errors.New("space owner limit reached")
 
 func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, spaceSlug string, rootWrappedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile []byte, referredBySpaceID string) (*SpaceRecord, error) {
 	normalizedSpaceSlug := normalizeSlug(spaceSlug)
@@ -18,6 +23,23 @@ func (r *SpacesRepository) CreateSpace(ctx context.Context, ownerID int64, space
 		return nil, stacktrace.Propagate(err, "")
 	}
 	defer tx.Rollback()
+
+	var lockedOwnerID int64
+	if err := tx.QueryRowContext(ctx, `
+		SELECT user_id
+		FROM users
+		WHERE user_id = $1
+		FOR UPDATE
+	`, ownerID).Scan(&lockedOwnerID); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	var spaceCount int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM spaces WHERE owner_id = $1`, ownerID).Scan(&spaceCount); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if spaceCount >= MaxSpacesPerOwner {
+		return nil, ErrSpaceOwnerLimitReached
+	}
 
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO spaces (

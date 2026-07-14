@@ -69,6 +69,9 @@ func (c *SpacesController) Create(ctx *gin.Context, req models.CreateSpaceReques
 	}
 	space, err := c.SpacesRepo.CreateSpace(ctx, userID, normalizedSlug, rootWrappedSpaceKey, publicKey, encryptedSecretKey, encryptedProfile, referredBySpaceID)
 	if err != nil {
+		if errors.Is(stacktrace.RootCause(err), repo.ErrSpaceOwnerLimitReached) {
+			return nil, ente.NewConflictError("space limit reached")
+		}
 		return nil, err
 	}
 	return toSpaceKeyResponse(space), nil

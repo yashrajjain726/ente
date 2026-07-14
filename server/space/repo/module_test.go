@@ -208,6 +208,19 @@ func testCreatePost(ctx context.Context, module *Module, _ int64, spaceID string
 	return postID, err
 }
 
+func TestCreateSpaceEnforcesOneSpacePerOwner(t *testing.T) {
+	module := newSpaceTestModule(t)
+	ctx := context.Background()
+	userID := insertSpaceUser(t, module, "space-limit@example.com", "space-limit-public")
+
+	_, err := testCreateSpace(ctx, module, userID, "space_limit", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+
+	_, err = testCreateSpace(ctx, module, userID, "another_space", "root", "public", "secret", "nonce", "profile")
+	require.ErrorIs(t, err, ErrSpaceOwnerLimitReached)
+	require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM spaces WHERE owner_id = $1`, userID))
+}
+
 func TestCreatePostEnforcesSpacePostLimit(t *testing.T) {
 	module := newSpaceTestModule(t)
 	ctx := context.Background()
