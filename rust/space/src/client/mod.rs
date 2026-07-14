@@ -34,7 +34,7 @@ use crate::transport::{
     SpaceKeyVersionResponse, SpaceLookupResponse, SpaceProfileResponse, UpdateSpaceSlugRequest,
 };
 use ente_core::{
-    crypto::{decode_b64, encode_b64},
+    crypto::{SecretVec, decode_b64, encode_b64},
     http::{Api, ApiConfig, Auth, Http},
 };
 const UPLOAD_PURPOSE_AVATAR: &str = "avatar";
@@ -74,28 +74,35 @@ fn profile_object_id_from_key(object_key: &str) -> Result<String> {
         .ok_or_else(|| SpaceError::InvalidInput("invalid profile asset object key".into()))
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct ResolvedSpaceAccess {
     space_key: Vec<u8>,
     key_version: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct ResolvedOwnedSpaceAccess {
     space_key: Vec<u8>,
     key_version: i32,
 }
 
-#[derive(Debug, Clone)]
 pub(crate) struct SpaceIdentity {
     public_key: Vec<u8>,
-    secret_key: Vec<u8>,
+    secret_key: SecretVec,
+}
+
+impl Clone for SpaceIdentity {
+    fn clone(&self) -> Self {
+        Self {
+            public_key: self.public_key.clone(),
+            secret_key: SecretVec::new(self.secret_key.to_vec()),
+        }
+    }
 }
 
 pub struct AccountSpaceCtx {
     api: Api,
-    space_root_key: Vec<u8>,
-    space_root_key_cache: Mutex<Option<Option<Vec<u8>>>>,
+    space_root_key: SecretVec,
     space_identity_cache: Mutex<BTreeMap<String, SpaceIdentity>>,
     owned_spaces_cache: Mutex<Option<Vec<SpaceKeyResponse>>>,
     friend_shares_cache: Mutex<BTreeMap<String, Vec<DecryptedFriendShare>>>,
@@ -103,6 +110,7 @@ pub struct AccountSpaceCtx {
 
 impl AccountSpaceCtx {
     pub fn open(input: OpenAccountSpaceCtxInput) -> Result<Self> {
+        let space_root_key = SecretVec::new(input.space_root_key);
         let api = build_api(
             &input.base_url,
             input.space_session_token,
@@ -112,8 +120,7 @@ impl AccountSpaceCtx {
         )?;
         Ok(Self {
             api,
-            space_root_key: input.space_root_key,
-            space_root_key_cache: Mutex::new(None),
+            space_root_key,
             space_identity_cache: Mutex::new(BTreeMap::new()),
             owned_spaces_cache: Mutex::new(None),
             friend_shares_cache: Mutex::new(BTreeMap::new()),
@@ -129,14 +136,11 @@ impl AccountSpaceCtx {
     }
 
     pub async fn get_space_root_key(&self) -> Result<Option<Vec<u8>>> {
-        Ok(Some(self.space_root_key.clone()))
+        Ok(Some(self.space_root_key.to_vec()))
     }
 
     pub async fn get_or_create_space_root_key(&self) -> Result<Vec<u8>> {
-        let space_root_key = self.space_root_key.clone();
-        *cache_lock(&self.space_root_key_cache, "space root key")? =
-            Some(Some(space_root_key.clone()));
-        Ok(space_root_key)
+        Ok(self.space_root_key.to_vec())
     }
 
     pub async fn list_owned_spaces(&self) -> Result<Vec<SpaceKeyResponse>> {
@@ -176,7 +180,7 @@ impl AccountSpaceCtx {
         let secret_key = decrypt_secretbox_payload(&self.space_root_key, &encrypted_secret_key)?;
         Ok(SpaceIdentity {
             public_key,
-            secret_key,
+            secret_key: SecretVec::new(secret_key),
         })
     }
 
@@ -338,7 +342,7 @@ impl AccountSpaceCtx {
             response.space_id.clone(),
             SpaceIdentity {
                 public_key,
-                secret_key,
+                secret_key: SecretVec::new(secret_key),
             },
         );
         Ok(CreatedSpace {
@@ -402,7 +406,7 @@ impl AccountSpaceCtx {
         &self,
         space_id: &str,
     ) -> Result<Option<ResolvedOwnedSpaceAccess>> {
-        let space_root_key = match self.get_space_root_key_cached().await? {
+        let space_root_key = match self.get_space_root_key().await? {
             Some(value) => value,
             None => return Ok(None),
         };
@@ -423,11 +427,11 @@ impl AccountSpaceCtx {
         space_id: &str,
     ) -> Result<Option<ResolvedSpaceAccess>> {
         let shares = self.list_all_decrypted_friend_shares().await?;
-        let Some(share) = shares.into_iter().find(|value| value.space_id == space_id) else {
+        let Some(mut share) = shares.into_iter().find(|value| value.space_id == space_id) else {
             return Ok(None);
         };
         Ok(Some(ResolvedSpaceAccess {
-            space_key: share.space_key,
+            space_key: std::mem::take(&mut share.space_key),
             key_version: share.key_version,
         }))
     }
@@ -450,11 +454,11 @@ impl AccountSpaceCtx {
         let shares = self
             .list_decrypted_friend_shares_cached(viewer_space_id)
             .await?;
-        let Some(share) = shares.into_iter().find(|value| value.space_id == space_id) else {
+        let Some(mut share) = shares.into_iter().find(|value| value.space_id == space_id) else {
             return Ok(None);
         };
         Ok(Some(ResolvedSpaceAccess {
-            space_key: share.space_key,
+            space_key: std::mem::take(&mut share.space_key),
             key_version: share.key_version,
         }))
     }
@@ -513,15 +517,6 @@ impl AccountSpaceCtx {
             .build_space_key_history_for_space_for_viewer(space_id, viewer_space_id)
             .await?;
         Ok(history.get(&target_version).cloned())
-    }
-
-    pub(crate) async fn get_space_root_key_cached(&self) -> Result<Option<Vec<u8>>> {
-        if let Some(value) = cache_lock(&self.space_root_key_cache, "space root key")?.clone() {
-            return Ok(value);
-        }
-        let value = self.get_space_root_key().await?;
-        *cache_lock(&self.space_root_key_cache, "space root key")? = Some(value.clone());
-        Ok(value)
     }
 
     pub(crate) async fn list_owned_spaces_cached(&self) -> Result<Vec<SpaceKeyResponse>> {
@@ -691,11 +686,12 @@ pub(super) fn build_api(
     client_package: Option<String>,
     client_version: Option<String>,
 ) -> Result<Api> {
+    let auth = space_session_token.map(Auth::SpaceSession);
     Ok(Api::new(
         Http::new()?,
         ApiConfig {
             origin: base_url.to_owned(),
-            auth: space_session_token.map(Auth::SpaceSession),
+            auth,
             user_agent,
             client_package,
             client_version,
