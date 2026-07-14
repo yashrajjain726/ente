@@ -29,6 +29,10 @@ typedef ManualPersonAssignmentResult = ({
   List<int> addedFileIds,
   List<int> alreadyAssignedFileIds,
 });
+typedef PersonAvatarUpdateResult = ({
+  PersonEntity person,
+  bool contactPictureUpdateFailed,
+});
 
 class PersonService {
   static const Object _attributeNotProvided = Object();
@@ -603,7 +607,10 @@ class PersonService {
     return changed;
   }
 
-  Future<PersonEntity> updateAvatar(PersonEntity p, EnteFile file) async {
+  Future<PersonAvatarUpdateResult> updateAvatar(
+    PersonEntity p,
+    EnteFile file,
+  ) async {
     final Face? face = await faceMLDataDB.getCoverFaceForPerson(
       recentFileID: file.uploadedFileID!,
       personID: p.remoteID,
@@ -615,13 +622,22 @@ class PersonService {
     }
 
     final person = (await getPerson(p.remoteID))!;
-    await _updateLinkedContactAvatarBeforePerson(person, file, face);
+    var contactPictureUpdateFailed = false;
+    try {
+      await _updateLinkedContactAvatarBeforePerson(person, file, face);
+    } catch (e, s) {
+      contactPictureUpdateFailed = true;
+      logger.warning("Failed to update linked contact picture", e, s);
+    }
     final updatedPerson = person.copyWith(
       data: person.data.copyWith(avatarFaceId: face.faceID),
     );
     await updatePerson(updatedPerson);
     await putFaceIdCachedForPersonOrCluster(p.remoteID, face.faceID);
-    return updatedPerson;
+    return (
+      person: updatedPerson,
+      contactPictureUpdateFailed: contactPictureUpdateFailed,
+    );
   }
 
   Future<void> _updateLinkedContactAvatarBeforePerson(
