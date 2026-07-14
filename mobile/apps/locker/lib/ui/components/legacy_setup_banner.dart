@@ -1,6 +1,8 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_events/event_bus.dart";
+import "package:ente_legacy/events/legacy_kit_created_event.dart";
 import "package:ente_legacy/services/emergency_service.dart";
 import "package:ente_legacy/services/legacy_kit_service.dart";
 import "package:flutter/material.dart";
@@ -46,12 +48,23 @@ class _LegacySetupBannerState extends State<LegacySetupBanner> {
   static const _contentRightReserve = 150.0;
 
   final _logger = Logger("LegacySetupBanner");
+  late final StreamSubscription<LegacyKitCreatedEvent>
+  _legacyKitCreatedSubscription;
   bool _shouldShow = false;
 
   @override
   void initState() {
     super.initState();
+    _legacyKitCreatedSubscription = Bus.instance
+        .on<LegacyKitCreatedEvent>()
+        .listen((_) => unawaited(_evaluateVisibility()));
     unawaited(_evaluateVisibility());
+  }
+
+  @override
+  void dispose() {
+    _legacyKitCreatedSubscription.cancel();
+    super.dispose();
   }
 
   Future<void> _evaluateVisibility() async {
