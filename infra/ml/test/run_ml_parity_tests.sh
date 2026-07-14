@@ -164,11 +164,6 @@ cleanup_resources() {
 trap cleanup_resources EXIT
 
 ensure_goldens_python_runtime_deps() {
-  if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "x86_64" ]]; then
-    echo "Python golden generation requires Apple Silicon on macOS because ONNX Runtime 1.27 does not publish Intel Mac binaries." >&2
-    return 1
-  fi
-
   if ! command -v uv >/dev/null 2>&1; then
     echo "Python golden generation requires uv, but uv is unavailable." >&2
     return 1

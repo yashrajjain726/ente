@@ -633,22 +633,8 @@ fn onnx_runtime_target_key_for(os: &str, arch: &str) -> Result<String> {
     match (os, arch) {
         ("linux", "x86_64") => Ok("x86_64-unknown-linux-gnu".to_string()),
         ("linux", "aarch64") => Ok("aarch64-unknown-linux-gnu".to_string()),
-        ("macos", "x86_64") => bail!(
-            "ONNX Runtime 1.27 does not support Apple x86_64; the ML indexing test requires Apple Silicon on macOS"
-        ),
         ("macos", "aarch64") => Ok("aarch64-apple-darwin".to_string()),
         (os, arch) => bail!("unsupported ONNX Runtime target for ML indexing test: {arch}-{os}"),
-    }
-}
-
-#[cfg(test)]
-mod onnx_runtime_target_key_tests {
-    use super::onnx_runtime_target_key_for;
-
-    #[test]
-    fn rejects_intel_macos() {
-        let error = onnx_runtime_target_key_for("macos", "x86_64").unwrap_err();
-        assert!(error.to_string().contains("requires Apple Silicon"));
     }
 }
 
