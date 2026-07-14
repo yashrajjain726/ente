@@ -22,6 +22,9 @@ A new Flutter FFI plugin project.
   s.dependency 'FlutterMacOS'
 
   s.platform = :osx, '10.11'
+  # ONNX Runtime 1.27 does not publish Apple x86_64 binaries, so consumers
+  # must also avoid trying to link an x86_64 application slice.
+  s.user_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=macosx*]' => 'x86_64' }
   s.swift_version = '5.0'
 
   s.script_phase = {
