@@ -567,17 +567,23 @@ export const Upload: React.FC<UploadProps> = ({
         uploadItemsAndPaths.current = prunedItemAndPaths;
 
         void (async () => {
+            const _selectedUploadType = selectedUploadType.current;
+            selectedUploadType.current = undefined;
+            const _isDragAndDrop = isDragAndDrop.current;
+            isDragAndDrop.current = false;
+
             const importSuggestion = await deriveImportSuggestion(
-                selectedUploadType.current,
+                _selectedUploadType,
                 prunedItemAndPaths,
             );
+
+            if (uploadItemsAndPaths.current !== prunedItemAndPaths) return;
+
             setImportSuggestion(importSuggestion);
 
             log.debug(() => ["Upload request", uploadItemsAndPaths.current]);
             log.debug(() => ["Import suggestion", importSuggestion]);
 
-            const _selectedUploadType = selectedUploadType.current;
-            selectedUploadType.current = undefined;
             props.setLoading(false);
 
             if (isPendingDesktopUpload.current) {
@@ -609,14 +615,16 @@ export const Upload: React.FC<UploadProps> = ({
                 );
             }
 
-            if (isDragAndDrop.current) {
-                isDragAndDrop.current = false;
+            if (_isDragAndDrop) {
                 const canUploadToActiveCollection =
                     props.activeCollection &&
                     (props.activeCollection.owner.id == user?.id ||
                         canAddFilesToCollection(props.activeCollection));
                 if (props.activeCollection && canUploadToActiveCollection) {
-                    uploadFilesToExistingCollection(props.activeCollection);
+                    uploadFilesToExistingCollection(
+                        props.activeCollection,
+                        prunedItemAndPaths,
+                    );
                     return;
                 }
             }
@@ -632,7 +640,11 @@ export const Upload: React.FC<UploadProps> = ({
                 action: "upload",
                 activeCollectionID: props.activeCollection?.id,
                 showHiddenCollections: props.isInHiddenSection,
-                onSelectCollection: uploadFilesToExistingCollection,
+                onSelectCollection: (collection) =>
+                    uploadFilesToExistingCollection(
+                        collection,
+                        prunedItemAndPaths,
+                    ),
                 onCreateCollection: showNextModal,
                 onCancel: handleCollectionSelectorCancel,
             });
@@ -765,7 +777,10 @@ export const Upload: React.FC<UploadProps> = ({
         uploadRunning.current = false;
     };
 
-    const uploadFilesToExistingCollection = async (collection: Collection) => {
+    const uploadFilesToExistingCollection = async (
+        collection: Collection,
+        uploadItemAndPaths: UploadItemAndPath[],
+    ) => {
         preCollectionCreationAction();
         try {
             const uploadCollection = canDirectlyUploadToCollection(collection)
@@ -778,7 +793,7 @@ export const Upload: React.FC<UploadProps> = ({
                 throw new Error("Upload not allowed for the selected album");
             }
 
-            const uploadItemsWithCollection = uploadItemsAndPaths.current.map(
+            const uploadItemsWithCollection = uploadItemAndPaths.map(
                 ([uploadItem, path], index) => ({
                     uploadItem,
                     pathPrefix: uploadPathPrefix(path),
@@ -797,7 +812,9 @@ export const Upload: React.FC<UploadProps> = ({
                             : collection,
                 },
             );
-            uploadItemsAndPaths.current = [];
+            if (uploadItemsAndPaths.current === uploadItemAndPaths) {
+                uploadItemsAndPaths.current = [];
+            }
         } catch (e) {
             retrySharedAlbumUploadTarget.current = undefined;
             closeUploadProgress();
