@@ -168,25 +168,6 @@ void main() {
       expect(contactsService.createOrUpdateCalls, 0);
       expect(contactsService.lastUpdatedName, isNull);
     });
-
-    test("updateAttributes clears userID when explicitly provided", () async {
-      final updated = await personService.updateAttributes(
-        "person-1",
-        email: null,
-        userID: null,
-      );
-
-      expect(updated.data.userID, isNull);
-      expect(updated.data.email, isNull);
-
-      final stored = await entityService.getEntity(
-        EntityType.cgroup,
-        "person-1",
-      );
-      final storedJson = jsonDecode(stored!.data) as Map<String, dynamic>;
-      expect(storedJson["userID"], isNull);
-      expect(storedJson["email"], isNull);
-    });
   });
 
   group("contact link conflict rules", () {

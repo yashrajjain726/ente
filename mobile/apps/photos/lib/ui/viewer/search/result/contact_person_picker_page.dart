@@ -57,20 +57,7 @@ class ContactPersonPickerPage extends StatelessWidget {
             },
           ),
         ],
-        slivers: [
-          if (persons.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Text(
-                  "${l10n.noResultsFound}.",
-                  style: TextStyles.body.copyWith(color: colors.textLight),
-                ),
-              ),
-            )
-          else
-            _buildGrid(persons),
-        ],
+        slivers: [_buildGrid(persons)],
       ),
     );
   }
@@ -100,6 +87,7 @@ class ContactPersonPickerPage extends StatelessWidget {
             delegate: SliverChildBuilderDelegate(
               childCount: persons.length,
               (context, index) => _PersonTile(
+                key: ValueKey(persons[index].remoteID),
                 person: persons[index],
                 size: tileSize,
                 contactUserId: contactUserId,
@@ -115,6 +103,7 @@ class ContactPersonPickerPage extends StatelessWidget {
 
 class _PersonTile extends StatelessWidget {
   const _PersonTile({
+    super.key,
     required this.person,
     required this.size,
     required this.contactUserId,

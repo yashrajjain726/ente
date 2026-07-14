@@ -182,9 +182,10 @@ class _EditContactPageState extends State<EditContactPage> {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            _ReadOnlyContactTextInput(
+                            TextInputComponent(
                               label: l10n.email,
-                              value: widget.email,
+                              initialValue: widget.email,
+                              isDisabled: true,
                             ),
                             const SizedBox(height: 20),
                             TextInputComponent(
@@ -577,21 +578,13 @@ class _EditContactPageState extends State<EditContactPage> {
           contactNameChanged &&
           contactName.isNotEmpty &&
           selectedPerson.data.name.trim() != contactName;
-      if (shouldUpdateSelectedLink) {
+      if (shouldUpdateSelectedLink || shouldUpdateSelectedName) {
         updatedPersons.add(
           await PersonService.instance.updateAttributes(
             selectedPerson.remoteID,
             name: shouldUpdateSelectedName ? contactName : null,
             userID: widget.contactUserId,
             email: widget.email,
-            syncLinkedContactName: false,
-          ),
-        );
-      } else if (shouldUpdateSelectedName) {
-        updatedPersons.add(
-          await PersonService.instance.updateAttributes(
-            selectedPerson.remoteID,
-            name: contactName,
             syncLinkedContactName: false,
           ),
         );
@@ -666,42 +659,6 @@ class _EditContactPageState extends State<EditContactPage> {
       actionSheetType: ActionSheetType.defaultActionSheet,
     );
     return actionResult?.action;
-  }
-}
-
-class _ReadOnlyContactTextInput extends StatelessWidget {
-  const _ReadOnlyContactTextInput({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.componentColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(label, style: TextStyles.body.copyWith(color: colors.textBase)),
-        const SizedBox(height: 9),
-        Container(
-          height: 52,
-          width: double.infinity,
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
-          decoration: BoxDecoration(
-            color: colors.fillLight,
-            borderRadius: BorderRadius.circular(Radii.lg),
-          ),
-          child: Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyles.body.copyWith(color: colors.textLightest),
-          ),
-        ),
-      ],
-    );
   }
 }
 

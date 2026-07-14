@@ -674,6 +674,7 @@ class _ReassignMeSelectionPageState extends State<ReassignMeSelectionPage> {
               itemCount: results.length,
               itemBuilder: (context, index) {
                 return _RoundedPersonFaceWidget(
+                  key: ValueKey(results[index].remoteID),
                   onTap: () async {
                     final dialog = createProgressDialog(
                       context,

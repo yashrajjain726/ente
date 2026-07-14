@@ -139,26 +139,22 @@ class PhotosContactsService {
   }
 
   String? getCachedSavedName({int? contactUserId, String? email}) {
-    final savedName = getCachedContact(
-      contactUserId: contactUserId,
-      email: email,
-    )?.data?.name;
-    if (savedName == null) {
-      return null;
-    }
-    final trimmed = savedName.trim();
-    return trimmed.isEmpty ? null : trimmed;
+    return _trimmedNonEmpty(
+      getCachedContact(contactUserId: contactUserId, email: email)?.data?.name,
+    );
   }
 
   String? getCachedResolvedEmail({int? contactUserId, String? email}) {
-    final resolved = getCachedContact(
-      contactUserId: contactUserId,
-      email: email,
-    )?.email;
-    if (resolved == null) {
+    return _trimmedNonEmpty(
+      getCachedContact(contactUserId: contactUserId, email: email)?.email,
+    );
+  }
+
+  String? _trimmedNonEmpty(String? value) {
+    if (value == null) {
       return null;
     }
-    final trimmed = resolved.trim();
+    final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
   }
 

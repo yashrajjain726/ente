@@ -103,13 +103,16 @@ class _ContactsSectionState extends State<ContactsSection> {
       streamSubscriptions.add(
         stream.listen((event) async {
           _debouncer.run(() async {
-            _contactSearchResults =
+            final contactSearchResults =
                 (await SectionType.contacts.getData(
                       context,
                       limit: widget.resultLimit + 1,
                     ))
                     as List<GenericSearchResult>;
-            setState(() {});
+            if (!mounted) return;
+            setState(() {
+              _contactSearchResults = contactSearchResults;
+            });
           });
         }),
       );

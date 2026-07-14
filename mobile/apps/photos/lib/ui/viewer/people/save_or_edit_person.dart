@@ -354,6 +354,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                                 context,
                               );
                               if (updatedPersonEntity != null) {
+                                if (!mounted) return;
                                 Navigator.pop(context, updatedPersonEntity);
                               }
                             } else {
@@ -372,6 +373,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                                     return null;
                                   });
                               if (newPersonEntity != null) {
+                                if (!mounted) return;
                                 Navigator.pop(context, newPersonEntity);
                               }
                             }
