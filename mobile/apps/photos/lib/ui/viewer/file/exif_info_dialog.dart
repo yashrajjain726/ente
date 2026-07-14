@@ -2,8 +2,8 @@ import "package:ente_components/ente_components.dart";
 import 'package:flutter/material.dart';
 import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart';
+import 'package:photos/module/metadata/exif.dart';
 import 'package:photos/ui/common/loading_widget.dart';
-import 'package:photos/utils/exif_util.dart';
 
 class ExifInfoDialog extends StatelessWidget {
   final EnteFile file;

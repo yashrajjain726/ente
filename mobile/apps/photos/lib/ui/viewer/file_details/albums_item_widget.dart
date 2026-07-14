@@ -95,6 +95,7 @@ class _AlbumsItemWidgetState extends State<AlbumsItemWidget> {
       final colors = context.componentColors;
       final chips = <Widget>[];
       final Set<int> collectionIDs = await allCollectionIDsOfFile;
+      if (!context.mounted) return const [];
       for (var collectionID in collectionIDs) {
         final c = CollectionsService.instance.getCollectionByID(collectionID)!;
         chips.add(

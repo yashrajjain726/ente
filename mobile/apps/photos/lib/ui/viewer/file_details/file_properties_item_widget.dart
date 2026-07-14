@@ -6,8 +6,8 @@ import 'package:path/path.dart' as path;
 import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
-import "package:photos/utils/file_uploader_util.dart";
-import "package:photos/utils/file_util.dart";
+import "package:photos/module/download/file.dart";
+import "package:photos/utils/image_util.dart";
 import "package:photos/utils/magic_util.dart";
 
 class FilePropertiesItemWidget extends StatefulWidget {
@@ -88,11 +88,11 @@ class _FilePropertiesItemWidgetState extends State<FilePropertiesItemWidget> {
       try {
         final localFile = await getFile(widget.file);
         final decoded = localFile != null
-            ? await getImageHeightAndWith(imagePath: localFile.path)
+            ? await getImageDimensions(imagePath: localFile.path)
             : null;
         if (decoded != null) {
-          width = decoded["width"];
-          height = decoded["height"];
+          width = decoded.width;
+          height = decoded.height;
         }
       } catch (_) {}
     }

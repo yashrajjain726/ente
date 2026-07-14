@@ -255,10 +255,12 @@ class _InfoMapState extends State<InfoMap> {
                                     onTap: () async {
                                       try {
                                         await setMapEnabled(true);
+                                        if (!mounted) return;
                                         setState(() {
                                           _hasEnabledMap = true;
                                         });
                                       } catch (e) {
+                                        if (!context.mounted) return;
                                         showShortToast(
                                           context,
                                           AppLocalizations.of(

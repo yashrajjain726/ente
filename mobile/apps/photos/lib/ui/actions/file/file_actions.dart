@@ -8,12 +8,12 @@ import "package:photos/events/details_sheet_event.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/file/extensions/file_props.dart";
 import 'package:photos/models/file/file.dart';
+import 'package:photos/module/metadata/panorama.dart';
 import "package:photos/service_locator.dart";
 import "package:photos/services/media_store_service.dart";
 import "package:photos/ui/notification/toast.dart";
 import 'package:photos/ui/viewer/file/file_details_widget.dart';
 import "package:photos/utils/delete_file_util.dart";
-import "package:photos/utils/panorama_util.dart";
 
 Future<void> showSingleFileDeleteSheet(
   BuildContext context,
@@ -30,6 +30,7 @@ Future<void> showSingleFileDeleteSheet(
       return;
     }
     if (Platform.isAndroid && await MediaStoreService.canManageMedia()) {
+      if (!context.mounted) return;
       await showBottomSheetComponent<bool>(
         context: context,
         useRootNavigator: Platform.isIOS,
@@ -53,6 +54,7 @@ Future<void> showSingleFileDeleteSheet(
         ),
       );
     } else {
+      if (!context.mounted) return;
       final deletedFiles = await deleteFilesOnDeviceOnly(context, [file]);
       if (deletedFiles.isNotEmpty &&
           ((isLocal && !isRemote) || isLocalOnlyContext)) {
@@ -80,6 +82,7 @@ Future<void> showSingleFileDeleteSheet(
       },
       onDeleteFromRemote: () async {
         await deleteFilesFromRemoteOnly(context, [file]);
+        if (!context.mounted) return;
         showShortToast(context, l10n.movedToTrash);
         if (((isRemote && !isLocal) || !isLocalOnlyContext)) {
           onFileRemoved?.call(file);
@@ -92,6 +95,7 @@ Future<void> showSingleFileDeleteSheet(
     ),
   );
   if (didDelete == true && isLocal) {
+    if (!context.mounted) return;
     await showMediaManagementHintSheet(context);
   }
 }
