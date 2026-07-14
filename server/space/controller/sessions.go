@@ -3,6 +3,7 @@ package controller
 import (
 	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"strings"
 
@@ -18,6 +19,7 @@ import (
 const (
 	spaceBrowserSessionDurationDays = 365
 	spaceBrowserSessionTouchMinutes = 1
+	spaceBrowserSessionWrapKeyBytes = 32
 )
 const SpaceBrowserSessionTokenHeader = "X-Space-Session-Token"
 
@@ -30,11 +32,15 @@ type CreatedBrowserSession struct {
 }
 
 func (c *SessionsController) CreateBrowserSession(ctx *gin.Context, userID int64, authToken string, sessionWrapKey string) (*CreatedBrowserSession, error) {
-	sessionToken := auth.GenerateURLSafeRandomString(32)
 	sessionWrapKey = strings.TrimSpace(sessionWrapKey)
-	if sessionWrapKey == "" {
-		return nil, ente.NewBadRequestWithMessage("sessionWrapKey is required")
+	if len(sessionWrapKey) != base64.StdEncoding.EncodedLen(spaceBrowserSessionWrapKeyBytes) {
+		return nil, ente.NewBadRequestWithMessage("sessionWrapKey must be a base64-encoded 32-byte key")
 	}
+	decodedWrapKey, err := base64.StdEncoding.DecodeString(sessionWrapKey)
+	if err != nil || len(decodedWrapKey) != spaceBrowserSessionWrapKeyBytes {
+		return nil, ente.NewBadRequestWithMessage("sessionWrapKey must be a base64-encoded 32-byte key")
+	}
+	sessionToken := auth.GenerateURLSafeRandomString(32)
 	sessionHash := sha256.Sum256([]byte(sessionToken))
 	expiresAt := timeutil.NDaysFromNow(spaceBrowserSessionDurationDays)
 	if err := c.SessionsRepo.ExchangeBrowserSession(ctx, authToken, sessionHash[:], userID, sessionWrapKey, expiresAt); err != nil {
