@@ -7,15 +7,6 @@ set -euo pipefail
 
 : "${SRCROOT:?}" "${TARGET_TEMP_DIR:?}" "${PLATFORM_NAME:?}" "${ARCHS:?}"
 
-if [[ "$PLATFORM_NAME" == "iphonesimulator" ]]; then
-    for arch in $ARCHS; do
-        if [[ "$arch" != "arm64" ]]; then
-            echo "error: ONNX Runtime 1.27 does not support the $arch iOS Simulator; Ensu Simulator builds require arm64." >&2
-            exit 1
-        fi
-    done
-fi
-
 REPO_ROOT=$(cd "$SRCROOT/../../../../.." && pwd)
 GENERATED_DIR="$SRCROOT/Ensu/Generated"
 OUT_DIR="$TARGET_TEMP_DIR/ensu_rust"
