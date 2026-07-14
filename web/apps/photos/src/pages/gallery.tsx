@@ -187,8 +187,6 @@ import { Trans } from "react-i18next";
  *     ---------------------      |
  *           Photo List           v
  */
-const galleryFeatureFlags: { v2: boolean } = { v2: true };
-
 const Page: React.FC = () => {
     const { logout, showMiniDialog, onGenericError } = useBaseContext();
     const {
@@ -262,7 +260,7 @@ const Page: React.FC = () => {
     const [collectionSelectorAttributes, setCollectionSelectorAttributes] =
         useState<CollectionSelectorAttributes | undefined>();
 
-    const { customDomain } = useSettingsSnapshot();
+    const { customDomain, isInternalUser } = useSettingsSnapshot();
     const userDetails = useUserDetailsSnapshot();
     const peopleState = usePeopleStateSnapshot();
 
@@ -2201,7 +2199,7 @@ const Page: React.FC = () => {
             !isFirstLoad &&
             !state.collectionFiles.length &&
             activeCollectionID === PseudoCollectionID.all ? (
-                galleryFeatureFlags.v2 ? (
+                isInternalUser ? (
                     <GalleryEmptyStateV2
                         isUploadInProgress={uploadManager.isUploadInProgress()}
                         onUpload={openUploader}

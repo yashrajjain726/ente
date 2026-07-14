@@ -170,11 +170,6 @@ interface UploadProps {
 
 type UploadType = "files" | "folders" | "zips";
 
-const uploadFeatureFlags: {
-    defaultOptionsV2: boolean;
-    takeoutOptionsV2: boolean;
-} = { defaultOptionsV2: true, takeoutOptionsV2: true };
-
 interface UploadFilesOptions {
     persistPendingUploads?: boolean;
     postUploadTargetCollection?: Collection;
@@ -1105,6 +1100,7 @@ export const Upload: React.FC<UploadProps> = ({
                 open={props.uploadTypeSelectorView}
                 onClose={props.closeUploadTypeSelector}
                 intent={props.uploadTypeSelectorIntent}
+                {...{ isInternalUser }}
                 pendingUploadType={
                     isInputPending ? selectedUploadType.current : undefined
                 }
@@ -1427,6 +1423,8 @@ const setPendingUploads = async (
 };
 
 type UploadTypeSelectorProps = ModalVisibilityProps & {
+    /** Whether experimental upload UI should be shown. */
+    isInternalUser: boolean;
     /**
      * The particular context / scenario in which this upload is occurring.
      */
@@ -1454,6 +1452,7 @@ type UploadTypeSelectorProps = ModalVisibilityProps & {
 const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
     open,
     onClose,
+    isInternalUser,
     intent,
     pendingUploadType,
     onSelect,
@@ -1500,7 +1499,13 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
             }}
         >
             <UploadOptions
-                {...{ intent, pendingUploadType, onSelect, onClose }}
+                {...{
+                    isInternalUser,
+                    intent,
+                    pendingUploadType,
+                    onSelect,
+                    onClose,
+                }}
             />
         </Dialog>
     );
@@ -1508,10 +1513,11 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
 
 type UploadOptionsProps = Pick<
     UploadTypeSelectorProps,
-    "onClose" | "intent" | "pendingUploadType" | "onSelect"
+    "isInternalUser" | "onClose" | "intent" | "pendingUploadType" | "onSelect"
 >;
 
 const UploadOptions: React.FC<UploadOptionsProps> = ({
+    isInternalUser,
     intent,
     pendingUploadType,
     onSelect,
@@ -1553,7 +1559,7 @@ const UploadOptions: React.FC<UploadOptionsProps> = ({
     const handleSelectFolder = () => handleSelect("folders");
 
     return showTakeoutOptions ? (
-        uploadFeatureFlags.takeoutOptionsV2 ? (
+        isInternalUser ? (
             <TakeoutOptionsV2
                 onBack={handleTakeoutClose}
                 onSelectFolder={handleSelectFolder}
@@ -1566,7 +1572,7 @@ const UploadOptions: React.FC<UploadOptionsProps> = ({
                 onClose={handleTakeoutClose}
             />
         )
-    ) : uploadFeatureFlags.defaultOptionsV2 && intent != "collect" ? (
+    ) : isInternalUser && intent != "collect" ? (
         <DefaultOptionsV2
             intent={intent}
             isFileSelectionPending={pendingUploadType == "files"}
@@ -1584,12 +1590,12 @@ const UploadOptions: React.FC<UploadOptionsProps> = ({
     );
 };
 
-const DefaultOptions: React.FC<UploadOptionsProps> = ({
-    intent,
-    pendingUploadType,
-    onClose,
-    onSelect,
-}) => {
+const DefaultOptions: React.FC<
+    Pick<
+        UploadOptionsProps,
+        "intent" | "pendingUploadType" | "onClose" | "onSelect"
+    >
+> = ({ intent, pendingUploadType, onClose, onSelect }) => {
     return (
         <>
             <SpacedRow>
