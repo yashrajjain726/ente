@@ -978,6 +978,34 @@
   "legacyKitDownloaded": "Legacy kit downloaded",
   "legacyKitMaxReached": "You can create up to 5 legacy kits.",
   "authToManageLegacyKit": "Authenticate to manage legacy kits",
+  "legacyIntroTitle": "Help loved ones access important information, in your absence.",
+  "legacyIntroCard1": "We give you 3 cards",
+  "legacyIntroCard2": "Share them with\n3 people you trust",
+  "legacyIntroCard3": "Any 2 of 3 can unlock your information on Locker",
+  "setupYourLegacy": "Setup your Legacy",
+  "setupLegacyDescription": "Choose 3 people you trust. Any 2 of them, together, can unlock your information - never just one alone.",
+  "addTrustedPerson": "Add a trusted person",
+  "accountRecovery": "Account recovery",
+  "shareYourLegacy": "Share your Legacy",
+  "shareLegacyDescription": "Send each card to the person it's for. No single card works alone.",
+  "legacyKitAllSetTitle": "Your Legacy kit is all set!",
+  "legacyKitAllSetDescription": "You can set up more Legacy kits or revoke access anytime.",
+  "share": "Share",
+  "revokeLegacyKit": "Revoke Legacy kit",
+  "getAnotherPartOfKitFrom": "Get another part of the kit from",
+  "goToUrl": "Go to {url}",
+  "@goToUrl": {
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "legacy.ente.com"
+      }
+    }
+  },
+  "linkCopiedToClipboard": "Link copied to clipboard",
+  "congratulations": "Congratulations!",
+  "legacyCongratulationsMessage": "You've successfully setup your Legacy. Start saving your important information.",
+  "saveToLocker": "Save to Locker",
   "createdOn": "Created {date}",
   "@createdOn": {
     "placeholders": {
