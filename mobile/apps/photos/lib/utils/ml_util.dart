@@ -33,7 +33,6 @@ import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/services/sync/local_sync_service.dart";
 import "package:photos/src/rust/api/ml_indexing_api.dart" as rust_ml;
-import "package:photos/utils/file_util.dart";
 import "package:photos/utils/image_decode_util.dart";
 import "package:photos/utils/network_util.dart";
 
