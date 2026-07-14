@@ -133,11 +133,13 @@ pub struct Http {
 }
 
 impl Http {
-    /// Create a transport with a default connect timeout.
+    /// Create a transport with default connect and read timeouts.
     pub fn new() -> Result<Self, Error> {
         let builder = reqwest::Client::builder();
         #[cfg(not(target_arch = "wasm32"))]
-        let builder = builder.connect_timeout(Duration::from_secs(15));
+        let builder = builder
+            .connect_timeout(Duration::from_secs(15))
+            .read_timeout(Duration::from_secs(30));
         Ok(Http {
             client: builder.build()?,
         })
@@ -414,6 +416,11 @@ impl Response {
     /// The value of a response header, if present and valid UTF-8.
     pub fn header(&self, name: &str) -> Option<&str> {
         self.0.headers().get(name).and_then(|v| v.to_str().ok())
+    }
+
+    /// All the response headers.
+    pub fn headers(&self) -> &reqwest::header::HeaderMap {
+        self.0.headers()
     }
 
     /// Return an [`Error::Http`] if the status is not 2xx, otherwise the response.
