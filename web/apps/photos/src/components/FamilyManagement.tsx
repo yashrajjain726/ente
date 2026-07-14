@@ -7,22 +7,27 @@ import {
 } from "@/services/family";
 import {
     AddOutlined,
+    ChevronRightOutlined,
     DeleteOutlined,
     EditOutlined,
     RefreshOutlined,
 } from "@mui/icons-material";
 import {
+    Avatar,
     Box,
     Dialog,
     DialogContent,
     Divider,
-    IconButton,
-    LinearProgress,
     Stack,
     TextField,
-    Tooltip,
     Typography,
 } from "@mui/material";
+import {
+    RowButton,
+    RowButtonDivider,
+    RowButtonEndActivityIndicator,
+    RowButtonGroup,
+} from "ente-base/components/RowButton";
 import { ActivityIndicator } from "ente-base/components/mui/ActivityIndicator";
 import { DialogCloseIconButton } from "ente-base/components/mui/DialogCloseIconButton";
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
@@ -33,6 +38,10 @@ import { useBaseContext } from "ente-base/context";
 import { isHTTPErrorWithStatus } from "ente-base/http";
 import { formattedStorageByteSize } from "ente-gallery/utils/units";
 import { useUserDetailsSnapshot } from "ente-new/photos/components/utils/use-snapshot";
+import {
+    avatarBackgroundColor,
+    avatarTextColor,
+} from "ente-new/photos/services/avatar";
 import {
     familyUsage,
     isSubscriptionActivePaid,
@@ -58,6 +67,7 @@ export const FamilyManagement: React.FC<FamilyManagementProps> = ({
     const fullScreen = useIsSmallWidth();
     const [loading, setLoading] = useState(false);
     const [inviteOpen, setInviteOpen] = useState(false);
+    const [selectedMember, setSelectedMember] = useState<FamilyMember>();
     const [editingMember, setEditingMember] = useState<FamilyMember>();
     const [resendingID, setResendingID] = useState<string>();
 
@@ -99,8 +109,8 @@ export const FamilyManagement: React.FC<FamilyManagementProps> = ({
                 color: "critical",
                 action: () =>
                     invited
-                        ? revokeFamilyInvite(member.id!)
-                        : removeFamilyMember(member.id!),
+                        ? revokeFamilyInvite(member.id)
+                        : removeFamilyMember(member.id),
             },
         });
     };
@@ -109,6 +119,7 @@ export const FamilyManagement: React.FC<FamilyManagementProps> = ({
         setResendingID(member.id);
         try {
             await inviteFamilyMember(member.email);
+            setSelectedMember(undefined);
         } catch (e) {
             onGenericError(e);
         } finally {
@@ -162,10 +173,7 @@ export const FamilyManagement: React.FC<FamilyManagementProps> = ({
                         <FamilyDashboard
                             {...{ userDetails, members, isAdmin }}
                             onInvite={() => setInviteOpen(true)}
-                            onEdit={setEditingMember}
-                            onRemove={confirmRemove}
-                            onResend={(member) => void resendInvite(member)}
-                            {...{ resendingID }}
+                            onManage={setSelectedMember}
                             onLeave={confirmLeave}
                         />
                     ) : (
@@ -183,6 +191,20 @@ export const FamilyManagement: React.FC<FamilyManagementProps> = ({
                 open={inviteOpen}
                 onClose={() => setInviteOpen(false)}
                 create={!members.length}
+            />
+            <MemberActionsDialog
+                member={selectedMember}
+                resending={selectedMember?.id == resendingID}
+                onClose={() => setSelectedMember(undefined)}
+                onEdit={(member) => {
+                    setSelectedMember(undefined);
+                    setEditingMember(member);
+                }}
+                onRemove={(member) => {
+                    setSelectedMember(undefined);
+                    confirmRemove(member);
+                }}
+                onResend={(member) => void resendInvite(member)}
             />
             <StorageLimitDialog
                 member={editingMember}
@@ -218,11 +240,8 @@ interface FamilyDashboardProps {
     userDetails: UserDetails;
     members: FamilyMember[];
     isAdmin: boolean;
-    resendingID?: string;
     onInvite: () => void;
-    onEdit: (member: FamilyMember) => void;
-    onRemove: (member: FamilyMember) => void;
-    onResend: (member: FamilyMember) => void;
+    onManage: (member: FamilyMember) => void;
     onLeave: () => void;
 }
 
@@ -230,11 +249,8 @@ const FamilyDashboard: React.FC<FamilyDashboardProps> = ({
     userDetails,
     members,
     isAdmin,
-    resendingID,
     onInvite,
-    onEdit,
-    onRemove,
-    onResend,
+    onManage,
     onLeave,
 }) => {
     const used = familyUsage(userDetails);
@@ -253,11 +269,31 @@ const FamilyDashboard: React.FC<FamilyDashboardProps> = ({
                         })}
                     </Typography>
                 </Stack>
-                <LinearProgress
-                    variant="determinate"
-                    value={total ? Math.min((used / total) * 100, 100) : 0}
-                    sx={{ mt: 1.5, height: 8, borderRadius: 1 }}
-                />
+                <Box
+                    sx={{
+                        display: "flex",
+                        mt: 1.5,
+                        height: 8,
+                        bgcolor: "fill.muted",
+                        borderRadius: 1,
+                        overflow: "hidden",
+                    }}
+                >
+                    {members.map((member, index) =>
+                        member.status == "INVITED" ? null : (
+                            <Box
+                                key={member.id}
+                                sx={{
+                                    flexShrink: 0,
+                                    width: total
+                                        ? `${Math.min(((member.usage ?? 0) / total) * 100, 100)}%`
+                                        : 0,
+                                    bgcolor: avatarBackgroundColor(index),
+                                }}
+                            />
+                        ),
+                    )}
+                </Box>
             </Box>
             <Stack sx={{ gap: 1 }}>
                 <Typography variant="small" sx={{ px: 1, color: "text.muted" }}>
@@ -265,17 +301,11 @@ const FamilyDashboard: React.FC<FamilyDashboardProps> = ({
                 </Typography>
                 <Box sx={{ bgcolor: "fill.faint", borderRadius: 2 }}>
                     {members.map((member, index) => (
-                        <React.Fragment key={member.email}>
+                        <React.Fragment key={member.id}>
                             {!!index && <Divider />}
                             <FamilyMemberRow
-                                {...{
-                                    member,
-                                    isAdmin,
-                                    onEdit,
-                                    onRemove,
-                                    onResend,
-                                }}
-                                resending={member.id == resendingID}
+                                {...{ member, isAdmin, onManage }}
+                                color={avatarBackgroundColor(index)}
                             />
                         </React.Fragment>
                     ))}
@@ -303,21 +333,40 @@ const FamilyDashboard: React.FC<FamilyDashboardProps> = ({
 const FamilyMemberRow: React.FC<{
     member: FamilyMember;
     isAdmin: boolean;
-    resending: boolean;
-    onEdit: (member: FamilyMember) => void;
-    onRemove: (member: FamilyMember) => void;
-    onResend: (member: FamilyMember) => void;
-}> = ({ member, isAdmin, resending, onEdit, onRemove, onResend }) => {
+    color: string;
+    onManage: (member: FamilyMember) => void;
+}> = ({ member, isAdmin, color, onManage }) => {
     const invited = member.status == "INVITED";
+    const manageable = isAdmin && !member.isAdmin;
     const role = member.isAdmin
         ? t("family_manager")
         : t(invited ? "family_invited" : "family_member");
 
-    return (
-        <Stack direction="row" sx={{ p: 2, gap: 1, alignItems: "center" }}>
+    const content = (
+        <Stack
+            direction="row"
+            sx={{
+                minHeight: 72,
+                px: 2,
+                py: 1.5,
+                gap: 1.5,
+                alignItems: "center",
+            }}
+        >
+            <Avatar
+                sx={{
+                    width: 36,
+                    height: 36,
+                    bgcolor: color,
+                    color: avatarTextColor,
+                    fontSize: 15,
+                }}
+            >
+                {member.email[0]?.toUpperCase()}
+            </Avatar>
             <Stack sx={{ flex: 1, minWidth: 0 }}>
                 <Typography noWrap>{member.email}</Typography>
-                <Typography variant="small" sx={{ color: "text.muted" }}>
+                <Typography variant="small" noWrap sx={{ color: "text.muted" }}>
                     {role}
                     {!invited &&
                         ` · ${formattedStorageByteSize(member.usage ?? 0)}`}
@@ -325,42 +374,95 @@ const FamilyMemberRow: React.FC<{
                         ` / ${formattedStorageByteSize(member.storageLimit)}`}
                 </Typography>
             </Stack>
-            {isAdmin && !member.isAdmin && member.id && (
-                <Stack direction="row">
-                    {invited ? (
-                        <Tooltip title={t("resend_family_invite")}>
-                            <IconButton
-                                disabled={resending}
-                                onClick={() => onResend(member)}
-                            >
-                                {resending ? (
-                                    <ActivityIndicator size={20} />
-                                ) : (
-                                    <RefreshOutlined />
-                                )}
-                            </IconButton>
-                        </Tooltip>
-                    ) : (
-                        <Tooltip title={t("set_storage_limit")}>
-                            <IconButton onClick={() => onEdit(member)}>
-                                <EditOutlined />
-                            </IconButton>
-                        </Tooltip>
-                    )}
-                    <Tooltip
-                        title={t(
-                            invited
-                                ? "revoke_family_invite"
-                                : "remove_family_member",
-                        )}
-                    >
-                        <IconButton onClick={() => onRemove(member)}>
-                            <DeleteOutlined />
-                        </IconButton>
-                    </Tooltip>
-                </Stack>
+            {manageable && (
+                <ChevronRightOutlined sx={{ color: "stroke.muted" }} />
             )}
         </Stack>
+    );
+
+    return manageable ? (
+        <FocusVisibleButton
+            fullWidth
+            onClick={() => onManage(member)}
+            sx={{
+                display: "block",
+                p: 0,
+                color: "text.base",
+                bgcolor: "transparent",
+                textAlign: "left",
+                textTransform: "none",
+                borderRadius: 0,
+                "&:hover": { bgcolor: "fill.faintHover" },
+            }}
+        >
+            {content}
+        </FocusVisibleButton>
+    ) : (
+        content
+    );
+};
+
+const MemberActionsDialog: React.FC<{
+    member?: FamilyMember;
+    resending: boolean;
+    onClose: () => void;
+    onEdit: (member: FamilyMember) => void;
+    onRemove: (member: FamilyMember) => void;
+    onResend: (member: FamilyMember) => void;
+}> = ({ member, resending, onClose, onEdit, onRemove, onResend }) => {
+    if (!member) return null;
+
+    const invited = member.status == "INVITED";
+    return (
+        <Dialog open onClose={onClose} maxWidth="xs" fullWidth>
+            <Stack direction="row" sx={{ p: "20px 16px 8px 24px" }}>
+                <Typography variant="h3" noWrap sx={{ flex: 1, minWidth: 0 }}>
+                    {member.email}
+                </Typography>
+                <DialogCloseIconButton {...{ onClose }} />
+            </Stack>
+            <DialogContent>
+                <RowButtonGroup>
+                    {invited ? (
+                        <>
+                            <RowButton
+                                disabled={resending}
+                                startIcon={<RefreshOutlined />}
+                                endIcon={
+                                    resending ? (
+                                        <RowButtonEndActivityIndicator />
+                                    ) : undefined
+                                }
+                                label={t("resend_family_invite")}
+                                onClick={() => onResend(member)}
+                            />
+                            <RowButtonDivider />
+                            <RowButton
+                                color="critical"
+                                startIcon={<DeleteOutlined />}
+                                label={t("revoke_family_invite")}
+                                onClick={() => onRemove(member)}
+                            />
+                        </>
+                    ) : (
+                        <>
+                            <RowButton
+                                startIcon={<EditOutlined />}
+                                label={t("set_storage_limit")}
+                                onClick={() => onEdit(member)}
+                            />
+                            <RowButtonDivider />
+                            <RowButton
+                                color="critical"
+                                startIcon={<DeleteOutlined />}
+                                label={t("remove_family_member")}
+                                onClick={() => onRemove(member)}
+                            />
+                        </>
+                    )}
+                </RowButtonGroup>
+            </DialogContent>
+        </Dialog>
     );
 };
 
@@ -479,7 +581,7 @@ const StorageLimitDialog: React.FC<{
         }
         setLoading(true);
         try {
-            await modifyFamilyMemberStorage(member!.id!, storageLimit);
+            await modifyFamilyMemberStorage(member!.id, storageLimit);
             onClose();
         } catch (e) {
             onGenericError(e);

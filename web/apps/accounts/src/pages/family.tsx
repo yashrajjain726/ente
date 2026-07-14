@@ -3,11 +3,8 @@ import {
     getFamilyInviteInfo,
     type FamilyInviteInfo,
 } from "@/services/family";
-import { Stack, Typography } from "@mui/material";
-import {
-    AccountsPageContents,
-    AccountsPageTitle,
-} from "ente-accounts/components/layouts/centered-paper";
+import { Box, Stack, Typography } from "@mui/material";
+import { AccountsPageContents } from "ente-accounts/components/layouts/centered-paper";
 import { ActivityIndicator } from "ente-base/components/mui/ActivityIndicator";
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
@@ -35,6 +32,7 @@ const Page: React.FC = () => {
             setPhase("loading");
             try {
                 setInvite(await getFamilyInviteInfo(token));
+                window.history.replaceState(null, "", window.location.pathname);
                 setPhase("ready");
             } catch (e) {
                 setPhase(isHTTP4xxError(e) ? "invalid" : "failed");
@@ -48,7 +46,6 @@ const Page: React.FC = () => {
         const token = new URLSearchParams(window.location.hash.slice(1)).get(
             "inviteToken",
         );
-        window.history.replaceState(null, "", window.location.pathname);
         if (!token) {
             setPhase("invalid");
             return;
@@ -81,53 +78,82 @@ const Page: React.FC = () => {
                     <ActivityIndicator />
                 </Stack>
             ) : phase == "invalid" ? (
-                <AccountsPageTitle>
-                    {t("family_invite_invalid")}
-                </AccountsPageTitle>
+                <Stack sx={{ flex: 1, placeContent: "center" }}>
+                    <Typography variant="h3" sx={{ textAlign: "center" }}>
+                        {t("family_invite_invalid")}
+                    </Typography>
+                </Stack>
             ) : phase == "failed" ? (
-                <>
-                    <AccountsPageTitle>
+                <Stack sx={{ flex: 1, placeContent: "center", gap: 3 }}>
+                    <Typography variant="h3" sx={{ textAlign: "center" }}>
                         {t("generic_error_retry")}
-                    </AccountsPageTitle>
+                    </Typography>
                     <FocusVisibleButton onClick={() => void loadInvite(token!)}>
                         {t("retry")}
                     </FocusVisibleButton>
-                </>
+                </Stack>
             ) : phase == "accepted" ? (
-                <>
-                    <AccountsPageTitle>
-                        {t("family_invite_accepted")}
-                    </AccountsPageTitle>
-                    <Typography sx={{ color: "text.muted" }}>
-                        {t("family_invite_accepted_description", {
-                            email: invite?.adminEmail,
-                        })}
-                    </Typography>
-                    <Typography sx={{ color: "text.muted" }}>
-                        {t("family_invite_open_ente")}
-                    </Typography>
-                </>
+                <FamilyInviteContents>
+                    <Stack sx={{ gap: 1.5 }}>
+                        <Typography variant="h3">
+                            {t("family_invite_accepted")}
+                        </Typography>
+                        <Typography sx={{ color: "text.muted" }}>
+                            {t("family_invite_accepted_description", {
+                                email: invite?.adminEmail,
+                            })}
+                        </Typography>
+                        <Typography sx={{ color: "text.muted" }}>
+                            {t("family_invite_open_ente")}
+                        </Typography>
+                    </Stack>
+                </FamilyInviteContents>
             ) : (
-                <>
-                    <AccountsPageTitle>
-                        {t("family_invite_title")}
-                    </AccountsPageTitle>
-                    <Typography sx={{ color: "text.muted" }}>
-                        {t("family_invite_description", {
-                            email: invite?.adminEmail,
-                        })}
-                    </Typography>
+                <FamilyInviteContents>
+                    <Stack sx={{ gap: 1.5 }}>
+                        <Typography variant="h3">
+                            {t("family_invite_title")}
+                        </Typography>
+                        <Typography sx={{ color: "text.muted" }}>
+                            {t("family_invite_description", {
+                                email: invite?.adminEmail,
+                            })}
+                        </Typography>
+                    </Stack>
                     <LoadingButton
+                        fullWidth
                         color="accent"
                         loading={phase == "accepting"}
                         onClick={() => void accept()}
                     >
                         {t("accept_family_invite")}
                     </LoadingButton>
-                </>
+                </FamilyInviteContents>
             )}
         </AccountsPageContents>
     );
 };
+
+const FamilyInviteContents: React.FC<React.PropsWithChildren> = ({
+    children,
+}) => (
+    <Stack
+        sx={{
+            flex: 1,
+            placeContent: "center",
+            alignItems: "center",
+            textAlign: "center",
+            gap: 3,
+        }}
+    >
+        <Box
+            component="img"
+            alt=""
+            src="/images/family-plan-illustration.png"
+            sx={{ width: 160, height: "auto" }}
+        />
+        {children}
+    </Stack>
+);
 
 export default Page;
