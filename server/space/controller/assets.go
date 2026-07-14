@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	timeutil "github.com/ente/museum/pkg/utils/time"
 	"github.com/ente/museum/space/models"
 	spacerepo "github.com/ente/museum/space/repo"
+	"github.com/ente/stacktrace"
 	"github.com/gin-gonic/gin"
 )
 
@@ -70,6 +72,20 @@ func (c *AssetsController) PresignUpload(ctx context.Context, space *spacerepo.S
 		keyPrefix = fmt.Sprintf("space/%s/cover", space.SpaceID)
 	}
 	objectKey := fmt.Sprintf("%s/%s", keyPrefix, base.MustNewID("wo"))
+	err = c.AssetsRepo.ReserveTempObject(ctx, spacerepo.SpaceTempObjectRecord{
+		ObjectKey:    objectKey,
+		SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
+		Purpose:      purpose,
+		BucketID:     bucketID,
+		ExpectedSize: req.Size,
+		ExpiresAt:    timeutil.Microseconds() + int64(uploadTempObjectExpiry/time.Microsecond),
+	})
+	if errors.Is(err, spacerepo.ErrSpaceUploadLimitReached) {
+		return nil, newSpaceUploadLimitError()
+	}
+	if err != nil {
+		return nil, err
+	}
 	input := &s3.PutObjectInput{
 		Bucket:        bucket,
 		Key:           aws.String(objectKey),
@@ -80,17 +96,9 @@ func (c *AssetsController) PresignUpload(ctx context.Context, space *spacerepo.S
 	putReq, _ := s3Client.PutObjectRequest(input)
 	url, err := putReq.Presign(uploadURLExpiry)
 	if err != nil {
-		return nil, err
-	}
-	err = c.AssetsRepo.AddTempObject(ctx, spacerepo.SpaceTempObjectRecord{
-		ObjectKey:    objectKey,
-		SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
-		Purpose:      purpose,
-		BucketID:     bucketID,
-		ExpectedSize: req.Size,
-		ExpiresAt:    timeutil.Microseconds() + int64(uploadTempObjectExpiry/time.Microsecond),
-	})
-	if err != nil {
+		if cleanupErr := c.AssetsRepo.RemoveTempObject(ctx, objectKey); cleanupErr != nil {
+			return nil, stacktrace.Propagate(cleanupErr, "failed to release space upload reservation")
+		}
 		return nil, err
 	}
 	return &models.PresignUploadResponse{
@@ -100,6 +108,14 @@ func (c *AssetsController) PresignUpload(ctx context.Context, space *spacerepo.S
 		ObjectKey: objectKey,
 		ExpiresIn: int(uploadURLExpiry.Seconds()),
 	}, nil
+}
+
+func newSpaceUploadLimitError() *ente.ApiError {
+	return &ente.ApiError{
+		Code:           ente.ErrorCode("SPACE_UPLOAD_LIMIT_REACHED"),
+		Message:        "too many unfinished space uploads",
+		HttpStatusCode: http.StatusTooManyRequests,
+	}
 }
 
 func normalizeContentMD5(value string) (string, error) {

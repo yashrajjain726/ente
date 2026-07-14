@@ -146,6 +146,10 @@ CREATE TABLE IF NOT EXISTS space_temp_objects (
 CREATE INDEX IF NOT EXISTS idx_space_temp_objects_expires
     ON space_temp_objects (cleanup_after ASC);
 
+CREATE INDEX IF NOT EXISTS idx_space_temp_objects_active
+    ON space_temp_objects (space_id, expires_at)
+    WHERE space_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS space_friend_shares (
     space_id              TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,
     friend_space_id       TEXT   NOT NULL REFERENCES spaces (space_id) ON DELETE CASCADE,

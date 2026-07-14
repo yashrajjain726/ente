@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sort"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/ente/museum/ente"
@@ -1434,6 +1435,52 @@ func TestSpaceModuleLifecycle(t *testing.T) {
 	require.Equal(t, aliceSpace.SpaceID, lookup.SpaceID)
 
 	_ = bobSpace
+}
+
+func TestReserveTempObjectEnforcesCountAtomically(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+	userID := insertSpaceUser(t, module, "upload-count@example.com", "upload-count-public")
+	space, err := testCreateSpace(ctx, module, userID, "upload_count", "root", "public", "secret", "nonce", "profile")
+	require.NoError(t, err)
+
+	start := make(chan struct{})
+	errs := make(chan error, MaxActiveUploadCount*2)
+	var wg sync.WaitGroup
+	for i := 0; i < MaxActiveUploadCount*2; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			errs <- module.Assets.ReserveTempObject(ctx, SpaceTempObjectRecord{
+				ObjectKey:    "space/upload-count/" + strconv.Itoa(i),
+				SpaceID:      sql.NullString{String: space.SpaceID, Valid: true},
+				Purpose:      TempObjectPurposePost,
+				BucketID:     "b2-eu-cen",
+				ExpectedSize: 1,
+				ExpiresAt:    timeutil.MicrosecondsAfterMinutes(30),
+			})
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	accepted := 0
+	rejected := 0
+	for err := range errs {
+		switch {
+		case err == nil:
+			accepted++
+		case errors.Is(err, ErrSpaceUploadLimitReached):
+			rejected++
+		default:
+			require.NoError(t, err)
+		}
+	}
+	require.Equal(t, MaxActiveUploadCount, accepted)
+	require.Equal(t, MaxActiveUploadCount, rejected)
+	require.Equal(t, int64(MaxActiveUploadCount), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_temp_objects WHERE space_id = $1`, space.SpaceID))
 }
 
 func TestPostAssetPositionIsUnique(t *testing.T) {
