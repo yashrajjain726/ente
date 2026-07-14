@@ -2,6 +2,7 @@ import "dart:async";
 
 import "package:ente_components/ente_components.dart";
 import "package:ente_legacy/components/legacy_kit_recovery_wait_time_sheet.dart";
+import "package:ente_legacy/models/legacy_kit_models.dart";
 import "package:ente_legacy/pages/share_legacy_kit_page.dart";
 import "package:ente_legacy/services/legacy_kit_service.dart";
 import "package:ente_strings/ente_strings.dart";
@@ -13,14 +14,18 @@ import "package:hugeicons/hugeicons.dart";
 Future<void> showCreateLegacyKitPage(
   BuildContext context, {
   required String accountEmail,
+  required bool isFirstLegacyKit,
   LegacyKitAuthenticator? authenticator,
+  ValueChanged<LegacyKit>? onCreated,
   VoidCallback? onChanged,
 }) {
   return Navigator.of(context).push(
     MaterialPageRoute(
       builder: (context) => CreateLegacyKitPage(
         accountEmail: accountEmail,
+        isFirstLegacyKit: isFirstLegacyKit,
         authenticator: authenticator,
+        onCreated: onCreated,
         onChanged: onChanged,
       ),
     ),
@@ -29,12 +34,16 @@ Future<void> showCreateLegacyKitPage(
 
 class CreateLegacyKitPage extends StatefulWidget {
   final String accountEmail;
+  final bool isFirstLegacyKit;
   final LegacyKitAuthenticator? authenticator;
+  final ValueChanged<LegacyKit>? onCreated;
   final VoidCallback? onChanged;
 
   const CreateLegacyKitPage({
     required this.accountEmail,
+    required this.isFirstLegacyKit,
     this.authenticator,
+    this.onCreated,
     this.onChanged,
     super.key,
   });
@@ -189,7 +198,7 @@ class _CreateLegacyKitPageState extends State<CreateLegacyKitPage> {
         partNames: _partNames,
         noticePeriodInHours: _selectedDays * 24,
       );
-      widget.onChanged?.call();
+      widget.onCreated?.call(result.kit);
       if (!mounted) {
         return;
       }
@@ -203,6 +212,7 @@ class _CreateLegacyKitPageState extends State<CreateLegacyKitPage> {
               authenticator: widget.authenticator,
               onChanged: widget.onChanged,
               isCreationFlow: true,
+              isFirstLegacyKit: widget.isFirstLegacyKit,
             ),
           ),
         ),
