@@ -42,6 +42,20 @@ func TestCreatePostRequiresAssetMetadataCipher(t *testing.T) {
 	require.Contains(t, err.Error(), "metadataCipher is required")
 }
 
+func TestCreatePostRejectsMultipleObjects(t *testing.T) {
+	controller := &PostsController{}
+
+	_, err := controller.Create(t.Context(), &spacerepo.SpaceRecord{}, models.CreatePostRequest{
+		EncryptedPostKey: "post-key",
+		Objects: []models.PostObjectPayload{
+			{ObjectKey: "first"},
+			{ObjectKey: "second"},
+		},
+	})
+
+	require.ErrorContains(t, err, "too many post objects")
+}
+
 func TestListPostsHydratesPostAssets(t *testing.T) {
 	controller, repos, ctx := setupPostsControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice-list-assets@example.com", "alice-public")

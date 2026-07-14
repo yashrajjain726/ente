@@ -19,7 +19,7 @@ const (
 	maxSpaceCaptionCipherDecodedBytes    = 12 * 1024
 	maxSpaceAssetMetadataEncodedBytes    = 8 * 1024
 	maxSpaceAssetMetadataDecodedBytes    = 6 * 1024
-	maxSpacePostObjects                  = 10
+	maxSpacePostObjects                  = 1
 	maxSpaceFriendSharesPerRefresh       = 500
 	maxSpaceObjectKeyBytes               = 512
 )
