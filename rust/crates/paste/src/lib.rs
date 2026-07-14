@@ -1,5 +1,3 @@
-//! Encrypted pastes: create, consume, and decrypt them.
-
 use ente_core::crypto::{self, Key, argon, blob, secretbox};
 use ente_core::http::{self, Api, ApiConfig, Http};
 use serde::{Deserialize, Serialize};
@@ -92,61 +90,71 @@ fn validate_fragment_secret(fragment_secret: &str) -> Result<()> {
     Err(Error::InvalidInput("Invalid paste key".to_string()))
 }
 
-pub fn parse_reference(input: &str, key: Option<&str>) -> Result<(String, PasteKey)> {
-    let input = input.trim();
-    if input.is_empty() {
-        return Err(Error::InvalidInput(
-            "Paste URL or access token is empty".to_string(),
-        ));
-    }
-
-    let (access_token, embedded_secret) = match url::Url::parse(input) {
-        Ok(url) => {
-            let token = url
-                .path_segments()
-                .and_then(|mut segments| segments.rfind(|segment| !segment.is_empty()))
-                .ok_or_else(|| {
-                    Error::InvalidInput("Paste URL is missing an access token".into())
-                })?;
-            (token.to_string(), url.fragment().map(str::to_string))
-        }
-        Err(_) => match input.split_once('#') {
-            Some((token, secret)) => (token.trim().to_string(), Some(secret.trim().to_string())),
-            None => (input.to_string(), None),
-        },
-    };
-
-    if access_token.trim().is_empty() {
-        return Err(Error::InvalidInput(
-            "Paste access token is empty".to_string(),
-        ));
-    }
-
-    let paste_key = match (embedded_secret, key) {
-        (Some(embedded), Some(key)) if embedded != key => {
-            return Err(Error::InvalidInput(
-                "Paste URL fragment and --key do not match".to_string(),
-            ));
-        }
-        (Some(embedded), _) => PasteKey::parse(&embedded)?,
-        (None, Some(key)) => PasteKey::parse(key)?,
-        (None, None) => {
-            return Err(Error::InvalidInput(
-                "Paste key missing. Pass a full paste URL or --key".to_string(),
-            ));
-        }
-    };
-
-    Ok((access_token, paste_key))
+#[derive(Debug)]
+pub struct PasteLink {
+    pub access_token: String,
+    pub key: PasteKey,
 }
 
-pub fn paste_link(paste_origin: &str, access_token: &str, key: &PasteKey) -> String {
-    format!(
-        "{}/{}#{}",
-        paste_origin.trim_end_matches('/'),
-        access_token,
-        key.link_fragment()
-    )
+impl PasteLink {
+    pub fn parse(input: &str, key: Option<&str>) -> Result<Self> {
+        let input = input.trim();
+        if input.is_empty() {
+            return Err(Error::InvalidInput(
+                "Paste URL or access token is empty".to_string(),
+            ));
+        }
+
+        let (access_token, embedded_secret) = match url::Url::parse(input) {
+            Ok(url) => {
+                let token = url
+                    .path_segments()
+                    .and_then(|mut segments| segments.rfind(|segment| !segment.is_empty()))
+                    .ok_or_else(|| {
+                        Error::InvalidInput("Paste URL is missing an access token".into())
+                    })?;
+                (token.to_string(), url.fragment().map(str::to_string))
+            }
+            Err(_) => match input.split_once('#') {
+                Some((token, secret)) => {
+                    (token.trim().to_string(), Some(secret.trim().to_string()))
+                }
+                None => (input.to_string(), None),
+            },
+        };
+
+        if access_token.trim().is_empty() {
+            return Err(Error::InvalidInput(
+                "Paste access token is empty".to_string(),
+            ));
+        }
+
+        let key = match (embedded_secret, key) {
+            (Some(embedded), Some(key)) if embedded != key => {
+                return Err(Error::InvalidInput(
+                    "Paste URL fragment and --key do not match".to_string(),
+                ));
+            }
+            (Some(embedded), _) => PasteKey::parse(&embedded)?,
+            (None, Some(key)) => PasteKey::parse(key)?,
+            (None, None) => {
+                return Err(Error::InvalidInput(
+                    "Paste key missing. Pass a full paste URL or --key".to_string(),
+                ));
+            }
+        };
+
+        Ok(Self { access_token, key })
+    }
+
+    pub fn url(&self, paste_origin: &str) -> String {
+        format!(
+            "{}/{}#{}",
+            paste_origin.trim_end_matches('/'),
+            self.access_token,
+            self.key.link_fragment()
+        )
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -198,8 +206,8 @@ impl Client {
         })
     }
 
-    pub async fn create(&self, text: &str, password: Option<&str>) -> Result<(String, PasteKey)> {
-        let (paste_key, payload) = encrypt(text, password)?;
+    pub async fn create(&self, text: &str, password: Option<&str>) -> Result<PasteLink> {
+        let (key, payload) = encrypt(text, password)?;
         let response: CreatePasteResponse = self
             .api
             .post("/paste/create")
@@ -210,16 +218,17 @@ impl Client {
             .await?
             .json()
             .await?;
-        Ok((response.access_token, paste_key))
+        Ok(PasteLink {
+            access_token: response.access_token,
+            key,
+        })
     }
 
-    /// Check that the paste is still available, without consuming it.
     pub async fn check(&self, access_token: &str) -> Result<()> {
         self.guard(access_token).await?;
         Ok(())
     }
 
-    /// Consume the paste, returning its encrypted payload.
     pub async fn consume(&self, access_token: &str) -> Result<PastePayload> {
         let cookie = self.guard(access_token).await?;
         Ok(self
@@ -435,12 +444,11 @@ mod tests {
 
     #[test]
     fn parse_full_paste_link() {
-        let (token, paste_key) =
-            parse_reference("https://paste.ente.com/ABC123#AbCd1234EfGh", None).unwrap();
+        let link = PasteLink::parse("https://paste.ente.com/ABC123#AbCd1234EfGh", None).unwrap();
 
-        assert_eq!(token, "ABC123");
+        assert_eq!(link.access_token, "ABC123");
         assert_eq!(
-            paste_key,
+            link.key,
             PasteKey {
                 fragment_secret: "AbCd1234EfGh".to_string(),
                 password_required: false,
@@ -450,12 +458,11 @@ mod tests {
 
     #[test]
     fn parse_password_protected_paste_link() {
-        let (token, paste_key) =
-            parse_reference("https://paste.ente.com/ABC123#p-AbCd1234EfGh", None).unwrap();
+        let link = PasteLink::parse("https://paste.ente.com/ABC123#p-AbCd1234EfGh", None).unwrap();
 
-        assert_eq!(token, "ABC123");
+        assert_eq!(link.access_token, "ABC123");
         assert_eq!(
-            paste_key,
+            link.key,
             PasteKey {
                 fragment_secret: "AbCd1234EfGh".to_string(),
                 password_required: true,
@@ -465,11 +472,11 @@ mod tests {
 
     #[test]
     fn parse_token_with_key() {
-        let (token, paste_key) = parse_reference("ABC123", Some("AbCd1234EfGh")).unwrap();
+        let link = PasteLink::parse("ABC123", Some("AbCd1234EfGh")).unwrap();
 
-        assert_eq!(token, "ABC123");
+        assert_eq!(link.access_token, "ABC123");
         assert_eq!(
-            paste_key,
+            link.key,
             PasteKey {
                 fragment_secret: "AbCd1234EfGh".to_string(),
                 password_required: false,
@@ -479,11 +486,11 @@ mod tests {
 
     #[test]
     fn parse_token_with_password_key() {
-        let (token, paste_key) = parse_reference("ABC123", Some("p-AbCd1234EfGh")).unwrap();
+        let link = PasteLink::parse("ABC123", Some("p-AbCd1234EfGh")).unwrap();
 
-        assert_eq!(token, "ABC123");
+        assert_eq!(link.access_token, "ABC123");
         assert_eq!(
-            paste_key,
+            link.key,
             PasteKey {
                 fragment_secret: "AbCd1234EfGh".to_string(),
                 password_required: true,
@@ -493,7 +500,7 @@ mod tests {
 
     #[test]
     fn reject_mismatched_fragment_and_key() {
-        let error = parse_reference(
+        let error = PasteLink::parse(
             "https://paste.ente.com/ABC123#AbCd1234EfGh",
             Some("123456789012"),
         )

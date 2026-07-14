@@ -4,7 +4,7 @@ use crate::{
     models::error::{Error, Result},
 };
 use dialoguer::Password;
-use ente_paste::{PasteKey, PastePayload};
+use ente_paste::{PasteKey, PasteLink, PastePayload};
 use std::ffi::OsStr;
 use std::io::{self, IsTerminal, Read};
 use std::path::PathBuf;
@@ -27,11 +27,8 @@ pub async fn handle_paste_command(cmd: PasteCommand) -> Result<()> {
                 None
             };
             let client = paste_client(endpoint)?;
-            let (access_token, paste_key) = client.create(&text, password.as_deref()).await?;
-            println!(
-                "{}",
-                ente_paste::paste_link(&paste_origin, &access_token, &paste_key)
-            );
+            let link = client.create(&text, password.as_deref()).await?;
+            println!("{}", link.url(&paste_origin));
             Ok(())
         }
         PasteSubcommands::Consume {
@@ -40,9 +37,8 @@ pub async fn handle_paste_command(cmd: PasteCommand) -> Result<()> {
             key,
             endpoint,
         } => {
-            let (access_token, paste_key) =
-                ente_paste::parse_reference(&link_or_token, key.as_deref())?;
-            let text = consume_paste(endpoint, &access_token, &paste_key).await?;
+            let link = PasteLink::parse(&link_or_token, key.as_deref())?;
+            let text = consume_paste(endpoint, &link.access_token, &link.key).await?;
             print_consumed_paste(&text, raw);
             Ok(())
         }
