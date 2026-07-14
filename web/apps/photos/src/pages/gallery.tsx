@@ -78,7 +78,7 @@ import {
 } from "ente-new/photos/components/SelectedFileOptions";
 import { WhatsNew } from "ente-new/photos/components/WhatsNew";
 import {
-    GalleryEmptyState,
+    GalleryEmptyStateV2,
     PeopleEmptyState,
     SearchResultsHeader,
     type RemotePullOpts,
@@ -2036,6 +2036,7 @@ const Page: React.FC = () => {
                         px: "24px",
                         "@media (width < 720px)": { px: "4px" },
                     },
+                    !showSelectionBar && { borderBottom: "none" },
                     showSelectionBar && { borderColor: "accent.main" },
                 ]}
             >
@@ -2198,7 +2199,7 @@ const Page: React.FC = () => {
             !isFirstLoad &&
             !state.collectionFiles.length &&
             activeCollectionID === PseudoCollectionID.all ? (
-                <GalleryEmptyState
+                <GalleryEmptyStateV2
                     isUploadInProgress={uploadManager.isUploadInProgress()}
                     onUpload={openUploader}
                 />
