@@ -278,19 +278,6 @@ func (c *UserController) resetAccountDeletionAccess(ctx context.Context, userID 
 }
 
 func (c *UserController) resetUserAccess(ctx context.Context, userID int64, logger *logrus.Entry, accountDeletion bool) error {
-	logger.Info("remove locker and photos tokens for user")
-	if err := c.RemoveTokensForApps(userID, []ente.App{ente.Locker, ente.Photos}); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-
-	if err := c.CollectionCtrl.ResetUserSharingAccess(ctx, userID, logger); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-
-	if err := c.FamilyController.ResetUserFamilyAccess(ctx, userID, logger); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-
 	if c.SpaceAccessResetter != nil {
 		logger.Info("reset space access for user")
 		var err error
@@ -306,6 +293,19 @@ func (c *UserController) resetUserAccess(ctx context.Context, userID int64, logg
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
+	}
+
+	logger.Info("remove locker and photos tokens for user")
+	if err := c.RemoveTokensForApps(userID, []ente.App{ente.Locker, ente.Photos}); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+
+	if err := c.CollectionCtrl.ResetUserSharingAccess(ctx, userID, logger); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+
+	if err := c.FamilyController.ResetUserFamilyAccess(ctx, userID, logger); err != nil {
+		return stacktrace.Propagate(err, "")
 	}
 	return nil
 }
@@ -332,10 +332,6 @@ func (c *UserController) handleAccountDeletion(
 	logger.Info("remove remaining active tokens for user")
 	err = c.RemoveAllTokens(userID)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	logger.Info("revoke space browser sessions for user")
-	if err := c.SpaceAccessResetter.RevokeBrowserSessions(ctx, userID); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 

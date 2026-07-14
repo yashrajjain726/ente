@@ -291,6 +291,20 @@ func TestGetBrowserSession(t *testing.T) {
 	require.Equal(t, expiresAt, session.ExpiresAt)
 }
 
+func TestGetBrowserSessionRejectsDeletedUser(t *testing.T) {
+	ctx := context.Background()
+	module := newSpaceTestModule(t)
+	userID := insertSpaceUser(t, module, "deleted-browser-session@example.com", "deleted-browser-session-public")
+	tokenHash := sha256.Sum256([]byte("deleted-browser-session-token"))
+
+	require.NoError(t, module.Sessions.CreateBrowserSession(ctx, tokenHash[:], userID, "session-wrap-key", timeutil.NDaysFromNow(1)))
+	_, err := module.Sessions.DB.Exec(`UPDATE users SET encrypted_email = NULL WHERE user_id = $1`, userID)
+	require.NoError(t, err)
+
+	_, err = module.Sessions.GetBrowserSession(ctx, tokenHash[:])
+	require.ErrorIs(t, err, sql.ErrNoRows)
+}
+
 func TestExchangeBrowserSessionConsumesTokenOnce(t *testing.T) {
 	ctx := context.Background()
 	module := newSpaceTestModule(t)

@@ -48,6 +48,7 @@ func (r *SessionsRepository) GetBrowserSession(ctx context.Context, tokenHash []
 	row := r.DB.QueryRowContext(ctx, `
 		SELECT s.token_hash, s.user_id, s.session_wrap_key, s.expires_at, s.created_at, s.updated_at, s.last_used_at
 		FROM space_browser_sessions s
+		JOIN users u ON u.user_id = s.user_id AND u.encrypted_email IS NOT NULL
 		WHERE s.token_hash = $1
 	`, tokenHash)
 	rec := &SpaceBrowserSessionRecord{}
