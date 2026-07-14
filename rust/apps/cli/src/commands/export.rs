@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::api::client::ApiClient;
+use crate::api::AppClient;
 use crate::api::methods::ApiMethods;
 use crate::models::{
     account::Account,
@@ -197,14 +197,11 @@ async fn sync_account_before_export(storage: &Storage, account: &Account) -> Res
         .ok_or_else(|| crate::Error::NotFound("Account secrets not found".into()))?;
 
     // Create API client with account's endpoint
-    let api_client = ApiClient::new_with_client_package(
-        Some(account.endpoint.clone()),
-        account.app.client_package(),
-    )?;
+    let api_client = AppClient::new(Some(account.endpoint.clone()), account.app)?;
 
     // Store token for this account
     let token = base64::engine::general_purpose::URL_SAFE.encode(&secrets.token);
-    api_client.add_token(&account.email, &token);
+    api_client.set_token(&token);
 
     // Get the database path to create a new Storage instance
     let db_path = storage
@@ -261,16 +258,13 @@ async fn export_account(storage: &Storage, account: &Account, filter: &ExportFil
         .ok_or_else(|| crate::Error::NotFound("Account secrets not found".into()))?;
 
     // Create API client with account's endpoint
-    let api_client = ApiClient::new_with_client_package(
-        Some(account.endpoint.clone()),
-        account.app.client_package(),
-    )?;
+    let api_client = AppClient::new(Some(account.endpoint.clone()), account.app)?;
 
     // Store token for this account
     // Token is stored as raw bytes from sealed_box_open
     // The Go CLI encodes it as base64 URL-encoded string WITH padding for the API
     let token = base64::engine::general_purpose::URL_SAFE.encode(&secrets.token);
-    api_client.add_token(&account.email, &token);
+    api_client.set_token(&token);
 
     let api = ApiMethods::new(&api_client);
 
@@ -283,7 +277,7 @@ async fn export_account(storage: &Storage, account: &Account, filter: &ExportFil
 
     // Step 1: Fetch all collections and create a map of collection IDs to collections
     println!("\nFetching collections...");
-    let collections = api.get_collections(&account.email, 0).await?;
+    let collections = api.get_collections(0).await?;
     println!("Found {} collections", collections.len());
 
     // Create collection ID to collection map and decrypt collection keys
@@ -390,9 +384,7 @@ async fn export_account(storage: &Storage, account: &Account, filter: &ExportFil
         let mut since_time = 0i64;
 
         while has_more {
-            let (files, more) = api
-                .get_collection_files(&account.email, *collection_id, since_time)
-                .await?;
+            let (files, more) = api.get_collection_files(*collection_id, since_time).await?;
             has_more = more;
 
             if files.is_empty() {
@@ -703,7 +695,7 @@ async fn export_account(storage: &Storage, account: &Account, filter: &ExportFil
             }
 
             // Download encrypted file
-            let encrypted_data = api.download_file(&account.email, file.id).await?;
+            let encrypted_data = api.download_file(file.id).await?;
 
             // The file nonce/header is stored separately in the API response
             let file_nonce = match base64::engine::general_purpose::STANDARD
