@@ -87,7 +87,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
     _peopleChangedSubscription = Bus.instance.on<PeopleChangedEvent>().listen((
       event,
     ) {
-      if (mounted && event.person?.remoteID == widget.personId) {
+      if (mounted && isPerson && event.person?.remoteID == widget.personId) {
         setState(() => faceCropFuture = _startFaceCropLoad());
       }
     });
@@ -279,7 +279,9 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
           ? MLDataDB.localGalleryInstance
           : MLDataDB.instance;
       if (isPerson && !isLocalGalleryMode) {
-        personEntity = await PersonService.instance.getPerson(widget.personId!);
+        personEntity =
+            PersonService.instance.getCachedPerson(widget.personId!) ??
+            await PersonService.instance.getPerson(widget.personId!);
         if (personEntity == null) {
           _logger.severe(
             "Person with ID ${widget.personId} not found, cannot get cover face.",

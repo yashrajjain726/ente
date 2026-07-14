@@ -53,7 +53,6 @@ class _EditContactPageState extends State<EditContactPage> {
   final _logger = Logger("EditContactPage");
   late final TextEditingController _nameController;
   late final FocusNode _nameFocusNode;
-  late final String? _birthDateToPreserve;
   bool _isSaving = false;
   bool _isLoadingPhoto = false;
   bool _photoDirty = false;
@@ -80,7 +79,6 @@ class _EditContactPageState extends State<EditContactPage> {
           setState(() {});
         }
       });
-    _birthDateToPreserve = widget.existingContact?.data?.birthDate;
     _loadExistingPhoto();
     _loadLinkedPersonDraft();
   }
@@ -303,9 +301,6 @@ class _EditContactPageState extends State<EditContactPage> {
         return;
       }
 
-      final needsContactLinkUpdate = _personNeedsContactLinkUpdate(
-        linkedPerson,
-      );
       final shouldPrefillFromPerson = widget.existingContact == null;
       if (shouldPrefillFromPerson && _nameController.text.trim().isEmpty) {
         _nameController.text = linkedPerson.data.name;
@@ -314,7 +309,6 @@ class _EditContactPageState extends State<EditContactPage> {
         _initialLinkedPerson = linkedPerson;
         _draftLinkedPerson = linkedPerson;
         _unlinkDraft = false;
-        _linkDirty = needsContactLinkUpdate;
       });
 
       if (shouldPrefillFromPerson && !_photoDirty && _draftPhotoBytes == null) {
@@ -489,7 +483,7 @@ class _EditContactPageState extends State<EditContactPage> {
     setState(() {
       _isLoadingPhoto = true;
     });
-    final photoBytes = await normalizeContactPhotoAttachmentBytes(croppedBytes);
+    final photoBytes = await compressThumbnailToSizeLimit(croppedBytes);
     if (!mounted) {
       return;
     }
@@ -513,7 +507,6 @@ class _EditContactPageState extends State<EditContactPage> {
       var saved = await PhotosContactsService.instance.createOrUpdateContact(
         contactUserId: widget.contactUserId,
         name: contactName,
-        birthDate: _birthDateToPreserve,
       );
       if (_photoDirty) {
         final draftPhotoBytes = _draftPhotoBytes;

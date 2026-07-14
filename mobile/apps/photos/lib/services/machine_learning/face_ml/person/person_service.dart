@@ -53,6 +53,8 @@ class PersonService {
   static double autoMergeThreshold = kDefaultAutoMergeThreshold;
 
   Future<List<PersonEntity>>? _cachedPersonsFuture;
+  Map<String, PersonEntity>? _cachedPersonsById;
+  int _personCacheGeneration = 0;
   int _lastCacheRefreshTime = 0;
 
   static PersonService get instance {
@@ -84,15 +86,22 @@ class PersonService {
 
   void clearCache() {
     _emailToPartialPersonDataMapCache.clear();
-    _cachedPersonsFuture = null;
+    _invalidatePersonCache();
     _lastCacheRefreshTime = 0;
+  }
+
+  void _invalidatePersonCache() {
+    _cachedPersonsFuture = null;
+    _cachedPersonsById = null;
+    _personCacheGeneration++;
   }
 
   Future<void> refreshPersonCache({
     bool notifyListeners = false,
     String source = "",
   }) async {
-    _lastCacheRefreshTime = 0;
+    _invalidatePersonCache();
+    _lastCacheRefreshTime = lastRemoteSyncTime();
     // wait to ensure cache is refreshed
     final _ = await getPersons();
     if (notifyListeners) {
@@ -119,15 +128,19 @@ class PersonService {
   }
 
   Future<List<PersonEntity>> getPersons() async {
-    if (_lastCacheRefreshTime != lastRemoteSyncTime()) {
-      _lastCacheRefreshTime = lastRemoteSyncTime();
-      _cachedPersonsFuture = null; // Invalidate cache
+    final remoteSyncTime = lastRemoteSyncTime();
+    if (_lastCacheRefreshTime != remoteSyncTime) {
+      _lastCacheRefreshTime = remoteSyncTime;
+      _invalidatePersonCache();
     }
-    _cachedPersonsFuture ??= _fetchAndCachePersons();
+    if (_cachedPersonsFuture == null) {
+      final generation = _personCacheGeneration;
+      _cachedPersonsFuture = _fetchAndCachePersons(generation);
+    }
     return _cachedPersonsFuture!;
   }
 
-  Future<List<PersonEntity>> _fetchAndCachePersons() async {
+  Future<List<PersonEntity>> _fetchAndCachePersons(int generation) async {
     logger.finest("reading all persons from local db");
     final entities = await entityService.getEntities(EntityType.cgroup);
     final persons = await Computer.shared().compute(
@@ -135,6 +148,12 @@ class PersonService {
       param: {"entity": entities},
       taskName: "decode_person_entities",
     );
+    if (generation != _personCacheGeneration) {
+      return persons;
+    }
+    _cachedPersonsById = {
+      for (final person in persons) person.remoteID: person,
+    };
     _emailToPartialPersonDataMapCache.clear();
     for (PersonEntity person in persons) {
       if (person.data.email != null && person.data.email!.isNotEmpty) {
@@ -166,13 +185,17 @@ class PersonService {
     });
   }
 
+  PersonEntity? getCachedPerson(String id) {
+    if (_lastCacheRefreshTime != lastRemoteSyncTime()) {
+      return null;
+    }
+    return _cachedPersonsById?[id];
+  }
+
   Future<Map<String, PersonEntity>> getPersonsMap() async {
     final persons = await getPersons();
-    final Map<String, PersonEntity> map = {};
-    for (var person in persons) {
-      map[person.remoteID] = person;
-    }
-    return map;
+    return _cachedPersonsById ??
+        {for (final person in persons) person.remoteID: person};
   }
 
   Future<void> reconcileClusters() async {
@@ -685,7 +708,6 @@ class PersonService {
     await _contactsService.createOrUpdateContact(
       contactUserId: contact.contactUserId,
       name: name,
-      birthDate: contact.data?.birthDate,
     );
   }
 
@@ -767,8 +789,7 @@ class PersonService {
   }) async {
     final result = await entityService.addOrUpdate(type, jsonMap, id: id);
     _lastCacheRefreshTime = 0; // Invalidate cache
-    _cachedPersonsFuture =
-        null; // Force refresh even if last sync time unchanged
+    _invalidatePersonCache();
     return result;
   }
 

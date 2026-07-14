@@ -82,11 +82,7 @@ void main() {
             id: "contact-1",
             contactUserId: 3,
             email: "old@example.com",
-            data: contacts.ContactData(
-              contactUserId: 3,
-              name: "Old Contact",
-              birthDate: "2001-04-02",
-            ),
+            data: contacts.ContactData(contactUserId: 3, name: "Old Contact"),
             profilePictureAttachmentId: null,
             isDeleted: false,
             createdAt: 1,
@@ -143,7 +139,6 @@ void main() {
       expect(contactsService.createOrUpdateCalls, 1);
       expect(contactsService.lastUpdatedContactUserId, 3);
       expect(contactsService.lastUpdatedName, "Alex R");
-      expect(contactsService.lastUpdatedBirthDate, "2001-04-02");
     });
 
     test("updateAttributes does not sync unchanged person name", () async {
@@ -253,7 +248,6 @@ class _FakePhotosContactsService implements PhotosContactsService {
   int createOrUpdateCalls = 0;
   int? lastUpdatedContactUserId;
   String? lastUpdatedName;
-  String? lastUpdatedBirthDate;
 
   void seed(contacts.ContactRecord value) {
     contact = value;
@@ -282,12 +276,10 @@ class _FakePhotosContactsService implements PhotosContactsService {
   Future<contacts.ContactRecord> createOrUpdateContact({
     required int contactUserId,
     required String name,
-    String? birthDate,
   }) async {
     createOrUpdateCalls += 1;
     lastUpdatedContactUserId = contactUserId;
     lastUpdatedName = name.trim();
-    lastUpdatedBirthDate = birthDate;
     final saved = contact;
     return contacts.ContactRecord(
       id: saved?.id ?? "contact-$contactUserId",
@@ -296,7 +288,6 @@ class _FakePhotosContactsService implements PhotosContactsService {
       data: contacts.ContactData(
         contactUserId: contactUserId,
         name: name.trim(),
-        birthDate: birthDate,
       ),
       profilePictureAttachmentId: saved?.profilePictureAttachmentId,
       isDeleted: false,

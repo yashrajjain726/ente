@@ -15,6 +15,7 @@ import "package:photos/models/ml/face/person.dart";
 import "package:photos/services/machine_learning/face_ml/feedback/cluster_feedback.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/theme/ente_theme.dart";
+import "package:photos/ui/common/date_input.dart";
 import "package:photos/ui/components/action_sheet_widget.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
 import "package:photos/ui/components/models/button_type.dart";
@@ -25,6 +26,7 @@ import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
 import "package:photos/ui/viewer/people/merge_clusters_to_person_sheet.dart";
 import "package:photos/ui/viewer/people/person_clusters_page.dart";
 import "package:photos/ui/viewer/people/person_face_widget.dart";
+import "package:photos/utils/contact_string_util.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/person_contact_linking_util.dart";
 
@@ -49,18 +51,11 @@ class SaveOrEditPerson extends StatefulWidget {
   State<SaveOrEditPerson> createState() => _SaveOrEditPersonState();
 }
 
-String? _trimEmptyToNull(String? value) {
-  final trimmedValue = value?.trim();
-  if (trimmedValue == null || trimmedValue.isEmpty) {
-    return null;
-  }
-  return trimmedValue;
-}
-
 class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   static const int _maxSuggestedPersons = 3;
   String _inputName = "";
   String? _selectedDate;
+  bool _isBirthdayValid = true;
   String? _email;
   bool _isMe = false;
   bool _isMeAssignedToAnotherPerson = true;
@@ -73,7 +68,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   late final TextEditingController _nameController;
   List<PersonEntity> _allPersons = [];
 
-  String? get _emailToSave => _trimEmptyToNull(_email);
+  String? get _emailToSave => trimToNull(_email);
 
   int? get _currentUserIDToSave =>
       currentUserIDForContactLinkEmail(_emailToSave);
@@ -86,7 +81,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   bool get _isMeChanged => widget.isEditing && _isMe != _initiallyIsMe;
 
   bool get _contactLinkEmailChanged =>
-      widget.isEditing && _emailToSave != _trimEmptyToNull(person?.data.email);
+      widget.isEditing && _emailToSave != trimToNull(person?.data.email);
 
   bool get _shouldClearContactUserID =>
       person?.data.userID != null &&
@@ -251,11 +246,9 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                   children: [
                     ButtonComponent(
                       label: context.l10n.savePerson,
-                      isDisabled: !changed || _inputName.trim().isEmpty,
+                      isDisabled: !_canSave,
                       shouldShowSuccessState: false,
-                      onTap: changed && _inputName.trim().isNotEmpty
-                          ? _savePerson
-                          : null,
+                      onTap: _canSave ? _savePerson : null,
                     ),
                     if (!widget.isEditing) ...[
                       const SizedBox(height: Spacing.sm),
@@ -315,29 +308,17 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   }
 
   Widget _buildBirthdayInput() {
-    final date = DateTime.tryParse(_selectedDate ?? "");
-    final hasBirthday = date != null;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: _pickBirthday,
-      child: TextInputComponent(
-        key: ValueKey(_selectedDate),
-        label: context.l10n.birthday,
-        hintText: context.l10n.enterDateOfBirth,
-        initialValue: date == null
-            ? null
-            : MaterialLocalizations.of(context).formatMediumDate(date),
-        readOnly: true,
-        suffix: HugeIcon(
-          icon: hasBirthday
-              ? HugeIcons.strokeRoundedCancel01
-              : HugeIcons.strokeRoundedCalendar03,
-          color: context.componentColors.textLighter,
-          size: IconSizes.small,
-        ),
-        onSuffixTap: hasBirthday
-            ? () => setState(() => _selectedDate = null)
-            : _pickBirthday,
+    return DatePickerField(
+      label: context.l10n.birthday,
+      hintText: context.l10n.enterDateOfBirthHint,
+      firstDate: DateTime(100),
+      lastDate: DateTime.now(),
+      initialValue: _selectedDate,
+      isRequired: false,
+      onValidityChanged: (isValid) =>
+          setState(() => _isBirthdayValid = isValid),
+      onChanged: (date) => setState(
+        () => _selectedDate = date?.toIso8601String().split("T").first,
       ),
     );
   }
@@ -356,21 +337,6 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
         person: result,
       ),
     );
-  }
-
-  Future<void> _pickBirthday() async {
-    final locale = await getFormatLocale();
-    if (!mounted) return;
-    final picked = await showDatePicker(
-      context: context,
-      locale: locale,
-      initialDate: DateTime.tryParse(_selectedDate ?? "") ?? DateTime.now(),
-      firstDate: DateTime(100),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null && mounted) {
-      setState(() => _selectedDate = picked.toIso8601String().split("T").first);
-    }
   }
 
   void _setIsMe(bool selected) {
@@ -662,18 +628,20 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   bool get changed => widget.isEditing
       ? (_inputName.trim() != person!.data.name ||
             _selectedDate != person!.data.birthDate ||
-            _emailToSave != _trimEmptyToNull(person!.data.email) ||
+            _emailToSave != trimToNull(person!.data.email) ||
             _isMeChanged ||
-            _shouldUpdateContactUserID ||
             _isPinned != person!.data.isPinned ||
             _hideFromMemories != person!.data.hideFromMemories)
       : _inputName.trim().isNotEmpty;
+
+  bool get _canSave =>
+      changed && _inputName.trim().isNotEmpty && _isBirthdayValid;
 
   Future<PersonEntity?> updatePerson(BuildContext context) async {
     try {
       final emailToSave = _emailToSave;
       if (emailToSave != null &&
-          emailToSave != _trimEmptyToNull(person!.data.email)) {
+          emailToSave != trimToNull(person!.data.email)) {
         final linkedPerson = await findPersonLinkedToEmail(
           emailToSave,
           excludedPersonId: person!.remoteID,

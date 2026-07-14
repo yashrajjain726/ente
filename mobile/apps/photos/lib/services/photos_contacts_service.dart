@@ -6,6 +6,7 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/contacts_changed_event.dart";
 import "package:photos/events/user_logged_out_event.dart";
 import "package:photos/service_locator.dart";
+import "package:photos/utils/contact_string_util.dart";
 
 class PhotosContactsService {
   PhotosContactsService._privateConstructor()
@@ -130,23 +131,15 @@ class PhotosContactsService {
   }
 
   String? getCachedSavedName({int? contactUserId, String? email}) {
-    return _trimmedNonEmpty(
+    return trimToNull(
       getCachedContact(contactUserId: contactUserId, email: email)?.data?.name,
     );
   }
 
   String? getCachedResolvedEmail({int? contactUserId, String? email}) {
-    return _trimmedNonEmpty(
+    return trimToNull(
       getCachedContact(contactUserId: contactUserId, email: email)?.email,
     );
-  }
-
-  String? _trimmedNonEmpty(String? value) {
-    if (value == null) {
-      return null;
-    }
-    final trimmed = value.trim();
-    return trimmed.isEmpty ? null : trimmed;
   }
 
   Uint8List? getCachedProfilePictureBytesByUserId(int? contactUserId) {
@@ -230,15 +223,9 @@ class PhotosContactsService {
   Future<contacts.ContactRecord> createOrUpdateContact({
     required int contactUserId,
     required String name,
-    String? birthDate,
   }) async {
     final contactsService = await _ensureReadyForWrite();
     final trimmedName = name.trim();
-    final trimmedBirthDate = birthDate?.trim();
-    final normalizedBirthDate =
-        trimmedBirthDate == null || trimmedBirthDate.isEmpty
-        ? null
-        : trimmedBirthDate;
     final existing = await contactsService.getContactByUserId(
       contactUserId,
       includeDeleted: true,
@@ -246,7 +233,6 @@ class PhotosContactsService {
     final data = contacts.ContactData(
       contactUserId: contactUserId,
       name: trimmedName,
-      birthDate: normalizedBirthDate,
     );
     final contact = existing == null
         ? await contactsService.createContact(data)
@@ -453,7 +439,7 @@ class PhotosContactsService {
   void _cacheContact(contacts.ContactRecord contact) {
     final userId = contact.contactUserId;
     final existing = _contactsByUserId[userId];
-    final previousEmail = _normalizeEmail(existing?.email);
+    final previousEmail = normalizeContactLinkEmail(existing?.email);
     if (previousEmail != null &&
         _contactsByNormalizedEmail[previousEmail]?.contactUserId == userId) {
       _contactsByNormalizedEmail.remove(previousEmail);
@@ -464,7 +450,7 @@ class PhotosContactsService {
       return;
     }
     _contactsByUserId[userId] = contact;
-    final normalizedEmail = _normalizeEmail(contact.email);
+    final normalizedEmail = normalizeContactLinkEmail(contact.email);
     if (normalizedEmail != null) {
       _contactsByNormalizedEmail[normalizedEmail] = contact;
     }
@@ -522,7 +508,7 @@ class PhotosContactsService {
   }
 
   contacts.ContactRecord? _contactByEmailOrNull(String? email) {
-    final normalizedEmail = _normalizeEmail(email);
+    final normalizedEmail = normalizeContactLinkEmail(email);
     if (normalizedEmail == null) {
       return null;
     }
@@ -531,14 +517,6 @@ class PhotosContactsService {
       return null;
     }
     return contact;
-  }
-
-  String? _normalizeEmail(String? email) {
-    if (email == null) {
-      return null;
-    }
-    final trimmed = email.trim().toLowerCase();
-    return trimmed.isEmpty ? null : trimmed;
   }
 
   void _attachSessionResetListeners() {

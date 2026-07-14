@@ -1,6 +1,5 @@
 import "dart:typed_data";
 
-import "package:photos/core/constants.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/models/file/file.dart";
@@ -10,21 +9,6 @@ import "package:photos/module/download/thumbnail.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/utils/face/face_thumbnail_cache.dart";
-
-const _maxContactPhotoCompressionAttempts = 2;
-
-Future<Uint8List> normalizeContactPhotoAttachmentBytes(
-  Uint8List sourceBytes,
-) async {
-  var bytes = sourceBytes;
-  var attempts = 0;
-  while (bytes.length > thumbnailDataLimit &&
-      attempts < _maxContactPhotoCompressionAttempts) {
-    bytes = await compressThumbnail(bytes);
-    attempts++;
-  }
-  return bytes;
-}
 
 Future<Uint8List?> buildContactPhotoAttachmentBytesFromFace({
   required EnteFile file,
@@ -40,7 +24,7 @@ Future<Uint8List?> buildContactPhotoAttachmentBytesFromFace({
   if (croppedBytes == null) {
     return null;
   }
-  return normalizeContactPhotoAttachmentBytes(croppedBytes);
+  return compressThumbnailToSizeLimit(croppedBytes);
 }
 
 Future<Uint8List?> buildContactPhotoAttachmentBytesFromPerson(

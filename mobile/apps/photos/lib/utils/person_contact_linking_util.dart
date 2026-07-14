@@ -6,15 +6,11 @@ import "package:photos/l10n/l10n.dart";
 import "package:photos/models/ml/face/person.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/ui/viewer/people/people_page.dart";
+import "package:photos/utils/contact_string_util.dart";
 import "package:photos/utils/dialog_util.dart";
 
-String? normalizeContactLinkEmail(String? email) {
-  final normalized = email?.trim().toLowerCase();
-  if (normalized == null || normalized.isEmpty) {
-    return null;
-  }
-  return normalized;
-}
+export "package:photos/utils/contact_string_util.dart"
+    show normalizeContactLinkEmail;
 
 bool contactLinkEmailMatches(String? first, String? second) {
   final normalizedFirst = normalizeContactLinkEmail(first);
