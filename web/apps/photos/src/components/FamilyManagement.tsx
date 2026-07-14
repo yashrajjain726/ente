@@ -352,8 +352,8 @@ const FamilyMemberRow: React.FC<{
                 sx={{
                     width: 36,
                     height: 36,
-                    bgcolor: color,
-                    color: avatarTextColor,
+                    bgcolor: invited ? "fill.muted" : color,
+                    color: invited ? "text.muted" : avatarTextColor,
                     fontSize: 15,
                 }}
             >

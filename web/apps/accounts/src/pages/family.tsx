@@ -108,8 +108,8 @@ const Page: React.FC = () => {
                     <Box
                         component="img"
                         alt=""
-                        src="/images/family-invite.png"
-                        sx={{ width: 160, height: "auto" }}
+                        src="/images/family-invite-accepted.png"
+                        sx={{ width: 200, height: "auto" }}
                     />
                     <Stack sx={{ gap: 1.5 }}>
                         <Typography variant="h3">
@@ -120,10 +120,13 @@ const Page: React.FC = () => {
                                 email: invite?.adminEmail,
                             })}
                         </Typography>
-                        <Typography sx={{ color: "text.muted" }}>
-                            {t("family_invite_open_ente")}
-                        </Typography>
                     </Stack>
+                    <FocusVisibleButton
+                        color="accent"
+                        href="https://photos.ente.com"
+                    >
+                        {t("open_ente")}
+                    </FocusVisibleButton>
                 </FamilyInviteContents>
             ) : (
                 <FamilyInviteContents>

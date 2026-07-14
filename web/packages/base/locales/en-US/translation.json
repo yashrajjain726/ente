@@ -255,7 +255,7 @@
     "family_invite_accepted": "Welcome to the family",
     "family_invite_accepted_description": "You are now sharing {{email}}'s plan.",
     "family_invite_invalid": "This invite is invalid or no longer available.",
-    "family_invite_open_ente": "You can now open Ente to start using the shared plan.",
+    "open_ente": "Open Ente",
     "invite": "Invite",
     "enter_valid_email": "Enter a valid email address",
     "family_user_not_found": "No Ente account was found for this email address.",
