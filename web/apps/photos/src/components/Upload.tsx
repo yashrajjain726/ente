@@ -563,17 +563,23 @@ export const Upload: React.FC<UploadProps> = ({
         uploadItemsAndPaths.current = prunedItemAndPaths;
 
         void (async () => {
+            const _selectedUploadType = selectedUploadType.current;
+            selectedUploadType.current = undefined;
+            const _isDragAndDrop = isDragAndDrop.current;
+            isDragAndDrop.current = false;
+
             const importSuggestion = await deriveImportSuggestion(
-                selectedUploadType.current,
+                _selectedUploadType,
                 prunedItemAndPaths,
             );
+
+            if (uploadItemsAndPaths.current !== prunedItemAndPaths) return;
+
             setImportSuggestion(importSuggestion);
 
             log.debug(() => ["Upload request", uploadItemsAndPaths.current]);
             log.debug(() => ["Import suggestion", importSuggestion]);
 
-            const _selectedUploadType = selectedUploadType.current;
-            selectedUploadType.current = undefined;
             props.setLoading(false);
 
             if (isPendingDesktopUpload.current) {
@@ -605,8 +611,7 @@ export const Upload: React.FC<UploadProps> = ({
                 );
             }
 
-            if (isDragAndDrop.current) {
-                isDragAndDrop.current = false;
+            if (_isDragAndDrop) {
                 const canUploadToActiveCollection =
                     props.activeCollection &&
                     (props.activeCollection.owner.id == user?.id ||
