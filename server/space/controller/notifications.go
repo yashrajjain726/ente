@@ -1,13 +1,17 @@
 package controller
 
 import (
+	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	baserepo "github.com/ente/museum/pkg/repo"
+	util "github.com/ente/museum/pkg/utils"
 	emailutil "github.com/ente/museum/pkg/utils/email"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/ulule/limiter/v3"
 )
 
 const (
@@ -25,43 +29,52 @@ const (
 	spaceNewPostLikeIllustrationWidth  = 132
 	spaceNewPostReplyIllustrationWidth = 132
 	spaceNewFriendIllustrationWidth    = 220
+	spaceEmailSendRate                 = "50-H"
 )
 
 var sendSpaceNotificationEmail = emailutil.SendTemplatedEmail
 
 type SpaceEmailNotifier interface {
-	OnSpacePostCreated(authorSlug string, recipientUserIDs []int64)
-	OnSpacePostLiked(actorSlug string, recipientUserID int64)
-	OnSpacePostReplied(actorSlug string, recipientUserID int64)
-	OnSpaceFriendAdded(actorSlug string, recipientUserID int64)
-	OnSpaceFriendRequested(actorSlug string, recipientUserID int64)
+	OnSpacePostCreated(actorUserID int64, actorSlug string, recipientUserIDs []int64)
+	OnSpacePostLiked(actorUserID int64, actorSlug string, recipientUserID int64)
+	OnSpacePostReplied(actorUserID int64, actorSlug string, recipientUserID int64)
+	OnSpaceFriendAdded(actorUserID int64, actorSlug string, recipientUserID int64)
+	OnSpaceFriendRequested(actorUserID int64, actorSlug string, recipientUserID int64)
 }
 
 type SpaceEmailSender struct {
-	UserRepo *baserepo.UserRepository
+	UserRepo    *baserepo.UserRepository
+	sendLimiter *limiter.Limiter
 }
 
-func (n *SpaceEmailSender) OnSpacePostCreated(authorSlug string, recipientUserIDs []int64) {
-	n.send(authorSlug, "posted a new photo", spaceNotificationPostCreated, recipientUserIDs)
+func NewSpaceEmailSender(userRepo *baserepo.UserRepository) *SpaceEmailSender {
+	return &SpaceEmailSender{
+		UserRepo:    userRepo,
+		sendLimiter: util.NewRateLimiter(spaceEmailSendRate),
+	}
 }
 
-func (n *SpaceEmailSender) OnSpacePostLiked(actorSlug string, recipientUserID int64) {
-	n.send(actorSlug, "liked your post", spaceNotificationPostLiked, []int64{recipientUserID})
+func (n *SpaceEmailSender) OnSpacePostCreated(actorUserID int64, actorSlug string, recipientUserIDs []int64) {
+	n.send(actorUserID, actorSlug, "posted a new photo", spaceNotificationPostCreated, recipientUserIDs)
 }
 
-func (n *SpaceEmailSender) OnSpacePostReplied(actorSlug string, recipientUserID int64) {
-	n.send(actorSlug, "replied to your post", spaceNotificationPostReplied, []int64{recipientUserID})
+func (n *SpaceEmailSender) OnSpacePostLiked(actorUserID int64, actorSlug string, recipientUserID int64) {
+	n.send(actorUserID, actorSlug, "liked your post", spaceNotificationPostLiked, []int64{recipientUserID})
 }
 
-func (n *SpaceEmailSender) OnSpaceFriendAdded(actorSlug string, recipientUserID int64) {
-	n.send(actorSlug, "is now your friend", spaceNotificationFriendAdded, []int64{recipientUserID})
+func (n *SpaceEmailSender) OnSpacePostReplied(actorUserID int64, actorSlug string, recipientUserID int64) {
+	n.send(actorUserID, actorSlug, "replied to your post", spaceNotificationPostReplied, []int64{recipientUserID})
 }
 
-func (n *SpaceEmailSender) OnSpaceFriendRequested(actorSlug string, recipientUserID int64) {
-	n.send(actorSlug, "sent you a friend request", spaceNotificationFriendRequested, []int64{recipientUserID})
+func (n *SpaceEmailSender) OnSpaceFriendAdded(actorUserID int64, actorSlug string, recipientUserID int64) {
+	n.send(actorUserID, actorSlug, "is now your friend", spaceNotificationFriendAdded, []int64{recipientUserID})
 }
 
-func (n *SpaceEmailSender) send(actorSlug, action, event string, recipientUserIDs []int64) {
+func (n *SpaceEmailSender) OnSpaceFriendRequested(actorUserID int64, actorSlug string, recipientUserID int64) {
+	n.send(actorUserID, actorSlug, "sent you a friend request", spaceNotificationFriendRequested, []int64{recipientUserID})
+}
+
+func (n *SpaceEmailSender) send(actorUserID int64, actorSlug, action, event string, recipientUserIDs []int64) {
 	if n == nil || n.UserRepo == nil || len(recipientUserIDs) == 0 {
 		return
 	}
@@ -87,6 +100,20 @@ func (n *SpaceEmailSender) send(actorSlug, action, event string, recipientUserID
 		user := users[userID]
 		if user == nil || strings.TrimSpace(user.Email) == "" {
 			continue
+		}
+		limitContext, err := n.sendLimiter.Get(context.Background(), strconv.FormatInt(actorUserID, 10))
+		if err != nil {
+			log.WithField("actor_user_id", actorUserID).WithError(err).Error("Error checking space email rate limit")
+			continue
+		}
+		if limitContext.Reached {
+			continue
+		}
+		if limitContext.Remaining == 0 {
+			log.WithFields(log.Fields{
+				"actor_user_id": actorUserID,
+				"reset_at":      limitContext.Reset,
+			}).Warn("Space email rate limit reached")
 		}
 		if err := sendSpaceNotificationEmail(
 			[]string{user.Email},

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -20,6 +21,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+var testSpaceBrowserSessionWrapKey = base64.StdEncoding.EncodeToString(make([]byte, 32))
 
 type failingUserTokenTerminator struct{}
 
@@ -58,7 +61,7 @@ func TestCreateSpaceBrowserSessionReturnsTokenWhenCacheEvictionFails(t *testing.
 	require.NoError(t, (&baserepo.UserAuthRepository{DB: repos.Sessions.DB}).AddToken(userID, ente.Photos, authToken, "127.0.0.1", "space-test"))
 	router := gin.New()
 	router.POST("/account/space/sessions", handlers.CreateBrowserSession)
-	req := httptest.NewRequest(http.MethodPost, "/account/space/sessions", bytes.NewBufferString(`{"sessionWrapKey":"session-wrap-key"}`))
+	req := httptest.NewRequest(http.MethodPost, "/account/space/sessions", bytes.NewBufferString(`{"sessionWrapKey":"`+testSpaceBrowserSessionWrapKey+`"}`))
 	req.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
 	req.Header.Set("X-Auth-Token", authToken)
 	recorder := httptest.NewRecorder()
@@ -75,6 +78,36 @@ func TestCreateSpaceBrowserSessionReturnsTokenWhenCacheEvictionFails(t *testing.
 	session, err := repos.Sessions.GetBrowserSession(context.Background(), tokenHash[:])
 	require.NoError(t, err)
 	require.Equal(t, userID, session.UserID)
+	require.Equal(t, testSpaceBrowserSessionWrapKey, session.SessionWrapKey)
+}
+
+func TestCreateSpaceBrowserSessionRejectsInvalidWrapKey(t *testing.T) {
+	handlers, repos, userID := setupSpaceSessionAPITest(t)
+	router := gin.New()
+	router.POST("/account/space/sessions", handlers.CreateBrowserSession)
+
+	for _, tt := range []struct {
+		name string
+		key  string
+	}{
+		{name: "invalid base64", key: testSpaceBrowserSessionWrapKey[:len(testSpaceBrowserSessionWrapKey)-1] + "!"},
+		{name: "wrong decoded length", key: base64.StdEncoding.EncodeToString(make([]byte, 31))},
+		{name: "too long", key: testSpaceBrowserSessionWrapKey + "A"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/account/space/sessions", bytes.NewBufferString(`{"sessionWrapKey":"`+tt.key+`"}`))
+			req.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
+			recorder := httptest.NewRecorder()
+
+			router.ServeHTTP(recorder, req)
+
+			require.Equal(t, http.StatusBadRequest, recorder.Code)
+		})
+	}
+
+	var count int
+	require.NoError(t, repos.Sessions.DB.QueryRow(`SELECT COUNT(*) FROM space_browser_sessions WHERE user_id = $1`, userID).Scan(&count))
+	require.Zero(t, count)
 }
 
 func TestRegisteredTokenSessionRoutesAllowSessionCreationBeforeBrowserSession(t *testing.T) {
@@ -91,7 +124,7 @@ func TestRegisteredTokenSessionRoutesAllowSessionCreationBeforeBrowserSession(t 
 	sessionReq := httptest.NewRequest(
 		http.MethodPost,
 		"/account/space/sessions",
-		bytes.NewBufferString(`{"sessionWrapKey":"session-wrap-key"}`),
+		bytes.NewBufferString(`{"sessionWrapKey":"`+testSpaceBrowserSessionWrapKey+`"}`),
 	)
 	sessionReq.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
 	sessionReq.Header.Set("X-Auth-Token", authToken)

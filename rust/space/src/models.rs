@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroize;
 
 use crate::transport::{
     PostObjectPayload, ProfileAvatarResponse, ProfileCoverResponse, SpaceActorResponse,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct OpenAccountSpaceCtxInput {
     pub base_url: String,
     pub space_session_token: Option<String>,
@@ -14,7 +15,7 @@ pub struct OpenAccountSpaceCtxInput {
     pub client_version: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CreatedSpace {
     pub space_id: String,
     pub space_slug: String,
@@ -36,7 +37,7 @@ pub struct DecryptedSpaceProfile {
     pub updated_at: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DecryptedPost {
     pub post_key: Vec<u8>,
     pub caption_plaintext: Option<Vec<u8>>,
@@ -67,13 +68,14 @@ pub struct MessagePayload {
     pub text: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DecryptedMessage {
     pub message_key: Vec<u8>,
     pub payload: MessagePayload,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Zeroize)]
+#[zeroize(drop)]
 pub struct DecryptedFriendShare {
     pub friend: String,
     pub space_id: String,
@@ -107,7 +109,7 @@ pub struct FeedPage {
     pub next_cursor: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HydratedKeys {
     pub owned: Vec<(String, Vec<u8>)>,
     pub friends: Vec<DecryptedFriendShare>,

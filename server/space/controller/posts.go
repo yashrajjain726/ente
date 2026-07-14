@@ -92,11 +92,11 @@ func (c *PostsController) Create(ctx context.Context, space *repo.SpaceRecord, r
 			space.SpaceID, space.OwnerID, postCount, repo.MaxPostsPerSpace,
 		))
 	}
-	c.notifyFriendsOfNewPost(space.SpaceID, space.SpaceSlug)
+	c.notifyFriendsOfNewPost(space.OwnerID, space.SpaceID, space.SpaceSlug)
 	return &models.CreatePostResponse{PostID: postID}, nil
 }
 
-func (c *PostsController) notifyFriendsOfNewPost(spaceID, spaceSlug string) {
+func (c *PostsController) notifyFriendsOfNewPost(ownerID int64, spaceID, spaceSlug string) {
 	if c.EmailNotifier == nil || c.FriendsRepo == nil {
 		return
 	}
@@ -109,7 +109,7 @@ func (c *PostsController) notifyFriendsOfNewPost(spaceID, spaceSlug string) {
 		if len(recipientUserIDs) == 0 {
 			return
 		}
-		c.EmailNotifier.OnSpacePostCreated(spaceSlug, recipientUserIDs)
+		c.EmailNotifier.OnSpacePostCreated(ownerID, spaceSlug, recipientUserIDs)
 	}()
 }
 
@@ -243,7 +243,7 @@ func (c *PostsController) SetLike(ctx context.Context, actorSpace *repo.SpaceRec
 		return nil, err
 	}
 	if like && created && c.EmailNotifier != nil {
-		go c.EmailNotifier.OnSpacePostLiked(actorSpace.SpaceSlug, post.OwnerID)
+		go c.EmailNotifier.OnSpacePostLiked(actorSpace.OwnerID, actorSpace.SpaceSlug, post.OwnerID)
 	}
 	return &models.LikePostResponse{Liked: like}, nil
 }

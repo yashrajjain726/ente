@@ -25,7 +25,7 @@ pub async fn open_ctx(endpoint: &str, account: &TestAccount) -> AccountSpaceCtx 
         .post(format!("{endpoint}/account/space/sessions"))
         .header("X-Auth-Token", &account.auth_token)
         .header("X-Client-Package", App::Photos.client_package())
-        .json(&serde_json::json!({ "sessionWrapKey": "space-e2e-session-wrap-key" }))
+        .json(&serde_json::json!({ "sessionWrapKey": encode_b64(Key::generate().as_bytes()) }))
         .send()
         .await
         .expect("space session create request failed");
