@@ -1019,6 +1019,7 @@
 				CUSTOM_GROUP_ID = group.io.ente.frame.ShareExtension;
 				DEVELOPMENT_TEAM = 6Z68YJY9Q2;
 				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "$(inherited) x86_64";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
@@ -1322,6 +1323,7 @@
 				CUSTOM_GROUP_ID = group.io.ente.frame.ShareExtension;
 				DEVELOPMENT_TEAM = 6Z68YJY9Q2;
 				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "$(inherited) x86_64";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
@@ -1365,6 +1367,7 @@
 				CUSTOM_GROUP_ID = group.io.ente.frame.ShareExtension;
 				DEVELOPMENT_TEAM = 6Z68YJY9Q2;
 				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "$(inherited) x86_64";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",

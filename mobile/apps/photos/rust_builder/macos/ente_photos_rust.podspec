@@ -22,7 +22,6 @@ A new Flutter FFI plugin project.
   s.dependency 'FlutterMacOS'
 
   s.platform = :osx, '10.11'
-  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
   s.swift_version = '5.0'
 
   s.script_phase = {
@@ -37,8 +36,8 @@ A new Flutter FFI plugin project.
   }
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    # Flutter.framework does not contain a i386 slice.
-    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
+    # ONNX Runtime 1.27 does not publish Apple x86_64 binaries.
+    'EXCLUDED_ARCHS[sdk=macosx*]' => 'x86_64',
     'OTHER_LDFLAGS' => '-force_load ${BUILT_PRODUCTS_DIR}/libente_photos_rust.a -lc++',
   }
 end
