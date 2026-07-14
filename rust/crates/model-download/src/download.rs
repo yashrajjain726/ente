@@ -1064,6 +1064,10 @@ async fn fetch_download_probe(client: &Client, url: &str) -> DownloadProbe {
     }
 }
 
+pub(crate) async fn probe_content_length(client: &Client, url: &str) -> Option<u64> {
+    fetch_download_probe(client, url).await.content_length
+}
+
 fn should_use_range_download(total: u64, probe: &DownloadProbe) -> bool {
     total >= MIN_RANGE_DOWNLOAD_BYTES && probe.supports_ranges
 }
@@ -1596,7 +1600,7 @@ fn write_range_download_metadata(
     Ok(())
 }
 
-pub(crate) fn metadata_path_for(path: &Path) -> PathBuf {
+pub fn metadata_path_for(path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.metadata.json", path.display()))
 }
 

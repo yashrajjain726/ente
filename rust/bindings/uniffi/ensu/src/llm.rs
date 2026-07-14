@@ -107,13 +107,6 @@ pub struct LlmGenerationSummary {
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
-pub struct LlmModelDownloadTarget {
-    pub label: String,
-    pub url: String,
-    pub destination_path: String,
-}
-
-#[derive(Debug, Clone, uniffi::Record)]
 pub struct LlmModelDownloadProgress {
     pub label: String,
     pub downloaded_bytes: i64,
@@ -256,16 +249,6 @@ impl From<LlmChatRequest> for llm::ChatRequest {
     }
 }
 
-impl From<LlmModelDownloadTarget> for download::Target {
-    fn from(value: LlmModelDownloadTarget) -> Self {
-        Self {
-            label: value.label,
-            url: value.url,
-            destination_path: value.destination_path,
-        }
-    }
-}
-
 impl From<llm::GenerationSummary> for LlmGenerationSummary {
     fn from(value: llm::GenerationSummary) -> Self {
         Self {
@@ -338,23 +321,6 @@ impl llm::EventSink for CallbackSink {
 #[uniffi::export]
 pub fn llm_init_backend() -> Result<(), LlmError> {
     llm::init_backend().map_err(LlmError::from)
-}
-
-#[uniffi::export]
-pub fn llm_download_model_files(
-    targets: Vec<LlmModelDownloadTarget>,
-    callback: Box<dyn LlmModelDownloadCallback>,
-) -> Result<(), LlmError> {
-    let callback: Arc<dyn LlmModelDownloadCallback> = Arc::from(callback);
-    let progress_callback = Arc::clone(&callback);
-    let cancel_callback = Arc::clone(&callback);
-    let targets = targets.into_iter().map(Into::into).collect();
-    llm::download_model_files(
-        targets,
-        move |progress| progress_callback.on_progress(progress.into()),
-        move || cancel_callback.is_cancelled(),
-    )
-    .map_err(LlmError::from)
 }
 
 #[uniffi::export]

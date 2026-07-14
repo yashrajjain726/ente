@@ -10,9 +10,8 @@ pub fn download_model_files(
     targets: Vec<Target>,
     on_progress: impl FnMut(Progress),
     is_cancelled: impl Fn() -> bool,
-) -> Result<(), super::Error> {
-    download::fetch(targets, validate_gguf, on_progress, is_cancelled)?;
-    Ok(())
+) -> Result<(), download::Error> {
+    download::fetch(targets, validate_gguf, on_progress, is_cancelled)
 }
 
 fn validate_gguf(_target: &Target, path: &Path) -> Result<(), download::Error> {
@@ -31,7 +30,7 @@ fn validate_gguf(_target: &Target, path: &Path) -> Result<(), download::Error> {
     Ok(())
 }
 
-fn looks_like_gguf(path: &Path) -> bool {
+pub(crate) fn looks_like_gguf(path: &Path) -> bool {
     let mut file = match File::open(path) {
         Ok(file) => file,
         Err(_) => return false,

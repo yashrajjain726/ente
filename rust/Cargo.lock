@@ -2377,13 +2377,12 @@ version = "0.0.0"
 dependencies = [
  "ente-core",
  "ente-image",
+ "ente-model-download",
  "flate2",
- "futures-util",
  "llama-cpp-2",
  "ort",
  "parking_lot",
  "regex",
- "reqwest 0.12.28",
  "rubato",
  "rusqlite",
  "self_cell",
@@ -2402,6 +2401,7 @@ name = "ente-ensu-uniffi"
 version = "0.0.0"
 dependencies = [
  "ente-ensu",
+ "ente-model-download",
  "thiserror 2.0.18",
  "uniffi",
  "uuid",
@@ -2419,6 +2419,19 @@ dependencies = [
  "moxcms",
  "thiserror 2.0.18",
  "tiff 0.10.3",
+]
+
+[[package]]
+name = "ente-model-download"
+version = "0.0.0"
+dependencies = [
+ "futures-util",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]
