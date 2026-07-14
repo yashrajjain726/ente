@@ -78,6 +78,7 @@ import {
 } from "ente-new/photos/components/SelectedFileOptions";
 import { WhatsNew } from "ente-new/photos/components/WhatsNew";
 import {
+    GalleryEmptyState,
     GalleryEmptyStateV2,
     PeopleEmptyState,
     SearchResultsHeader,
@@ -186,6 +187,8 @@ import { Trans } from "react-i18next";
  *     ---------------------      |
  *           Photo List           v
  */
+const galleryFeatureFlags: { v2: boolean } = { v2: true };
+
 const Page: React.FC = () => {
     const { logout, showMiniDialog, onGenericError } = useBaseContext();
     const {
@@ -2199,10 +2202,17 @@ const Page: React.FC = () => {
             !isFirstLoad &&
             !state.collectionFiles.length &&
             activeCollectionID === PseudoCollectionID.all ? (
-                <GalleryEmptyStateV2
-                    isUploadInProgress={uploadManager.isUploadInProgress()}
-                    onUpload={openUploader}
-                />
+                galleryFeatureFlags.v2 ? (
+                    <GalleryEmptyStateV2
+                        isUploadInProgress={uploadManager.isUploadInProgress()}
+                        onUpload={openUploader}
+                    />
+                ) : (
+                    <GalleryEmptyState
+                        isUploadInProgress={uploadManager.isUploadInProgress()}
+                        onUpload={openUploader}
+                    />
+                )
             ) : !isInSearchMode &&
               !isFirstLoad &&
               state.view?.type == "people" &&
