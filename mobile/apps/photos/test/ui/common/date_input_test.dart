@@ -32,12 +32,13 @@ void main() {
 
     await tester.enterText(field, '02/30/2000');
     await tester.pump();
-    expect(selectedDate, isNull);
+    expect(selectedDate, DateTime(2000, 12, 31));
     expect(isValid, isFalse);
     expect(find.text('MM/DD/YYYY'), findsOneWidget);
 
     await tester.enterText(field, '');
     await tester.pump();
+    expect(selectedDate, isNull);
     expect(isValid, isTrue);
     expect(find.text('MM/DD/YYYY'), findsNothing);
   });

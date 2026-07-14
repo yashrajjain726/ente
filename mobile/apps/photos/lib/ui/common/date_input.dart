@@ -90,11 +90,15 @@ class _DatePickerFieldState extends State<DatePickerField> {
               (widget.lastDate == null || !parsed.isAfter(widget.lastDate!));
 
     setState(() {
-      _selectedDate = isValid ? parsed : null;
+      if (isValid) {
+        _selectedDate = parsed;
+      }
       _hasError = !isValid;
     });
     widget.onValidityChanged?.call(isValid);
-    widget.onChanged?.call(isValid ? parsed : null);
+    if (isValid) {
+      widget.onChanged?.call(parsed);
+    }
   }
 
   Future<void> _showDatePicker() async {
