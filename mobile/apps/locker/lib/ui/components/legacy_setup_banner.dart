@@ -100,7 +100,7 @@ class _LegacySetupBannerState extends State<LegacySetupBanner> {
   }
 
   void _onSetup() {
-    unawaited(openLegacyPage(context));
+    unawaited(openLegacyFromHome(context));
   }
 
   Future<void> _onDismiss() async {

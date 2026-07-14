@@ -745,7 +745,7 @@ class _HomePageState extends UploaderPageState<HomePage>
       children: [
         LockerHomeHeader(
           scaffoldKey: scaffoldKey,
-          onLegacyTapped: () => unawaited(openLegacyPage(context)),
+          onLegacyTapped: () => unawaited(openLegacyFromHome(context)),
           isSyncing: _isSyncing,
         ),
         if (!isHomeEmptyState) _buildSearchBar(),
