@@ -2399,7 +2399,8 @@
     "description": "Caption for the 'Link email' title. It should be a continuation of the 'Link email' title. Just like how 'Link email' + 'for faster sharing' forms a proper sentence in English, the combination of these two strings should also be a proper sentence in other languages."
   },
   "selectPerson": "Select person",
-  "selectPersonToLinkToThisContact": "Select a person to link to this contact",
+  "selectPersonToLinkToThisContact": "Select a person to autofill this contact",
+  "searchAllPeople": "Search all people",
   "selectPersonToLink": "Select person to link",
   "linkPersonToEmail": "Link person to {email}",
   "@linkPersonToEmail": {

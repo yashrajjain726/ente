@@ -1,6 +1,5 @@
 import "dart:typed_data";
 
-import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
 import "package:ente_pure_utils/ente_pure_utils.dart";
@@ -11,9 +10,12 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/people_changed_event.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/ml/face/person.dart";
+import "package:photos/models/search/search_constants.dart";
 import "package:photos/module/download/thumbnail.dart";
+import "package:photos/services/machine_learning/face_ml/face_filtering/face_filtering_constants.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/photos_contacts_service.dart";
+import "package:photos/services/search_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/action_sheet_widget.dart";
@@ -329,7 +331,17 @@ class _EditContactPageState extends State<EditContactPage> {
     }
     List<PersonEntity> persons;
     try {
-      persons = await PersonService.instance.getPersons();
+      final faceResults = await SearchService.instance.getAllFace(
+        null,
+        minClusterSize: kMinimumClusterSizeAllFaces,
+      );
+      final personIdsWithFiles = faceResults
+          .map((result) => result.params[kPersonParamID])
+          .whereType<String>()
+          .toSet();
+      persons = (await PersonService.instance.getPersons())
+          .where((person) => personIdsWithFiles.contains(person.remoteID))
+          .toList();
     } catch (e, s) {
       _logger.warning(
         "Failed to load people before editing contact photo",
@@ -342,19 +354,7 @@ class _EditContactPageState extends State<EditContactPage> {
     if (!mounted) {
       return;
     }
-    final visiblePersons =
-        persons.where((person) => !person.data.isIgnored).toList()
-          ..sort((first, second) {
-            final nameComparison = compareAsciiLowerCaseNatural(
-              first.data.name,
-              second.data.name,
-            );
-            if (nameComparison != 0) {
-              return nameComparison;
-            }
-            return first.remoteID.compareTo(second.remoteID);
-          });
-    if (visiblePersons.isEmpty) {
+    if (persons.isEmpty) {
       await _pickContactPhoto();
       return;
     }
@@ -364,7 +364,7 @@ class _EditContactPageState extends State<EditContactPage> {
       ContactPersonPickerPage(
         contactUserId: widget.contactUserId,
         contactEmail: widget.email,
-        persons: visiblePersons,
+        persons: persons,
       ),
     );
     if (!mounted || result == null) {
@@ -393,8 +393,8 @@ class _EditContactPageState extends State<EditContactPage> {
   }
 
   Future<void> _draftSelectedPerson(PersonEntity person) async {
-    final success = await _loadPersonPhotoDraft(person, showError: true);
-    if (!success || !mounted) {
+    await _loadPersonPhotoDraft(person, showError: true);
+    if (!mounted) {
       return;
     }
     _nameController.text = person.data.name;
@@ -407,7 +407,7 @@ class _EditContactPageState extends State<EditContactPage> {
     });
   }
 
-  Future<bool> _loadPersonPhotoDraft(
+  Future<void> _loadPersonPhotoDraft(
     PersonEntity person, {
     required bool showError,
   }) async {
@@ -422,7 +422,7 @@ class _EditContactPageState extends State<EditContactPage> {
       _logger.warning("Failed to build contact photo from person", e, s);
     }
     if (!mounted || loadGeneration != _photoLoadGeneration) {
-      return false;
+      return;
     }
     if (photoBytes == null) {
       setState(() {
@@ -434,14 +434,13 @@ class _EditContactPageState extends State<EditContactPage> {
           AppLocalizations.of(context).couldNotLoadSelectedPhoto,
         );
       }
-      return false;
+      return;
     }
     setState(() {
       _draftPhotoBytes = photoBytes;
       _isLoadingPhoto = false;
       _photoDirty = true;
     });
-    return true;
   }
 
   Future<void> _pickContactPhoto() async {

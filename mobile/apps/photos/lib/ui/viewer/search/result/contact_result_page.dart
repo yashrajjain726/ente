@@ -501,15 +501,18 @@ class _UnsavedContactHeader extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: MenuComponent(
-        title: l10n.addANameAndPhoto,
-        titleColor: colorScheme.textBase,
-        leading: _AddContactMenuIcon(colorScheme: colorScheme),
-        trailing: Icon(
-          Icons.chevron_right_rounded,
-          color: colorScheme.textMuted,
+      child: SizedBox(
+        height: 60,
+        child: MenuComponent(
+          title: l10n.addANameAndPhoto,
+          titleColor: colorScheme.textBase,
+          leading: _AddContactMenuIcon(colorScheme: colorScheme),
+          trailing: Icon(
+            Icons.chevron_right_rounded,
+            color: colorScheme.textMuted,
+          ),
+          onTap: onTap,
         ),
-        onTap: onTap,
       ),
     );
   }
@@ -548,38 +551,32 @@ class _UnsavedContactEmptyState extends StatelessWidget {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
     final l10n = AppLocalizations.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 36),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              "assets/ducky_share.png",
-              height: 180,
-              errorBuilder: (context, error, stackTrace) {
-                return const SizedBox(height: 180);
-              },
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(36, 32, 36, 0),
+      child: Column(
+        children: [
+          Image.asset(
+            "assets/ducky_share.png",
+            height: 180,
+            errorBuilder: (context, error, stackTrace) {
+              return const SizedBox(height: 180);
+            },
+          ),
+          const SizedBox(height: 12),
+          Text(
+            l10n.nothingToSeeHere,
+            style: textTheme.largeBold.copyWith(fontSize: 18, height: 24 / 18),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.photosSharedByWillAppearHere(email: email),
+            textAlign: TextAlign.center,
+            style: textTheme.mini.copyWith(
+              color: colorScheme.textMuted,
+              height: 16 / 12,
             ),
-            const SizedBox(height: 12),
-            Text(
-              l10n.nothingToSeeHere,
-              style: textTheme.largeBold.copyWith(
-                fontSize: 18,
-                height: 24 / 18,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              l10n.photosSharedByWillAppearHere(email: email),
-              textAlign: TextAlign.center,
-              style: textTheme.mini.copyWith(
-                color: colorScheme.textMuted,
-                height: 16 / 12,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

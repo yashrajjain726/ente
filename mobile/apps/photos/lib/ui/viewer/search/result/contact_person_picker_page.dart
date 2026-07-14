@@ -1,9 +1,9 @@
+import "package:collection/collection.dart";
 import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/ml/face/person.dart";
-import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/viewer/people/face_thumbnail_squircle.dart";
 import "package:photos/ui/viewer/people/person_face_widget.dart";
 import "package:photos/utils/person_contact_linking_util.dart";
@@ -22,7 +22,7 @@ class ContactPersonPickerPickPhoto extends ContactPersonPickerResult {
   const ContactPersonPickerPickPhoto();
 }
 
-class ContactPersonPickerPage extends StatelessWidget {
+class ContactPersonPickerPage extends StatefulWidget {
   const ContactPersonPickerPage({
     required this.contactUserId,
     required this.contactEmail,
@@ -37,9 +37,38 @@ class ContactPersonPickerPage extends StatelessWidget {
   static const _gridGap = 10.0;
 
   @override
+  State<ContactPersonPickerPage> createState() =>
+      _ContactPersonPickerPageState();
+}
+
+class _ContactPersonPickerPageState extends State<ContactPersonPickerPage> {
+  String _searchQuery = "";
+  bool _sortAscending = true;
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
     final l10n = AppLocalizations.of(context);
+    final persons =
+        widget.persons
+            .where(
+              (person) => !isLinkedToDifferentContact(
+                person,
+                contactUserId: widget.contactUserId,
+                email: widget.contactEmail,
+              ),
+            )
+            .where(
+              (person) => person.data.name.toLowerCase().contains(_searchQuery),
+            )
+            .toList()
+          ..sort((first, second) {
+            final comparison = compareAsciiLowerCaseNatural(
+              first.data.name,
+              second.data.name,
+            );
+            return _sortAscending ? comparison : -comparison;
+          });
 
     return Scaffold(
       backgroundColor: colors.backgroundBase,
@@ -57,17 +86,89 @@ class ContactPersonPickerPage extends StatelessWidget {
             },
           ),
         ],
-        slivers: [_buildGrid(persons)],
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              ContactPersonPickerPage._horizontalPadding,
+              0,
+              ContactPersonPickerPage._horizontalPadding,
+              Spacing.xl,
+            ),
+            sliver: SliverToBoxAdapter(child: _buildSearchRow(context)),
+          ),
+          _buildGrid(persons),
+        ],
       ),
     );
+  }
+
+  Widget _buildSearchRow(BuildContext context) {
+    final colors = context.componentColors;
+    final l10n = AppLocalizations.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: TextInputComponent(
+            hintText: l10n.searchAllPeople,
+            prefix: HugeIcon(
+              icon: HugeIcons.strokeRoundedSearch01,
+              size: IconSizes.small,
+              color: colors.textLight,
+            ),
+            autocorrect: false,
+            textInputAction: TextInputAction.search,
+            onChanged: (value) {
+              setState(() => _searchQuery = value.trim().toLowerCase());
+            },
+          ),
+        ),
+        const SizedBox(width: Spacing.xl),
+        Builder(
+          builder: (buttonContext) => IconButtonComponent(
+            tooltip: l10n.sort,
+            variant: IconButtonComponentVariant.primary,
+            shouldSurfaceExecutionStates: false,
+            icon: const HugeIcon(icon: HugeIcons.strokeRoundedFilterHorizontal),
+            onTap: () => _showSortMenu(buttonContext),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showSortMenu(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final selected = await showEntePopupMenu<bool>(
+      context: context,
+      options: [
+        EntePopupMenuOption(
+          value: true,
+          label: l10n.name,
+          secondaryLabel: l10n.sortAToZ,
+          isActive: _sortAscending,
+          activeTrailingWidget: const Icon(Icons.check_rounded),
+        ),
+        EntePopupMenuOption(
+          value: false,
+          label: l10n.name,
+          secondaryLabel: l10n.sortZToA,
+          isActive: !_sortAscending,
+          activeTrailingWidget: const Icon(Icons.check_rounded),
+          showDivider: false,
+        ),
+      ],
+    );
+    if (selected != null && mounted) {
+      setState(() => _sortAscending = selected);
+    }
   }
 
   Widget _buildGrid(List<PersonEntity> persons) {
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(
-        _horizontalPadding,
+        ContactPersonPickerPage._horizontalPadding,
         0,
-        _horizontalPadding,
+        ContactPersonPickerPage._horizontalPadding,
         48,
       ),
       sliver: SliverLayoutBuilder(
@@ -75,14 +176,14 @@ class ContactPersonPickerPage extends StatelessWidget {
           const crossAxisCount = 3;
           final tileSize =
               (constraints.crossAxisExtent -
-                  (_gridGap * (crossAxisCount - 1))) /
+                  (ContactPersonPickerPage._gridGap * (crossAxisCount - 1))) /
               crossAxisCount;
           return SliverGrid(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
               mainAxisSpacing: 20,
-              crossAxisSpacing: _gridGap,
-              childAspectRatio: tileSize / (tileSize + 30),
+              crossAxisSpacing: ContactPersonPickerPage._gridGap,
+              childAspectRatio: tileSize / (tileSize + 28),
             ),
             delegate: SliverChildBuilderDelegate(
               childCount: persons.length,
@@ -90,8 +191,6 @@ class ContactPersonPickerPage extends StatelessWidget {
                 key: ValueKey(persons[index].remoteID),
                 person: persons[index],
                 size: tileSize,
-                contactUserId: contactUserId,
-                contactEmail: contactEmail,
               ),
             ),
           );
@@ -102,18 +201,10 @@ class ContactPersonPickerPage extends StatelessWidget {
 }
 
 class _PersonTile extends StatelessWidget {
-  const _PersonTile({
-    super.key,
-    required this.person,
-    required this.size,
-    required this.contactUserId,
-    required this.contactEmail,
-  });
+  const _PersonTile({super.key, required this.person, required this.size});
 
   final PersonEntity person;
   final double size;
-  final int contactUserId;
-  final String contactEmail;
 
   @override
   Widget build(BuildContext context) {
@@ -122,23 +213,11 @@ class _PersonTile extends StatelessWidget {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () {
-        if (isLinkedToDifferentContact(
-          person,
-          contactUserId: contactUserId,
-          email: contactEmail,
-        )) {
-          showShortToast(
-            context,
-            AppLocalizations.of(context).personAlreadyLinkedToAnotherContact,
-          );
-          return;
-        }
-        Navigator.of(context).pop(ContactPersonPickerSelected(person));
-      },
+      onTap: () =>
+          Navigator.of(context).pop(ContactPersonPickerSelected(person)),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox.square(
             dimension: size,
@@ -154,15 +233,14 @@ class _PersonTile extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            person.data.name,
-            maxLines: 1,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyles.body.copyWith(
-              color: colors.textBase,
-              height: 20 / 14,
+          const SizedBox(height: Spacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: Text(
+              person.data.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyles.body.copyWith(color: colors.textBase),
             ),
           ),
         ],
