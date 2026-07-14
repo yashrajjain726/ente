@@ -369,7 +369,8 @@ const FamilyMemberRow: React.FC<{
                     {role}
                     {!invited &&
                         ` · ${formattedStorageByteSize(member.usage ?? 0)}`}
-                    {member.storageLimit != undefined &&
+                    {!invited &&
+                        member.storageLimit != undefined &&
                         ` / ${formattedStorageByteSize(member.storageLimit)}`}
                 </Typography>
             </Stack>
