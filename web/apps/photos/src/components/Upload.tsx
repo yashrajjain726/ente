@@ -617,7 +617,10 @@ export const Upload: React.FC<UploadProps> = ({
                     (props.activeCollection.owner.id == user?.id ||
                         canAddFilesToCollection(props.activeCollection));
                 if (props.activeCollection && canUploadToActiveCollection) {
-                    uploadFilesToExistingCollection(props.activeCollection);
+                    uploadFilesToExistingCollection(
+                        props.activeCollection,
+                        prunedItemAndPaths,
+                    );
                     return;
                 }
             }
@@ -633,7 +636,11 @@ export const Upload: React.FC<UploadProps> = ({
                 action: "upload",
                 activeCollectionID: props.activeCollection?.id,
                 showHiddenCollections: props.isInHiddenSection,
-                onSelectCollection: uploadFilesToExistingCollection,
+                onSelectCollection: (collection) =>
+                    uploadFilesToExistingCollection(
+                        collection,
+                        prunedItemAndPaths,
+                    ),
                 onCreateCollection: showNextModal,
                 onCancel: handleCollectionSelectorCancel,
             });
@@ -766,7 +773,10 @@ export const Upload: React.FC<UploadProps> = ({
         uploadRunning.current = false;
     };
 
-    const uploadFilesToExistingCollection = async (collection: Collection) => {
+    const uploadFilesToExistingCollection = async (
+        collection: Collection,
+        uploadItemAndPaths: UploadItemAndPath[],
+    ) => {
         preCollectionCreationAction();
         try {
             const uploadCollection = canDirectlyUploadToCollection(collection)
@@ -779,7 +789,7 @@ export const Upload: React.FC<UploadProps> = ({
                 throw new Error("Upload not allowed for the selected album");
             }
 
-            const uploadItemsWithCollection = uploadItemsAndPaths.current.map(
+            const uploadItemsWithCollection = uploadItemAndPaths.map(
                 ([uploadItem, path], index) => ({
                     uploadItem,
                     pathPrefix: uploadPathPrefix(path),
@@ -798,7 +808,9 @@ export const Upload: React.FC<UploadProps> = ({
                             : collection,
                 },
             );
-            uploadItemsAndPaths.current = [];
+            if (uploadItemsAndPaths.current === uploadItemAndPaths) {
+                uploadItemsAndPaths.current = [];
+            }
         } catch (e) {
             retrySharedAlbumUploadTarget.current = undefined;
             closeUploadProgress();
