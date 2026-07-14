@@ -22,7 +22,6 @@ import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/search_constants.dart";
 import "package:photos/models/search/search_result.dart";
 import "package:photos/models/selected_files.dart";
-import "package:photos/service_locator.dart";
 import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -105,7 +104,7 @@ class _ContactResultPageState extends State<ContactResultPage> {
       initialGalleryFilter: widget.searchResult.getHierarchicalSearchFilter(),
     );
 
-    if (flagService.enableContact && _contactUserId != null) {
+    if (_contactUserId != null) {
       _refreshSavedContact();
       _contactsChangedEvent = Bus.instance.on<ContactsChangedEvent>().listen((
         event,
@@ -240,7 +239,7 @@ class _ContactResultPageState extends State<ContactResultPage> {
   }
 
   Widget? _buildContactHeader(BuildContext context) {
-    if (flagService.enableContact && _contactUserId != null) {
+    if (_contactUserId != null) {
       if (!_resolvedSavedContact) {
         return const Padding(
           padding: EdgeInsets.only(top: 20, bottom: 8),
@@ -293,7 +292,6 @@ class _ContactResultPageState extends State<ContactResultPage> {
   }
 
   bool get _shouldShowUnsavedContactEmptyState =>
-      flagService.enableContact &&
       _contactUserId != null &&
       _resolvedSavedContact &&
       _savedContact == null &&

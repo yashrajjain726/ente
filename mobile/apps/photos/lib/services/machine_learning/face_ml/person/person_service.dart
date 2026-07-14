@@ -606,7 +606,7 @@ class PersonService {
     EnteFile file,
     Face face,
   ) async {
-    final contact = await _getLinkedContactIfEnabled(person);
+    final contact = await _getLinkedContact(person);
     if (contact == null) {
       return;
     }
@@ -619,11 +619,9 @@ class PersonService {
         "Failed to prepare contact avatar for linked person ${person.remoteID}",
       );
     }
-    await _runLinkedContactWriteIfEnabled(
-      () => _contactsService.setProfilePicture(
-        contactId: contact.id,
-        bytes: bytes,
-      ),
+    await _contactsService.setProfilePicture(
+      contactId: contact.id,
+      bytes: bytes,
     );
   }
 
@@ -680,50 +678,22 @@ class PersonService {
     PersonEntity person,
     String name,
   ) async {
-    final contact = await _getLinkedContactIfEnabled(person);
+    final contact = await _getLinkedContact(person);
     if (contact == null) {
       return;
     }
-    await _runLinkedContactWriteIfEnabled(
-      () => _contactsService.createOrUpdateContact(
-        contactUserId: contact.contactUserId,
-        name: name,
-        birthDate: contact.data?.birthDate,
-      ),
+    await _contactsService.createOrUpdateContact(
+      contactUserId: contact.contactUserId,
+      name: name,
+      birthDate: contact.data?.birthDate,
     );
   }
 
-  Future<contacts.ContactRecord?> _getLinkedContactIfEnabled(
-    PersonEntity person,
-  ) async {
-    if (!flagService.enableContact) {
-      return null;
-    }
-    final contact = await _contactsService.getContact(
-      contactUserId: person.data.userID,
-      email: person.data.email,
-    );
-    if (contact == null || !flagService.enableContact) {
-      return null;
-    }
-    return contact;
-  }
-
-  Future<void> _runLinkedContactWriteIfEnabled(
-    Future<void> Function() write,
-  ) async {
-    if (!flagService.enableContact) {
-      return;
-    }
-    try {
-      await write();
-    } on StateError {
-      if (!flagService.enableContact) {
-        return;
-      }
-      rethrow;
-    }
-  }
+  Future<contacts.ContactRecord?> _getLinkedContact(PersonEntity person) =>
+      _contactsService.getContact(
+        contactUserId: person.data.userID,
+        email: person.data.email,
+      );
 
   Future<ManualPersonAssignmentResult> addManualFileAssignments({
     required String personID,

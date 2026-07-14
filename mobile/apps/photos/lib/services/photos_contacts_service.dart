@@ -46,15 +46,9 @@ class PhotosContactsService {
 
   bool get hasHydratedCache => _hasHydratedCache;
 
-  bool get needsWarmup =>
-      flagService.enableContact && (!_hasHydratedCache || _readyFuture == null);
+  bool get needsWarmup => !_hasHydratedCache || _readyFuture == null;
 
   Future<void> ensureReady() async {
-    if (!flagService.enableContact) {
-      _sessionGeneration += 1;
-      _resetSessionState(notify: true);
-      return;
-    }
     final session = _buildSession();
     if (session == null) {
       _sessionGeneration += 1;
@@ -97,9 +91,6 @@ class PhotosContactsService {
     int? contactUserId,
     String? email,
   }) async {
-    if (!flagService.enableContact) {
-      return null;
-    }
     final cached = _getCachedContact(
       contactUserId: contactUserId,
       email: email,
@@ -175,7 +166,7 @@ class PhotosContactsService {
     if (contactUserId == null) {
       return null;
     }
-    if (!flagService.enableContact || _sessionKey == null) {
+    if (_sessionKey == null) {
       return null;
     }
     if (hasResolvedProfilePictureByUserId(contactUserId)) {

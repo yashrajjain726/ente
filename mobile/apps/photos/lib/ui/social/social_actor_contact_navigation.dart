@@ -3,7 +3,6 @@ import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/search/generic_search_result.dart";
-import "package:photos/service_locator.dart" show flagService;
 import "package:photos/services/contacts/contact_identity_resolver.dart";
 import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/services/search_service.dart";
@@ -16,9 +15,6 @@ bool canOpenSocialActorContactDestination(
   User user, {
   required int currentUserID,
 }) {
-  if (!flagService.enableContact) {
-    return false;
-  }
   final userId = user.id;
   if (userId == null || userId <= 0 || userId == currentUserID) {
     return false;

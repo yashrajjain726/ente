@@ -1,6 +1,5 @@
 import "package:photos/extensions/user_extension.dart";
 import "package:photos/models/api/collection/user.dart";
-import "package:photos/service_locator.dart" show flagService;
 import "package:photos/services/photos_contacts_service.dart";
 
 String resolveDisplayName(User user) {
@@ -18,17 +17,15 @@ String resolveDisplayName(User user) {
 }
 
 String? resolveKnownEmail(User user) {
-  if (flagService.enableContact) {
-    final contactUserId = _validContactUserId(user);
-    final savedEmail = _knownEmailOrNull(
-      PhotosContactsService.instance.getCachedResolvedEmail(
-        contactUserId: contactUserId,
-        email: contactUserId == null ? user.email : null,
-      ),
-    );
-    if (savedEmail != null) {
-      return savedEmail;
-    }
+  final contactUserId = _validContactUserId(user);
+  final savedEmail = _knownEmailOrNull(
+    PhotosContactsService.instance.getCachedResolvedEmail(
+      contactUserId: contactUserId,
+      email: contactUserId == null ? user.email : null,
+    ),
+  );
+  if (savedEmail != null) {
+    return savedEmail;
   }
 
   return _knownEmailOrNull(user.email);
@@ -46,10 +43,6 @@ bool matchesResolvedContactQuery(User user, String lowerCaseQuery) {
 }
 
 String? _savedContactName(User user) {
-  if (!flagService.enableContact) {
-    return null;
-  }
-
   final contactUserId = _validContactUserId(user);
   return PhotosContactsService.instance.getCachedSavedName(
     contactUserId: contactUserId,
