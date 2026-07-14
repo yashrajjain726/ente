@@ -213,6 +213,9 @@ func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limi
 		reqPath == "/space/public/slug-availability/:spaceSlug" {
 		return r.limit200ReqPerMin
 	}
+	if reqPath == "/spaces/:spaceID/uploads/presign" && reqMethod == http.MethodPost {
+		return r.limit10ReqPerMin
+	}
 	if strings.HasPrefix(reqPath, "/spaces/") &&
 		(reqMethod == http.MethodPost || reqMethod == http.MethodPut || reqMethod == http.MethodPatch || reqMethod == http.MethodDelete) {
 		return r.limit200ReqPerMin

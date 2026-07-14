@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,7 +13,10 @@ import (
 const (
 	SpaceUploadURLExpiry    = 15 * time.Minute
 	SpaceUploadCleanupDelay = 2 * SpaceUploadURLExpiry
+	MaxActiveUploadCount    = 10
 )
+
+var ErrSpaceUploadLimitReached = errors.New("space upload limit reached")
 
 const (
 	TempObjectPurposePost   = "post"
@@ -30,6 +34,44 @@ func (r *AssetsRepository) AddTempObject(ctx context.Context, rec SpaceTempObjec
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`, rec.ObjectKey, rec.SpaceID, rec.Purpose, rec.BucketID, rec.ExpectedSize, rec.ExpiresAt, cleanupAfter)
 	return stacktrace.Propagate(err, "")
+}
+
+func (r *AssetsRepository) ReserveTempObject(ctx context.Context, rec SpaceTempObjectRecord) error {
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	defer tx.Rollback()
+	if err := tx.QueryRowContext(ctx, `
+		SELECT space_id
+		FROM spaces
+		WHERE space_id = $1
+		FOR UPDATE
+	`, rec.SpaceID.String).Scan(&rec.SpaceID.String); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	var activeCount int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM space_temp_objects
+		WHERE space_id = $1 AND expires_at > now_utc_micro_seconds()
+	`, rec.SpaceID.String).Scan(&activeCount); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if activeCount >= MaxActiveUploadCount {
+		return ErrSpaceUploadLimitReached
+	}
+	cleanupAfter := rec.CleanupAfter
+	if cleanupAfter == 0 {
+		cleanupAfter = rec.ExpiresAt
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO space_temp_objects (object_key, space_id, purpose, bucket_id, expected_size, expires_at, cleanup_after)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, rec.ObjectKey, rec.SpaceID, rec.Purpose, rec.BucketID, rec.ExpectedSize, rec.ExpiresAt, cleanupAfter); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	return stacktrace.Propagate(tx.Commit(), "")
 }
 
 func QueueObjectCleanupTx(ctx context.Context, tx *sql.Tx, rec SpaceTempObjectRecord) error {
