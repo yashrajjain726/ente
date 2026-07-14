@@ -203,6 +203,14 @@ func isEventURLPath(reqPath string) bool {
 		reqPath == "/events/user"
 }
 
+func isSpaceViewerReadURLPath(reqPath string) bool {
+	return reqPath == "/spaces/:spaceID/profile" ||
+		reqPath == "/spaces/:spaceID/assets/redirect" ||
+		reqPath == "/spaces/:spaceID/posts" ||
+		reqPath == "/spaces/:spaceID/posts/:postID" ||
+		reqPath == "/spaces/:spaceID/versions"
+}
+
 // getLimiter, based on reqPath & reqMethod, return instance of limiter.Limiter which needs to
 // be applied for a request. It returns nil if the request is not rate limited
 func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limiter.Limiter {
@@ -215,6 +223,9 @@ func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limi
 	}
 	if reqPath == "/spaces/:spaceID/uploads/presign" && reqMethod == http.MethodPost {
 		return r.limit10ReqPerMin
+	}
+	if reqMethod == http.MethodGet && isSpaceViewerReadURLPath(reqPath) {
+		return r.limit200ReqPerMin
 	}
 	if strings.HasPrefix(reqPath, "/spaces/") &&
 		(reqMethod == http.MethodPost || reqMethod == http.MethodPut || reqMethod == http.MethodPatch || reqMethod == http.MethodDelete) {
