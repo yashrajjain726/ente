@@ -9,6 +9,7 @@ import "package:photos/db/files_db.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/db/offline_files_db.dart";
 import "package:photos/events/contacts_changed_event.dart";
+import "package:photos/events/people_changed_event.dart";
 import 'package:photos/models/file/file.dart';
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/face/person.dart";
@@ -70,6 +71,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
   int? _linkedContactUserId;
   int _loadGeneration = 0;
   StreamSubscription<ContactsChangedEvent>? _contactsChangedSubscription;
+  StreamSubscription<PeopleChangedEvent>? _peopleChangedSubscription;
 
   bool get isPerson => widget.personId != null;
 
@@ -82,6 +84,13 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
     _contactsChangedSubscription = Bus.instance
         .on<ContactsChangedEvent>()
         .listen(_onContactsChanged);
+    _peopleChangedSubscription = Bus.instance.on<PeopleChangedEvent>().listen((
+      event,
+    ) {
+      if (mounted && event.person?.remoteID == widget.personId) {
+        setState(() => faceCropFuture = _startFaceCropLoad());
+      }
+    });
     faceCropFuture = _startFaceCropLoad();
   }
 
@@ -100,6 +109,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
   @override
   void dispose() {
     _contactsChangedSubscription?.cancel();
+    _peopleChangedSubscription?.cancel();
     if (_faceCropFileId != null) {
       checkStopTryingToGenerateFaceThumbnails(
         _faceCropFileId!,

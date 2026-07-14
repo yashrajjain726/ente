@@ -3,6 +3,7 @@ import "dart:async";
 import "package:email_validator/email_validator.dart";
 import "package:ente_components/components/app_bar_component.dart";
 import "package:ente_components/components/buttons/icon_button_component.dart";
+import "package:ente_components/components/menu_component.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
@@ -28,7 +29,6 @@ import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/album/row_item.dart";
 import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/end_to_end_banner.dart";
-import "package:photos/ui/components/menu_item_widget/menu_item_widget_new.dart";
 import "package:photos/ui/viewer/actions/file_selection_overlay_bar.dart";
 import "package:photos/ui/viewer/gallery/empty_state.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
@@ -501,13 +501,14 @@ class _UnsavedContactHeader extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: MenuItemWidgetNew(
+      child: MenuComponent(
         title: l10n.addANameAndPhoto,
         titleColor: colorScheme.textBase,
-        leadingIconWidget: _AddContactMenuIcon(colorScheme: colorScheme),
-        leadingIconSize: 36,
-        trailingIcon: Icons.chevron_right_rounded,
-        trailingIconIsMuted: true,
+        leading: _AddContactMenuIcon(colorScheme: colorScheme),
+        trailing: Icon(
+          Icons.chevron_right_rounded,
+          color: colorScheme.textMuted,
+        ),
         onTap: onTap,
       ),
     );

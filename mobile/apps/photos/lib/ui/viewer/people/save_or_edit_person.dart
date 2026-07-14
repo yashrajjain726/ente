@@ -244,8 +244,9 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(Spacing.xxl),
+              SafeArea(
+                top: false,
+                minimum: const EdgeInsets.all(Spacing.xxl),
                 child: Column(
                   children: [
                     ButtonComponent(
