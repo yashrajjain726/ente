@@ -55,6 +55,10 @@ impl ApiClient {
     }
 
     pub(crate) fn api(&self, account_id: Option<&str>) -> Api {
+        self.api_at(&self.base_url, account_id)
+    }
+
+    fn api_at(&self, origin: &str, account_id: Option<&str>) -> Api {
         let auth = account_id.and_then(|id| {
             let token = self.get_token(id);
             if token.is_none() {
@@ -65,7 +69,7 @@ impl ApiClient {
         Api::new(
             self.http.clone(),
             ApiConfig {
-                origin: self.base_url.clone(),
+                origin: origin.to_owned(),
                 client_package: Some(self.client_package.clone()),
                 client_version: None,
                 user_agent: Some(USER_AGENT.to_string()),
@@ -74,18 +78,68 @@ impl ApiClient {
         )
     }
 
-    pub async fn download_file(&self, url: &str, account_id: Option<&str>) -> Result<Vec<u8>> {
-        let token = account_id.and_then(|id| self.get_token(id));
+    pub async fn download_file(&self, url: &str) -> Result<Vec<u8>> {
         Ok(
             http::retry_with_profile(RetryProfile::Background, || async {
-                let mut request = self.http.get(url);
-                if let Some(token) = &token {
-                    // A header would ride the redirect to presigned storage; a query does not.
-                    request = request.query(&[("token", token)]);
-                }
-                request.send().await?.error_for_status()?.bytes().await
+                self.http
+                    .get(url)
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .bytes()
+                    .await
             })
             .await?,
         )
+    }
+
+    pub async fn download_from_proxy(
+        &self,
+        origin: &str,
+        account_id: &str,
+        file_id: i64,
+    ) -> Result<Vec<u8>> {
+        let api = self.api_at(origin, Some(account_id));
+        Ok(
+            http::retry_with_profile(RetryProfile::Background, || async {
+                api.get("/")
+                    .query(&[("fileID", file_id)])
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .bytes()
+                    .await
+            })
+            .await?,
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockito::{Matcher, Server};
+
+    #[tokio::test]
+    async fn proxy_download_uses_api_headers() {
+        let mut server = Server::new_async().await;
+        let download = server
+            .mock("GET", "/")
+            .match_query(Matcher::UrlEncoded("fileID".into(), "12345".into()))
+            .match_header("x-auth-token", "token")
+            .match_header("x-client-package", "io.ente.locker")
+            .with_body("file")
+            .create_async()
+            .await;
+        let client = ApiClient::new_with_client_package(None, "io.ente.locker").unwrap();
+        client.add_token("account", "token");
+
+        let bytes = client
+            .download_from_proxy(&server.url(), "account", 12345)
+            .await
+            .unwrap();
+
+        download.assert_async().await;
+        assert_eq!(bytes, b"file");
     }
 }

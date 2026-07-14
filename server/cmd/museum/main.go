@@ -598,7 +598,9 @@ func main() {
 	storageAPI.POST("/files/upload-url", fileHandler.GetUploadURLV2)
 	storageAPI.POST("/files/multipart-upload-url", fileHandler.GetMultipartUploadURLV2)
 	storageAPI.GET("/files/download/:fileID", fileHandler.Get)
+	storageAPI.GET("/files/download/v2/:fileID", fileHandler.GetV2)
 	storageAPI.GET("/files/preview/:fileID", fileHandler.GetThumbnail)
+	storageAPI.GET("/files/preview/v2/:fileID", fileHandler.GetThumbnailV2)
 
 	storageAPI.POST("/files/share-url", fileHandler.ShareUrl)
 	storageAPI.GET("/files/share-url", fileHandler.GetUrls)
@@ -1388,14 +1390,14 @@ func cacheHeaders() gin.HandlerFunc {
 		// Add "Cache-Control: no-store" to HTTP GET API responses.
 		if c.Request.Method == http.MethodGet {
 			reqPath := urlSanitizer(c)
-			if strings.HasPrefix(reqPath, "/files/preview/") ||
-				strings.HasPrefix(reqPath, "/files/download/") ||
-				strings.HasPrefix(reqPath, "/public-collection/files/preview/") ||
-				strings.HasPrefix(reqPath, "/public-collection/files/download/") ||
-				strings.HasPrefix(reqPath, "/public-memory/files/preview/") ||
-				strings.HasPrefix(reqPath, "/public-memory/files/download/") ||
-				strings.HasPrefix(reqPath, "/cast/files/preview/") ||
-				strings.HasPrefix(reqPath, "/cast/files/download/") {
+			if reqPath == "/files/preview/:fileID" ||
+				reqPath == "/files/download/:fileID" ||
+				reqPath == "/public-collection/files/preview/:fileID" ||
+				reqPath == "/public-collection/files/download/:fileID" ||
+				reqPath == "/public-memory/files/preview/:fileID" ||
+				reqPath == "/public-memory/files/download/:fileID" ||
+				reqPath == "/cast/files/preview/:fileID" ||
+				reqPath == "/cast/files/download/:fileID" {
 				// Exclude those that redirect to S3 for file downloads.
 			} else {
 				c.Writer.Header().Set("Cache-Control", "no-store")
