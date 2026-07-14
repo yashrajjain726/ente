@@ -1,13 +1,10 @@
-use crate::api::client::AppClient;
+use crate::api::client::{AppClient, download_from_proxy};
 use crate::api::models::{
     Collection, File, GetCollectionsResponse, GetDiffResponse, GetFileResponse, GetFileUrlResponse,
     GetFilesResponse, GetThumbnailUrlResponse, UserDetails,
 };
 use crate::models::error::Result;
 use ente_core::http;
-use ente_core::urls::{PRODUCTION_API_ORIGIN, file_download_url};
-
-const THUMBNAILS_ORIGIN: &str = "https://thumbnails.ente.com";
 
 pub struct ApiMethods<'a> {
     client: &'a AppClient,
@@ -123,10 +120,7 @@ impl<'a> ApiMethods<'a> {
         Ok((response.diff, response.has_more))
     }
 
-    pub async fn get_file_url(&self, file_id: i64) -> Result<String> {
-        if self.client.origin() == PRODUCTION_API_ORIGIN {
-            return Ok(file_download_url(self.client.origin(), file_id));
-        }
+    async fn get_signed_file_url(&self, file_id: i64) -> Result<String> {
         let api = self.client.api();
         let response: GetFileUrlResponse = http::retry(|| async {
             api.get(&format!("/files/download/v2/{file_id}"))
@@ -141,10 +135,7 @@ impl<'a> ApiMethods<'a> {
         Ok(response.url)
     }
 
-    pub async fn get_thumbnail_url(&self, file_id: i64) -> Result<String> {
-        if self.client.origin() == PRODUCTION_API_ORIGIN {
-            return Ok(format!("{THUMBNAILS_ORIGIN}/?fileID={file_id}"));
-        }
+    async fn get_signed_thumbnail_url(&self, file_id: i64) -> Result<String> {
         let api = self.client.api();
         let response: GetThumbnailUrlResponse = http::retry(|| async {
             api.get(&format!("/files/preview/v2/{file_id}"))
@@ -160,19 +151,23 @@ impl<'a> ApiMethods<'a> {
     }
 
     pub async fn download_file(&self, file_id: i64) -> Result<Vec<u8>> {
-        if self.client.origin() == PRODUCTION_API_ORIGIN {
-            return self.client.download_file_from_proxy(file_id).await;
+        match self.client.download_proxies() {
+            Some(proxies) => download_from_proxy(&proxies.files, file_id).await,
+            None => {
+                let url = self.get_signed_file_url(file_id).await?;
+                self.client.download_url(&url).await
+            }
         }
-        let url = self.get_file_url(file_id).await?;
-        self.client.download_file(&url).await
     }
 
     pub async fn download_thumbnail(&self, file_id: i64) -> Result<Vec<u8>> {
-        if self.client.origin() == PRODUCTION_API_ORIGIN {
-            return self.client.download_thumbnail_from_proxy(file_id).await;
+        match self.client.download_proxies() {
+            Some(proxies) => download_from_proxy(&proxies.thumbnails, file_id).await,
+            None => {
+                let url = self.get_signed_thumbnail_url(file_id).await?;
+                self.client.download_url(&url).await
+            }
         }
-        let url = self.get_thumbnail_url(file_id).await?;
-        self.client.download_file(&url).await
     }
 
     pub async fn get_trash(&self, since_time: i64) -> Result<(Vec<File>, bool)> {
@@ -226,21 +221,6 @@ impl<'a> ApiMethods<'a> {
 mod tests {
     use super::*;
     use mockito::{Matcher, Server};
-
-    #[tokio::test]
-    async fn test_production_urls() {
-        let api = AppClient::new(None, crate::models::account::App::Photos).unwrap();
-        let methods = ApiMethods::new(&api);
-
-        assert_eq!(
-            methods.get_file_url(12345).await.unwrap(),
-            "https://files.ente.com/?fileID=12345"
-        );
-        assert_eq!(
-            methods.get_thumbnail_url(12345).await.unwrap(),
-            "https://thumbnails.ente.com/?fileID=12345"
-        );
-    }
 
     #[tokio::test]
     async fn test_self_hosted_download_uses_signed_url() {

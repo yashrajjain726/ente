@@ -16,9 +16,9 @@ pub struct AppClient {
     token: RwLock<Option<String>>,
 }
 
-struct DownloadProxies {
-    files: Api,
-    thumbnails: Api,
+pub(crate) struct DownloadProxies {
+    pub(crate) files: Api,
+    pub(crate) thumbnails: Api,
 }
 
 impl AppClient {
@@ -67,7 +67,11 @@ impl AppClient {
         &self.museum
     }
 
-    pub(crate) async fn download_file(&self, url: &str) -> Result<Vec<u8>> {
+    pub(crate) fn download_proxies(&self) -> Option<&DownloadProxies> {
+        self.proxies.as_ref()
+    }
+
+    pub(crate) async fn download_url(&self, url: &str) -> Result<Vec<u8>> {
         Ok(
             http::retry_with_profile(RetryProfile::Background, || async {
                 self.museum
@@ -81,14 +85,6 @@ impl AppClient {
             })
             .await?,
         )
-    }
-
-    pub(crate) async fn download_file_from_proxy(&self, file_id: i64) -> Result<Vec<u8>> {
-        download_from_proxy(&self.proxies.as_ref().unwrap().files, file_id).await
-    }
-
-    pub(crate) async fn download_thumbnail_from_proxy(&self, file_id: i64) -> Result<Vec<u8>> {
-        download_from_proxy(&self.proxies.as_ref().unwrap().thumbnails, file_id).await
     }
 }
 
@@ -105,7 +101,7 @@ fn new_api(http: &Http, origin: &str, client_package: &str) -> Api {
     )
 }
 
-async fn download_from_proxy(api: &Api, file_id: i64) -> Result<Vec<u8>> {
+pub(crate) async fn download_from_proxy(api: &Api, file_id: i64) -> Result<Vec<u8>> {
     Ok(
         http::retry_with_profile(RetryProfile::Background, || async {
             api.get("/")
@@ -125,8 +121,17 @@ mod tests {
     use super::*;
     use mockito::{Matcher, Server};
 
+    #[test]
+    fn selects_download_backend_from_origin() {
+        let production = AppClient::new(None, App::Photos).unwrap();
+        assert!(production.download_proxies().is_some());
+
+        let self_hosted = AppClient::new(Some("https://example.com".into()), App::Photos).unwrap();
+        assert!(self_hosted.download_proxies().is_none());
+    }
+
     #[tokio::test]
-    async fn app_clients_keep_auth_scoped_to_app() {
+    async fn app_clients_keep_museum_auth_scoped_to_app() {
         let mut server = Server::new_async().await;
         let auth_download = server
             .mock("GET", "/")
