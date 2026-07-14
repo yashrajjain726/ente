@@ -1,8 +1,4 @@
-import {
-    Album02Icon,
-    File01Icon,
-    Folder01Icon,
-} from "@hugeicons/core-free-icons";
+import { Album02Icon, Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
@@ -56,25 +52,22 @@ export function DefaultOptionsV2({
                 <IconButton
                     aria-label="Close"
                     onClick={onClose}
-                    sx={{
-                        width: "40px",
-                        height: "40px",
+                    sx={(theme) => ({
+                        width: "38px",
+                        height: "38px",
                         backgroundColor: "background.paper",
                         "&:hover": { backgroundColor: "secondary.hover" },
-                    }}
+                        ...theme.applyStyles("dark", {
+                            backgroundColor: "secondary.main",
+                        }),
+                    })}
                 >
                     <CloseIcon sx={{ fontSize: "18px" }} />
                 </IconButton>
             </SpacedRow>
 
             {intent == "import" ? (
-                <ImportOptions
-                    {...{
-                        isFolderSelectionPending,
-                        onSelectGooglePhotos,
-                        onSelectFolder,
-                    }}
-                />
+                <ImportOptions {...{ onSelectGooglePhotos }} />
             ) : (
                 <UploadOptions
                     {...{
@@ -90,46 +83,25 @@ export function DefaultOptionsV2({
     );
 }
 
-type ImportOptionsProps = Pick<
-    DefaultOptionsV2Props,
-    "isFolderSelectionPending" | "onSelectGooglePhotos" | "onSelectFolder"
->;
+type ImportOptionsProps = Pick<DefaultOptionsV2Props, "onSelectGooglePhotos">;
 
 function ImportOptions({
-    isFolderSelectionPending,
     onSelectGooglePhotos,
-    onSelectFolder,
 }: ImportOptionsProps): React.JSX.Element {
     return (
-        <>
-            <ImportSection title="Import from">
-                <Stack direction="row" sx={{ gap: "10px" }}>
-                    <ImportProviderButton
-                        icon={
-                            <HugeiconsIcon
-                                icon={Album02Icon}
-                                size={22}
-                                color="var(--mui-palette-text-muted)"
-                            />
-                        }
-                        label="Google Photos"
-                        onClick={onSelectGooglePhotos}
+        <Stack direction="row" sx={{ gap: "10px", pb: "12px" }}>
+            <ImportProviderButton
+                icon={
+                    <HugeiconsIcon
+                        icon={Album02Icon}
+                        size={22}
+                        color="var(--mui-palette-text-muted)"
                     />
-                </Stack>
-            </ImportSection>
-
-            <ImportSection title="Import from other providers" gap="20px">
-                <Stack sx={{ gap: 1 }}>
-                    <OptionRowButton
-                        icon={<HugeiconsIcon icon={File01Icon} size={18} />}
-                        label="Files + JSON"
-                        description="Use when each photo has a matching .json sidecar file"
-                        pending={isFolderSelectionPending}
-                        onClick={onSelectFolder}
-                    />
-                </Stack>
-            </ImportSection>
-        </>
+                }
+                label="Google Photos"
+                onClick={onSelectGooglePhotos}
+            />
+        </Stack>
     );
 }
 
@@ -235,16 +207,19 @@ function ImportProviderButton({
         <FocusVisibleButton
             fullWidth
             onClick={onClick}
-            sx={{
+            sx={(theme) => ({
                 flex: 1,
                 minWidth: 0,
-                height: "76px",
+                height: "74px",
                 p: "12px",
                 borderRadius: "16px",
                 backgroundColor: "background.paper",
                 color: "text.base",
                 "&:hover": { backgroundColor: "secondary.hover" },
-            }}
+                ...theme.applyStyles("dark", {
+                    backgroundColor: "secondary.main",
+                }),
+            })}
         >
             <Stack sx={{ alignItems: "center", gap: 1 }}>
                 {pending ? <PendingIndicator /> : icon}
@@ -281,14 +256,17 @@ function OptionRowButton({
         <FocusVisibleButton
             fullWidth
             onClick={onClick}
-            sx={{
+            sx={(theme) => ({
                 height: "60px",
                 p: "12px",
                 borderRadius: "20px",
                 backgroundColor: "background.paper",
                 color: "text.base",
                 "&:hover": { backgroundColor: "secondary.hover" },
-            }}
+                ...theme.applyStyles("dark", {
+                    backgroundColor: "secondary.main",
+                }),
+            })}
         >
             <Stack
                 direction="row"

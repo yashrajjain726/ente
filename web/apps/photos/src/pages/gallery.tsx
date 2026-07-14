@@ -2039,7 +2039,6 @@ const Page: React.FC = () => {
                         px: "24px",
                         "@media (width < 720px)": { px: "4px" },
                     },
-                    !showSelectionBar && { borderBottom: "none" },
                     showSelectionBar && { borderColor: "accent.main" },
                 ]}
             >

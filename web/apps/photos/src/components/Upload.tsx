@@ -4,6 +4,7 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/no-floating-promises */
 import { DefaultOptionsV2 } from "@/components/DefaultOptionsV2";
+import { TakeoutOptionsV2 } from "@/components/TakeoutOptionsV2";
 import type {
     InProgressUpload,
     SegregatedFinishedUploads,
@@ -169,9 +170,10 @@ interface UploadProps {
 
 type UploadType = "files" | "folders" | "zips";
 
-const uploadFeatureFlags: { defaultOptionsV2: boolean } = {
-    defaultOptionsV2: true,
-};
+const uploadFeatureFlags: {
+    defaultOptionsV2: boolean;
+    takeoutOptionsV2: boolean;
+} = { defaultOptionsV2: true, takeoutOptionsV2: true };
 
 interface UploadFilesOptions {
     persistPendingUploads?: boolean;
@@ -1477,12 +1479,16 @@ const UploadTypeSelector: React.FC<UploadTypeSelectorProps> = ({
                         boxShadow: "none",
                         border: "1px solid",
                         borderColor: "stroke.faint",
-                        "&:has([data-default-options-v2])": {
-                            maxWidth: "621px",
-                            p: 0,
-                            borderRadius: "20px",
-                            backgroundColor: "secondary.main",
-                        },
+                        "&:has([data-default-options-v2], [data-takeout-options-v2])":
+                            {
+                                maxWidth: "621px",
+                                p: 0,
+                                borderRadius: "20px",
+                                backgroundColor: "secondary.main",
+                                ...theme.applyStyles("dark", {
+                                    backgroundColor: "background.paper",
+                                }),
+                            },
                         [theme.breakpoints.down(360)]: { p: 0 },
                     }),
                 },
@@ -1547,7 +1553,19 @@ const UploadOptions: React.FC<UploadOptionsProps> = ({
     const handleSelectFolder = () => handleSelect("folders");
 
     return showTakeoutOptions ? (
-        <TakeoutOptions onSelect={handleSelect} onClose={handleTakeoutClose} />
+        uploadFeatureFlags.takeoutOptionsV2 ? (
+            <TakeoutOptionsV2
+                onBack={handleTakeoutClose}
+                onSelectFolder={handleSelectFolder}
+                onSelectZips={handleSelectGooglePhotos}
+                {...{ onClose }}
+            />
+        ) : (
+            <TakeoutOptions
+                onSelect={handleSelect}
+                onClose={handleTakeoutClose}
+            />
+        )
     ) : uploadFeatureFlags.defaultOptionsV2 && intent != "collect" ? (
         <DefaultOptionsV2
             intent={intent}

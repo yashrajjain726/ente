@@ -68,8 +68,7 @@ export function GalleryEmptyStateV2({
                     pb: { xs: 4, sm: "44px" },
                     borderRadius: { xs: "30px", sm: "42px" },
                     bgcolor: "background.paper",
-                    boxShadow: (theme) =>
-                        `${theme.vars.palette.boxShadow.paper}, 0px 16px 40px rgba(0 0 0 / 0.14)`,
+                    boxShadow: "0px 4px 16px rgba(0 0 0 / 0.12)",
                     zIndex: 2,
                 }}
             >
