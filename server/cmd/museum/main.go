@@ -314,7 +314,7 @@ func main() {
 		AccessCtrl:     accessCtrl,
 		AnonUsersRepo:  anonUsersRepo,
 	}
-	fileDataCtrl := filedata.New(fileDataRepo, accessCtrl, objectCleanupController, s3Config, fileRepo, collectionRepo)
+	fileDataCtrl := filedata.New(fileDataRepo, accessCtrl, objectCleanupController, s3Config, fileRepo, collectionRepo, discordController)
 
 	fileController := &controller.FileController{
 		FileRepo:              fileRepo,
