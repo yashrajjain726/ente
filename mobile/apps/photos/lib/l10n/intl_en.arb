@@ -1865,7 +1865,6 @@
   "editContact": "Edit contact",
   "autoFetchFromPeople": "Auto-fetch from people",
   "useTheirNameAndPhoto": "Use their name and photo",
-  "personAlreadyLinkedToAnotherContact": "This person is already linked to another contact.",
   "savePerson": "Save person",
   "saveContact": "Save contact",
   "editPerson": "Edit person",
