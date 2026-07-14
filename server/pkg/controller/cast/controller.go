@@ -3,11 +3,13 @@ package cast
 import (
 	"context"
 
+	"github.com/ente/museum/ente"
 	"github.com/ente/museum/ente/cast"
 	"github.com/ente/museum/pkg/controller/access"
 	castRepo "github.com/ente/museum/pkg/repo/cast"
 	"github.com/ente/museum/pkg/utils/auth"
 	"github.com/ente/museum/pkg/utils/network"
+	"github.com/ente/museum/pkg/utils/ua"
 	"github.com/ente/stacktrace"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -19,6 +21,8 @@ type Controller struct {
 	AccessCtrl access.Controller
 }
 
+const maxRegisterDeviceUserAgentBytes = 1000
+
 func NewController(castRepo *castRepo.Repository,
 	accessCtrl access.Controller,
 ) *Controller {
@@ -29,7 +33,21 @@ func NewController(castRepo *castRepo.Repository,
 }
 
 func (c *Controller) RegisterDevice(ctx *gin.Context, request *cast.RegisterDeviceRequest) (string, error) {
-	return c.CastRepo.AddCode(ctx, request.PublicKey, network.GetClientIP(ctx))
+	ipAddress := network.GetClientIP(ctx)
+	userAgent := ctx.GetHeader("User-Agent")
+	if len(userAgent) > maxRegisterDeviceUserAgentBytes {
+		return "", ente.NewInternalError("user agent too long")
+	}
+	deviceName, err := ua.GetDeviceType(userAgent)
+	if deviceName == "" || err != nil {
+		logrus.WithFields(logrus.Fields{
+			"userAgent": userAgent,
+			"ip":        ipAddress,
+			"err":       err,
+		}).Warn("RegisterDevice: failed to get device type")
+		deviceName = ipAddress
+	}
+	return c.CastRepo.AddCode(ctx, request.PublicKey, ipAddress, deviceName)
 }
 
 func (c *Controller) GetAllDevices(ctx *gin.Context, userID int64) ([]cast.CastInfo, error) {

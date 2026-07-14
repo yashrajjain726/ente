@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ente_account_deletion/account_deletion.dart';
 import 'package:ente_accounts/pages/change_email_dialog.dart';
 import 'package:ente_accounts/pages/password_entry_page.dart';
@@ -43,6 +45,7 @@ class AccountSectionWidget extends StatelessWidget {
           final hasAuthenticated = await LocalAuthenticationService.instance
               .requestLocalAuthentication(context, l10n.authToChangeYourEmail);
           if (hasAuthenticated) {
+            if (!context.mounted) return;
             // ignore: unawaited_futures
             showChangeEmailDialog(context);
           }
@@ -61,6 +64,7 @@ class AccountSectionWidget extends StatelessWidget {
                 l10n.authToChangeYourPassword,
               );
           if (hasAuthenticated) {
+            if (!context.mounted) return;
             // ignore: unawaited_futures
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -89,6 +93,7 @@ class AccountSectionWidget extends StatelessWidget {
                 l10n.authToViewYourRecoveryKey,
               );
           if (hasAuthenticated) {
+            if (!context.mounted) return;
             String recoveryKey;
             try {
               recoveryKey = CryptoUtil.bin2hex(
@@ -131,14 +136,20 @@ class AccountSectionWidget extends StatelessWidget {
           if (!context.mounted || !hasAuthenticated) {
             return;
           }
-          // ignore: unawaited_futures
-          Navigator.of(context).push(
+          final deleted = await Navigator.of(context).push<bool>(
             MaterialPageRoute(
               builder: (BuildContext context) {
                 return const DeleteAccountPage();
               },
             ),
           );
+          if (deleted == true && context.mounted) {
+            unawaited(
+              Navigator.of(
+                context,
+              ).pushNamedAndRemoveUntil('/', (route) => false),
+            );
+          }
         },
       ),
       sectionOptionSpacing,

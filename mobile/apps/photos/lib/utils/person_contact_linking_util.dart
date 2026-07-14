@@ -120,6 +120,7 @@ Future<void> showAlreadyLinkedEmailDialog(
     return;
   }
 
+  if (!context.mounted) return;
   await showChoiceActionSheet(
     context,
     title: context.l10n.error,

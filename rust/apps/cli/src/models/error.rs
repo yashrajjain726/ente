@@ -1,5 +1,5 @@
 use ente_accounts::Error as AccountsError;
-use ente_core::{auth::AuthError, crypto::CryptoError};
+use ente_core::{auth::AuthError, crypto};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -51,11 +51,11 @@ pub enum Error {
     Generic(String),
 }
 
-impl From<CryptoError> for Error {
-    fn from(err: CryptoError) -> Self {
+impl From<crypto::Error> for Error {
+    fn from(err: crypto::Error) -> Self {
         match err {
-            CryptoError::Base64Decode(source) => Error::Base64Decode(source),
-            CryptoError::Io(source) => Error::Io(source),
+            crypto::Error::Base64Decode(source) => Error::Base64Decode(source),
+            crypto::Error::Io(source) => Error::Io(source),
             other => Error::Crypto(other.to_string()),
         }
     }
@@ -84,23 +84,26 @@ impl From<AuthError> for Error {
 impl From<AccountsError> for Error {
     fn from(err: AccountsError) -> Self {
         match err {
-            AccountsError::Http(ente_core::http::Error::Http {
-                status,
-                code,
-                message,
-            }) => Error::ApiError {
-                status,
-                code,
-                message,
-            },
-            AccountsError::Http(ente_core::http::Error::Network(message)) => {
-                Error::Generic(format!("Network error: {message}"))
-            }
-            AccountsError::Http(ente_core::http::Error::Parse(message)) => {
-                Error::Generic(format!("JSON parse error: {message}"))
-            }
-            AccountsError::Http(ente_core::http::Error::InvalidUrl(message)) => {
-                Error::InvalidConfig(message)
+            AccountsError::Http(error) => {
+                let message = error.to_string();
+                match error {
+                    ente_core::http::Error::Http { status, .. } => Error::ApiError {
+                        status,
+                        code: None,
+                        message,
+                    },
+                    ente_core::http::Error::Api { status, code, .. } => Error::ApiError {
+                        status,
+                        code: Some(code),
+                        message,
+                    },
+                    ente_core::http::Error::Network(_) => {
+                        Error::Generic(format!("Network error: {message}"))
+                    }
+                    ente_core::http::Error::Parse(_) => {
+                        Error::Generic(format!("JSON parse error: {message}"))
+                    }
+                }
             }
             AccountsError::Serialization(source) => Error::Serialization(source),
             AccountsError::Crypto(message) => Error::Crypto(message),

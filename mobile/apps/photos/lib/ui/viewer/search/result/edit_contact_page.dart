@@ -11,6 +11,7 @@ import "package:photos/core/event_bus.dart";
 import "package:photos/events/people_changed_event.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/models/ml/face/person.dart";
+import "package:photos/module/download/thumbnail.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/theme/ente_theme.dart";
@@ -26,7 +27,6 @@ import "package:photos/ui/viewer/search/result/contact_photo_picker_sheet.dart";
 import "package:photos/utils/contact_photo_util.dart";
 import "package:photos/utils/dialog_util.dart";
 import "package:photos/utils/person_contact_linking_util.dart";
-import "package:photos/utils/thumbnail_util.dart";
 
 class EditContactPage extends StatefulWidget {
   final int contactUserId;

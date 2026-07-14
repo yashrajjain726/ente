@@ -6,10 +6,10 @@ import "package:photos/db/ml/db.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/face/person.dart";
+import "package:photos/module/download/thumbnail.dart";
 import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/utils/face/face_thumbnail_cache.dart";
-import "package:photos/utils/file_util.dart";
 
 const _maxContactPhotoCompressionAttempts = 2;
 

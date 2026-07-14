@@ -65,7 +65,6 @@ import "package:photos/ui/viewer/people/cluster_page.dart";
 import "package:photos/ui/viewer/people/people_page.dart";
 import "package:photos/ui/viewer/search/result/magic_result_screen.dart";
 import "package:photos/utils/cache_util.dart";
-import "package:photos/utils/file_util.dart";
 import "package:photos/utils/people_sort_util.dart";
 
 class SearchService {
@@ -453,7 +452,8 @@ class SearchService {
     String query,
   ) async {
     final List<GenericSearchResult> searchResults = [];
-    for (var month in _getMatchingMonths(context, query)) {
+    final matchingMonths = _getMatchingMonths(context, query).toList();
+    for (final month in matchingMonths) {
       final matchedFiles = await FilesDB.instance
           .getFilesCreatedWithinDurations(
             _getDurationsOfMonthInEveryYear(month.monthNumber),
@@ -599,6 +599,7 @@ class SearchService {
     final List<GenericSearchResult> searchResults = [];
     final List<EnteFile> allFiles = await getAllFilesForSearch();
     for (var fileType in FileType.values) {
+      if (!context.mounted) return const [];
       final String fileTypeString = getHumanReadableString(context, fileType);
       if (fileTypeString.toLowerCase().startsWith(query.toLowerCase())) {
         final matchedFiles = allFiles
@@ -834,7 +835,9 @@ class SearchService {
     final locationTagEntities = (await locationService.getLocationTags());
     final Map<LocalEntity<LocationTag>, List<EnteFile>> result = {};
     final normalizedQuery = query.toLowerCase();
+    if (!context.mounted) return const [];
     final noLocationName = AppLocalizations.of(context).noLocation;
+    if (!context.mounted) return const [];
     final noLocationTagName = AppLocalizations.of(context).noLocationTag;
     final normalizedNoLocationName = noLocationName.toLowerCase();
     final normalizedNoLocationTagName = noLocationTagName.toLowerCase();
@@ -1081,6 +1084,7 @@ class SearchService {
     required int minClusterSize,
     int? fallbackMinClusterSize,
     bool showIgnoredOnly = false,
+    bool includeEmptyPersons = false,
   }) async {
     try {
       if (isLocalGalleryMode) {
@@ -1244,6 +1248,13 @@ class SearchService {
         }
       }
 
+      if (includeEmptyPersons) {
+        for (final personID in personIdToPerson.keys) {
+          personIdToFiles.putIfAbsent(personID, () => <EnteFile>[]);
+          personIdToFileIds.putIfAbsent(personID, () => <int>{});
+        }
+      }
+
       // get sorted personId by files count
       final sortedPersonIds = personIdToFiles.keys.toList()
         ..sort(
@@ -1266,19 +1277,21 @@ class SearchService {
         final PersonEntity p = personIdToPerson[personID]!;
         final bool isIgnored = p.data.isIgnored;
         if (showIgnoredOnly != isIgnored) continue;
-        if (files.isEmpty) continue;
+        if (!includeEmptyPersons && files.isEmpty) continue;
         final matchedUploadedIDs = personIdToFileIds[personID]!;
+        final previewFile = files.isEmpty ? null : files.first;
+        final params = {
+          kPersonWidgetKey: p.data.avatarFaceID ?? p.hashCode.toString(),
+          kPersonParamID: personID,
+          if (previewFile != null) kFileID: previewFile.uploadedFileID,
+          kPersonPinned: p.data.isPinned,
+        };
         facesResult.add(
           GenericSearchResult(
             ResultType.faces,
             p.data.name,
             files,
-            params: {
-              kPersonWidgetKey: p.data.avatarFaceID ?? p.hashCode.toString(),
-              kPersonParamID: personID,
-              kFileID: files.first.uploadedFileID,
-              kPersonPinned: p.data.isPinned,
-            },
+            params: params,
             onResultTap: (ctx) {
               routeToPage(
                 ctx,
@@ -1289,18 +1302,12 @@ class SearchService {
                     ResultType.faces,
                     p.data.name,
                     files,
-                    params: {
-                      kPersonWidgetKey:
-                          p.data.avatarFaceID ?? p.hashCode.toString(),
-                      kPersonParamID: personID,
-                      kPersonPinned: p.data.isPinned,
-                      kFileID: files.first.uploadedFileID,
-                    },
+                    params: params,
                     hierarchicalSearchFilter: FaceFilter(
                       personId: p.remoteID,
                       clusterId: null,
                       faceName: p.data.name,
-                      faceFile: files.first,
+                      faceFile: previewFile,
                       occurrence: kMostRelevantFilter,
                       matchedUploadedIDs: matchedUploadedIDs,
                     ),
@@ -1312,7 +1319,7 @@ class SearchService {
               personId: p.remoteID,
               clusterId: null,
               faceName: p.data.name,
-              faceFile: files.first,
+              faceFile: previewFile,
               occurrence: kMostRelevantFilter,
               matchedUploadedIDs: matchedUploadedIDs,
             ),
@@ -1396,6 +1403,7 @@ class SearchService {
             limit,
             minClusterSize: fallbackMinClusterSize,
             showIgnoredOnly: showIgnoredOnly,
+            includeEmptyPersons: includeEmptyPersons,
           );
         } else {
           return [];
@@ -1716,6 +1724,7 @@ class SearchService {
     } else {
       // await two seconds to let new page load first
       await Future.delayed(const Duration(seconds: 1));
+      if (!context.mounted) return const [];
       final DateTime? pickedTime = await showDatePicker(
         context: context,
         initialDate: DateTime.now(),

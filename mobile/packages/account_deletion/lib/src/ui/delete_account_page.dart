@@ -162,7 +162,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       if (!mounted) {
         return;
       }
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      Navigator.of(context).pop(true);
     } catch (e, s) {
       _logger.severe('Failed to delete account', e, s);
       if (!mounted) {

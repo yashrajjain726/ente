@@ -3,7 +3,6 @@ import 'dart:io';
 
 import "package:ente_components/ente_components.dart";
 import 'package:ente_pure_utils/ente_pure_utils.dart';
-import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import "package:hugeicons/hugeicons.dart";
 import "package:local_auth/local_auth.dart";
@@ -11,16 +10,12 @@ import 'package:logging/logging.dart';
 import 'package:photos/core/configuration.dart';
 import "package:photos/core/constants.dart";
 import 'package:photos/core/event_bus.dart';
-import "package:photos/core/network/network.dart";
 import "package:photos/db/files_db.dart";
 import "package:photos/events/collection_meta_event.dart";
 import "package:photos/events/guest_view_event.dart";
 import "package:photos/events/magic_sort_change_event.dart";
 import 'package:photos/events/subscription_purchased_event.dart';
-import "package:photos/gateways/cast/cast_gateway.dart";
 import "package:photos/generated/l10n.dart";
-import "package:photos/l10n/l10n.dart";
-import "package:photos/models/button_result.dart";
 import 'package:photos/models/collection/collection.dart';
 import 'package:photos/models/device_collection.dart';
 import "package:photos/models/file/file.dart";
@@ -28,14 +23,14 @@ import 'package:photos/models/freeable_space_info.dart';
 import 'package:photos/models/gallery_type.dart';
 import "package:photos/models/metadata/common_keys.dart";
 import 'package:photos/models/selected_files.dart';
+import 'package:photos/module/download/gallery.dart';
 import 'package:photos/service_locator.dart';
 import 'package:photos/services/collections_service.dart';
 import "package:photos/services/files_service.dart";
 import "package:photos/states/location_screen_state.dart";
 import "package:photos/theme/ente_theme.dart";
 import 'package:photos/ui/actions/collection/collection_sharing_actions.dart';
-import "package:photos/ui/cast/auto.dart";
-import "package:photos/ui/cast/choose.dart";
+import "package:photos/ui/cast/cast.dart";
 import "package:photos/ui/collections/album/smart_album_people.dart";
 import "package:photos/ui/common/web_page.dart";
 import 'package:photos/ui/components/action_sheet_widget.dart';
@@ -57,9 +52,7 @@ import "package:photos/ui/viewer/hierarchicial_search/app_bar_filter_chips.dart"
 import "package:photos/ui/viewer/location/edit_location_sheet.dart";
 import 'package:photos/utils/delete_file_util.dart';
 import 'package:photos/utils/dialog_util.dart';
-import "package:photos/utils/file_download_util.dart";
 import 'package:photos/utils/magic_util.dart';
-import "package:uuid/uuid.dart";
 
 class GalleryAppBarWidget extends StatefulWidget {
   static const double toolbarHeight = kToolbarHeight;
@@ -340,6 +333,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       },
     );
     if (result is Exception) {
+      if (!context.mounted) return null;
       await showGenericErrorDialog(context: context, error: result);
     }
   }
@@ -374,11 +368,13 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
     );
     if (actionResult?.action != null && mounted) {
       if (actionResult!.action == ButtonAction.error) {
+        if (!context.mounted) return null;
         await showGenericErrorDialog(
           context: context,
           error: actionResult.exception,
         );
       } else if (actionResult.action == ButtonAction.first) {
+        if (!context.mounted) return null;
         Navigator.of(context).pop();
       }
     }
@@ -401,18 +397,21 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       );
     } catch (e) {
       await dialog.hide();
+      if (!context.mounted) return null;
       unawaited(showGenericErrorDialog(context: context, error: e));
       return;
     }
 
     await dialog.hide();
     if (status.localIDs.isEmpty) {
+      if (!context.mounted) return null;
       await showErrorDialog(
         context,
         AppLocalizations.of(context).allClear,
         AppLocalizations.of(context).youveNoFilesInThisAlbumThatCanBeDeleted,
       );
     } else {
+      if (!context.mounted) return null;
       final bool? result = await routeToPage(
         context,
         FreeSpacePage(status, clearSpaceForFolder: true),
@@ -568,7 +567,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
           } else if (value == AlbumPopupAction.leave) {
             await _leaveAlbum(context);
           } else if (value == AlbumPopupAction.castAlbum) {
-            await _castChoiceDialog();
+            await showCastSheet(context, widget.collection!);
           } else if (value == AlbumPopupAction.autoAddPhotos) {
             await routeToPage(
               context,
@@ -907,6 +906,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         );
       } catch (e, s) {
         _logger.severe("Failed to download album", e, s);
+        if (!mounted) return;
         await showGenericErrorDialog(context: context, error: e);
       }
       return;
@@ -927,6 +927,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       }
     } catch (e, s) {
       _logger.severe("Failed to download album", e, s);
+      if (!mounted) return;
       await showGenericErrorDialog(context: context, error: e);
     }
     await dialog.hide();
@@ -944,8 +945,10 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       await locationService.deleteLocationTag(
         InheritedLocationScreenState.of(context).locationTagEntity.id,
       );
+      if (!mounted) return;
       Navigator.of(context).pop();
     } catch (e) {
+      if (!mounted) return;
       await showGenericErrorDialog(context: context, error: e);
     }
   }
@@ -960,6 +963,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
     );
     if (actionResult?.action != null && mounted) {
       if (actionResult!.action == ButtonAction.first) {
+        if (!buildContext.mounted) return;
         await collectionActions.removeFromUncatIfPresentInOtherAlbum(
           widget.collection!,
           buildContext,
@@ -974,6 +978,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       widget.collection!,
     );
     if (coverPhotoID != null) {
+      if (!context.mounted) return;
       unawaited(changeCoverPhoto(context, widget.collection!, coverPhotoID));
     }
   }
@@ -983,6 +988,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       try {
         await setMapEnabled(true);
       } catch (e) {
+        if (!mounted) return;
         showShortToast(
           context,
           AppLocalizations.of(context).somethingWentWrong,
@@ -990,6 +996,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         return;
       }
     }
+    if (!mounted) return;
     unawaited(
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -1026,6 +1033,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       ],
     );
     if (sortByAsc != null) {
+      if (!bContext.mounted) return;
       unawaited(changeSortOrder(bContext, widget.collection!, sortByAsc));
     }
   }
@@ -1036,6 +1044,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       widget.collection!,
       useCache: false,
     );
+    if (!mounted) return;
     final bool isEmptyCollection = count == 0;
     if (isEmptyCollection) {
       final dialog = createProgressDialog(
@@ -1048,10 +1057,12 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
           widget.collection!,
         );
         await dialog.hide();
+        if (!mounted) return;
         Navigator.of(context).pop();
       } catch (e, s) {
         _logger.warning("failed to trash collection", e, s);
         await dialog.hide();
+        if (!mounted) return;
         await showGenericErrorDialog(context: context, error: e);
       }
     } else {
@@ -1059,6 +1070,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         context,
         widget.collection!,
       );
+      if (!mounted) return;
       if (result == true) {
         Navigator.of(context).pop();
       } else {
@@ -1077,6 +1089,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       }
     } catch (e, s) {
       _logger.severe("failed to trash collection", e, s);
+      if (!mounted) return;
       await showGenericErrorDialog(context: context, error: e);
     }
   }
@@ -1140,6 +1153,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         );
 
         if (res != null && res.action == ButtonAction.first) {
+          if (!mounted) return;
           await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => WebPage(
@@ -1154,6 +1168,7 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
       }
     } catch (e, s) {
       _logger.severe("Failed to show add photo dialog", e, s);
+      if (!bContext.mounted) return;
       await showGenericErrorDialog(context: bContext, error: e);
     }
   }
@@ -1188,135 +1203,6 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
     setState(() {});
   }
 
-  Future<void> _castChoiceDialog() async {
-    final gw = CastGateway(NetworkClient.instance.enteDio);
-
-    if (!flagService.enableMultiCast) {
-      if (castService.getActiveSessions().isNotEmpty) {
-        await showChoiceDialog(
-          context,
-          title: AppLocalizations.of(context).stopCastingTitle,
-          firstButtonLabel: AppLocalizations.of(context).yes,
-          secondButtonLabel: AppLocalizations.of(context).no,
-          body: AppLocalizations.of(context).stopCastingBody,
-          firstButtonOnTap: () async {
-            gw.revokeAllTokens().ignore();
-            await castService.closeActiveCasts();
-          },
-        );
-        return;
-      }
-      // stop any existing cast session
-      gw.revokeAllTokens().ignore();
-    } else {
-      await castService.closeActiveCasts();
-    }
-
-    if (!Platform.isAndroid && !kDebugMode) {
-      await _pairWithPin(gw, '');
-    } else {
-      final result = await showDialog<ButtonResult?>(
-        context: context,
-        barrierDismissible: true,
-        useRootNavigator: false,
-        builder: (BuildContext context) {
-          return const CastChooseDialog();
-        },
-      );
-      if (result == null) {
-        return;
-      }
-      // wait to allow the dialog to close
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (result.action == ButtonAction.first) {
-        await showDialog(
-          useRootNavigator: false,
-          context: context,
-          barrierDismissible: true,
-          builder: (BuildContext bContext) {
-            return AutoCastDialog((device) async {
-              await _castPair(bContext, gw, device);
-              Navigator.pop(bContext);
-            });
-          },
-        );
-      }
-      if (result.action == ButtonAction.second) {
-        await _pairWithPin(gw, '');
-      }
-    }
-  }
-
-  Future<void> _pairWithPin(CastGateway gw, String code) async {
-    await showTextInputDialog(
-      context,
-      title: context.l10n.playOnTv,
-      body: AppLocalizations.of(
-        context,
-      ).castInstruction(castUrl: flagService.castUrl),
-      submitButtonLabel: AppLocalizations.of(context).pair,
-      textInputType: TextInputType.streetAddress,
-      hintText: context.l10n.deviceCodeHint,
-      showOnlyLoadingState: true,
-      alwaysShowSuccessState: false,
-      initialValue: code,
-      onSubmit: (String text) async {
-        final bool paired = await _castPair(context, gw, text);
-        if (!paired) {
-          Future.delayed(Duration.zero, () => _pairWithPin(gw, code));
-        }
-      },
-    );
-  }
-
-  String lastCode = '';
-  Future<bool> _castPair(
-    BuildContext bContext,
-    CastGateway gw,
-    String code,
-  ) async {
-    try {
-      if (lastCode == code) {
-        return false;
-      }
-      lastCode = code;
-      _logger.info("Casting album to device with code $code");
-      final String? publicKey = await gw.getPublicKey(code);
-      if (publicKey == null) {
-        showToast(context, AppLocalizations.of(context).deviceNotFound);
-
-        return false;
-      }
-      final String castToken = const Uuid().v4().toString();
-      final castPayload = CollectionsService.instance.getCastData(
-        castToken,
-        widget.collection!,
-        publicKey,
-      );
-      await gw.publishCastPayload(
-        code,
-        castPayload,
-        widget.collection!.id,
-        castToken,
-      );
-      _logger.info("cast album completed");
-      return true;
-    } catch (e, s) {
-      lastCode = '';
-      _logger.severe("Failed to cast album", e, s);
-      if (e is CastIPMismatchException) {
-        await showErrorDialog(
-          context,
-          AppLocalizations.of(context).castIPMismatchTitle,
-          AppLocalizations.of(context).castIPMismatchBody,
-        );
-      } else {
-        await showGenericErrorDialog(context: bContext, error: e);
-      }
-      return false;
-    }
-  }
-
   Future<void> _onGalleryGuestViewClick() async {
     if (await LocalAuthentication().isDeviceSupported()) {
       // Get all files from the collection with proper sort order
@@ -1334,11 +1220,13 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         );
         collectionFiles = filesResult.files;
       } else {
+        if (!mounted) return;
         showToast(context, AppLocalizations.of(context).somethingWentWrong);
         return;
       }
 
       if (collectionFiles.isEmpty) {
+        if (!mounted) return;
         showToast(context, AppLocalizations.of(context).nothingToSeeHere);
         return;
       }
@@ -1353,11 +1241,13 @@ class _GalleryAppBarWidgetState extends State<GalleryAppBarWidget> {
         ),
       );
       await localSettings.setOnGuestView(true);
+      if (!mounted) return;
       routeToPage(context, page, forceCustomPageRoute: true).ignore();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Bus.instance.fire(GuestViewEvent(true, false));
       });
     } else {
+      if (!mounted) return;
       await showErrorDialog(
         context,
         AppLocalizations.of(context).noSystemLockFound,

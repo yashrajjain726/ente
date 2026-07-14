@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import "package:flutter/services.dart";
 import "package:flutter_image_compress/flutter_image_compress.dart";
 import "package:hugeicons/hugeicons.dart";
+import 'package:image/image.dart' as img;
 import "package:logging/logging.dart";
 import 'package:path/path.dart' as path;
 import "package:photo_manager/photo_manager.dart";
@@ -18,6 +19,9 @@ import "package:photos/events/local_photos_updated_event.dart";
 import "package:photos/generated/l10n.dart";
 import 'package:photos/models/file/file.dart' as ente;
 import "package:photos/models/location/location.dart";
+import 'package:photos/module/metadata/exif.dart';
+import "package:photos/module/metadata/local_file.dart";
+import "package:photos/service_locator.dart";
 import "package:photos/services/sync/sync_service.dart";
 import "package:photos/ui/components/action_sheet_widget.dart";
 import "package:photos/ui/components/buttons/button_widget.dart";
@@ -71,13 +75,28 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
 
     try {
       final ui.Image decodedResult = await decodeImageFromList(bytes);
-      final result = await FlutterImageCompress.compressWithList(
+      var result = await FlutterImageCompress.compressWithList(
         bytes,
         minWidth: decodedResult.width,
         minHeight: decodedResult.height,
         quality: 95,
         format: CompressFormat.jpeg,
       );
+      if (flagService.internalUser) {
+        try {
+          final image = img.decodePng(bytes);
+          if (image != null) {
+            await copyExif(
+              widget.originalFile,
+              image,
+              copyRenderingFields: false,
+            );
+            result = img.encodeJpg(image, quality: 95);
+          }
+        } catch (e, s) {
+          _logger.warning("Image Editor: copyExif failed", e, s);
+        }
+      }
       _logger.info('Size after compression = ${result.length}');
       final Duration diff = DateTime.now().difference(start);
       _logger.info('image_editor time : $diff');
@@ -95,7 +114,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
         result,
         filename: fileName,
       ));
-      final newFile = await ente.EnteFile.fromAsset(
+      final newFile = fileFromAsset(
         widget.originalFile.deviceFolder ?? '',
         newAsset,
       );
@@ -116,6 +135,10 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
       newFile.generatedID = await FilesDB.instance.insertAndGetId(newFile);
       Bus.instance.fire(LocalPhotosUpdatedEvent([newFile], source: "editSave"));
       unawaited(SyncService.instance.sync());
+      if (!mounted) {
+        await dialog.hide();
+        return;
+      }
       showShortToast(context, AppLocalizations.of(context).editsSaved);
       _logger.info("Original file " + widget.originalFile.toString());
       _logger.info("Saved edits to file " + newFile.toString());
@@ -131,6 +154,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
         selectionIndex = files.length - 1;
       }
       await dialog.hide();
+      if (!mounted) return;
       replacePage(
         context,
         DetailPage(
@@ -142,7 +166,9 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
       );
     } catch (e, s) {
       await dialog.hide();
-      showToast(context, AppLocalizations.of(context).oopsCouldNotSaveEdits);
+      if (mounted) {
+        showToast(context, AppLocalizations.of(context).oopsCouldNotSaveEdits);
+      }
       _logger.severe("Failed to save image edits", e, s);
     } finally {
       if (hasStoppedChangeNotify) {
@@ -176,6 +202,7 @@ class _ImageEditorPageState extends State<ImageEditorPage> {
       body: AppLocalizations.of(context).doYouWantToDiscardTheEditsYouHaveMade,
       actionSheetType: ActionSheetType.defaultActionSheet,
     );
+    if (!context.mounted) return;
     if (actionResult?.action != null &&
         actionResult!.action == ButtonAction.first) {
       replacePage(context, DetailPage(widget.detailPageConfig));

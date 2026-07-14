@@ -20,6 +20,8 @@ import 'package:photos/models/file/file.dart';
 import 'package:photos/models/file/file_type.dart';
 import 'package:photos/models/file/trash_file.dart';
 import 'package:photos/models/gallery_type.dart';
+import 'package:photos/module/download/file.dart';
+import 'package:photos/module/download/thumbnail.dart';
 import 'package:photos/service_locator.dart';
 import 'package:photos/services/collections_service.dart';
 import 'package:photos/services/favorites_service.dart';
@@ -27,8 +29,6 @@ import "package:photos/ui/sharing/user_avator_widget.dart";
 import 'package:photos/ui/viewer/file/file_icons_widget.dart';
 import 'package:photos/ui/viewer/gallery/component/group/type.dart';
 import 'package:photos/ui/viewer/gallery/state/gallery_context_state.dart';
-import 'package:photos/utils/file_util.dart';
-import 'package:photos/utils/thumbnail_util.dart';
 
 class ThumbnailWidget extends StatefulWidget {
   final EnteFile file;
@@ -46,6 +46,7 @@ class ThumbnailWidget extends StatefulWidget {
   final bool shouldShowOwnerAvatar;
   final AvatarType ownerAvatarType;
   final bool shouldShowFavoriteIcon;
+  final Color? placeholderColor;
 
   ///On video thumbnails, shows the video duration if true. If false,
   ///shows a centered play icon.
@@ -67,6 +68,7 @@ class ThumbnailWidget extends StatefulWidget {
     this.thumbnailSize = thumbnailSmallSize,
     this.useRequestedThumbnailSizeForLocalCache = false,
     this.shouldShowFavoriteIcon = true,
+    this.placeholderColor,
     this.shouldShowVideoDuration = false,
     this.shouldShowVideoOverlayIcon = true,
   }) : super(key: key ?? Key(file.tag));
@@ -239,7 +241,7 @@ class _ThumbnailWidgetState extends State<ThumbnailWidget> {
           : Stack(fit: StackFit.expand, children: contentChildren);
     }
     final List<Widget> viewChildren = [
-      const ThumbnailPlaceHolder(),
+      ThumbnailPlaceHolder(color: widget.placeholderColor),
       content ?? const SizedBox(),
     ];
     if (!widget.rawThumbnail && widget.file.fileType == FileType.video) {

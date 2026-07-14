@@ -334,6 +334,7 @@ class _SettingsBody extends StatelessWidget {
                       AppLocalizations.of(context).authToManageLegacy,
                     );
             if (hasAuthenticated) {
+              if (!context.mounted) return;
               await Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (BuildContext context) {
@@ -431,8 +432,8 @@ class _SettingsBody extends StatelessWidget {
         ),
         if (flagService.enableMultiCast)
           _buildMenuItem(
-            title: AppLocalizations.of(context).cast,
-            icon: HugeIcons.strokeRoundedTv02,
+            title: AppLocalizations.of(context).castSessions,
+            icon: HugeIcons.strokeRoundedTvSmart,
             onTap: () async {
               await routeToPage(context, const CastSettingsPage());
             },
@@ -453,10 +454,12 @@ class _SettingsBody extends StatelessWidget {
           try {
             await setMapEnabled(!isEnabled);
           } catch (e) {
-            showShortToast(
-              context,
-              AppLocalizations.of(context).somethingWentWrong,
-            );
+            if (context.mounted) {
+              showShortToast(
+                context,
+                AppLocalizations.of(context).somethingWentWrong,
+              );
+            }
             rethrow;
           }
         },
