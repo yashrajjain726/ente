@@ -203,6 +203,10 @@ export const FamilyManagement: React.FC<FamilyManagementProps> = ({
             />
             <StorageLimitDialog
                 member={editingMember}
+                totalStorage={
+                    (userDetails?.familyData?.storage ?? 0) +
+                    (userDetails?.storageBonus ?? 0)
+                }
                 onClose={() => setEditingMember(undefined)}
             />
         </>
@@ -546,8 +550,9 @@ const inviteErrorKey = (error: unknown) => {
 
 const StorageLimitDialog: React.FC<{
     member?: FamilyMember;
+    totalStorage: number;
     onClose: () => void;
-}> = ({ member, onClose }) => {
+}> = ({ member, totalStorage, onClose }) => {
     const { onGenericError } = useBaseContext();
     const [value, setValue] = useState("");
     const [error, setError] = useState("");
@@ -567,9 +572,10 @@ const StorageLimitDialog: React.FC<{
             ? Math.round(Number(value) * 1024 ** 3)
             : null;
         if (
-            (storageLimit != null &&
-                (!Number.isFinite(storageLimit) || storageLimit < 0)) ||
-            (storageLimit != null && storageLimit < (member?.usage ?? 0))
+            storageLimit != null &&
+            (!Number.isFinite(storageLimit) ||
+                storageLimit < (member?.usage ?? 0) ||
+                storageLimit > totalStorage)
         ) {
             setError(t("family_storage_limit_invalid"));
             return;
@@ -579,7 +585,9 @@ const StorageLimitDialog: React.FC<{
             await modifyFamilyMemberStorage(member!.id, storageLimit);
             onClose();
         } catch (e) {
-            onGenericError(e);
+            if (isHTTPErrorWithStatus(e, 426))
+                setError(t("family_storage_limit_invalid"));
+            else onGenericError(e);
         } finally {
             setLoading(false);
         }

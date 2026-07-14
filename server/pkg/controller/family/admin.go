@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/ente/museum/ente"
@@ -77,10 +78,6 @@ func (c *Controller) InviteMember(ctx *gin.Context, adminUserID int64, email str
 		return stacktrace.Propagate(err, "")
 	}
 
-	if len(members) >= maxFamilyMemberLimit {
-		return stacktrace.Propagate(ente.ErrFamilySizeLimitReached, "family invite limit exceeded")
-	}
-
 	potentialMemberID, err := c.UserRepo.GetUserIDWithEmail(email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -91,6 +88,11 @@ func (c *Controller) InviteMember(ctx *gin.Context, adminUserID int64, email str
 	}
 	if potentialMemberID == adminUserID {
 		return stacktrace.Propagate(ente.ErrCanNotInviteUserAlreadyInFamily, "Can not self invite")
+	}
+	if len(members) >= maxFamilyMemberLimit && !slices.ContainsFunc(members, func(member ente.FamilyMember) bool {
+		return member.MemberUserID == potentialMemberID && member.Status == ente.INVITED
+	}) {
+		return stacktrace.Propagate(ente.ErrFamilySizeLimitReached, "family invite limit exceeded")
 	}
 
 	potentialMemberUser, err := c.UserRepo.Get(potentialMemberID)

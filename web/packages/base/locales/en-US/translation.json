@@ -272,7 +272,7 @@
     "set_storage_limit": "Set storage limit",
     "storage_limit_gb": "Storage limit (GB)",
     "storage_limit_hint": "Leave blank for no limit.",
-    "family_storage_limit_invalid": "The limit must be at least the member's current usage.",
+    "family_storage_limit_invalid": "The limit must be between the member's current usage and the family's total storage.",
     "leave_family_plan": "Leave family plan",
     "leave": "Leave",
     "leave_family_plan_confirm": "Are you sure that you want to leave family plan?",
