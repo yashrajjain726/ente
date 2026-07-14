@@ -1,14 +1,11 @@
 import "dart:convert";
 
-import "package:dio/dio.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
 import "package:flutter_test/flutter_test.dart";
-import "package:package_info_plus/package_info_plus.dart";
 import "package:photos/db/ml/db.dart";
 import "package:photos/gateways/entity/models/type.dart";
 import "package:photos/models/local_entity_data.dart";
 import "package:photos/models/ml/face/person.dart";
-import "package:photos/service_locator.dart";
 import "package:photos/services/entity_service.dart";
 import "package:photos/services/machine_learning/face_ml/person/person_service.dart";
 import "package:photos/services/photos_contacts_service.dart";
@@ -16,23 +13,6 @@ import "package:photos/utils/person_contact_linking_util.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
 void main() {
-  setUpAll(() async {
-    SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
-    ServiceLocator.instance.init(
-      prefs,
-      Dio(),
-      Dio(),
-      Dio(),
-      PackageInfo(
-        appName: "Photos",
-        packageName: "photos",
-        version: "1.0.0",
-        buildNumber: "1",
-      ),
-    );
-  });
-
   group("PersonData contact link", () {
     test("copyWith preserves link fields when omitted", () {
       final data = PersonData(

@@ -9,9 +9,6 @@ import "package:photos/ui/viewer/people/people_page.dart";
 import "package:photos/utils/contact_string_util.dart";
 import "package:photos/utils/dialog_util.dart";
 
-export "package:photos/utils/contact_string_util.dart"
-    show normalizeContactLinkEmail;
-
 bool contactLinkEmailMatches(String? first, String? second) {
   final normalizedFirst = normalizeContactLinkEmail(first);
   final normalizedSecond = normalizeContactLinkEmail(second);
@@ -100,10 +97,7 @@ bool isLinkedToDifferentContact(
   }
 
   final linkedEmail = normalizeContactLinkEmail(person.data.email);
-  if (linkedEmail == null) {
-    return false;
-  }
-  return !contactLinkEmailMatches(linkedEmail, email);
+  return linkedEmail != null && linkedEmail != normalizeContactLinkEmail(email);
 }
 
 Future<void> showAlreadyLinkedEmailDialog(

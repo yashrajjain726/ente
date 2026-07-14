@@ -61,7 +61,6 @@ class _EditContactPageState extends State<EditContactPage> {
   PersonEntity? _initialLinkedPerson;
   PersonEntity? _draftLinkedPerson;
   bool _linkDirty = false;
-  bool _unlinkDraft = false;
 
   @override
   void initState() {
@@ -73,12 +72,7 @@ class _EditContactPageState extends State<EditContactPage> {
               setState(() {});
             }
           });
-    _nameFocusNode = FocusNode()
-      ..addListener(() {
-        if (mounted) {
-          setState(() {});
-        }
-      });
+    _nameFocusNode = FocusNode();
     _loadExistingPhoto();
     _loadLinkedPersonDraft();
   }
@@ -94,7 +88,7 @@ class _EditContactPageState extends State<EditContactPage> {
   String get _initialName => (widget.existingContact?.data?.name ?? "").trim();
   bool get _hasUnsavedChanges =>
       _nameController.text.trim() != _initialName || _photoDirty || _linkDirty;
-  bool get _hasLinkedPersonDraft => !_unlinkDraft && _draftLinkedPerson != null;
+  bool get _hasLinkedPersonDraft => _draftLinkedPerson != null;
   bool get _hasContactPhoto =>
       _draftPhotoBytes != null ||
       (!_photoDirty &&
@@ -308,7 +302,6 @@ class _EditContactPageState extends State<EditContactPage> {
       setState(() {
         _initialLinkedPerson = linkedPerson;
         _draftLinkedPerson = linkedPerson;
-        _unlinkDraft = false;
       });
 
       if (shouldPrefillFromPerson && !_photoDirty && _draftPhotoBytes == null) {
@@ -376,7 +369,6 @@ class _EditContactPageState extends State<EditContactPage> {
   void _draftUnlinkPerson() {
     setState(() {
       _draftLinkedPerson = null;
-      _unlinkDraft = true;
       _linkDirty = _initialLinkedPerson != null;
     });
   }
@@ -394,7 +386,6 @@ class _EditContactPageState extends State<EditContactPage> {
     _nameController.text = person.data.name;
     setState(() {
       _draftLinkedPerson = person;
-      _unlinkDraft = false;
       _linkDirty =
           _initialLinkedPerson?.remoteID != person.remoteID ||
           _personNeedsContactLinkUpdate(person);
@@ -546,7 +537,7 @@ class _EditContactPageState extends State<EditContactPage> {
     required bool contactNameChanged,
   }) async {
     final previousPerson = _initialLinkedPerson;
-    final selectedPerson = _unlinkDraft ? null : _draftLinkedPerson;
+    final selectedPerson = _draftLinkedPerson;
     final updatedPersons = <PersonEntity>[];
 
     if (previousPerson != null &&
@@ -567,9 +558,7 @@ class _EditContactPageState extends State<EditContactPage> {
           previousPerson?.remoteID != selectedPerson.remoteID ||
           _personNeedsContactLinkUpdate(selectedPerson);
       final shouldUpdateSelectedName =
-          contactNameChanged &&
-          contactName.isNotEmpty &&
-          selectedPerson.data.name.trim() != contactName;
+          contactNameChanged && selectedPerson.data.name.trim() != contactName;
       if (shouldUpdateSelectedLink || shouldUpdateSelectedName) {
         updatedPersons.add(
           await PersonService.instance.updateAttributes(

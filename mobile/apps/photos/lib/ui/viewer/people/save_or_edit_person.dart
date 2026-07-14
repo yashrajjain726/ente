@@ -65,7 +65,6 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   late final Logger _logger = Logger("_SavePersonState");
   PersonEntity? person;
   final _nameFocsNode = FocusNode();
-  late final TextEditingController _nameController;
   List<PersonEntity> _allPersons = [];
 
   String? get _emailToSave => trimToNull(_email);
@@ -100,14 +99,10 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   void initState() {
     super.initState();
     _inputName = widget.person?.data.name ?? "";
-    _nameController = TextEditingController(text: _inputName);
     _selectedDate = widget.person?.data.birthDate;
     _email = widget.person?.data.email;
     person = widget.person;
-    _isMe = isCurrentUserContactLink(
-      email: widget.person?.data.email,
-      userID: widget.person?.data.userID,
-    );
+    _isMe = _initiallyIsMe;
     _isPinned = widget.person?.data.isPinned ?? false;
     _hideFromMemories = widget.person?.data.hideFromMemories ?? false;
     _nameFocsNode.addListener(_handleNameFocusChange);
@@ -118,7 +113,6 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   void dispose() {
     _nameFocsNode.removeListener(_handleNameFocusChange);
     _nameFocsNode.dispose();
-    _nameController.dispose();
     super.dispose();
   }
 
@@ -158,7 +152,6 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
         }
       },
       child: Scaffold(
-        resizeToAvoidBottomInset: true,
         backgroundColor: colors.backgroundBase,
         body: GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),
@@ -169,7 +162,6 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                   title: widget.isEditing
                       ? context.l10n.editPerson
                       : context.l10n.savePerson,
-                  onBack: () => Navigator.of(context).maybePop(),
                   physics: const BouncingScrollPhysics(),
                   slivers: [
                     SliverPadding(
@@ -183,7 +175,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                             TextInputComponent(
                               label: context.l10n.name,
                               hintText: context.l10n.enterName,
-                              controller: _nameController,
+                              initialValue: widget.person?.data.name,
                               focusNode: _nameFocsNode,
                               keyboardType: TextInputType.name,
                               textCapitalization: TextCapitalization.words,
@@ -344,10 +336,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
       _isMe = selected;
       _email = selected
           ? Configuration.instance.getEmail()
-          : isCurrentUserContactLink(
-              email: widget.person?.data.email,
-              userID: widget.person?.data.userID,
-            )
+          : _initiallyIsMe
           ? null
           : widget.person?.data.email;
     });

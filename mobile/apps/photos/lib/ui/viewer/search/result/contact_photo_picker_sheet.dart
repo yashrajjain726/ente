@@ -49,13 +49,7 @@ class _ContactPhotoPickerSheet extends StatefulWidget {
 }
 
 class _ContactPhotoPickerSheetState extends State<_ContactPhotoPickerSheet> {
-  late final SelectedFiles _selectedFiles;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedFiles = SelectedFiles();
-  }
+  final _selectedFiles = SelectedFiles();
 
   @override
   void dispose() {
@@ -96,42 +90,30 @@ class _ContactPhotoPickerSheetState extends State<_ContactPhotoPickerSheet> {
             listenable: _selectedFiles,
             builder: (context, _) {
               final isFileSelected = _selectedFiles.files.isNotEmpty;
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ButtonComponent(
-                    label: l10n.setSelectedPhoto,
-                    isDisabled: !isFileSelected,
-                    shouldSurfaceExecutionStates: false,
-                    onTap: isFileSelected
-                        ? () {
-                            Navigator.pop(
-                              context,
-                              ContactPhotoPickerFile(
-                                _selectedFiles.files.first,
-                              ),
-                            );
-                          }
-                        : null,
-                  ),
-                  if (widget.canRemovePhoto) ...[
-                    const SizedBox(height: Spacing.md),
-                    ButtonComponent(
-                      label: l10n.removeContactPhoto,
-                      variant: ButtonComponentVariant.secondary,
-                      shouldSurfaceExecutionStates: false,
-                      onTap: () {
+              return ButtonComponent(
+                label: l10n.setSelectedPhoto,
+                isDisabled: !isFileSelected,
+                shouldSurfaceExecutionStates: false,
+                onTap: isFileSelected
+                    ? () {
                         Navigator.pop(
                           context,
-                          const ContactPhotoPickerRemove(),
+                          ContactPhotoPickerFile(_selectedFiles.files.first),
                         );
-                      },
-                    ),
-                  ],
-                ],
+                      }
+                    : null,
               );
             },
           ),
+          if (widget.canRemovePhoto)
+            ButtonComponent(
+              label: l10n.removeContactPhoto,
+              variant: ButtonComponentVariant.secondary,
+              shouldSurfaceExecutionStates: false,
+              onTap: () {
+                Navigator.pop(context, const ContactPhotoPickerRemove());
+              },
+            ),
         ],
       ),
     );

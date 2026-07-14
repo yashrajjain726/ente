@@ -226,8 +226,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
         generation: generation,
         useFullFile: widget.useFullFile,
       );
-      if (_isCurrentLoad(generation, personOrClusterId) &&
-          thumbnailCrop != null) {
+      if (_isCurrentLoad(generation) && thumbnailCrop != null) {
         _fallbackEverUsed = true;
         _showingFallback = false;
       }
@@ -239,7 +238,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
       useFullFile: widget.useFullFile,
     );
     if (fullCrop != null) {
-      if (_isCurrentLoad(generation, personOrClusterId)) {
+      if (_isCurrentLoad(generation)) {
         _showingFallback = false;
       }
       return fullCrop;
@@ -254,7 +253,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
       useFullFile: false,
     );
     if (fallbackCrop != null) {
-      if (_isCurrentLoad(generation, personOrClusterId)) {
+      if (_isCurrentLoad(generation)) {
         _showingFallback = true;
         _fallbackEverUsed = true;
       }
@@ -288,7 +287,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
           );
           return null;
         }
-        if (!_isCurrentLoad(generation, personOrClusterId)) {
+        if (!_isCurrentLoad(generation)) {
           return null;
         }
         _personName = personEntity.data.name;
@@ -296,7 +295,6 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
         final contactPhotoBytes = await _getLinkedContactPhotoBytes(
           personEntity,
           generation: generation,
-          personOrClusterId: personOrClusterId,
         );
         if (contactPhotoBytes != null) {
           return contactPhotoBytes;
@@ -472,7 +470,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
         personOrClusterID: personOrClusterId,
         useTempCache: false,
       );
-      if (_isCurrentLoad(generation, personOrClusterId)) {
+      if (_isCurrentLoad(generation)) {
         _faceCropFileId = recentFileID;
       }
       final result = cropMap?[face.faceID];
@@ -493,10 +491,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
     }
   }
 
-  bool _isCurrentLoad(int generation, String personOrClusterId) {
-    return _loadGeneration == generation &&
-        (widget.personId ?? widget.clusterID) == personOrClusterId;
-  }
+  bool _isCurrentLoad(int generation) => _loadGeneration == generation;
 
   bool _hasContactLink(PersonEntity personEntity) {
     final userId = personEntity.data.userID;
@@ -508,7 +503,6 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
   Future<Uint8List?> _getLinkedContactPhotoBytes(
     PersonEntity personEntity, {
     required int generation,
-    required String personOrClusterId,
   }) async {
     if (!_personHasContactLink) {
       _linkedContactUserId = null;
@@ -518,7 +512,7 @@ class _PersonFaceWidgetState extends State<PersonFaceWidget>
       contactUserId: personEntity.data.userID,
       email: personEntity.data.email,
     );
-    if (!_isCurrentLoad(generation, personOrClusterId)) {
+    if (!_isCurrentLoad(generation)) {
       return null;
     }
     _linkedContactUserId = contact?.contactUserId ?? personEntity.data.userID;

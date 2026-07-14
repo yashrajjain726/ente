@@ -240,46 +240,13 @@ void main() {
         await service.getProfilePictureBytesByUserId(7),
         Uint8List.fromList([1, 2, 3]),
       );
+      expect(
+        service.getCachedProfilePictureBytesByUserId(7),
+        Uint8List.fromList([1, 2, 3]),
+      );
       expect(contactsService.getProfilePictureCalls, 1);
     },
   );
-
-  test('loads profile picture through linked email lookup', () async {
-    contactsService = FakeContactsService(
-      localContacts: const [
-        contacts.ContactRecord(
-          id: 'ct_1',
-          contactUserId: 7,
-          email: 'alice@test.test',
-          data: contacts.ContactData(contactUserId: 7, name: 'Alice'),
-          profilePictureAttachmentId: 'att_1',
-          isDeleted: false,
-          createdAt: 1,
-          updatedAt: 2,
-        ),
-      ],
-    );
-    contactsService.profilePictureBytesByContactId['ct_1'] = Uint8List.fromList(
-      [4, 5, 6],
-    );
-    service = PhotosContactsService.forTesting(
-      contactsService: contactsService,
-    );
-
-    await service.debugOpenAndSync(session);
-
-    final contact = await service.getContact(email: 'ALICE@test.test');
-    expect(contact?.id, 'ct_1');
-    expect(
-      await service.getProfilePictureBytesByUserId(contact!.contactUserId),
-      Uint8List.fromList([4, 5, 6]),
-    );
-    expect(
-      service.getCachedProfilePictureBytesByUserId(7),
-      Uint8List.fromList([4, 5, 6]),
-    );
-    expect(contactsService.getProfilePictureCalls, 1);
-  });
 
   test('logout event clears hydrated contact cache immediately', () async {
     await service.debugOpenAndSync(session);

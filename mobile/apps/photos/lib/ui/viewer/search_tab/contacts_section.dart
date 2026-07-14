@@ -6,13 +6,11 @@ import "package:flutter/material.dart";
 import "package:flutter_svg/flutter_svg.dart";
 import "package:photos/events/event.dart";
 import "package:photos/generated/l10n.dart";
-import "package:photos/models/api/collection/user.dart";
 import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/recent_searches.dart";
 import "package:photos/models/search/search_constants.dart";
 import "package:photos/models/search/search_types.dart";
 import "package:photos/service_locator.dart" show isLocalGalleryMode;
-import "package:photos/services/contacts/contact_identity_resolver.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/loading_widget.dart";
@@ -214,7 +212,7 @@ class ContactRecommendation extends StatelessWidget {
     final personId = contactSearchResult.params[kPersonParamID] as String?;
     final contactUserId = contactSearchResult.params[kContactUserId] as int?;
     final contactEmail = contactSearchResult.params[kContactEmail] as String;
-    final displayName = _displayName(contactUserId, contactEmail);
+    final displayName = contactSearchResult.hierarchicalSearchFilter.name();
     return GestureDetector(
       onTap: () {
         RecentSearches().add(displayName);
@@ -248,16 +246,6 @@ class ContactRecommendation extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _displayName(int? contactUserId, String contactEmail) {
-    final contactUser = User(id: contactUserId, email: contactEmail);
-    final resolvedName = resolveDisplayName(contactUser);
-    final resolvedEmail = resolveKnownEmail(contactUser) ?? contactEmail;
-    if (resolvedName == resolvedEmail || resolvedName == "Someone") {
-      return contactSearchResult.name();
-    }
-    return resolvedName;
   }
 }
 

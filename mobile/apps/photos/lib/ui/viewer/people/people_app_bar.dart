@@ -168,8 +168,7 @@ class _AppBarWidgetState extends State<PeopleAppBar> {
               if (event.person != null &&
                   event.type == PeopleEventType.saveOrEditPerson &&
                   widget.person.remoteID == event.person!.remoteID &&
-                  (event.source == "linkEmailToPerson" ||
-                      event.source == "reassignMe")) {
+                  event.source == "reassignMe") {
                 person = event.person!;
 
                 _appBarTitle = _resolveAppBarTitle(

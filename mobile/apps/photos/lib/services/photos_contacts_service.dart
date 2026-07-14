@@ -92,16 +92,13 @@ class PhotosContactsService {
     int? contactUserId,
     String? email,
   }) async {
-    final cached = _getCachedContact(
-      contactUserId: contactUserId,
-      email: email,
-    );
+    final cached = getCachedContact(contactUserId: contactUserId, email: email);
     if (cached != null) {
       return cached;
     }
     return _runReadSafely(() async {
       await ensureReady();
-      final hydratedCached = _getCachedContact(
+      final hydratedCached = getCachedContact(
         contactUserId: contactUserId,
         email: email,
       );
@@ -119,7 +116,7 @@ class PhotosContactsService {
       if (contact != null) {
         _cacheContact(contact);
       }
-      return _getCachedContact(contactUserId: contactUserId, email: email);
+      return getCachedContact(contactUserId: contactUserId, email: email);
     }, description: "load contact for user $contactUserId");
   }
 
@@ -127,7 +124,16 @@ class PhotosContactsService {
     int? contactUserId,
     String? email,
   }) {
-    return _getCachedContact(contactUserId: contactUserId, email: email);
+    if (_sessionKey == null) {
+      return null;
+    }
+    if (contactUserId != null) {
+      return _contactsByUserId[contactUserId];
+    }
+    final normalizedEmail = normalizeContactLinkEmail(email);
+    return normalizedEmail == null
+        ? null
+        : _contactsByNormalizedEmail[normalizedEmail];
   }
 
   String? getCachedSavedName({int? contactUserId, String? email}) {
@@ -481,42 +487,6 @@ class PhotosContactsService {
     _profilePictureBytesByUserId.remove(contactUserId);
     _resolvedProfilePictureUserIds.remove(contactUserId);
     _profilePictureLoadsByUserId.remove(contactUserId);
-  }
-
-  contacts.ContactRecord? _getCachedContact({
-    int? contactUserId,
-    String? email,
-  }) {
-    if (_sessionKey == null) {
-      return null;
-    }
-    if (contactUserId != null) {
-      return _contactByUserIdOrNull(contactUserId);
-    }
-    return _contactByEmailOrNull(email);
-  }
-
-  contacts.ContactRecord? _contactByUserIdOrNull(int? contactUserId) {
-    if (contactUserId == null) {
-      return null;
-    }
-    final contact = _contactsByUserId[contactUserId];
-    if (contact == null || contact.isDeleted) {
-      return null;
-    }
-    return contact;
-  }
-
-  contacts.ContactRecord? _contactByEmailOrNull(String? email) {
-    final normalizedEmail = normalizeContactLinkEmail(email);
-    if (normalizedEmail == null) {
-      return null;
-    }
-    final contact = _contactsByNormalizedEmail[normalizedEmail];
-    if (contact == null || contact.isDeleted) {
-      return null;
-    }
-    return contact;
   }
 
   void _attachSessionResetListeners() {
