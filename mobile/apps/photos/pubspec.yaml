@@ -186,7 +186,7 @@ dependencies:
   native_dio_adapter: 1.5.1
   native_video_editor:
     path: ../../packages/native_video_editor
-  native_video_player: 4.0.0
+  native_video_player: 4.0.1
   open_mail_app: # replace plugin, git is archived
     git:
       url: https://github.com/ente/open-mail-app-flutter.git

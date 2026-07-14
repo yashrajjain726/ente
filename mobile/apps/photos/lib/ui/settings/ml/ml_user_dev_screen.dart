@@ -149,6 +149,7 @@ class _MLUserDeveloperOptionsState extends State<MLUserDeveloperOptions> {
                                     e,
                                     s,
                                   );
+                                  if (!context.mounted) return;
                                   await showGenericErrorDialog(
                                     context: context,
                                     error: e,
@@ -194,6 +195,7 @@ class _MLUserDeveloperOptionsState extends State<MLUserDeveloperOptions> {
                                     e,
                                     s,
                                   );
+                                  if (!context.mounted) return;
                                   await showGenericErrorDialog(
                                     context: context,
                                     error: e,
@@ -231,8 +233,10 @@ class _MLUserDeveloperOptionsState extends State<MLUserDeveloperOptions> {
       await mlDataDB.deleteFaceIndexForFiles(emptyFileIDs.toList());
       await mlDataDB.deleteClipEmbeddings(emptyFileIDs.toList());
       await mlDataDB.deletePetDataForFiles(emptyFileIDs.toList());
+      if (!context.mounted) return;
       showShortToast(context, "Deleted ${emptyFileIDs.length} entries");
     } catch (e) {
+      if (!context.mounted) return;
       // ignore: unawaited_futures
       showGenericErrorDialog(context: context, error: e);
     }
@@ -243,8 +247,10 @@ class _MLUserDeveloperOptionsState extends State<MLUserDeveloperOptions> {
       await mlDataDB.dropClustersAndPersonTable(faces: true);
       await SemanticSearchService.instance.clearIndexes();
       Bus.instance.fire(PeopleChangedEvent());
+      if (!context.mounted) return;
       showShortToast(context, "All local ML cleared");
     } catch (e) {
+      if (!context.mounted) return;
       // ignore: unawaited_futures
       showGenericErrorDialog(context: context, error: e);
     }
