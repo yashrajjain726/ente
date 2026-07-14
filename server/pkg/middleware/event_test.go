@@ -38,6 +38,27 @@ func TestEventsUse120PerHourGlobalRateLimit(t *testing.T) {
 	require.Nil(t, rateLimiter.getLimiter("/events/user", http.MethodPost))
 }
 
+func TestSpaceRoutesUseRouteSpecificRateLimits(t *testing.T) {
+	limit10ReqPerMin := util.NewRateLimiter("10-M")
+	limit200ReqPerMin := util.NewRateLimiter("200-M")
+	rateLimiter := &RateLimitMiddleware{
+		limit10ReqPerMin:  limit10ReqPerMin,
+		limit200ReqPerMin: limit200ReqPerMin,
+	}
+
+	require.Same(t, limit200ReqPerMin, rateLimiter.getLimiter("/space/public/by-slug/:spaceSlug", http.MethodGet))
+	require.Same(t, limit200ReqPerMin, rateLimiter.getLimiter("/space/public/slug-availability/:spaceSlug", http.MethodGet))
+	require.Same(t, limit200ReqPerMin, rateLimiter.getLimiter("/spaces/:spaceID/uploads/presign", http.MethodPost))
+	require.Same(t, limit200ReqPerMin, rateLimiter.getLimiter("/spaces/:spaceID/posts", http.MethodPost))
+	require.Same(t, limit200ReqPerMin, rateLimiter.getLimiter("/spaces/:spaceID/messages/:messageID", http.MethodDelete))
+	require.Same(t, limit10ReqPerMin, rateLimiter.getLimiter("/account/space", http.MethodPost))
+	require.Same(t, limit10ReqPerMin, rateLimiter.getLimiter("/account/space/sessions", http.MethodPost))
+	require.Same(t, limit10ReqPerMin, rateLimiter.getLimiter("/account/space/sessions/bootstrap", http.MethodPost))
+	require.Same(t, limit10ReqPerMin, rateLimiter.getLimiter("/account/space/sessions/current", http.MethodDelete))
+	require.Nil(t, rateLimiter.getLimiter("/account/space", http.MethodGet))
+	require.Nil(t, rateLimiter.getLimiter("/spaces/:spaceID/feed", http.MethodGet))
+}
+
 func TestEventsShareGlobalRateLimitAcrossPublicAndAuthenticatedRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rateLimiter := &RateLimitMiddleware{

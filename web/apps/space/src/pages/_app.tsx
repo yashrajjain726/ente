@@ -3,6 +3,7 @@ import "@fontsource/nunito/800.css";
 import { CssBaseline } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import { SpaceRouteTransitionBoundary } from "components/SpaceRouteTransitionBoundary";
+import "configureZod";
 import { CustomHead } from "ente-base/components/Head";
 import { useSetupLogs } from "ente-base/components/utils/hooks-app";
 import { shareTheme } from "ente-base/components/utils/theme";

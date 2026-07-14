@@ -46,6 +46,9 @@ impl From<CoreSpaceError> for WasmSpaceError {
     fn from(e: CoreSpaceError) -> Self {
         let (code, status) = match &e {
             CoreSpaceError::Http(HttpError::Http { status, .. }) => ("http", Some(*status)),
+            CoreSpaceError::Http(HttpError::Api { status, code, .. }) => {
+                (code.as_str(), Some(*status))
+            }
             CoreSpaceError::Http(HttpError::Network(_)) => ("network", None),
             CoreSpaceError::Http(HttpError::Parse(_)) => ("parse", None),
             CoreSpaceError::Crypto(_) => ("crypto", None),
@@ -255,17 +258,18 @@ fn created_space_to_js(value: CreatedSpace) -> CreatedSpaceJs {
     }
 }
 
-fn profile_to_js(value: DecryptedSpaceProfile) -> Result<SpaceProfileJs, WasmSpaceError> {
-    Ok(SpaceProfileJs {
+fn profile_to_js(value: DecryptedSpaceProfile) -> SpaceProfileJs {
+    let profile = utf8_field(value.profile, "profile").unwrap_or_default();
+    SpaceProfileJs {
         space_id: value.space_id,
         space_slug: value.space_slug,
         version: value.version,
         friends: value.friends,
-        profile: utf8_field(value.profile, "profile")?,
+        profile,
         avatar: value.avatar,
         cover: value.cover,
         updated_at: value.updated_at,
-    })
+    }
 }
 
 fn actor_to_js(
@@ -286,8 +290,15 @@ async fn account_actor_to_js(
     ctx: &AccountSpaceCtx,
     actor: SpaceActorResponse,
 ) -> Result<ActorJs, WasmSpaceError> {
-    let profile = ctx.decrypt_actor_profile(&actor).await?;
-    actor_to_js(actor, profile)
+    let profile = match ctx.decrypt_actor_profile(&actor).await {
+        Ok(profile) => profile,
+        Err(error) if error.is_unavailable_record() => None,
+        Err(error) => return Err(error.into()),
+    };
+    match actor_to_js(actor.clone(), profile) {
+        Ok(actor) => Ok(actor),
+        Err(_) => actor_to_js(actor, None),
+    }
 }
 
 fn public_actor_to_js(actor: SpaceActorResponse) -> Result<ActorJs, WasmSpaceError> {
@@ -297,12 +308,14 @@ fn public_actor_to_js(actor: SpaceActorResponse) -> Result<ActorJs, WasmSpaceErr
 fn post_object_to_js(
     post_key: Option<&[u8]>,
     object: ente_space::PostObjectPayload,
-) -> Result<PostObjectJs, WasmSpaceError> {
+) -> PostObjectJs {
     let metadata = match post_key {
-        Some(post_key) => ente_space::client::decrypt_post_object_metadata(post_key, &object)?,
+        Some(post_key) => {
+            ente_space::client::decrypt_post_object_metadata(post_key, &object).unwrap_or(None)
+        }
         None => None,
     };
-    Ok(PostObjectJs {
+    PostObjectJs {
         object_key: object.object_key,
         size: object.size,
         position: object.position,
@@ -312,13 +325,13 @@ fn post_object_to_js(
         width: metadata.as_ref().and_then(|value| value.width),
         height: metadata.as_ref().and_then(|value| value.height),
         media_type: metadata.and_then(|value| value.media_type),
-    })
+    }
 }
 
 fn post_objects_to_js(
     post_key: Option<&[u8]>,
     objects: Vec<ente_space::PostObjectPayload>,
-) -> Result<Vec<PostObjectJs>, WasmSpaceError> {
+) -> Vec<PostObjectJs> {
     objects
         .into_iter()
         .map(|object| post_object_to_js(post_key, object))
@@ -336,10 +349,10 @@ async fn account_post_to_js(
         space_id: post.space_id,
         space_slug: post.space_slug,
         author,
-        caption: optional_utf8_field(decrypted.caption_plaintext, "caption")?,
+        caption: optional_utf8_field(decrypted.caption_plaintext, "caption").unwrap_or(None),
         encrypted_post_key: post.encrypted_post_key,
         key_version: post.key_version,
-        objects: post_objects_to_js(Some(&decrypted.post_key), post.objects)?,
+        objects: post_objects_to_js(Some(&decrypted.post_key), post.objects),
         created_at: post.created_at,
         viewer_liked: post.viewer_liked,
     })
@@ -351,7 +364,13 @@ async fn account_post_page_to_js(
 ) -> Result<PostPageJs, WasmSpaceError> {
     let mut items = Vec::with_capacity(page.items.len());
     for post in page.items {
-        let decrypted = ctx.decrypt_post_for_space(&post.space_id, &post).await?;
+        let decrypted = match ctx.decrypt_post_for_space(&post.space_id, &post).await {
+            Ok(decrypted) => decrypted,
+            Err(error) if error.is_unavailable_record() => {
+                continue;
+            }
+            Err(error) => return Err(error.into()),
+        };
         items.push(account_post_to_js(ctx, post, decrypted).await?);
     }
     Ok(PostPageJs {
@@ -364,12 +383,16 @@ async fn account_message_to_js(
     message: MessageResponse,
     decrypted: DecryptedMessage,
 ) -> Result<MessageJs, WasmSpaceError> {
-    Ok(MessageJs {
+    Ok(message_to_js(message, decrypted.payload.text))
+}
+
+fn message_to_js(message: MessageResponse, text: String) -> MessageJs {
+    MessageJs {
         message_id: message.message_id,
         kind: message.kind,
         sender_space_id: message.sender_space_id,
         recipient_space_id: message.recipient_space_id,
-        text: decrypted.payload.text,
+        text,
         reply_post_id: message.reply_post_id,
         reply_message_id: message.reply_message_id,
         liked: message.liked,
@@ -377,7 +400,7 @@ async fn account_message_to_js(
         is_deleted: message.is_deleted,
         created_at: message.created_at,
         updated_at: message.updated_at,
-    })
+    }
 }
 
 async fn account_message_response_to_js(
@@ -385,25 +408,22 @@ async fn account_message_response_to_js(
     viewer_space_id: &str,
     message: MessageResponse,
 ) -> Result<MessageJs, WasmSpaceError> {
+    if message.is_deleted {
+        return Ok(message_to_js(message, String::new()));
+    }
     if message.kind != "post_like" && message.kind != "friend_added" {
-        let decrypted = ctx.decrypt_message(viewer_space_id, &message).await?;
+        let decrypted = match ctx.decrypt_message(viewer_space_id, &message).await {
+            Ok(decrypted) => decrypted,
+            Err(error) if error.is_unavailable_record() => {
+                return Ok(message_to_js(message, String::new()));
+            }
+            Err(error) => return Err(error.into()),
+        };
         return account_message_to_js(message, decrypted).await;
     }
 
-    Ok(MessageJs {
-        message_id: message.message_id,
-        kind: message.kind,
-        sender_space_id: message.sender_space_id,
-        recipient_space_id: message.recipient_space_id,
-        text: message.text,
-        reply_post_id: message.reply_post_id,
-        reply_message_id: message.reply_message_id,
-        liked: message.liked,
-        viewer_liked: message.viewer_liked,
-        is_deleted: message.is_deleted,
-        created_at: message.created_at,
-        updated_at: message.updated_at,
-    })
+    let text = message.text.clone();
+    Ok(message_to_js(message, text))
 }
 
 async fn message_conversation_activity_text(
@@ -438,8 +458,11 @@ async fn message_conversation_activity_text(
         created_at: activity.created_at.clone(),
         updated_at: activity.created_at.clone(),
     };
-    let decrypted = ctx.decrypt_message(viewer_space_id, &message).await?;
-    Ok(Some(decrypted.payload.text))
+    match ctx.decrypt_message(viewer_space_id, &message).await {
+        Ok(decrypted) => Ok(Some(decrypted.payload.text)),
+        Err(error) if error.is_unavailable_record() => Ok(None),
+        Err(error) => Err(error.into()),
+    }
 }
 
 async fn message_conversation_activity_to_js(
@@ -520,7 +543,7 @@ impl SpaceAccountCtxHandle {
             self.inner
                 .get_space_profile_decrypted(&space_id, viewer_space_id.as_deref(), None)
                 .await?,
-        )?)
+        ))
         .map_err(Into::into)
     }
 
@@ -742,7 +765,14 @@ impl SpaceAccountCtxHandle {
         let decrypted = self
             .inner
             .decrypt_post_for_viewer(&post.space_id, viewer_space_id.as_deref(), &post)
-            .await?;
+            .await;
+        let decrypted = match decrypted {
+            Ok(decrypted) => decrypted,
+            Err(error) if error.is_unavailable_record() => {
+                return Ok(JsValue::NULL);
+            }
+            Err(error) => return Err(error.into()),
+        };
         swb::to_value(&account_post_to_js(&self.inner, post, decrypted).await?).map_err(Into::into)
     }
 

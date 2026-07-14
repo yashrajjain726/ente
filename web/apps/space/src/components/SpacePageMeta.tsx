@@ -2,7 +2,9 @@ import Head from "next/head";
 import React from "react";
 import { onboardingDescription } from "screens/OnboardingScreen";
 
-const spacePreviewTitle = "Add me on Ente Space";
+const spacePreviewTitle = "Ente Space";
+const spacePreviewDescription =
+    "A private space for sharing everyday moments with friends and family.";
 const previewImages = {
     home: "https://ente.space/images/meta.jpg",
     invite: "https://ente.space/images/meta-invite.jpg",
@@ -23,7 +25,12 @@ export const SpacePageMeta: React.FC<SpacePageMetaProps> = ({
         <Head>
             <meta name="theme-color" content={themeColor} />
             <meta name="robots" content="noindex,nofollow" />
-            <meta name="description" content={onboardingDescription} />
+            <meta
+                name="description"
+                content={
+                    preview ? spacePreviewDescription : onboardingDescription
+                }
+            />
             {previewImage && (
                 <>
                     <meta property="og:image" content={previewImage} />
@@ -32,19 +39,15 @@ export const SpacePageMeta: React.FC<SpacePageMetaProps> = ({
                     <meta property="og:image:height" content="630" />
                     <meta name="twitter:card" content="summary_large_image" />
                     <meta name="twitter:image" content={previewImage} />
-                </>
-            )}
-            {preview == "invite" && (
-                <>
                     <meta property="og:title" content={spacePreviewTitle} />
                     <meta
                         property="og:description"
-                        content={onboardingDescription}
+                        content={spacePreviewDescription}
                     />
                     <meta name="twitter:title" content={spacePreviewTitle} />
                     <meta
                         name="twitter:description"
-                        content={onboardingDescription}
+                        content={spacePreviewDescription}
                     />
                 </>
             )}

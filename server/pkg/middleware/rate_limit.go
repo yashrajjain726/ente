@@ -209,6 +209,20 @@ func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limi
 	if strings.HasPrefix(reqPath, "/files/preview/") {
 		return r.limit700ReqPerSec
 	}
+	if reqPath == "/space/public/by-slug/:spaceSlug" ||
+		reqPath == "/space/public/slug-availability/:spaceSlug" {
+		return r.limit200ReqPerMin
+	}
+	if strings.HasPrefix(reqPath, "/spaces/") &&
+		(reqMethod == http.MethodPost || reqMethod == http.MethodPut || reqMethod == http.MethodPatch || reqMethod == http.MethodDelete) {
+		return r.limit200ReqPerMin
+	}
+	if (reqPath == "/account/space" && reqMethod == http.MethodPost) ||
+		(reqPath == "/account/space/sessions" && reqMethod == http.MethodPost) ||
+		(reqPath == "/account/space/sessions/bootstrap" && reqMethod == http.MethodPost) ||
+		(reqPath == "/account/space/sessions/current" && reqMethod == http.MethodDelete) {
+		return r.limit10ReqPerMin
+	}
 	if isAuthenticatedUploadURLPath(reqPath) {
 		return r.limit500ReqPerMin
 	}
