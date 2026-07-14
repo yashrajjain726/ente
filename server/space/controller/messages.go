@@ -119,7 +119,7 @@ func (c *MessagesController) ReplyToPost(ctx context.Context, senderSpace *repo.
 		return nil, err
 	}
 	if c.EmailNotifier != nil {
-		go c.EmailNotifier.OnSpacePostReplied(senderSpace.SpaceSlug, recipientSpace.OwnerID)
+		go c.EmailNotifier.OnSpacePostReplied(senderSpace.OwnerID, senderSpace.SpaceSlug, recipientSpace.OwnerID)
 	}
 	return toMessageResponse(*message), nil
 }

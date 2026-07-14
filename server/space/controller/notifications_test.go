@@ -2,17 +2,23 @@ package controller
 
 import (
 	"encoding/base64"
+	"io"
 	"testing"
 	"time"
 
+	"github.com/ente/museum/internal/testutil"
+	baserepo "github.com/ente/museum/pkg/repo"
 	"github.com/ente/museum/space/models"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
 )
 
 type recordedSpaceEmail struct {
-	event      string
-	actorSlug  string
-	recipients []int64
+	event       string
+	actorUserID int64
+	actorSlug   string
+	recipients  []int64
 }
 
 type recordingSpaceEmailNotifier struct {
@@ -23,24 +29,24 @@ func newRecordingSpaceEmailNotifier() *recordingSpaceEmailNotifier {
 	return &recordingSpaceEmailNotifier{events: make(chan recordedSpaceEmail, 8)}
 }
 
-func (n *recordingSpaceEmailNotifier) OnSpacePostCreated(actorSlug string, recipientUserIDs []int64) {
-	n.events <- recordedSpaceEmail{event: "post_created", actorSlug: actorSlug, recipients: append([]int64(nil), recipientUserIDs...)}
+func (n *recordingSpaceEmailNotifier) OnSpacePostCreated(actorUserID int64, actorSlug string, recipientUserIDs []int64) {
+	n.events <- recordedSpaceEmail{event: "post_created", actorUserID: actorUserID, actorSlug: actorSlug, recipients: append([]int64(nil), recipientUserIDs...)}
 }
 
-func (n *recordingSpaceEmailNotifier) OnSpacePostLiked(actorSlug string, recipientUserID int64) {
-	n.events <- recordedSpaceEmail{event: "post_liked", actorSlug: actorSlug, recipients: []int64{recipientUserID}}
+func (n *recordingSpaceEmailNotifier) OnSpacePostLiked(actorUserID int64, actorSlug string, recipientUserID int64) {
+	n.events <- recordedSpaceEmail{event: "post_liked", actorUserID: actorUserID, actorSlug: actorSlug, recipients: []int64{recipientUserID}}
 }
 
-func (n *recordingSpaceEmailNotifier) OnSpacePostReplied(actorSlug string, recipientUserID int64) {
-	n.events <- recordedSpaceEmail{event: "post_replied", actorSlug: actorSlug, recipients: []int64{recipientUserID}}
+func (n *recordingSpaceEmailNotifier) OnSpacePostReplied(actorUserID int64, actorSlug string, recipientUserID int64) {
+	n.events <- recordedSpaceEmail{event: "post_replied", actorUserID: actorUserID, actorSlug: actorSlug, recipients: []int64{recipientUserID}}
 }
 
-func (n *recordingSpaceEmailNotifier) OnSpaceFriendAdded(actorSlug string, recipientUserID int64) {
-	n.events <- recordedSpaceEmail{event: "friend_added", actorSlug: actorSlug, recipients: []int64{recipientUserID}}
+func (n *recordingSpaceEmailNotifier) OnSpaceFriendAdded(actorUserID int64, actorSlug string, recipientUserID int64) {
+	n.events <- recordedSpaceEmail{event: "friend_added", actorUserID: actorUserID, actorSlug: actorSlug, recipients: []int64{recipientUserID}}
 }
 
-func (n *recordingSpaceEmailNotifier) OnSpaceFriendRequested(actorSlug string, recipientUserID int64) {
-	n.events <- recordedSpaceEmail{event: "friend_requested", actorSlug: actorSlug, recipients: []int64{recipientUserID}}
+func (n *recordingSpaceEmailNotifier) OnSpaceFriendRequested(actorUserID int64, actorSlug string, recipientUserID int64) {
+	n.events <- recordedSpaceEmail{event: "friend_requested", actorUserID: actorUserID, actorSlug: actorSlug, recipients: []int64{recipientUserID}}
 }
 
 func requireSpaceEmail(t *testing.T, notifier *recordingSpaceEmailNotifier) recordedSpaceEmail {
@@ -89,6 +95,51 @@ func TestSpaceEmailTemplateData(t *testing.T) {
 	require.Equal(t, spaceNewFriendIllustrationWidth, spaceEmailIllustrationWidth(spaceNotificationFriendRequested))
 }
 
+func TestSpaceEmailSenderLimitsEachSenderToFiftyEmailsPerHour(t *testing.T) {
+	_, repos, _ := setupPostsControllerTest(t)
+	recipientID := insertSpaceControllerUser(t, repos, "space-email-limit-recipient@example.com", "recipient-public")
+	otherRecipientID := insertSpaceControllerUser(t, repos, "space-email-limit-other-recipient@example.com", "other-recipient-public")
+	sender := NewSpaceEmailSender(&baserepo.UserRepository{
+		DB:                  repos.Spaces.DB,
+		SecretEncryptionKey: testutil.SecretEncryptionKey(),
+	})
+	logger := log.StandardLogger()
+	originalHooks := logger.ReplaceHooks(make(log.LevelHooks))
+	originalOutput := logger.Out
+	logger.SetOutput(io.Discard)
+	hook := logtest.NewGlobal()
+	t.Cleanup(func() {
+		logger.ReplaceHooks(originalHooks)
+		logger.SetOutput(originalOutput)
+		hook.Reset()
+	})
+
+	originalSend := sendSpaceNotificationEmail
+	t.Cleanup(func() {
+		sendSpaceNotificationEmail = originalSend
+	})
+	sent := 0
+	sendSpaceNotificationEmail = func(_ []string, _ string, _ string, _ string, _ string, _ map[string]interface{}, _ []map[string]interface{}) error {
+		sent++
+		return nil
+	}
+
+	for range 50 {
+		sender.OnSpacePostReplied(1, "alice", recipientID)
+	}
+	require.Equal(t, 50, sent)
+
+	sender.OnSpacePostLiked(1, "alice", otherRecipientID)
+	require.Equal(t, 50, sent)
+	require.Len(t, hook.AllEntries(), 1)
+	require.Equal(t, log.WarnLevel, hook.LastEntry().Level)
+	require.Equal(t, "Space email rate limit reached", hook.LastEntry().Message)
+	require.Equal(t, int64(1), hook.LastEntry().Data["actor_user_id"])
+
+	sender.OnSpaceFriendRequested(2, "bob", recipientID)
+	require.Equal(t, 51, sent)
+}
+
 func TestPostLikeSendsEmailOnce(t *testing.T) {
 	_, repos, ctx := setupPostsControllerTest(t)
 	notifier := newRecordingSpaceEmailNotifier()
@@ -107,7 +158,7 @@ func TestPostLikeSendsEmailOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, resp.Liked)
 	email := requireSpaceEmail(t, notifier)
-	require.Equal(t, recordedSpaceEmail{event: "post_liked", actorSlug: bobSpace.SpaceSlug, recipients: []int64{aliceID}}, email)
+	require.Equal(t, recordedSpaceEmail{event: "post_liked", actorUserID: bobID, actorSlug: bobSpace.SpaceSlug, recipients: []int64{aliceID}}, email)
 
 	_, err = posts.SetLike(ctx, bobSpace, postID, true)
 	require.NoError(t, err)
@@ -131,7 +182,7 @@ func TestPostReplySendsEmail(t *testing.T) {
 	})
 	require.NoError(t, err)
 	email := requireSpaceEmail(t, notifier)
-	require.Equal(t, recordedSpaceEmail{event: "post_replied", actorSlug: bobSpace.SpaceSlug, recipients: []int64{aliceID}}, email)
+	require.Equal(t, recordedSpaceEmail{event: "post_replied", actorUserID: bobID, actorSlug: bobSpace.SpaceSlug, recipients: []int64{aliceID}}, email)
 }
 
 func TestAddFriendSendsEmailOnce(t *testing.T) {
@@ -154,7 +205,7 @@ func TestAddFriendSendsEmailOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "requested", resp.Status)
 	email := requireSpaceEmail(t, notifier)
-	require.Equal(t, recordedSpaceEmail{event: "friend_requested", actorSlug: bobSpace.SpaceSlug, recipients: []int64{aliceID}}, email)
+	require.Equal(t, recordedSpaceEmail{event: "friend_requested", actorUserID: bobID, actorSlug: bobSpace.SpaceSlug, recipients: []int64{aliceID}}, email)
 
 	_, err = friends.Add(ctx, bobSpace, req)
 	require.NoError(t, err)
@@ -172,5 +223,5 @@ func TestAddFriendSendsEmailOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "friend", resp.Status)
 	email = requireSpaceEmail(t, notifier)
-	require.Equal(t, recordedSpaceEmail{event: "friend_added", actorSlug: aliceSpace.SpaceSlug, recipients: []int64{bobID}}, email)
+	require.Equal(t, recordedSpaceEmail{event: "friend_added", actorUserID: aliceID, actorSlug: aliceSpace.SpaceSlug, recipients: []int64{bobID}}, email)
 }
