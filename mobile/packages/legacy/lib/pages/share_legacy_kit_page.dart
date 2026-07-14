@@ -71,8 +71,8 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
-    final expandedContentBottomPadding = _expandedIndex == null
-        ? 0.0
+    final contentBottomPadding = widget.isCreationFlow
+        ? (_expandedIndex == null ? 0.0 : Spacing.xxl)
         : MediaQuery.paddingOf(context).bottom + Spacing.xxl;
     return Scaffold(
       backgroundColor: colors.backgroundBase,
@@ -103,7 +103,7 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
               Spacing.lg,
               0,
               Spacing.lg,
-              expandedContentBottomPadding,
+              contentBottomPadding,
             ),
             sliver: SliverToBoxAdapter(
               child: Column(
