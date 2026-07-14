@@ -354,20 +354,6 @@ func (h *FileHandler) GetDuplicates(c *gin.Context) {
 	})
 }
 
-// GetLargeThumbnail returns the list of files whose thumbnail size is larger than threshold size
-func (h *FileHandler) GetLargeThumbnailFiles(c *gin.Context) {
-	userID := auth.GetUserID(c.Request.Header)
-	threshold, _ := strconv.ParseInt(c.Query("threshold"), 10, 64)
-	largeThumbnailFiles, err := h.Controller.GetLargeThumbnailFiles(userID, threshold)
-	if err != nil {
-		handler.Error(c, stacktrace.Propagate(err, ""))
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"largeThumbnailFiles": largeThumbnailFiles,
-	})
-}
-
 // UpdateMagicMetadata updates magic metadata for a list of files.
 func (h *FileHandler) UpdateMagicMetadata(c *gin.Context) {
 	var request ente.UpdateMultipleMagicMetadataRequest

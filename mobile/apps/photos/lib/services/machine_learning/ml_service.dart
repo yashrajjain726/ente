@@ -19,6 +19,7 @@ import "package:photos/models/file/file_type.dart";
 import "package:photos/models/ml/clip.dart";
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/ml_versions.dart";
+import "package:photos/module/download/file.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/filedata/model/file_data.dart";
 import "package:photos/services/machine_learning/face_ml/face_clustering/face_clustering_service.dart";
@@ -31,7 +32,6 @@ import "package:photos/services/machine_learning/ml_result.dart";
 import "package:photos/services/machine_learning/semantic_search/semantic_search_service.dart";
 import "package:photos/services/search_service.dart";
 import "package:photos/services/video_preview_service.dart";
-import "package:photos/utils/file_util.dart";
 import "package:photos/utils/isolate/isolate_operations.dart";
 import "package:photos/utils/ml_util.dart";
 import "package:photos/utils/network_util.dart";
@@ -352,7 +352,7 @@ class MLService {
 
   Future<void> sync() async {
     await fileDataService.syncFDStatus();
-    await faceRecognitionService.syncPersonFeedback();
+    await personFeedbackService.syncPersonFeedback();
   }
 
   Future<void> runAllML({bool force = false}) async {
@@ -499,8 +499,7 @@ class MLService {
           await MLModelDownloadService.instance.ensureModelsDownloaded(
             onlyIndexingModels: true,
           );
-          if ((flagService.useRustForML || isLocalGalleryMode) &&
-              !rustRuntimePrepared) {
+          if (!rustRuntimePrepared) {
             await MLIndexingIsolate.instance.prepareRustRuntime();
             rustRuntimePrepared = true;
           }
@@ -518,7 +517,6 @@ class MLService {
             _logger.info("indexAllImages() was paused, stopping");
             break stream;
           }
-          await MLIndexingIsolate.instance.ensureLoadedModels(instruction);
           futures.add(processImage(instruction));
         }
         final awaitedFutures = await Future.wait(futures);
@@ -777,10 +775,7 @@ class MLService {
       actuallyRanML = result.ranML;
       if (!actuallyRanML) return actuallyRanML;
       final bool isLocalGallery = instruction.isLocalGallery;
-      // Bitmask describing properties of this index (e.g. which runtime
-      // produced it), so remote indexes stay distinguishable between rust
-      // and legacy during and after the rust ML rollout.
-      final int remoteFlags = result.usedRustMl ? mlIndexFlagRuntimeRust : 0;
+      const int remoteFlags = mlIndexFlagRuntimeRust;
       // Prepare storing data on remote (online mode only)
       final FileDataEntity? dataEntity = isLocalGallery
           ? null
