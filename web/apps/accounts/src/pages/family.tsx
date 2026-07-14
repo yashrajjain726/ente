@@ -9,7 +9,7 @@ import { ActivityIndicator } from "ente-base/components/mui/ActivityIndicator";
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
 import { LoadingButton } from "ente-base/components/mui/LoadingButton";
 import { useBaseContext } from "ente-base/context";
-import { isHTTP4xxError } from "ente-base/http";
+import { isHTTPErrorWithStatus } from "ente-base/http";
 import { t } from "i18next";
 import React, { useCallback, useEffect, useState } from "react";
 
@@ -35,8 +35,11 @@ const Page: React.FC = () => {
                 window.history.replaceState(null, "", window.location.pathname);
                 setPhase("ready");
             } catch (e) {
-                setPhase(isHTTP4xxError(e) ? "invalid" : "failed");
-                if (!isHTTP4xxError(e)) onGenericError(e);
+                const invalid =
+                    isHTTPErrorWithStatus(e, 400) ||
+                    isHTTPErrorWithStatus(e, 404);
+                setPhase(invalid ? "invalid" : "failed");
+                if (!invalid) onGenericError(e);
             }
         },
         [onGenericError],
@@ -60,8 +63,10 @@ const Page: React.FC = () => {
             setInvite(await acceptFamilyInvite(token!));
             setPhase("accepted");
         } catch (e) {
-            setPhase(isHTTP4xxError(e) ? "invalid" : "ready");
-            if (!isHTTP4xxError(e)) onGenericError(e);
+            const invalid =
+                isHTTPErrorWithStatus(e, 401) || isHTTPErrorWithStatus(e, 404);
+            setPhase(invalid ? "invalid" : "ready");
+            if (!invalid) onGenericError(e);
         }
     };
 
@@ -78,11 +83,17 @@ const Page: React.FC = () => {
                     <ActivityIndicator />
                 </Stack>
             ) : phase == "invalid" ? (
-                <Stack sx={{ flex: 1, placeContent: "center" }}>
-                    <Typography variant="h3" sx={{ textAlign: "center" }}>
+                <FamilyInviteContents>
+                    <Box
+                        component="img"
+                        alt=""
+                        src="/images/family-invite-invalid.png"
+                        sx={{ width: 180, height: "auto" }}
+                    />
+                    <Typography sx={{ color: "text.muted" }}>
                         {t("family_invite_invalid")}
                     </Typography>
-                </Stack>
+                </FamilyInviteContents>
             ) : phase == "failed" ? (
                 <Stack sx={{ flex: 1, placeContent: "center", gap: 3 }}>
                     <Typography variant="h3" sx={{ textAlign: "center" }}>
@@ -94,6 +105,12 @@ const Page: React.FC = () => {
                 </Stack>
             ) : phase == "accepted" ? (
                 <FamilyInviteContents>
+                    <Box
+                        component="img"
+                        alt=""
+                        src="/images/family-invite.png"
+                        sx={{ width: 160, height: "auto" }}
+                    />
                     <Stack sx={{ gap: 1.5 }}>
                         <Typography variant="h3">
                             {t("family_invite_accepted")}
@@ -110,6 +127,12 @@ const Page: React.FC = () => {
                 </FamilyInviteContents>
             ) : (
                 <FamilyInviteContents>
+                    <Box
+                        component="img"
+                        alt=""
+                        src="/images/family-invite.png"
+                        sx={{ width: 160, height: "auto" }}
+                    />
                     <Stack sx={{ gap: 1.5 }}>
                         <Typography variant="h3">
                             {t("family_invite_title")}
@@ -146,12 +169,6 @@ const FamilyInviteContents: React.FC<React.PropsWithChildren> = ({
             gap: 3,
         }}
     >
-        <Box
-            component="img"
-            alt=""
-            src="/images/family-plan-illustration.png"
-            sx={{ width: 160, height: "auto" }}
-        />
         {children}
     </Stack>
 );

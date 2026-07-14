@@ -51,7 +51,7 @@ import {
     type UserDetails,
 } from "ente-new/photos/services/user-details";
 import { t } from "i18next";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 type FamilyManagementProps = ModalVisibilityProps & {
     onShowPlanSelector: () => void;
@@ -65,7 +65,6 @@ export const FamilyManagement: React.FC<FamilyManagementProps> = ({
     const { onGenericError, showMiniDialog } = useBaseContext();
     const userDetails = useUserDetailsSnapshot();
     const fullScreen = useIsSmallWidth();
-    const [loading, setLoading] = useState(false);
     const [inviteOpen, setInviteOpen] = useState(false);
     const [selectedMember, setSelectedMember] = useState<FamilyMember>();
     const [editingMember, setEditingMember] = useState<FamilyMember>();
@@ -73,25 +72,21 @@ export const FamilyManagement: React.FC<FamilyManagementProps> = ({
 
     useEffect(() => {
         if (!open) return;
-        setLoading(true);
-        void pullUserDetails()
-            .catch(onGenericError)
-            .finally(() => setLoading(false));
+        void pullUserDetails().catch(onGenericError);
     }, [onGenericError, open]);
 
-    const members = useMemo(() => {
-        const currentEmail = userDetails?.email.toLowerCase();
-        return [...(userDetails?.familyData?.members ?? [])].sort((a, b) => {
-            if (a.email.toLowerCase() == currentEmail) return -1;
-            if (b.email.toLowerCase() == currentEmail) return 1;
+    const members = [...(userDetails?.familyData?.members ?? [])].sort(
+        (a, b) => {
+            if (a.status == "SELF") return -1;
+            if (b.status == "SELF") return 1;
             if (a.status == "INVITED" && b.status != "INVITED") return 1;
             if (b.status == "INVITED" && a.status != "INVITED") return -1;
             return a.email.localeCompare(b.email);
-        });
-    }, [userDetails]);
+        },
+    );
 
     const isAdmin = members.some(
-        (member) => member.isAdmin && member.email == userDetails?.email,
+        (member) => member.status == "SELF" && member.isAdmin,
     );
 
     const confirmRemove = (member: FamilyMember) => {
@@ -159,7 +154,7 @@ export const FamilyManagement: React.FC<FamilyManagementProps> = ({
                     <DialogCloseIconButton {...{ onClose }} />
                 </Stack>
                 <DialogContent sx={{ pt: 1, minHeight: 360 }}>
-                    {loading || !userDetails ? (
+                    {!userDetails ? (
                         <Stack
                             sx={{
                                 height: 300,
