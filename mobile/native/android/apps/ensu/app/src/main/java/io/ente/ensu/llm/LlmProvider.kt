@@ -66,7 +66,7 @@ class LlmProvider(
         val mmprojPath = if (imageFiles.isEmpty()) {
             null
         } else {
-            downloader.mmprojPath(target)?.absolutePath
+            downloader.mmprojPath(target.downloadTarget)
         }
         val clampedTemperature = temperature.coerceIn(0.35f, 0.7f)
 
@@ -100,10 +100,9 @@ class LlmProvider(
         withContext(ioDispatcher) {
             runCatching {
                 modelLoadMutex.withLock {
-                    if (!downloader.isDownloaded(target)) return@withLock
-                    val mmprojPath = downloader.mmprojPath(target)
-                        ?.takeIf { it.exists() }
-                        ?.absolutePath
+                    if (!downloader.isDownloaded(target.downloadTarget)) return@withLock
+                    val mmprojPath = downloader.mmprojPath(target.downloadTarget)
+                        ?.takeIf { File(it).exists() }
                         ?: return@withLock
                     ensureModelReadyLocked(target) { }
                     val context = loadedContext ?: return@withLock
@@ -187,10 +186,10 @@ class LlmProvider(
 
         unloadModel()
 
-        downloader.download(target, onProgress)
+        downloader.download(target.downloadTarget, onProgress)
 
         onProgress(DownloadProgress(100, "Loading model...", phase = DownloadPhase.Loading))
-        loadWithFallbacks(target, downloader.modelPath(target))
+        loadWithFallbacks(target, downloader.modelPath(target.downloadTarget))
         onProgress(DownloadProgress(100, "Ready", phase = DownloadPhase.Ready))
     }
 

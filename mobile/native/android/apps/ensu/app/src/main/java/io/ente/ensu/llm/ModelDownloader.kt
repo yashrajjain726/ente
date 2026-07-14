@@ -3,12 +3,11 @@ package io.ente.ensu.llm
 import android.content.Context
 import android.os.Environment
 import android.util.Log
-import io.ente.ensu.bindings.LlmModelDownloadCallback
-import io.ente.ensu.bindings.LlmModelDownloadProgress
-import io.ente.ensu.bindings.ModelDownloader as RustModelDownloader
-import io.ente.ensu.bindings.ModelTarget as RustModelTarget
+import io.ente.ensu.bindings.ModelDownloadCallback
+import io.ente.ensu.bindings.ModelDownloadProgress
+import io.ente.ensu.bindings.ModelDownloadCore
+import io.ente.ensu.bindings.ModelDownloadTarget
 import io.ente.ensu.bindings.uniffiEnsureInitialized
-import io.ente.ensu.format.formatBytes
 import java.io.File
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
@@ -17,114 +16,58 @@ import kotlinx.coroutines.withContext
 
 class ModelDownloader(context: Context) {
     private val appContext = context.applicationContext
-    private val rust: RustModelDownloader
+    private val core: ModelDownloadCore
 
     init {
         uniffiEnsureInitialized()
-        rust = RustModelDownloader(
+        ModelDownloadJobService.attach(appContext)
+        core = ModelDownloadCore(
             File(appContext.noBackupFilesDir, "models").absolutePath,
             appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
                 ?.let { File(it, "llm").absolutePath }
         )
     }
 
-    val isDownloadActive: Boolean get() = rust.isDownloadActive()
+    val isDownloadActive: Boolean get() = core.isDownloadActive()
 
-    fun modelPath(target: LlmModelTarget): File = File(rust.modelPath(target.toRust()))
+    fun modelPath(target: ModelDownloadTarget): File = File(core.modelPath(target))
 
-    fun mmprojPath(target: LlmModelTarget): File? = rust.mmprojPath(target.toRust())?.let(::File)
+    fun mmprojPath(target: ModelDownloadTarget): String? = core.mmprojPath(target)
 
-    fun isDownloaded(target: LlmModelTarget): Boolean = rust.isDownloaded(target.toRust())
+    fun isDownloaded(target: ModelDownloadTarget): Boolean = core.isDownloaded(target)
 
-    fun cancel() = rust.cancel()
+    fun cancel() = core.cancel()
 
     fun migrate() {
         File(appContext.filesDir, "llm").deleteRecursively()
-        rust.migrate()
+        core.migrate()
     }
 
-    suspend fun estimateDownloadSize(target: LlmModelTarget): Long? = withContext(Dispatchers.IO) {
-        rust.estimatedDownloadSize(target.toRust())
+    suspend fun estimateDownloadSize(target: ModelDownloadTarget): Long? = withContext(Dispatchers.IO) {
+        core.estimatedDownloadSize(target)
     }
 
-    suspend fun download(target: LlmModelTarget, onProgress: (DownloadProgress) -> Unit) {
+    suspend fun download(target: ModelDownloadTarget, onProgress: (DownloadProgress) -> Unit) {
         val downloadJob = coroutineContext[Job]
-        val rustTarget = target.toRust()
-        rust.migrate()
-        if (rust.isDownloaded(rustTarget)) return
+        core.migrate()
+        if (core.isDownloaded(target)) return
 
-        ModelDownloadJobService.begin(appContext) { rust.cancel() }
+        ModelDownloadJobService.begin { core.cancel() }
         try {
-            rust.download(
-                rustTarget,
-                object : LlmModelDownloadCallback {
-                    override fun onProgress(progress: LlmModelDownloadProgress) {
-                        logMetrics(progress)
-                        ModelDownloadJobService.update(
-                            appContext,
-                            progress.downloadedBytes,
-                            progress.totalBytes
-                        )
-                        onProgress(progress.toDomainProgress())
+            core.download(
+                target,
+                object : ModelDownloadCallback {
+                    override fun onProgress(progress: ModelDownloadProgress) {
+                        progress.logLine?.let { Log.i("ModelDownloader", it) }
+                        ModelDownloadJobService.update(progress.percent, progress.totalBytes == null)
+                        onProgress(DownloadProgress(progress.percent, progress.status))
                     }
 
                     override fun isCancelled(): Boolean = downloadJob?.isCancelled == true
                 }
             )
         } finally {
-            ModelDownloadJobService.end(appContext)
+            ModelDownloadJobService.end()
         }
-    }
-
-    private fun LlmModelTarget.toRust() =
-        RustModelTarget(id = id, url = url, mmprojUrl = mmprojUrl)
-
-    private fun logMetrics(progress: LlmModelDownloadProgress) {
-        if (progress.fileComplete) {
-            Log.i(
-                "ModelDownloader",
-                "Model download file complete label=${progress.label} " +
-                    "bytes=${progress.fileDownloadedBytes} " +
-                    "elapsedMs=${progress.fileElapsedMs} " +
-                    "rate=${formatRate(progress.fileBytesPerSecond)} " +
-                    "retries=${progress.fileRetryCount}"
-            )
-        }
-        if (progress.complete) {
-            Log.i(
-                "ModelDownloader",
-                "Model download complete bytes=${progress.downloadedBytes} " +
-                    "elapsedMs=${progress.elapsedMs} " +
-                    "rate=${formatRate(progress.bytesPerSecond)} " +
-                    "retries=${progress.retryCount}"
-            )
-        }
-    }
-
-    private fun formatRate(bytesPerSecond: Double): String {
-        val bytes = if (bytesPerSecond.isFinite() && bytesPerSecond > 0.0) {
-            bytesPerSecond.toLong()
-        } else {
-            0L
-        }
-        return "${formatBytes(bytes)}/s"
-    }
-
-    private fun LlmModelDownloadProgress.toDomainProgress(): DownloadProgress {
-        val downloaded = downloadedBytes.coerceAtLeast(0L)
-        val total = totalBytes?.takeIf { it > 0 }
-        val percent = if (total != null) {
-            ((downloaded * 100) / total).toInt().coerceIn(0, 99)
-        } else {
-            0
-        }
-        val status = if (total != null) {
-            "Downloading... ${formatBytes(downloaded)} / ${formatBytes(total)}"
-        } else if (fileDownloadedBytes > 0) {
-            "Downloading ${label.lowercase()}... ${formatBytes(fileDownloadedBytes)}"
-        } else {
-            "Downloading ${label.lowercase()}..."
-        }
-        return DownloadProgress(percent, status)
     }
 }

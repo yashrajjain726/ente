@@ -2,32 +2,69 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::download::DownloadError;
-use crate::llm::{LlmError, LlmModelDownloadCallback};
+use crate::llm::LlmError;
 
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct ModelTarget {
-    pub id: String,
-    pub url: String,
-    pub mmproj_url: Option<String>,
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum ModelDownloadTarget {
+    Gguf {
+        id: String,
+        url: String,
+        mmproj_url: Option<String>,
+    },
 }
 
-impl From<ModelTarget> for ente_model_download::ModelTarget {
-    fn from(value: ModelTarget) -> Self {
-        Self {
-            id: value.id,
-            url: value.url,
-            mmproj_url: value.mmproj_url,
+impl From<ModelDownloadTarget> for ente_model_download::ModelDownloadTarget {
+    fn from(value: ModelDownloadTarget) -> Self {
+        match value {
+            ModelDownloadTarget::Gguf {
+                id,
+                url,
+                mmproj_url,
+            } => Self::Gguf {
+                id,
+                url,
+                mmproj_url,
+            },
         }
     }
 }
 
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ModelDownloadProgress {
+    pub downloaded_bytes: i64,
+    pub total_bytes: Option<i64>,
+    pub percent: i32,
+    pub status: String,
+    pub log_line: Option<String>,
+}
+
+impl From<ente_model_download::ModelDownloadProgress> for ModelDownloadProgress {
+    fn from(value: ente_model_download::ModelDownloadProgress) -> Self {
+        Self {
+            downloaded_bytes: i64::try_from(value.downloaded_bytes).unwrap_or(i64::MAX),
+            total_bytes: value
+                .total_bytes
+                .map(|total| i64::try_from(total).unwrap_or(i64::MAX)),
+            percent: value.percent,
+            status: value.status,
+            log_line: value.log_line,
+        }
+    }
+}
+
+#[uniffi::export(callback_interface)]
+pub trait ModelDownloadCallback: Send + Sync {
+    fn on_progress(&self, progress: ModelDownloadProgress);
+    fn is_cancelled(&self) -> bool;
+}
+
 #[derive(uniffi::Object)]
-pub struct ModelDownloader {
+pub struct ModelDownloadCore {
     inner: ente_model_download::ModelDownloader,
 }
 
 #[uniffi::export]
-impl ModelDownloader {
+impl ModelDownloadCore {
     #[uniffi::constructor]
     pub fn new(models_dir: String, legacy_dir: Option<String>) -> Arc<Self> {
         Arc::new(Self {
@@ -38,17 +75,17 @@ impl ModelDownloader {
         })
     }
 
-    pub fn model_path(&self, target: ModelTarget) -> String {
+    pub fn model_path(&self, target: ModelDownloadTarget) -> String {
         self.inner.model_path(&target.into()).display().to_string()
     }
 
-    pub fn mmproj_path(&self, target: ModelTarget) -> Option<String> {
+    pub fn mmproj_path(&self, target: ModelDownloadTarget) -> Option<String> {
         self.inner
             .mmproj_path(&target.into())
             .map(|path| path.display().to_string())
     }
 
-    pub fn is_downloaded(&self, target: ModelTarget) -> bool {
+    pub fn is_downloaded(&self, target: ModelDownloadTarget) -> bool {
         self.inner.is_downloaded(&target.into())
     }
 
@@ -56,7 +93,7 @@ impl ModelDownloader {
         self.inner.is_download_active()
     }
 
-    pub fn estimated_download_size(&self, target: ModelTarget) -> Option<i64> {
+    pub fn estimated_download_size(&self, target: ModelDownloadTarget) -> Option<i64> {
         self.inner.estimated_download_size(&target.into())
     }
 
@@ -68,16 +105,16 @@ impl ModelDownloader {
         self.inner.cancel();
     }
 
-    pub fn remove_downloaded(&self, target: ModelTarget) -> bool {
+    pub fn remove_downloaded(&self, target: ModelDownloadTarget) -> bool {
         self.inner.remove_downloaded(&target.into())
     }
 
     pub fn download(
         &self,
-        target: ModelTarget,
-        callback: Box<dyn LlmModelDownloadCallback>,
+        target: ModelDownloadTarget,
+        callback: Box<dyn ModelDownloadCallback>,
     ) -> Result<bool, LlmError> {
-        let callback: Arc<dyn LlmModelDownloadCallback> = Arc::from(callback);
+        let callback: Arc<dyn ModelDownloadCallback> = Arc::from(callback);
         let progress_callback = Arc::clone(&callback);
         let cancel_callback = Arc::clone(&callback);
         self.inner

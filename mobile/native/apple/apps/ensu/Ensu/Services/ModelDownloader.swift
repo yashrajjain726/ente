@@ -3,16 +3,18 @@ import Foundation
 
 private let logger = EnsuLogging.shared.logger("ModelDownloader")
 
-extension ModelDownloader {
-    convenience init() {
+final class ModelDownloader {
+    private let core: ModelDownloadCore
+
+    init() {
         let baseDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         let modelsDir = baseDir.appendingPathComponent("models", isDirectory: true)
-        self.init(
+        core = ModelDownloadCore(
             modelsDir: modelsDir.path,
             legacyDir: baseDir.appendingPathComponent("llm", isDirectory: true).path
         )
-        migrate()
+        core.migrate()
         var excludedDir = modelsDir
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
@@ -25,45 +27,47 @@ extension ModelDownloader {
         }
     }
 
-    func modelPath(for target: LlmModelTarget) -> URL {
-        URL(fileURLWithPath: modelPath(target: target.rustTarget))
+    func modelPath(target: ModelDownloadTarget) -> URL {
+        URL(fileURLWithPath: core.modelPath(target: target))
     }
 
-    func mmprojPath(for target: LlmModelTarget) -> URL? {
-        mmprojPath(target: target.rustTarget).map(URL.init(fileURLWithPath:))
+    func mmprojPath(target: ModelDownloadTarget) -> String? {
+        core.mmprojPath(target: target)
     }
 
-    func isDownloaded(target: LlmModelTarget) -> Bool {
-        isDownloaded(target: target.rustTarget)
+    func isDownloaded(target: ModelDownloadTarget) -> Bool {
+        core.isDownloaded(target: target)
     }
 
-    func estimatedDownloadSize(target: LlmModelTarget) async -> Int64? {
-        let rustTarget = target.rustTarget
-        return await Task.detached(priority: .utility) {
-            self.estimatedDownloadSize(target: rustTarget)
+    func removeDownloaded(target: ModelDownloadTarget) -> Bool {
+        core.removeDownloaded(target: target)
+    }
+
+    func cancel() {
+        core.cancel()
+    }
+
+    func estimateDownloadSize(target: ModelDownloadTarget) async -> Int64? {
+        await Task.detached(priority: .utility) { [core] in
+            core.estimatedDownloadSize(target: target)
         }.value
-    }
-
-    func removeDownloaded(target: LlmModelTarget) -> Bool {
-        removeDownloaded(target: target.rustTarget)
     }
 
     @discardableResult
     func download(
-        target: LlmModelTarget,
+        target: ModelDownloadTarget,
         onProgress: @escaping (DownloadProgress) -> Void
     ) async throws -> Bool {
-        let rustTarget = target.rustTarget
-        migrate()
-        if isDownloaded(target: rustTarget) {
+        core.migrate()
+        if core.isDownloaded(target: target) {
             return false
         }
 
         onProgress(DownloadProgress(percent: 0, status: "Starting download..."))
 
         if #available(iOS 26.0, *) {
-            ModelDownloadBackgroundTask.begin { [weak self] in
-                self?.cancel()
+            ModelDownloadBackgroundTask.begin { [core] in
+                core.cancel()
             }
         }
         defer {
@@ -72,99 +76,54 @@ extension ModelDownloader {
             }
         }
 
-        let downloadTask = Task.detached(priority: .utility) { [weak self] in
-            guard let self else { return }
+        let core = core
+        let downloadTask = Task.detached(priority: .utility) {
             let callback = ModelDownloadCallbackSink(
                 onProgress: { progress in
-                    logDownloadMetrics(progress)
+                    if let line = progress.logLine {
+                        logger.info(line)
+                    }
                     if #available(iOS 26.0, *) {
                         ModelDownloadBackgroundTask.update(
                             downloadedBytes: progress.downloadedBytes,
                             totalBytes: progress.totalBytes
                         )
                     }
-                    onProgress(progress.toInferenceProgress())
+                    onProgress(DownloadProgress(percent: Int(progress.percent), status: progress.status))
                 },
                 isCancelled: { Task.isCancelled }
             )
-            _ = try self.download(target: rustTarget, callback: callback)
+            _ = try core.download(target: target, callback: callback)
         }
 
         try await withTaskCancellationHandler {
             try await downloadTask.value
         } onCancel: {
-            self.cancel()
+            core.cancel()
             downloadTask.cancel()
         }
         return true
     }
 }
 
-private extension LlmModelTarget {
-    var rustTarget: ModelTarget {
-        ModelTarget(id: id, url: url, mmprojUrl: mmprojUrl)
-    }
-}
-
-private func logDownloadMetrics(_ progress: LlmModelDownloadProgress) {
-    if progress.fileComplete {
-        logger.info(
-            "Model download file complete",
-            details: "label=\(progress.label) bytes=\(progress.fileDownloadedBytes) elapsedMs=\(progress.fileElapsedMs) rate=\(formatRate(progress.fileBytesPerSecond)) retries=\(progress.fileRetryCount)"
-        )
-    }
-    if progress.complete {
-        logger.info(
-            "Model download complete",
-            details: "bytes=\(progress.downloadedBytes) elapsedMs=\(progress.elapsedMs) rate=\(formatRate(progress.bytesPerSecond)) retries=\(progress.retryCount)"
-        )
-    }
-}
-
-private func formatRate(_ bytesPerSecond: Double) -> String {
-    guard bytesPerSecond.isFinite, bytesPerSecond > 0 else {
-        return "0 B/s"
-    }
-    return "\(Int64(bytesPerSecond).formattedFileSize)/s"
-}
-
-private final class ModelDownloadCallbackSink: LlmModelDownloadCallback, @unchecked Sendable {
-    private let onProgressHandler: (LlmModelDownloadProgress) -> Void
+private final class ModelDownloadCallbackSink: ModelDownloadCallback, @unchecked Sendable {
+    private let onProgressHandler: (ModelDownloadProgress) -> Void
     private let isCancelledHandler: () -> Bool
 
     init(
-        onProgress: @escaping (LlmModelDownloadProgress) -> Void,
+        onProgress: @escaping (ModelDownloadProgress) -> Void,
         isCancelled: @escaping () -> Bool
     ) {
         self.onProgressHandler = onProgress
         self.isCancelledHandler = isCancelled
     }
 
-    func onProgress(progress: LlmModelDownloadProgress) {
+    func onProgress(progress: ModelDownloadProgress) {
         onProgressHandler(progress)
     }
 
     func isCancelled() -> Bool {
         isCancelledHandler()
-    }
-}
-
-private extension LlmModelDownloadProgress {
-    func toInferenceProgress() -> DownloadProgress {
-        let total = totalBytes.flatMap { $0 > 0 ? $0 : nil }
-        let percent: Int
-        let status: String
-        if let total {
-            percent = min(99, max(0, Int((Double(downloadedBytes) / Double(total)) * 100.0)))
-            status = "Downloading... \(downloadedBytes.formattedFileSize) / \(total.formattedFileSize)"
-        } else if fileDownloadedBytes > 0 {
-            percent = 0
-            status = "Downloading \(label.lowercased())... \(fileDownloadedBytes.formattedFileSize)"
-        } else {
-            percent = 0
-            status = "Downloading \(label.lowercased())..."
-        }
-        return DownloadProgress(percent: percent, status: status)
     }
 }
 

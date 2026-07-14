@@ -50,28 +50,33 @@ class ModelDownloadJobService : JobService() {
         private const val NOTIFY_INTERVAL_MS = 1000L
 
         private val lock = Any()
+        private lateinit var appContext: Context
         private var onCancel: (() -> Unit)? = null
         private var downloadActive = false
         private var lastNotifyMs = 0L
         private var runningJob: ModelDownloadJobService? = null
         private var runningParams: JobParameters? = null
 
-        fun begin(context: Context, onCancelled: () -> Unit) {
+        fun attach(context: Context) {
+            appContext = context.applicationContext
+        }
+
+        fun begin(onCancelled: () -> Unit) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
             synchronized(lock) {
                 onCancel = onCancelled
                 downloadActive = true
                 lastNotifyMs = 0L
             }
-            val scheduler = context.getSystemService(JobScheduler::class.java) ?: return
-            val job = JobInfo.Builder(JOB_ID, ComponentName(context, ModelDownloadJobService::class.java))
+            val scheduler = appContext.getSystemService(JobScheduler::class.java) ?: return
+            val job = JobInfo.Builder(JOB_ID, ComponentName(appContext, ModelDownloadJobService::class.java))
                 .setUserInitiated(true)
                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
                 .build()
             runCatching { scheduler.schedule(job) }
         }
 
-        fun update(context: Context, downloadedBytes: Long, totalBytes: Long?) {
+        fun update(percent: Int, indeterminate: Boolean) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
             val job: ModelDownloadJobService
             val params: JobParameters
@@ -83,17 +88,15 @@ class ModelDownloadJobService : JobService() {
                 if (now - lastNotifyMs < NOTIFY_INTERVAL_MS) return
                 lastNotifyMs = now
             }
-            val percent = totalBytes?.takeIf { it > 0 }
-                ?.let { ((downloadedBytes * 100) / it).toInt().coerceIn(0, 100) }
             job.setNotification(
                 params,
                 NOTIFICATION_ID,
-                buildNotification(context, percent ?: 0, percent == null),
+                buildNotification(appContext, percent, indeterminate),
                 JOB_END_NOTIFICATION_POLICY_REMOVE
             )
         }
 
-        fun end(context: Context) {
+        fun end() {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
             val job: ModelDownloadJobService?
             val params: JobParameters?
@@ -108,7 +111,7 @@ class ModelDownloadJobService : JobService() {
             if (job != null && params != null) {
                 job.jobFinished(params, false)
             } else {
-                context.getSystemService(JobScheduler::class.java)?.cancel(JOB_ID)
+                appContext.getSystemService(JobScheduler::class.java)?.cancel(JOB_ID)
             }
         }
 

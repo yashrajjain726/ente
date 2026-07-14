@@ -1,6 +1,6 @@
 package io.ente.ensu.llm
 
-
+import io.ente.ensu.bindings.ModelDownloadTarget
 
 data class LlmModelTarget(
     val id: String,
@@ -8,7 +8,10 @@ data class LlmModelTarget(
     val mmprojUrl: String? = null,
     val contextLength: Int? = null,
     val maxTokens: Int? = null
-)
+) {
+    val downloadTarget: ModelDownloadTarget
+        get() = ModelDownloadTarget.Gguf(id = id, url = url, mmprojUrl = mmprojUrl)
+}
 
 data class DownloadProgress(
     val percent: Int?,

@@ -80,7 +80,7 @@ internal class ModelSettingsActions(
             return
         }
         val target = resolveTarget(state.value.modelSettings)
-        val isDownloaded = modelDownloader.isDownloaded(target)
+        val isDownloaded = modelDownloader.isDownloaded(target.downloadTarget)
         if (isDownloaded) {
             persistModelDownloadRequested(false)
         }
@@ -117,7 +117,7 @@ internal class ModelSettingsActions(
                 }
             }
 
-            val size = modelDownloader.estimateDownloadSize(target)
+            val size = modelDownloader.estimateDownloadSize(target.downloadTarget)
             state.update { appState ->
                 appState.copy(
                     chat = appState.chat.copy(
@@ -137,7 +137,7 @@ internal class ModelSettingsActions(
         if (!userInitiated && !currentState.chat.hasRequestedModelDownload) return
 
         val target = resolveTarget(currentState.modelSettings)
-        val isDownloaded = modelDownloader.isDownloaded(target)
+        val isDownloaded = modelDownloader.isDownloaded(target.downloadTarget)
         if (isDownloaded) {
             state.update { appState ->
                 appState.copy(
@@ -263,7 +263,7 @@ internal class ModelSettingsActions(
         if (!currentState.chat.deviceCapability.isChatSupported()) return
 
         val target = resolveTarget(currentState.modelSettings)
-        if (!modelDownloader.isDownloaded(target)) return
+        if (!modelDownloader.isDownloaded(target.downloadTarget)) return
 
         scope.launch {
             try {

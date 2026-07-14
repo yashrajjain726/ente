@@ -6,6 +6,10 @@ struct LlmModelTarget: Equatable {
     let mmprojUrl: String?
     let contextLength: Int?
     let maxTokens: Int?
+
+    var downloadTarget: ModelDownloadTarget {
+        .gguf(id: id, url: url, mmprojUrl: mmprojUrl)
+    }
 }
 
 struct DownloadProgress: Equatable {
@@ -149,13 +153,13 @@ final class LlmProvider {
             backendInitialized = true
         }
 
-        let downloaded = try await downloader.download(target: target, onProgress: onProgress)
+        let downloaded = try await downloader.download(target: target.downloadTarget, onProgress: onProgress)
 
         onProgress(DownloadProgress(percent: 100, status: "Loading model...", phase: .loading))
         do {
-            try loadModel(target: target, modelPath: downloader.modelPath(for: target))
+            try loadModel(target: target, modelPath: downloader.modelPath(target: target.downloadTarget))
         } catch {
-            if allowRecovery, !downloaded, downloader.removeDownloaded(target: target) {
+            if allowRecovery, !downloaded, downloader.removeDownloaded(target: target.downloadTarget) {
                 onProgress(DownloadProgress(percent: 0, status: "Starting download..."))
                 try await ensureModelReadyLocked(target: target, onProgress: onProgress, allowRecovery: false)
                 return
@@ -186,7 +190,7 @@ final class LlmProvider {
             LlmChatMessage(role: $0.role.roleString, content: $0.text)
         }
 
-        let mmprojPath = imageFiles.isEmpty ? nil : downloader.mmprojPath(for: target)?.path
+        let mmprojPath = imageFiles.isEmpty ? nil : downloader.mmprojPath(target: target.downloadTarget)
         let clampedTemperature = min(max(temperature, 0.35), 0.7)
 
         let request = LlmChatRequest(
@@ -247,15 +251,15 @@ final class LlmProvider {
     }
 
     func prewarmImageInference(target: LlmModelTarget) async {
-        guard downloader.isDownloaded(target: target) else { return }
+        guard downloader.isDownloaded(target: target.downloadTarget) else { return }
 
         do {
             try await Task.detached(priority: .utility) { [weak self] in
                 guard let self else { return }
                 try await self.modelLoadGate.withLock {
-                    guard self.downloader.isDownloaded(target: target) else { return }
-                    guard let mmprojPath = self.downloader.mmprojPath(for: target),
-                          FileManager.default.fileExists(atPath: mmprojPath.path) else {
+                    guard self.downloader.isDownloaded(target: target.downloadTarget) else { return }
+                    guard let mmprojPath = self.downloader.mmprojPath(target: target.downloadTarget),
+                          FileManager.default.fileExists(atPath: mmprojPath) else {
                         return
                     }
 
@@ -266,7 +270,7 @@ final class LlmProvider {
 
                     self.unloadTranscriptionModelIfLoaded()
                     try context.prewarmMultimodal(
-                        mmprojPath: mmprojPath.path,
+                        mmprojPath: mmprojPath,
                         mediaMarker: nil
                         )
                 }

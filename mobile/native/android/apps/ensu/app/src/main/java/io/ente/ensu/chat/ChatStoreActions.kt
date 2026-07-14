@@ -779,7 +779,7 @@ internal class ChatStoreActions(
         if (!state.value.chat.deviceCapability.isChatSupported()) {
             return sessionTitleFromText(fallback, fallback = fallback)
         }
-        if (!modelDownloader.isDownloaded(target)) {
+        if (!modelDownloader.isDownloaded(target.downloadTarget)) {
             return sessionTitleFromText(fallback, fallback = fallback)
         }
         val cleanedInput = sanitizeTitleText(input)

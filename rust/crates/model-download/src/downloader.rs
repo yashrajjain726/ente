@@ -4,17 +4,27 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use sha2::{Digest, Sha256};
 use tokio::runtime::Builder;
 
 use crate::download::{self, Progress, Target};
 use crate::gguf;
 
 #[derive(Debug, Clone)]
-pub struct ModelTarget {
-    pub id: String,
-    pub url: String,
-    pub mmproj_url: Option<String>,
+pub enum ModelDownloadTarget {
+    Gguf {
+        id: String,
+        url: String,
+        mmproj_url: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct ModelDownloadProgress {
+    pub downloaded_bytes: u64,
+    pub total_bytes: Option<u64>,
+    pub percent: i32,
+    pub status: String,
+    pub log_line: Option<String>,
 }
 
 pub struct ModelDownloader {
@@ -38,15 +48,17 @@ impl ModelDownloader {
         }
     }
 
-    pub fn model_path(&self, target: &ModelTarget) -> PathBuf {
-        self.path_for_url(target, &target.url, "model.gguf")
+    pub fn model_path(&self, target: &ModelDownloadTarget) -> PathBuf {
+        let ModelDownloadTarget::Gguf { id, url, .. } = target;
+        gguf::model_path(&self.models_dir, id, url)
     }
 
-    pub fn mmproj_path(&self, target: &ModelTarget) -> Option<PathBuf> {
-        mmproj_url(target).map(|url| self.path_for_url(target, url, "mmproj.gguf"))
+    pub fn mmproj_path(&self, target: &ModelDownloadTarget) -> Option<PathBuf> {
+        let ModelDownloadTarget::Gguf { id, mmproj_url, .. } = target;
+        gguf::mmproj_path(&self.models_dir, id, mmproj_url.as_deref())
     }
 
-    pub fn is_downloaded(&self, target: &ModelTarget) -> bool {
+    pub fn is_downloaded(&self, target: &ModelDownloadTarget) -> bool {
         self.expected_targets(target).iter().all(|entry| {
             let path = Path::new(&entry.destination_path);
             path.exists() && gguf::looks_like_gguf(path)
@@ -61,7 +73,7 @@ impl ModelDownloader {
         self.cancelled.store(true, Ordering::SeqCst);
     }
 
-    pub fn remove_downloaded(&self, target: &ModelTarget) -> bool {
+    pub fn remove_downloaded(&self, target: &ModelDownloadTarget) -> bool {
         let mut removed = false;
         for entry in self.expected_targets(target) {
             let path = Path::new(&entry.destination_path);
@@ -77,8 +89,8 @@ impl ModelDownloader {
     /// already present.
     pub fn download(
         &self,
-        target: &ModelTarget,
-        on_progress: impl FnMut(Progress),
+        target: &ModelDownloadTarget,
+        mut on_progress: impl FnMut(ModelDownloadProgress),
         is_cancelled: impl Fn() -> bool,
     ) -> Result<bool, download::Error> {
         self.migrate();
@@ -88,14 +100,16 @@ impl ModelDownloader {
 
         self.cancelled.store(false, Ordering::SeqCst);
         self.active.store(true, Ordering::SeqCst);
-        let result = gguf::download_model_files(self.expected_targets(target), on_progress, || {
-            self.cancelled.load(Ordering::SeqCst) || is_cancelled()
-        });
+        let result = gguf::download_model_files(
+            self.expected_targets(target),
+            |progress| on_progress(display_progress(progress)),
+            || self.cancelled.load(Ordering::SeqCst) || is_cancelled(),
+        );
         self.active.store(false, Ordering::SeqCst);
         result.map(|()| true)
     }
 
-    pub fn estimated_download_size(&self, target: &ModelTarget) -> Option<i64> {
+    pub fn estimated_download_size(&self, target: &ModelDownloadTarget) -> Option<i64> {
         let runtime = Builder::new_current_thread()
             .enable_io()
             .enable_time()
@@ -170,57 +184,83 @@ impl ModelDownloader {
         }
     }
 
-    fn expected_targets(&self, target: &ModelTarget) -> Vec<Target> {
-        let mut targets = vec![Target {
-            label: "Model".to_string(),
-            url: target.url.clone(),
-            destination_path: self.model_path(target).display().to_string(),
-        }];
-        if let (Some(url), Some(path)) = (mmproj_url(target), self.mmproj_path(target)) {
-            targets.push(Target {
-                label: "Mmproj".to_string(),
-                url: url.to_string(),
-                destination_path: path.display().to_string(),
-            });
-        }
-        targets
-    }
-
-    fn path_for_url(&self, target: &ModelTarget, url: &str, fallback: &str) -> PathBuf {
-        let filename = filename_for_url(url, fallback);
-        if target.id.starts_with("custom:") {
-            self.models_dir
-                .join("custom")
-                .join(format!("{}_{filename}", sha256_hex(url)))
-        } else {
-            self.models_dir.join(filename)
-        }
+    fn expected_targets(&self, target: &ModelDownloadTarget) -> Vec<Target> {
+        let ModelDownloadTarget::Gguf {
+            id,
+            url,
+            mmproj_url,
+        } = target;
+        gguf::expected_targets(&self.models_dir, id, url, mmproj_url.as_deref())
     }
 }
 
-fn mmproj_url(target: &ModelTarget) -> Option<&str> {
-    target
-        .mmproj_url
-        .as_deref()
-        .map(str::trim)
-        .filter(|url| !url.is_empty())
-}
-
-fn filename_for_url(url: &str, fallback: &str) -> String {
-    let without_query = url.split(['?', '#']).next().unwrap_or(url);
-    let name = without_query.rsplit('/').next().unwrap_or("");
-    if name.trim().is_empty() {
-        fallback.to_string()
+fn display_progress(progress: Progress) -> ModelDownloadProgress {
+    let total = progress.total_bytes.filter(|total| *total > 0);
+    let percent = total
+        .map(|total| ((progress.downloaded_bytes * 100 / total) as i32).clamp(0, 99))
+        .unwrap_or(0);
+    let status = if let Some(total) = total {
+        format!(
+            "Downloading... {} / {}",
+            format_bytes(progress.downloaded_bytes),
+            format_bytes(total)
+        )
+    } else if progress.file_downloaded_bytes > 0 {
+        format!(
+            "Downloading {}... {}",
+            progress.label.to_lowercase(),
+            format_bytes(progress.file_downloaded_bytes)
+        )
     } else {
-        name.to_string()
+        format!("Downloading {}...", progress.label.to_lowercase())
+    };
+    let log_line = if progress.file_complete {
+        Some(format!(
+            "Model download file complete label={} bytes={} elapsedMs={} rate={}/s retries={}",
+            progress.label,
+            progress.file_downloaded_bytes,
+            progress.file_elapsed_ms,
+            format_bytes(rate_bytes(progress.file_bytes_per_second)),
+            progress.file_retry_count
+        ))
+    } else if progress.complete {
+        Some(format!(
+            "Model download complete bytes={} elapsedMs={} rate={}/s retries={}",
+            progress.downloaded_bytes,
+            progress.elapsed_ms,
+            format_bytes(rate_bytes(progress.bytes_per_second)),
+            progress.retry_count
+        ))
+    } else {
+        None
+    };
+
+    ModelDownloadProgress {
+        downloaded_bytes: progress.downloaded_bytes,
+        total_bytes: progress.total_bytes,
+        percent,
+        status,
+        log_line,
     }
 }
 
-fn sha256_hex(value: &str) -> String {
-    Sha256::digest(value.as_bytes())
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+fn rate_bytes(bytes_per_second: f64) -> u64 {
+    if bytes_per_second.is_finite() && bytes_per_second > 0.0 {
+        bytes_per_second as u64
+    } else {
+        0
+    }
+}
+
+pub fn format_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
+    let mut size = bytes as f64;
+    let mut unit = 0;
+    while size >= 1024.0 && unit < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit += 1;
+    }
+    format!("{size:.1} {}", UNITS[unit])
 }
 
 fn walk_files(dir: &Path) -> Vec<PathBuf> {
@@ -255,8 +295,8 @@ mod tests {
         dir
     }
 
-    fn target(id: &str) -> ModelTarget {
-        ModelTarget {
+    fn target(id: &str) -> ModelDownloadTarget {
+        ModelDownloadTarget::Gguf {
             id: id.to_string(),
             url: "https://example.org/models/main.gguf?download=true".to_string(),
             mmproj_url: Some("https://example.org/models/mmproj.gguf".to_string()),
@@ -366,5 +406,70 @@ mod tests {
         assert!(!legacy.exists());
 
         let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn display_progress_composes_percent_and_status() {
+        let progress = Progress {
+            label: "Model".to_string(),
+            downloaded_bytes: 512 * 1024 * 1024,
+            total_bytes: Some(2 * 1024 * 1024 * 1024),
+            file_downloaded_bytes: 512 * 1024 * 1024,
+            file_total_bytes: Some(2 * 1024 * 1024 * 1024),
+            percentage: 25.0,
+            elapsed_ms: 0,
+            bytes_per_second: 0.0,
+            file_elapsed_ms: 0,
+            file_bytes_per_second: 0.0,
+            retry_count: 0,
+            file_retry_count: 0,
+            file_complete: false,
+            complete: false,
+        };
+
+        let display = display_progress(progress);
+        assert_eq!(display.percent, 25);
+        assert_eq!(display.status, "Downloading... 512.0 MB / 2.0 GB");
+        assert_eq!(display.log_line, None);
+
+        let unknown_total = Progress {
+            total_bytes: None,
+            ..display_to_progress_stub()
+        };
+        let display = display_progress(unknown_total);
+        assert_eq!(display.percent, 0);
+        assert_eq!(display.status, "Downloading model... 100.0 B");
+
+        let file_complete = Progress {
+            file_complete: true,
+            file_bytes_per_second: 2048.0,
+            ..display_to_progress_stub()
+        };
+        let display = display_progress(file_complete);
+        assert_eq!(
+            display.log_line.as_deref(),
+            Some(
+                "Model download file complete label=Model bytes=100 elapsedMs=0 rate=2.0 KB/s retries=0"
+            )
+        );
+    }
+
+    fn display_to_progress_stub() -> Progress {
+        Progress {
+            label: "Model".to_string(),
+            downloaded_bytes: 100,
+            total_bytes: None,
+            file_downloaded_bytes: 100,
+            file_total_bytes: None,
+            percentage: 0.0,
+            elapsed_ms: 0,
+            bytes_per_second: 0.0,
+            file_elapsed_ms: 0,
+            file_bytes_per_second: 0.0,
+            retry_count: 0,
+            file_retry_count: 0,
+            file_complete: false,
+            complete: false,
+        }
     }
 }

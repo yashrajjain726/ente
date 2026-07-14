@@ -1,4 +1,3 @@
-use ente_ensu::download;
 use ente_ensu::llm;
 
 use crate::download::DownloadError;
@@ -106,24 +105,6 @@ pub struct LlmGenerationSummary {
     pub total_time_ms: Option<i64>,
 }
 
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct LlmModelDownloadProgress {
-    pub label: String,
-    pub downloaded_bytes: i64,
-    pub total_bytes: Option<i64>,
-    pub file_downloaded_bytes: i64,
-    pub file_total_bytes: Option<i64>,
-    pub percentage: f64,
-    pub elapsed_ms: i64,
-    pub bytes_per_second: f64,
-    pub file_elapsed_ms: i64,
-    pub file_bytes_per_second: f64,
-    pub retry_count: i32,
-    pub file_retry_count: i32,
-    pub file_complete: bool,
-    pub complete: bool,
-}
-
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum LlmGenerationEvent {
     Text {
@@ -190,12 +171,6 @@ pub trait LlmGenerationEventCallback: Send + Sync {
     fn on_event(&self, event: LlmGenerationEvent);
 }
 
-#[uniffi::export(callback_interface)]
-pub trait LlmModelDownloadCallback: Send + Sync {
-    fn on_progress(&self, progress: LlmModelDownloadProgress);
-    fn is_cancelled(&self) -> bool;
-}
-
 impl From<LlmModelLoadParams> for llm::ModelLoadParams {
     fn from(value: LlmModelLoadParams) -> Self {
         Self {
@@ -260,27 +235,6 @@ impl From<llm::GenerationSummary> for LlmGenerationSummary {
     }
 }
 
-impl From<download::Progress> for LlmModelDownloadProgress {
-    fn from(value: download::Progress) -> Self {
-        Self {
-            label: value.label,
-            downloaded_bytes: u64_to_i64(value.downloaded_bytes),
-            total_bytes: value.total_bytes.map(u64_to_i64),
-            file_downloaded_bytes: u64_to_i64(value.file_downloaded_bytes),
-            file_total_bytes: value.file_total_bytes.map(u64_to_i64),
-            percentage: value.percentage,
-            elapsed_ms: u64_to_i64(value.elapsed_ms),
-            bytes_per_second: value.bytes_per_second,
-            file_elapsed_ms: u64_to_i64(value.file_elapsed_ms),
-            file_bytes_per_second: value.file_bytes_per_second,
-            retry_count: u32_to_i32(value.retry_count),
-            file_retry_count: u32_to_i32(value.file_retry_count),
-            file_complete: value.file_complete,
-            complete: value.complete,
-        }
-    }
-}
-
 impl From<llm::GenerationEvent> for LlmGenerationEvent {
     fn from(value: llm::GenerationEvent) -> Self {
         match value {
@@ -298,14 +252,6 @@ impl From<llm::GenerationEvent> for LlmGenerationEvent {
             },
         }
     }
-}
-
-fn u64_to_i64(value: u64) -> i64 {
-    i64::try_from(value).unwrap_or(i64::MAX)
-}
-
-fn u32_to_i32(value: u32) -> i32 {
-    i32::try_from(value).unwrap_or(i32::MAX)
 }
 
 struct CallbackSink {

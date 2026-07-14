@@ -459,7 +459,7 @@ final class ChatViewModel: ObservableObject {
         guard !isGenerating && !isDownloading else { return }
         guard !isChatUnsupported else { return }
         let target = modelSettings.currentTarget()
-        guard downloader.isDownloaded(target: target) else { return }
+        guard downloader.isDownloaded(target: target.downloadTarget) else { return }
 
         Task { [weak self] in
             guard let self else { return }
@@ -680,7 +680,7 @@ final class ChatViewModel: ObservableObject {
             return
         }
         let target = modelSettings.currentTarget()
-        isModelDownloaded = downloader.isDownloaded(target: target)
+        isModelDownloaded = downloader.isDownloaded(target: target.downloadTarget)
         if isModelDownloaded {
             clearDownloadProgressMemory()
             modelDownloadSizeBytes = nil
@@ -689,7 +689,7 @@ final class ChatViewModel: ObservableObject {
 
         Task { [weak self] in
             guard let self else { return }
-            let size = await downloader.estimatedDownloadSize(target: target)
+            let size = await downloader.estimateDownloadSize(target: target.downloadTarget)
             await MainActor.run {
                 guard self.modelReadyKey(for: self.modelSettings.currentTarget()) == self.modelReadyKey(for: target) else {
                     return
@@ -784,7 +784,7 @@ final class ChatViewModel: ObservableObject {
         }
 
         let target = modelSettings.currentTarget()
-        let isDownloaded = downloader.isDownloaded(target: target)
+        let isDownloaded = downloader.isDownloaded(target: target.downloadTarget)
         if isDownloaded {
             isModelDownloaded = true
             modelDownloadSizeBytes = nil
@@ -832,7 +832,7 @@ final class ChatViewModel: ObservableObject {
             return
         }
         let target = modelSettings.currentTarget()
-        let isDownloaded = downloader.isDownloaded(target: target)
+        let isDownloaded = downloader.isDownloaded(target: target.downloadTarget)
         isModelDownloaded = isDownloaded
         if !isDownloaded {
             return
@@ -991,7 +991,7 @@ final class ChatViewModel: ObservableObject {
                     downloadToast = DownloadToastState(
                         phase: .errorDownload,
                         percent: nil,
-                        status: self.userFacingModelReadyError(error, wasDownloaded: self.downloader.isDownloaded(target: target)),
+                        status: self.userFacingModelReadyError(error, wasDownloaded: self.downloader.isDownloaded(target: target.downloadTarget)),
                         offerRetryDownload: true
                     )
                     activeGenerationId = nil
