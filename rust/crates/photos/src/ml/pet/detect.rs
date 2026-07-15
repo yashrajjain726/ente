@@ -37,12 +37,21 @@ pub(crate) fn run_pet_face_detection(
     input: &YoloInput,
 ) -> MlResult<Vec<PetFaceDetection>> {
     let mut pet_face_detection = runtime.pet_face_detection_session()?;
-    let (output_shape, output_data) = onnx::run_prepared_f32(
+    onnx::with_prepared_f32_output(
         &mut pet_face_detection,
         &input.tensor,
         [1, 3, INPUT_HEIGHT as i64, INPUT_WIDTH as i64],
-    )?;
+        |output_shape, output_data| {
+            postprocess_pet_face_detections(output_shape, output_data, input)
+        },
+    )
+}
 
+fn postprocess_pet_face_detections(
+    output_shape: &[i64],
+    output_data: &[f32],
+    input: &YoloInput,
+) -> MlResult<Vec<PetFaceDetection>> {
     // Row format: [x, y, w, h, conf, lm_x1, lm_y1, lm_x2, lm_y2, lm_x3, lm_y3, cls0, cls1]
     // row_len = 4 + 1 + 6 + 2 = 13 for 2-class model
     // Use the output shape's last dimension to determine row length reliably.
@@ -158,12 +167,18 @@ pub(crate) fn run_pet_body_detection(
     input: &YoloInput,
 ) -> MlResult<Vec<PetBodyDetection>> {
     let mut body_detection = runtime.pet_body_detection_session()?;
-    let (_output_shape, output_data) = onnx::run_prepared_f32(
+    onnx::with_prepared_f32_output(
         &mut body_detection,
         &input.tensor,
         [1, 3, INPUT_HEIGHT as i64, INPUT_WIDTH as i64],
-    )?;
+        |_output_shape, output_data| postprocess_pet_body_detections(output_data, input),
+    )
+}
 
+fn postprocess_pet_body_detections(
+    output_data: &[f32],
+    input: &YoloInput,
+) -> MlResult<Vec<PetBodyDetection>> {
     // YOLOv5 output format: [x, y, w, h, obj_conf, cls0, cls1, ..., cls79]
     // Total columns: 4 + 1 + 80 = 85
     let row_len = 85usize;

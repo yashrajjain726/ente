@@ -16,12 +16,18 @@ pub(crate) fn run_face_detection(
     input: &YoloInput,
 ) -> MlResult<Vec<FaceDetection>> {
     let mut face_detection = runtime.face_detection_session()?;
-    let output_data = onnx::run_prepared_f32_data(
+    onnx::with_prepared_f32_output(
         &mut face_detection,
         &input.tensor,
         [1, 3, INPUT_HEIGHT as i64, INPUT_WIDTH as i64],
-    )?;
+        |_output_shape, output_data| postprocess_face_detections(output_data, input),
+    )
+}
 
+fn postprocess_face_detections(
+    output_data: &[f32],
+    input: &YoloInput,
+) -> MlResult<Vec<FaceDetection>> {
     let row_len = 16usize;
     if output_data.len() < row_len {
         return Err(MlError::Postprocess(

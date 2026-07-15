@@ -209,14 +209,16 @@ pub fn run_f32<const N: usize>(
     }
 }
 
-/// Run inference using a reusable, borrowed f32 input.
+/// Run inference using a reusable input and process the first output in place.
 ///
-/// Automatically uses the lazily cached FP16 representation for FP16 models.
-pub(crate) fn run_prepared_f32<const N: usize>(
+/// Native f32 output is borrowed directly from ONNX Runtime. FP16 output uses
+/// a temporary f32 conversion buffer because postprocessing operates on f32.
+pub(crate) fn with_prepared_f32_output<const N: usize, T>(
     session: &mut Session,
     input: &PreparedF32Input,
     input_shape: [i64; N],
-) -> MlResult<(Vec<i64>, Vec<f32>)> {
+    consume: impl FnOnce(&[i64], &[f32]) -> MlResult<T>,
+) -> MlResult<T> {
     let outputs = if session_expects_f16(session) {
         let input_tensor =
             TensorRef::<half::f16>::from_array_view((input_shape, input.f16_data()))?;
@@ -232,49 +234,12 @@ pub(crate) fn run_prepared_f32<const N: usize>(
     }
     let output = &outputs[0];
     if let Ok((tensor_shape, tensor_data)) = output.try_extract_tensor::<f32>() {
-        let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
-        Ok((shape, tensor_data.to_vec()))
+        consume(tensor_shape, tensor_data)
     } else {
         let (tensor_shape, tensor_data) = output.try_extract_tensor::<half::f16>()?;
-        let shape = tensor_shape.iter().copied().collect::<Vec<_>>();
         let mut data = vec![0.0; tensor_data.len()];
         tensor_data.convert_to_f32_slice(&mut data);
-        Ok((shape, data))
-    }
-}
-
-pub(crate) fn run_prepared_f32_data<const N: usize>(
-    session: &mut Session,
-    input: &PreparedF32Input,
-    input_shape: [i64; N],
-) -> MlResult<Vec<f32>> {
-    run_prepared_f32(session, input, input_shape).map(|(_, data)| data)
-}
-
-pub fn run_f32_data<const N: usize>(
-    session: &mut Session,
-    input: Vec<f32>,
-    input_shape: [i64; N],
-) -> MlResult<Vec<f32>> {
-    let outputs = if session_expects_f16(session) {
-        let f16_input = Vec::<half::f16>::from_f32_slice(&input);
-        let input_tensor = Tensor::<half::f16>::from_array((input_shape, f16_input))?;
-        session.run(ort::inputs![input_tensor])?
-    } else {
-        let input_tensor = Tensor::<f32>::from_array((input_shape, input))?;
-        session.run(ort::inputs![input_tensor])?
-    };
-    if outputs.len() == 0 {
-        return Err(MlError::Ort("missing first output tensor".to_string()));
-    }
-    let output = &outputs[0];
-    if let Ok((_tensor_shape, tensor_data)) = output.try_extract_tensor::<f32>() {
-        Ok(tensor_data.to_vec())
-    } else {
-        let (_tensor_shape, tensor_data) = output.try_extract_tensor::<half::f16>()?;
-        let mut data = vec![0.0; tensor_data.len()];
-        tensor_data.convert_to_f32_slice(&mut data);
-        Ok(data)
+        consume(tensor_shape, &data)
     }
 }
 
