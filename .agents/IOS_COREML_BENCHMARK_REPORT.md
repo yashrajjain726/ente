@@ -1,13 +1,283 @@
 # iOS CoreML Benchmark and Execution-Plan Investigation
 
-- **Investigation date:** 13 July 2026
-- **Report date:** 14 July 2026
-- **Device:** iPhone 15 Pro (`iPhone16,1`), Apple A17 Pro, iOS 26.5 (`23F77`)
+- **Initial investigation:** 13 July 2026
+- **Two-device follow-up:** 14 July 2026
+- **Devices:** iPhone 15 Pro (`iPhone16,1`, A17 Pro) and iPhone 11 Pro (`iPhone12,3`, A13), both on iOS 26.5 (`23F77`)
 - **Build mode:** Flutter profile build with release-mode Rust
-- **Code revision used for the benchmark:** `3a3ad670ec`
-- **Raw evidence:** [`infra/ml/test/out/ios_coreml_benchmark_artifacts_2026-07-13/`](infra/ml/test/out/ios_coreml_benchmark_artifacts_2026-07-13/)
+- **Follow-up base revision:** `68bd5ded13`, plus the benchmark-only instrumentation and model-transformation work listed below
+- **Original evidence:** [`infra/ml/test/out/ios_coreml_benchmark_artifacts_2026-07-13/`](infra/ml/test/out/ios_coreml_benchmark_artifacts_2026-07-13/)
+- **Follow-up evidence:** [`infra/ml/test/out/ios_coreml_strategy_2026-07-14/`](infra/ml/test/out/ios_coreml_strategy_2026-07-14/)
 
-## Technical summary
+## Final outcome after the two-device follow-up
+
+The requested architecture is viable and is now the recommended target:
+
+> Use the MLProgram format and the `ALL` compute policy for every model, allowing CoreML to choose CPU, GPU, or ANE per operation.
+
+The important qualification is that `ALL` is permission, not a hardware guarantee. On the A17 Pro, CoreML assigned every profiled operation in all three final graphs to the GPU. On the A13, it assigned MobileCLIP and MobileFaceNet to the GPU, but used a 219-GPU/109-CPU split for YOLO. No profiled operation was assigned to the ANE in these runs. That device-dependent choice is exactly why `ALL` is preferable to forcing CPU+GPU or CPU+ANE.
+
+All six requested experiments were completed:
+
+1. MLProgram `Default` and `FastPrediction` specialization were compared on both phones.
+2. The ORT-generated MobileCLIP MLProgram package was extracted, inspected, and compiled as a native-package delivery pilot.
+3. YOLO was rewritten to static batch 1 and constant-folded.
+4. MobileFaceNet's decomposed activations were replaced with native `PRelu` nodes and fixed B1, B4, B8, and B16 variants were produced.
+5. Cold conversion, warm loading, first inference, steady inference, storage, memory, power impact, thermal state, and parity were measured.
+6. The final candidates were exercised on both an iPhone 11 Pro and an iPhone 15 Pro.
+
+The final production candidate is:
+
+| Model | Recommended model | Format and policy | Specialization | Batch policy |
+|---|---|---|---|---|
+| YOLO face detector | Static `[1, 3, 640, 640]`, constant-folded ONNX | MLProgram + `ALL` | `Default` | B1 |
+| MobileCLIP | Existing fixed `[1, 3, 256, 256]` ONNX | MLProgram + `ALL` | `Default` | B1 |
+| MobileFaceNet | PReLU-rewritten, explicit-padding, static ONNX | MLProgram + `ALL` | `Default` | B1 with chunking; consider B4/B8 buckets only if production telemetry justifies them |
+
+This supersedes the initial recommendation below to keep MobileFaceNet on CPU or use a NeuralNetwork/MLProgram hybrid. The graph rewrite changed the result materially: final MobileFaceNet B1 inference is about 1.9 ms on A17 Pro and 4–5 ms on A13, and all 101 operations are assigned to the GPU on both devices.
+
+## Final model transformations
+
+### Static YOLO
+
+The original detector declared a dynamic batch and contained 587 nodes. The final candidate:
+
+- Declares input `[1, 3, 640, 640]` and output `[1, 25200, 16]`.
+- Uses ONNX Runtime basic graph optimization to constant-fold the shape graph.
+- Contains 328 nodes, with the dynamic `Shape`, `Gather`, and related batch-shape work removed.
+- Is 32,355,091 bytes, versus 30,762,872 bytes for the original. The slight size increase is acceptable and comes with a much simpler runtime graph.
+- Forms one CoreML Execution Provider partition on both phones.
+
+The old phone still assigns 109 operations to CPU. Static export makes the graph supported and predictable, but it does not make “all GPU” a portable invariant.
+
+### PReLU MobileFaceNet
+
+The original MobileFaceNet graph contained 267 nodes and represented each PReLU as an arithmetic decomposition involving `Relu`, `Abs`, `Sub`, `Mul`, and `Add`. The final graph contains 101 nodes:
+
+| Operator | Count |
+|---|---:|
+| `Conv` | 52 |
+| `PRelu` | 33 |
+| `Add` | 12 |
+| `Reshape` | 3 |
+| `Transpose` | 1 |
+
+Two details were necessary for a clean CoreML compilation:
+
+- PReLU slopes use CoreML-compatible `[channels, 1, 1]` broadcasting. A `[1, channels, 1, 1]` slope only produced partial CoreML coverage.
+- Two valid-padding convolutions that omitted an explicit ONNX `pads` attribute were rewritten with explicit zero pads. The earlier CoreML compiler failure—`Required param 'pad' is missing`—came from those convolutions, not from PReLU.
+
+The final redundant `LpNormalization` was removed because the Rust caller already L2-normalizes each returned embedding. CPU equivalence after caller normalization had a maximum absolute difference of `5.96e-8`; the largest observed cosine distance through B16 was approximately `2.98e-7`.
+
+Fixed B1, B4, B8, and B16 models were produced. Each is 5,238,749 bytes and forms one CoreML partition.
+
+## Final compute plans on both phones
+
+`ProfileComputePlan` was enabled only for placement analysis and disabled for the timing runs.
+
+| Model | A17 Pro placement | A13 placement | CoreML-supported ONNX nodes |
+|---|---:|---:|---:|
+| Static YOLO | 328 GPU | 219 GPU, 109 CPU | 328/328 on both |
+| MobileCLIP | 658 GPU | 655 printed GPU plan entries[^clip-plan] | 658/658 on both |
+| PReLU MobileFaceNet B1 | 101 GPU | 101 GPU | 101/101 on both |
+
+[^clip-plan]: ORT reported all 658 MobileCLIP nodes in the CoreML partition on A13, while Apple's printed compute plan contained 655 explicit operation-placement lines. The missing three lines appear to be fused or omitted from the textual plan; there was no CPU or ANE placement line for them.
+
+The result supports a uniform provider policy, not a uniform hardware claim. On A17 Pro, the final graphs happen to be fully GPU-placed. On A13, CoreML deliberately keeps part of YOLO on CPU. Neither device selected ANE for these graphs.
+
+## Final timing results
+
+All timings below come from real devices running the profile app, with Rust built in release mode. The timers surround only synchronous ONNX Runtime inference or session creation. Decoding, resize, preprocessing, detector postprocessing, face alignment, and caller-side embedding normalization are excluded.
+
+### Cold conversion and warm session loading
+
+“Cold” uses a new model cache and therefore includes ONNX-to-MLProgram conversion and device compilation. “Warm” is a relaunch of the same installed app using the existing compiled cache.
+
+| Device | Model | Cold session | Warm session 1 | Warm session 2 |
+|---|---|---:|---:|---:|
+| A17 Pro | Static YOLO | 372.4 ms | 58.8 ms | 57.8 ms |
+| A17 Pro | MobileCLIP | 3,609.0 ms | 560.1 ms | 565.8 ms |
+| A17 Pro | MobileFaceNet B1 | 165.5 ms | 26.5 ms | 27.6 ms |
+| A13 | Static YOLO | 1,065.1 ms | 257.2 ms | 256.7 ms |
+| A13 | MobileCLIP | 5,042.2 ms | 1,400.7 ms | 1,382.0 ms |
+| A13 | MobileFaceNet B1 | 410.5 ms | 117.3 ms | 96.8 ms |
+
+Persistent caching is effective. It removes most conversion/compilation work, especially for MobileCLIP, but does not eliminate normal CoreML/session construction or the first hardware-use warm-up.
+
+### First and steady pure inference
+
+| Device | Model | First inference per app launch | Steady result |
+|---|---|---:|---:|
+| A17 Pro | Static YOLO B1 | 49.7–51.1 ms | 18.8–19.1 ms median across the suite |
+| A17 Pro | MobileCLIP B1 | 64.0–66.0 ms | 18.24–18.30 ms median |
+| A17 Pro | MobileFaceNet physical B1 | 17.7–19.8 ms | 1.7–2.0 ms per face |
+| A17 Pro | MobileFaceNet logical B7 | — | 10.5–10.8 ms total |
+| A17 Pro | MobileFaceNet logical B10 | — | 15.0–15.2 ms total |
+| A13 | Static YOLO B1 | 161–171 ms | 97.6–99.4 ms median |
+| A13 | MobileCLIP B1 | 211–216 ms | 74.7–76.1 ms median |
+| A13 | MobileFaceNet physical B1 | 36–43 ms | 4.0–5.3 ms per face |
+| A13 | MobileFaceNet logical B7 | — | 27.6–29.8 ms total |
+| A13 | MobileFaceNet logical B10 | — | 50.5–51.0 ms total |
+
+The A13 was in the iOS `Fair` thermal state during the Instruments runs and remained `Fair` after an idle recheck; the A17 Pro stayed `Nominal`. The placement result and large MobileFaceNet improvement are robust, but the A13 absolute latency and cross-device ratios should not be treated as a thermally controlled chipset comparison.
+
+### Profiling overhead
+
+`ProfileComputePlan` is extremely intrusive for first inference. With it enabled, MobileFaceNet first inference appeared to take about 1.0 seconds on A17 Pro and 1.56 seconds on A13. With it disabled, the corresponding production-like values were about 18–20 ms and 36–43 ms. Placement evidence must therefore come from profiled runs, while performance evidence must come from unprofiled runs.
+
+## Default versus `FastPrediction`
+
+The missing MLProgram specialization experiment was run in both orders across the two phones. In the controlled A17 warm comparison on the pre-rewrite models:
+
+| Model session | `Default` | `FastPrediction` |
+|---|---:|---:|
+| YOLO | 421 ms | 409 ms |
+| MobileCLIP | 562 ms | 560 ms |
+| MobileFaceNet | 1,679 ms | 1,684 ms |
+
+Inference values and outputs were likewise indistinguishable within run noise. An apparent A13 cold-start difference disappeared when execution order was reversed, identifying device-wide warm-up/order effects rather than a specialization benefit.
+
+Recommendation: use `Default`. `FastPrediction` has not demonstrated a repeatable advantage and would add another conversion/cache dimension.
+
+## Bounded MobileFaceNet batch experiment
+
+The B1, B4, B8, and B16 variants were tested by padding a logical input to the model's physical batch and, when necessary, invoking multiple chunks. The table shows representative logical-call latency.
+
+| Device | Physical variant | One face after warm-up | Logical B7 | Logical B10 |
+|---|---:|---:|---:|---:|
+| A17 Pro | B1 | 1.7–2.0 ms | 10.8 ms | 15.0 ms |
+| A17 Pro | B4 | 3.6–3.9 ms | 7.1 ms | **10.3 ms** |
+| A17 Pro | B8 | 5.8–6.3 ms | **5.9 ms** | 12.0 ms |
+| A17 Pro | B16 | 11.3–12.2 ms | 11.5 ms | 11.4 ms |
+| A13 | B1 | 4.0–5.3 ms | 29.8 ms | 51.0 ms |
+| A13 | B4 | 10.3–13.4 ms | 23.4 ms | **44.3 ms** |
+| A13 | B8 | 18.5–26.2 ms | **20.8 ms** | 49.2 ms |
+| A13 | B16 | 34.6–59.3 ms | 41.0 ms | 43.2 ms |
+
+B8 is best for the observed seven-face case and B4 is best for the ten-face case on both devices. B16 is never the best choice. B1 is clearly best for the common one-face case and has the simplest loading, cache, and routing behavior.
+
+One A17 B4 run showed an 874 ms first-use outlier and one A13 B4 run showed a 1.38 second first-use outlier. The A17 outlier did not reproduce on an immediate clean rerun, whose first inference was 21.8 ms. The A13 outlier was not repeated, so no production startup claim should rely on its single value.
+
+Recommendation: ship B1 with chunking first. Add B4 and/or B8 buckets only if production telemetry shows enough multi-face images to justify another model, compiled cache, session, and routing policy. Do not ship B16.
+
+## Output parity
+
+Parity was checked at three levels:
+
+- The final V3 models versus the previous iOS models: 14/14 fixtures passed on both phones. Maximum face-embedding cosine distance was approximately `3.60e-7` on A13 and `6.71e-13` on A17.
+- Every B4/B8/B16 candidate versus the B1 iOS reference: all six device/variant candidates passed all 14 fixtures. Across the reported comparisons, maximum CLIP cosine distance was about `9.02e-12`, face-embedding cosine distance about `3.61e-7`, and score/landmark changes remained far below thresholds.
+- Final iOS results versus the Python reference: 13/14 fixtures passed on each phone. The only failure was MobileCLIP for `IMG_8905.CR2`; face detection and face embedding passed for that fixture. This is the pre-existing iOS-versus-Python RAW decode difference, not a model-format, graph-rewrite, or cross-device regression.
+
+The two iPhones agree extremely closely with each other. The transformed models therefore preserve the application-visible results within the existing test tolerances.
+
+## Native MobileCLIP delivery/loading pilot
+
+ORT's generated A17 MLProgram cache was extracted into a portable package and compiled on the Mac with `coremlcompiler`:
+
+| Artifact | Size |
+|---|---:|
+| Existing MobileCLIP ONNX | 143,061,211 bytes |
+| Extracted `MobileCLIP-S2.mlpackage` data | 143,308,974 bytes, about 137 MiB |
+| Device-compiled `.mlmodelc` | 162,223,783 bytes, about 155 MiB |
+| Host `coremlcompiler` compile time | 0.57 s |
+
+This proves the generated package is a valid MLProgram asset and that a package-delivery pilot is technically possible. It also exposes an important architectural boundary:
+
+- ONNX Runtime's CoreML Execution Provider takes ONNX as its model input.
+- `ModelCacheDirectory` is an internal cache of the generated `.mlpackage` and device-compiled `.mlmodelc`.
+- ORT does not provide a public API to load a CDN-delivered `.mlpackage` as an ORT model.
+
+Therefore “native MLProgram in ONNX Runtime” cannot currently mean one CDN-delivered `.mlpackage` passed to ORT. There are two real choices:
+
+1. Keep the uniform ORT path: deliver ONNX and use ORT's persistent CoreML cache.
+2. Deliver a native `.mlpackage` and add a direct CoreML backend on iOS, which is no longer the same ORT loading path.
+
+A portable `.mlpackage` may be distributed and compiled on the phone. A compiled `.mlmodelc` should not be distributed from the CDN because it is tied to CoreML/runtime/device details. The ORT-generated A13 and A17 package hashes also differed, so the runtime-generated packages should not be assumed byte-identical or deterministic even though their outputs were equivalent.
+
+The package is almost the same size as the ONNX file, so native delivery does not materially reduce download size. Its main benefit would be eliminating ORT's ONNX-to-CoreML conversion step. It would still incur device compilation and would require a separate iOS loader.
+
+## Cache and storage findings
+
+The final ORT cache contains both generated package data and compiled model data:
+
+| Model | Generated package data | Compiled data | Total ORT cache |
+|---|---:|---:|---:|
+| MobileFaceNet B1 | 5.31 MB | 5.40 MB | 10.70 MB |
+| Static YOLO | 32.49 MB | 32.50 MB | 65.00 MB |
+| MobileCLIP | 143.31 MB | 162.22 MB | 305.53 MB |
+| **Total** | **181.11 MB** | **200.12 MB** | **381.23 MB / 363.5 MiB** |
+
+The three ONNX source assets total about 180.7 MB. Keeping those sources plus the full persistent cache therefore consumes about 562 MB after first use. MobileCLIP dominates both conversion time and storage.
+
+Recommendation for the ORT architecture:
+
+- Keep a versioned `ModelCacheDirectory`; warm session loading is materially faster than cold conversion.
+- Put it in an evictable, non-backed-up cache location.
+- Key it by model SHA, ORT version, model format, compute policy, and specialization policy.
+- Establish a storage budget and cleanup policy before rollout.
+- Consider caching all three initially: YOLO and MobileFaceNet add only about 72 MB together, while their warm-load reductions are useful. If the total budget is unacceptable, MobileCLIP is both the most valuable cache and the dominant cost, so selective caching cannot make the problem small.
+
+The “optimization” is not a model mutation that can simply be generated once and served as `.mlmodelc`. The portable part can be generated up front as `.mlpackage`, but using it directly requires the separate CoreML backend described above.
+
+## Memory, power, and thermal observations
+
+Instruments captured the whole Flutter parity process while the three models and the complete fixture suite were active:
+
+| Device | Peak physical footprint | Peak resident memory | Thermal state |
+|---|---:|---:|---|
+| A17 Pro | 974 MiB | 1,004 MiB | Nominal |
+| A13 | 563 MiB | 604 MiB | Fair |
+
+These are whole-process peaks, not incremental per-model memory. They include Flutter, decoding, fixtures, preprocessing, ORT, CoreML, all loaded sessions, and Instruments overhead. Without a matched CPU/no-CoreML baseline they are upper-bound characterization, not a CoreML memory delta.
+
+The Power Profiler showed CPU and GPU activity on both phones. Its duration-weighted normalized impact values were approximately:
+
+| Device | CPU impact | GPU impact | Sample window |
+|---|---:|---:|---:|
+| A17 Pro | 10.00 | 1.20 | about 14 s |
+| A13 | 17.96 | 2.12 | about 25 s |
+
+These values are Instruments impact units, not joules. The phones were USB-connected/charging, the windows differed, the A13 was already in `Fair` thermal state, and there is no matched CPU baseline. They confirm GPU use but do not establish an energy saving or permit a fair energy comparison between devices.
+
+A production energy claim requires a separate battery-powered experiment with fixed brightness/radios, cooled devices, isolated repeated inference loops, equal-duration windows, and a CPU baseline. The current latency, placement, storage, and parity evidence is sufficient for the architectural decision; the energy numbers are not.
+
+## Final recommendation and rollout plan
+
+Proceed with one production-facing iOS policy: MLProgram + `ALL` + `Default` specialization for all three models. Use the static YOLO and PReLU/static MobileFaceNet transformations, and leave MobileCLIP's graph as-is.
+
+The rollout should be staged:
+
+1. Land the model-transformation script and reproducibly build the three production ONNX assets.
+2. Ship static MobileFaceNet B1 with chunking. Do not add B4/B8 until real face-count telemetry demonstrates a worthwhile end-to-end benefit.
+3. Enable MLProgram + `ALL` + `Default` for iOS and enable a versioned, evictable cache.
+4. Repeat the 14-fixture parity suite in CI for the final CDN assets and model hashes.
+5. Add production telemetry for session creation, first inference, steady inference, cache size/eviction, face-count distribution, and CoreML fallback/errors.
+6. Decide separately whether avoiding MobileCLIP's 3.6–5.0 second first-install conversion is worth a native CoreML backend. Do not conflate that decision with enabling the ORT CoreML EP.
+7. Before claiming an energy improvement, run the controlled battery-powered test described above on the minimum supported iPhone and an A17-class device.
+
+The architecture should not depend on all operations running on GPU. Its contract should be that CoreML owns the supported model partition and may schedule its operations on CPU, GPU, or ANE. This keeps the configuration uniform while remaining correct across hardware generations.
+
+## Follow-up raw artifact map
+
+The follow-up evidence is stored in the gitignored [`infra/ml/test/out/ios_coreml_strategy_2026-07-14/`](infra/ml/test/out/ios_coreml_strategy_2026-07-14/) directory. The concise aggregate is [`final_findings.json`](infra/ml/test/out/ios_coreml_strategy_2026-07-14/final_findings.json); [`strategy_summary.json`](infra/ml/test/out/ios_coreml_strategy_2026-07-14/strategy_summary.json) retains the detailed per-call timing data.
+
+Key locations:
+
+- Final transformed models and graph inventory: [`model_variants_v3/`](infra/ml/test/out/ios_coreml_strategy_2026-07-14/model_variants_v3/)
+- Final B1 two-device cold/warm logs, result JSON, compute plans, cache inventory, and Instruments data: [`final_b1_v3/`](infra/ml/test/out/ios_coreml_strategy_2026-07-14/final_b1_v3/)
+- B4/B8/B16 device runs and parity: [`bounded_v3/`](infra/ml/test/out/ios_coreml_strategy_2026-07-14/bounded_v3/)
+- MLProgram Default/FastPrediction runs: [`fastprediction/`](infra/ml/test/out/ios_coreml_strategy_2026-07-14/fastprediction/)
+- PReLU/padding compiler diagnosis: [`face_compile_diagnostics/`](infra/ml/test/out/ios_coreml_strategy_2026-07-14/face_compile_diagnostics/)
+- Native MobileCLIP pilot and compiler logs: [`mobileclip_native_pilot/`](infra/ml/test/out/ios_coreml_strategy_2026-07-14/mobileclip_native_pilot/)
+
+The artifact directory is approximately 281 MiB. It was pruned from approximately 1.6 GiB after analysis: duplicate pulled device caches, superseded model generations, and the reproducible host-compiled `.mlmodelc` copy were removed after their sizes and hashes were recorded. The retained bulk data is the final ONNX variants, the portable MobileCLIP `.mlpackage`, and the raw Instruments traces; logs and result JSON remain intact.
+
+The transformation can be reproduced with [`build_coreml_model_variants.py`](infra/ml/test/tools/build_coreml_model_variants.py). Benchmark-only application/Rust instrumentation remains in the working tree for review; it is not represented as a proposed production change.
+
+---
+
+## Original 13 July technical summary
+
+The remainder of this document records the first investigation. Its measurements remain useful historical evidence, but its hybrid recommendation and its statements about the old dynamic MobileFaceNet graph are superseded by the completed follow-up above.
 
 The original expectation that CoreML should be substantially faster is correct, but it depends strongly on the CoreML model format and on choosing an execution policy per model.
 
@@ -299,7 +569,7 @@ MobileCLIP is the best native-package pilot because:
 
 A native package should replace the iOS ONNX asset for that model rather than coexist permanently, otherwise the installation pays for both large representations.
 
-## Recommended implementation direction
+## Original recommended implementation direction (superseded)
 
 ### Option A: measured uniform configuration
 
@@ -349,7 +619,7 @@ This is the recommended direction, but it should be validated as a combined buil
 - Do not expect `FastPrediction` to fix dynamic batches.
 - Do not enable `RequireStaticInputShapes` until the dynamic models themselves have been re-exported with fixed or bounded shapes.
 
-## Proposed next experiments
+## Original proposed next experiments (completed above)
 
 Before making the production change, the following sequence gives the highest information value:
 
@@ -468,7 +738,7 @@ Key evidence files:
 - Parity comparison: [`parity_comparison.json`](infra/ml/test/out/ios_coreml_benchmark_artifacts_2026-07-13/parity_comparison.json).
 - On-device cache file inventory: [`device_files.json`](infra/ml/test/out/ios_coreml_benchmark_artifacts_2026-07-13/device_files.json).
 
-## Decision questions for review
+## Original decision questions (answered by the follow-up)
 
 The evidence supports discussing these concrete choices:
 
@@ -478,4 +748,4 @@ The evidence supports discussing these concrete choices:
 4. Is a native MobileCLIP package worth a separate implementation phase to reduce conversion time and duplicate storage?
 5. What minimum iOS version should the MLProgram route support, and does the app need a fallback policy for older devices?
 
-These questions can be decided independently of the temporary benchmark instrumentation; all investigation-only code was removed after the run.
+The original run removed its temporary instrumentation. The two-device follow-up instrumentation and reproducible model-transformation script remain in the working tree for review, as documented in the current artifact map above.
