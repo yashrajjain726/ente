@@ -708,7 +708,7 @@ class _HomePageState extends UploaderPageState<HomePage>
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: HomeEmptyStateWidget(
                       isLoading: _isSyncing,
-                      onSetupLegacy: () => openLegacyPage(context),
+                      onSetupLegacy: () => openLegacyFromHome(context),
                       onSaveToLocker: _openSavePage,
                     ),
                   ),
