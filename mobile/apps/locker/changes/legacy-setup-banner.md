@@ -1,1 +1,0 @@
-- Added a Legacy setup prompt to Locker.
