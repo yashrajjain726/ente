@@ -1,11 +1,14 @@
-use image::{ImageBuffer, Rgb, RgbImage};
+use image::{Rgb, RgbImage};
 
 use crate::ml::{
     error::{MlError, MlResult},
     types::{DecodedImage, PetAlignmentResult, PetFaceDetection, PetFaceResult, to_face_id},
 };
 
-use super::preprocess::{PixelCrop, resize_rgb_crop};
+use super::{
+    embed::PetFaceEmbeddingInputs,
+    preprocess::{PixelCrop, RgbCropResizer, append_imagenet_tensor},
+};
 
 const PET_FACE_CROP_SIZE: u32 = 224;
 /// Minimum eye distance in pixels below which alignment is skipped.
@@ -23,18 +26,24 @@ const CROP_EXPAND: f32 = 0.1;
 ///   3. Otherwise rotate around face center, then crop with 10% expand
 ///   4. Resize to 224×224
 ///   5. Apply ImageNet normalization (CHW)
-pub fn run_pet_face_alignment(
+pub(crate) fn run_pet_face_alignment(
     file_id: i64,
     decoded: &DecodedImage,
     detections: &[PetFaceDetection],
-) -> MlResult<(Vec<Vec<f32>>, Vec<PetFaceResult>)> {
+) -> MlResult<(PetFaceEmbeddingInputs, Vec<PetFaceResult>)> {
     let img_w = decoded.dimensions.width;
     let img_h = decoded.dimensions.height;
     let img_wf = img_w as f32;
     let img_hf = img_h as f32;
 
-    let mut aligned_inputs = Vec::with_capacity(detections.len());
+    let cat_capacity = detections
+        .iter()
+        .filter(|detection| detection.class_id == 1)
+        .count();
+    let dog_capacity = detections.len() - cat_capacity;
+    let mut aligned_inputs = PetFaceEmbeddingInputs::new(dog_capacity, cat_capacity);
     let mut face_results = Vec::with_capacity(detections.len());
+    let mut crop_resizer = RgbCropResizer::new(PET_FACE_CROP_SIZE);
 
     for detection in detections {
         // Convert relative keypoints to absolute
@@ -78,7 +87,7 @@ pub fn run_pet_face_alignment(
             if crop_w == 0 || crop_h == 0 {
                 continue;
             }
-            crop_and_resize_decoded(decoded, cx1, cy1, crop_w, crop_h)?
+            crop_and_resize_decoded(&mut crop_resizer, decoded, cx1, cy1, crop_w, crop_h)?
         } else {
             // Rotate only a padded region around the face, not the full image.
             let bw = (box_x2 - box_x1) as f32;
@@ -115,10 +124,13 @@ pub fn run_pet_face_alignment(
             if crop_w == 0 || crop_h == 0 {
                 continue;
             }
-            crop_and_resize_rgb(&rotated, nx1, ny1, crop_w, crop_h)?
+            crop_and_resize_rgb(&mut crop_resizer, &rotated, nx1, ny1, crop_w, crop_h)?
         };
 
-        let normalized = aligned_face_to_tensor(&aligned_rgb);
+        let result_index = face_results.len();
+        let batch = aligned_inputs.batch_mut(detection.class_id);
+        append_imagenet_tensor(aligned_rgb, &mut batch.input);
+        batch.indices.push(result_index);
 
         let base_id = to_face_id(file_id, detection.box_xyxy);
         let pet_face_id = format!("{base_id}_c{}", detection.class_id);
@@ -135,7 +147,6 @@ pub fn run_pet_face_alignment(
             crop_size,
         };
 
-        aligned_inputs.push(normalized);
         face_results.push(PetFaceResult {
             detection: detection.clone(),
             species: 0, // will be set after embedding
@@ -204,7 +215,14 @@ fn rotate_around_center(source: &RgbRegion<'_>, angle_rad: f64, cx: f64, cy: f64
 }
 
 /// Crop a region from an RGB image and resize to 224×224 using bilinear interpolation.
-fn crop_and_resize_rgb(source: &RgbImage, x: u32, y: u32, w: u32, h: u32) -> MlResult<RgbImage> {
+fn crop_and_resize_rgb<'a>(
+    resizer: &'a mut RgbCropResizer,
+    source: &RgbImage,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+) -> MlResult<&'a [u8]> {
     let src_w = source.width();
     let src_h = source.height();
     // Clamp crop region to source bounds to avoid edge-replication artifacts.
@@ -215,7 +233,8 @@ fn crop_and_resize_rgb(source: &RgbImage, x: u32, y: u32, w: u32, h: u32) -> MlR
             "crop_and_resize_rgb: crop region extends beyond source image".to_string(),
         ));
     }
-    resize_crop_to_image(
+    resize_crop(
+        resizer,
         source.as_raw(),
         src_w,
         src_h,
@@ -230,14 +249,16 @@ fn crop_and_resize_rgb(source: &RgbImage, x: u32, y: u32, w: u32, h: u32) -> MlR
 
 /// Crop directly from decoded image bytes and resize — avoids building a
 /// full-size RgbImage when no rotation is needed.
-fn crop_and_resize_decoded(
+fn crop_and_resize_decoded<'a>(
+    resizer: &'a mut RgbCropResizer,
     decoded: &DecodedImage,
     x: u32,
     y: u32,
     w: u32,
     h: u32,
-) -> MlResult<RgbImage> {
-    resize_crop_to_image(
+) -> MlResult<&'a [u8]> {
+    resize_crop(
+        resizer,
         &decoded.rgb,
         decoded.dimensions.width,
         decoded.dimensions.height,
@@ -250,15 +271,14 @@ fn crop_and_resize_decoded(
     )
 }
 
-fn resize_crop_to_image(
+fn resize_crop<'a>(
+    resizer: &'a mut RgbCropResizer,
     rgb: &[u8],
     source_width: u32,
     source_height: u32,
     crop: PixelCrop,
-) -> MlResult<RgbImage> {
-    let buf = resize_rgb_crop(rgb, source_width, source_height, crop, PET_FACE_CROP_SIZE)?;
-    ImageBuffer::<Rgb<u8>, _>::from_raw(PET_FACE_CROP_SIZE, PET_FACE_CROP_SIZE, buf)
-        .ok_or_else(|| MlError::Preprocess("failed to build aligned face image".to_string()))
+) -> MlResult<&'a [u8]> {
+    resizer.resize(rgb, source_width, source_height, crop)
 }
 
 /// A row-strided view into a rectangular region of the decoded RGB buffer.
@@ -307,29 +327,4 @@ impl<'a> RgbRegion<'a> {
         let pixel = ((self.y + y) as usize * self.image_width + (self.x + x) as usize) * 3;
         [self.rgb[pixel], self.rgb[pixel + 1], self.rgb[pixel + 2]]
     }
-}
-
-/// Convert an aligned pet face image to ImageNet-normalized CHW tensor.
-fn aligned_face_to_tensor(face_image: &RgbImage) -> Vec<f32> {
-    let w = face_image.width() as usize;
-    let h = face_image.height() as usize;
-    let pixel_count = w * h;
-    let mut output = vec![0.0f32; 3 * pixel_count];
-
-    const MEAN: [f32; 3] = [0.485, 0.456, 0.406];
-    const STD: [f32; 3] = [0.229, 0.224, 0.225];
-
-    let r_off = 0;
-    let g_off = pixel_count;
-    let b_off = 2 * pixel_count;
-
-    let raw = face_image.as_raw();
-    for i in 0..pixel_count {
-        let src_idx = i * 3;
-        output[r_off + i] = (raw[src_idx] as f32 / 255.0 - MEAN[0]) / STD[0];
-        output[g_off + i] = (raw[src_idx + 1] as f32 / 255.0 - MEAN[1]) / STD[1];
-        output[b_off + i] = (raw[src_idx + 2] as f32 / 255.0 - MEAN[2]) / STD[2];
-    }
-
-    output
 }

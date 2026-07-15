@@ -36,39 +36,33 @@ pub(super) struct PixelCrop {
 /// img = (img - IMAGENET_MEAN) / IMAGENET_STD
 /// img = img.transpose(2, 0, 1)  # HWC -> CHW
 /// ```
-pub fn preprocess_pet_embedding(decoded: &DecodedImage, box_xyxy: &[f32; 4]) -> MlResult<Vec<f32>> {
-    let crop = relative_crop(decoded, box_xyxy)?;
-    let resized = resize_rgb_crop(
-        &decoded.rgb,
-        decoded.dimensions.width,
-        decoded.dimensions.height,
-        crop,
-        PET_EMBED_INPUT_SIZE as u32,
-    )?;
-    let pixel_count = PET_EMBED_INPUT_SIZE * PET_EMBED_INPUT_SIZE;
-    let mut output = vec![0.0f32; 3 * pixel_count];
+pub(super) struct PetEmbeddingPreprocessor {
+    crop_resizer: RgbCropResizer,
+}
 
-    // CHW layout with ImageNet normalization
-    let r_offset = 0;
-    let g_offset = pixel_count;
-    let b_offset = 2 * pixel_count;
-
-    for y in 0..PET_EMBED_INPUT_SIZE {
-        for x in 0..PET_EMBED_INPUT_SIZE {
-            let src_idx = (y * PET_EMBED_INPUT_SIZE + x) * 3;
-            let dst_idx = y * PET_EMBED_INPUT_SIZE + x;
-
-            let r = resized[src_idx] as f32 / 255.0;
-            let g = resized[src_idx + 1] as f32 / 255.0;
-            let b = resized[src_idx + 2] as f32 / 255.0;
-
-            output[r_offset + dst_idx] = (r - IMAGENET_MEAN[0]) / IMAGENET_STD[0];
-            output[g_offset + dst_idx] = (g - IMAGENET_MEAN[1]) / IMAGENET_STD[1];
-            output[b_offset + dst_idx] = (b - IMAGENET_MEAN[2]) / IMAGENET_STD[2];
+impl PetEmbeddingPreprocessor {
+    pub(super) fn new() -> Self {
+        Self {
+            crop_resizer: RgbCropResizer::new(PET_EMBED_INPUT_SIZE as u32),
         }
     }
 
-    Ok(output)
+    pub(super) fn append(
+        &mut self,
+        decoded: &DecodedImage,
+        box_xyxy: &[f32; 4],
+        output: &mut Vec<f32>,
+    ) -> MlResult<()> {
+        let crop = relative_crop(decoded, box_xyxy)?;
+        let resized = self.crop_resizer.resize(
+            &decoded.rgb,
+            decoded.dimensions.width,
+            decoded.dimensions.height,
+            crop,
+        )?;
+        append_imagenet_tensor(resized, output);
+        Ok(())
+    }
 }
 
 fn relative_crop(decoded: &DecodedImage, box_xyxy: &[f32; 4]) -> MlResult<PixelCrop> {
@@ -105,43 +99,74 @@ fn relative_crop(decoded: &DecodedImage, box_xyxy: &[f32; 4]) -> MlResult<PixelC
     })
 }
 
-/// Resize a rectangular view of an RGB buffer without materializing the crop.
-pub(super) fn resize_rgb_crop(
-    rgb: &[u8],
-    source_width: u32,
-    source_height: u32,
-    crop: PixelCrop,
-    output_size: u32,
-) -> MlResult<Vec<u8>> {
-    if crop.width == 0 || crop.height == 0 {
-        return Err(MlError::Preprocess(
-            "crop dimensions cannot be zero".to_string(),
-        ));
-    }
-    if crop.x > source_width.saturating_sub(crop.width)
-        || crop.y > source_height.saturating_sub(crop.height)
-    {
-        return Err(MlError::Preprocess(
-            "crop region extends beyond source image".to_string(),
-        ));
+/// Resizes row-strided crop views while retaining FIR's internal workspace.
+pub(super) struct RgbCropResizer {
+    resizer: Resizer,
+    resized: FirImage<'static>,
+    options: ResizeOptions,
+}
+
+impl RgbCropResizer {
+    pub(super) fn new(output_size: u32) -> Self {
+        Self {
+            resizer: Resizer::new(),
+            resized: FirImage::new(output_size, output_size, PixelType::U8x3),
+            options: ResizeOptions::new()
+                .resize_alg(ResizeAlg::Interpolation(FilterType::Bilinear)),
+        }
     }
 
-    let source = FirImageRef::new(source_width, source_height, rgb, PixelType::U8x3)
-        .map_err(|e| MlError::Preprocess(format!("failed to create FIR source image: {e}")))?;
-    let source = CroppedImage::new(&source, crop.x, crop.y, crop.width, crop.height)
-        .map_err(|e| MlError::Preprocess(format!("failed to create FIR crop view: {e}")))?;
-    let mut resized = FirImage::new(output_size, output_size, PixelType::U8x3);
-    let options = ResizeOptions::new().resize_alg(ResizeAlg::Interpolation(FilterType::Bilinear));
-    Resizer::new()
-        .resize(&source, &mut resized, Some(&options))
-        .map_err(|e| MlError::Preprocess(format!("failed to resize RGB crop: {e}")))?;
+    pub(super) fn resize(
+        &mut self,
+        rgb: &[u8],
+        source_width: u32,
+        source_height: u32,
+        crop: PixelCrop,
+    ) -> MlResult<&[u8]> {
+        if crop.width == 0 || crop.height == 0 {
+            return Err(MlError::Preprocess(
+                "crop dimensions cannot be zero".to_string(),
+            ));
+        }
+        if crop.x > source_width.saturating_sub(crop.width)
+            || crop.y > source_height.saturating_sub(crop.height)
+        {
+            return Err(MlError::Preprocess(
+                "crop region extends beyond source image".to_string(),
+            ));
+        }
 
-    Ok(resized.into_vec())
+        let source = FirImageRef::new(source_width, source_height, rgb, PixelType::U8x3)
+            .map_err(|e| MlError::Preprocess(format!("failed to create FIR source image: {e}")))?;
+        let source = CroppedImage::new(&source, crop.x, crop.y, crop.width, crop.height)
+            .map_err(|e| MlError::Preprocess(format!("failed to create FIR crop view: {e}")))?;
+        self.resizer
+            .resize(&source, &mut self.resized, Some(&self.options))
+            .map_err(|e| MlError::Preprocess(format!("failed to resize RGB crop: {e}")))?;
+
+        Ok(self.resized.buffer())
+    }
+}
+
+pub(super) fn append_imagenet_tensor(resized: &[u8], output: &mut Vec<f32>) {
+    let pixel_count = PET_EMBED_INPUT_SIZE * PET_EMBED_INPUT_SIZE;
+    let start = output.len();
+    output.resize(start + 3 * pixel_count, 0.0);
+    let tensor = &mut output[start..];
+
+    for index in 0..pixel_count {
+        let source = index * 3;
+        tensor[index] = (resized[source] as f32 / 255.0 - IMAGENET_MEAN[0]) / IMAGENET_STD[0];
+        tensor[pixel_count + index] =
+            (resized[source + 1] as f32 / 255.0 - IMAGENET_MEAN[1]) / IMAGENET_STD[1];
+        tensor[2 * pixel_count + index] =
+            (resized[source + 2] as f32 / 255.0 - IMAGENET_MEAN[2]) / IMAGENET_STD[2];
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{PixelCrop, resize_rgb_crop};
+    use super::{PixelCrop, RgbCropResizer};
 
     #[test]
     fn cropped_view_resize_matches_a_materialized_crop() {
@@ -157,7 +182,10 @@ mod tests {
             height: 3,
         };
 
-        let direct = resize_rgb_crop(&rgb, width, height, crop, 7).unwrap();
+        let direct = RgbCropResizer::new(7)
+            .resize(&rgb, width, height, crop)
+            .unwrap()
+            .to_vec();
 
         let mut materialized = Vec::new();
         for row in crop.y..crop.y + crop.height {
@@ -165,19 +193,20 @@ mod tests {
             let end = start + (crop.width * 3) as usize;
             materialized.extend_from_slice(&rgb[start..end]);
         }
-        let baseline = resize_rgb_crop(
-            &materialized,
-            crop.width,
-            crop.height,
-            PixelCrop {
-                x: 0,
-                y: 0,
-                width: crop.width,
-                height: crop.height,
-            },
-            7,
-        )
-        .unwrap();
+        let baseline = RgbCropResizer::new(7)
+            .resize(
+                &materialized,
+                crop.width,
+                crop.height,
+                PixelCrop {
+                    x: 0,
+                    y: 0,
+                    width: crop.width,
+                    height: crop.height,
+                },
+            )
+            .unwrap()
+            .to_vec();
 
         assert_eq!(direct, baseline);
     }

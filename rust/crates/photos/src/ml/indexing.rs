@@ -110,7 +110,7 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
             let pet_face_results = if !pet_face_detections.is_empty() {
                 let (aligned, mut pet_results) =
                     run_pet_face_alignment(file_id, &decoded, &pet_face_detections)?;
-                run_pet_face_embedding(runtime, &aligned, &mut pet_results)?;
+                run_pet_face_embedding(runtime, aligned, &mut pet_results)?;
                 pet_results
             } else {
                 Vec::new()
