@@ -190,45 +190,24 @@ class _UserAvatarWidgetState extends State<UserAvatarWidget> {
                     )
                   : _FirstLetterCircularAvatar(
                       user: widget.user,
-                      currentUserID: widget.currentUserID,
-                      thumbnailView: widget.thumbnailView,
                       type: widget.type,
                     ),
             ),
           )
-        : _FirstLetterCircularAvatar(
-            user: widget.user,
-            currentUserID: widget.currentUserID,
-            thumbnailView: widget.thumbnailView,
-            type: widget.type,
-          );
+        : _FirstLetterCircularAvatar(user: widget.user, type: widget.type);
   }
 }
 
-class _FirstLetterCircularAvatar extends StatefulWidget {
+class _FirstLetterCircularAvatar extends StatelessWidget {
   final User user;
-  final int currentUserID;
-  final bool thumbnailView;
   final AvatarType type;
-  const _FirstLetterCircularAvatar({
-    required this.user,
-    required this.currentUserID,
-    required this.thumbnailView,
-    required this.type,
-  });
+  const _FirstLetterCircularAvatar({required this.user, required this.type});
 
-  @override
-  State<_FirstLetterCircularAvatar> createState() =>
-      _FirstLetterCircularAvatarState();
-}
-
-class _FirstLetterCircularAvatarState
-    extends State<_FirstLetterCircularAvatar> {
   @override
   Widget build(BuildContext context) {
-    final identity = getUserAvatarIdentity(widget.user);
+    final identity = getUserAvatarIdentity(user);
 
-    final avatarStyle = getAvatarStyle(context, widget.type);
+    final avatarStyle = getAvatarStyle(context, type);
     final double size = avatarStyle.item1;
     final TextStyle textStyle = avatarStyle.item2;
     return SizedBox(
@@ -284,32 +263,9 @@ double getAvatarSize(AvatarType type) {
   }
 }
 
-class FirstLetterUserAvatar extends StatefulWidget {
+class FirstLetterUserAvatar extends StatelessWidget {
   final User user;
   const FirstLetterUserAvatar(this.user, {super.key});
-
-  @override
-  State<FirstLetterUserAvatar> createState() => _FirstLetterUserAvatarState();
-}
-
-class _FirstLetterUserAvatarState extends State<FirstLetterUserAvatar> {
-  late User user;
-
-  @override
-  void initState() {
-    super.initState();
-    user = widget.user;
-  }
-
-  @override
-  void didUpdateWidget(covariant FirstLetterUserAvatar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.user != widget.user) {
-      setState(() {
-        user = widget.user;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
