@@ -372,8 +372,9 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
         return;
       }
       final size = MediaQuery.sizeOf(context);
+      final ShareResult result;
       try {
-        await SharePlus.instance.share(
+        result = await SharePlus.instance.share(
           ShareParams(
             files: [XFile.fromData(bytes, mimeType: "application/pdf")],
             fileNameOverrides: ["${_fileNameForPart(part)}.pdf"],
@@ -386,7 +387,7 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
         }
         return;
       }
-      if (!mounted) {
+      if (result.status == ShareResultStatus.dismissed || !mounted) {
         return;
       }
       setState(() {
