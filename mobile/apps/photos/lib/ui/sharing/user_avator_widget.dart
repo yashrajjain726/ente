@@ -23,10 +23,9 @@ Color getUserAvatarColor(BuildContext context, User user) {
 }
 
 AvatarIdentity getUserAvatarIdentity(User user) {
-  final resolvedEmail = resolveKnownEmail(user);
   return AvatarIdentity.account(
     label: resolveDisplayName(user),
-    email: resolvedEmail,
+    email: resolveKnownEmail(user) ?? user.email,
     userID: user.id,
     currentUserEmail: Configuration.instance.getEmail(),
   );
