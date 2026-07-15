@@ -25,6 +25,7 @@ const (
 // Controller exposes functions to interact with family module
 type Controller struct {
 	BillingCtrl     *controller.BillingController
+	UserLookup      controller.UserLookup
 	UserRepo        *repo.UserRepository
 	FamilyRepo      *repo.FamilyRepository
 	UserCacheCtrl   *usercache.Controller

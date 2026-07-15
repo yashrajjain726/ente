@@ -41,6 +41,7 @@ type UserController struct {
 	TwoFactorRecoveryRepo   *two_factor_recovery.Repository
 	UsageRepo               *repo.UsageRepository
 	UserAuthRepo            *repo.UserAuthRepository
+	UserLookup              controller.UserLookup
 	TwoFactorRepo           *repo.TwoFactorRepository
 	PasskeyRepo             *passkey.Repository
 	StorageBonusRepo        *storageBonusRepo.Repository
@@ -131,6 +132,7 @@ func NewUserController(
 	billingController *controller.BillingController,
 	familyController *family.Controller,
 	discordController *discord.DiscordController,
+	userLookup controller.UserLookup,
 	mailingListsController *controller.MailingListsController,
 	pushController *controller.PushController,
 	userCache *cache2.UserCache,
@@ -145,6 +147,7 @@ func NewUserController(
 		UsageRepo:               usageRepo,
 		TwoFactorRecoveryRepo:   twoFactorRecoveryRepo,
 		UserAuthRepo:            userAuthRepo,
+		UserLookup:              userLookup,
 		StorageBonusRepo:        storageBonusRepo,
 		TwoFactorRepo:           twoFactorRepo,
 		AuthenticatorRepo:       authenticatorRepo,
@@ -230,8 +233,8 @@ func (c *UserController) SetRecoveryKey(userID int64, request ente.SetRecoveryKe
 }
 
 // GetPublicKey returns the public key of a user
-func (c *UserController) GetPublicKey(email string) (string, error) {
-	userID, err := c.UserRepo.GetUserIDWithEmail(email)
+func (c *UserController) GetPublicKey(requesterUserID int64, email string) (string, error) {
+	userID, err := c.UserLookup.LookupUserID(requesterUserID, email)
 	if err != nil {
 		return "", stacktrace.Propagate(err, "")
 	}

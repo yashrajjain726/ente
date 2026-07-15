@@ -162,7 +162,7 @@ func (c *UserController) SendEmailOTT(context *gin.Context, email string, purpos
 }
 
 func (c *UserController) isEmailAlreadyUsed(email string) error {
-	_, err := c.UserRepo.GetUserIDWithEmail(email)
+	_, err := c.UserRepo.GetUserIDWithEmailUnrestricted(email)
 	if err == nil {
 		// email already owned by a user
 		return stacktrace.Propagate(ente.ErrPermissionDenied, "email already belongs to a user")
@@ -234,7 +234,7 @@ func (c *UserController) shouldSwallowSendOTTDisclosureError(ctx *gin.Context) b
 // getSignUpState returns the signup state for an email.
 // Signup is complete only when both email and key attributes exist.
 func (c *UserController) getSignUpState(email string) (signUpState, error) {
-	userID, err := c.UserRepo.GetUserIDWithEmail(email)
+	userID, err := c.UserRepo.GetUserIDWithEmailUnrestricted(email)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return signUpStateNoAccount, nil
 	}
@@ -340,7 +340,7 @@ func (c *UserController) ChangeEmail(ctx *gin.Context, request ente.EmailVerific
 func (c *UserController) UpdateEmail(ctx *gin.Context, userID int64, email string) error {
 	email = emailUtil.NormalizeEmail(email)
 
-	_, err := c.UserRepo.GetUserIDWithEmail(email)
+	_, err := c.UserRepo.GetUserIDWithEmailUnrestricted(email)
 	if err == nil {
 		// email already owned by a user
 		return stacktrace.Propagate(ente.ErrPermissionDenied, "")
@@ -643,7 +643,7 @@ func (c *UserController) onVerificationSuccess(context *gin.Context, email strin
 	isTwoFactorEnabled := false
 	app := auth.GetApp(context)
 
-	userID, err := c.UserRepo.GetUserIDWithEmail(email)
+	userID, err := c.UserRepo.GetUserIDWithEmailUnrestricted(email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			if viper.GetBool("internal.disable-registration") {

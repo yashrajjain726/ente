@@ -101,7 +101,7 @@ func (c *UserController) UpdateSrpAndKeyAttributes(context *gin.Context,
 }
 
 func (c *UserController) GetSRPAttributes(context *gin.Context, email string) (*ente.GetSRPAttributesResponse, error) {
-	userID, err := c.UserRepo.GetUserIDWithEmail(email)
+	userID, err := c.UserRepo.GetUserIDWithEmailUnrestricted(email)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, stacktrace.Propagate(err, "failed to get user id")

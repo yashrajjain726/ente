@@ -219,6 +219,7 @@ func main() {
 	authCache := cache.New(1*time.Minute, 15*time.Minute)
 	accessTokenCache := cache.New(1*time.Minute, 15*time.Minute)
 	discordController := discord.NewDiscordController(userRepo, hostName, environment)
+	userLookupController := controller.NewUserLookupController(userRepo, discordController)
 	rateLimiter := middleware.NewRateLimitMiddleware(discordController, 1000, 1*time.Second)
 	defer rateLimiter.Stop()
 
@@ -354,6 +355,7 @@ func main() {
 	familyController := &family.Controller{
 		FamilyRepo:      familyRepo,
 		BillingCtrl:     billingController,
+		UserLookup:      userLookupController,
 		UserRepo:        userRepo,
 		UserCacheCtrl:   userCacheCtrl,
 		UsageRepo:       usageRepo,
@@ -400,6 +402,7 @@ func main() {
 		TrashRepo:             trashRepo,
 		CastRepo:              &castDb,
 		BillingCtrl:           billingController,
+		UserLookup:            userLookupController,
 		QueueRepo:             queueRepo,
 		TaskRepo:              taskLockingRepo,
 		CollectionActionsRepo: collectionActionRepo,
@@ -437,6 +440,7 @@ func main() {
 		billingController,
 		familyController,
 		discordController,
+		userLookupController,
 		mailingListsController,
 		pushController,
 		userCache,
@@ -664,6 +668,7 @@ func main() {
 	emergencyCtrl := &emergency.Controller{
 		Repo:              emergencyContactRepository,
 		UserRepo:          userRepo,
+		UserLookup:        userLookupController,
 		UserCtrl:          userController,
 		PasskeyController: passkeyCtrl,
 		LockCtrl:          lockController,
