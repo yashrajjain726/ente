@@ -751,6 +751,9 @@ class MLService {
 
     final mlDataDB = _dbForMode(instruction.mode);
     String? pathToDeleteAfterMLProcessing;
+    // True once result or skip-marker rows are stored, meaning the file
+    // won't be retried and its cached download/export can be dropped.
+    bool indexedOrSkipped = false;
     try {
       final String filePath = await getImagePathForML(instruction.file);
       if (_shouldDeleteAfterMLProcessing(instruction.file)) {
@@ -905,6 +908,7 @@ class MLService {
         }
       }
       _logger.info("ML result for fileID ${result.fileId} stored remote+local");
+      indexedOrSkipped = true;
       return actuallyRanML;
     } catch (e, s) {
       final String format = instruction.file.displayName.split('.').last;
@@ -951,6 +955,7 @@ class MLService {
         _logger.info(
           "Stored empty ML result markers for fileID ${instruction.fileKey}: ${storedMarkers.join(', ')}",
         );
+        indexedOrSkipped = true;
         return true;
       }
       _logger.severe(
@@ -965,18 +970,20 @@ class MLService {
       }
       return false;
     } finally {
-      if (pathToDeleteAfterMLProcessing != null) {
-        try {
-          await File(pathToDeleteAfterMLProcessing).delete();
-        } catch (e, s) {
-          _logger.warning(
-            "Failed to delete origin file exported for ML at $pathToDeleteAfterMLProcessing",
-            e,
-            s,
-          );
+      if (indexedOrSkipped) {
+        if (pathToDeleteAfterMLProcessing != null) {
+          try {
+            await File(pathToDeleteAfterMLProcessing).delete();
+          } catch (e, s) {
+            _logger.warning(
+              "Failed to delete origin file exported for ML at $pathToDeleteAfterMLProcessing",
+              e,
+              s,
+            );
+          }
         }
+        await _evictRemoteCacheAfterMLProcessing(instruction.file);
       }
-      await _evictRemoteCacheAfterMLProcessing(instruction.file);
     }
   }
 
