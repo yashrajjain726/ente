@@ -326,7 +326,8 @@ impl AccountSpaceCtx {
             .json(&request)
             .send()
             .await?
-            .error_for_status()?
+            .error_for_code()
+            .await?
             .json::<SpaceKeyResponse>()
             .await?;
         self.cache_created_owned_space(SpaceKeyResponse {
@@ -382,7 +383,8 @@ impl AccountSpaceCtx {
             .json(&request)
             .send()
             .await?
-            .error_for_status()?
+            .error_for_code()
+            .await?
             .json()
             .await?;
         self.clear_owned_space_cache()?;

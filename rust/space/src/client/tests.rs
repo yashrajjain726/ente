@@ -649,6 +649,63 @@ async fn create_space_with_key_sends_encrypted_space_and_profile_payloads() {
 }
 
 #[tokio::test]
+async fn create_space_preserves_api_error_code() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let create_space = server
+        .mock("POST", "/account/space")
+        .with_status(409)
+        .with_body(json!({ "code": "CONFLICT" }).to_string())
+        .create_async()
+        .await;
+
+    let error = match ctx
+        .create_space_with_key("owner-main", &generate_key(), b"profile-json")
+        .await
+    {
+        Ok(_) => panic!("space creation should fail"),
+        Err(error) => error,
+    };
+
+    assert!(matches!(
+        error,
+        SpaceError::Http(ente_core::http::Error::Api {
+            status: 409,
+            ref code,
+            ..
+        }) if code == "CONFLICT"
+    ));
+    create_space.assert_async().await;
+}
+
+#[tokio::test]
+async fn update_space_slug_preserves_api_error_code() {
+    let mut server = Server::new_async().await;
+    let ctx = test_account_ctx(&server.url());
+    let update_slug = server
+        .mock("PUT", "/spaces/space_owner_main/slug")
+        .with_status(409)
+        .with_body(json!({ "code": "ALREADY_EXISTS" }).to_string())
+        .create_async()
+        .await;
+
+    let error = ctx
+        .update_space_slug("space_owner_main", "taken")
+        .await
+        .expect_err("slug update should fail");
+
+    assert!(matches!(
+        error,
+        SpaceError::Http(ente_core::http::Error::Api {
+            status: 409,
+            ref code,
+            ..
+        }) if code == "ALREADY_EXISTS"
+    ));
+    update_slug.assert_async().await;
+}
+
+#[tokio::test]
 async fn create_space_updates_loaded_owned_space_cache() {
     let mut server = Server::new_async().await;
     let space_root_key = generate_key();
