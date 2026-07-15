@@ -333,7 +333,7 @@ class _FamilyPlanPageState extends State<FamilyPlanPage> {
         _FamilyMembersCard(
           members: members,
           userDetails: _userDetails,
-          colorMap: colorMap,
+          memberColor: _memberColor,
           isAdminView: isAdminView,
           onMemberTap: _showMemberActions,
         ),
@@ -851,14 +851,14 @@ class _FamilyMembersCard extends StatefulWidget {
   const _FamilyMembersCard({
     required this.members,
     required this.userDetails,
-    required this.colorMap,
+    required this.memberColor,
     required this.isAdminView,
     required this.onMemberTap,
   });
 
   final List<FamilyMember> members;
   final UserDetails userDetails;
-  final Map<String, Color> colorMap;
+  final Color Function(FamilyMember) memberColor;
   final bool isAdminView;
   final ValueChanged<FamilyMember> onMemberTap;
 
@@ -991,7 +991,7 @@ class _FamilyMembersCardState extends State<_FamilyMembersCard> {
           child: _FamilyMemberListItem(
             member: member,
             currentEmail: widget.userDetails.email,
-            avatarColor: widget.colorMap[member.email]!,
+            avatarColor: widget.memberColor(member),
             isAdminView: widget.isAdminView,
             onTap: () => widget.onMemberTap(member),
             showDivider: showDivider,
