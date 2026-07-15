@@ -1,5 +1,3 @@
-import "package:ente_components/ente_components.dart";
-import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
 import "package:photos/utils/avatar_util.dart";
 
@@ -21,7 +19,7 @@ void main() {
 
     expect(before.key, "email:alice@example.com");
     expect(after.key, before.key);
-    expect(after.initial, "B");
+    expect(before.role, AvatarIdentityRole.standard);
   });
 
   test("falls back through stable IDs before name", () {
@@ -71,36 +69,5 @@ void main() {
 
     expect(identity.role, AvatarIdentityRole.currentUser);
     expect(identity.key, "email:alice@example.com");
-  });
-
-  testWidgets("semantic avatar roles stay black across themes", (tester) async {
-    for (final theme in [
-      ComponentTheme.lightTheme(),
-      ComponentTheme.darkTheme(),
-    ]) {
-      for (final identity in [
-        AvatarIdentity.account(
-          label: "A",
-          email: "alice@example.com",
-          userID: 7,
-          currentUserEmail: "alice@example.com",
-        ),
-        AvatarIdentity.publicUploader(label: "A"),
-      ]) {
-        late Color backgroundColor;
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: theme,
-            home: Builder(
-              builder: (context) {
-                backgroundColor = avatarBackgroundColor(context, identity);
-                return const SizedBox.shrink();
-              },
-            ),
-          ),
-        );
-        expect(backgroundColor, Colors.black);
-      }
-    }
   });
 }

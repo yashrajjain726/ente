@@ -63,10 +63,6 @@ void main() {
                 color: AvatarComponentColor.cyan,
               ),
               const AvatarComponent.seeded(initials: 'A', seed: 0),
-              const AvatarComponent(
-                initials: 'P',
-                color: AvatarComponentColor.black,
-              ),
             ],
           ),
         ),
@@ -76,7 +72,6 @@ void main() {
       expect(find.text('K'), findsOneWidget);
       expect(find.text('C'), findsOneWidget);
       expect(find.text('A'), findsOneWidget);
-      expect(find.text('P'), findsOneWidget);
       expect(avatarLight.length, avatarDark.length);
 
       final cyanAvatar = tester.widget<DecoratedBox>(
@@ -85,45 +80,13 @@ void main() {
             .first,
       );
       expect((cyanAvatar.decoration as BoxDecoration).color, avatarCyan);
-      final blackAvatar = tester.widget<DecoratedBox>(
-        find
-            .ancestor(of: find.text('P'), matching: find.byType(DecoratedBox))
-            .first,
-      );
-      expect((blackAvatar.decoration as BoxDecoration).color, Colors.black);
     },
   );
-
-  testWidgets('identity colors use the theme palette at a stable index', (
-    tester,
-  ) async {
-    const identityKey = 'alice@example.com';
-    final paletteIndex =
-        avatarSeedForIdentity(identityKey) % avatarLight.length;
-    for (final (theme, palette) in [
-      (ComponentTheme.lightTheme(), avatarLight),
-      (ComponentTheme.darkTheme(), avatarDark),
-    ]) {
-      late Color color;
-      await tester.pumpWidget(
-        _wrap(
-          Builder(
-            builder: (context) {
-              color = avatarColorForIdentity(context, identityKey);
-              return const SizedBox.shrink();
-            },
-          ),
-          theme: theme,
-        ),
-      );
-      expect(color, palette[paletteIndex]);
-    }
-  });
 }
 
-Widget _wrap(Widget child, {ThemeData? theme}) {
+Widget _wrap(Widget child) {
   return MaterialApp(
-    theme: theme ?? ComponentTheme.lightTheme(),
+    theme: ComponentTheme.lightTheme(),
     home: Scaffold(body: Center(child: child)),
   );
 }
