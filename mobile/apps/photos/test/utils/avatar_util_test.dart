@@ -53,4 +53,17 @@ void main() {
     expect(identity.role, AvatarIdentityRole.currentUser);
     expect(identity.key, "email:alice@example.com");
   });
+
+  test("uses the saved person ID when no account identity exists", () {
+    final identity = AvatarIdentity.account(
+      label: "Alice",
+      email: null,
+      userID: null,
+      personID: "person-1",
+      currentUserEmail: "me@example.com",
+    );
+
+    expect(identity.role, AvatarIdentityRole.standard);
+    expect(identity.key, "person:person-1");
+  });
 }

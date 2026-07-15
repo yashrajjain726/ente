@@ -22,6 +22,7 @@ class AvatarIdentity {
     required String? email,
     required int? userID,
     required String? currentUserEmail,
+    String? personID,
   }) {
     final normalizedEmail = normalizeAvatarEmail(email);
     final role =
@@ -33,6 +34,7 @@ class AvatarIdentity {
       label: label,
       email: normalizedEmail,
       userID: userID,
+      personID: personID,
       role: role,
     );
   }
