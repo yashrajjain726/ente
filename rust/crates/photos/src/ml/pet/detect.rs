@@ -1,8 +1,9 @@
 use crate::ml::{
     error::{MlError, MlResult},
-    onnx, preprocess,
+    onnx,
+    preprocess::YoloInput,
     runtime::MlRuntimeView,
-    types::{DecodedImage, PetBodyDetection, PetFaceDetection},
+    types::{PetBodyDetection, PetFaceDetection},
 };
 
 const INPUT_WIDTH: f32 = 640.0;
@@ -31,17 +32,14 @@ const COCO_DOG: u8 = 16;
 /// 3 keypoints: left_eye, right_eye, nose (6 values for coords).
 ///
 /// This mirrors `pet_pipeline/detection.py` `FaceDetector.detect()`.
-pub fn run_pet_face_detection(
+pub(crate) fn run_pet_face_detection(
     runtime: &MlRuntimeView<'_>,
-    decoded: &DecodedImage,
+    input: &YoloInput,
 ) -> MlResult<Vec<PetFaceDetection>> {
-    let (input, scaled_width, scaled_height, pad_left, pad_top) =
-        preprocess::preprocess_yolo(decoded)?;
-
     let mut pet_face_detection = runtime.pet_face_detection_session()?;
-    let (output_shape, output_data) = onnx::run_f32(
+    let (output_shape, output_data) = onnx::run_prepared_f32(
         &mut pet_face_detection,
-        input,
+        &input.tensor,
         [1, 3, INPUT_HEIGHT as i64, INPUT_WIDTH as i64],
     )?;
 
@@ -122,10 +120,10 @@ pub fn run_pet_face_detection(
         correct_for_maintained_aspect_ratio_3kp(
             &mut box_xyxy,
             &mut keypoints,
-            scaled_width,
-            scaled_height,
-            pad_left,
-            pad_top,
+            input.scaled_width,
+            input.scaled_height,
+            input.pad_left,
+            input.pad_top,
         );
 
         // For a 2-class model (row_len >= 13): row[11] = cat score,
@@ -155,17 +153,14 @@ pub fn run_pet_face_detection(
 /// Returns all qualifying detections after NMS.
 ///
 /// This mirrors `pet_pipeline/detection.py` `BodyDetector.detect()`.
-pub fn run_pet_body_detection(
+pub(crate) fn run_pet_body_detection(
     runtime: &MlRuntimeView<'_>,
-    decoded: &DecodedImage,
+    input: &YoloInput,
 ) -> MlResult<Vec<PetBodyDetection>> {
-    let (input, scaled_width, scaled_height, pad_left, pad_top) =
-        preprocess::preprocess_yolo(decoded)?;
-
     let mut body_detection = runtime.pet_body_detection_session()?;
-    let (_output_shape, output_data) = onnx::run_f32(
+    let (_output_shape, output_data) = onnx::run_prepared_f32(
         &mut body_detection,
-        input,
+        &input.tensor,
         [1, 3, INPUT_HEIGHT as i64, INPUT_WIDTH as i64],
     )?;
 
@@ -216,10 +211,10 @@ pub fn run_pet_body_detection(
 
         correct_box_for_aspect_ratio(
             &mut box_xyxy,
-            scaled_width,
-            scaled_height,
-            pad_left,
-            pad_top,
+            input.scaled_width,
+            input.scaled_height,
+            input.pad_left,
+            input.pad_top,
         );
 
         detections.push(PetBodyDetection {

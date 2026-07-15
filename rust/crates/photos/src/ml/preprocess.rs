@@ -5,6 +5,7 @@ use fast_image_resize::{
 
 use crate::ml::{
     error::{MlError, MlResult},
+    onnx::PreparedF32Input,
     types::DecodedImage,
 };
 
@@ -14,7 +15,15 @@ const CLIP_INPUT_WIDTH: usize = 256;
 const CLIP_INPUT_HEIGHT: usize = 256;
 const PAD_VALUE: f32 = 114.0;
 
-pub fn preprocess_yolo(decoded: &DecodedImage) -> MlResult<(Vec<f32>, usize, usize, usize, usize)> {
+pub(crate) struct YoloInput {
+    pub(crate) tensor: PreparedF32Input,
+    pub(crate) scaled_width: usize,
+    pub(crate) scaled_height: usize,
+    pub(crate) pad_left: usize,
+    pub(crate) pad_top: usize,
+}
+
+pub(crate) fn preprocess_yolo(decoded: &DecodedImage) -> MlResult<YoloInput> {
     if decoded.dimensions.width == 0 || decoded.dimensions.height == 0 {
         return Err(MlError::Preprocess(
             "image dimensions cannot be zero".to_string(),
@@ -66,13 +75,13 @@ pub fn preprocess_yolo(decoded: &DecodedImage) -> MlResult<(Vec<f32>, usize, usi
         }
     }
 
-    Ok((
-        output,
-        scaled_width_usize,
-        scaled_height_usize,
+    Ok(YoloInput {
+        tensor: PreparedF32Input::new(output),
+        scaled_width: scaled_width_usize,
+        scaled_height: scaled_height_usize,
         pad_left,
         pad_top,
-    ))
+    })
 }
 
 pub fn preprocess_clip(decoded: &DecodedImage) -> MlResult<Vec<f32>> {

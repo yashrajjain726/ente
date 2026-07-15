@@ -1,8 +1,9 @@
 use crate::ml::{
     error::{MlError, MlResult},
-    onnx, preprocess,
+    onnx,
+    preprocess::YoloInput,
     runtime::MlRuntimeView,
-    types::{DecodedImage, FaceDetection},
+    types::FaceDetection,
 };
 
 const INPUT_WIDTH: f32 = 640.0;
@@ -10,16 +11,14 @@ const INPUT_HEIGHT: f32 = 640.0;
 const IOU_THRESHOLD: f32 = 0.4;
 const MIN_SCORE_THRESHOLD: f32 = 0.5;
 
-pub fn run_face_detection(
+pub(crate) fn run_face_detection(
     runtime: &MlRuntimeView<'_>,
-    decoded: &DecodedImage,
+    input: &YoloInput,
 ) -> MlResult<Vec<FaceDetection>> {
-    let (input, scaled_width, scaled_height, pad_left, pad_top) =
-        preprocess::preprocess_yolo(decoded)?;
     let mut face_detection = runtime.face_detection_session()?;
-    let output_data = onnx::run_f32_data(
+    let output_data = onnx::run_prepared_f32_data(
         &mut face_detection,
-        input,
+        &input.tensor,
         [1, 3, INPUT_HEIGHT as i64, INPUT_WIDTH as i64],
     )?;
 
@@ -62,10 +61,10 @@ pub fn run_face_detection(
         correct_for_maintained_aspect_ratio(
             &mut box_xyxy,
             &mut keypoints,
-            scaled_width,
-            scaled_height,
-            pad_left,
-            pad_top,
+            input.scaled_width,
+            input.scaled_height,
+            input.pad_left,
+            input.pad_top,
         );
 
         detections.push(FaceDetection {

@@ -10,6 +10,7 @@ use crate::ml::{
         detect::{run_pet_body_detection, run_pet_face_detection},
         embed::{run_pet_body_embedding, run_pet_face_embedding},
     },
+    preprocess,
     runtime::{self, ModelPaths},
     types::{self, ClipResult, Dimensions, FaceResult, PetBodyResult, PetFaceResult},
 };
@@ -70,9 +71,17 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
     runtime::with_runtime(&model_paths, |runtime| {
         let decoded = decode_image_from_path(&image_path)?;
         let dims = decoded.dimensions.clone();
+        let detector_input = (run_faces || run_pets)
+            .then(|| preprocess::preprocess_yolo(&decoded))
+            .transpose()?;
 
         let faces = if run_faces {
-            let detections = run_face_detection(runtime, &decoded)?;
+            let detections = run_face_detection(
+                runtime,
+                detector_input
+                    .as_ref()
+                    .expect("detector input is prepared when face indexing is enabled"),
+            )?;
             if detections.is_empty() {
                 Some(Vec::new())
             } else {
@@ -92,8 +101,11 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
         };
 
         let (pet_faces, pet_bodies) = if run_pets {
-            let pet_face_detections = run_pet_face_detection(runtime, &decoded)?;
-            let body_detections = run_pet_body_detection(runtime, &decoded)?;
+            let detector_input = detector_input
+                .as_ref()
+                .expect("detector input is prepared when pet indexing is enabled");
+            let pet_face_detections = run_pet_face_detection(runtime, detector_input)?;
+            let body_detections = run_pet_body_detection(runtime, detector_input)?;
 
             let pet_face_results = if !pet_face_detections.is_empty() {
                 let (aligned, mut pet_results) =
