@@ -1,0 +1,64 @@
+{
+  "yolo_static_b1": {
+    "path": "infra/ml/playground/optimizations/models/yolov5s_face_640_640_static_b1.onnx",
+    "sha256": "e047647409403d52696035ecd445792173e50d7fbdcccac97b958a585db9aa3d",
+    "bytes": 32355091,
+    "nodes": 328,
+    "operators": {
+      "Add": 28,
+      "Concat": 21,
+      "Conv": 64,
+      "MaxPool": 4,
+      "Mul": 88,
+      "Pow": 3,
+      "Reshape": 6,
+      "Resize": 2,
+      "Sigmoid": 67,
+      "Slice": 36,
+      "Sub": 3,
+      "Transpose": 6
+    },
+    "inputs": {
+      "input": [
+        1,
+        3,
+        640,
+        640
+      ]
+    },
+    "outputs": {
+      "output": [
+        1,
+        25200,
+        16
+      ]
+    }
+  },
+  "mobilefacenet_prelu_static_b1": {
+    "path": "infra/ml/playground/optimizations/models/mobilefacenet_prelu_static_b1.onnx",
+    "sha256": "f525daf3089ec41c938a66c47cd8278c2a443f31ee2bd2dac987db531c58ccfd",
+    "bytes": 5238749,
+    "nodes": 101,
+    "operators": {
+      "Add": 12,
+      "Conv": 52,
+      "PRelu": 33,
+      "Reshape": 3,
+      "Transpose": 1
+    },
+    "inputs": {
+      "img_inputs": [
+        1,
+        112,
+        112,
+        3
+      ]
+    },
+    "outputs": {
+      "embeddings": [
+        1,
+        192
+      ]
+    }
+  }
+}
