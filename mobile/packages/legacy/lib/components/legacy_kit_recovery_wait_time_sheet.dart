@@ -57,19 +57,18 @@ class _LegacyKitRecoveryWaitSheetState
     final colors = context.componentColors;
     return BottomSheetComponent(
       title: context.strings.recoveryWaitTime,
-      isScrollable: true,
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            "How soon is account recovery possible after the legacy kit is scanned?",
+            context.strings.recoveryWaitTimeDescription,
             style: TextStyles.body.copyWith(color: colors.textLight),
           ),
           if (widget.showCancellationWarning) ...[
             const SizedBox(height: Spacing.md),
             Text(
-              "Changing this will cancel any ongoing attempts.",
+              context.strings.recoveryWaitTimeChangeWarning,
               style: TextStyles.body.copyWith(color: colors.textLight),
             ),
           ],
