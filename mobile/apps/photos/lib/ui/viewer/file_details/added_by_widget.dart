@@ -23,10 +23,7 @@ class AddedByWidget extends StatelessWidget {
       if (uploaderName == null || uploaderName.isEmpty) {
         return const SizedBox.shrink();
       }
-      identity = AvatarIdentity(
-        label: uploaderName,
-        role: AvatarIdentityRole.publicUploader,
-      );
+      identity = AvatarIdentity.publicUploader(label: uploaderName);
     } else {
       if (file.ownerID == null) {
         return const SizedBox.shrink();

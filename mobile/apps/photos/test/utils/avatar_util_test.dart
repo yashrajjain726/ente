@@ -5,13 +5,19 @@ import "package:photos/utils/avatar_util.dart";
 
 void main() {
   test("email identity is normalized and independent of the label", () {
-    final before = AvatarIdentity(
+    final before = AvatarIdentity.account(
       label: "Alice",
       email: " Alice@Example.com ",
       userID: 7,
       personID: "person-1",
+      currentUserEmail: null,
     );
-    final after = AvatarIdentity(label: "Bob", email: "alice@example.com");
+    final after = AvatarIdentity.account(
+      label: "Bob",
+      email: "alice@example.com",
+      userID: null,
+      currentUserEmail: null,
+    );
 
     expect(before.key, "email:alice@example.com");
     expect(after.key, before.key);
@@ -33,6 +39,19 @@ void main() {
       "person:person-1",
     );
     expect(avatarIdentityKey(name: "  Alice   Smith "), "name:alice smith");
+    expect(avatarIdentityKey(userID: -1, name: "Alice"), "name:alice");
+  });
+
+  test("anonymous identity is independent of its display name", () {
+    final before = AvatarIdentity.anonymous(
+      label: "Alice",
+      anonymousID: " Anon-1 ",
+    );
+    final after = AvatarIdentity.anonymous(label: "Bob", anonymousID: "anon-1");
+
+    expect(before.key, "anonymous:anon-1");
+    expect(after.key, before.key);
+    expect(after.role, AvatarIdentityRole.standard);
   });
 
   test("marks the signed-in email as the current-user role", () {
@@ -52,9 +71,14 @@ void main() {
       ComponentTheme.lightTheme(),
       ComponentTheme.darkTheme(),
     ]) {
-      for (final role in [
-        AvatarIdentityRole.currentUser,
-        AvatarIdentityRole.publicUploader,
+      for (final identity in [
+        AvatarIdentity.account(
+          label: "A",
+          email: "alice@example.com",
+          userID: 7,
+          currentUserEmail: "alice@example.com",
+        ),
+        AvatarIdentity.publicUploader(label: "A"),
       ]) {
         late Color backgroundColor;
         await tester.pumpWidget(
@@ -62,10 +86,7 @@ void main() {
             theme: theme,
             home: Builder(
               builder: (context) {
-                backgroundColor = avatarBackgroundColor(
-                  context,
-                  AvatarIdentity(label: "A", role: role),
-                );
+                backgroundColor = avatarBackgroundColor(context, identity);
                 return const SizedBox.shrink();
               },
             ),

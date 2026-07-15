@@ -24,13 +24,6 @@ Color getUserAvatarColor(BuildContext context, User user) {
 
 AvatarIdentity getUserAvatarIdentity(User user) {
   final resolvedEmail = resolveKnownEmail(user);
-  if (user.id != null && user.id! < 0) {
-    return AvatarIdentity(
-      label: resolveDisplayName(user),
-      userID: user.id,
-      role: AvatarIdentityRole.publicUploader,
-    );
-  }
   return AvatarIdentity.account(
     label: resolveDisplayName(user),
     email: resolvedEmail,
@@ -45,6 +38,7 @@ class UserAvatarWidget extends StatefulWidget {
   final int currentUserID;
   final bool thumbnailView;
   final bool addStroke;
+  final AvatarIdentity? fallbackIdentity;
 
   const UserAvatarWidget(
     this.user, {
@@ -53,6 +47,7 @@ class UserAvatarWidget extends StatefulWidget {
     this.type = AvatarType.medium,
     this.thumbnailView = false,
     this.addStroke = true,
+    this.fallbackIdentity,
   });
 
   @override
@@ -191,21 +186,31 @@ class _UserAvatarWidgetState extends State<UserAvatarWidget> {
                   : _FirstLetterCircularAvatar(
                       user: widget.user,
                       type: widget.type,
+                      fallbackIdentity: widget.fallbackIdentity,
                     ),
             ),
           )
-        : _FirstLetterCircularAvatar(user: widget.user, type: widget.type);
+        : _FirstLetterCircularAvatar(
+            user: widget.user,
+            type: widget.type,
+            fallbackIdentity: widget.fallbackIdentity,
+          );
   }
 }
 
 class _FirstLetterCircularAvatar extends StatelessWidget {
   final User user;
   final AvatarType type;
-  const _FirstLetterCircularAvatar({required this.user, required this.type});
+  final AvatarIdentity? fallbackIdentity;
+  const _FirstLetterCircularAvatar({
+    required this.user,
+    required this.type,
+    required this.fallbackIdentity,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final identity = getUserAvatarIdentity(user);
+    final identity = fallbackIdentity ?? getUserAvatarIdentity(user);
 
     final avatarStyle = getAvatarStyle(context, type);
     final double size = avatarStyle.item1;

@@ -12,18 +12,11 @@ enum AvatarIdentityRole {
 }
 
 class AvatarIdentity {
-  AvatarIdentity({
+  AvatarIdentity._({
     required this.label,
-    String? email,
-    int? userID,
-    String? personID,
-    this.role = AvatarIdentityRole.standard,
-  }) : key = avatarIdentityKey(
-         email: email,
-         userID: userID,
-         personID: personID,
-         name: label,
-       );
+    required this.key,
+    required this.role,
+  });
 
   factory AvatarIdentity.account({
     required String label,
@@ -38,12 +31,34 @@ class AvatarIdentity {
             normalizedEmail == normalizeAvatarEmail(currentUserEmail)
         ? AvatarIdentityRole.currentUser
         : AvatarIdentityRole.standard;
-    return AvatarIdentity(
+    return AvatarIdentity._(
       label: label,
-      email: normalizedEmail,
-      userID: userID,
-      personID: personID,
+      key: avatarIdentityKey(
+        email: normalizedEmail,
+        userID: userID,
+        personID: personID,
+        name: label,
+      ),
       role: role,
+    );
+  }
+
+  factory AvatarIdentity.anonymous({
+    required String label,
+    required String anonymousID,
+  }) {
+    return AvatarIdentity._(
+      label: label,
+      key: avatarIdentityKey(anonymousID: anonymousID, name: label),
+      role: AvatarIdentityRole.standard,
+    );
+  }
+
+  factory AvatarIdentity.publicUploader({required String label}) {
+    return AvatarIdentity._(
+      label: label,
+      key: avatarIdentityKey(name: label),
+      role: AvatarIdentityRole.publicUploader,
     );
   }
 
@@ -61,18 +76,23 @@ String avatarIdentityKey({
   String? email,
   int? userID,
   String? personID,
+  String? anonymousID,
   String? name,
 }) {
   final normalizedEmail = normalizeAvatarEmail(email);
   if (normalizedEmail != null) {
     return "email:$normalizedEmail";
   }
-  if (userID != null) {
+  if (userID != null && userID > 0) {
     return "user:$userID";
   }
   final normalizedPersonID = personID?.trim();
   if (normalizedPersonID != null && normalizedPersonID.isNotEmpty) {
     return "person:$normalizedPersonID";
+  }
+  final normalizedAnonymousID = anonymousID?.trim().toLowerCase();
+  if (normalizedAnonymousID != null && normalizedAnonymousID.isNotEmpty) {
+    return "anonymous:$normalizedAnonymousID";
   }
   final normalizedName = name?.trim().toLowerCase().replaceAll(
     RegExp(r"\s+"),
