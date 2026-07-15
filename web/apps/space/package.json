@@ -13,6 +13,7 @@
         "ente-accounts-rs": "*",
         "ente-base": "*",
         "ente-media": "*",
+        "ente-space-wasm": "*",
         "ente-wasm": "*",
         "ente-wasm-core": "*",
         "photoswipe": "5.4.4",

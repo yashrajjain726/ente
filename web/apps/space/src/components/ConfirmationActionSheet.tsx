@@ -14,7 +14,7 @@ interface ConfirmationActionSheetProps {
     appearance?: "light" | "dark";
     open: boolean;
     title: string;
-    description?: string;
+    description?: React.ReactNode;
     confirmLabel: string;
     confirmBackgroundColor?: string;
     confirmActionPhase?: SpaceActionPhase | null;
