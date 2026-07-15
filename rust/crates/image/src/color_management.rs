@@ -1,8 +1,27 @@
 use image::{DynamicImage, ImageBuffer, Pixel};
 use moxcms::{
-    ColorProfile, DataColorSpace, Layout, ToneReprCurve, TransferCharacteristics, TransformOptions,
-    Xyzd,
+    ColorProfile, DataColorSpace, InPlaceTransformExecutor, Layout, ToneReprCurve,
+    TransferCharacteristics, TransformOptions, Xyzd,
 };
+use std::{
+    collections::VecDeque,
+    sync::{Arc, Mutex, OnceLock},
+};
+
+static SRGB_PROFILE: OnceLock<ColorProfile> = OnceLock::new();
+static SRGB_GRAY_PROFILE: OnceLock<ColorProfile> = OnceLock::new();
+static ICC_PROFILE_CACHE: OnceLock<Mutex<VecDeque<CachedIccProfile>>> = OnceLock::new();
+
+const ICC_PROFILE_CACHE_CAPACITY: usize = 8;
+const MAX_CACHEABLE_ICC_PROFILE_BYTES: usize = 4 * 1024 * 1024;
+
+type U8Transform = Arc<dyn InPlaceTransformExecutor<u8> + Send + Sync>;
+
+struct CachedIccProfile {
+    encoded: Arc<[u8]>,
+    profile: Arc<ColorProfile>,
+    u8_transforms: Vec<(Layout, U8Transform)>,
+}
 
 pub(crate) fn apply_icc_profile_to_srgb(
     image: DynamicImage,
@@ -12,7 +31,7 @@ pub(crate) fn apply_icc_profile_to_srgb(
         return image;
     };
 
-    let source_profile = match ColorProfile::new_from_slice(icc_profile) {
+    let source_profile = match cached_color_profile(icc_profile) {
         Ok(profile) => profile,
         Err(err) => {
             eprintln!("[ml][decode] failed to parse embedded ICC profile: {err}");
@@ -31,7 +50,7 @@ pub(crate) fn apply_icc_profile_to_srgb(
         return image;
     }
 
-    match apply_profile_to_image(image, &source_profile) {
+    match apply_profile_to_image(image, &source_profile, icc_profile) {
         Ok(image) => image,
         Err((image, err)) => {
             eprintln!("[ml][decode] failed to convert embedded ICC profile to sRGB: {err}");
@@ -43,28 +62,58 @@ pub(crate) fn apply_icc_profile_to_srgb(
 fn apply_profile_to_image(
     image: DynamicImage,
     source_profile: &ColorProfile,
+    encoded_profile: &[u8],
 ) -> Result<DynamicImage, (DynamicImage, String)> {
     use DynamicImage::*;
     use Layout::{Gray, GrayAlpha, Rgb, Rgba};
 
     match image {
-        ImageLuma8(buffer) => transform_buffer(buffer, source_profile, Gray, ImageLuma8),
-        ImageLumaA8(buffer) => transform_buffer(buffer, source_profile, GrayAlpha, ImageLumaA8),
-        ImageRgb8(buffer) => transform_buffer(buffer, source_profile, Rgb, ImageRgb8),
-        ImageRgba8(buffer) => transform_buffer(buffer, source_profile, Rgba, ImageRgba8),
-        ImageLuma16(buffer) => transform_buffer(buffer, source_profile, Gray, ImageLuma16),
-        ImageLumaA16(buffer) => transform_buffer(buffer, source_profile, GrayAlpha, ImageLumaA16),
-        ImageRgb16(buffer) => transform_buffer(buffer, source_profile, Rgb, ImageRgb16),
-        ImageRgba16(buffer) => transform_buffer(buffer, source_profile, Rgba, ImageRgba16),
-        ImageRgb32F(buffer) => transform_buffer(buffer, source_profile, Rgb, ImageRgb32F),
-        ImageRgba32F(buffer) => transform_buffer(buffer, source_profile, Rgba, ImageRgba32F),
+        ImageLuma8(buffer) => {
+            transform_buffer(buffer, source_profile, encoded_profile, Gray, ImageLuma8)
+        }
+        ImageLumaA8(buffer) => transform_buffer(
+            buffer,
+            source_profile,
+            encoded_profile,
+            GrayAlpha,
+            ImageLumaA8,
+        ),
+        ImageRgb8(buffer) => {
+            transform_buffer(buffer, source_profile, encoded_profile, Rgb, ImageRgb8)
+        }
+        ImageRgba8(buffer) => {
+            transform_buffer(buffer, source_profile, encoded_profile, Rgba, ImageRgba8)
+        }
+        ImageLuma16(buffer) => {
+            transform_buffer(buffer, source_profile, encoded_profile, Gray, ImageLuma16)
+        }
+        ImageLumaA16(buffer) => transform_buffer(
+            buffer,
+            source_profile,
+            encoded_profile,
+            GrayAlpha,
+            ImageLumaA16,
+        ),
+        ImageRgb16(buffer) => {
+            transform_buffer(buffer, source_profile, encoded_profile, Rgb, ImageRgb16)
+        }
+        ImageRgba16(buffer) => {
+            transform_buffer(buffer, source_profile, encoded_profile, Rgba, ImageRgba16)
+        }
+        ImageRgb32F(buffer) => {
+            transform_buffer(buffer, source_profile, encoded_profile, Rgb, ImageRgb32F)
+        }
+        ImageRgba32F(buffer) => {
+            transform_buffer(buffer, source_profile, encoded_profile, Rgba, ImageRgba32F)
+        }
         other => Ok(other),
     }
 }
 
 fn transform_buffer<P>(
-    buffer: ImageBuffer<P, Vec<P::Subpixel>>,
+    mut buffer: ImageBuffer<P, Vec<P::Subpixel>>,
     source_profile: &ColorProfile,
+    encoded_profile: &[u8],
     layout: Layout,
     into_dynamic: fn(ImageBuffer<P, Vec<P::Subpixel>>) -> DynamicImage,
 ) -> Result<DynamicImage, (DynamicImage, String)>
@@ -73,11 +122,12 @@ where
     P::Subpixel: TransformSubpixel,
 {
     let (width, height) = buffer.dimensions();
-    match P::Subpixel::transform_to_srgb(buffer.as_raw(), source_profile, layout) {
-        Ok(data) => Ok(into_dynamic(
-            ImageBuffer::from_raw(width, height, data)
+    match P::Subpixel::transform_to_srgb(buffer.as_mut(), source_profile, encoded_profile, layout) {
+        Ok(Some(transformed)) => Ok(into_dynamic(
+            ImageBuffer::from_raw(width, height, transformed)
                 .expect("transformed buffer length should match source dimensions"),
         )),
+        Ok(None) => Ok(into_dynamic(buffer)),
         Err(err) => Err((into_dynamic(buffer), err)),
     }
 }
@@ -85,76 +135,179 @@ where
 /// Subpixel types for which moxcms can transform pixel buffers to sRGB.
 trait TransformSubpixel: Copy {
     fn transform_to_srgb(
-        pixels: &[Self],
+        pixels: &mut [Self],
         source_profile: &ColorProfile,
+        encoded_profile: &[u8],
         layout: Layout,
-    ) -> Result<Vec<Self>, String>;
+    ) -> Result<Option<Vec<Self>>, String>;
 }
 
 impl TransformSubpixel for u8 {
     fn transform_to_srgb(
-        pixels: &[Self],
+        pixels: &mut [Self],
         source_profile: &ColorProfile,
+        encoded_profile: &[u8],
         layout: Layout,
-    ) -> Result<Vec<Self>, String> {
-        let target_profile = target_profile_for_layout(layout);
-        let transform = source_profile
-            .create_transform_8bit(layout, &target_profile, layout, transform_options())
-            .map_err(|err| err.to_string())?;
-        let mut transformed = vec![0; pixels.len()];
-        transform
-            .transform(pixels, &mut transformed)
-            .map_err(|err| err.to_string())?;
-        Ok(transformed)
+    ) -> Result<Option<Vec<Self>>, String> {
+        let transform = cached_u8_transform(encoded_profile, source_profile, layout)?;
+        transform.transform(pixels).map_err(|err| err.to_string())?;
+        Ok(None)
     }
 }
 
 impl TransformSubpixel for u16 {
     fn transform_to_srgb(
-        pixels: &[Self],
+        pixels: &mut [Self],
         source_profile: &ColorProfile,
+        _encoded_profile: &[u8],
         layout: Layout,
-    ) -> Result<Vec<Self>, String> {
+    ) -> Result<Option<Vec<Self>>, String> {
         let target_profile = target_profile_for_layout(layout);
         let transform = source_profile
-            .create_transform_16bit(layout, &target_profile, layout, transform_options())
+            .create_transform_16bit(layout, target_profile, layout, transform_options())
             .map_err(|err| err.to_string())?;
         let mut transformed = vec![0; pixels.len()];
         transform
             .transform(pixels, &mut transformed)
             .map_err(|err| err.to_string())?;
-        Ok(transformed)
+        Ok(Some(transformed))
     }
 }
 
 impl TransformSubpixel for f32 {
     fn transform_to_srgb(
-        pixels: &[Self],
+        pixels: &mut [Self],
         source_profile: &ColorProfile,
+        _encoded_profile: &[u8],
         layout: Layout,
-    ) -> Result<Vec<Self>, String> {
+    ) -> Result<Option<Vec<Self>>, String> {
         let target_profile = target_profile_for_layout(layout);
         let transform = source_profile
-            .create_transform_f32(layout, &target_profile, layout, transform_options())
+            .create_transform_f32(layout, target_profile, layout, transform_options())
             .map_err(|err| err.to_string())?;
         let mut transformed = vec![0.0; pixels.len()];
         transform
             .transform(pixels, &mut transformed)
             .map_err(|err| err.to_string())?;
-        Ok(transformed)
+        Ok(Some(transformed))
     }
+}
+
+fn cached_color_profile(encoded: &[u8]) -> Result<Arc<ColorProfile>, String> {
+    if !profile_is_cacheable(encoded) {
+        return ColorProfile::new_from_slice(encoded)
+            .map(Arc::new)
+            .map_err(|err| err.to_string());
+    }
+
+    {
+        let mut cache = lock_profile_cache();
+        if let Some(index) = cache
+            .iter()
+            .position(|entry| entry.encoded.as_ref() == encoded)
+        {
+            let entry = cache
+                .remove(index)
+                .expect("cache index came from iteration");
+            let profile = Arc::clone(&entry.profile);
+            cache.push_back(entry);
+            return Ok(profile);
+        }
+    }
+
+    let profile = Arc::new(ColorProfile::new_from_slice(encoded).map_err(|err| err.to_string())?);
+    let mut cache = lock_profile_cache();
+    if let Some(entry) = cache.iter().find(|entry| entry.encoded.as_ref() == encoded) {
+        return Ok(Arc::clone(&entry.profile));
+    }
+    if cache.len() == ICC_PROFILE_CACHE_CAPACITY {
+        cache.pop_front();
+    }
+    cache.push_back(CachedIccProfile {
+        encoded: Arc::from(encoded),
+        profile: Arc::clone(&profile),
+        u8_transforms: Vec::new(),
+    });
+    Ok(profile)
+}
+
+/// Cache only exact profile bytes, bound both entry count and profile size,
+/// and retain at most one u8 transform per pixel layout in each entry.
+fn cached_u8_transform(
+    encoded: &[u8],
+    source_profile: &ColorProfile,
+    layout: Layout,
+) -> Result<U8Transform, String> {
+    if profile_is_cacheable(encoded) {
+        let cache = lock_profile_cache();
+        if let Some(transform) = cache
+            .iter()
+            .find(|entry| entry.encoded.as_ref() == encoded)
+            .and_then(|entry| {
+                entry
+                    .u8_transforms
+                    .iter()
+                    .find(|(cached_layout, _)| *cached_layout == layout)
+                    .map(|(_, transform)| Arc::clone(transform))
+            })
+        {
+            return Ok(transform);
+        }
+    }
+
+    let transform = source_profile
+        .create_in_place_transform_8bit(
+            layout,
+            target_profile_for_layout(layout),
+            transform_options(),
+        )
+        .map_err(|err| err.to_string())?;
+    Ok(cache_u8_transform(encoded, layout, transform))
+}
+
+fn cache_u8_transform(encoded: &[u8], layout: Layout, transform: U8Transform) -> U8Transform {
+    if !profile_is_cacheable(encoded) {
+        return transform;
+    }
+    let mut cache = lock_profile_cache();
+    let Some(entry) = cache
+        .iter_mut()
+        .find(|entry| entry.encoded.as_ref() == encoded)
+    else {
+        return transform;
+    };
+    if let Some((_, cached)) = entry
+        .u8_transforms
+        .iter()
+        .find(|(cached_layout, _)| *cached_layout == layout)
+    {
+        return Arc::clone(cached);
+    }
+    entry.u8_transforms.push((layout, Arc::clone(&transform)));
+    transform
+}
+
+fn profile_is_cacheable(encoded: &[u8]) -> bool {
+    !encoded.is_empty() && encoded.len() <= MAX_CACHEABLE_ICC_PROFILE_BYTES
+}
+
+fn lock_profile_cache() -> std::sync::MutexGuard<'static, VecDeque<CachedIccProfile>> {
+    ICC_PROFILE_CACHE
+        .get_or_init(|| Mutex::new(VecDeque::with_capacity(ICC_PROFILE_CACHE_CAPACITY)))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn transform_options() -> TransformOptions {
     TransformOptions::default()
 }
 
-fn target_profile_for_layout(layout: Layout) -> ColorProfile {
+fn target_profile_for_layout(layout: Layout) -> &'static ColorProfile {
     if matches!(layout, Layout::Gray | Layout::GrayAlpha) {
-        return srgb_gray_profile();
+        return SRGB_GRAY_PROFILE.get_or_init(srgb_gray_profile);
     }
 
-    ColorProfile::new_srgb()
+    SRGB_PROFILE.get_or_init(ColorProfile::new_srgb)
 }
 
 fn srgb_gray_profile() -> ColorProfile {
@@ -228,16 +381,16 @@ fn tone_curve_matches_transfer(
 }
 
 fn rgb_profile_is_effectively_srgb(profile: &ColorProfile) -> bool {
-    let srgb = ColorProfile::new_srgb();
+    let srgb = SRGB_PROFILE.get_or_init(ColorProfile::new_srgb);
 
-    profile_colorants_match(profile, &srgb)
+    profile_colorants_match(profile, srgb)
         && tone_curve_matches_srgb(profile.red_trc.as_ref(), srgb.red_trc.as_ref())
         && tone_curve_matches_srgb(profile.green_trc.as_ref(), srgb.green_trc.as_ref())
         && tone_curve_matches_srgb(profile.blue_trc.as_ref(), srgb.blue_trc.as_ref())
 }
 
 fn gray_profile_is_effectively_srgb(profile: &ColorProfile) -> bool {
-    let srgb = ColorProfile::new_srgb();
+    let srgb = SRGB_PROFILE.get_or_init(ColorProfile::new_srgb);
     tone_curve_matches_srgb(profile.gray_trc.as_ref(), srgb.red_trc.as_ref())
 }
 
@@ -297,7 +450,7 @@ fn tone_curve_matches_reference(
 #[cfg(test)]
 mod tests {
     use image::{DynamicImage, ImageBuffer};
-    use moxcms::ColorProfile;
+    use moxcms::{ColorProfile, Layout, TransformOptions};
 
     use super::{apply_icc_profile_to_srgb, profile_is_effectively_srgb};
 
@@ -419,6 +572,62 @@ mod tests {
         assert!(raw[0] > 128, "expected red channel to move into sRGB");
         assert_eq!(raw[1], 0);
         assert_eq!(raw[2], 0);
+    }
+
+    #[test]
+    fn in_place_rgb8_transform_matches_previous_out_of_place_result() {
+        let display_p3 = ColorProfile::new_display_p3();
+        let display_p3_icc = display_p3.encode().unwrap();
+        let parsed_display_p3 = ColorProfile::new_from_slice(&display_p3_icc).unwrap();
+        let pixels = vec![0, 32, 64, 96, 128, 160, 192, 224, 255, 17, 91, 203];
+        let mut expected = vec![0; pixels.len()];
+        parsed_display_p3
+            .create_transform_8bit(
+                Layout::Rgb,
+                &ColorProfile::new_srgb(),
+                Layout::Rgb,
+                TransformOptions::default(),
+            )
+            .unwrap()
+            .transform(&pixels, &mut expected)
+            .unwrap();
+        let image =
+            DynamicImage::ImageRgb8(ImageBuffer::from_raw(4, 1, pixels).expect("valid RGB image"));
+
+        let actual = apply_icc_profile_to_srgb(image, Some(&display_p3_icc))
+            .into_rgb8()
+            .into_raw();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn rgba16_transform_matches_previous_out_of_place_result() {
+        let display_p3 = ColorProfile::new_display_p3();
+        let display_p3_icc = display_p3.encode().unwrap();
+        let parsed_display_p3 = ColorProfile::new_from_slice(&display_p3_icc).unwrap();
+        let pixels = vec![0, 8192, 32768, 1111, 49152, 65535, 12345, 54321];
+        let mut expected = vec![0; pixels.len()];
+        parsed_display_p3
+            .create_transform_16bit(
+                Layout::Rgba,
+                &ColorProfile::new_srgb(),
+                Layout::Rgba,
+                TransformOptions::default(),
+            )
+            .unwrap()
+            .transform(&pixels, &mut expected)
+            .unwrap();
+        let image = DynamicImage::ImageRgba16(
+            ImageBuffer::from_raw(2, 1, pixels).expect("valid RGBA image"),
+        );
+
+        let actual = apply_icc_profile_to_srgb(image, Some(&display_p3_icc));
+        let DynamicImage::ImageRgba16(actual) = actual else {
+            panic!("expected RGBA16 image");
+        };
+
+        assert_eq!(actual.into_raw(), expected);
     }
 
     #[test]

@@ -10,6 +10,6 @@ kamadak-exif = "0.6.1"
 ente_heic = { package = "heic_decoder", git = "https://github.com/ente/heic-decoder.git", rev = "0998ddc52085b38fa359049d1fe28baf144fe79b", features = [
     "image-integration",
 ] }
-moxcms = "0.8.1"
+moxcms = { version = "0.8.1", features = ["in_place"] }
 thiserror.workspace = true
 tiff = "0.10.3"
