@@ -7,7 +7,14 @@ import "package:flutter/material.dart";
 import "package:flutter/rendering.dart";
 import "package:flutter/services.dart";
 import "package:logging/logging.dart";
-import "package:mobile_ocr/mobile_ocr.dart" show MobileOcr;
+import "package:mobile_ocr/mobile_ocr.dart"
+    show
+        DisplayImageHelper,
+        MobileOcr,
+        TextDetectorController,
+        TextDetectorStrings,
+        TextDetectorWidget,
+        ZoomedInteractionPolicy;
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/reset_zoom_of_photo_view_event.dart";
 import "package:photos/l10n/l10n.dart";
@@ -16,11 +23,7 @@ import "package:photos/models/file/file_type.dart";
 import "package:photos/models/file/trash_file.dart";
 import "package:photos/module/download/file.dart";
 import "package:photos/states/detail_page_state.dart";
-import "package:photos/ui/viewer/file/ocr/display_image_helper.dart";
 import "package:photos/ui/viewer/file/ocr/ocr_dot_wave_overlay.dart";
-import "package:photos/ui/viewer/file/ocr/text_detector_widget.dart";
-import "package:photos/ui/viewer/file/ocr/text_overlay_widget.dart"
-    show ZoomedInteractionPolicy;
 import "package:photos/utils/image_util.dart";
 
 /// Inline text detection widget that mimics Apple's Live Text behavior:

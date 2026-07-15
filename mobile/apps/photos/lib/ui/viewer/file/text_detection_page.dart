@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
+import 'package:mobile_ocr/mobile_ocr.dart'
+    show TextDetectorStrings, TextDetectorWidget;
 import 'package:photos/l10n/l10n.dart';
 import 'package:photos/models/file/file.dart';
-import 'package:photos/ui/viewer/file/ocr/text_detector_widget.dart';
 import 'package:photos/ui/viewer/file/zoomable_image.dart';
 
 class TextDetectionPage extends StatefulWidget {
