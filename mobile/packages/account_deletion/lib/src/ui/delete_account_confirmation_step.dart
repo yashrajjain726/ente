@@ -26,6 +26,7 @@ class DeleteAccountConfirmationStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.componentColors;
+    final canConfirm = summary != null || summaryUnsupported;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,12 +44,12 @@ class DeleteAccountConfirmationStep extends StatelessWidget {
         _buildSummary(context),
         const SizedBox(height: Spacing.lg),
         InkWell(
-          onTap: () => onConfirmationChanged(!confirmed),
+          onTap: canConfirm ? () => onConfirmationChanged(!confirmed) : null,
           borderRadius: BorderRadius.circular(Radii.sm),
           child: LabeledControlComponent(
             control: CheckboxComponent(
               selected: confirmed,
-              onChanged: onConfirmationChanged,
+              onChanged: canConfirm ? onConfirmationChanged : null,
               selectedColor: colors.warning,
             ),
             label: context.strings.confirmDeleteAccountAcrossApps,
