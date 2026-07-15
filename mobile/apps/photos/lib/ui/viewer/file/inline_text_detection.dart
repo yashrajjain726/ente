@@ -782,6 +782,7 @@ class _InlineTextDetectionState extends State<InlineTextDetection> {
         showProcessingOverlay: false,
         showScanAnimation: false,
         showEditorHint: false,
+        showNoTextMessageOnAutoDetect: false,
         initialInteractionPosition: _pendingLongPressPosition,
         controller: _detectorController,
         isImageZoomed: isZoomed,
