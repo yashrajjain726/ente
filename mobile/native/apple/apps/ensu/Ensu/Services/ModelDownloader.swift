@@ -10,11 +10,11 @@ final class ModelDownloader {
         let baseDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         let modelsDir = baseDir.appendingPathComponent("models", isDirectory: true)
-        core = ModelDownloadCore(
+        core = ModelDownloadCore(modelsDir: modelsDir.path)
+        migrateLegacyDir(
             modelsDir: modelsDir.path,
             legacyDir: baseDir.appendingPathComponent("llm", isDirectory: true).path
         )
-        core.migrate()
         var excludedDir = modelsDir
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
@@ -58,7 +58,6 @@ final class ModelDownloader {
         target: ModelDownloadTarget,
         onProgress: @escaping (DownloadProgress) -> Void
     ) async throws -> Bool {
-        core.migrate()
         if core.isDownloaded(target: target) {
             return false
         }
@@ -70,9 +69,10 @@ final class ModelDownloader {
                 core.cancel()
             }
         }
+        var succeeded = false
         defer {
             if #available(iOS 26.0, *) {
-                ModelDownloadBackgroundTask.end()
+                ModelDownloadBackgroundTask.end(success: succeeded)
             }
         }
 
@@ -102,6 +102,7 @@ final class ModelDownloader {
             core.cancel()
             downloadTask.cancel()
         }
+        succeeded = true
         return true
     }
 }
@@ -157,7 +158,11 @@ private enum ModelDownloadBackgroundTask {
             subtitle: ""
         )
         request.strategy = .fail
-        try? BGTaskScheduler.shared.submit(request)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            logger.warning("Background download task not scheduled", details: "\(error)")
+        }
     }
 
     static func update(downloadedBytes: Int64, totalBytes: Int64?) {
@@ -169,14 +174,14 @@ private enum ModelDownloadBackgroundTask {
         task.progress.completedUnitCount = min(downloadedBytes, totalBytes)
     }
 
-    static func end() {
+    static func end(success: Bool) {
         lock.lock()
         downloadActive = false
         onExpiration = nil
         let task = task
         Self.task = nil
         lock.unlock()
-        task?.setTaskCompleted(success: true)
+        task?.setTaskCompleted(success: success)
     }
 
     private static func adopt(_ bgTask: BGContinuedProcessingTask) {

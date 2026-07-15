@@ -4,9 +4,10 @@ import android.content.Context
 import android.os.Environment
 import android.util.Log
 import io.ente.ensu.bindings.ModelDownloadCallback
-import io.ente.ensu.bindings.ModelDownloadProgress
 import io.ente.ensu.bindings.ModelDownloadCore
+import io.ente.ensu.bindings.ModelDownloadProgress
 import io.ente.ensu.bindings.ModelDownloadTarget
+import io.ente.ensu.bindings.migrateLegacyDir
 import io.ente.ensu.bindings.uniffiEnsureInitialized
 import java.io.File
 import kotlin.coroutines.coroutineContext
@@ -16,16 +17,22 @@ import kotlinx.coroutines.withContext
 
 class ModelDownloader(context: Context) {
     private val appContext = context.applicationContext
+    private val modelsDir = File(appContext.noBackupFilesDir, "models")
+    private val legacyDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        ?.let { File(it, "llm") }
     private val core: ModelDownloadCore
 
     init {
         uniffiEnsureInitialized()
         ModelDownloadJobService.attach(appContext)
-        core = ModelDownloadCore(
-            File(appContext.noBackupFilesDir, "models").absolutePath,
-            appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-                ?.let { File(it, "llm").absolutePath }
-        )
+        core = ModelDownloadCore(modelsDir.absolutePath)
+    }
+
+    fun needsMigration(): Boolean = legacyDir?.exists() == true
+
+    fun migrate() {
+        File(appContext.filesDir, "llm").deleteRecursively()
+        legacyDir?.let { migrateLegacyDir(modelsDir.absolutePath, it.absolutePath) }
     }
 
     val isDownloadActive: Boolean get() = core.isDownloadActive()
@@ -36,24 +43,20 @@ class ModelDownloader(context: Context) {
 
     fun isDownloaded(target: ModelDownloadTarget): Boolean = core.isDownloaded(target)
 
-    fun cancel() = core.cancel()
+    fun removeDownloaded(target: ModelDownloadTarget): Boolean = core.removeDownloaded(target)
 
-    fun migrate() {
-        File(appContext.filesDir, "llm").deleteRecursively()
-        core.migrate()
-    }
+    fun cancel() = core.cancel()
 
     suspend fun estimateDownloadSize(target: ModelDownloadTarget): Long? = withContext(Dispatchers.IO) {
         core.estimatedDownloadSize(target)
     }
 
-    suspend fun download(target: ModelDownloadTarget, onProgress: (DownloadProgress) -> Unit) {
+    suspend fun download(target: ModelDownloadTarget, onProgress: (DownloadProgress) -> Unit): Boolean {
         val downloadJob = coroutineContext[Job]
-        core.migrate()
-        if (core.isDownloaded(target)) return
+        if (core.isDownloaded(target)) return false
 
         ModelDownloadJobService.begin { core.cancel() }
-        try {
+        return try {
             core.download(
                 target,
                 object : ModelDownloadCallback {

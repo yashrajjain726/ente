@@ -21,7 +21,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val sessionPreferences = SessionPreferencesDataStore(application)
@@ -33,6 +36,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     val logRepository = FileLogRepository(application)
     private val modelDownloader = ModelDownloader(application)
+    private val _isReady = MutableStateFlow(!modelDownloader.needsMigration())
+    val isReady = _isReady.asStateFlow()
     private val llmProvider = LlmProvider(
         downloader = modelDownloader,
         transcriber = transcriber,
@@ -55,11 +60,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val launchMessage = "App launched app=$appVersion device=${Build.MANUFACTURER} ${Build.MODEL} os=${Build.VERSION.RELEASE} (sdk=${Build.VERSION.SDK_INT})"
         logRepository.log(LogLevel.Info, launchMessage, tag = "App")
 
-        viewModelScope.launch(Dispatchers.IO) {
-            modelDownloader.migrate()
-        }
-
         viewModelScope.launch {
+            withContext(Dispatchers.IO) { modelDownloader.migrate() }
             val initialSettings = runCatching {
                 advancedSettingsDataStore.settingsFlow.first()
             }.getOrDefault(AdvancedSettingsSnapshot())
@@ -69,6 +71,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             )
             store.hydrateModelDownloadRequested(sessionPreferences.modelDownloadRequested.first())
             store.bootstrap(viewModelScope)
+            _isReady.value = true
 
             advancedSettingsDataStore.settingsFlow.drop(1).collectLatest { settings ->
                 store.applyPersistedSettings(

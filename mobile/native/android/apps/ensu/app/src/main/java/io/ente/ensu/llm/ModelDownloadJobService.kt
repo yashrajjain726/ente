@@ -9,6 +9,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
@@ -44,6 +45,7 @@ class ModelDownloadJobService : JobService() {
     }
 
     companion object {
+        private const val TAG = "ModelDownloadJob"
         private const val CHANNEL_ID = "model-download"
         private const val NOTIFICATION_ID = 1
         private const val JOB_ID = 1
@@ -68,12 +70,22 @@ class ModelDownloadJobService : JobService() {
                 downloadActive = true
                 lastNotifyMs = 0L
             }
-            val scheduler = appContext.getSystemService(JobScheduler::class.java) ?: return
+            val scheduler = appContext.getSystemService(JobScheduler::class.java)
+            if (scheduler == null) {
+                Log.w(TAG, "JobScheduler unavailable")
+                return
+            }
             val job = JobInfo.Builder(JOB_ID, ComponentName(appContext, ModelDownloadJobService::class.java))
                 .setUserInitiated(true)
                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
                 .build()
-            runCatching { scheduler.schedule(job) }
+            val result = runCatching { scheduler.schedule(job) }.getOrElse { error ->
+                Log.w(TAG, "Download job schedule failed", error)
+                return
+            }
+            if (result != JobScheduler.RESULT_SUCCESS) {
+                Log.w(TAG, "Download job not scheduled")
+            }
         }
 
         fun update(percent: Int, indeterminate: Boolean) {

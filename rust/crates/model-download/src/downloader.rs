@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -29,22 +28,18 @@ pub struct ModelDownloadProgress {
 
 pub struct ModelDownloader {
     models_dir: PathBuf,
-    legacy_dir: Option<PathBuf>,
     cancelled: AtomicBool,
     active: AtomicBool,
-    migration_done: Mutex<bool>,
 }
 
 impl ModelDownloader {
-    pub fn new(models_dir: impl Into<PathBuf>, legacy_dir: Option<PathBuf>) -> Self {
+    pub fn new(models_dir: impl Into<PathBuf>) -> Self {
         let models_dir = models_dir.into();
         let _ = fs::create_dir_all(&models_dir);
         Self {
             models_dir,
-            legacy_dir,
             cancelled: AtomicBool::new(false),
             active: AtomicBool::new(false),
-            migration_done: Mutex::new(false),
         }
     }
 
@@ -93,7 +88,6 @@ impl ModelDownloader {
         mut on_progress: impl FnMut(ModelDownloadProgress),
         is_cancelled: impl Fn() -> bool,
     ) -> Result<bool, download::Error> {
-        self.migrate();
         if self.is_downloaded(target) {
             return Ok(false);
         }
@@ -136,52 +130,6 @@ impl ModelDownloader {
             }
             any.then_some(total)
         })
-    }
-
-    /// Moves files from `<legacy_dir>/models` into the models dir via a
-    /// staged copy and rename, then discards the legacy dir. Retries on the
-    /// next call (or process) if any file could not be moved.
-    pub fn migrate(&self) {
-        let mut done = self.migration_done.lock().unwrap();
-        if *done {
-            return;
-        }
-        let Some(legacy_dir) = &self.legacy_dir else {
-            *done = true;
-            return;
-        };
-        if !legacy_dir.exists() {
-            *done = true;
-            return;
-        }
-
-        let legacy_models = legacy_dir.join("models");
-        let mut all_moved = true;
-        for file in walk_files(&legacy_models) {
-            let Ok(relative) = file.strip_prefix(&legacy_models) else {
-                continue;
-            };
-            let dest = self.models_dir.join(relative);
-            if dest.exists() {
-                continue;
-            }
-            if let Some(parent) = dest.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            if fs::rename(&file, &dest).is_ok() {
-                continue;
-            }
-            let staged = PathBuf::from(format!("{}.migrating", dest.display()));
-            let copied = fs::copy(&file, &staged).and_then(|_| fs::rename(&staged, &dest));
-            if copied.is_err() {
-                let _ = fs::remove_file(&staged);
-                all_moved = false;
-            }
-        }
-        if all_moved {
-            let _ = fs::remove_dir_all(legacy_dir);
-            *done = true;
-        }
     }
 
     fn expected_targets(&self, target: &ModelDownloadTarget) -> Vec<Target> {
@@ -263,6 +211,41 @@ pub fn format_bytes(bytes: u64) -> String {
     format!("{size:.1} {}", UNITS[unit])
 }
 
+pub fn migrate_legacy_dir(models_dir: &Path, legacy_dir: &Path) {
+    if !legacy_dir.exists() {
+        return;
+    }
+    let legacy_models = legacy_dir.join("models");
+    let mut all_moved = true;
+    for file in walk_files(&legacy_models) {
+        if file.extension().is_some_and(|ext| ext == "tmp") || !gguf::looks_like_gguf(&file) {
+            continue;
+        }
+        let Ok(relative) = file.strip_prefix(&legacy_models) else {
+            continue;
+        };
+        let dest = models_dir.join(relative);
+        if dest.exists() {
+            continue;
+        }
+        if let Some(parent) = dest.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        if fs::rename(&file, &dest).is_ok() {
+            continue;
+        }
+        let staged = PathBuf::from(format!("{}.migrating", dest.display()));
+        let copied = fs::copy(&file, &staged).and_then(|_| fs::rename(&staged, &dest));
+        if copied.is_err() {
+            let _ = fs::remove_file(&staged);
+            all_moved = false;
+        }
+    }
+    if all_moved {
+        let _ = fs::remove_dir_all(legacy_dir);
+    }
+}
+
 fn walk_files(dir: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     let Ok(entries) = fs::read_dir(dir) else {
@@ -306,7 +289,7 @@ mod tests {
     #[test]
     fn paths_use_url_filenames_and_hash_custom_models() {
         let dir = scratch_dir("paths");
-        let downloader = ModelDownloader::new(&dir, None);
+        let downloader = ModelDownloader::new(&dir);
 
         assert_eq!(
             downloader.model_path(&target("default:1")),
@@ -331,7 +314,7 @@ mod tests {
     #[test]
     fn is_downloaded_requires_gguf_magic_on_all_files() {
         let dir = scratch_dir("is-downloaded");
-        let downloader = ModelDownloader::new(&dir, None);
+        let downloader = ModelDownloader::new(&dir);
         let target = target("default:1");
 
         assert!(!downloader.is_downloaded(&target));
@@ -351,7 +334,7 @@ mod tests {
     #[test]
     fn download_skips_when_already_present() {
         let dir = scratch_dir("skip");
-        let downloader = ModelDownloader::new(&dir, None);
+        let downloader = ModelDownloader::new(&dir);
         let target = target("default:1");
         fs::write(dir.join("main.gguf"), b"GGUFdata").unwrap();
         fs::write(dir.join("mmproj.gguf"), b"GGUFdata").unwrap();
@@ -365,24 +348,28 @@ mod tests {
     }
 
     #[test]
-    fn migrate_moves_files_and_discards_legacy_dir() {
+    fn migrate_moves_models_and_discards_legacy_dir() {
         let base = scratch_dir("migrate");
         let legacy = base.join("llm");
         let legacy_models = legacy.join("models");
         fs::create_dir_all(legacy_models.join("custom")).unwrap();
         fs::write(legacy_models.join("main.gguf"), b"GGUFmain").unwrap();
         fs::write(legacy_models.join("custom/abc_x.gguf"), b"GGUFcustom").unwrap();
-        fs::write(legacy.join("stale.tmp"), b"junk").unwrap();
+        fs::write(legacy_models.join("main.gguf.tmp"), b"GGUFpartial").unwrap();
+        fs::write(legacy_models.join("main.gguf.tmp.ranges.json"), b"{}").unwrap();
+        fs::write(legacy_models.join("main.gguf.metadata.json"), b"{}").unwrap();
 
         let models_dir = base.join("models");
-        let downloader = ModelDownloader::new(&models_dir, Some(legacy.clone()));
-        downloader.migrate();
+        migrate_legacy_dir(&models_dir, &legacy);
 
         assert_eq!(fs::read(models_dir.join("main.gguf")).unwrap(), b"GGUFmain");
         assert_eq!(
             fs::read(models_dir.join("custom/abc_x.gguf")).unwrap(),
             b"GGUFcustom"
         );
+        assert!(!models_dir.join("main.gguf.tmp").exists());
+        assert!(!models_dir.join("main.gguf.tmp.ranges.json").exists());
+        assert!(!models_dir.join("main.gguf.metadata.json").exists());
         assert!(!legacy.exists());
 
         let _ = fs::remove_dir_all(base);
@@ -399,8 +386,7 @@ mod tests {
         fs::create_dir_all(&models_dir).unwrap();
         fs::write(models_dir.join("main.gguf"), b"GGUFnew").unwrap();
 
-        let downloader = ModelDownloader::new(&models_dir, Some(legacy.clone()));
-        downloader.migrate();
+        migrate_legacy_dir(&models_dir, &legacy);
 
         assert_eq!(fs::read(models_dir.join("main.gguf")).unwrap(), b"GGUFnew");
         assert!(!legacy.exists());

@@ -104,7 +104,7 @@ class LlmProvider(
                     val mmprojPath = downloader.mmprojPath(target.downloadTarget)
                         ?.takeIf { File(it).exists() }
                         ?: return@withLock
-                    ensureModelReadyLocked(target) { }
+                    ensureModelReadyLocked(target, onProgress = {})
                     val context = loadedContext ?: return@withLock
                     unloadTranscriptionModelIfLoaded()
                     context.prewarmMultimodal(mmprojPath, null)
@@ -171,7 +171,8 @@ class LlmProvider(
 
     private suspend fun ensureModelReadyLocked(
         target: LlmModelTarget,
-        onProgress: (DownloadProgress) -> Unit
+        onProgress: (DownloadProgress) -> Unit,
+        allowRecovery: Boolean = true
     ) {
         deviceCapabilityProvider.chatCapability().requireChatSupported()
         val modelKey = LoadedModelKey(target.id, target.contextLength)
@@ -186,10 +187,19 @@ class LlmProvider(
 
         unloadModel()
 
-        downloader.download(target.downloadTarget, onProgress)
+        val downloaded = downloader.download(target.downloadTarget, onProgress)
 
         onProgress(DownloadProgress(100, "Loading model...", phase = DownloadPhase.Loading))
-        loadWithFallbacks(target, downloader.modelPath(target.downloadTarget))
+        try {
+            loadWithFallbacks(target, downloader.modelPath(target.downloadTarget))
+        } catch (error: Throwable) {
+            if (allowRecovery && !downloaded && downloader.removeDownloaded(target.downloadTarget)) {
+                onProgress(DownloadProgress(0, "Starting download...", phase = DownloadPhase.Downloading))
+                ensureModelReadyLocked(target, onProgress, allowRecovery = false)
+                return
+            }
+            throw error
+        }
         onProgress(DownloadProgress(100, "Ready", phase = DownloadPhase.Ready))
     }
 

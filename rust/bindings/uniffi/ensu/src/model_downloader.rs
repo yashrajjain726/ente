@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::download::DownloadError;
@@ -58,6 +58,11 @@ pub trait ModelDownloadCallback: Send + Sync {
     fn is_cancelled(&self) -> bool;
 }
 
+#[uniffi::export]
+pub fn migrate_legacy_dir(models_dir: String, legacy_dir: String) {
+    ente_model_download::migrate_legacy_dir(Path::new(&models_dir), Path::new(&legacy_dir));
+}
+
 #[derive(uniffi::Object)]
 pub struct ModelDownloadCore {
     inner: ente_model_download::ModelDownloader,
@@ -66,12 +71,9 @@ pub struct ModelDownloadCore {
 #[uniffi::export]
 impl ModelDownloadCore {
     #[uniffi::constructor]
-    pub fn new(models_dir: String, legacy_dir: Option<String>) -> Arc<Self> {
+    pub fn new(models_dir: String) -> Arc<Self> {
         Arc::new(Self {
-            inner: ente_model_download::ModelDownloader::new(
-                models_dir,
-                legacy_dir.map(PathBuf::from),
-            ),
+            inner: ente_model_download::ModelDownloader::new(models_dir),
         })
     }
 
@@ -95,10 +97,6 @@ impl ModelDownloadCore {
 
     pub fn estimated_download_size(&self, target: ModelDownloadTarget) -> Option<i64> {
         self.inner.estimated_download_size(&target.into())
-    }
-
-    pub fn migrate(&self) {
-        self.inner.migrate();
     }
 
     pub fn cancel(&self) {
