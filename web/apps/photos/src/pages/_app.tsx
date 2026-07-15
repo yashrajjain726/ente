@@ -3,14 +3,15 @@ import { photosLogout } from "@/services/logout";
 import "@fontsource-variable/inter";
 import "@fontsource/outfit/700.css";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import { CssBaseline, Typography } from "@mui/material";
+import { Button, CssBaseline, Typography } from "@mui/material";
 import { styled, ThemeProvider } from "@mui/material/styles";
 import {
     isLocalStorageAndIndexedDBMismatch,
     savedLocalUser,
 } from "ente-accounts/services/accounts-db";
 import { isDesktop, staticAppTitle } from "ente-base/app";
-import { CenteredRow } from "ente-base/components/containers";
+import { CenteredRow, Stack100vhCenter } from "ente-base/components/containers";
+import { ActivityErrorIndicator } from "ente-base/components/ErrorIndicator";
 import { CustomHead } from "ente-base/components/Head";
 import {
     LoadingIndicator,
@@ -220,7 +221,8 @@ const DesktopMainContent: React.FC<MainContentProps> = ({
     pageProps,
     isChangingRoute,
 }) => {
-    const isAppLockReady = useSetupAppLock();
+    const { isAppLockReady, appLockSetupFailed, retryAppLockSetup } =
+        useSetupAppLock();
     const appLock = useAppLockSnapshot();
     const { shouldBlockAppLockRouteTransition } = useDesktopAppLockRoute(
         isAppLockReady,
@@ -234,6 +236,9 @@ const DesktopMainContent: React.FC<MainContentProps> = ({
         appLock.autoLockTimeMs,
     );
 
+    if (appLockSetupFailed) {
+        return <AppLockSetupError onRetry={retryAppLockSetup} />;
+    }
     if (!isAppLockReady) return <LoadingIndicator />;
     if (shouldBlockAppLockRouteTransition) return <LoadingIndicator />;
 
@@ -245,6 +250,17 @@ const DesktopMainContent: React.FC<MainContentProps> = ({
         </>
     );
 };
+
+const AppLockSetupError: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
+    <Stack100vhCenter sx={{ gap: 2 }}>
+        <ActivityErrorIndicator>
+            {t("generic_error_retry")}
+        </ActivityErrorIndicator>
+        <Button color="secondary" onClick={onRetry}>
+            {t("retry")}
+        </Button>
+    </Stack100vhCenter>
+);
 
 const WindowTitlebar: React.FC<React.PropsWithChildren> = ({ children }) => (
     <WindowTitlebarArea>
