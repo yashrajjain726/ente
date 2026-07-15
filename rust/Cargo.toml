@@ -10,6 +10,7 @@ members = [
     "bindings/uniffi/ensu",
     "bindings/wasm/ente-wasm",
     "bindings/wasm/core",
+    "bindings/wasm/space",
     "crates/accounts",
     "crates/contacts",
     "crates/core",

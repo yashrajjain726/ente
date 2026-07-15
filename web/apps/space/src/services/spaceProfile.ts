@@ -1,8 +1,7 @@
 import { savedPartialLocalUser } from "ente-accounts-rs/services/accounts-db";
 import { clientPackageName, desktopAppVersion, isDesktop } from "ente-base/app";
 import { apiOrigin, apiURL } from "ente-base/origins";
-import type { SpaceAccountCtxHandle } from "ente-wasm";
-import { loadEnteWasm } from "ente-wasm/load";
+import type { SpaceAccountCtxHandle } from "ente-space-wasm";
 import type {
     SetupProfile,
     SetupProfileInput,
@@ -158,8 +157,8 @@ export const openCurrentSpaceContext = async () => {
     const config = await currentSpaceContextConfig();
     if (!config) return undefined;
 
-    const { space_open_account_ctx } = await loadEnteWasm();
-    return await space_open_account_ctx(config.input);
+    const { spaceOpenAccountCtx } = await import("ente-space-wasm");
+    return await spaceOpenAccountCtx(config.input);
 };
 
 export const clearCurrentSpaceContext = () => {
@@ -190,8 +189,8 @@ export const ensureCurrentSpaceContext = async () => {
 
     const generation = currentSpaceContextGeneration;
     const promise = (async () => {
-        const { space_open_account_ctx } = await loadEnteWasm();
-        return await space_open_account_ctx(config.input);
+        const { spaceOpenAccountCtx } = await import("ente-space-wasm");
+        return await spaceOpenAccountCtx(config.input);
     })()
         .then((ctx) => {
             if (
@@ -235,7 +234,7 @@ const avatarURLForRemoteAvatar = async (
             avatar.keyVersion,
         ),
         () =>
-            ctx.download_space_avatar(
+            ctx.downloadSpaceAvatar(
                 spaceId,
                 spaceId,
                 avatar.objectID,
@@ -258,7 +257,7 @@ const coverURLForRemoteCover = async (
             cover.keyVersion,
         ),
         () =>
-            ctx.download_space_cover(
+            ctx.downloadSpaceCover(
                 spaceId,
                 spaceId,
                 cover.objectID,
@@ -307,11 +306,11 @@ export const loadExistingSpaceProfile = async (options?: {
 
     const promise = (async () => {
         const ctx = await ensureCurrentSpaceContext();
-        const spaces = (await ctx.list_owned_spaces()) as OwnedSpace[];
+        const spaces = (await ctx.listOwnedSpaces()) as OwnedSpace[];
         const space = defaultOwnedSpace(spaces);
         if (!space) return null;
 
-        const spaceProfile = (await ctx.get_space_profile(
+        const spaceProfile = (await ctx.getSpaceProfile(
             space.spaceId,
             space.spaceId,
         )) as DecryptedSpaceProfile;
@@ -400,7 +399,7 @@ export const saveSpaceProfile = async (
 
     const ctx = await ensureCurrentSpaceContext();
     try {
-        const spaces = (await ctx.list_owned_spaces()) as OwnedSpace[];
+        const spaces = (await ctx.listOwnedSpaces()) as OwnedSpace[];
         const existingSpace =
             (profile.spaceId &&
                 spaces.find((space) => space.spaceId == profile.spaceId)) ||
@@ -421,14 +420,14 @@ export const saveSpaceProfile = async (
             spaceId = existingSpace.spaceId;
             spaceSlug = existingSpace.spaceSlug;
             if (normalizeSpaceUsername(spaceSlug) != username) {
-                const updatedSlug = (await ctx.update_space_slug(
+                const updatedSlug = (await ctx.updateSpaceSlug(
                     spaceId,
                     username,
                 )) as SpaceLookup;
                 spaceSlug = updatedSlug.spaceSlug;
             }
         } else {
-            const created = (await ctx.create_space(
+            const created = (await ctx.createSpace(
                 username,
                 profilePayload,
                 referredBySpaceId?.trim() || undefined,
@@ -443,7 +442,7 @@ export const saveSpaceProfile = async (
             const avatarBytes = new Uint8Array(
                 await profile.avatarFile.arrayBuffer(),
             );
-            updateResponse = (await ctx.update_space_profile_with_avatar(
+            updateResponse = (await ctx.updateSpaceProfileWithAvatar(
                 spaceId,
                 profilePayload,
                 avatarBytes,
@@ -463,7 +462,7 @@ export const saveSpaceProfile = async (
             const coverBytes = new Uint8Array(
                 await profile.coverFile.arrayBuffer(),
             );
-            updateResponse = (await ctx.update_space_profile_with_cover(
+            updateResponse = (await ctx.updateSpaceProfileWithCover(
                 spaceId,
                 profilePayload,
                 coverBytes,
@@ -480,7 +479,7 @@ export const saveSpaceProfile = async (
                   )
                 : URL.createObjectURL(profile.coverFile);
         } else if (existingSpace) {
-            updateResponse = (await ctx.update_space_profile(
+            updateResponse = (await ctx.updateSpaceProfile(
                 spaceId,
                 profilePayload,
             )) as UpdateSpaceProfileResponse;

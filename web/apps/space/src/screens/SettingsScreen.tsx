@@ -378,7 +378,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <ConfirmationActionSheet
                 open={logoutSheetOpen}
                 title="Log out of Space?"
-                description="This will also log you out of Space on any other devices."
+                description={
+                    <>
+                        This will also log you out of Space on
+                        <br />
+                        any other devices.
+                    </>
+                }
                 confirmLabel="Yes, logout"
                 confirmActionPhase={logoutActionPhase}
                 confirmDisabled={isLogoutRunning}

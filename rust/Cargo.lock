@@ -2542,6 +2542,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ente-space-wasm"
+version = "0.0.0"
+dependencies = [
+ "ente-core",
+ "ente-space",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "ente-test-support"
 version = "0.0.0"
 dependencies = [
@@ -2556,7 +2568,6 @@ version = "0.0.0"
 dependencies = [
  "ente-contacts",
  "ente-core",
- "ente-space",
  "js-sys",
  "md-5 0.11.0",
  "serde",

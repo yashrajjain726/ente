@@ -1,4 +1,4 @@
-//! WASM bindings for space flows.
+//! WASM bindings for Space flows.
 
 use std::collections::BTreeMap;
 
@@ -484,7 +484,7 @@ async fn message_conversation_activity_to_js(
 }
 
 /// Open an authenticated space context for web.
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = spaceOpenAccountCtx)]
 pub async fn space_open_account_ctx(
     input: JsValue,
 ) -> Result<SpaceAccountCtxHandle, WasmSpaceError> {
@@ -510,6 +510,7 @@ pub struct SpaceAccountCtxHandle {
 #[wasm_bindgen]
 impl SpaceAccountCtxHandle {
     /// Create a space with an encrypted JSON profile payload.
+    #[wasm_bindgen(js_name = createSpace)]
     pub async fn create_space(
         &self,
         space_slug: String,
@@ -529,11 +530,13 @@ impl SpaceAccountCtxHandle {
     }
 
     /// List spaces owned by the current account.
+    #[wasm_bindgen(js_name = listOwnedSpaces)]
     pub async fn list_owned_spaces(&self) -> Result<JsValue, WasmSpaceError> {
         swb::to_value(&self.inner.list_owned_spaces().await?).map_err(Into::into)
     }
 
     /// Fetch and decrypt a space profile.
+    #[wasm_bindgen(js_name = getSpaceProfile)]
     pub async fn get_space_profile(
         &self,
         space_id: String,
@@ -548,6 +551,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Update a space's encrypted JSON profile payload.
+    #[wasm_bindgen(js_name = updateSpaceProfile)]
     pub async fn update_space_profile(
         &self,
         space_id: String,
@@ -563,6 +567,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Update a space profile and replace its encrypted avatar asset.
+    #[wasm_bindgen(js_name = updateSpaceProfileWithAvatar)]
     pub async fn update_space_profile_with_avatar(
         &self,
         space_id: String,
@@ -592,6 +597,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Update a space profile and replace its encrypted cover asset.
+    #[wasm_bindgen(js_name = updateSpaceProfileWithCover)]
     pub async fn update_space_profile_with_cover(
         &self,
         space_id: String,
@@ -628,6 +634,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Update a space's slug.
+    #[wasm_bindgen(js_name = updateSpaceSlug)]
     pub async fn update_space_slug(
         &self,
         space_id: String,
@@ -638,6 +645,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Lookup public space metadata by slug.
+    #[wasm_bindgen(js_name = lookupSpaceBySlug)]
     pub async fn lookup_space_by_slug(
         &self,
         space_slug: String,
@@ -646,6 +654,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Return whether the target space is self, friend, or neither.
+    #[wasm_bindgen(js_name = getRelationship)]
     pub async fn get_relationship(
         &self,
         space_id: String,
@@ -661,6 +670,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Request to add a public username as a friend.
+    #[wasm_bindgen(js_name = requestFriendByUsername)]
     pub async fn request_friend_by_username(
         &self,
         space_id: String,
@@ -676,6 +686,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// List the current account feed with captions decrypted.
+    #[wasm_bindgen(js_name = listFeed)]
     pub async fn list_feed(
         &self,
         space_id: String,
@@ -712,11 +723,13 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Return whether the current account has unread notification activity.
+    #[wasm_bindgen(js_name = unreadStatus)]
     pub async fn unread_status(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
         swb::to_value(&self.inner.unread_status(&space_id).await?).map_err(Into::into)
     }
 
     /// Mark notification activity for one friend as read.
+    #[wasm_bindgen(js_name = markNotificationsRead)]
     pub async fn mark_notifications_read(
         &self,
         space_id: String,
@@ -732,6 +745,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// List posts on a space with captions decrypted.
+    #[wasm_bindgen(js_name = listPosts)]
     pub async fn list_posts(
         &self,
         space_id: String,
@@ -752,6 +766,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Fetch one post with its caption decrypted.
+    #[wasm_bindgen(js_name = getPost)]
     pub async fn get_post(
         &self,
         space_id: String,
@@ -778,6 +793,7 @@ impl SpaceAccountCtxHandle {
 
     /// Create a single-photo post with optional caption.
     #[allow(clippy::too_many_arguments)]
+    #[wasm_bindgen(js_name = createPhotoPost)]
     pub async fn create_photo_post(
         &self,
         space_id: String,
@@ -824,6 +840,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Download and decrypt one object from a space post.
+    #[wasm_bindgen(js_name = downloadPostAsset)]
     pub async fn download_post_asset(
         &self,
         space_id: String,
@@ -838,6 +855,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Download and decrypt one object from an already fetched space post.
+    #[wasm_bindgen(js_name = downloadPostAssetWithKey)]
     pub async fn download_post_asset_with_key(
         &self,
         space_id: String,
@@ -859,6 +877,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Download and decrypt a space avatar using an owned or friend space key.
+    #[wasm_bindgen(js_name = downloadSpaceAvatar)]
     pub async fn download_space_avatar(
         &self,
         space_id: String,
@@ -879,6 +898,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Download and decrypt a space cover using an owned or friend space key.
+    #[wasm_bindgen(js_name = downloadSpaceCover)]
     pub async fn download_space_cover(
         &self,
         space_id: String,
@@ -899,6 +919,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Like or unlike a post.
+    #[wasm_bindgen(js_name = likePost)]
     pub async fn like_post(
         &self,
         space_id: String,
@@ -909,6 +930,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Send a regular 1:1 message to a friend space.
+    #[wasm_bindgen(js_name = sendMessage)]
     pub async fn send_message(
         &self,
         sender_space_id: String,
@@ -927,6 +949,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Send a 1:1 reply to an existing message.
+    #[wasm_bindgen(js_name = replyToMessage)]
     pub async fn reply_to_message(
         &self,
         sender_space_id: String,
@@ -946,6 +969,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Send a private post reply message to the post owner.
+    #[wasm_bindgen(js_name = replyToPost)]
     pub async fn reply_to_post(
         &self,
         sender_space_id: String,
@@ -965,6 +989,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Like or unlike a message.
+    #[wasm_bindgen(js_name = likeMessage)]
     pub async fn like_message(
         &self,
         space_id: String,
@@ -981,6 +1006,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Delete a message sent by the current account.
+    #[wasm_bindgen(js_name = deleteMessage)]
     pub async fn delete_message(
         &self,
         space_id: String,
@@ -993,6 +1019,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// List current friends, pending requests, and latest chat summaries.
+    #[wasm_bindgen(js_name = listConversations)]
     pub async fn list_conversations(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
         let response = self.inner.list_conversations(&space_id).await?;
         let mut friends = Vec::with_capacity(response.friends.len());
@@ -1044,6 +1071,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// List a 1:1 message thread with decrypted messages.
+    #[wasm_bindgen(js_name = listMessageThread)]
     pub async fn list_message_thread(
         &self,
         viewer_space_id: String,
@@ -1069,6 +1097,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Update a post caption.
+    #[wasm_bindgen(js_name = updatePostCaption)]
     pub async fn update_post_caption(
         &self,
         space_id: String,
@@ -1095,6 +1124,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Delete a post.
+    #[wasm_bindgen(js_name = deletePost)]
     pub async fn delete_post(&self, space_id: String, post_id: i64) -> Result<(), WasmSpaceError> {
         self.inner
             .delete_post(&space_id, post_id)
@@ -1103,6 +1133,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// List friends for a space.
+    #[wasm_bindgen(js_name = listSpaceFriends)]
     pub async fn list_space_friends(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
         let friends = self.inner.list_space_friends(&space_id).await?;
         let mut items = Vec::with_capacity(friends.len());
@@ -1117,6 +1148,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// List incoming friend requests for the current account.
+    #[wasm_bindgen(js_name = listFriendRequests)]
     pub async fn list_friend_requests(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
         let requests = self.inner.list_friend_requests(&space_id).await?;
         let mut items = Vec::with_capacity(requests.len());
@@ -1131,6 +1163,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Confirm an incoming friend request.
+    #[wasm_bindgen(js_name = confirmFriendRequest)]
     pub async fn confirm_friend_request(
         &self,
         space_id: String,
@@ -1146,6 +1179,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Delete an incoming friend request.
+    #[wasm_bindgen(js_name = deleteFriendRequest)]
     pub async fn delete_friend_request(
         &self,
         space_id: String,
@@ -1158,6 +1192,7 @@ impl SpaceAccountCtxHandle {
     }
 
     /// Remove a friend by their space ID.
+    #[wasm_bindgen(js_name = removeFriendBySpace)]
     pub async fn remove_friend_by_space(
         &self,
         actor_space_id: String,
@@ -1170,11 +1205,13 @@ impl SpaceAccountCtxHandle {
     }
 
     /// List friend shares available to the current account.
+    #[wasm_bindgen(js_name = listFriendShares)]
     pub async fn list_friend_shares(&self, space_id: String) -> Result<JsValue, WasmSpaceError> {
         swb::to_value(&self.inner.list_friend_shares(&space_id).await?).map_err(Into::into)
     }
 
     /// Refresh friend shares for a rotated space key.
+    #[wasm_bindgen(js_name = refreshFriendShares)]
     pub async fn refresh_friend_shares(&self, space_id: String) -> Result<usize, WasmSpaceError> {
         self.inner
             .refresh_friend_shares(&space_id)
