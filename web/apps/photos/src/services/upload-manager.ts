@@ -10,7 +10,9 @@ import { ComlinkWorker } from "ente-base/worker/comlink-worker";
 import {
     markUploadedAndObtainProcessableItem,
     shouldDisableCFUploadProxy,
+    uploadPathPrefix,
     type ClusteredUploadItem,
+    type UploadItemAndPath,
     type UploadPhase,
     type UploadResult,
     type UploadableUploadItem,
@@ -872,6 +874,47 @@ const clusterLivePhotos = async (
         result.push({ ...f, isLivePhoto: f.isLivePhoto ?? false });
     }
     return result;
+};
+
+export const uploadableMediaCount = async (
+    itemGroups: UploadItemAndPath[][],
+): Promise<{ count: number; isTakeout: boolean }> => {
+    let localID = 0;
+    const namedItems = itemGroups.flatMap((items, collectionID) =>
+        items.map(([uploadItem, path]) =>
+            makeUploadItemWithCollectionIDAndName({
+                localID: localID++,
+                collectionID,
+                uploadItem,
+                pathPrefix: uploadPathPrefix(path),
+            }),
+        ),
+    );
+    const [metadataItems, mediaItems] = splitMetadataAndMediaItems(namedItems);
+    const parsedMetadataJSONMap = new Map<string, ParsedMetadataJSON>();
+
+    for (const {
+        uploadItem,
+        pathPrefix,
+        collectionID,
+        fileName,
+    } of metadataItems) {
+        const metadataJSON = await tryParseTakeoutMetadataJSON(uploadItem!);
+        if (metadataJSON) {
+            parsedMetadataJSONMap.set(
+                metadataJSONMapKeyForJSON(pathPrefix, collectionID, fileName),
+                metadataJSON,
+            );
+        }
+    }
+
+    return {
+        count: (await clusterLivePhotos(mediaItems, parsedMetadataJSONMap))
+            .length,
+        // The presence of Takeout metadata JSONs amongst the uploaded items
+        // indicates that this is a Google Takeout import.
+        isTakeout: parsedMetadataJSONMap.size > 0,
+    };
 };
 
 /**
