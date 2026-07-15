@@ -23,7 +23,7 @@ s3:
     # Only path-style URL works if disabling are_local_buckets with MinIO
     use_path_style_urls: true
     b2-eu-cen:
-      # Uncomment the below configuration to override the top-level configuration 
+      # Uncomment the below configuration to override the top-level configuration
       # are_local_buckets: true
       # use_path_style_urls: true
       key: <key>

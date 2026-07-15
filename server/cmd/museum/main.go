@@ -540,9 +540,9 @@ func main() {
 	paymentJwtAuthAPI := server.Group("/")
 	paymentJwtAuthAPI.Use(rateLimiter.GlobalRateLimiter(), authMiddleware.TokenAuthMiddleware(jwt.PAYMENT.Ptr()))
 
-	familiesJwtAuthAPI := server.Group("/")
+	familyAuthAPI := server.Group("/")
 	//The middleware order matters. First, the userID must be set in the context, so that we can apply limit for user.
-	familiesJwtAuthAPI.Use(rateLimiter.GlobalRateLimiter(), authMiddleware.TokenAuthMiddleware(jwt.FAMILIES.Ptr()), rateLimiter.APIRateLimitForUserMiddleware(urlSanitizer))
+	familyAuthAPI.Use(rateLimiter.GlobalRateLimiter(), authMiddleware.TokenOrJWTAuthMiddleware(jwt.FAMILIES), rateLimiter.APIRateLimitForUserMiddleware(urlSanitizer))
 
 	publicCollectionAPI := server.Group("/public-collection")
 	publicCollectionAPI.Use(
@@ -858,12 +858,12 @@ func main() {
 
 	privateAPI.DELETE("/family/leave", familyHandler.Leave) // native/web app
 
-	familiesJwtAuthAPI.POST("/family/create", familyHandler.CreateFamily)
-	familiesJwtAuthAPI.POST("/family/add-member", familyHandler.InviteMember)
-	familiesJwtAuthAPI.GET("/family/members", familyHandler.FetchMembers)
-	familiesJwtAuthAPI.DELETE("/family/remove-member/:id", familyHandler.RemoveMember)
-	familiesJwtAuthAPI.DELETE("/family/revoke-invite/:id", familyHandler.RevokeInvite)
-	familiesJwtAuthAPI.POST("/family/modify-storage", familyHandler.ModifyStorageLimit)
+	familyAuthAPI.POST("/family/create", familyHandler.CreateFamily)
+	familyAuthAPI.POST("/family/add-member", familyHandler.InviteMember)
+	familyAuthAPI.GET("/family/members", familyHandler.FetchMembers)
+	familyAuthAPI.DELETE("/family/remove-member/:id", familyHandler.RemoveMember)
+	familyAuthAPI.DELETE("/family/revoke-invite/:id", familyHandler.RevokeInvite)
+	familyAuthAPI.POST("/family/modify-storage", familyHandler.ModifyStorageLimit)
 
 	emergencyHandler := &api.EmergencyHandler{
 		Controller: emergencyCtrl,
