@@ -1,5 +1,4 @@
 import 'dart:async';
-import "dart:io" show Platform;
 import "dart:typed_data" show Float32List;
 
 import "package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart"
@@ -87,10 +86,6 @@ class MLComputer extends SuperIsolate {
         "text": query,
         "clipTextModelPath": modelPath,
         "clipTextVocabPath": vocabPath,
-        "preferCoreml": Platform.isIOS,
-        "preferNnapi": Platform.isAndroid,
-        "preferXnnpack": Platform.isAndroid,
-        "allowCpuFallback": true,
       });
       if (isolateResult is RustCorruptModelCacheDeletedException) {
         _clipTextModelPath = null;

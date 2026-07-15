@@ -1,28 +1,9 @@
 use ente_photos::ml::{
     error::MlError as SharedMlError,
     indexing as shared_indexing,
-    runtime::{ExecutionProviderPolicy, MlRuntimeConfig, ModelPaths},
+    runtime::{MlRuntimeConfig, ModelPaths},
     types as shared_types,
 };
-
-#[derive(Clone, Debug)]
-pub struct RustExecutionProviderPolicy {
-    pub prefer_coreml: bool,
-    pub prefer_nnapi: bool,
-    pub prefer_xnnpack: bool,
-    pub allow_cpu_fallback: bool,
-}
-
-impl Default for RustExecutionProviderPolicy {
-    fn default() -> Self {
-        Self {
-            prefer_coreml: true,
-            prefer_nnapi: true,
-            prefer_xnnpack: false,
-            allow_cpu_fallback: true,
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct RustModelPaths {
@@ -41,7 +22,6 @@ pub struct RustModelPaths {
 #[derive(Clone, Debug)]
 pub struct RustMlRuntimeConfig {
     pub model_paths: RustModelPaths,
-    pub provider_policy: RustExecutionProviderPolicy,
 }
 
 #[derive(Clone, Debug)]
@@ -52,7 +32,6 @@ pub struct AnalyzeImageRequest {
     pub run_clip: bool,
     pub run_pets: bool,
     pub model_paths: RustModelPaths,
-    pub provider_policy: RustExecutionProviderPolicy,
 }
 
 #[derive(Clone, Debug)]
@@ -151,7 +130,6 @@ pub struct RunClipTextRequest {
     pub text: String,
     pub model_path: String,
     pub vocab_path: String,
-    pub provider_policy: RustExecutionProviderPolicy,
 }
 
 #[derive(Clone, Debug)]
@@ -176,7 +154,6 @@ pub fn analyze_image_rust(req: AnalyzeImageRequest) -> Result<AnalyzeImageResult
         run_pets: req.run_pets,
         runtime_config: MlRuntimeConfig {
             model_paths: to_model_paths(&req.model_paths),
-            provider_policy: to_provider_policy(&req.provider_policy),
         },
     };
 
@@ -190,7 +167,6 @@ pub fn run_clip_text_rust(req: RunClipTextRequest) -> Result<RunClipTextResult, 
         text: req.text,
         model_path: req.model_path,
         vocab_path: req.vocab_path,
-        provider_policy: to_provider_policy(&req.provider_policy),
     };
 
     shared_indexing::run_clip_text(shared_req)
@@ -211,7 +187,6 @@ pub fn tokenize_clip_text_rust(text: String, vocab_path: String) -> Result<Vec<i
 fn to_runtime_config(config: &RustMlRuntimeConfig) -> MlRuntimeConfig {
     MlRuntimeConfig {
         model_paths: to_model_paths(&config.model_paths),
-        provider_policy: to_provider_policy(&config.provider_policy),
     }
 }
 
@@ -227,15 +202,6 @@ fn to_model_paths(paths: &RustModelPaths) -> ModelPaths {
         pet_body_detection: paths.pet_body_detection.clone(),
         pet_body_embedding_dog: paths.pet_body_embedding_dog.clone(),
         pet_body_embedding_cat: paths.pet_body_embedding_cat.clone(),
-    }
-}
-
-fn to_provider_policy(policy: &RustExecutionProviderPolicy) -> ExecutionProviderPolicy {
-    ExecutionProviderPolicy {
-        prefer_coreml: policy.prefer_coreml,
-        prefer_nnapi: policy.prefer_nnapi,
-        prefer_xnnpack: policy.prefer_xnnpack,
-        allow_cpu_fallback: policy.allow_cpu_fallback,
     }
 }
 

@@ -184,15 +184,16 @@ prepare_local_model_mirror_cache() {
   local downloaded=0
   local reused=0
   local failed=0
-  local -a model_files=(
-    "yolov5s_face_640_640_dynamic.onnx"
-    "mobilefacenet_opset15.onnx"
-    "mobileclip_s2_image.onnx"
+  local -a model_urls=(
+    "https://entedevassets.priem.dev/yolov5s_face_640_640_static_b1.onnx"
+    "https://entedevassets.priem.dev/mobilefacenet_prelu_static_b1.onnx"
+    "https://models.ente.com/mobileclip_s2_image.onnx"
   )
 
   mkdir -p "$model_dir"
 
-  for model_file in "${model_files[@]}"; do
+  for model_url in "${model_urls[@]}"; do
+    local model_file="${model_url##*/}"
     local target_path="$model_dir/$model_file"
     if [[ -f "$target_path" ]]; then
       reused=$((reused + 1))
@@ -200,7 +201,7 @@ prepare_local_model_mirror_cache() {
     fi
 
     local tmp_path="$target_path.tmp"
-    if curl -fsSL --retry 3 --retry-delay 1 "https://models.ente.io/$model_file" -o "$tmp_path"; then
+    if curl -fsSL --retry 3 --retry-delay 1 "$model_url" -o "$tmp_path"; then
       mv "$tmp_path" "$target_path"
       downloaded=$((downloaded + 1))
     else

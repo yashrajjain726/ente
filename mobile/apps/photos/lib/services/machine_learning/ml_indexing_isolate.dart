@@ -1,5 +1,3 @@
-import "dart:io" show Platform;
-
 import "package:flutter/foundation.dart" show debugPrint, kDebugMode;
 import "package:logging/logging.dart";
 import "package:photos/service_locator.dart" show flagService, localSettings;
@@ -187,10 +185,6 @@ class MLIndexingIsolate extends SuperIsolate {
       "petBodyDetectionModelPath": petBodyDetectionPath,
       "petBodyEmbeddingDogModelPath": petBodyEmbeddingDogPath,
       "petBodyEmbeddingCatModelPath": petBodyEmbeddingCatPath,
-      "preferCoreml": Platform.isIOS,
-      "preferNnapi": Platform.isAndroid,
-      "preferXnnpack": Platform.isAndroid,
-      "allowCpuFallback": true,
     };
   }
 

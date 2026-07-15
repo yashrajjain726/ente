@@ -1,30 +1,32 @@
 import "package:photos/services/machine_learning/ml_model.dart";
 
+const _optimizedModelBucketEndpoint = "https://entedevassets.priem.dev/";
+
 class FaceDetectionModel extends MlModelAsset {
-  static const remoteFileName = "yolov5s_face_640_640_dynamic.onnx";
+  static const remoteFileName = "yolov5s_face_640_640_static_b1.onnx";
   static const _sha256 =
-      "71a008707283b03db4881449a24f4da197f9dbd9ddaca5c91fcdb363fbf7e06f";
+      "e047647409403d52696035ecd445792173e50d7fbdcccac97b958a585db9aa3d";
 
   FaceDetectionModel._();
   static final instance = FaceDetectionModel._();
 
   @override
-  String get modelRemotePath => kModelBucketEndpoint + remoteFileName;
+  String get modelRemotePath => _optimizedModelBucketEndpoint + remoteFileName;
 
   @override
   String get modelSha256 => _sha256;
 }
 
 class FaceEmbeddingModel extends MlModelAsset {
-  static const remoteFileName = "mobilefacenet_opset15.onnx";
+  static const remoteFileName = "mobilefacenet_prelu_static_b1.onnx";
   static const _sha256 =
-      "472a0f7e24d0b070cbbdc031b085bc2a06c70655b3bdefb87dbd69bc98662f45";
+      "f525daf3089ec41c938a66c47cd8278c2a443f31ee2bd2dac987db531c58ccfd";
 
   FaceEmbeddingModel._();
   static final instance = FaceEmbeddingModel._();
 
   @override
-  String get modelRemotePath => kModelBucketEndpoint + remoteFileName;
+  String get modelRemotePath => _optimizedModelBucketEndpoint + remoteFileName;
 
   @override
   String get modelSha256 => _sha256;

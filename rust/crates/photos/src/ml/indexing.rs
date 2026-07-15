@@ -10,7 +10,7 @@ use crate::ml::{
         detect::{run_pet_body_detection, run_pet_face_detection},
         embed::{run_pet_body_embedding, run_pet_face_embedding},
     },
-    runtime::{self, ExecutionProviderPolicy, MlRuntimeConfig, ModelPaths},
+    runtime::{self, MlRuntimeConfig, ModelPaths},
     types::{self, ClipResult, Dimensions, FaceResult, PetBodyResult, PetFaceResult},
 };
 use ente_image::decode::decode_image_from_path;
@@ -40,7 +40,6 @@ pub struct RunClipTextRequest {
     pub text: String,
     pub model_path: String,
     pub vocab_path: String,
-    pub provider_policy: ExecutionProviderPolicy,
 }
 
 #[derive(Clone, Debug)]
@@ -143,7 +142,6 @@ pub fn run_clip_text(req: RunClipTextRequest) -> MlResult<RunClipTextResult> {
         text,
         model_path,
         vocab_path,
-        provider_policy,
     } = req;
 
     if model_path.trim().is_empty() {
@@ -170,7 +168,6 @@ pub fn run_clip_text(req: RunClipTextRequest) -> MlResult<RunClipTextResult> {
             pet_body_embedding_dog: String::new(),
             pet_body_embedding_cat: String::new(),
         },
-        provider_policy,
     };
 
     runtime::with_runtime(&runtime_config, |runtime| {

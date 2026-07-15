@@ -1,59 +1,41 @@
 use ort::{
-    ep::{CPU, ExecutionProviderDispatch, XNNPACK},
+    ep::{CPU, ExecutionProviderDispatch},
     session::{Session, builder::GraphOptimizationLevel},
     value::{Tensor, TensorElementType, ValueType},
 };
 
-// Temporarily disabled on Rust side to avoid iOS duplicate ObjC class collisions
-// (`CoreMLExecution`) while Dart ONNXRuntime is still linked in production.
-// Re-enable once iOS uses a single shared ORT runtime.
-// #[cfg(target_vendor = "apple")]
-// use ort::ep::CoreML;
 #[cfg(target_os = "android")]
-use ort::ep::NNAPI;
-
-use crate::ml::{
-    error::{MlError, MlResult},
-    runtime::ExecutionProviderPolicy,
+use ort::ep::XNNPACK;
+#[cfg(target_os = "ios")]
+use ort::ep::{
+    CoreML,
+    coreml::{ComputeUnits, ModelFormat, SpecializationStrategy},
 };
+#[cfg(target_os = "android")]
+use std::num::NonZeroUsize;
 
-pub fn build_session(model_path: &str, policy: &ExecutionProviderPolicy) -> MlResult<Session> {
-    let primary_providers = providers_for_policy(policy, true);
-    let mut attempts = vec![primary_providers];
+use crate::ml::error::{MlError, MlResult};
 
-    if policy.allow_cpu_fallback && policy.prefer_xnnpack {
-        let providers_without_xnnpack = providers_for_policy(policy, false);
-        attempts.push(providers_without_xnnpack);
-    }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ExecutionMode {
+    PlatformDefault,
+    CpuOnly,
+}
 
-    if policy.allow_cpu_fallback {
-        let cpu_only_policy = ExecutionProviderPolicy {
-            prefer_coreml: false,
-            prefer_nnapi: false,
-            prefer_xnnpack: false,
-            allow_cpu_fallback: true,
-        };
-        let cpu_only_providers = providers_for_policy(&cpu_only_policy, false);
-        attempts.push(cpu_only_providers);
+pub(crate) fn build_session(model_path: &str, mode: ExecutionMode) -> MlResult<Session> {
+    let primary = providers_for_mode(mode);
+    let has_preferred_provider = primary.has_preferred_provider;
+    let mut attempts = vec![primary];
+    if has_preferred_provider {
+        attempts.push(ProviderAttempt::cpu_only());
     }
 
     let mut errors = Vec::new();
-    for providers in attempts {
-        if providers.is_empty() {
-            continue;
-        }
-
-        match build_session_with_providers(model_path, providers) {
+    for attempt in attempts {
+        match build_session_with_providers(model_path, attempt) {
             Ok(session) => return Ok(session),
             Err(error) => errors.push(format!("{error}")),
         }
-    }
-
-    if errors.is_empty() {
-        return Err(MlError::InvalidRequest(
-            "no supported execution provider selected for this platform while CPU fallback is disabled"
-                .to_string(),
-        ));
     }
 
     if has_protobuf_parse_failure(&errors) {
@@ -74,44 +56,80 @@ fn has_protobuf_parse_failure(errors: &[String]) -> bool {
     })
 }
 
-fn providers_for_policy(
-    policy: &ExecutionProviderPolicy,
-    include_xnnpack: bool,
-) -> Vec<ExecutionProviderDispatch> {
-    let mut providers: Vec<ExecutionProviderDispatch> = Vec::new();
-
-    // Temporarily disabled on Rust side. Keep this block for easy re-enable.
-    // #[cfg(target_vendor = "apple")]
-    // if policy.prefer_coreml {
-    //     providers.push(CoreML::default().build());
-    // }
-
-    #[cfg(target_os = "android")]
-    if policy.prefer_nnapi {
-        // Prefer NNAPI accelerators and let ORT handle CPU fallback via the added CPU EP.
-        providers.push(NNAPI::default().with_disable_cpu(true).build());
-    }
-
-    if policy.allow_cpu_fallback {
-        if include_xnnpack && policy.prefer_xnnpack {
-            providers.push(XNNPACK::default().build());
-        }
-        providers.push(CPU::default().with_arena_allocator(true).build());
-    }
-
-    providers
+struct ProviderAttempt {
+    providers: Vec<ExecutionProviderDispatch>,
+    has_preferred_provider: bool,
+    uses_xnnpack: bool,
 }
 
-fn build_session_with_providers(
-    model_path: &str,
-    providers: Vec<ExecutionProviderDispatch>,
-) -> MlResult<Session> {
+impl ProviderAttempt {
+    fn cpu_only() -> Self {
+        Self {
+            providers: vec![CPU::default().with_arena_allocator(true).build()],
+            has_preferred_provider: false,
+            uses_xnnpack: false,
+        }
+    }
+}
+
+fn providers_for_mode(_mode: ExecutionMode) -> ProviderAttempt {
+    let mut providers: Vec<ExecutionProviderDispatch> = Vec::new();
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    let mut has_preferred_provider = false;
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    let has_preferred_provider = false;
+    #[cfg(not(target_os = "android"))]
+    let uses_xnnpack = false;
+    #[cfg(target_os = "android")]
+    let mut uses_xnnpack = false;
+
+    #[cfg(target_os = "ios")]
+    if _mode == ExecutionMode::PlatformDefault {
+        providers.push(
+            CoreML::default()
+                .with_model_format(ModelFormat::MLProgram)
+                .with_compute_units(ComputeUnits::All)
+                .with_specialization_strategy(SpecializationStrategy::Default)
+                .build()
+                .error_on_failure(),
+        );
+        has_preferred_provider = true;
+    }
+
+    #[cfg(target_os = "android")]
+    if _mode == ExecutionMode::PlatformDefault {
+        providers.push(xnnpack_provider());
+        has_preferred_provider = true;
+        uses_xnnpack = true;
+    }
+
+    providers.push(CPU::default().with_arena_allocator(true).build());
+
+    ProviderAttempt {
+        providers,
+        has_preferred_provider,
+        uses_xnnpack,
+    }
+}
+
+#[cfg(target_os = "android")]
+fn xnnpack_provider() -> ExecutionProviderDispatch {
+    XNNPACK::default()
+        .with_intra_op_num_threads(NonZeroUsize::new(4).expect("four is non-zero"))
+        .build()
+        .error_on_failure()
+}
+
+fn build_session_with_providers(model_path: &str, attempt: ProviderAttempt) -> MlResult<Session> {
     let mut builder = Session::builder()?
         .with_optimization_level(GraphOptimizationLevel::All)?
         .with_intra_threads(1)?
         .with_inter_threads(1)?;
 
-    builder = builder.with_execution_providers(providers)?;
+    if attempt.uses_xnnpack {
+        builder = builder.with_intra_op_spinning(false)?;
+    }
+    builder = builder.with_execution_providers(attempt.providers)?;
 
     let session = builder.commit_from_file(model_path)?;
     Ok(session)

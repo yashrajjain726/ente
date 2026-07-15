@@ -27,12 +27,6 @@ const _localMirrorBaseUrl = String.fromEnvironment(
 const _localModelMirrorRelativeDir = ".cache/local_model_mirror";
 
 const _parityReportDataKey = "ml_parity_results_json";
-const _modelBaseUrl = "https://models.ente.com/";
-const _modelFiles = <String>[
-  "yolov5s_face_640_640_dynamic.onnx",
-  "mobilefacenet_opset15.onnx",
-  "mobileclip_s2_image.onnx",
-];
 
 class _ManifestItem {
   final String fileID;
@@ -78,9 +72,8 @@ void runMLParityIntegrationTest({required String expectedPlatform}) {
           manifestItems: manifestItems,
           fixtureRoot: fixtureRoot,
         );
-        await _stageModelsFromLocalMirror(appSupportDir);
-
         final modelSpecs = _modelSpecs();
+        await _stageModelsFromLocalMirror(appSupportDir, modelSpecs);
         final loadedModels = await _downloadModels(modelSpecs);
 
         const runtime = "rust-ml";
@@ -271,7 +264,10 @@ Future<void> _stageFixturesFromLocalMirror({
   }
 }
 
-Future<void> _stageModelsFromLocalMirror(Directory appSupportDir) async {
+Future<void> _stageModelsFromLocalMirror(
+  Directory appSupportDir,
+  List<_ModelSpec> modelSpecs,
+) async {
   if (_localMirrorBaseUrl.isEmpty) {
     return;
   }
@@ -279,8 +275,9 @@ Future<void> _stageModelsFromLocalMirror(Directory appSupportDir) async {
   final assetsDir = Directory("${appSupportDir.path}/assets");
   await assetsDir.create(recursive: true);
 
-  for (final modelFile in _modelFiles) {
-    final canonicalURL = "$_modelBaseUrl$modelFile";
+  for (final modelSpec in modelSpecs) {
+    final canonicalURL = modelSpec.model.modelRemotePath;
+    final modelFile = Uri.parse(canonicalURL).pathSegments.last;
     final targetPath =
         "${assetsDir.path}/${_remoteAssetPathToLocalFileName(canonicalURL)}";
     final targetFile = File(targetPath);
@@ -445,10 +442,6 @@ Future<MLResult> _analyzeImage({
     "faceDetectionModelPath": faceDetectionModelPath,
     "faceEmbeddingModelPath": faceEmbeddingModelPath,
     "clipImageModelPath": clipImageModelPath,
-    "preferCoreml": Platform.isIOS,
-    "preferNnapi": Platform.isAndroid,
-    "preferXnnpack": Platform.isAndroid,
-    "allowCpuFallback": true,
   });
 
   final resultJSONString =

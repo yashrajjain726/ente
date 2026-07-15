@@ -12,7 +12,7 @@ use ente_photos::ml::{
     indexing::{
         AnalyzeImageRequest, AnalyzeImageResult, analyze_image, init_ml_runtime, release_ml_runtime,
     },
-    runtime::{ExecutionProviderPolicy, MlRuntimeConfig, ModelPaths},
+    runtime::{MlRuntimeConfig, ModelPaths},
     types::FaceResult as RustFaceResult,
 };
 use flate2::read::GzDecoder;
@@ -203,12 +203,6 @@ impl MlIndexingTestContext {
 
         let runtime_config = MlRuntimeConfig {
             model_paths: resolve_model_paths(&client, &cache_dir, &asset_lock.models)?,
-            provider_policy: ExecutionProviderPolicy {
-                prefer_coreml: false,
-                prefer_nnapi: false,
-                prefer_xnnpack: false,
-                allow_cpu_fallback: true,
-            },
         };
 
         Ok(Self {

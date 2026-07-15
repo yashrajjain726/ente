@@ -30,28 +30,32 @@ ort = { workspace = true, features = [
     "std",
     "ndarray",
     "half",
-    # Temporarily disabled to avoid iOS duplicate ObjC class collisions
-    # when both Dart ONNXRuntime and Rust ONNXRuntime are linked.
-    # Re-enable once we move to a single shared ORT runtime.
-    # "coreml",
+    # CoreML is the preferred iOS execution provider for Rust ML sessions.
+    "coreml",
     "api-27",
     # Link the revision-pinned crate's verified 1.27 archive directly into the
     # Rust ML library.
     "download-binaries",
     "tls-native",
-    "xnnpack",
 ] }
 
-[target.'cfg(not(target_os = "ios"))'.dependencies]
+[target.'cfg(target_os = "android")'.dependencies]
 ort = { workspace = true, features = [
     "ndarray",
     "half",
     "api-27",
     "load-dynamic",
     "copy-dylibs",
-    "coreml",
-    "nnapi",
     "xnnpack",
+] }
+
+[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
+ort = { workspace = true, features = [
+    "ndarray",
+    "half",
+    "api-27",
+    "load-dynamic",
+    "copy-dylibs",
 ] }
 
 [dev-dependencies]

@@ -189,12 +189,6 @@ Future<dynamic> isolateFunction(
             text: text,
             modelPath: clipTextModelPath,
             vocabPath: clipTextVocabPath,
-            providerPolicy: rust_ml.RustExecutionProviderPolicy(
-              preferCoreml: args["preferCoreml"] as bool? ?? true,
-              preferNnapi: args["preferNnapi"] as bool? ?? true,
-              preferXnnpack: args["preferXnnpack"] as bool? ?? false,
-              allowCpuFallback: args["allowCpuFallback"] as bool? ?? true,
-            ),
           ),
         );
       } on rust_ml.RustMlError_CorruptModel catch (e) {
@@ -401,13 +395,7 @@ Future<void> _ensureRustRuntimePrepared(Map<String, dynamic> args) async {
     petBodyEmbeddingCat:
         (args["petBodyEmbeddingCatModelPath"] as String?) ?? "",
   );
-  final providerPolicy = rust_ml.RustExecutionProviderPolicy(
-    preferCoreml: args["preferCoreml"] as bool? ?? true,
-    preferNnapi: args["preferNnapi"] as bool? ?? true,
-    preferXnnpack: args["preferXnnpack"] as bool? ?? false,
-    allowCpuFallback: args["allowCpuFallback"] as bool? ?? true,
-  );
-  final runtimeConfigKey = _runtimeConfigCacheKey(modelPaths, providerPolicy);
+  final runtimeConfigKey = _runtimeConfigCacheKey(modelPaths);
   final currentConfigKey =
       _isolateCache[_rustMlRuntimeConfigCacheKey] as String?;
   if (currentConfigKey == runtimeConfigKey) {
@@ -431,10 +419,7 @@ Future<void> _ensureRustRuntimePrepared(Map<String, dynamic> args) async {
   }
 
   await rust_ml.initMlRuntime(
-    config: rust_ml.RustMlRuntimeConfig(
-      modelPaths: modelPaths,
-      providerPolicy: providerPolicy,
-    ),
+    config: rust_ml.RustMlRuntimeConfig(modelPaths: modelPaths),
   );
   _isolateCache[_rustMlRuntimeConfigCacheKey] = runtimeConfigKey;
 }
@@ -452,10 +437,7 @@ Future<void> _releaseRustRuntime() async {
   _isolateCache.remove(_rustMlRuntimeConfigCacheKey);
 }
 
-String _runtimeConfigCacheKey(
-  rust_ml.RustModelPaths modelPaths,
-  rust_ml.RustExecutionProviderPolicy providerPolicy,
-) {
+String _runtimeConfigCacheKey(rust_ml.RustModelPaths modelPaths) {
   return [
     modelPaths.faceDetection,
     modelPaths.faceEmbedding,
@@ -467,9 +449,5 @@ String _runtimeConfigCacheKey(
     modelPaths.petBodyDetection,
     modelPaths.petBodyEmbeddingDog,
     modelPaths.petBodyEmbeddingCat,
-    providerPolicy.preferCoreml,
-    providerPolicy.preferNnapi,
-    providerPolicy.preferXnnpack,
-    providerPolicy.allowCpuFallback,
   ].join("|");
 }

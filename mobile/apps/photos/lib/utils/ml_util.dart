@@ -781,11 +781,6 @@ Future<MLResult> analyzeImageRust(Map args) async {
         args["petBodyEmbeddingDogModelPath"] as String?;
     final String? petBodyEmbeddingCatModelPath =
         args["petBodyEmbeddingCatModelPath"] as String?;
-    final bool preferCoreml = args["preferCoreml"] as bool? ?? true;
-    final bool preferNnapi = args["preferNnapi"] as bool? ?? true;
-    final bool preferXnnpack = args["preferXnnpack"] as bool? ?? false;
-    final bool allowCpuFallback = args["allowCpuFallback"] as bool? ?? true;
-
     bool isMissingModelPath(String? path) =>
         path == null || path.trim().isEmpty;
     final missingModelPaths = <String>[];
@@ -838,13 +833,6 @@ Future<MLResult> analyzeImageRust(Map args) async {
       petBodyEmbeddingDog: petBodyEmbeddingDogModelPath ?? "",
       petBodyEmbeddingCat: petBodyEmbeddingCatModelPath ?? "",
     );
-    final providerPolicy = rust_ml.RustExecutionProviderPolicy(
-      preferCoreml: preferCoreml,
-      preferNnapi: preferNnapi,
-      preferXnnpack: preferXnnpack,
-      allowCpuFallback: allowCpuFallback,
-    );
-
     Future<rust_ml.AnalyzeImageResult> runRustAnalyzeForPath(
       String analyzePath,
     ) {
@@ -856,7 +844,6 @@ Future<MLResult> analyzeImageRust(Map args) async {
           runClip: runClip,
           runPets: runPets,
           modelPaths: modelPaths,
-          providerPolicy: providerPolicy,
         ),
       );
     }
