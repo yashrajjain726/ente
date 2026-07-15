@@ -454,6 +454,8 @@
     "blocked_uploads_hint": "Your browser or an addon is preventing Ente from using <code>eTags</code> to upload large files.",
     "large_files": "Large files",
     "large_files_hint": "These files were not uploaded as they exceed our maximum file size limit",
+    "partner_shared_files": "Partner shared files",
+    "partner_shared_files_hint": "These files were skipped since they were shared with you via partner sharing in Google Photos",
     "insufficient_storage": "Insufficient storage",
     "insufficient_storage_hint": "These files were not uploaded as they exceed the maximum size limit for your storage plan",
     "uploads_in_progress": "Uploads in progress",
