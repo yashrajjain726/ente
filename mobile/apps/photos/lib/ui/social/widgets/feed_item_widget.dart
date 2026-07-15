@@ -13,9 +13,6 @@ import "package:photos/ui/sharing/user_avator_widget.dart";
 import "package:photos/ui/social/widgets/resolved_social_user_name.dart";
 import "package:photos/ui/social/widgets/shared_photos_grid.dart";
 import "package:photos/ui/viewer/file/thumbnail_widget.dart";
-import "package:photos/utils/avatar_util.dart";
-
-typedef _AvatarActor = ({User user, AvatarIdentity? fallbackIdentity});
 
 /// Widget that displays a single feed item.
 class FeedItemWidget extends StatelessWidget {
@@ -384,7 +381,7 @@ class _StackedAvatars extends StatelessWidget {
     if (displayCount == 1) {
       return _wrapActorTap(
         _buildSingleAvatar(actors.first, colorScheme),
-        actors.first.user,
+        actors.first,
       );
     }
 
@@ -408,11 +405,10 @@ class _StackedAvatars extends StatelessWidget {
                   ),
                 ),
                 child: UserAvatarWidget(
-                  actors.first.user,
+                  actors.first,
                   type: AvatarType.regular,
                   currentUserID: currentUserID,
                   addStroke: false,
-                  fallbackIdentity: actors.first.fallbackIdentity,
                 ),
               ),
             ),
@@ -428,33 +424,31 @@ class _StackedAvatars extends StatelessWidget {
                   ),
                 ),
                 child: UserAvatarWidget(
-                  actors[1].user,
+                  actors[1],
                   type: AvatarType.regular,
                   currentUserID: currentUserID,
                   addStroke: false,
-                  fallbackIdentity: actors[1].fallbackIdentity,
                 ),
               ),
             ),
           ],
         ),
       ),
-      actors.first.user,
+      actors.first,
     );
   }
 
-  Widget _buildSingleAvatar(_AvatarActor actor, EnteColorScheme colorScheme) {
+  Widget _buildSingleAvatar(User user, EnteColorScheme colorScheme) {
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: colorScheme.backgroundColour, width: 1.167),
       ),
       child: UserAvatarWidget(
-        actor.user,
+        user,
         type: AvatarType.regular,
         currentUserID: currentUserID,
         addStroke: false,
-        fallbackIdentity: actor.fallbackIdentity,
       ),
     );
   }
@@ -471,8 +465,8 @@ class _StackedAvatars extends StatelessWidget {
     );
   }
 
-  List<_AvatarActor> _getActors() {
-    final actors = <_AvatarActor>[];
+  List<User> _getActors() {
+    final users = <User>[];
     final maxActors = feedItem.actorCount.clamp(1, 2);
 
     for (int i = 0; i < maxActors; i++) {
@@ -482,26 +476,20 @@ class _StackedAvatars extends StatelessWidget {
       if (userID <= 0 && anonID != null) {
         // Anonymous user - use decrypted display name if available
         final displayName = anonDisplayNames[anonID] ?? anonID;
-        final user = User(
-          id: userID,
-          email: "$anonID@unknown.com",
-          name: displayName,
+        users.add(
+          User(id: userID, email: "$anonID@unknown.com", name: displayName),
         );
-        actors.add((
-          user: user,
-          fallbackIdentity: getAnonymousUserAvatarIdentity(user, anonID),
-        ));
       } else {
         // Get user from collections service
         final user = CollectionsService.instance.getFileOwner(
           userID,
           feedItem.collectionID,
         );
-        actors.add((user: user, fallbackIdentity: null));
+        users.add(user);
       }
     }
 
-    return actors;
+    return users;
   }
 }
 

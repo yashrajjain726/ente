@@ -26,12 +26,12 @@ void main() {
 
   test("falls back through stable IDs before name", () {
     expect(
-      avatarIdentityKey(
+      AvatarIdentity.account(
+        label: "Alice",
         email: "unknown@unknown.com",
         userID: 7,
-        personID: "person-1",
-        name: "Alice",
-      ),
+        currentUserEmail: null,
+      ).key,
       "user:7",
     );
     expect(
@@ -43,11 +43,18 @@ void main() {
   });
 
   test("anonymous identity is independent of its display name", () {
-    final before = AvatarIdentity.anonymous(
+    final before = AvatarIdentity.account(
       label: "Alice",
-      anonymousID: " Anon-1 ",
+      email: " Anon-1@unknown.com ",
+      userID: -1,
+      currentUserEmail: null,
     );
-    final after = AvatarIdentity.anonymous(label: "Bob", anonymousID: "anon-1");
+    final after = AvatarIdentity.account(
+      label: "Bob",
+      email: "anon-1@unknown.com",
+      userID: -1,
+      currentUserEmail: null,
+    );
 
     expect(before.key, "anonymous:anon-1");
     expect(after.key, before.key);

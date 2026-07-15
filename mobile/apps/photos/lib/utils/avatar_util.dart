@@ -37,20 +37,10 @@ class AvatarIdentity {
         email: normalizedEmail,
         userID: userID,
         personID: personID,
+        anonymousID: _anonymousIDFromPlaceholderEmail(email),
         name: label,
       ),
       role: role,
-    );
-  }
-
-  factory AvatarIdentity.anonymous({
-    required String label,
-    required String anonymousID,
-  }) {
-    return AvatarIdentity._(
-      label: label,
-      key: avatarIdentityKey(anonymousID: anonymousID, name: label),
-      role: AvatarIdentityRole.standard,
     );
   }
 
@@ -112,6 +102,17 @@ String? normalizeAvatarEmail(String? email) {
     return null;
   }
   return normalized;
+}
+
+String? _anonymousIDFromPlaceholderEmail(String? email) {
+  const suffix = "@unknown.com";
+  final normalized = email?.trim().toLowerCase();
+  if (normalized == null || !normalized.endsWith(suffix)) return null;
+  final anonymousID = normalized.substring(
+    0,
+    normalized.length - suffix.length,
+  );
+  return anonymousID.isEmpty ? null : anonymousID;
 }
 
 Color avatarBackgroundColor(BuildContext context, AvatarIdentity identity) {

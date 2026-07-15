@@ -21,7 +21,6 @@ import "package:photos/ui/social/widgets/comment_actions_popup.dart";
 import "package:photos/ui/social/widgets/comment_like_count_capsule.dart";
 import "package:photos/ui/social/widgets/delete_comment_confirmation_dialog.dart";
 import "package:photos/ui/social/widgets/resolved_social_user_name.dart";
-import "package:photos/utils/avatar_util.dart";
 import "package:photos/utils/social/relative_time_formatter.dart";
 
 final _logger = Logger("CommentBubbleWidget");
@@ -520,12 +519,6 @@ class _CommentBubbleWidgetState extends State<CommentBubbleWidget>
               child: _Header(
                 isOwnComment: widget.isOwnComment,
                 user: widget.user,
-                fallbackIdentity: widget.comment.anonUserID == null
-                    ? null
-                    : getAnonymousUserAvatarIdentity(
-                        widget.user,
-                        widget.comment.anonUserID!,
-                      ),
                 createdAt: widget.comment.createdAt,
                 currentUserID: widget.currentUserID,
                 onAuthorTap: widget.onAuthorTap,
@@ -825,7 +818,6 @@ class _CommentBubble extends StatelessWidget {
 class _Header extends StatelessWidget {
   final bool isOwnComment;
   final User user;
-  final AvatarIdentity? fallbackIdentity;
   final int createdAt;
   final int currentUserID;
   final VoidCallback? onAuthorTap;
@@ -833,7 +825,6 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.isOwnComment,
     required this.user,
-    required this.fallbackIdentity,
     required this.createdAt,
     required this.currentUserID,
     this.onAuthorTap,
@@ -918,7 +909,6 @@ class _Header extends StatelessWidget {
             type: AvatarType.regular,
             thumbnailView: true,
             addStroke: false,
-            fallbackIdentity: fallbackIdentity,
           ),
           const SizedBox(width: 10),
           Flexible(child: headerText),
@@ -931,7 +921,6 @@ class _Header extends StatelessWidget {
             type: AvatarType.regular,
             thumbnailView: true,
             addStroke: false,
-            fallbackIdentity: fallbackIdentity,
           ),
         ],
       ],
