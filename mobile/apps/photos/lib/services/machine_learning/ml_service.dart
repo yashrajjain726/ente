@@ -19,6 +19,7 @@ import "package:photos/models/file/file_type.dart";
 import "package:photos/models/ml/clip.dart";
 import "package:photos/models/ml/face/face.dart";
 import "package:photos/models/ml/ml_versions.dart";
+import "package:photos/module/download/file.dart";
 import "package:photos/service_locator.dart";
 import "package:photos/services/filedata/model/file_data.dart";
 import "package:photos/services/machine_learning/face_ml/face_clustering/face_clustering_service.dart";
@@ -975,6 +976,7 @@ class MLService {
           );
         }
       }
+      await _evictRemoteCacheAfterMLProcessing(instruction.file);
     }
   }
 
@@ -982,6 +984,25 @@ class MLService {
     return Platform.isIOS &&
         file.fileType != FileType.video &&
         !file.isRemoteOnlyFile;
+  }
+
+  bool _shouldEvictRemoteCacheAfterMLProcessing(EnteFile file) {
+    return file.isRemoteOnlyFile && file.fileType != FileType.video;
+  }
+
+  Future<void> _evictRemoteCacheAfterMLProcessing(EnteFile file) async {
+    if (!_shouldEvictRemoteCacheAfterMLProcessing(file)) {
+      return;
+    }
+    try {
+      await removeFromDownloadCache(file);
+    } catch (e, s) {
+      _logger.warning(
+        "Failed to evict remote file cached for ML for fileID ${file.uploadedFileID}",
+        e,
+        s,
+      );
+    }
   }
 
   bool _canRunMLFunction({required String function}) {
