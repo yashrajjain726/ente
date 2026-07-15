@@ -1,3 +1,5 @@
+import "package:ente_components/ente_components.dart";
+import "package:flutter/material.dart";
 import "package:flutter_test/flutter_test.dart";
 import "package:photos/utils/avatar_util.dart";
 
@@ -65,5 +67,34 @@ void main() {
 
     expect(identity.role, AvatarIdentityRole.standard);
     expect(identity.key, "person:person-1");
+  });
+
+  testWidgets("semantic avatar roles stay black across themes", (tester) async {
+    for (final theme in [
+      ComponentTheme.lightTheme(),
+      ComponentTheme.darkTheme(),
+    ]) {
+      for (final role in [
+        AvatarIdentityRole.currentUser,
+        AvatarIdentityRole.publicUploader,
+      ]) {
+        late Color backgroundColor;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Builder(
+              builder: (context) {
+                backgroundColor = avatarBackgroundColor(
+                  context,
+                  AvatarIdentity(label: "A", role: role),
+                );
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        );
+        expect(backgroundColor, Colors.black);
+      }
+    }
   });
 }

@@ -1,7 +1,15 @@
 import "package:ente_components/ente_components.dart";
 import "package:flutter/material.dart";
 
-enum AvatarIdentityRole { standard, currentUser, publicUploader }
+enum AvatarIdentityRole {
+  standard,
+
+  /// Kept black across themes to preserve the established "me" treatment.
+  currentUser,
+
+  /// A non-user uploading through a public Collect link.
+  publicUploader,
+}
 
 class AvatarIdentity {
   AvatarIdentity({

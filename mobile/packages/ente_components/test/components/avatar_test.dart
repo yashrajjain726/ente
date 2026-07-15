@@ -85,6 +85,12 @@ void main() {
             .first,
       );
       expect((cyanAvatar.decoration as BoxDecoration).color, avatarCyan);
+      final blackAvatar = tester.widget<DecoratedBox>(
+        find
+            .ancestor(of: find.text('P'), matching: find.byType(DecoratedBox))
+            .first,
+      );
+      expect((blackAvatar.decoration as BoxDecoration).color, Colors.black);
     },
   );
 
