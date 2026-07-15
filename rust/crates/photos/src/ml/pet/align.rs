@@ -1,12 +1,11 @@
-use fast_image_resize::{
-    FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer, images::Image as FirImage,
-};
 use image::{ImageBuffer, Rgb, RgbImage};
 
 use crate::ml::{
     error::{MlError, MlResult},
     types::{DecodedImage, PetAlignmentResult, PetFaceDetection, PetFaceResult, to_face_id},
 };
+
+use super::preprocess::{PixelCrop, resize_rgb_crop};
 
 const PET_FACE_CROP_SIZE: u32 = 224;
 /// Minimum eye distance in pixels below which alignment is skipped.
@@ -96,7 +95,7 @@ pub fn run_pet_face_alignment(
                 continue;
             }
 
-            let region = extract_rgb_region(decoded, region_x1, region_y1, region_w, region_h)?;
+            let region = RgbRegion::new(decoded, region_x1, region_y1, region_w, region_h)?;
 
             // Face center relative to the extracted region
             let local_cx = (box_x1 + box_x2) as f64 / 2.0 - region_x1 as f64;
@@ -151,9 +150,9 @@ pub fn run_pet_face_alignment(
 
 /// Rotate an image around a center point using bilinear interpolation
 /// with BORDER_REPLICATE behaviour (clamp to nearest edge pixel).
-fn rotate_around_center(source: &RgbImage, angle_rad: f64, cx: f64, cy: f64) -> RgbImage {
-    let w = source.width();
-    let h = source.height();
+fn rotate_around_center(source: &RgbRegion<'_>, angle_rad: f64, cx: f64, cy: f64) -> RgbImage {
+    let w = source.width;
+    let h = source.height;
     let cos_a = angle_rad.cos();
     let sin_a = angle_rad.sin();
 
@@ -184,10 +183,10 @@ fn rotate_around_center(source: &RgbImage, angle_rad: f64, cx: f64, cy: f64) -> 
             let fx = (sx - sx.floor()) as f32;
             let fy = (sy - sy.floor()) as f32;
 
-            let p00 = source.get_pixel(x0, y0).0;
-            let p10 = source.get_pixel(x1, y0).0;
-            let p01 = source.get_pixel(x0, y1).0;
-            let p11 = source.get_pixel(x1, y1).0;
+            let p00 = source.get_pixel(x0, y0);
+            let p10 = source.get_pixel(x1, y0);
+            let p01 = source.get_pixel(x0, y1);
+            let p11 = source.get_pixel(x1, y1);
 
             let mut px = [0u8; 3];
             for c in 0..3 {
@@ -206,7 +205,6 @@ fn rotate_around_center(source: &RgbImage, angle_rad: f64, cx: f64, cy: f64) -> 
 
 /// Crop a region from an RGB image and resize to 224×224 using bilinear interpolation.
 fn crop_and_resize_rgb(source: &RgbImage, x: u32, y: u32, w: u32, h: u32) -> MlResult<RgbImage> {
-    // Extract crop bytes
     let src_w = source.width();
     let src_h = source.height();
     // Clamp crop region to source bounds to avoid edge-replication artifacts.
@@ -217,53 +215,17 @@ fn crop_and_resize_rgb(source: &RgbImage, x: u32, y: u32, w: u32, h: u32) -> MlR
             "crop_and_resize_rgb: crop region extends beyond source image".to_string(),
         ));
     }
-    let mut crop_bytes = Vec::with_capacity((clamped_w as usize) * (clamped_h as usize) * 3);
-    for row in y..(y + clamped_h) {
-        for col in x..(x + clamped_w) {
-            let px = source.get_pixel(col, row).0;
-            crop_bytes.extend_from_slice(&px);
-        }
-    }
-
-    let src_img = FirImage::from_vec_u8(clamped_w, clamped_h, crop_bytes, PixelType::U8x3)
-        .map_err(|e| MlError::Preprocess(format!("FIR source: {e}")))?;
-
-    let mut dst_img = FirImage::new(PET_FACE_CROP_SIZE, PET_FACE_CROP_SIZE, PixelType::U8x3);
-    let mut resizer = Resizer::new();
-    let opts = ResizeOptions::new().resize_alg(ResizeAlg::Interpolation(FilterType::Bilinear));
-    resizer
-        .resize(&src_img, &mut dst_img, Some(&opts))
-        .map_err(|e| MlError::Preprocess(format!("FIR resize: {e}")))?;
-
-    let buf = dst_img.into_vec();
-    ImageBuffer::<Rgb<u8>, _>::from_raw(PET_FACE_CROP_SIZE, PET_FACE_CROP_SIZE, buf)
-        .ok_or_else(|| MlError::Preprocess("failed to build aligned face image".to_string()))
-}
-
-/// Extract a rectangular region from the decoded image without cloning
-/// the entire buffer.
-fn extract_rgb_region(
-    decoded: &DecodedImage,
-    x: u32,
-    y: u32,
-    w: u32,
-    h: u32,
-) -> MlResult<RgbImage> {
-    let img_w = decoded.dimensions.width as usize;
-    let mut buf = Vec::with_capacity((w as usize) * (h as usize) * 3);
-    for row in y..(y + h) {
-        let start = ((row as usize) * img_w + (x as usize)) * 3;
-        let end = start + (w as usize) * 3;
-        if end > decoded.rgb.len() {
-            return Err(MlError::Preprocess(format!(
-                "region row {row} out of bounds (end={end}, len={})",
-                decoded.rgb.len()
-            )));
-        }
-        buf.extend_from_slice(&decoded.rgb[start..end]);
-    }
-    ImageBuffer::<Rgb<u8>, _>::from_raw(w, h, buf)
-        .ok_or_else(|| MlError::Preprocess("failed to build region image".to_string()))
+    resize_crop_to_image(
+        source.as_raw(),
+        src_w,
+        src_h,
+        PixelCrop {
+            x,
+            y,
+            width: clamped_w,
+            height: clamped_h,
+        },
+    )
 }
 
 /// Crop directly from decoded image bytes and resize — avoids building a
@@ -275,33 +237,76 @@ fn crop_and_resize_decoded(
     w: u32,
     h: u32,
 ) -> MlResult<RgbImage> {
-    let img_w = decoded.dimensions.width as usize;
-    let mut crop_bytes = Vec::with_capacity((w as usize) * (h as usize) * 3);
-    for row in y..(y + h) {
-        let start = ((row as usize) * img_w + (x as usize)) * 3;
-        let end = start + (w as usize) * 3;
-        if end > decoded.rgb.len() {
-            return Err(MlError::Preprocess(format!(
-                "crop row {row} out of bounds (end={end}, len={})",
-                decoded.rgb.len()
-            )));
-        }
-        crop_bytes.extend_from_slice(&decoded.rgb[start..end]);
-    }
+    resize_crop_to_image(
+        &decoded.rgb,
+        decoded.dimensions.width,
+        decoded.dimensions.height,
+        PixelCrop {
+            x,
+            y,
+            width: w,
+            height: h,
+        },
+    )
+}
 
-    let src_img = FirImage::from_vec_u8(w, h, crop_bytes, PixelType::U8x3)
-        .map_err(|e| MlError::Preprocess(format!("FIR source: {e}")))?;
-
-    let mut dst_img = FirImage::new(PET_FACE_CROP_SIZE, PET_FACE_CROP_SIZE, PixelType::U8x3);
-    let mut resizer = Resizer::new();
-    let opts = ResizeOptions::new().resize_alg(ResizeAlg::Interpolation(FilterType::Bilinear));
-    resizer
-        .resize(&src_img, &mut dst_img, Some(&opts))
-        .map_err(|e| MlError::Preprocess(format!("FIR resize: {e}")))?;
-
-    let buf = dst_img.into_vec();
+fn resize_crop_to_image(
+    rgb: &[u8],
+    source_width: u32,
+    source_height: u32,
+    crop: PixelCrop,
+) -> MlResult<RgbImage> {
+    let buf = resize_rgb_crop(rgb, source_width, source_height, crop, PET_FACE_CROP_SIZE)?;
     ImageBuffer::<Rgb<u8>, _>::from_raw(PET_FACE_CROP_SIZE, PET_FACE_CROP_SIZE, buf)
         .ok_or_else(|| MlError::Preprocess("failed to build aligned face image".to_string()))
+}
+
+/// A row-strided view into a rectangular region of the decoded RGB buffer.
+struct RgbRegion<'a> {
+    rgb: &'a [u8],
+    image_width: usize,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+}
+
+impl<'a> RgbRegion<'a> {
+    fn new(decoded: &'a DecodedImage, x: u32, y: u32, width: u32, height: u32) -> MlResult<Self> {
+        if width == 0
+            || height == 0
+            || x > decoded.dimensions.width.saturating_sub(width)
+            || y > decoded.dimensions.height.saturating_sub(height)
+        {
+            return Err(MlError::Preprocess(
+                "RGB region extends beyond decoded image".to_string(),
+            ));
+        }
+        let expected_len = (decoded.dimensions.width as usize)
+            .checked_mul(decoded.dimensions.height as usize)
+            .and_then(|pixels| pixels.checked_mul(3))
+            .ok_or_else(|| MlError::Preprocess("decoded RGB dimensions overflow".to_string()))?;
+        if decoded.rgb.len() < expected_len {
+            return Err(MlError::Preprocess(
+                "decoded RGB buffer is shorter than its dimensions".to_string(),
+            ));
+        }
+
+        Ok(Self {
+            rgb: &decoded.rgb,
+            image_width: decoded.dimensions.width as usize,
+            x,
+            y,
+            width,
+            height,
+        })
+    }
+
+    #[inline]
+    fn get_pixel(&self, x: u32, y: u32) -> [u8; 3] {
+        let pixel = ((self.y + y) as usize * self.image_width + (self.x + x) as usize) * 3;
+        [self.rgb[pixel], self.rgb[pixel + 1], self.rgb[pixel + 2]]
+    }
 }
 
 /// Convert an aligned pet face image to ImageNet-normalized CHW tensor.

@@ -5,7 +5,7 @@ use crate::ml::{
     types::{DecodedImage, PetBodyResult, PetFaceResult},
 };
 
-use super::preprocess::{extract_crop, preprocess_pet_embedding};
+use super::preprocess::preprocess_pet_embedding;
 
 const FACE_EMBED_INPUT_SIZE: i64 = 224;
 const BODY_EMBED_INPUT_SIZE: i64 = 224;
@@ -148,9 +148,7 @@ pub fn run_pet_body_embedding(
     let mut cat_indices = Vec::new();
     let mut preprocessed: Vec<Option<Vec<f32>>> = Vec::with_capacity(body_results.len());
     for (i, body_result) in body_results.iter().enumerate() {
-        let crop = extract_crop(decoded, &body_result.detection.box_xyxy).and_then(
-            |(crop_data, crop_w, crop_h)| preprocess_pet_embedding(&crop_data, crop_w, crop_h),
-        );
+        let crop = preprocess_pet_embedding(decoded, &body_result.detection.box_xyxy);
         match crop {
             Ok(input) => {
                 preprocessed.push(Some(input));
