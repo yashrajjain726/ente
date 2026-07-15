@@ -33,45 +33,62 @@ struct FaceDetectionAbsolute {
 
 pub fn run_face_alignment(
     file_id: i64,
-    decoded: &DecodedImage,
+    decoded: &mut DecodedImage,
     detections: Vec<FaceDetection>,
 ) -> MlResult<(Vec<Vec<f32>>, Vec<FaceResult>)> {
-    let source = rgb_image_from_decoded(decoded)?;
+    let image_width = decoded.dimensions.width;
+    let image_height = decoded.dimensions.height;
+    let source = take_rgb_image(decoded)?;
     let mut aligned_face_inputs = Vec::with_capacity(detections.len());
     let mut face_results = Vec::with_capacity(detections.len());
 
-    for detection in detections {
-        let absolute_detection = to_absolute_detection(
-            &detection,
-            decoded.dimensions.width,
-            decoded.dimensions.height,
-        );
-        let alignment = estimate_similarity_transform(&absolute_detection.keypoints)?;
-        let aligned = warp_face_image(&source, &alignment.affine_matrix)?;
-        let normalized = normalize_face_rgb_for_mobilefacenet(&aligned);
-        let blur_value = compute_blur_value(&aligned, face_direction(&absolute_detection));
-        let face_id = to_face_id(file_id, detection.box_xyxy);
+    let result = (|| {
+        for detection in detections {
+            let absolute_detection = to_absolute_detection(&detection, image_width, image_height);
+            let alignment = estimate_similarity_transform(&absolute_detection.keypoints)?;
+            let aligned = warp_face_image(&source, &alignment.affine_matrix)?;
+            let normalized = normalize_face_rgb_for_mobilefacenet(&aligned);
+            let blur_value = compute_blur_value(&aligned, face_direction(&absolute_detection));
+            let face_id = to_face_id(file_id, detection.box_xyxy);
 
-        aligned_face_inputs.push(normalized);
-        face_results.push(FaceResult {
-            detection,
-            blur_value,
-            alignment,
-            embedding: Vec::new(),
-            face_id,
-        });
-    }
+            aligned_face_inputs.push(normalized);
+            face_results.push(FaceResult {
+                detection,
+                blur_value,
+                alignment,
+                embedding: Vec::new(),
+                face_id,
+            });
+        }
 
-    Ok((aligned_face_inputs, face_results))
+        Ok((aligned_face_inputs, face_results))
+    })();
+
+    // `imageproc::warp_into` requires an owned `RgbImage`. Put its allocation
+    // back so later indexing stages continue to borrow the decoded pixels.
+    decoded.rgb = source.into_raw();
+    result
 }
 
-fn rgb_image_from_decoded(decoded: &DecodedImage) -> MlResult<RgbImage> {
-    ImageBuffer::<Rgb<u8>, _>::from_raw(
+fn take_rgb_image(decoded: &mut DecodedImage) -> MlResult<RgbImage> {
+    let expected_len = (decoded.dimensions.width as usize)
+        .checked_mul(decoded.dimensions.height as usize)
+        .and_then(|pixels| pixels.checked_mul(3))
+        .ok_or_else(|| MlError::Preprocess("RGB source dimensions overflow".to_string()))?;
+    if decoded.rgb.len() != expected_len {
+        return Err(MlError::Preprocess(format!(
+            "invalid RGB source length: expected {expected_len}, got {}",
+            decoded.rgb.len()
+        )));
+    }
+
+    let rgb = std::mem::take(&mut decoded.rgb);
+    Ok(ImageBuffer::<Rgb<u8>, _>::from_raw(
         decoded.dimensions.width,
         decoded.dimensions.height,
-        decoded.rgb.clone(),
+        rgb,
     )
-    .ok_or_else(|| MlError::Preprocess("failed to build RGB source image".to_string()))
+    .expect("validated RGB source dimensions and length"))
 }
 
 fn to_absolute_detection(
@@ -381,4 +398,29 @@ fn variance_2d(matrix: &[i32], rows: usize, cols: usize) -> f32 {
         variance += diff * diff;
     }
     variance / total
+}
+
+#[cfg(test)]
+mod tests {
+    use super::run_face_alignment;
+    use crate::ml::types::{DecodedImage, Dimensions};
+
+    #[test]
+    fn face_alignment_restores_the_decoded_rgb_allocation() {
+        let mut decoded = DecodedImage {
+            dimensions: Dimensions {
+                width: 2,
+                height: 2,
+            },
+            rgb: (0..12).collect(),
+        };
+        let allocation = decoded.rgb.as_ptr();
+
+        let (aligned, results) = run_face_alignment(1, &mut decoded, Vec::new()).unwrap();
+
+        assert!(aligned.is_empty());
+        assert!(results.is_empty());
+        assert_eq!(decoded.rgb, (0..12).collect::<Vec<_>>());
+        assert_eq!(decoded.rgb.as_ptr(), allocation);
+    }
 }

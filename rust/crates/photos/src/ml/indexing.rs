@@ -69,7 +69,7 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
     } = req;
 
     runtime::with_runtime(&model_paths, |runtime| {
-        let decoded = decode_image_from_path(&image_path)?;
+        let mut decoded = decode_image_from_path(&image_path)?;
         let dims = decoded.dimensions.clone();
         let detector_input = (run_faces || run_pets)
             .then(|| preprocess::preprocess_yolo(&decoded))
@@ -86,7 +86,7 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
                 Some(Vec::new())
             } else {
                 let (aligned, mut face_results) =
-                    run_face_alignment(file_id, &decoded, detections)?;
+                    run_face_alignment(file_id, &mut decoded, detections)?;
                 run_face_embedding(runtime, aligned, &mut face_results)?;
                 Some(face_results)
             }
