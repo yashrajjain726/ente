@@ -708,7 +708,7 @@ class _HomePageState extends UploaderPageState<HomePage>
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: HomeEmptyStateWidget(
                       isLoading: _isSyncing,
-                      onSetupLegacy: () => openLegacyPage(context),
+                      onSetupLegacy: () => openLegacyFromHome(context),
                       onSaveToLocker: _openSavePage,
                     ),
                   ),
@@ -745,7 +745,7 @@ class _HomePageState extends UploaderPageState<HomePage>
       children: [
         LockerHomeHeader(
           scaffoldKey: scaffoldKey,
-          onLegacyTapped: () => unawaited(openLegacyPage(context)),
+          onLegacyTapped: () => unawaited(openLegacyFromHome(context)),
           isSyncing: _isSyncing,
         ),
         if (!isHomeEmptyState) _buildSearchBar(),

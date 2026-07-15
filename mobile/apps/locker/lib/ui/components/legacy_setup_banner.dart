@@ -1,6 +1,8 @@
 import "dart:async";
 
 import "package:ente_components/ente_components.dart";
+import "package:ente_events/event_bus.dart";
+import "package:ente_legacy/events/legacy_kit_created_event.dart";
 import "package:ente_legacy/services/emergency_service.dart";
 import "package:ente_legacy/services/legacy_kit_service.dart";
 import "package:flutter/material.dart";
@@ -46,12 +48,23 @@ class _LegacySetupBannerState extends State<LegacySetupBanner> {
   static const _contentRightReserve = 150.0;
 
   final _logger = Logger("LegacySetupBanner");
+  late final StreamSubscription<LegacyKitCreatedEvent>
+  _legacyKitCreatedSubscription;
   bool _shouldShow = false;
 
   @override
   void initState() {
     super.initState();
+    _legacyKitCreatedSubscription = Bus.instance
+        .on<LegacyKitCreatedEvent>()
+        .listen((_) => unawaited(_evaluateVisibility()));
     unawaited(_evaluateVisibility());
+  }
+
+  @override
+  void dispose() {
+    _legacyKitCreatedSubscription.cancel();
+    super.dispose();
   }
 
   Future<void> _evaluateVisibility() async {
@@ -64,7 +77,12 @@ class _LegacySetupBannerState extends State<LegacySetupBanner> {
       final legacyConfigured =
           info.contacts.isNotEmpty || await _hasLegacyKit();
       if (!mounted) return;
-      _setShouldShow(!legacyConfigured);
+      if (legacyConfigured) {
+        _setShouldShow(false);
+        await LocalSettings.instance.setLegacySetupBannerDismissed(true);
+        return;
+      }
+      _setShouldShow(!LocalSettings.instance.isLegacySetupBannerDismissed);
     } catch (e, s) {
       _logger.warning("Failed to fetch legacy info for banner", e, s);
     }
@@ -87,7 +105,7 @@ class _LegacySetupBannerState extends State<LegacySetupBanner> {
   }
 
   void _onSetup() {
-    unawaited(openLegacyPage(context));
+    unawaited(openLegacyFromHome(context));
   }
 
   Future<void> _onDismiss() async {
@@ -117,8 +135,8 @@ class _LegacySetupBannerState extends State<LegacySetupBanner> {
             child: Stack(
               children: [
                 Positioned(
-                  right: -8,
-                  bottom: -8,
+                  right: 24,
+                  bottom: -12,
                   child: IgnorePointer(
                     child: Image.asset(
                       "assets/legacy_banner.png",
@@ -155,15 +173,22 @@ class _LegacySetupBannerState extends State<LegacySetupBanner> {
                   ),
                 ),
                 Positioned(
-                  top: 18,
+                  top: 20,
                   right: 16,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: _onDismiss,
-                    child: HugeIcon(
-                      icon: HugeIcons.strokeRoundedCancel01,
-                      color: colors.specialWhite,
-                      size: 18,
+                    child: SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedCancel01,
+                          color: colors.specialWhite,
+                          size: 18,
+                        ),
+                      ),
                     ),
                   ),
                 ),
