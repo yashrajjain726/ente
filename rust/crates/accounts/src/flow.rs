@@ -1239,10 +1239,10 @@ mod tests {
         }
     }
 
-    fn make_client(base_url: String) -> AccountsClient {
+    fn make_client(origin: String) -> AccountsClient {
         AccountsClient::new(
             AccountsClientConfig::new("io.ente.photos")
-                .with_base_url(base_url)
+                .with_origin(origin)
                 .with_user_agent("ente-accounts-test"),
         )
         .unwrap()

@@ -223,6 +223,7 @@ func main() {
 	authCache := cache.New(1*time.Minute, 15*time.Minute)
 	accessTokenCache := cache.New(1*time.Minute, 15*time.Minute)
 	discordController := discord.NewDiscordController(userRepo, hostName, environment)
+	userLookupController := controller.NewUserLookupController(userRepo, discordController)
 	rateLimiter := middleware.NewRateLimitMiddleware(discordController, 1000, 1*time.Second)
 	defer rateLimiter.Stop()
 
@@ -301,13 +302,15 @@ func main() {
 	reactionsRepo := &socialrepo.ReactionsRepository{DB: db}
 	anonUsersRepo := &socialrepo.AnonUsersRepository{DB: db}
 	commentsController := &socialcontroller.CommentsController{
-		Repo:       commentsRepo,
-		AccessCtrl: accessCtrl,
+		Repo:           commentsRepo,
+		CollectionRepo: collectionRepo,
+		AccessCtrl:     accessCtrl,
 	}
 	reactionsController := &socialcontroller.ReactionsController{
-		Repo:         reactionsRepo,
-		CommentsRepo: commentsRepo,
-		AccessCtrl:   accessCtrl,
+		Repo:           reactionsRepo,
+		CommentsRepo:   commentsRepo,
+		CollectionRepo: collectionRepo,
+		AccessCtrl:     accessCtrl,
 	}
 	socialController := &socialcontroller.Controller{
 		CommentsRepo:   commentsRepo,
@@ -316,7 +319,7 @@ func main() {
 		AccessCtrl:     accessCtrl,
 		AnonUsersRepo:  anonUsersRepo,
 	}
-	fileDataCtrl := filedata.New(fileDataRepo, accessCtrl, objectCleanupController, s3Config, fileRepo, collectionRepo)
+	fileDataCtrl := filedata.New(fileDataRepo, accessCtrl, objectCleanupController, s3Config, fileRepo, collectionRepo, discordController)
 
 	fileController := &controller.FileController{
 		FileRepo:              fileRepo,
@@ -356,6 +359,7 @@ func main() {
 	familyController := &family.Controller{
 		FamilyRepo:      familyRepo,
 		BillingCtrl:     billingController,
+		UserLookup:      userLookupController,
 		UserRepo:        userRepo,
 		UserCacheCtrl:   userCacheCtrl,
 		UsageRepo:       usageRepo,
@@ -402,6 +406,7 @@ func main() {
 		TrashRepo:             trashRepo,
 		CastRepo:              &castDb,
 		BillingCtrl:           billingController,
+		UserLookup:            userLookupController,
 		QueueRepo:             queueRepo,
 		TaskRepo:              taskLockingRepo,
 		CollectionActionsRepo: collectionActionRepo,
@@ -439,6 +444,7 @@ func main() {
 		billingController,
 		familyController,
 		discordController,
+		userLookupController,
 		mailingListsController,
 		pushController,
 		userCache,
@@ -542,9 +548,9 @@ func main() {
 	paymentJwtAuthAPI := server.Group("/")
 	paymentJwtAuthAPI.Use(rateLimiter.GlobalRateLimiter(), authMiddleware.TokenAuthMiddleware(jwt.PAYMENT.Ptr()))
 
-	familiesJwtAuthAPI := server.Group("/")
+	familyAuthAPI := server.Group("/")
 	//The middleware order matters. First, the userID must be set in the context, so that we can apply limit for user.
-	familiesJwtAuthAPI.Use(rateLimiter.GlobalRateLimiter(), authMiddleware.TokenAuthMiddleware(jwt.FAMILIES.Ptr()), rateLimiter.APIRateLimitForUserMiddleware(urlSanitizer))
+	familyAuthAPI.Use(rateLimiter.GlobalRateLimiter(), authMiddleware.TokenOrJWTAuthMiddleware(jwt.FAMILIES), rateLimiter.APIRateLimitForUserMiddleware(urlSanitizer))
 
 	publicCollectionAPI := server.Group("/public-collection")
 	publicCollectionAPI.Use(
@@ -600,7 +606,9 @@ func main() {
 	storageAPI.POST("/files/upload-url", fileHandler.GetUploadURLV2)
 	storageAPI.POST("/files/multipart-upload-url", fileHandler.GetMultipartUploadURLV2)
 	storageAPI.GET("/files/download/:fileID", fileHandler.Get)
+	storageAPI.GET("/files/download/v2/:fileID", fileHandler.GetV2)
 	storageAPI.GET("/files/preview/:fileID", fileHandler.GetThumbnail)
+	storageAPI.GET("/files/preview/v2/:fileID", fileHandler.GetThumbnailV2)
 
 	storageAPI.POST("/files/share-url", fileHandler.ShareUrl)
 	storageAPI.GET("/files/share-url", fileHandler.GetUrls)
@@ -624,7 +632,6 @@ func main() {
 	storageAPI.POST("/files/size", fileHandler.GetSize)
 	storageAPI.POST("/files/info", fileHandler.GetInfo)
 	storageAPI.GET("/files/duplicates", fileHandler.GetDuplicates)
-	storageAPI.GET("/files/large-thumbnails", fileHandler.GetLargeThumbnailFiles)
 	storageAPI.PUT("/files/thumbnail", fileHandler.UpdateThumbnail)
 	storageAPI.PUT("/files/magic-metadata", fileHandler.UpdateMagicMetadata)
 	storageAPI.PUT("/files/public-magic-metadata", fileHandler.UpdatePublicMagicMetadata)
@@ -665,6 +672,7 @@ func main() {
 	emergencyCtrl := &emergency.Controller{
 		Repo:              emergencyContactRepository,
 		UserRepo:          userRepo,
+		UserLookup:        userLookupController,
 		UserCtrl:          userController,
 		PasskeyController: passkeyCtrl,
 		LockCtrl:          lockController,
@@ -779,9 +787,7 @@ func main() {
 	publicCollectionAPI.GET("/files/data/preview", publicCollectionHandler.GetPreviewURL)
 	publicCollectionAPI.GET("/diff", publicCollectionHandler.GetDiff)
 	publicCollectionAPI.GET("/info", publicCollectionHandler.GetCollection)
-	publicCollectionAPI.GET("/upload-urls", publicCollectionHandler.GetUploadUrls)
 	publicCollectionAPI.POST("/upload-url", publicCollectionHandler.GetUploadURLV2)
-	publicCollectionAPI.GET("/multipart-upload-urls", publicCollectionHandler.GetMultipartUploadURLs)
 	publicCollectionAPI.POST("/multipart-upload-url", publicCollectionHandler.GetMultipartUploadURLV2)
 	publicCollectionAPI.POST("/file", publicCollectionHandler.CreateFile)
 	publicCollectionAPI.POST("/verify-password", publicCollectionHandler.VerifyPassword)
@@ -861,12 +867,12 @@ func main() {
 
 	privateAPI.DELETE("/family/leave", familyHandler.Leave) // native/web app
 
-	familiesJwtAuthAPI.POST("/family/create", familyHandler.CreateFamily)
-	familiesJwtAuthAPI.POST("/family/add-member", familyHandler.InviteMember)
-	familiesJwtAuthAPI.GET("/family/members", familyHandler.FetchMembers)
-	familiesJwtAuthAPI.DELETE("/family/remove-member/:id", familyHandler.RemoveMember)
-	familiesJwtAuthAPI.DELETE("/family/revoke-invite/:id", familyHandler.RevokeInvite)
-	familiesJwtAuthAPI.POST("/family/modify-storage", familyHandler.ModifyStorageLimit)
+	familyAuthAPI.POST("/family/create", familyHandler.CreateFamily)
+	familyAuthAPI.POST("/family/add-member", familyHandler.InviteMember)
+	familyAuthAPI.GET("/family/members", familyHandler.FetchMembers)
+	familyAuthAPI.DELETE("/family/remove-member/:id", familyHandler.RemoveMember)
+	familyAuthAPI.DELETE("/family/revoke-invite/:id", familyHandler.RevokeInvite)
+	familyAuthAPI.POST("/family/modify-storage", familyHandler.ModifyStorageLimit)
 
 	emergencyHandler := &api.EmergencyHandler{
 		Controller: emergencyCtrl,
@@ -1413,14 +1419,14 @@ func cacheHeaders() gin.HandlerFunc {
 		// Add "Cache-Control: no-store" to HTTP GET API responses.
 		if c.Request.Method == http.MethodGet {
 			reqPath := urlSanitizer(c)
-			if strings.HasPrefix(reqPath, "/files/preview/") ||
-				strings.HasPrefix(reqPath, "/files/download/") ||
-				strings.HasPrefix(reqPath, "/public-collection/files/preview/") ||
-				strings.HasPrefix(reqPath, "/public-collection/files/download/") ||
-				strings.HasPrefix(reqPath, "/public-memory/files/preview/") ||
-				strings.HasPrefix(reqPath, "/public-memory/files/download/") ||
-				strings.HasPrefix(reqPath, "/cast/files/preview/") ||
-				strings.HasPrefix(reqPath, "/cast/files/download/") {
+			if reqPath == "/files/preview/:fileID" ||
+				reqPath == "/files/download/:fileID" ||
+				reqPath == "/public-collection/files/preview/:fileID" ||
+				reqPath == "/public-collection/files/download/:fileID" ||
+				reqPath == "/public-memory/files/preview/:fileID" ||
+				reqPath == "/public-memory/files/download/:fileID" ||
+				reqPath == "/cast/files/preview/:fileID" ||
+				reqPath == "/cast/files/download/:fileID" {
 				// Exclude those that redirect to S3 for file downloads.
 			} else {
 				c.Writer.Header().Set("Cache-Control", "no-store")
