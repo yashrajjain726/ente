@@ -990,7 +990,7 @@
   },
   "linkCopiedToClipboard": "Link copied to clipboard",
   "congratulations": "Congratulations!",
-  "legacyCongratulationsMessage": "You've successfully setup your Legacy.\n Start saving your important information.",
+  "legacyCongratulationsMessage": "You've successfully setup your Legacy.\nStart saving your important information.",
   "saveToLocker": "Save to Locker",
   "createdOn": "Created {date}",
   "@createdOn": {
