@@ -88,6 +88,26 @@ void main() {
     expect((await service.getContact(email: 'ALICE@test.test'))?.id, 'ct_1');
   });
 
+  test('deletion tombstone evicts contact indexes', () async {
+    await service.debugOpenAndSync(session);
+
+    service.debugHydrateContacts(const [
+      contacts.ContactRecord(
+        id: 'ct_1',
+        contactUserId: 7,
+        email: 'alice@test.test',
+        data: contacts.ContactData(contactUserId: 7, name: 'Alice'),
+        profilePictureAttachmentId: null,
+        isDeleted: true,
+        createdAt: 1,
+        updatedAt: 3,
+      ),
+    ]);
+
+    expect(service.getCachedContact(contactUserId: 7), isNull);
+    expect(service.getCachedContact(email: 'ALICE@test.test'), isNull);
+  });
+
   test(
     'stale in-flight debugOpenAndSync does not repopulate cache after session switch',
     () async {

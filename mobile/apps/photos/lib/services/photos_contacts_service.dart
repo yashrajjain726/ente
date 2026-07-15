@@ -32,8 +32,10 @@ class PhotosContactsService {
 
   final contacts.ContactsService Function()? _contactsServiceFactory;
   final _logger = Logger("PhotosContactsService");
-  final Map<int, contacts.ContactRecord> _contactsByUserId = {};
-  final Map<String, contacts.ContactRecord> _contactsByNormalizedEmail = {};
+  // Deleted records evict entries; these indexes contain active contacts only.
+  final Map<int, contacts.ContactRecord> _activeContactsByUserId = {};
+  final Map<String, contacts.ContactRecord> _activeContactsByNormalizedEmail =
+      {};
   final Map<int, Uint8List?> _profilePictureBytesByUserId = {};
   final Set<int> _resolvedProfilePictureUserIds = {};
   final Map<int, Future<Uint8List?>> _profilePictureLoadsByUserId = {};
@@ -128,12 +130,12 @@ class PhotosContactsService {
       return null;
     }
     if (contactUserId != null) {
-      return _contactsByUserId[contactUserId];
+      return _activeContactsByUserId[contactUserId];
     }
     final normalizedEmail = normalizeContactLinkEmail(email);
     return normalizedEmail == null
         ? null
-        : _contactsByNormalizedEmail[normalizedEmail];
+        : _activeContactsByNormalizedEmail[normalizedEmail];
   }
 
   String? getCachedSavedName({int? contactUserId, String? email}) {
@@ -206,7 +208,7 @@ class PhotosContactsService {
     final contactId = contact.id;
     try {
       final bytes = await _requireContacts().getProfilePicture(contactId);
-      final latestContact = _contactsByUserId[contactUserId];
+      final latestContact = _activeContactsByUserId[contactUserId];
       if (latestContact == null ||
           latestContact.isDeleted ||
           latestContact.id != contactId ||
@@ -338,7 +340,7 @@ class PhotosContactsService {
       return;
     }
 
-    final cachedUserIdsBeforeHydration = _contactsByUserId.keys.toSet();
+    final cachedUserIdsBeforeHydration = _activeContactsByUserId.keys.toSet();
     final localContacts = await contactsService.getContacts();
     if (!_isSessionGenerationCurrent(generation, session)) {
       return;
@@ -444,21 +446,22 @@ class PhotosContactsService {
 
   void _cacheContact(contacts.ContactRecord contact) {
     final userId = contact.contactUserId;
-    final existing = _contactsByUserId[userId];
+    final existing = _activeContactsByUserId[userId];
     final previousEmail = normalizeContactLinkEmail(existing?.email);
     if (previousEmail != null &&
-        _contactsByNormalizedEmail[previousEmail]?.contactUserId == userId) {
-      _contactsByNormalizedEmail.remove(previousEmail);
+        _activeContactsByNormalizedEmail[previousEmail]?.contactUserId ==
+            userId) {
+      _activeContactsByNormalizedEmail.remove(previousEmail);
     }
     if (contact.isDeleted) {
-      _contactsByUserId.remove(userId);
+      _activeContactsByUserId.remove(userId);
       _invalidateProfilePictureCache(userId);
       return;
     }
-    _contactsByUserId[userId] = contact;
+    _activeContactsByUserId[userId] = contact;
     final normalizedEmail = normalizeContactLinkEmail(contact.email);
     if (normalizedEmail != null) {
-      _contactsByNormalizedEmail[normalizedEmail] = contact;
+      _activeContactsByNormalizedEmail[normalizedEmail] = contact;
     }
     if (existing?.profilePictureAttachmentId !=
         contact.profilePictureAttachmentId) {
@@ -467,9 +470,9 @@ class PhotosContactsService {
   }
 
   void _resetSessionState({required bool notify}) {
-    final hadCachedContacts = _contactsByUserId.isNotEmpty;
-    _contactsByUserId.clear();
-    _contactsByNormalizedEmail.clear();
+    final hadCachedContacts = _activeContactsByUserId.isNotEmpty;
+    _activeContactsByUserId.clear();
+    _activeContactsByNormalizedEmail.clear();
     _profilePictureBytesByUserId.clear();
     _resolvedProfilePictureUserIds.clear();
     _profilePictureLoadsByUserId.clear();

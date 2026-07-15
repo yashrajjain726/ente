@@ -59,7 +59,7 @@ class PersonService {
   Future<List<PersonEntity>>? _cachedPersonsFuture;
   Map<String, PersonEntity>? _cachedPersonsById;
   int _personCacheGeneration = 0;
-  int _lastCacheRefreshTime = 0;
+  int _cachedRemoteSyncTime = 0;
 
   static PersonService get instance {
     if (_instance == null) {
@@ -91,7 +91,7 @@ class PersonService {
   void clearCache() {
     _emailToPartialPersonDataMapCache.clear();
     _invalidatePersonCache();
-    _lastCacheRefreshTime = 0;
+    _cachedRemoteSyncTime = 0;
   }
 
   void _invalidatePersonCache() {
@@ -105,9 +105,7 @@ class PersonService {
     String source = "",
   }) async {
     _invalidatePersonCache();
-    _lastCacheRefreshTime = lastRemoteSyncTime();
-    // wait to ensure cache is refreshed
-    final _ = await getPersons();
+    await getPersons();
     if (notifyListeners) {
       Bus.instance.fire(
         PeopleChangedEvent(type: PeopleEventType.syncDone, source: source),
@@ -133,8 +131,8 @@ class PersonService {
 
   Future<List<PersonEntity>> getPersons() async {
     final remoteSyncTime = lastRemoteSyncTime();
-    if (_lastCacheRefreshTime != remoteSyncTime) {
-      _lastCacheRefreshTime = remoteSyncTime;
+    if (_cachedRemoteSyncTime != remoteSyncTime) {
+      _cachedRemoteSyncTime = remoteSyncTime;
       _invalidatePersonCache();
     }
     if (_cachedPersonsFuture == null) {
@@ -190,7 +188,7 @@ class PersonService {
   }
 
   PersonEntity? getCachedPerson(String id) {
-    if (_lastCacheRefreshTime != lastRemoteSyncTime()) {
+    if (_cachedRemoteSyncTime != lastRemoteSyncTime()) {
       return null;
     }
     return _cachedPersonsById?[id];
@@ -804,7 +802,6 @@ class PersonService {
     String? id,
   }) async {
     final result = await entityService.addOrUpdate(type, jsonMap, id: id);
-    _lastCacheRefreshTime = 0; // Invalidate cache
     _invalidatePersonCache();
     return result;
   }
