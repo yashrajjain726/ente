@@ -107,9 +107,14 @@ class SearchService {
     User user,
     List<Collection> collections,
   ) {
+    final contactUserId = user.id != null && user.id! > 0 ? user.id : null;
+    final cachedContact = PhotosContactsService.instance.getCachedContact(
+      contactUserId: contactUserId,
+      email: contactUserId == null ? user.email : null,
+    );
     final params = <String, dynamic>{
       kPersonParamID: user.linkedPersonID,
-      kContactUserId: user.id,
+      kContactUserId: contactUserId ?? cachedContact?.contactUserId,
       kContactEmail: resolveKnownEmail(user) ?? user.email,
       kContactCollections: collections,
     };

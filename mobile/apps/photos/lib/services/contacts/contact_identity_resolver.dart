@@ -1,6 +1,5 @@
 import "package:photos/extensions/user_extension.dart";
 import "package:photos/models/api/collection/user.dart";
-import "package:photos/service_locator.dart" show flagService;
 import "package:photos/services/photos_contacts_service.dart";
 
 String resolveDisplayName(User user) {
@@ -18,13 +17,15 @@ String resolveDisplayName(User user) {
 }
 
 String? resolveKnownEmail(User user) {
-  if (flagService.enableContact && user.id != null && user.id! > 0) {
-    final savedEmail = _knownEmailOrNull(
-      PhotosContactsService.instance.getCachedResolvedEmailByUserId(user.id),
-    );
-    if (savedEmail != null) {
-      return savedEmail;
-    }
+  final contactUserId = _validContactUserId(user);
+  final savedEmail = _knownEmailOrNull(
+    PhotosContactsService.instance.getCachedResolvedEmail(
+      contactUserId: contactUserId,
+      email: contactUserId == null ? user.email : null,
+    ),
+  );
+  if (savedEmail != null) {
+    return savedEmail;
   }
 
   return _knownEmailOrNull(user.email);
@@ -42,17 +43,16 @@ bool matchesResolvedContactQuery(User user, String lowerCaseQuery) {
 }
 
 String? _savedContactName(User user) {
-  if (!flagService.enableContact || user.id == null || user.id! <= 0) {
-    return null;
-  }
+  final contactUserId = _validContactUserId(user);
+  return PhotosContactsService.instance.getCachedSavedName(
+    contactUserId: contactUserId,
+    email: contactUserId == null ? user.email : null,
+  );
+}
 
-  final savedName = PhotosContactsService.instance
-      .getCachedSavedNameByUserId(user.id)
-      ?.trim();
-  if (savedName == null || savedName.isEmpty) {
-    return null;
-  }
-  return savedName;
+int? _validContactUserId(User user) {
+  final userId = user.id;
+  return userId != null && userId > 0 ? userId : null;
 }
 
 String? _knownEmailOrNull(String? email) {

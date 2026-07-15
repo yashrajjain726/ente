@@ -1,10 +1,13 @@
 import "dart:async";
 
 import "package:email_validator/email_validator.dart";
-import "package:ente_components/theme/text_styles.dart";
+import "package:ente_components/components/app_bar_component.dart";
+import "package:ente_components/components/buttons/icon_button_component.dart";
+import "package:ente_components/components/menu_component.dart";
 import "package:ente_contacts/contacts.dart" as contacts;
 import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
+import "package:hugeicons/hugeicons.dart";
 import "package:photos/core/event_bus.dart";
 import "package:photos/events/contacts_changed_event.dart";
 import "package:photos/events/files_updated_event.dart";
@@ -20,17 +23,16 @@ import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/search_constants.dart";
 import "package:photos/models/search/search_result.dart";
 import "package:photos/models/selected_files.dart";
-import "package:photos/service_locator.dart";
 import "package:photos/services/photos_contacts_service.dart";
 import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/album/row_item.dart";
 import "package:photos/ui/common/loading_widget.dart";
 import "package:photos/ui/components/end_to_end_banner.dart";
-import "package:photos/ui/components/menu_item_widget/menu_item_widget_new.dart";
 import "package:photos/ui/viewer/actions/file_selection_overlay_bar.dart";
 import "package:photos/ui/viewer/gallery/empty_state.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
+import "package:photos/ui/viewer/gallery/gallery_app_bar_config.dart";
 import "package:photos/ui/viewer/gallery/gallery_app_bar_widget.dart";
 import "package:photos/ui/viewer/gallery/hierarchical_search_gallery.dart";
 import "package:photos/ui/viewer/gallery/state/gallery_boundaries_provider.dart";
@@ -38,6 +40,7 @@ import "package:photos/ui/viewer/gallery/state/gallery_files_inherited_widget.da
 import "package:photos/ui/viewer/gallery/state/inherited_search_filter_data.dart";
 import "package:photos/ui/viewer/gallery/state/search_filter_data_provider.dart";
 import "package:photos/ui/viewer/gallery/state/selection_state.dart";
+import "package:photos/ui/viewer/hierarchicial_search/app_bar_filter_chips.dart";
 import "package:photos/ui/viewer/people/person_selection_action_widgets.dart";
 import "package:photos/ui/viewer/search/contact_avatar_widget.dart";
 import "package:photos/ui/viewer/search/result/edit_contact_page.dart";
@@ -101,7 +104,7 @@ class _ContactResultPageState extends State<ContactResultPage> {
       initialGalleryFilter: widget.searchResult.getHierarchicalSearchFilter(),
     );
 
-    if (flagService.enableContact && _contactUserId != null) {
+    if (_contactUserId != null) {
       _refreshSavedContact();
       _contactsChangedEvent = Bus.instance.on<ContactsChangedEvent>().listen((
         event,
@@ -122,11 +125,7 @@ class _ContactResultPageState extends State<ContactResultPage> {
 
   @override
   Widget build(BuildContext context) {
-    final appBar = GalleryAppBarWidget.sliverConfig(
-      ContactResultPage.appBarType,
-      _searchResultName,
-      _selectedFiles,
-    );
+    final appBar = _buildAppBarConfig();
     final gallery = Gallery(
       appBar: appBar,
       asyncLoader: (creationStartTime, creationEndTime, {limit, asc}) {
@@ -201,8 +200,46 @@ class _ContactResultPageState extends State<ContactResultPage> {
     );
   }
 
-  Widget _buildContactHeader(BuildContext context) {
-    if (flagService.enableContact && _contactUserId != null) {
+  GalleryAppBarConfig _buildAppBarConfig() {
+    final contactUserId = _contactUserId;
+    if (_savedContact != null && contactUserId != null) {
+      return GalleryAppBarConfig(
+        sliverBuilder: (_) => _SavedContactAppBar(
+          title: _savedContactDisplayName,
+          email: _savedContactEmail,
+          contactUserId: contactUserId,
+          personId: _personId,
+          selectedFiles: _selectedFiles,
+          onEdit: _openEditContactPage,
+        ),
+        geometryBuilder: (context) {
+          final inheritedSearchFilterData = InheritedSearchFilterData.maybeOf(
+            context,
+          );
+          final isHierarchicalSearchable =
+              inheritedSearchFilterData?.isHierarchicalSearchable ?? false;
+          final bottomHeight = isHierarchicalSearchable
+              ? AppBarFilterChips.preferredHeight(context)
+              : 0.0;
+          return SliverAppBarComponent.resolveGeometry(
+            context,
+            subtitle: _savedContactEmail,
+            collapsedHeight: GalleryAppBarWidget.toolbarHeight,
+            bottomHeight: bottomHeight,
+          );
+        },
+      );
+    }
+
+    return GalleryAppBarWidget.sliverConfig(
+      ContactResultPage.appBarType,
+      _searchResultName,
+      _selectedFiles,
+    );
+  }
+
+  Widget? _buildContactHeader(BuildContext context) {
+    if (_contactUserId != null) {
       if (!_resolvedSavedContact) {
         return const Padding(
           padding: EdgeInsets.only(top: 20, bottom: 8),
@@ -213,53 +250,9 @@ class _ContactResultPageState extends State<ContactResultPage> {
         );
       }
       if (_savedContact == null) {
-        return _UnsavedContactHeader(
-          email: _contactEmail,
-          itemCount: files.length,
-          onTap: _openEditContactPage,
-        );
+        return _UnsavedContactHeader(onTap: _openEditContactPage);
       }
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            ContactAvatarWidget(
-              contactUserId: _contactUserId,
-              email: _contactEmail,
-              personId:
-                  (widget.searchResult as GenericSearchResult)
-                          .params[kPersonParamID]
-                      as String?,
-              size: 36,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _savedContact?.data?.name ?? _searchResultName,
-                    style: _contactHeaderTitleStyle(context),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _savedContact?.email ?? _contactEmail,
-                    style: _contactHeaderSubtitleStyle(context),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            _ContactHeaderOverflowButton(onEdit: _openEditContactPage),
-          ],
-        ),
-      );
+      return null;
     }
 
     if (EmailValidator.validate(_searchResultName)) {
@@ -284,14 +277,13 @@ class _ContactResultPageState extends State<ContactResultPage> {
       );
     }
 
-    return const SizedBox.shrink();
+    return null;
   }
 
   Widget? _buildPageHeader(BuildContext context) {
-    final sections = <Widget>[
+    final sections = <Widget?>[
       _buildContactHeader(context),
-      if (collections.isNotEmpty)
-        _AlbumsSection(context: context, collections: collections),
+      if (collections.isNotEmpty) _AlbumsSection(collections: collections),
     ].whereType<Widget>().toList();
     if (sections.isEmpty) {
       return null;
@@ -300,7 +292,6 @@ class _ContactResultPageState extends State<ContactResultPage> {
   }
 
   bool get _shouldShowUnsavedContactEmptyState =>
-      flagService.enableContact &&
       _contactUserId != null &&
       _resolvedSavedContact &&
       _savedContact == null &&
@@ -312,8 +303,8 @@ class _ContactResultPageState extends State<ContactResultPage> {
     if (contactUserId == null) {
       return;
     }
-    final saved = await PhotosContactsService.instance.getContactByUserId(
-      contactUserId,
+    final saved = await PhotosContactsService.instance.getContact(
+      contactUserId: contactUserId,
     );
     if (!mounted) {
       return;
@@ -344,67 +335,118 @@ class _ContactResultPageState extends State<ContactResultPage> {
     }
   }
 
-  TextStyle _contactHeaderTitleStyle(BuildContext context) {
-    return getEnteTextTheme(
-      context,
-    ).largeBold.copyWith(fontSize: 20, height: 28 / 20);
+  String? get _personId =>
+      (widget.searchResult as GenericSearchResult).params[kPersonParamID]
+          as String?;
+
+  String get _savedContactDisplayName {
+    final savedName = _savedContact?.data?.name.trim();
+    if (savedName != null && savedName.isNotEmpty) {
+      return savedName;
+    }
+    return _searchResultName;
   }
 
-  TextStyle _contactHeaderSubtitleStyle(BuildContext context) {
-    return getEnteTextTheme(context).mini.copyWith(
-      color: getEnteColorScheme(context).textMuted,
-      height: 16 / 12,
-      fontWeight: FontWeight.w500,
-    );
+  String get _savedContactEmail {
+    final savedEmail = _savedContact?.email?.trim();
+    if (savedEmail != null && savedEmail.isNotEmpty) {
+      return savedEmail;
+    }
+    return _contactEmail;
   }
 }
 
-enum _ContactHeaderAction { edit }
+class _SavedContactAppBar extends StatelessWidget {
+  const _SavedContactAppBar({
+    required this.title,
+    required this.email,
+    required this.contactUserId,
+    required this.personId,
+    required this.selectedFiles,
+    required this.onEdit,
+  });
 
-class _ContactHeaderOverflowButton extends StatelessWidget {
-  const _ContactHeaderOverflowButton({required this.onEdit});
-
-  final VoidCallback onEdit;
+  final String title;
+  final String email;
+  final int contactUserId;
+  final String? personId;
+  final SelectedFiles selectedFiles;
+  final Future<void> Function() onEdit;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = getEnteColorScheme(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: EnteTheme.isDark(context)
-            ? colorScheme.backgroundElevated2
-            : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.strokeFainter),
+    final inheritedSearchFilterData = InheritedSearchFilterData.maybeOf(
+      context,
+    );
+    final isHierarchicalSearchable =
+        inheritedSearchFilterData?.isHierarchicalSearchable ?? false;
+
+    if (!isHierarchicalSearchable) {
+      return _buildSliverAppBar(context, isSearching: false);
+    }
+
+    return ValueListenableBuilder(
+      valueListenable: inheritedSearchFilterData!
+          .searchFilterDataProvider!
+          .isSearchingNotifier,
+      child: PreferredSize(
+        preferredSize: Size.fromHeight(
+          AppBarFilterChips.preferredHeight(context),
+        ),
+        child: const AppBarFilterChips(),
       ),
-      child: PopupMenuButton<_ContactHeaderAction>(
-        tooltip: "",
-        padding: const EdgeInsets.all(2),
-        iconSize: 18,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: colorScheme.fill,
-        icon: Icon(Icons.more_vert_rounded, color: colorScheme.textBase),
-        onSelected: (value) {
-          switch (value) {
-            case _ContactHeaderAction.edit:
-              onEdit();
-          }
-        },
-        itemBuilder: (context) => [
-          PopupMenuItem<_ContactHeaderAction>(
-            value: _ContactHeaderAction.edit,
-            child: Text(context.l10n.edit),
+      builder: (context, isSearching, child) {
+        return _buildSliverAppBar(
+          context,
+          isSearching: isSearching,
+          bottom: child as PreferredSizeWidget,
+        );
+      },
+    );
+  }
+
+  Widget _buildSliverAppBar(
+    BuildContext context, {
+    required bool isSearching,
+    PreferredSizeWidget? bottom,
+  }) {
+    return AnimatedBuilder(
+      animation: selectedFiles,
+      builder: (context, _) {
+        return SliverAppBarComponent(
+          title: title,
+          subtitle: email,
+          leading: Center(
+            child: ContactAvatarWidget(
+              contactUserId: contactUserId,
+              email: email,
+              personId: personId,
+              size: 36,
+            ),
           ),
-        ],
-      ),
+          actions: isSearching || selectedFiles.files.isNotEmpty
+              ? const []
+              : [
+                  IconButtonComponent(
+                    tooltip: context.l10n.edit,
+                    icon: const HugeIcon(icon: HugeIcons.strokeRoundedEdit03),
+                    variant: IconButtonComponentVariant.primary,
+                    shouldSurfaceExecutionStates: false,
+                    onTap: onEdit,
+                  ),
+                ],
+          bottom: bottom,
+          collapsedHeight: GalleryAppBarWidget.toolbarHeight,
+          backgroundColor: GalleryAppBarWidget.backgroundColor(context),
+        );
+      },
     );
   }
 }
 
 class _AlbumsSection extends StatelessWidget {
-  const _AlbumsSection({required this.context, required this.collections});
+  const _AlbumsSection({required this.collections});
 
-  final BuildContext context;
   final List<Collection> collections;
 
   @override
@@ -449,49 +491,28 @@ class _AlbumsSection extends StatelessWidget {
 }
 
 class _UnsavedContactHeader extends StatelessWidget {
-  const _UnsavedContactHeader({
-    required this.email,
-    required this.itemCount,
-    required this.onTap,
-  });
+  const _UnsavedContactHeader({required this.onTap});
 
-  final String email;
-  final int itemCount;
   final Future<void> Function() onTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = getEnteColorScheme(context);
-    final textTheme = getEnteTextTheme(context);
     final l10n = AppLocalizations.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            email,
-            style: TextStyles.body.copyWith(color: colorScheme.textMuted),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      child: SizedBox(
+        height: 60,
+        child: MenuComponent(
+          title: l10n.addANameAndPhoto,
+          titleColor: colorScheme.textBase,
+          leading: _AddContactMenuIcon(colorScheme: colorScheme),
+          trailing: Icon(
+            Icons.chevron_right_rounded,
+            color: colorScheme.textMuted,
           ),
-          const SizedBox(height: 12),
-          MenuItemWidgetNew(
-            title: l10n.addANameAndPhoto,
-            subText: l10n.itemCount(count: itemCount),
-            titleColor: colorScheme.textBase,
-            subTextStyle: textTheme.mini.copyWith(
-              color: colorScheme.textMuted,
-              height: 16 / 12,
-            ),
-            titleToSubTextSpacing: 4,
-            leadingIconWidget: _AddContactMenuIcon(colorScheme: colorScheme),
-            leadingIconSize: 36,
-            trailingIcon: Icons.chevron_right_rounded,
-            trailingIconIsMuted: true,
-            onTap: onTap,
-          ),
-        ],
+          onTap: onTap,
+        ),
       ),
     );
   }
@@ -530,38 +551,32 @@ class _UnsavedContactEmptyState extends StatelessWidget {
     final colorScheme = getEnteColorScheme(context);
     final textTheme = getEnteTextTheme(context);
     final l10n = AppLocalizations.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 36),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              "assets/ducky_share.png",
-              height: 180,
-              errorBuilder: (context, error, stackTrace) {
-                return const SizedBox(height: 180);
-              },
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(36, 32, 36, 0),
+      child: Column(
+        children: [
+          Image.asset(
+            "assets/ducky_share.png",
+            height: 180,
+            errorBuilder: (context, error, stackTrace) {
+              return const SizedBox(height: 180);
+            },
+          ),
+          const SizedBox(height: 12),
+          Text(
+            l10n.nothingToSeeHere,
+            style: textTheme.largeBold.copyWith(fontSize: 18, height: 24 / 18),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.photosSharedByWillAppearHere(email: email),
+            textAlign: TextAlign.center,
+            style: textTheme.mini.copyWith(
+              color: colorScheme.textMuted,
+              height: 16 / 12,
             ),
-            const SizedBox(height: 12),
-            Text(
-              l10n.nothingToSeeHere,
-              style: textTheme.largeBold.copyWith(
-                fontSize: 18,
-                height: 24 / 18,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              l10n.photosSharedByWillAppearHere(email: email),
-              textAlign: TextAlign.center,
-              style: textTheme.mini.copyWith(
-                color: colorScheme.textMuted,
-                height: 16 / 12,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
