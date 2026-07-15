@@ -78,7 +78,7 @@ func (c *Controller) InviteMember(ctx *gin.Context, adminUserID int64, email str
 		return stacktrace.Propagate(err, "")
 	}
 
-	potentialMemberID, err := c.UserRepo.GetUserIDWithEmail(email)
+	potentialMemberID, err := c.UserLookup.LookupUserID(adminUserID, email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return stacktrace.Propagate(ente.ErrNotFound, "invited member is not on ente")

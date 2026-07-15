@@ -84,6 +84,7 @@ func setupFullFamilyTest(t *testing.T) (http.Handler, int64, string, string) {
 
 	handler := &FamilyHandler{Controller: &familycontroller.Controller{
 		BillingCtrl: billingController,
+		UserLookup:  museumcontroller.NewUserLookupController(userRepo, nil),
 		UserRepo:    userRepo,
 		FamilyRepo:  familyRepo,
 	}}
