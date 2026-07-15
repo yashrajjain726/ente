@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:ente_components/theme/colors.dart';
 import 'package:ente_components/theme/spacing.dart';
 import 'package:ente_components/theme/text_styles.dart';
@@ -104,7 +106,33 @@ enum AvatarComponentSize {
   final TextStyle textStyle;
 }
 
-enum AvatarComponentColor { yellow, green, orange, pink, purple, blue, cyan }
+enum AvatarComponentColor {
+  yellow,
+  green,
+  orange,
+  pink,
+  purple,
+  blue,
+  cyan,
+  black,
+}
+
+/// A stable FNV-1a seed for identity colors across processes and platforms.
+int avatarSeedForIdentity(String identityKey) {
+  var hash = 0x811c9dc5;
+  for (final byte in utf8.encode(identityKey.trim().toLowerCase())) {
+    hash ^= byte;
+    hash = (hash * 0x01000193) & 0xffffffff;
+  }
+  return hash;
+}
+
+Color avatarColorForIdentity(BuildContext context, String identityKey) {
+  final palette = Theme.of(context).brightness == Brightness.dark
+      ? avatarDark
+      : avatarLight;
+  return palette[avatarSeedForIdentity(identityKey) % palette.length];
+}
 
 /// Figma: https://www.figma.com/design/BuBNPPytxlVnqfmCUW0mgz/Ente-Visual-Design?node-id=2482-6547&m=dev
 /// Section: Labels and avatars / Avatar
@@ -118,6 +146,18 @@ class AvatarComponent extends StatelessWidget {
     this.seed,
     this.semanticLabel,
   }) : image = null,
+       identityKey = null,
+       icon = null;
+
+  const AvatarComponent.identity({
+    super.key,
+    required this.initials,
+    required this.identityKey,
+    this.size = AvatarComponentSize.defaultSize,
+    this.semanticLabel,
+  }) : image = null,
+       color = AvatarComponentColor.yellow,
+       seed = null,
        icon = null;
 
   const AvatarComponent.image({
@@ -127,6 +167,7 @@ class AvatarComponent extends StatelessWidget {
     this.semanticLabel,
   }) : initials = '',
        color = AvatarComponentColor.yellow,
+       identityKey = null,
        seed = null,
        icon = null;
 
@@ -138,6 +179,7 @@ class AvatarComponent extends StatelessWidget {
   }) : initials = '',
        image = null,
        color = AvatarComponentColor.yellow,
+       identityKey = null,
        seed = null;
 
   const AvatarComponent.seeded({
@@ -148,11 +190,13 @@ class AvatarComponent extends StatelessWidget {
     this.semanticLabel,
   }) : image = null,
        color = AvatarComponentColor.yellow,
+       identityKey = null,
        icon = null;
 
   final String initials;
   final AvatarComponentSize size;
   final AvatarComponentColor color;
+  final String? identityKey;
   final int? seed;
   final ImageProvider? image;
   final Widget? icon;
@@ -241,6 +285,9 @@ class AvatarComponent extends StatelessWidget {
 
   Color _backgroundColor(BuildContext context) {
     final colors = context.componentColors;
+    if (identityKey != null) {
+      return avatarColorForIdentity(context, identityKey!);
+    }
     if (seed != null) {
       final palette = Theme.of(context).brightness == Brightness.dark
           ? avatarDark
@@ -256,6 +303,7 @@ class AvatarComponent extends StatelessWidget {
       AvatarComponentColor.purple => colors.purple,
       AvatarComponentColor.blue => colors.blue,
       AvatarComponentColor.cyan => avatarCyan,
+      AvatarComponentColor.black => Colors.black,
     };
   }
 

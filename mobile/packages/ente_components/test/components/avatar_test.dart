@@ -6,6 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('avatar identity seeds are stable and normalized', () {
+    expect(
+      avatarSeedForIdentity(' Alice@Example.com '),
+      avatarSeedForIdentity('alice@example.com'),
+    );
+    expect(avatarSeedForIdentity('alice@example.com'), 2493822278);
+  });
+
   testWidgets('AvatarComponent renders the Figma sizes', (tester) async {
     await tester.pumpWidget(
       _wrap(
@@ -55,6 +63,10 @@ void main() {
                 color: AvatarComponentColor.cyan,
               ),
               const AvatarComponent.seeded(initials: 'A', seed: 0),
+              const AvatarComponent(
+                initials: 'P',
+                color: AvatarComponentColor.black,
+              ),
             ],
           ),
         ),
@@ -64,6 +76,7 @@ void main() {
       expect(find.text('K'), findsOneWidget);
       expect(find.text('C'), findsOneWidget);
       expect(find.text('A'), findsOneWidget);
+      expect(find.text('P'), findsOneWidget);
       expect(avatarLight.length, avatarDark.length);
 
       final cyanAvatar = tester.widget<DecoratedBox>(
@@ -74,11 +87,43 @@ void main() {
       expect((cyanAvatar.decoration as BoxDecoration).color, avatarCyan);
     },
   );
+
+  testWidgets('identity avatars use the theme palette at a stable index', (
+    tester,
+  ) async {
+    const identityKey = 'alice@example.com';
+    final paletteIndex =
+        avatarSeedForIdentity(identityKey) % avatarLight.length;
+
+    await tester.pumpWidget(
+      _wrap(
+        const AvatarComponent.identity(initials: 'A', identityKey: identityKey),
+      ),
+    );
+    expect(_avatarBackground(tester), avatarLight[paletteIndex]);
+
+    await tester.pumpWidget(
+      _wrap(
+        const AvatarComponent.identity(initials: 'A', identityKey: identityKey),
+        theme: ComponentTheme.darkTheme(),
+      ),
+    );
+    expect(_avatarBackground(tester), avatarDark[paletteIndex]);
+  });
 }
 
-Widget _wrap(Widget child) {
+Color? _avatarBackground(WidgetTester tester) {
+  final avatar = tester.widget<DecoratedBox>(
+    find
+        .ancestor(of: find.text('A'), matching: find.byType(DecoratedBox))
+        .first,
+  );
+  return (avatar.decoration as BoxDecoration).color;
+}
+
+Widget _wrap(Widget child, {ThemeData? theme}) {
   return MaterialApp(
-    theme: ComponentTheme.lightTheme(),
+    theme: theme ?? ComponentTheme.lightTheme(),
     home: Scaffold(body: Center(child: child)),
   );
 }
