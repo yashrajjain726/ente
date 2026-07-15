@@ -32,6 +32,13 @@ AvatarIdentity getUserAvatarIdentity(User user) {
   );
 }
 
+AvatarIdentity getAnonymousUserAvatarIdentity(User user, String anonymousID) {
+  return AvatarIdentity.anonymous(
+    label: resolveDisplayName(user),
+    anonymousID: anonymousID,
+  );
+}
+
 class UserAvatarWidget extends StatefulWidget {
   final User user;
   final AvatarType type;

@@ -18,6 +18,7 @@ import "package:photos/ui/sharing/user_avator_widget.dart";
 import "package:photos/ui/social/social_actor_contact_navigation.dart";
 import "package:photos/ui/social/widgets/collection_selector_widget.dart";
 import "package:photos/ui/social/widgets/resolved_social_user_name.dart";
+import "package:photos/utils/avatar_util.dart";
 
 const _shrinkWrapThreshold = 30;
 
@@ -412,6 +413,9 @@ class _LikesList extends StatelessWidget {
         final user = _getUserForReaction(reaction);
         return _LikeListItem(
           user: user,
+          fallbackIdentity: reaction.anonUserID == null
+              ? null
+              : getAnonymousUserAvatarIdentity(user, reaction.anonUserID!),
           currentUserID: currentUserID,
           youLabel: l10n.you,
           onTap: () => onUserTap(user),
@@ -423,12 +427,14 @@ class _LikesList extends StatelessWidget {
 
 class _LikeListItem extends StatelessWidget {
   final User user;
+  final AvatarIdentity? fallbackIdentity;
   final int currentUserID;
   final String youLabel;
   final VoidCallback? onTap;
 
   const _LikeListItem({
     required this.user,
+    required this.fallbackIdentity,
     required this.currentUserID,
     required this.youLabel,
     this.onTap,
@@ -447,6 +453,7 @@ class _LikeListItem extends StatelessWidget {
             currentUserID: currentUserID,
             type: AvatarType.regular,
             addStroke: false,
+            fallbackIdentity: fallbackIdentity,
           ),
           const SizedBox(width: 12),
           Expanded(
