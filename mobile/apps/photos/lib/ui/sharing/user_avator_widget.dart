@@ -13,22 +13,30 @@ import "package:photos/services/machine_learning/face_ml/person/person_service.d
 import "package:photos/services/photos_contacts_service.dart";
 import 'package:photos/theme/ente_theme.dart';
 import "package:photos/ui/viewer/people/person_face_widget.dart";
+import "package:photos/utils/avatar_util.dart";
 import 'package:tuple/tuple.dart';
 
 enum AvatarType { xs, small, medium, regular, large, huge }
 
 Color getUserAvatarColor(BuildContext context, User user) {
-  if (user.email == Configuration.instance.getEmail()) {
-    return Colors.black;
-  }
-  final colorScheme = getEnteColorScheme(context);
-  final resolvedDisplayName = resolveDisplayName(user);
-  final colorIndex = user.email.contains("unknown.com")
-      ? resolvedDisplayName.length
-      : user.email.length;
-  return colorScheme.avatarColors[colorIndex.remainder(
-    colorScheme.avatarColors.length,
-  )];
+  return avatarBackgroundColor(context, getUserAvatarIdentity(user));
+}
+
+AvatarIdentity getUserAvatarIdentity(User user) {
+  final resolvedEmail = resolveKnownEmail(user);
+  final currentEmail = normalizeAvatarEmail(Configuration.instance.getEmail());
+  final role = user.id != null && user.id! < 0
+      ? AvatarIdentityRole.publicUploader
+      : currentEmail != null &&
+            normalizeAvatarEmail(resolvedEmail) == currentEmail
+      ? AvatarIdentityRole.currentUser
+      : AvatarIdentityRole.standard;
+  return AvatarIdentity(
+    label: resolveDisplayName(user),
+    email: resolvedEmail,
+    userID: user.id,
+    role: role,
+  );
 }
 
 class UserAvatarWidget extends StatefulWidget {
@@ -218,13 +226,7 @@ class _FirstLetterCircularAvatarState
     extends State<_FirstLetterCircularAvatar> {
   @override
   Widget build(BuildContext context) {
-    final resolvedDisplayName = resolveDisplayName(widget.user);
-    final displayChar = resolvedDisplayName.isEmpty
-        ? ((widget.user.email.isEmpty)
-              ? " "
-              : widget.user.email.substring(0, 1))
-        : resolvedDisplayName.substring(0, 1);
-    final decorationColor = getUserAvatarColor(context, widget.user);
+    final identity = getUserAvatarIdentity(widget.user);
 
     final avatarStyle = getAvatarStyle(context, widget.type);
     final double size = avatarStyle.item1;
@@ -233,9 +235,9 @@ class _FirstLetterCircularAvatarState
       height: size,
       width: size,
       child: CircleAvatar(
-        backgroundColor: decorationColor,
+        backgroundColor: avatarBackgroundColor(context, identity),
         child: Text(
-          displayChar.toUpperCase(),
+          identity.initial,
           // fixed color
           style: textStyle.copyWith(color: Colors.white),
         ),
@@ -311,16 +313,12 @@ class _FirstLetterUserAvatarState extends State<FirstLetterUserAvatar> {
 
   @override
   Widget build(BuildContext context) {
-    final resolvedDisplayName = resolveDisplayName(user);
-    final displayChar = resolvedDisplayName.isEmpty
-        ? ((user.email.isEmpty) ? " " : user.email.substring(0, 1))
-        : resolvedDisplayName.substring(0, 1);
-    final decorationColor = getUserAvatarColor(context, user);
+    final identity = getUserAvatarIdentity(user);
     return Container(
-      color: decorationColor,
+      color: avatarBackgroundColor(context, identity),
       child: Center(
         child: Text(
-          displayChar.toUpperCase(),
+          identity.initial,
           style: getEnteTextTheme(context).small.copyWith(color: Colors.white),
         ),
       ),
