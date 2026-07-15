@@ -44,7 +44,11 @@ func (a authDeps) resolveViewer(c *gin.Context, rawViewerSpaceID string) (*viewe
 	viewerSpaceID := strings.TrimSpace(rawViewerSpaceID)
 	token := auth.GetToken(c)
 	if token != "" && a.UserAuthRepo != nil {
-		userID, expired, err := a.UserAuthRepo.GetUserIDWithToken(token, auth.GetApp(c))
+		app := auth.GetApp(c)
+		if app != ente.Photos {
+			return nil, ente.ErrPermissionDenied
+		}
+		userID, expired, err := a.UserAuthRepo.GetUserIDWithToken(token, app)
 		if err == nil && !expired && userID > 0 {
 			viewer := &viewerAuth{UserID: userID}
 			if viewerSpaceID != "" {

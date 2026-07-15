@@ -224,6 +224,9 @@ func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limi
 	if reqPath == "/spaces/:spaceID/assets/redirect" && reqMethod == http.MethodGet {
 		return r.limit500ReqPerMin
 	}
+	if reqPath == "/spaces/:spaceID/conversations" && reqMethod == http.MethodGet {
+		return r.limit10ReqPerMin
+	}
 	if reqMethod == http.MethodGet && isSpaceViewerReadURLPath(reqPath) {
 		return r.limit200ReqPerMin
 	}

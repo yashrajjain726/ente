@@ -114,8 +114,7 @@ func queueOwnedSpaceObjectsTx(ctx context.Context, tx *sql.Tx, userID int64, spa
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE space_temp_objects
 		SET space_id = NULL,
-		    expires_at = now_utc_micro_seconds(),
-		    cleanup_after = now_utc_micro_seconds()
+		    expires_at = now_utc_micro_seconds()
 		WHERE space_id = ANY($1)
 	`, pq.Array(spaceIDs)); err != nil {
 		return stacktrace.Propagate(err, "failed to queue staged space uploads for cleanup")
