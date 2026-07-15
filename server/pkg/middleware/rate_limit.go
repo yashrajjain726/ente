@@ -205,7 +205,6 @@ func isEventURLPath(reqPath string) bool {
 
 func isSpaceViewerReadURLPath(reqPath string) bool {
 	return reqPath == "/spaces/:spaceID/profile" ||
-		reqPath == "/spaces/:spaceID/assets/redirect" ||
 		reqPath == "/spaces/:spaceID/posts" ||
 		reqPath == "/spaces/:spaceID/posts/:postID" ||
 		reqPath == "/spaces/:spaceID/versions"
@@ -223,6 +222,9 @@ func (r *RateLimitMiddleware) getLimiter(reqPath string, reqMethod string) *limi
 	}
 	if reqPath == "/spaces/:spaceID/uploads/presign" && reqMethod == http.MethodPost {
 		return r.limit10ReqPerMin
+	}
+	if reqPath == "/spaces/:spaceID/assets/redirect" && reqMethod == http.MethodGet {
+		return r.limit500ReqPerMin
 	}
 	if reqMethod == http.MethodGet && isSpaceViewerReadURLPath(reqPath) {
 		return r.limit200ReqPerMin

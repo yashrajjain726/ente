@@ -101,6 +101,14 @@ const spaceHTTPStatus = (error: unknown) => {
     return typeof status == "number" ? status : undefined;
 };
 
+const spaceHTTPCode = (error: unknown) => {
+    if (!error || typeof error != "object" || !("code" in error)) {
+        return undefined;
+    }
+    const { code } = error as { code?: unknown };
+    return typeof code == "string" ? code : undefined;
+};
+
 export const isSpaceSessionUnauthorized = (error: unknown) =>
     spaceHTTPStatus(error) == 401;
 
@@ -502,10 +510,16 @@ export const saveSpaceProfile = async (
         pendingCurrentSpaceProfile = undefined;
         return savedProfile;
     } catch (error) {
-        if (spaceHTTPStatus(error) == 409) {
+        if (spaceHTTPCode(error) == "ALREADY_EXISTS") {
             throw new Error("This username is already taken.", {
                 cause: error,
             });
+        }
+        if (spaceHTTPCode(error) == "CONFLICT") {
+            throw new Error(
+                "A Space already exists for this account. Please refresh and try again.",
+                { cause: error },
+            );
         }
         throw error;
     } finally {
@@ -514,8 +528,15 @@ export const saveSpaceProfile = async (
 };
 
 export const spaceProfileErrorMessage = (error: unknown) => {
+    const code = spaceHTTPCode(error);
+    if (code == "ALREADY_EXISTS") return "This username is already taken.";
+    if (code == "CONFLICT") {
+        return "A Space already exists for this account. Please refresh and try again.";
+    }
     const status = spaceHTTPStatus(error);
-    if (status == 409) return "This username is already taken.";
+    if (status == 409) {
+        return "This profile conflicts with the current account state. Please refresh and try again.";
+    }
     if (status == 400) {
         const message = error instanceof Error ? error.message : "";
         if (message.toLowerCase().includes("reserved")) {

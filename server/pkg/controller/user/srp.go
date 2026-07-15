@@ -79,6 +79,11 @@ func (c *UserController) UpdateSrpAndKeyAttributes(context *gin.Context,
 	if err != nil {
 		return nil, err
 	}
+	if shouldClearTokens && c.SpaceAccessResetter != nil {
+		if err = c.SpaceAccessResetter.RevokeBrowserSessions(context, userID); err != nil {
+			return nil, err
+		}
+	}
 	err = c.UserAuthRepo.InsertOrUpdateSRPAuthAndKeyAttr(context, userID, req, setup)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to add entry in srp auth")
