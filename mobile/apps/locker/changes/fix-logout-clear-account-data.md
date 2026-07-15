@@ -1,1 +1,0 @@
-- Fixed an issue where logout could fail to clear account data from the device.
