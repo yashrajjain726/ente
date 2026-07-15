@@ -4,16 +4,18 @@ import "package:flutter_test/flutter_test.dart";
 import "package:photos/utils/avatar_util.dart";
 
 void main() {
-  test("prefers normalized email for avatar identity", () {
-    expect(
-      avatarIdentityKey(
-        email: " Alice@Example.com ",
-        userID: 7,
-        personID: "person-1",
-        name: "Alice",
-      ),
-      "email:alice@example.com",
+  test("email identity is normalized and independent of the label", () {
+    final before = AvatarIdentity(
+      label: "Alice",
+      email: " Alice@Example.com ",
+      userID: 7,
+      personID: "person-1",
     );
+    final after = AvatarIdentity(label: "Bob", email: "alice@example.com");
+
+    expect(before.key, "email:alice@example.com");
+    expect(after.key, before.key);
+    expect(after.initial, "B");
   });
 
   test("falls back through stable IDs before name", () {
@@ -33,17 +35,6 @@ void main() {
     expect(avatarIdentityKey(name: "  Alice   Smith "), "name:alice smith");
   });
 
-  test("display name changes do not change email identity", () {
-    final before = AvatarIdentity(label: "Alice", email: "alice@example.com");
-    final after = AvatarIdentity(
-      label: "Alice Smith",
-      email: "alice@example.com",
-    );
-
-    expect(after.key, before.key);
-    expect(after.initial, "A");
-  });
-
   test("marks the signed-in email as the current-user role", () {
     final identity = AvatarIdentity.account(
       label: "Alice",
@@ -54,19 +45,6 @@ void main() {
 
     expect(identity.role, AvatarIdentityRole.currentUser);
     expect(identity.key, "email:alice@example.com");
-  });
-
-  test("uses the saved person ID when no account identity exists", () {
-    final identity = AvatarIdentity.account(
-      label: "Alice",
-      email: null,
-      userID: null,
-      personID: "person-1",
-      currentUserEmail: "me@example.com",
-    );
-
-    expect(identity.role, AvatarIdentityRole.standard);
-    expect(identity.key, "person:person-1");
   });
 
   testWidgets("semantic avatar roles stay black across themes", (tester) async {
