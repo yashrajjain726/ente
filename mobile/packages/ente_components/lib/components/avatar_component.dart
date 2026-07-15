@@ -146,18 +146,6 @@ class AvatarComponent extends StatelessWidget {
     this.seed,
     this.semanticLabel,
   }) : image = null,
-       identityKey = null,
-       icon = null;
-
-  const AvatarComponent.identity({
-    super.key,
-    required this.initials,
-    required this.identityKey,
-    this.size = AvatarComponentSize.defaultSize,
-    this.semanticLabel,
-  }) : image = null,
-       color = AvatarComponentColor.yellow,
-       seed = null,
        icon = null;
 
   const AvatarComponent.image({
@@ -167,7 +155,6 @@ class AvatarComponent extends StatelessWidget {
     this.semanticLabel,
   }) : initials = '',
        color = AvatarComponentColor.yellow,
-       identityKey = null,
        seed = null,
        icon = null;
 
@@ -179,7 +166,6 @@ class AvatarComponent extends StatelessWidget {
   }) : initials = '',
        image = null,
        color = AvatarComponentColor.yellow,
-       identityKey = null,
        seed = null;
 
   const AvatarComponent.seeded({
@@ -190,13 +176,11 @@ class AvatarComponent extends StatelessWidget {
     this.semanticLabel,
   }) : image = null,
        color = AvatarComponentColor.yellow,
-       identityKey = null,
        icon = null;
 
   final String initials;
   final AvatarComponentSize size;
   final AvatarComponentColor color;
-  final String? identityKey;
   final int? seed;
   final ImageProvider? image;
   final Widget? icon;
@@ -285,9 +269,6 @@ class AvatarComponent extends StatelessWidget {
 
   Color _backgroundColor(BuildContext context) {
     final colors = context.componentColors;
-    if (identityKey != null) {
-      return avatarColorForIdentity(context, identityKey!);
-    }
     if (seed != null) {
       final palette = Theme.of(context).brightness == Brightness.dark
           ? avatarDark

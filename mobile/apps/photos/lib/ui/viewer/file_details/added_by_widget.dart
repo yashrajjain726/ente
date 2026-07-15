@@ -39,9 +39,9 @@ class AddedByWidget extends StatelessWidget {
     }
     final colors = context.componentColors;
     final avatar = identity.role == AvatarIdentityRole.standard
-        ? AvatarComponent.identity(
+        ? AvatarComponent.seeded(
             initials: identity.initial,
-            identityKey: identity.key,
+            seed: avatarSeedForIdentity(identity.key),
             size: AvatarComponentSize.defaultSize,
           )
         : AvatarComponent(

@@ -94,37 +94,31 @@ void main() {
     },
   );
 
-  testWidgets('identity avatars use the theme palette at a stable index', (
+  testWidgets('identity colors use the theme palette at a stable index', (
     tester,
   ) async {
     const identityKey = 'alice@example.com';
     final paletteIndex =
         avatarSeedForIdentity(identityKey) % avatarLight.length;
-
-    await tester.pumpWidget(
-      _wrap(
-        const AvatarComponent.identity(initials: 'A', identityKey: identityKey),
-      ),
-    );
-    expect(_avatarBackground(tester), avatarLight[paletteIndex]);
-
-    await tester.pumpWidget(
-      _wrap(
-        const AvatarComponent.identity(initials: 'A', identityKey: identityKey),
-        theme: ComponentTheme.darkTheme(),
-      ),
-    );
-    expect(_avatarBackground(tester), avatarDark[paletteIndex]);
+    for (final (theme, palette) in [
+      (ComponentTheme.lightTheme(), avatarLight),
+      (ComponentTheme.darkTheme(), avatarDark),
+    ]) {
+      late Color color;
+      await tester.pumpWidget(
+        _wrap(
+          Builder(
+            builder: (context) {
+              color = avatarColorForIdentity(context, identityKey);
+              return const SizedBox.shrink();
+            },
+          ),
+          theme: theme,
+        ),
+      );
+      expect(color, palette[paletteIndex]);
+    }
   });
-}
-
-Color? _avatarBackground(WidgetTester tester) {
-  final avatar = tester.widget<DecoratedBox>(
-    find
-        .ancestor(of: find.text('A'), matching: find.byType(DecoratedBox))
-        .first,
-  );
-  return (avatar.decoration as BoxDecoration).color;
 }
 
 Widget _wrap(Widget child, {ThemeData? theme}) {
