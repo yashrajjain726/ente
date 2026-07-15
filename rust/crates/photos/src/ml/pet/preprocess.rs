@@ -8,11 +8,53 @@ use crate::ml::{
     types::DecodedImage,
 };
 
-const PET_EMBED_INPUT_SIZE: usize = 224;
+use super::{PET_EMBEDDING_CHANNELS, PET_EMBEDDING_INPUT_SIZE, PET_SPECIES_CAT};
 
 // ImageNet normalization constants
 const IMAGENET_MEAN: [f32; 3] = [0.485, 0.456, 0.406];
 const IMAGENET_STD: [f32; 3] = [0.229, 0.224, 0.225];
+
+pub(super) struct IndexedEmbeddingBatch {
+    pub(super) indices: Vec<usize>,
+    pub(super) input: Vec<f32>,
+}
+
+impl IndexedEmbeddingBatch {
+    pub(super) fn new(item_capacity: usize, floats_per_item: usize) -> Self {
+        Self {
+            indices: Vec::with_capacity(item_capacity),
+            input: Vec::with_capacity(item_capacity * floats_per_item),
+        }
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.indices.is_empty()
+    }
+}
+
+pub(crate) struct PetFaceEmbeddingInputs {
+    pub(super) dog: IndexedEmbeddingBatch,
+    pub(super) cat: IndexedEmbeddingBatch,
+}
+
+impl PetFaceEmbeddingInputs {
+    pub(super) fn new(dog_capacity: usize, cat_capacity: usize) -> Self {
+        let floats_per_face =
+            PET_EMBEDDING_INPUT_SIZE * PET_EMBEDDING_INPUT_SIZE * PET_EMBEDDING_CHANNELS;
+        Self {
+            dog: IndexedEmbeddingBatch::new(dog_capacity, floats_per_face),
+            cat: IndexedEmbeddingBatch::new(cat_capacity, floats_per_face),
+        }
+    }
+
+    pub(super) fn batch_mut(&mut self, class_id: u8) -> &mut IndexedEmbeddingBatch {
+        if class_id == PET_SPECIES_CAT {
+            &mut self.cat
+        } else {
+            &mut self.dog
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub(super) struct PixelCrop {
@@ -43,7 +85,7 @@ pub(super) struct PetEmbeddingPreprocessor {
 impl PetEmbeddingPreprocessor {
     pub(super) fn new() -> Self {
         Self {
-            crop_resizer: RgbCropResizer::new(PET_EMBED_INPUT_SIZE as u32),
+            crop_resizer: RgbCropResizer::new(PET_EMBEDDING_INPUT_SIZE as u32),
         }
     }
 
@@ -149,7 +191,7 @@ impl RgbCropResizer {
 }
 
 pub(super) fn append_imagenet_tensor(resized: &[u8], output: &mut Vec<f32>) {
-    let pixel_count = PET_EMBED_INPUT_SIZE * PET_EMBED_INPUT_SIZE;
+    let pixel_count = PET_EMBEDDING_INPUT_SIZE * PET_EMBEDDING_INPUT_SIZE;
     let start = output.len();
     output.resize(start + 3 * pixel_count, 0.0);
     let tensor = &mut output[start..];

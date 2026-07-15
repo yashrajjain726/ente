@@ -1,13 +1,11 @@
 use crate::ml::{
     error::{MlError, MlResult},
     onnx,
-    preprocess::YoloInput,
+    preprocess::{YOLO_INPUT_SIZE, YoloInput},
     runtime::MlRuntimeView,
     types::FaceDetection,
 };
 
-const INPUT_WIDTH: f32 = 640.0;
-const INPUT_HEIGHT: f32 = 640.0;
 const IOU_THRESHOLD: f32 = 0.4;
 const MIN_SCORE_THRESHOLD: f32 = 0.5;
 
@@ -19,7 +17,7 @@ pub(crate) fn run_face_detection(
     onnx::with_prepared_f32_output(
         &mut face_detection,
         &input.tensor,
-        [1, 3, INPUT_HEIGHT as i64, INPUT_WIDTH as i64],
+        [1, 3, YOLO_INPUT_SIZE as i64, YOLO_INPUT_SIZE as i64],
         |_output_shape, output_data| postprocess_face_detections(output_data, input),
     )
 }
@@ -51,27 +49,35 @@ fn postprocess_face_detections(
         let y_max_abs = row[1] + row[3] / 2.0;
 
         let mut box_xyxy = [
-            x_min_abs / INPUT_WIDTH,
-            y_min_abs / INPUT_HEIGHT,
-            x_max_abs / INPUT_WIDTH,
-            y_max_abs / INPUT_HEIGHT,
+            x_min_abs / YOLO_INPUT_SIZE as f32,
+            y_min_abs / YOLO_INPUT_SIZE as f32,
+            x_max_abs / YOLO_INPUT_SIZE as f32,
+            y_max_abs / YOLO_INPUT_SIZE as f32,
         ];
         let mut keypoints = [
-            [row[5] / INPUT_WIDTH, row[6] / INPUT_HEIGHT],
-            [row[7] / INPUT_WIDTH, row[8] / INPUT_HEIGHT],
-            [row[9] / INPUT_WIDTH, row[10] / INPUT_HEIGHT],
-            [row[11] / INPUT_WIDTH, row[12] / INPUT_HEIGHT],
-            [row[13] / INPUT_WIDTH, row[14] / INPUT_HEIGHT],
+            [
+                row[5] / YOLO_INPUT_SIZE as f32,
+                row[6] / YOLO_INPUT_SIZE as f32,
+            ],
+            [
+                row[7] / YOLO_INPUT_SIZE as f32,
+                row[8] / YOLO_INPUT_SIZE as f32,
+            ],
+            [
+                row[9] / YOLO_INPUT_SIZE as f32,
+                row[10] / YOLO_INPUT_SIZE as f32,
+            ],
+            [
+                row[11] / YOLO_INPUT_SIZE as f32,
+                row[12] / YOLO_INPUT_SIZE as f32,
+            ],
+            [
+                row[13] / YOLO_INPUT_SIZE as f32,
+                row[14] / YOLO_INPUT_SIZE as f32,
+            ],
         ];
 
-        correct_for_maintained_aspect_ratio(
-            &mut box_xyxy,
-            &mut keypoints,
-            input.scaled_width,
-            input.scaled_height,
-            input.pad_left,
-            input.pad_top,
-        );
+        input.correct_box_and_keypoints(&mut box_xyxy, &mut keypoints);
 
         detections.push(FaceDetection {
             score,
@@ -81,43 +87,6 @@ fn postprocess_face_detections(
     }
 
     Ok(naive_non_max_suppression(detections, IOU_THRESHOLD))
-}
-
-fn correct_for_maintained_aspect_ratio(
-    box_xyxy: &mut [f32; 4],
-    keypoints: &mut [[f32; 2]; 5],
-    scaled_width: usize,
-    scaled_height: usize,
-    pad_left: usize,
-    pad_top: usize,
-) {
-    if scaled_width == INPUT_WIDTH as usize
-        && scaled_height == INPUT_HEIGHT as usize
-        && pad_left == 0
-        && pad_top == 0
-    {
-        return;
-    }
-
-    let scaled_width = scaled_width as f32;
-    let scaled_height = scaled_height as f32;
-    let pad_left = pad_left as f32;
-    let pad_top = pad_top as f32;
-
-    let transform_x =
-        |x: f32| -> f32 { ((x * INPUT_WIDTH - pad_left) / scaled_width).clamp(0.0, 1.0) };
-    let transform_y =
-        |y: f32| -> f32 { ((y * INPUT_HEIGHT - pad_top) / scaled_height).clamp(0.0, 1.0) };
-
-    box_xyxy[0] = transform_x(box_xyxy[0]);
-    box_xyxy[1] = transform_y(box_xyxy[1]);
-    box_xyxy[2] = transform_x(box_xyxy[2]);
-    box_xyxy[3] = transform_y(box_xyxy[3]);
-
-    for point in keypoints.iter_mut() {
-        point[0] = transform_x(point[0]);
-        point[1] = transform_y(point[1]);
-    }
 }
 
 fn naive_non_max_suppression(

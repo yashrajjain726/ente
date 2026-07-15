@@ -63,11 +63,11 @@ struct ModelSlot {
     state: Mutex<ModelSlotState>,
 }
 
-pub struct ModelSessionGuard<'a> {
+pub(crate) struct ModelSessionGuard<'a> {
     state: MutexGuard<'a, ModelSlotState>,
 }
 
-pub struct MlRuntimeView<'a> {
+pub(crate) struct MlRuntimeView<'a> {
     runtime: &'a MlRuntime,
     model_paths: &'a ModelPaths,
 }
@@ -213,7 +213,7 @@ impl ModelSlot {
 }
 
 #[derive(Debug)]
-pub struct MlRuntime {
+struct MlRuntime {
     face_detection: ModelSlot,
     face_embedding: ModelSlot,
     clip_image: ModelSlot,
@@ -339,70 +339,70 @@ impl MlRuntime {
 }
 
 impl MlRuntimeView<'_> {
-    pub fn face_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
+    pub(crate) fn face_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.face_detection.session_guard_for(
             &self.model_paths.face_detection,
             "missing model path: faceDetectionModelPath is required when runFaces is true",
         )
     }
 
-    pub fn face_embedding_session(&self) -> MlResult<ModelSessionGuard<'_>> {
+    pub(crate) fn face_embedding_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.face_embedding.session_guard_for(
             &self.model_paths.face_embedding,
             "missing model path: faceEmbeddingModelPath is required when runFaces is true",
         )
     }
 
-    pub fn clip_image_session(&self) -> MlResult<ModelSessionGuard<'_>> {
+    pub(crate) fn clip_image_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.clip_image.session_guard_for(
             &self.model_paths.clip_image,
             "missing model path: clipImageModelPath is required when runClip is true",
         )
     }
 
-    pub fn clip_text_session(&self) -> MlResult<ModelSessionGuard<'_>> {
+    pub(crate) fn clip_text_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.clip_text.session_guard_for(
             &self.model_paths.clip_text,
             "missing model path: clipTextModelPath is required when running clip text",
         )
     }
 
-    pub fn pet_face_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
+    pub(crate) fn pet_face_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.pet_face_detection.session_guard_for(
             &self.model_paths.pet_face_detection,
             "missing model path: petFaceDetectionModelPath is required when runPets is true",
         )
     }
 
-    pub fn pet_face_embedding_dog_session(&self) -> MlResult<ModelSessionGuard<'_>> {
+    pub(crate) fn pet_face_embedding_dog_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.pet_face_embedding_dog.session_guard_for(
             &self.model_paths.pet_face_embedding_dog,
             "missing model path: petFaceEmbeddingDogModelPath is required",
         )
     }
 
-    pub fn pet_face_embedding_cat_session(&self) -> MlResult<ModelSessionGuard<'_>> {
+    pub(crate) fn pet_face_embedding_cat_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.pet_face_embedding_cat.session_guard_for(
             &self.model_paths.pet_face_embedding_cat,
             "missing model path: petFaceEmbeddingCatModelPath is required",
         )
     }
 
-    pub fn pet_body_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
+    pub(crate) fn pet_body_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.pet_body_detection.session_guard_for(
             &self.model_paths.pet_body_detection,
             "missing model path: petBodyDetectionModelPath is required when runPets is true",
         )
     }
 
-    pub fn pet_body_embedding_dog_session(&self) -> MlResult<ModelSessionGuard<'_>> {
+    pub(crate) fn pet_body_embedding_dog_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.pet_body_embedding_dog.session_guard_for(
             &self.model_paths.pet_body_embedding_dog,
             "missing model path: petBodyEmbeddingDogModelPath is required",
         )
     }
 
-    pub fn pet_body_embedding_cat_session(&self) -> MlResult<ModelSessionGuard<'_>> {
+    pub(crate) fn pet_body_embedding_cat_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.pet_body_embedding_cat.session_guard_for(
             &self.model_paths.pet_body_embedding_cat,
             "missing model path: petBodyEmbeddingCatModelPath is required",
@@ -410,15 +410,15 @@ impl MlRuntimeView<'_> {
     }
 }
 
-pub fn ensure_runtime(model_paths: &ModelPaths) {
+pub(crate) fn ensure_runtime(model_paths: &ModelPaths) {
     GLOBAL_RUNTIME.configure_requested_models(model_paths);
 }
 
-pub fn prepare_runtime(model_paths: &ModelPaths) {
+pub(crate) fn prepare_runtime(model_paths: &ModelPaths) {
     GLOBAL_RUNTIME.prepare_indexing_models(model_paths);
 }
 
-pub fn with_runtime<F, R>(model_paths: &ModelPaths, func: F) -> MlResult<R>
+pub(crate) fn with_runtime<F, R>(model_paths: &ModelPaths, func: F) -> MlResult<R>
 where
     F: for<'a> Fn(&MlRuntimeView<'a>) -> MlResult<R>,
 {
@@ -443,7 +443,7 @@ where
     }
 }
 
-pub fn release_runtime() {
+pub(crate) fn release_runtime() {
     GLOBAL_RUNTIME.release_indexing_models();
 }
 

@@ -1,14 +1,10 @@
 use crate::ml::{
-    clip::{
-        image::run_clip_image, text::run_clip_text_query,
-        tokenizer::tokenize_clip_text as tokenize_clip_text_impl,
-    },
+    clip::{run_clip_image, run_clip_text_query, tokenize_clip_text as tokenize_clip_text_impl},
     error::{MlError, MlResult},
-    face::{align::run_face_alignment, detect::run_face_detection, embed::run_face_embedding},
+    face::{run_face_alignment, run_face_detection, run_face_embedding},
     pet::{
-        align::run_pet_face_alignment,
-        detect::{run_pet_body_detection, run_pet_face_detection},
-        embed::{run_pet_body_embedding, run_pet_face_embedding},
+        run_pet_body_detection, run_pet_body_embedding, run_pet_face_alignment,
+        run_pet_face_detection, run_pet_face_embedding,
     },
     preprocess,
     runtime::{self, ModelPaths},
@@ -109,7 +105,7 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
 
             let pet_face_results = if !pet_face_detections.is_empty() {
                 let (aligned, mut pet_results) =
-                    run_pet_face_alignment(file_id, &decoded, &pet_face_detections)?;
+                    run_pet_face_alignment(file_id, &decoded, pet_face_detections)?;
                 run_pet_face_embedding(runtime, aligned, &mut pet_results)?;
                 pet_results
             } else {

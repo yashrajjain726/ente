@@ -1,10 +1,11 @@
-pub mod clip;
+mod clip;
 pub mod error;
 pub mod face;
 pub mod indexing;
-pub mod onnx;
-pub mod pet;
-pub mod preprocess;
+mod onnx;
+mod pet;
+mod postprocess;
+mod preprocess;
 pub mod runtime;
 pub mod types;
 pub mod vector_db;

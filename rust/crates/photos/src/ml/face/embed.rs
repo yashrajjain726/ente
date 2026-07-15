@@ -1,15 +1,16 @@
 use crate::ml::{
     error::{MlError, MlResult},
     onnx,
+    postprocess::l2_normalize,
     runtime::MlRuntimeView,
     types::FaceResult,
 };
 
-const FACE_INPUT_WIDTH: i64 = 112;
-const FACE_INPUT_HEIGHT: i64 = 112;
+use super::FACE_INPUT_SIZE;
+
 const FACE_INPUT_CHANNELS: i64 = 3;
 
-pub fn run_face_embedding(
+pub(crate) fn run_face_embedding(
     runtime: &MlRuntimeView<'_>,
     aligned_faces: Vec<Vec<f32>>,
     face_results: &mut [FaceResult],
@@ -25,7 +26,8 @@ pub fn run_face_embedding(
         )));
     }
 
-    let expected_input_len = (FACE_INPUT_WIDTH * FACE_INPUT_HEIGHT * FACE_INPUT_CHANNELS) as usize;
+    let face_input_size = FACE_INPUT_SIZE as i64;
+    let expected_input_len = (face_input_size * face_input_size * FACE_INPUT_CHANNELS) as usize;
     let mut face_embedding = runtime.face_embedding_session()?;
     for (aligned, face_result) in aligned_faces.into_iter().zip(face_results.iter_mut()) {
         if aligned.len() != expected_input_len {
@@ -39,7 +41,7 @@ pub fn run_face_embedding(
         let (shape, mut embedding) = onnx::run_f32(
             &mut face_embedding,
             aligned,
-            [1, FACE_INPUT_HEIGHT, FACE_INPUT_WIDTH, FACE_INPUT_CHANNELS],
+            [1, face_input_size, face_input_size, FACE_INPUT_CHANNELS],
         )?;
         if shape.first() != Some(&1) || embedding.is_empty() {
             return Err(MlError::Postprocess(format!(
@@ -48,23 +50,9 @@ pub fn run_face_embedding(
                 embedding.len()
             )));
         }
-        normalize_embedding(&mut embedding);
+        l2_normalize(&mut embedding, f32::EPSILON);
         face_result.embedding = embedding;
     }
 
     Ok(())
-}
-
-fn normalize_embedding(embedding: &mut [f32]) {
-    let mut norm = 0.0f32;
-    for value in embedding.iter() {
-        norm += value * value;
-    }
-    let norm = norm.sqrt();
-    if norm <= f32::EPSILON {
-        return;
-    }
-    for value in embedding.iter_mut() {
-        *value /= norm;
-    }
 }

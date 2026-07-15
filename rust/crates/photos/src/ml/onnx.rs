@@ -176,7 +176,7 @@ fn session_expects_f16(session: &Session) -> bool {
 
 /// Run inference accepting f32 data and returning f32 results.
 /// Automatically converts inputs/outputs for FP16 models.
-pub fn run_f32<const N: usize>(
+pub(crate) fn run_f32<const N: usize>(
     session: &mut Session,
     input: Vec<f32>,
     input_shape: [i64; N],
@@ -243,12 +243,12 @@ pub(crate) fn with_prepared_f32_output<const N: usize, T>(
     }
 }
 
-pub fn run_i32_f32<const N: usize>(
+pub(crate) fn run_i32_f32<const N: usize>(
     session: &mut Session,
-    input: Vec<i32>,
+    input: &[i32],
     input_shape: [i64; N],
 ) -> MlResult<(Vec<i64>, Vec<f32>)> {
-    let input_tensor = Tensor::<i32>::from_array((input_shape, input))?;
+    let input_tensor = TensorRef::<i32>::from_array_view((input_shape, input))?;
     let outputs = session.run(ort::inputs![input_tensor])?;
     if outputs.len() == 0 {
         return Err(MlError::Ort("missing first output tensor".to_string()));

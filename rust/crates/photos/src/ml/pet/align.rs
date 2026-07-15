@@ -6,11 +6,10 @@ use crate::ml::{
 };
 
 use super::{
-    embed::PetFaceEmbeddingInputs,
-    preprocess::{PixelCrop, RgbCropResizer, append_imagenet_tensor},
+    PET_EMBEDDING_INPUT_SIZE, PET_SPECIES_CAT,
+    preprocess::{PetFaceEmbeddingInputs, PixelCrop, RgbCropResizer, append_imagenet_tensor},
 };
 
-const PET_FACE_CROP_SIZE: u32 = 224;
 /// Minimum eye distance in pixels below which alignment is skipped.
 const MIN_EYE_DISTANCE: f32 = 5.0;
 /// Angle threshold in degrees; below this, skip rotation and just crop.
@@ -29,7 +28,7 @@ const CROP_EXPAND: f32 = 0.1;
 pub(crate) fn run_pet_face_alignment(
     file_id: i64,
     decoded: &DecodedImage,
-    detections: &[PetFaceDetection],
+    detections: Vec<PetFaceDetection>,
 ) -> MlResult<(PetFaceEmbeddingInputs, Vec<PetFaceResult>)> {
     let img_w = decoded.dimensions.width;
     let img_h = decoded.dimensions.height;
@@ -38,12 +37,12 @@ pub(crate) fn run_pet_face_alignment(
 
     let cat_capacity = detections
         .iter()
-        .filter(|detection| detection.class_id == 1)
+        .filter(|detection| detection.class_id == PET_SPECIES_CAT)
         .count();
     let dog_capacity = detections.len() - cat_capacity;
     let mut aligned_inputs = PetFaceEmbeddingInputs::new(dog_capacity, cat_capacity);
     let mut face_results = Vec::with_capacity(detections.len());
-    let mut crop_resizer = RgbCropResizer::new(PET_FACE_CROP_SIZE);
+    let mut crop_resizer = RgbCropResizer::new(PET_EMBEDDING_INPUT_SIZE as u32);
 
     for detection in detections {
         // Convert relative keypoints to absolute
@@ -148,8 +147,8 @@ pub(crate) fn run_pet_face_alignment(
         };
 
         face_results.push(PetFaceResult {
-            detection: detection.clone(),
-            species: 0, // will be set after embedding
+            species: detection.class_id,
+            detection,
             face_embedding: Vec::new(),
             pet_face_id,
             alignment,

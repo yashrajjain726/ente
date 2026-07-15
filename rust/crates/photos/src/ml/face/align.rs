@@ -7,7 +7,8 @@ use crate::ml::{
     types::{AlignmentResult, DecodedImage, FaceDetection, FaceResult, to_face_id},
 };
 
-const FACE_SIZE: u32 = 112;
+use super::FACE_INPUT_SIZE;
+
 const LAPLACIAN_HARD_THRESHOLD: f32 = 10.0;
 const REMOVE_SIDE_COLUMNS: usize = 56;
 
@@ -31,7 +32,7 @@ struct FaceDetectionAbsolute {
     keypoints: [[f32; 2]; 5],
 }
 
-pub fn run_face_alignment(
+pub(crate) fn run_face_alignment(
     file_id: i64,
     decoded: &mut DecodedImage,
     detections: Vec<FaceDetection>,
@@ -218,7 +219,7 @@ fn warp_face_image(source: &RgbImage, affine_matrix: &[[f32; 3]; 3]) -> MlResult
             transform[row][col] = if (value - 1.0).abs() <= f32::EPSILON {
                 1.0
             } else {
-                value * FACE_SIZE as f32
+                value * FACE_INPUT_SIZE as f32
             };
         }
     }
@@ -236,7 +237,7 @@ fn warp_face_image(source: &RgbImage, affine_matrix: &[[f32; 3]; 3]) -> MlResult
     ])
     .ok_or_else(|| MlError::Postprocess("invalid affine matrix projection".to_string()))?;
 
-    let mut output = RgbImage::from_pixel(FACE_SIZE, FACE_SIZE, Rgb([114, 114, 114]));
+    let mut output = RgbImage::from_pixel(FACE_INPUT_SIZE, FACE_INPUT_SIZE, Rgb([114, 114, 114]));
     warp_into(
         source,
         &projection,
@@ -248,9 +249,9 @@ fn warp_face_image(source: &RgbImage, affine_matrix: &[[f32; 3]; 3]) -> MlResult
 }
 
 fn normalize_face_rgb_for_mobilefacenet(face_image: &RgbImage) -> Vec<f32> {
-    let mut output = Vec::with_capacity((FACE_SIZE * FACE_SIZE * 3) as usize);
-    for y in 0..FACE_SIZE {
-        for x in 0..FACE_SIZE {
+    let mut output = Vec::with_capacity((FACE_INPUT_SIZE * FACE_INPUT_SIZE * 3) as usize);
+    for y in 0..FACE_INPUT_SIZE {
+        for x in 0..FACE_INPUT_SIZE {
             let px = face_image.get_pixel(x, y).0;
             output.push(px[0] as f32 / 127.5 - 1.0);
             output.push(px[1] as f32 / 127.5 - 1.0);
