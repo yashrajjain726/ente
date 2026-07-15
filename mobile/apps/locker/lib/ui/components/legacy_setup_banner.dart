@@ -135,8 +135,8 @@ class _LegacySetupBannerState extends State<LegacySetupBanner> {
             child: Stack(
               children: [
                 Positioned(
-                  right: -8,
-                  bottom: -8,
+                  right: 24,
+                  bottom: -12,
                   child: IgnorePointer(
                     child: Image.asset(
                       "assets/legacy_banner.png",
@@ -173,15 +173,22 @@ class _LegacySetupBannerState extends State<LegacySetupBanner> {
                   ),
                 ),
                 Positioned(
-                  top: 18,
+                  top: 20,
                   right: 16,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: _onDismiss,
-                    child: HugeIcon(
-                      icon: HugeIcons.strokeRoundedCancel01,
-                      color: colors.specialWhite,
-                      size: 18,
+                    child: SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedCancel01,
+                          color: colors.specialWhite,
+                          size: 18,
+                        ),
+                      ),
                     ),
                   ),
                 ),
