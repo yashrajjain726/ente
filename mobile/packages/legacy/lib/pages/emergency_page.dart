@@ -34,10 +34,6 @@ import "package:intl/intl.dart";
 import "package:logging/logging.dart";
 
 final _logger = Logger("EmergencyPage");
-const _legacyEmptyStateDescription =
-    "In your absence, Legacy helps your loved ones access your information on Locker.";
-const _legacyKitRecoveryWarning =
-    "Someone is trying to recover your account using a legacy kit";
 
 class EmergencyPage extends StatefulWidget {
   final BaseConfiguration config;
@@ -126,10 +122,12 @@ class _EmergencyPageState extends State<EmergencyPage> {
             backgroundColor: colors.backgroundBase,
             slivers: [
               if (info != null && hasActiveLegacyKitRecovery)
-                const SliverPadding(
-                  padding: EdgeInsets.only(top: 20, left: 16, right: 16),
+                SliverPadding(
+                  padding: const EdgeInsets.only(top: 20, left: 16, right: 16),
                   sliver: SliverToBoxAdapter(
-                    child: _WarningBanner(text: _legacyKitRecoveryWarning),
+                    child: _WarningBanner(
+                      text: context.strings.legacyKitRecoveryWarning,
+                    ),
                   ),
                 ),
               if (showFullEmptyState)
@@ -851,7 +849,7 @@ class _FullLegacyEmptyState extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  _legacyEmptyStateDescription,
+                  context.strings.legacyEmptyStateDescription,
                   textAlign: TextAlign.center,
                   style: TextStyles.body.copyWith(color: colorScheme.textMuted),
                 ),
@@ -990,7 +988,7 @@ class _TrustedContactsEmptyCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            "Nominate another Ente user as a trusted contact to recover your account",
+            context.strings.trustedContactsEmptyDescription,
             textAlign: TextAlign.center,
             style: TextStyles.body.copyWith(color: colorScheme.textMuted),
           ),
@@ -1040,7 +1038,7 @@ class _LegacyKitEmptyCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            "Enable people you trust to come together to recover your account",
+            context.strings.legacyKitEmptyDescription,
             textAlign: TextAlign.center,
             style: TextStyles.body.copyWith(color: colorScheme.textMuted),
           ),
