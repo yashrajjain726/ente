@@ -52,7 +52,7 @@ func TestResolveViewerRejectsForgedUserHeaderWithoutToken(t *testing.T) {
 	require.ErrorIs(t, err, ente.ErrAuthenticationRequired)
 }
 
-func TestResolveViewerAcceptsValidatedUserToken(t *testing.T) {
+func TestResolveViewerEnforcesTokenAppPolicy(t *testing.T) {
 	module, repos, userAuthRepo, ctx := setupSpaceAuthControllerTest(t)
 	aliceID := insertSpaceControllerUser(t, repos, "alice@example.com", "alice-public")
 	space, err := testCreateSpace(ctx, repos, aliceID, "alice", "alice-space-key", "alice-public", "alice-secret", "alice-secret-nonce", "alice-profile")
@@ -60,6 +60,7 @@ func TestResolveViewerAcceptsValidatedUserToken(t *testing.T) {
 	require.NoError(t, userAuthRepo.AddToken(aliceID, ente.Photos, "alice-token", "127.0.0.1", "space-test"))
 	ginCtx := newPublicSpaceContext()
 	ginCtx.Request.Header.Set("X-Auth-Token", "alice-token")
+	ginCtx.Request.Header.Set("X-Client-Package", "io.ente.space.web")
 	ginCtx.Request.Header.Set("X-Auth-User-ID", "999999")
 
 	resp, err := module.Spaces.GetProfile(ginCtx, models.GetSpaceProfileRequest{SpaceID: space.SpaceID})
@@ -67,6 +68,19 @@ func TestResolveViewerAcceptsValidatedUserToken(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.Equal(t, space.SpaceID, resp.SpaceID)
+
+	for _, app := range []ente.App{ente.Auth, ente.Locker} {
+		token := "alice-" + string(app) + "-token"
+		require.NoError(t, userAuthRepo.AddToken(aliceID, app, token, "127.0.0.1", "space-test"))
+		deniedCtx := newPublicSpaceContext()
+		deniedCtx.Request.Header.Set("X-Auth-Token", token)
+		deniedCtx.Request.Header.Set("X-Client-Package", "io.ente."+string(app))
+
+		resp, err = module.Spaces.GetProfile(deniedCtx, models.GetSpaceProfileRequest{SpaceID: space.SpaceID})
+
+		require.Nil(t, resp)
+		require.ErrorIs(t, err, ente.ErrPermissionDenied)
+	}
 }
 
 func TestResolveViewerAcceptsSpaceBrowserSessionHeader(t *testing.T) {

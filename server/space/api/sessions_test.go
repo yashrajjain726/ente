@@ -15,6 +15,7 @@ import (
 	"github.com/ente/museum/ente"
 	"github.com/ente/museum/internal/testutil"
 	baserepo "github.com/ente/museum/pkg/repo"
+	"github.com/ente/museum/pkg/utils/auth"
 	timeutil "github.com/ente/museum/pkg/utils/time"
 	"github.com/ente/museum/space/controller"
 	spacerepo "github.com/ente/museum/space/repo"
@@ -23,6 +24,11 @@ import (
 )
 
 var testSpaceBrowserSessionWrapKey = base64.StdEncoding.EncodeToString(make([]byte, 32))
+
+func setTestAuthenticatedApp(c *gin.Context) {
+	c.Set(auth.AppContextKey, auth.GetApp(c))
+	c.Next()
+}
 
 type failingUserTokenTerminator struct{}
 
@@ -60,7 +66,7 @@ func TestCreateSpaceBrowserSessionReturnsTokenWhenCacheEvictionFails(t *testing.
 	authToken := "space-bootstrap-token"
 	require.NoError(t, (&baserepo.UserAuthRepository{DB: repos.Sessions.DB}).AddToken(userID, ente.Photos, authToken, "127.0.0.1", "space-test"))
 	router := gin.New()
-	router.POST("/account/space/sessions", handlers.CreateBrowserSession)
+	router.POST("/account/space/sessions", setTestAuthenticatedApp, handlers.CreateBrowserSession)
 	req := httptest.NewRequest(http.MethodPost, "/account/space/sessions", bytes.NewBufferString(`{"sessionWrapKey":"`+testSpaceBrowserSessionWrapKey+`"}`))
 	req.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
 	req.Header.Set("X-Auth-Token", authToken)
@@ -84,7 +90,7 @@ func TestCreateSpaceBrowserSessionReturnsTokenWhenCacheEvictionFails(t *testing.
 func TestCreateSpaceBrowserSessionRejectsInvalidWrapKey(t *testing.T) {
 	handlers, repos, userID := setupSpaceSessionAPITest(t)
 	router := gin.New()
-	router.POST("/account/space/sessions", handlers.CreateBrowserSession)
+	router.POST("/account/space/sessions", setTestAuthenticatedApp, handlers.CreateBrowserSession)
 
 	for _, tt := range []struct {
 		name string
@@ -110,16 +116,30 @@ func TestCreateSpaceBrowserSessionRejectsInvalidWrapKey(t *testing.T) {
 	require.Zero(t, count)
 }
 
-func TestRegisteredTokenSessionRoutesAllowSessionCreationBeforeBrowserSession(t *testing.T) {
+func TestRegisteredTokenSessionRoutesEnforceAppPolicy(t *testing.T) {
 	handlers, repos, userID := setupSpaceSessionAPITest(t)
 	authToken := "space-route-bootstrap-token"
 	require.NoError(t, (&baserepo.UserAuthRepository{DB: repos.Sessions.DB}).AddToken(userID, ente.Photos, authToken, "127.0.0.1", "space-test"))
 	router := gin.New()
 	tokenPrivateAPI := router.Group("")
+	tokenPrivateAPI.Use(setTestAuthenticatedApp)
 	spacePrivateAPI := router.Group("")
 	spacePrivateAPI.Use(handlers.RequireSpaceBrowserSession())
 	RegisterTokenSessionRoutes(tokenPrivateAPI, handlers)
 	Register(spacePrivateAPI, router.Group(""), handlers)
+
+	for _, clientPackage := range []string{"io.ente.auth", "io.ente.locker"} {
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/account/space/sessions",
+			bytes.NewBufferString(`{"sessionWrapKey":"`+testSpaceBrowserSessionWrapKey+`"}`),
+		)
+		req.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
+		req.Header.Set("X-Client-Package", clientPackage)
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, req)
+		require.Equal(t, http.StatusForbidden, recorder.Code)
+	}
 
 	sessionReq := httptest.NewRequest(
 		http.MethodPost,
@@ -128,6 +148,7 @@ func TestRegisteredTokenSessionRoutesAllowSessionCreationBeforeBrowserSession(t 
 	)
 	sessionReq.Header.Set("X-Auth-User-ID", strconv.FormatInt(userID, 10))
 	sessionReq.Header.Set("X-Auth-Token", authToken)
+	sessionReq.Header.Set("X-Client-Package", "io.ente.space.web")
 	sessionRecorder := httptest.NewRecorder()
 
 	router.ServeHTTP(sessionRecorder, sessionReq)

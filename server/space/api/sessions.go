@@ -42,6 +42,10 @@ func (h *Handlers) RequireSelectedSpace() gin.HandlerFunc {
 }
 
 func (h *Handlers) CreateBrowserSession(c *gin.Context) {
+	if app, ok := auth.GetAuthenticatedApp(c); !ok || app != ente.Photos {
+		respondJSON(c, nil, ente.ErrPermissionDenied)
+		return
+	}
 	var req models.SpaceBrowserSessionRequest
 	if !bindJSON(c, &req) {
 		return
