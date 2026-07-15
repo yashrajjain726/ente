@@ -566,7 +566,13 @@ func TestSpaceAccountDeletionDeleteUserData(t *testing.T) {
 	require.Equal(t, int64(0), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_notification_read_markers WHERE viewer_space_id = $1 OR friend_space_id = $1`, aliceSpace.SpaceID))
 
 	for _, objectKey := range []string{ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeAvatar, "avatar"), ProfileAssetObjectKey(aliceSpace.SpaceID, ProfileAssetTypeCover, "cover"), "space/alice/post-asset", "space/alice/staged-upload"} {
-		require.Equal(t, int64(1), countSpaceRows(t, module, `SELECT COUNT(*) FROM space_temp_objects WHERE object_key = $1 AND space_id IS NULL AND cleanup_after <= now_utc_micro_seconds()`, objectKey))
+		require.Equal(t, int64(1), countSpaceRows(t, module, `
+			SELECT COUNT(*)
+			FROM space_temp_objects
+			WHERE object_key = $1
+			  AND space_id IS NULL
+			  AND cleanup_after >= now_utc_micro_seconds() + $2
+		`, objectKey, SpaceUploadURLExpiry.Microseconds()))
 	}
 }
 
@@ -2380,16 +2386,20 @@ func sqlNullInt64(value int64) sql.NullInt64 {
 func requireQueuedTempObject(t *testing.T, module *Module, objectKey, purpose, bucketID string) {
 	t.Helper()
 	var gotPurpose, gotBucketID string
-	var expired bool
+	var expired, cleanupDelayed bool
 	err := module.Assets.DB.QueryRow(`
-		SELECT purpose, bucket_id, expires_at <= now_utc_micro_seconds()
+		SELECT purpose,
+		       bucket_id,
+		       expires_at <= now_utc_micro_seconds(),
+		       cleanup_after >= now_utc_micro_seconds() + $2
 		FROM space_temp_objects
 		WHERE object_key = $1
-	`, objectKey).Scan(&gotPurpose, &gotBucketID, &expired)
+	`, objectKey, SpaceUploadURLExpiry.Microseconds()).Scan(&gotPurpose, &gotBucketID, &expired, &cleanupDelayed)
 	require.NoError(t, err)
 	require.Equal(t, purpose, gotPurpose)
 	require.Equal(t, bucketID, gotBucketID)
 	require.True(t, expired)
+	require.True(t, cleanupDelayed)
 }
 
 func setPostCreatedAt(t *testing.T, module *Module, createdAt int64, postIDs ...int64) {

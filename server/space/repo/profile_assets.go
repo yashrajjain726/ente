@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	timeutil "github.com/ente/museum/pkg/utils/time"
 	"github.com/ente/stacktrace"
 )
 
@@ -111,7 +110,6 @@ func queueProfileAssetCleanupTx(ctx context.Context, tx *sql.Tx, asset profileAs
 		Purpose:      asset.AssetType,
 		BucketID:     asset.BucketID,
 		ExpectedSize: size,
-		CleanupAfter: timeutil.Microseconds() + SpaceUploadCleanupDelay.Microseconds(),
 	})
 }
 
