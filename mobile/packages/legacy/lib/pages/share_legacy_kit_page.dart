@@ -7,6 +7,7 @@ import "package:ente_legacy/components/legacy_kit_card_preview.dart";
 import "package:ente_legacy/components/legacy_kit_recovery_wait_time_sheet.dart";
 import "package:ente_legacy/models/legacy_kit_models.dart";
 import "package:ente_legacy/pages/legacy_congratulations_page.dart";
+import "package:ente_legacy/services/legacy_kit_local_settings.dart";
 import "package:ente_legacy/services/legacy_kit_pdf_service.dart";
 import "package:ente_legacy/services/legacy_kit_service.dart";
 import "package:ente_rust/ente_rust.dart" as rust;
@@ -61,12 +62,21 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
   late LegacyKit _kit = widget.kit;
   late List<LegacyKitShare>? _shares = widget.initialShares;
   final Set<int> _sharedParts = {};
-  int? _expandedIndex = 0;
+  int? _expandedIndex;
   bool _sharing = false;
 
   bool get _hasSharedAllParts =>
       _kit.parts.isNotEmpty &&
       _kit.parts.every((part) => _sharedParts.contains(part.index));
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isCreationFlow) {
+      _expandedIndex = _firstUnsharedSectionIndex();
+    }
+    unawaited(_restoreShareProgress());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -362,18 +372,28 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
         return;
       }
       final size = MediaQuery.sizeOf(context);
-      unawaited(
-        SharePlus.instance.share(
+      try {
+        await SharePlus.instance.share(
           ShareParams(
             files: [XFile.fromData(bytes, mimeType: "application/pdf")],
             fileNameOverrides: ["${_fileNameForPart(part)}.pdf"],
             sharePositionOrigin: Offset.zero & size,
           ),
-        ),
-      );
+        );
+      } catch (_) {
+        if (mounted) {
+          showShortToast(context, context.strings.somethingWentWrong);
+        }
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _sharedParts.add(part.index);
+        _expandedIndex = _firstUnsharedSectionIndex();
       });
+      await _markPartShared(part.index);
     } finally {
       _sharing = false;
     }
@@ -480,11 +500,52 @@ class _ShareLegacyKitPageState extends State<ShareLegacyKitPage> {
       },
     );
     if (confirmed) {
+      await _clearShareProgress();
       widget.onChanged?.call();
       if (mounted) {
         Navigator.pop(context);
       }
     }
+  }
+
+  Future<void> _markPartShared(int partIndex) async {
+    try {
+      await LegacyKitLocalSettings.markPartShared(_kit.id, partIndex);
+    } catch (_) {
+      // Local progress must not affect sharing the kit.
+    }
+  }
+
+  Future<void> _clearShareProgress() async {
+    try {
+      await LegacyKitLocalSettings.clearShareProgress(_kit.id);
+    } catch (_) {
+      // Local progress must not affect revoking the kit.
+    }
+  }
+
+  Future<void> _restoreShareProgress() async {
+    try {
+      final savedPartIndexes =
+          await LegacyKitLocalSettings.getSharedPartIndexes(_kit.id);
+      final validPartIndexes = _kit.parts.map((part) => part.index).toSet();
+      savedPartIndexes.retainAll(validPartIndexes);
+      if (mounted) {
+        setState(() {
+          _sharedParts.addAll(savedPartIndexes);
+          _expandedIndex = _firstUnsharedSectionIndex();
+        });
+      }
+    } catch (_) {
+      // Missing local progress means every part starts unchecked.
+    }
+  }
+
+  int? _firstUnsharedSectionIndex() {
+    final index = _kit.parts.indexWhere(
+      (part) => !_sharedParts.contains(part.index),
+    );
+    return index < 0 ? null : index;
   }
 
   Future<void> _blockRecovery() async {

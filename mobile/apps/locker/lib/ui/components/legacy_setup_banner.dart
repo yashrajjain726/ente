@@ -77,7 +77,12 @@ class _LegacySetupBannerState extends State<LegacySetupBanner> {
       final legacyConfigured =
           info.contacts.isNotEmpty || await _hasLegacyKit();
       if (!mounted) return;
-      _setShouldShow(!legacyConfigured);
+      if (legacyConfigured) {
+        _setShouldShow(false);
+        await LocalSettings.instance.setLegacySetupBannerDismissed(true);
+        return;
+      }
+      _setShouldShow(!LocalSettings.instance.isLegacySetupBannerDismissed);
     } catch (e, s) {
       _logger.warning("Failed to fetch legacy info for banner", e, s);
     }
