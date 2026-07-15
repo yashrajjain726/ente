@@ -17,6 +17,26 @@ class AvatarIdentity {
          name: label,
        );
 
+  factory AvatarIdentity.account({
+    required String label,
+    required String? email,
+    required int? userID,
+    required String? currentUserEmail,
+  }) {
+    final normalizedEmail = normalizeAvatarEmail(email);
+    final role =
+        normalizedEmail != null &&
+            normalizedEmail == normalizeAvatarEmail(currentUserEmail)
+        ? AvatarIdentityRole.currentUser
+        : AvatarIdentityRole.standard;
+    return AvatarIdentity(
+      label: label,
+      email: normalizedEmail,
+      userID: userID,
+      role: role,
+    );
+  }
+
   final String label;
   final String key;
   final AvatarIdentityRole role;

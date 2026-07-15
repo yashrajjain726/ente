@@ -41,4 +41,16 @@ void main() {
     expect(after.key, before.key);
     expect(after.initial, "A");
   });
+
+  test("marks the signed-in email as the current-user role", () {
+    final identity = AvatarIdentity.account(
+      label: "Alice",
+      email: " Alice@Example.com ",
+      userID: 7,
+      currentUserEmail: "alice@example.com",
+    );
+
+    expect(identity.role, AvatarIdentityRole.currentUser);
+    expect(identity.key, "email:alice@example.com");
+  });
 }

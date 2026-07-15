@@ -24,18 +24,18 @@ Color getUserAvatarColor(BuildContext context, User user) {
 
 AvatarIdentity getUserAvatarIdentity(User user) {
   final resolvedEmail = resolveKnownEmail(user);
-  final currentEmail = normalizeAvatarEmail(Configuration.instance.getEmail());
-  final role = user.id != null && user.id! < 0
-      ? AvatarIdentityRole.publicUploader
-      : currentEmail != null &&
-            normalizeAvatarEmail(resolvedEmail) == currentEmail
-      ? AvatarIdentityRole.currentUser
-      : AvatarIdentityRole.standard;
-  return AvatarIdentity(
+  if (user.id != null && user.id! < 0) {
+    return AvatarIdentity(
+      label: resolveDisplayName(user),
+      userID: user.id,
+      role: AvatarIdentityRole.publicUploader,
+    );
+  }
+  return AvatarIdentity.account(
     label: resolveDisplayName(user),
     email: resolvedEmail,
     userID: user.id,
-    role: role,
+    currentUserEmail: Configuration.instance.getEmail(),
   );
 }
 
