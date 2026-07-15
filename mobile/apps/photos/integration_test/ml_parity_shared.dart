@@ -209,6 +209,13 @@ Future<_LoadedModels> _downloadModels(List<_ModelSpec> modelSpecs) async {
 
     modelPathsBySchema[modelSpec.schemaName] = modelFile.path;
     final modelSHA256 = await _sha256HexOfFile(modelFile);
+    if (modelSHA256.toLowerCase() !=
+        modelSpec.model.modelSha256.toLowerCase()) {
+      throw StateError(
+        "Model SHA mismatch for ${modelSpec.schemaName}: "
+        "expected ${modelSpec.model.modelSha256}, got $modelSHA256",
+      );
+    }
     modelMetadata[modelSpec.schemaName] =
         "${modelFile.uri.pathSegments.last}:$modelSHA256";
   }

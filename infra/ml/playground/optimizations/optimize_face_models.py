@@ -2,8 +2,8 @@
 """Build Ente's optimized static face models for the mobile ML pipeline.
 
 The generated models remain standard ONNX. The transformations make their
-graphs easier for CoreML and NNAPI to compile while preserving the outputs used
-by the application.
+graphs easier for CoreML and mobile CPU runtimes to optimize while preserving
+the outputs used by the application.
 """
 
 from __future__ import annotations

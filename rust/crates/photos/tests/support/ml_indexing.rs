@@ -12,7 +12,7 @@ use ente_photos::ml::{
     indexing::{
         AnalyzeImageRequest, AnalyzeImageResult, analyze_image, init_ml_runtime, release_ml_runtime,
     },
-    runtime::{MlRuntimeConfig, ModelPaths},
+    runtime::ModelPaths,
     types::FaceResult as RustFaceResult,
 };
 use flate2::read::GzDecoder;
@@ -171,7 +171,7 @@ pub(crate) struct MlIndexingTestContext {
     client: Client,
     golden_results: HashMap<String, ComparableResult>,
     manifest: FixtureManifest,
-    runtime_config: MlRuntimeConfig,
+    model_paths: ModelPaths,
 }
 
 impl MlIndexingTestContext {
@@ -201,9 +201,7 @@ impl MlIndexingTestContext {
             .context("load ONNX Runtime dynamic library")?
             .commit();
 
-        let runtime_config = MlRuntimeConfig {
-            model_paths: resolve_model_paths(&client, &cache_dir, &asset_lock.models)?,
-        };
+        let model_paths = resolve_model_paths(&client, &cache_dir, &asset_lock.models)?;
 
         Ok(Self {
             asset_lock,
@@ -211,15 +209,15 @@ impl MlIndexingTestContext {
             client,
             golden_results,
             manifest,
-            runtime_config,
+            model_paths,
         })
     }
 
-    pub(crate) fn prepare_runtime(&self) -> Result<PreparedMlRuntime> {
-        init_ml_runtime(self.runtime_config.clone()).context("prepare ML runtime")?;
-        Ok(PreparedMlRuntime {
-            config: self.runtime_config.clone(),
-        })
+    pub(crate) fn prepare_runtime(&self) -> PreparedMlRuntime {
+        init_ml_runtime(self.model_paths.clone());
+        PreparedMlRuntime {
+            model_paths: self.model_paths.clone(),
+        }
     }
 
     pub(crate) fn validate_manifest_expectations(&self) -> Result<Vec<String>> {
@@ -258,7 +256,7 @@ impl MlIndexingTestContext {
                 run_faces: true,
                 run_clip: true,
                 run_pets: false,
-                runtime_config: runtime.config().clone(),
+                model_paths: runtime.model_paths().clone(),
             };
 
             if expected_unsupported.contains(&file_id) {
@@ -365,18 +363,18 @@ impl MlIndexingTestContext {
 }
 
 pub(crate) struct PreparedMlRuntime {
-    config: MlRuntimeConfig,
+    model_paths: ModelPaths,
 }
 
 impl PreparedMlRuntime {
-    fn config(&self) -> &MlRuntimeConfig {
-        &self.config
+    fn model_paths(&self) -> &ModelPaths {
+        &self.model_paths
     }
 }
 
 impl Drop for PreparedMlRuntime {
     fn drop(&mut self) {
-        let _ = release_ml_runtime();
+        release_ml_runtime();
     }
 }
 

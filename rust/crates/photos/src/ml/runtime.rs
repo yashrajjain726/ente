@@ -49,11 +49,6 @@ pub struct ModelPaths {
     pub pet_body_embedding_cat: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MlRuntimeConfig {
-    pub model_paths: ModelPaths,
-}
-
 #[derive(Debug)]
 struct ModelSlotState {
     path: String,
@@ -64,6 +59,7 @@ struct ModelSlotState {
 
 #[derive(Debug)]
 struct ModelSlot {
+    default_execution_mode: onnx::ExecutionMode,
     state: Mutex<ModelSlotState>,
 }
 
@@ -73,7 +69,7 @@ pub struct ModelSessionGuard<'a> {
 
 pub struct MlRuntimeView<'a> {
     runtime: &'a MlRuntime,
-    config: &'a MlRuntimeConfig,
+    model_paths: &'a ModelPaths,
 }
 
 impl Deref for ModelSessionGuard<'_> {
@@ -97,8 +93,9 @@ impl DerefMut for ModelSessionGuard<'_> {
 }
 
 impl ModelSlot {
-    fn new() -> Self {
+    fn new(default_execution_mode: onnx::ExecutionMode) -> Self {
         Self {
+            default_execution_mode,
             state: Mutex::new(ModelSlotState {
                 path: String::new(),
                 fell_back_to_cpu: false,
@@ -145,7 +142,7 @@ impl ModelSlot {
     }
 
     fn force_cpu_fallback_if_configured(&self, path: &str) {
-        if path.trim().is_empty() {
+        if self.default_execution_mode == onnx::ExecutionMode::CpuOnly || path.trim().is_empty() {
             return;
         }
 
@@ -168,7 +165,7 @@ impl ModelSlot {
 
         let mut state = self.lock_state();
         Self::set_config_locked(&mut state, path);
-        Self::ensure_loaded_locked(&mut state, error_msg)?;
+        self.ensure_loaded_locked(&mut state, error_msg)?;
         Ok(ModelSessionGuard { state })
     }
 
@@ -192,7 +189,7 @@ impl ModelSlot {
         Self::clear_transient_runtime_state_locked(state);
     }
 
-    fn ensure_loaded_locked(state: &mut ModelSlotState, error_msg: &str) -> MlResult<()> {
+    fn ensure_loaded_locked(&self, state: &mut ModelSlotState, error_msg: &str) -> MlResult<()> {
         if state.path.trim().is_empty() {
             return Err(MlError::InvalidRequest(error_msg.to_string()));
         }
@@ -206,7 +203,7 @@ impl ModelSlot {
         let execution_mode = if state.fell_back_to_cpu {
             onnx::ExecutionMode::CpuOnly
         } else {
-            onnx::ExecutionMode::PlatformDefault
+            self.default_execution_mode
         };
         let session = onnx::build_session(&state.path, execution_mode)?;
         rt_log(&format!("loaded {model_name} in {:?}", t.elapsed()));
@@ -233,64 +230,69 @@ static GLOBAL_RUNTIME: Lazy<MlRuntime> = Lazy::new(MlRuntime::new);
 
 impl MlRuntime {
     fn new() -> Self {
+        let platform_default = onnx::ExecutionMode::PlatformDefault;
+        let cpu_only = onnx::ExecutionMode::CpuOnly;
+
         Self {
-            face_detection: ModelSlot::new(),
-            face_embedding: ModelSlot::new(),
-            clip_image: ModelSlot::new(),
-            clip_text: ModelSlot::new(),
-            pet_face_detection: ModelSlot::new(),
-            pet_face_embedding_dog: ModelSlot::new(),
-            pet_face_embedding_cat: ModelSlot::new(),
-            pet_body_detection: ModelSlot::new(),
-            pet_body_embedding_dog: ModelSlot::new(),
-            pet_body_embedding_cat: ModelSlot::new(),
+            face_detection: ModelSlot::new(platform_default),
+            face_embedding: ModelSlot::new(platform_default),
+            clip_image: ModelSlot::new(platform_default),
+            clip_text: ModelSlot::new(platform_default),
+            // Pet models previously had device-specific FP16 driver failures.
+            // TODO: Benchmark every pet model with the platform-default providers
+            // on supported iOS and Android devices before release, then remove
+            // this CPU-only exception if parity and stability are preserved.
+            pet_face_detection: ModelSlot::new(cpu_only),
+            pet_face_embedding_dog: ModelSlot::new(cpu_only),
+            pet_face_embedding_cat: ModelSlot::new(cpu_only),
+            pet_body_detection: ModelSlot::new(cpu_only),
+            pet_body_embedding_dog: ModelSlot::new(cpu_only),
+            pet_body_embedding_cat: ModelSlot::new(cpu_only),
         }
     }
 
-    fn configure_requested_models(&self, config: &MlRuntimeConfig) {
+    fn configure_requested_models(&self, model_paths: &ModelPaths) {
         self.face_detection
-            .configure_if_requested(&config.model_paths.face_detection);
+            .configure_if_requested(&model_paths.face_detection);
         self.face_embedding
-            .configure_if_requested(&config.model_paths.face_embedding);
+            .configure_if_requested(&model_paths.face_embedding);
         self.clip_image
-            .configure_if_requested(&config.model_paths.clip_image);
+            .configure_if_requested(&model_paths.clip_image);
         self.clip_text
-            .configure_if_requested(&config.model_paths.clip_text);
+            .configure_if_requested(&model_paths.clip_text);
         self.pet_face_detection
-            .configure_if_requested(&config.model_paths.pet_face_detection);
+            .configure_if_requested(&model_paths.pet_face_detection);
         self.pet_face_embedding_dog
-            .configure_if_requested(&config.model_paths.pet_face_embedding_dog);
+            .configure_if_requested(&model_paths.pet_face_embedding_dog);
         self.pet_face_embedding_cat
-            .configure_if_requested(&config.model_paths.pet_face_embedding_cat);
+            .configure_if_requested(&model_paths.pet_face_embedding_cat);
         self.pet_body_detection
-            .configure_if_requested(&config.model_paths.pet_body_detection);
+            .configure_if_requested(&model_paths.pet_body_detection);
         self.pet_body_embedding_dog
-            .configure_if_requested(&config.model_paths.pet_body_embedding_dog);
+            .configure_if_requested(&model_paths.pet_body_embedding_dog);
         self.pet_body_embedding_cat
-            .configure_if_requested(&config.model_paths.pet_body_embedding_cat);
+            .configure_if_requested(&model_paths.pet_body_embedding_cat);
     }
 
-    fn prepare_indexing_models(&self, config: &MlRuntimeConfig) -> MlResult<()> {
+    fn prepare_indexing_models(&self, model_paths: &ModelPaths) {
         self.face_detection
-            .sync_indexing_residency(&config.model_paths.face_detection);
+            .sync_indexing_residency(&model_paths.face_detection);
         self.face_embedding
-            .sync_indexing_residency(&config.model_paths.face_embedding);
+            .sync_indexing_residency(&model_paths.face_embedding);
         self.clip_image
-            .sync_indexing_residency(&config.model_paths.clip_image);
+            .sync_indexing_residency(&model_paths.clip_image);
         self.pet_face_detection
-            .sync_indexing_residency(&config.model_paths.pet_face_detection);
+            .sync_indexing_residency(&model_paths.pet_face_detection);
         self.pet_face_embedding_dog
-            .sync_indexing_residency(&config.model_paths.pet_face_embedding_dog);
+            .sync_indexing_residency(&model_paths.pet_face_embedding_dog);
         self.pet_face_embedding_cat
-            .sync_indexing_residency(&config.model_paths.pet_face_embedding_cat);
+            .sync_indexing_residency(&model_paths.pet_face_embedding_cat);
         self.pet_body_detection
-            .sync_indexing_residency(&config.model_paths.pet_body_detection);
+            .sync_indexing_residency(&model_paths.pet_body_detection);
         self.pet_body_embedding_dog
-            .sync_indexing_residency(&config.model_paths.pet_body_embedding_dog);
+            .sync_indexing_residency(&model_paths.pet_body_embedding_dog);
         self.pet_body_embedding_cat
-            .sync_indexing_residency(&config.model_paths.pet_body_embedding_cat);
-
-        Ok(())
+            .sync_indexing_residency(&model_paths.pet_body_embedding_cat);
     }
 
     fn release_indexing_models(&self) {
@@ -305,33 +307,33 @@ impl MlRuntime {
         self.pet_body_embedding_cat.release_residency();
     }
 
-    fn force_cpu_only_for_requested_models(&self, config: &MlRuntimeConfig) {
+    fn force_cpu_only_for_requested_models(&self, model_paths: &ModelPaths) {
         self.face_detection
-            .force_cpu_fallback_if_configured(&config.model_paths.face_detection);
+            .force_cpu_fallback_if_configured(&model_paths.face_detection);
         self.face_embedding
-            .force_cpu_fallback_if_configured(&config.model_paths.face_embedding);
+            .force_cpu_fallback_if_configured(&model_paths.face_embedding);
         self.clip_image
-            .force_cpu_fallback_if_configured(&config.model_paths.clip_image);
+            .force_cpu_fallback_if_configured(&model_paths.clip_image);
         self.clip_text
-            .force_cpu_fallback_if_configured(&config.model_paths.clip_text);
+            .force_cpu_fallback_if_configured(&model_paths.clip_text);
         self.pet_face_detection
-            .force_cpu_fallback_if_configured(&config.model_paths.pet_face_detection);
+            .force_cpu_fallback_if_configured(&model_paths.pet_face_detection);
         self.pet_face_embedding_dog
-            .force_cpu_fallback_if_configured(&config.model_paths.pet_face_embedding_dog);
+            .force_cpu_fallback_if_configured(&model_paths.pet_face_embedding_dog);
         self.pet_face_embedding_cat
-            .force_cpu_fallback_if_configured(&config.model_paths.pet_face_embedding_cat);
+            .force_cpu_fallback_if_configured(&model_paths.pet_face_embedding_cat);
         self.pet_body_detection
-            .force_cpu_fallback_if_configured(&config.model_paths.pet_body_detection);
+            .force_cpu_fallback_if_configured(&model_paths.pet_body_detection);
         self.pet_body_embedding_dog
-            .force_cpu_fallback_if_configured(&config.model_paths.pet_body_embedding_dog);
+            .force_cpu_fallback_if_configured(&model_paths.pet_body_embedding_dog);
         self.pet_body_embedding_cat
-            .force_cpu_fallback_if_configured(&config.model_paths.pet_body_embedding_cat);
+            .force_cpu_fallback_if_configured(&model_paths.pet_body_embedding_cat);
     }
 
-    fn view<'a>(&'a self, config: &'a MlRuntimeConfig) -> MlRuntimeView<'a> {
+    fn view<'a>(&'a self, model_paths: &'a ModelPaths) -> MlRuntimeView<'a> {
         MlRuntimeView {
             runtime: self,
-            config,
+            model_paths,
         }
     }
 }
@@ -339,91 +341,90 @@ impl MlRuntime {
 impl MlRuntimeView<'_> {
     pub fn face_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.face_detection.session_guard_for(
-            &self.config.model_paths.face_detection,
+            &self.model_paths.face_detection,
             "missing model path: faceDetectionModelPath is required when runFaces is true",
         )
     }
 
     pub fn face_embedding_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.face_embedding.session_guard_for(
-            &self.config.model_paths.face_embedding,
+            &self.model_paths.face_embedding,
             "missing model path: faceEmbeddingModelPath is required when runFaces is true",
         )
     }
 
     pub fn clip_image_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.clip_image.session_guard_for(
-            &self.config.model_paths.clip_image,
+            &self.model_paths.clip_image,
             "missing model path: clipImageModelPath is required when runClip is true",
         )
     }
 
     pub fn clip_text_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.clip_text.session_guard_for(
-            &self.config.model_paths.clip_text,
+            &self.model_paths.clip_text,
             "missing model path: clipTextModelPath is required when running clip text",
         )
     }
 
     pub fn pet_face_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.pet_face_detection.session_guard_for(
-            &self.config.model_paths.pet_face_detection,
+            &self.model_paths.pet_face_detection,
             "missing model path: petFaceDetectionModelPath is required when runPets is true",
         )
     }
 
     pub fn pet_face_embedding_dog_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.pet_face_embedding_dog.session_guard_for(
-            &self.config.model_paths.pet_face_embedding_dog,
+            &self.model_paths.pet_face_embedding_dog,
             "missing model path: petFaceEmbeddingDogModelPath is required",
         )
     }
 
     pub fn pet_face_embedding_cat_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.pet_face_embedding_cat.session_guard_for(
-            &self.config.model_paths.pet_face_embedding_cat,
+            &self.model_paths.pet_face_embedding_cat,
             "missing model path: petFaceEmbeddingCatModelPath is required",
         )
     }
 
     pub fn pet_body_detection_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.pet_body_detection.session_guard_for(
-            &self.config.model_paths.pet_body_detection,
+            &self.model_paths.pet_body_detection,
             "missing model path: petBodyDetectionModelPath is required when runPets is true",
         )
     }
 
     pub fn pet_body_embedding_dog_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.pet_body_embedding_dog.session_guard_for(
-            &self.config.model_paths.pet_body_embedding_dog,
+            &self.model_paths.pet_body_embedding_dog,
             "missing model path: petBodyEmbeddingDogModelPath is required",
         )
     }
 
     pub fn pet_body_embedding_cat_session(&self) -> MlResult<ModelSessionGuard<'_>> {
         self.runtime.pet_body_embedding_cat.session_guard_for(
-            &self.config.model_paths.pet_body_embedding_cat,
+            &self.model_paths.pet_body_embedding_cat,
             "missing model path: petBodyEmbeddingCatModelPath is required",
         )
     }
 }
 
-pub fn ensure_runtime(config: &MlRuntimeConfig) -> MlResult<()> {
-    GLOBAL_RUNTIME.configure_requested_models(config);
-    Ok(())
+pub fn ensure_runtime(model_paths: &ModelPaths) {
+    GLOBAL_RUNTIME.configure_requested_models(model_paths);
 }
 
-pub fn prepare_runtime(config: &MlRuntimeConfig) -> MlResult<()> {
-    GLOBAL_RUNTIME.prepare_indexing_models(config)
+pub fn prepare_runtime(model_paths: &ModelPaths) {
+    GLOBAL_RUNTIME.prepare_indexing_models(model_paths);
 }
 
-pub fn with_runtime<F, R>(config: &MlRuntimeConfig, func: F) -> MlResult<R>
+pub fn with_runtime<F, R>(model_paths: &ModelPaths, func: F) -> MlResult<R>
 where
     F: for<'a> Fn(&MlRuntimeView<'a>) -> MlResult<R>,
 {
-    ensure_runtime(config)?;
+    ensure_runtime(model_paths);
 
-    let runtime_view = GLOBAL_RUNTIME.view(config);
+    let runtime_view = GLOBAL_RUNTIME.view(model_paths);
     let first_result = func(&runtime_view);
     match first_result {
         Ok(result) => Ok(result),
@@ -435,16 +436,15 @@ where
             rt_log(&format!(
                 "execution provider failed, retrying with CPU-only runtime: {first_error}"
             ));
-            GLOBAL_RUNTIME.force_cpu_only_for_requested_models(config);
-            let runtime_view = GLOBAL_RUNTIME.view(config);
+            GLOBAL_RUNTIME.force_cpu_only_for_requested_models(model_paths);
+            let runtime_view = GLOBAL_RUNTIME.view(model_paths);
             func(&runtime_view)
         }
     }
 }
 
-pub fn release_runtime() -> MlResult<()> {
+pub fn release_runtime() {
     GLOBAL_RUNTIME.release_indexing_models();
-    Ok(())
 }
 
 fn should_retry_with_cpu_only_runtime(error: &MlError) -> bool {
@@ -486,18 +486,14 @@ mod tests {
     fn configure_requested_models_preserves_unrequested_slots() {
         let runtime = MlRuntime::new();
 
-        runtime.configure_requested_models(&MlRuntimeConfig {
-            model_paths: ModelPaths {
-                clip_text: "clip_text.onnx".to_string(),
-                ..empty_paths()
-            },
+        runtime.configure_requested_models(&ModelPaths {
+            clip_text: "clip_text.onnx".to_string(),
+            ..empty_paths()
         });
 
-        runtime.configure_requested_models(&MlRuntimeConfig {
-            model_paths: ModelPaths {
-                face_detection: "face.onnx".to_string(),
-                ..empty_paths()
-            },
+        runtime.configure_requested_models(&ModelPaths {
+            face_detection: "face.onnx".to_string(),
+            ..empty_paths()
         });
 
         let clip_text = runtime.clip_text.lock_state();
@@ -537,16 +533,12 @@ mod tests {
     fn prepare_indexing_models_pins_without_loading_sessions() {
         let runtime = MlRuntime::new();
 
-        runtime
-            .prepare_indexing_models(&MlRuntimeConfig {
-                model_paths: ModelPaths {
-                    face_detection: "face.onnx".to_string(),
-                    face_embedding: "embed.onnx".to_string(),
-                    clip_image: "clip.onnx".to_string(),
-                    ..empty_paths()
-                },
-            })
-            .unwrap();
+        runtime.prepare_indexing_models(&ModelPaths {
+            face_detection: "face.onnx".to_string(),
+            face_embedding: "embed.onnx".to_string(),
+            clip_image: "clip.onnx".to_string(),
+            ..empty_paths()
+        });
 
         let face_detection = runtime.face_detection.lock_state();
         assert_eq!(face_detection.pin_count, 1);
@@ -563,7 +555,7 @@ mod tests {
 
     #[test]
     fn sync_indexing_residency_clears_disabled_slots() {
-        let slot = ModelSlot::new();
+        let slot = ModelSlot::new(onnx::ExecutionMode::PlatformDefault);
 
         {
             let mut state = slot.lock_state();
@@ -583,7 +575,7 @@ mod tests {
 
     #[test]
     fn release_residency_resets_transient_cpu_fallback_for_any_slot() {
-        let slot = ModelSlot::new();
+        let slot = ModelSlot::new(onnx::ExecutionMode::PlatformDefault);
 
         {
             let mut state = slot.lock_state();
@@ -598,5 +590,51 @@ mod tests {
         assert_eq!(state.pin_count, 0);
         assert!(!state.fell_back_to_cpu);
         assert!(state.session.is_none());
+    }
+
+    #[test]
+    fn only_pet_models_default_to_cpu_only() {
+        let runtime = MlRuntime::new();
+
+        assert_eq!(
+            runtime.face_detection.default_execution_mode,
+            onnx::ExecutionMode::PlatformDefault
+        );
+        assert_eq!(
+            runtime.face_embedding.default_execution_mode,
+            onnx::ExecutionMode::PlatformDefault
+        );
+        assert_eq!(
+            runtime.clip_image.default_execution_mode,
+            onnx::ExecutionMode::PlatformDefault
+        );
+        assert_eq!(
+            runtime.clip_text.default_execution_mode,
+            onnx::ExecutionMode::PlatformDefault
+        );
+        assert_eq!(
+            runtime.pet_face_detection.default_execution_mode,
+            onnx::ExecutionMode::CpuOnly
+        );
+        assert_eq!(
+            runtime.pet_face_embedding_dog.default_execution_mode,
+            onnx::ExecutionMode::CpuOnly
+        );
+        assert_eq!(
+            runtime.pet_face_embedding_cat.default_execution_mode,
+            onnx::ExecutionMode::CpuOnly
+        );
+        assert_eq!(
+            runtime.pet_body_detection.default_execution_mode,
+            onnx::ExecutionMode::CpuOnly
+        );
+        assert_eq!(
+            runtime.pet_body_embedding_dog.default_execution_mode,
+            onnx::ExecutionMode::CpuOnly
+        );
+        assert_eq!(
+            runtime.pet_body_embedding_cat.default_execution_mode,
+            onnx::ExecutionMode::CpuOnly
+        );
     }
 }

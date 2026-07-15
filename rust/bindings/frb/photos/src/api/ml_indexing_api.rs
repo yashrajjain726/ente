@@ -1,7 +1,5 @@
 use ente_photos::ml::{
-    error::MlError as SharedMlError,
-    indexing as shared_indexing,
-    runtime::{MlRuntimeConfig, ModelPaths},
+    error::MlError as SharedMlError, indexing as shared_indexing, runtime::ModelPaths,
     types as shared_types,
 };
 
@@ -17,11 +15,6 @@ pub struct RustModelPaths {
     pub pet_body_detection: String,
     pub pet_body_embedding_dog: String,
     pub pet_body_embedding_cat: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct RustMlRuntimeConfig {
-    pub model_paths: RustModelPaths,
 }
 
 #[derive(Clone, Debug)]
@@ -137,12 +130,12 @@ pub struct RunClipTextResult {
     pub embedding: Vec<f64>,
 }
 
-pub fn init_ml_runtime(config: RustMlRuntimeConfig) -> Result<(), String> {
-    shared_indexing::init_ml_runtime(to_runtime_config(&config)).map_err(|e| e.to_string())
+pub fn init_ml_runtime(model_paths: RustModelPaths) {
+    shared_indexing::init_ml_runtime(to_model_paths(&model_paths));
 }
 
-pub fn release_ml_runtime() -> Result<(), String> {
-    shared_indexing::release_ml_runtime().map_err(|e| e.to_string())
+pub fn release_ml_runtime() {
+    shared_indexing::release_ml_runtime();
 }
 
 pub fn analyze_image_rust(req: AnalyzeImageRequest) -> Result<AnalyzeImageResult, RustMlError> {
@@ -152,9 +145,7 @@ pub fn analyze_image_rust(req: AnalyzeImageRequest) -> Result<AnalyzeImageResult
         run_faces: req.run_faces,
         run_clip: req.run_clip,
         run_pets: req.run_pets,
-        runtime_config: MlRuntimeConfig {
-            model_paths: to_model_paths(&req.model_paths),
-        },
+        model_paths: to_model_paths(&req.model_paths),
     };
 
     shared_indexing::analyze_image(shared_req)
@@ -182,12 +173,6 @@ pub fn run_clip_text_rust(req: RunClipTextRequest) -> Result<RunClipTextResult, 
 
 pub fn tokenize_clip_text_rust(text: String, vocab_path: String) -> Result<Vec<i32>, String> {
     shared_indexing::tokenize_clip_text(&text, &vocab_path).map_err(|e| e.to_string())
-}
-
-fn to_runtime_config(config: &RustMlRuntimeConfig) -> MlRuntimeConfig {
-    MlRuntimeConfig {
-        model_paths: to_model_paths(&config.model_paths),
-    }
 }
 
 fn to_model_paths(paths: &RustModelPaths) -> ModelPaths {

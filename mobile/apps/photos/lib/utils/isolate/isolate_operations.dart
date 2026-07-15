@@ -21,7 +21,7 @@ import "package:photos/utils/ml_util.dart";
 
 final Map<String, dynamic> _isolateCache = {};
 const _rustLibLoadedCacheKey = "rustLibLoaded";
-const _rustMlRuntimeConfigCacheKey = "rustMlRuntimeConfig";
+const _rustMlModelPathsCacheKey = "rustMlModelPaths";
 
 class RustCorruptModelCacheDeletedException implements Exception {
   const RustCorruptModelCacheDeletedException(this.modelPath);
@@ -395,10 +395,10 @@ Future<void> _ensureRustRuntimePrepared(Map<String, dynamic> args) async {
     petBodyEmbeddingCat:
         (args["petBodyEmbeddingCatModelPath"] as String?) ?? "",
   );
-  final runtimeConfigKey = _runtimeConfigCacheKey(modelPaths);
-  final currentConfigKey =
-      _isolateCache[_rustMlRuntimeConfigCacheKey] as String?;
-  if (currentConfigKey == runtimeConfigKey) {
+  final modelPathsKey = _modelPathsCacheKey(modelPaths);
+  final currentModelPathsKey =
+      _isolateCache[_rustMlModelPathsCacheKey] as String?;
+  if (currentModelPathsKey == modelPathsKey) {
     return;
   }
 
@@ -418,10 +418,8 @@ Future<void> _ensureRustRuntimePrepared(Map<String, dynamic> args) async {
     );
   }
 
-  await rust_ml.initMlRuntime(
-    config: rust_ml.RustMlRuntimeConfig(modelPaths: modelPaths),
-  );
-  _isolateCache[_rustMlRuntimeConfigCacheKey] = runtimeConfigKey;
+  await rust_ml.initMlRuntime(modelPaths: modelPaths);
+  _isolateCache[_rustMlModelPathsCacheKey] = modelPathsKey;
 }
 
 Future<void> _releaseRustRuntime() async {
@@ -434,10 +432,10 @@ Future<void> _releaseRustRuntime() async {
   } catch (_) {
     // no-op: indexing-model release is best-effort.
   }
-  _isolateCache.remove(_rustMlRuntimeConfigCacheKey);
+  _isolateCache.remove(_rustMlModelPathsCacheKey);
 }
 
-String _runtimeConfigCacheKey(rust_ml.RustModelPaths modelPaths) {
+String _modelPathsCacheKey(rust_ml.RustModelPaths modelPaths) {
   return [
     modelPaths.faceDetection,
     modelPaths.faceEmbedding,

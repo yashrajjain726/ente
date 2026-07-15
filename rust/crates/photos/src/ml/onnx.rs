@@ -23,10 +23,10 @@ pub(crate) enum ExecutionMode {
 }
 
 pub(crate) fn build_session(model_path: &str, mode: ExecutionMode) -> MlResult<Session> {
-    let primary = providers_for_mode(mode);
-    let has_preferred_provider = primary.has_preferred_provider;
+    let primary = provider_attempt(mode);
+    let retry_with_cpu_only = primary.retry_with_cpu_only;
     let mut attempts = vec![primary];
-    if has_preferred_provider {
+    if retry_with_cpu_only {
         attempts.push(ProviderAttempt::cpu_only());
     }
 
@@ -58,58 +58,59 @@ fn has_protobuf_parse_failure(errors: &[String]) -> bool {
 
 struct ProviderAttempt {
     providers: Vec<ExecutionProviderDispatch>,
-    has_preferred_provider: bool,
-    uses_xnnpack: bool,
+    retry_with_cpu_only: bool,
+    disable_intra_op_spinning: bool,
 }
 
 impl ProviderAttempt {
     fn cpu_only() -> Self {
         Self {
             providers: vec![CPU::default().with_arena_allocator(true).build()],
-            has_preferred_provider: false,
-            uses_xnnpack: false,
+            retry_with_cpu_only: false,
+            disable_intra_op_spinning: false,
         }
     }
 }
 
-fn providers_for_mode(_mode: ExecutionMode) -> ProviderAttempt {
-    let mut providers: Vec<ExecutionProviderDispatch> = Vec::new();
-    #[cfg(any(target_os = "ios", target_os = "android"))]
-    let mut has_preferred_provider = false;
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
-    let has_preferred_provider = false;
-    #[cfg(not(target_os = "android"))]
-    let uses_xnnpack = false;
-    #[cfg(target_os = "android")]
-    let mut uses_xnnpack = false;
+fn provider_attempt(mode: ExecutionMode) -> ProviderAttempt {
+    match mode {
+        ExecutionMode::PlatformDefault => platform_default_attempt(),
+        ExecutionMode::CpuOnly => ProviderAttempt::cpu_only(),
+    }
+}
 
-    #[cfg(target_os = "ios")]
-    if _mode == ExecutionMode::PlatformDefault {
-        providers.push(
+#[cfg(target_os = "ios")]
+fn platform_default_attempt() -> ProviderAttempt {
+    ProviderAttempt {
+        providers: vec![
             CoreML::default()
                 .with_model_format(ModelFormat::MLProgram)
                 .with_compute_units(ComputeUnits::All)
                 .with_specialization_strategy(SpecializationStrategy::Default)
                 .build()
                 .error_on_failure(),
-        );
-        has_preferred_provider = true;
+            CPU::default().with_arena_allocator(true).build(),
+        ],
+        retry_with_cpu_only: true,
+        disable_intra_op_spinning: false,
     }
+}
 
-    #[cfg(target_os = "android")]
-    if _mode == ExecutionMode::PlatformDefault {
-        providers.push(xnnpack_provider());
-        has_preferred_provider = true;
-        uses_xnnpack = true;
-    }
-
-    providers.push(CPU::default().with_arena_allocator(true).build());
-
+#[cfg(target_os = "android")]
+fn platform_default_attempt() -> ProviderAttempt {
     ProviderAttempt {
-        providers,
-        has_preferred_provider,
-        uses_xnnpack,
+        providers: vec![
+            xnnpack_provider(),
+            CPU::default().with_arena_allocator(true).build(),
+        ],
+        retry_with_cpu_only: true,
+        disable_intra_op_spinning: true,
     }
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+fn platform_default_attempt() -> ProviderAttempt {
+    ProviderAttempt::cpu_only()
 }
 
 #[cfg(target_os = "android")]
@@ -126,7 +127,7 @@ fn build_session_with_providers(model_path: &str, attempt: ProviderAttempt) -> M
         .with_intra_threads(1)?
         .with_inter_threads(1)?;
 
-    if attempt.uses_xnnpack {
+    if attempt.disable_intra_op_spinning {
         builder = builder.with_intra_op_spinning(false)?;
     }
     builder = builder.with_execution_providers(attempt.providers)?;

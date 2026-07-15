@@ -10,7 +10,7 @@ use crate::ml::{
         detect::{run_pet_body_detection, run_pet_face_detection},
         embed::{run_pet_body_embedding, run_pet_face_embedding},
     },
-    runtime::{self, MlRuntimeConfig, ModelPaths},
+    runtime::{self, ModelPaths},
     types::{self, ClipResult, Dimensions, FaceResult, PetBodyResult, PetFaceResult},
 };
 use ente_image::decode::decode_image_from_path;
@@ -22,7 +22,7 @@ pub struct AnalyzeImageRequest {
     pub run_faces: bool,
     pub run_clip: bool,
     pub run_pets: bool,
-    pub runtime_config: MlRuntimeConfig,
+    pub model_paths: ModelPaths,
 }
 
 #[derive(Clone, Debug)]
@@ -47,12 +47,12 @@ pub struct RunClipTextResult {
     pub embedding: Vec<f32>,
 }
 
-pub fn init_ml_runtime(config: MlRuntimeConfig) -> MlResult<()> {
-    runtime::prepare_runtime(&config)
+pub fn init_ml_runtime(model_paths: ModelPaths) {
+    runtime::prepare_runtime(&model_paths);
 }
 
-pub fn release_ml_runtime() -> MlResult<()> {
-    runtime::release_runtime()
+pub fn release_ml_runtime() {
+    runtime::release_runtime();
 }
 
 pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
@@ -64,10 +64,10 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
         run_faces,
         run_clip,
         run_pets,
-        runtime_config,
+        model_paths,
     } = req;
 
-    runtime::with_runtime(&runtime_config, |runtime| {
+    runtime::with_runtime(&model_paths, |runtime| {
         let decoded = decode_image_from_path(&image_path)?;
         let dims = decoded.dimensions.clone();
 
@@ -78,7 +78,7 @@ pub fn analyze_image(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageResult> {
             } else {
                 let (aligned, mut face_results) =
                     run_face_alignment(file_id, &decoded, detections)?;
-                run_face_embedding(runtime, &aligned, &mut face_results)?;
+                run_face_embedding(runtime, aligned, &mut face_results)?;
                 Some(face_results)
             }
         } else {
@@ -155,22 +155,20 @@ pub fn run_clip_text(req: RunClipTextRequest) -> MlResult<RunClipTextResult> {
         ));
     }
 
-    let runtime_config = MlRuntimeConfig {
-        model_paths: ModelPaths {
-            face_detection: String::new(),
-            face_embedding: String::new(),
-            clip_image: String::new(),
-            clip_text: model_path,
-            pet_face_detection: String::new(),
-            pet_face_embedding_dog: String::new(),
-            pet_face_embedding_cat: String::new(),
-            pet_body_detection: String::new(),
-            pet_body_embedding_dog: String::new(),
-            pet_body_embedding_cat: String::new(),
-        },
+    let model_paths = ModelPaths {
+        face_detection: String::new(),
+        face_embedding: String::new(),
+        clip_image: String::new(),
+        clip_text: model_path,
+        pet_face_detection: String::new(),
+        pet_face_embedding_dog: String::new(),
+        pet_face_embedding_cat: String::new(),
+        pet_body_detection: String::new(),
+        pet_body_embedding_dog: String::new(),
+        pet_body_embedding_cat: String::new(),
     };
 
-    runtime::with_runtime(&runtime_config, |runtime| {
+    runtime::with_runtime(&model_paths, |runtime| {
         let clip = run_clip_text_query(runtime, &text, &vocab_path)?;
         Ok(RunClipTextResult {
             embedding: clip.embedding,
@@ -188,7 +186,7 @@ pub fn tokenize_clip_text(text: &str, vocab_path: &str) -> MlResult<Vec<i32>> {
 }
 
 fn validate_request_model_paths(req: &AnalyzeImageRequest) -> MlResult<()> {
-    let model_paths = &req.runtime_config.model_paths;
+    let model_paths = &req.model_paths;
 
     let mut missing = Vec::new();
     if req.run_faces {

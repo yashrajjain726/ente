@@ -1,7 +1,9 @@
 # Mobile ML model optimizations
 
 This directory records the production transformations applied to Ente's mobile
-face models and contains the resulting CDN artifacts under `models/`.
+face models. The generated CDN artifacts are written under `models/`; ONNX
+files are intentionally gitignored, while `model_manifest.json` records the
+reproducible output metadata.
 
 ## Rebuilding the models
 

@@ -11,7 +11,7 @@ const FACE_INPUT_CHANNELS: i64 = 3;
 
 pub fn run_face_embedding(
     runtime: &MlRuntimeView<'_>,
-    aligned_faces: &[Vec<f32>],
+    aligned_faces: Vec<Vec<f32>>,
     face_results: &mut [FaceResult],
 ) -> MlResult<()> {
     if aligned_faces.is_empty() {
@@ -27,7 +27,7 @@ pub fn run_face_embedding(
 
     let expected_input_len = (FACE_INPUT_WIDTH * FACE_INPUT_HEIGHT * FACE_INPUT_CHANNELS) as usize;
     let mut face_embedding = runtime.face_embedding_session()?;
-    for (aligned, face_result) in aligned_faces.iter().zip(face_results.iter_mut()) {
+    for (aligned, face_result) in aligned_faces.into_iter().zip(face_results.iter_mut()) {
         if aligned.len() != expected_input_len {
             return Err(MlError::Preprocess(format!(
                 "aligned face tensor length {} does not match expected {}",
@@ -38,7 +38,7 @@ pub fn run_face_embedding(
 
         let (shape, mut embedding) = onnx::run_f32(
             &mut face_embedding,
-            aligned.clone(),
+            aligned,
             [1, FACE_INPUT_HEIGHT, FACE_INPUT_WIDTH, FACE_INPUT_CHANNELS],
         )?;
         if shape.first() != Some(&1) || embedding.is_empty() {
