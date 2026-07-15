@@ -207,9 +207,16 @@ class _EmergencyPageState extends State<EmergencyPage> {
                     }, childCount: 1 + info!.recoverSessions.length),
                   ),
                 ),
+              if (info != null &&
+                  !showFullEmptyState &&
+                  LegacyKitService.instance.isInitialized &&
+                  (legacyKits.isNotEmpty ||
+                      trustedContacts.isNotEmpty ||
+                      othersTrustedContacts.isNotEmpty))
+                _buildLegacyKitsSliver(colorScheme),
               if (info != null && !showFullEmptyState)
                 SliverPadding(
-                  padding: const EdgeInsets.only(left: 16, right: 16),
+                  padding: const EdgeInsets.only(top: 20, left: 16, right: 16),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate((context, index) {
                       if (index == 0 &&
@@ -409,13 +416,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
                     }, childCount: 1 + othersTrustedContacts.length + 1),
                   ),
                 ),
-              if (info != null &&
-                  !showFullEmptyState &&
-                  LegacyKitService.instance.isInitialized &&
-                  (legacyKits.isNotEmpty ||
-                      trustedContacts.isNotEmpty ||
-                      othersTrustedContacts.isNotEmpty))
-                _buildLegacyKitsSliver(colorScheme),
             ],
           ),
         );
@@ -430,7 +430,6 @@ class _EmergencyPageState extends State<EmergencyPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 20),
             _buildSectionTitle(
               title: context.strings.legacyKits,
               colorScheme: colorScheme,
