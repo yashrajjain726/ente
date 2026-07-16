@@ -20,6 +20,8 @@ export const SpacePageMeta: React.FC<SpacePageMetaProps> = ({
     themeColor,
 }) => {
     const previewImage = preview && previewImages[preview];
+    const previewTitle =
+        preview == "invite" ? "Add me on Ente Space" : spacePreviewTitle;
 
     return (
         <Head>
@@ -39,12 +41,12 @@ export const SpacePageMeta: React.FC<SpacePageMetaProps> = ({
                     <meta property="og:image:height" content="630" />
                     <meta name="twitter:card" content="summary_large_image" />
                     <meta name="twitter:image" content={previewImage} />
-                    <meta property="og:title" content={spacePreviewTitle} />
+                    <meta property="og:title" content={previewTitle} />
                     <meta
                         property="og:description"
                         content={spacePreviewDescription}
                     />
-                    <meta name="twitter:title" content={spacePreviewTitle} />
+                    <meta name="twitter:title" content={previewTitle} />
                     <meta
                         name="twitter:description"
                         content={spacePreviewDescription}
