@@ -74,6 +74,9 @@ import (
 	"github.com/ente/museum/pkg/utils/config"
 	"github.com/ente/museum/pkg/utils/s3config"
 	timeUtil "github.com/ente/museum/pkg/utils/time"
+	spaceapi "github.com/ente/museum/space/api"
+	spacecontroller "github.com/ente/museum/space/controller"
+	spacerepo "github.com/ente/museum/space/repo"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/requestid"
 	"github.com/gin-contrib/timeout"
@@ -114,6 +117,7 @@ func main() {
 	viper.SetDefault("apps.accounts-legacy", "https://accounts.ente.io")
 	viper.SetDefault("apps.cast", "https://cast.ente.com")
 	viper.SetDefault("apps.family", "https://family.ente.io")
+	viper.SetDefault("apps.space", "https://ente.space")
 
 	setupLogger(environment)
 	log.Infof("Booting up %s server with commit #%s", environment, os.Getenv("GIT_COMMIT"))
@@ -980,13 +984,25 @@ func main() {
 
 	userEntityController := &userEntityCtrl.Controller{Repo: userEntityRepo}
 	userEntityHandler := &api.UserEntityHandler{Controller: userEntityController}
+	spaceRepos := spacerepo.NewModule(db, s3Config)
+	userController.SpaceAccessResetter = spaceRepos
+	spaceModule := spacecontroller.NewModule(spaceRepos, userAuthRepo, spacecontroller.NewSpaceEmailSender(userRepo))
+	spaceModule.Posts.AbuseNotifier = discordController
+	spaceDripController := spacecontroller.NewSpaceDripController(spaceRepos, userRepo, notificationHistoryRepo, lockController)
+	spaceModule.UserTokens = userController
+	spaceHandlers := spaceapi.NewHandlers(spaceModule)
+	spacePrivateAPI := server.Group("/")
+	spacePrivateAPI.Use(rateLimiter.GlobalRateLimiter(), spaceHandlers.RequireSpaceBrowserSession(), rateLimiter.APIRateLimitForUserMiddleware(urlSanitizer))
 
 	storageAPI.POST("/user-entity/key", userEntityHandler.CreateKey)
+	storageAPI.POST("/user-entity/key/ensure", userEntityHandler.EnsureKey)
 	storageAPI.GET("/user-entity/key", userEntityHandler.GetKey)
 	storageAPI.POST("/user-entity/entity", userEntityHandler.CreateEntity)
 	storageAPI.PUT("/user-entity/entity", userEntityHandler.UpdateEntity)
 	storageAPI.DELETE("/user-entity/entity", userEntityHandler.DeleteEntity)
 	storageAPI.GET("/user-entity/entity/diff", userEntityHandler.GetDiff)
+	spaceapi.RegisterTokenSessionRoutes(privateAPI, spaceHandlers)
+	spaceapi.Register(spacePrivateAPI, publicAPI, spaceHandlers)
 
 	contactController := contactCtrl.New(contactRepository, objectCleanupController, s3Config)
 	contactHandler := &api.ContactHandler{Controller: contactController}
@@ -1023,6 +1039,7 @@ func main() {
 		TaskLockRepo:   taskLockingRepo,
 		TrashRepo:      trashRepo,
 		UsageRepo:      usageRepo,
+		SpaceDataRepo:  spaceRepos,
 		HostName:       hostName,
 	}
 	remoteStoreHandler := &api.RemoteStoreHandler{Controller: remoteStoreController}
@@ -1054,11 +1071,11 @@ func main() {
 	adminAPI.POST("/discount/add-coupons", discountCouponHandler.AddCoupons)
 
 	setKnownAPIs(server.Routes())
-	setupAndStartBackgroundJobs(objectCleanupController, replicationController3, fileDataCtrl, contactController)
+	setupAndStartBackgroundJobs(objectCleanupController, replicationController3, fileDataCtrl, contactController, spaceModule)
 	setupAndStartCrons(
 		userAuthRepo, collectionLinkRepo, fileLinkRepo, pasteRepo, twoFactorRepo, passkeysRepo, fileController, taskLockingRepo, emailNotificationCtrl,
 		trashController, pushController, objectController, dataCleanupController, storageBonusCtrl, emergencyCtrl,
-		embeddingController, healthCheckHandler, castDb, inactiveUserOrchestrator)
+		embeddingController, healthCheckHandler, castDb, inactiveUserOrchestrator, spaceDripController)
 
 	// Create new collectors, the names will be used as labels on the metrics
 	primaryDBCollector := sqlstats.NewStatsCollector("prod_db", db)
@@ -1202,6 +1219,7 @@ func setupAndStartBackgroundJobs(
 	replicationController3 *controller.ReplicationController3,
 	fileDataCtrl *filedata.Controller,
 	contactController *contactCtrl.Controller,
+	spaceModule *spacecontroller.Module,
 ) {
 	isReplicationEnabled := viper.GetBool("replication.enabled")
 	if isReplicationEnabled {
@@ -1229,6 +1247,7 @@ func setupAndStartBackgroundJobs(
 	fileDataCtrl.StartDataDeletion() // Start data deletion for file data;
 	contactController.StartDataDeletion()
 	objectCleanupController.StartRemovingUnreportedObjects()
+	spaceModule.Cleanup.StartRemovingUnreportedObjects()
 }
 
 func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRepo *public.CollectionLinkRepo,
@@ -1244,7 +1263,8 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 	embeddingCtrl *embeddingCtrl.Controller,
 	healthCheckHandler *api.HealthCheckHandler,
 	castDb castRepo.Repository,
-	inactiveUserOrchestrator *user.InactiveUserOrchestrator) {
+	inactiveUserOrchestrator *user.InactiveUserOrchestrator,
+	spaceDripController *spacecontroller.SpaceDripController) {
 	if viper.GetBool("jobs.cron.skip") {
 		log.Info("Skipping cron jobs")
 		return
@@ -1360,6 +1380,10 @@ func setupAndStartCrons(userAuthRepo *repo.UserAuthRepository, collectionLinkRep
 		emailNotificationCtrl.SendStorageWarningMails()
 	})
 
+	scheduleAndRun(c, "@every 24h", func() {
+		spaceDripController.ProcessSpaceDrips()
+	})
+
 	schedule(c, "@every 1m", func() {
 		pushController.SendPushes()
 	})
@@ -1375,7 +1399,7 @@ func cors() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", c.GetHeader("Origin"))
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, X-Auth-Token, X-Auth-Access-Token, X-Cast-Access-Token, X-Auth-Access-Token-JWT, X-Auth-Link-Device-Token, X-Client-Package, X-Client-Version, X-Paste-Consume, Authorization, accept, origin, Cache-Control, X-Requested-With, upgrade-insecure-requests, Range")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, X-Auth-Token, X-Space-Session-Token, X-Auth-Access-Token, X-Cast-Access-Token, X-Auth-Access-Token-JWT, X-Auth-Link-Device-Token, X-Client-Package, X-Client-Version, X-Paste-Consume, Authorization, accept, origin, Cache-Control, X-Requested-With, upgrade-insecure-requests, Range")
 		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-Request-Id, X-Ente-Link-Device-Token")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
 		c.Writer.Header().Set("Access-Control-Max-Age", "1728000")
