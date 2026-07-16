@@ -47,6 +47,7 @@ import {
     TitledNestedSidebarDrawer,
     type NestedSidebarDrawerVisibilityProps,
 } from "ente-base/components/mui/SidebarDrawer";
+import { logoutDialogAttributes } from "ente-base/components/utils/dialog";
 import { useIsSmallWidth } from "ente-base/components/utils/hooks";
 import {
     useModalVisibility,
@@ -277,16 +278,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         useState<FreeUpSpaceAction>();
 
     const handleLogout = useCallback(
-        () =>
-            showMiniDialog({
-                message: t("logout_message"),
-                continue: {
-                    text: t("logout"),
-                    color: "critical",
-                    action: logout,
-                },
-                buttonDirection: "row",
-            }),
+        () => showMiniDialog(logoutDialogAttributes(logout)),
         [logout, showMiniDialog],
     );
 

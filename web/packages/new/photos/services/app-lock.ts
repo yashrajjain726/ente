@@ -462,7 +462,7 @@ export const initAppLock = async () => {
     const persistedConfig = await readPersistedAppLockConfig();
     const config = persistedConfig ?? defaultPersistedAppLockConfig();
 
-    if (persistedConfig && !config.enabled) {
+    if (persistedConfig && !persistedConfig.enabled) {
         try {
             await clearPersistedAppLockConfig();
         } catch (e) {
@@ -479,12 +479,7 @@ export const initAppLock = async () => {
         return;
     }
 
-    const hasSession = haveMasterKeyInSession();
-
-    // On desktop, lock pessimistically while safe-storage hydration is in flight.
-    const isLocked = config.enabled && (hasSession || !!globalThis.electron);
-
-    setSnapshotFromPersistedConfig(config, isLocked, true);
+    setSnapshotFromPersistedConfig(config, config.enabled, true);
 };
 
 /**
@@ -1088,12 +1083,6 @@ export const disableAppLock = async () => {
         throw new Error("App lock is not supported");
     }
 
-    await Promise.all([
-        clearPassphraseMaterial(),
-        removeKV(kvKeyInvalidAttempts),
-        removeKV(kvKeyCooldownExpiresAt),
-    ]);
-
     const snapshot = appLockState().snapshot;
     await clearPersistedAppLockConfig();
     setSnapshot({
@@ -1106,4 +1095,10 @@ export const disableAppLock = async () => {
         cooldownExpiresAt: 0,
     });
     stopBruteForceStateHydration();
+
+    await Promise.all([
+        clearPassphraseMaterial(),
+        removeKV(kvKeyInvalidAttempts),
+        removeKV(kvKeyCooldownExpiresAt),
+    ]);
 };

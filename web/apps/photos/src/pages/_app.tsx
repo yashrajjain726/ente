@@ -20,7 +20,10 @@ import {
 import { AttributedMiniDialog } from "ente-base/components/MiniDialog";
 import { Notification } from "ente-base/components/Notification";
 import { ThemedLoadingBar } from "ente-base/components/ThemedLoadingBar";
-import { useAttributedMiniDialog } from "ente-base/components/utils/dialog";
+import {
+    logoutDialogAttributes,
+    useAttributedMiniDialog,
+} from "ente-base/components/utils/dialog";
 import {
     useIsRouteChangeInProgress,
     useNotification,
@@ -29,7 +32,11 @@ import {
 } from "ente-base/components/utils/hooks-app";
 import { photosTheme } from "ente-base/components/utils/theme";
 import { useLoadingBar } from "ente-base/components/utils/use-loading-bar";
-import { BaseContext, deriveBaseContext } from "ente-base/context";
+import {
+    BaseContext,
+    deriveBaseContext,
+    useBaseContext,
+} from "ente-base/context";
 import log from "ente-base/log";
 import { logStartupBanner } from "ente-base/log-web";
 import type { AppUpdate } from "ente-base/types/ipc";
@@ -251,16 +258,26 @@ const DesktopMainContent: React.FC<MainContentProps> = ({
     );
 };
 
-const AppLockSetupError: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
-    <Stack100vhCenter sx={{ gap: 2 }}>
-        <ActivityErrorIndicator>
-            {t("generic_error_retry")}
-        </ActivityErrorIndicator>
-        <Button color="secondary" onClick={onRetry}>
-            {t("retry")}
-        </Button>
-    </Stack100vhCenter>
-);
+const AppLockSetupError: React.FC<{ onRetry: () => void }> = ({ onRetry }) => {
+    const { logout, showMiniDialog } = useBaseContext();
+
+    return (
+        <Stack100vhCenter sx={{ gap: 2 }}>
+            <ActivityErrorIndicator>
+                {t("app_lock_unavailable")}
+            </ActivityErrorIndicator>
+            <Button color="accent" onClick={onRetry}>
+                {t("retry")}
+            </Button>
+            <Button
+                color="secondary"
+                onClick={() => showMiniDialog(logoutDialogAttributes(logout))}
+            >
+                {t("logout")}
+            </Button>
+        </Stack100vhCenter>
+    );
+};
 
 const WindowTitlebar: React.FC<React.PropsWithChildren> = ({ children }) => (
     <WindowTitlebarArea>

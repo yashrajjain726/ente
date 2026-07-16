@@ -63,7 +63,7 @@ export const useSetupAppLock = () => {
                 await bootstrapAppLock();
                 if (!cancelled) setStatus("ready");
             } catch (e) {
-                log.error("Failed to initialize app lock during bootstrap", e);
+                log.error("Failed to bootstrap app lock", e);
                 if (!cancelled) setStatus("error");
             }
         };
