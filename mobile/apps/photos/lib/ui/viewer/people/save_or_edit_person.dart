@@ -64,6 +64,7 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
   bool userAlreadyAssigned = false;
   late final Logger _logger = Logger("_SavePersonState");
   PersonEntity? person;
+  String? _mergeSuggestionPersonId;
   final _nameFocsNode = FocusNode();
   List<PersonEntity> _allPersons = [];
 
@@ -172,6 +173,15 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                           children: [
                             Center(child: _buildAvatar()),
                             const SizedBox(height: Spacing.xxl),
+                            if (!widget.isEditing &&
+                                _allPersons.isNotEmpty) ...[
+                              _MergeWithExistingSection(
+                                clusterId: widget.clusterID!,
+                                suggestedPersonId: _mergeSuggestionPersonId,
+                                onTap: _onMergeWithExisting,
+                              ),
+                              const SizedBox(height: Spacing.xxl),
+                            ],
                             TextInputComponent(
                               label: context.l10n.name,
                               hintText: context.l10n.enterName,
@@ -242,16 +252,6 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
                       shouldShowSuccessState: false,
                       onTap: _canSave ? _savePerson : null,
                     ),
-                    if (!widget.isEditing) ...[
-                      const SizedBox(height: Spacing.sm),
-                      ButtonComponent(
-                        label: context.l10n.mergeWithExisting,
-                        variant: ButtonComponentVariant.link,
-                        size: ButtonComponentSize.small,
-                        shouldSurfaceExecutionStates: false,
-                        onTap: _onMergeWithExisting,
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -419,6 +419,32 @@ class _SaveOrEditPersonState extends State<SaveOrEditPerson> {
             ),
       );
     });
+    if (!widget.isEditing && persons.isNotEmpty) {
+      await _loadMergeSuggestion();
+    }
+  }
+
+  Future<void> _loadMergeSuggestion() async {
+    final clusterId = widget.clusterID;
+    if (clusterId == null) {
+      return;
+    }
+    try {
+      final suggestions = await ClusterFeedbackService.instance
+          .getAllLargePersonSuggestions();
+      for (final suggestion in suggestions) {
+        if (suggestion.clusterIDToMerge == clusterId) {
+          if (mounted) {
+            setState(
+              () => _mergeSuggestionPersonId = suggestion.person.remoteID,
+            );
+          }
+          return;
+        }
+      }
+    } catch (error, stackTrace) {
+      _logger.warning("Failed to load merge suggestion", error, stackTrace);
+    }
   }
 
   bool get _shouldShowSuggestions =>
@@ -711,6 +737,145 @@ class _AvatarEditButton extends StatelessWidget {
           size: IconSizes.small,
           strokeWidth: 2,
         ),
+      ),
+    );
+  }
+}
+
+class _MergeWithExistingSection extends StatelessWidget {
+  const _MergeWithExistingSection({
+    required this.clusterId,
+    required this.suggestedPersonId,
+    required this.onTap,
+  });
+
+  final String clusterId;
+  final String? suggestedPersonId;
+  final Future<void> Function() onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.componentColors;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.lg,
+        Spacing.md,
+        Spacing.md,
+        Spacing.md,
+      ),
+      decoration: BoxDecoration(
+        color: colors.fillLight,
+        borderRadius: BorderRadius.circular(Radii.button),
+      ),
+      child: Column(
+        children: [
+          _MergeWithExistingGraphic(
+            clusterId: clusterId,
+            suggestedPersonId: suggestedPersonId,
+          ),
+          const SizedBox(height: Spacing.sm),
+          Text(
+            context.l10n.mergeWithExisting,
+            style: TextStyles.body.copyWith(color: colors.textBase),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: Spacing.lg),
+          ButtonComponent(
+            label: context.l10n.selectPerson,
+            variant: ButtonComponentVariant.secondary,
+            shouldSurfaceExecutionStates: false,
+            shouldShowSuccessState: false,
+            onTap: onTap,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MergeWithExistingGraphic extends StatelessWidget {
+  const _MergeWithExistingGraphic({
+    required this.clusterId,
+    required this.suggestedPersonId,
+  });
+
+  final String clusterId;
+  final String? suggestedPersonId;
+
+  @override
+  Widget build(BuildContext context) {
+    const thumbnailSize = 48.0;
+    final colors = context.componentColors;
+    final cachedPixelWidth =
+        (thumbnailSize * MediaQuery.devicePixelRatioOf(context)).round();
+
+    return SizedBox(
+      width: 110,
+      height: 54,
+      child: Stack(
+        children: [
+          Positioned(
+            left: 3,
+            top: 3,
+            child: Transform.rotate(
+              angle: -7 * math.pi / 180,
+              child: _MergeFaceThumbnail(
+                size: thumbnailSize,
+                clusterId: clusterId,
+                cachedPixelWidth: cachedPixelWidth,
+              ),
+            ),
+          ),
+          Positioned(
+            right: 3,
+            top: 3,
+            child: Transform.rotate(
+              angle: 7 * math.pi / 180,
+              child: suggestedPersonId != null
+                  ? _MergeFaceThumbnail(
+                      size: thumbnailSize,
+                      personId: suggestedPersonId,
+                      cachedPixelWidth: cachedPixelWidth,
+                    )
+                  : Container(
+                      width: thumbnailSize,
+                      height: thumbnailSize,
+                      decoration: BoxDecoration(
+                        color: colors.backgroundBase,
+                        borderRadius: faceThumbnailSquircleBorderRadius(
+                          thumbnailSize,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedUser,
+                        color: colors.textLight,
+                        size: IconSizes.small,
+                        strokeWidth: 1.5,
+                      ),
+                    ),
+            ),
+          ),
+          Positioned(
+            left: 44,
+            top: 15,
+            child: Container(
+              padding: const EdgeInsets.all(Spacing.xs),
+              decoration: BoxDecoration(
+                color: colors.green,
+                shape: BoxShape.circle,
+                border: Border.all(color: colors.fillLight),
+              ),
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedArrowLeftRight,
+                color: colors.specialWhite,
+                size: 12,
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
