@@ -93,24 +93,17 @@ class _LikeCollectionSelectorSheetState
       // Load file if not provided (for thumbnail)
       _file ??= await FilesDB.instance.getAnyUploadedFile(widget.fileID);
 
-      // Get all collections containing this file
-      final collectionIDs = await FilesDB.instance.getAllCollectionIDsOfFile(
-        widget.fileID,
-      );
-
-      // Filter to shared collections only
-      final sharedCollections = collectionIDs
-          .map((id) => CollectionsService.instance.getCollectionByID(id))
-          .whereType<Collection>()
-          .where(
-            (c) =>
-                (c.hasSharees ||
-                    c.hasLink ||
-                    !c.isOwner(widget.currentUserID)) &&
-                (widget.allowedCollectionIDs == null ||
+      final sharedCollections =
+          (await CollectionsService.instance.getSharedCollectionsForFile(
+                widget.fileID,
+                includeHidden: true,
+              ))
+              .where(
+                (c) =>
+                    (widget.allowedCollectionIDs == null ||
                     widget.allowedCollectionIDs!.contains(c.id)),
-          )
-          .toList();
+              )
+              .toList();
 
       // If no shared collections, close the sheet
       if (sharedCollections.isEmpty) {

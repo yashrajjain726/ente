@@ -55,6 +55,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
   Comment? _latestComment;
   User? _latestCommentAuthor;
   int _loadGeneration = 0;
+  int? _reactionUpdateFileID;
 
   @override
   void initState() {
@@ -72,6 +73,7 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
         oldWidget.currentUserID != widget.currentUserID ||
         oldWidget.includeHiddenCollections != widget.includeHiddenCollections) {
       _loadGeneration++;
+      _reactionUpdateFileID = null;
       _clearSocialState();
       unawaited(_refreshSocialState());
     }
@@ -175,48 +177,58 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     final file = widget.file;
     final fileID = file.uploadedFileID;
     final currentUserID = widget.currentUserID;
-    if (fileID == null || currentUserID == null || _sharedCollections.isEmpty) {
+    if (fileID == null ||
+        currentUserID == null ||
+        _sharedCollections.isEmpty ||
+        _reactionUpdateFileID == fileID) {
       return;
     }
 
-    if (_hasLiked) {
-      await _unlikeFromAllCollections(fileID, currentUserID);
-      return;
-    }
-
-    if (_sharedCollections.length == 1) {
-      final previousState = _hasLiked;
-      setState(() => _hasLiked = true);
-      try {
-        await SocialDataProvider.instance.toggleReaction(
-          userID: currentUserID,
-          collectionID: _sharedCollections.single.id,
-          fileID: fileID,
-        );
-      } catch (error, stackTrace) {
-        _logger.severe("Failed to like photo", error, stackTrace);
-        if (mounted && widget.file.uploadedFileID == fileID) {
-          setState(() => _hasLiked = previousState);
-          showShortToast(
-            context,
-            AppLocalizations.of(context).failedToUpdateLike,
-          );
-        }
+    _reactionUpdateFileID = fileID;
+    try {
+      if (_hasLiked) {
+        await _unlikeFromAllCollections(fileID, currentUserID);
+        return;
       }
-      return;
-    }
 
-    await _runSheetAndRefresh(
-      () => showLikeCollectionSelectorSheet(
-        context,
-        fileID: fileID,
-        currentUserID: currentUserID,
-        file: file,
-        allowedCollectionIDs: _sharedCollections
-            .map((collection) => collection.id)
-            .toSet(),
-      ),
-    );
+      if (_sharedCollections.length == 1) {
+        final previousState = _hasLiked;
+        setState(() => _hasLiked = true);
+        try {
+          await SocialDataProvider.instance.toggleReaction(
+            userID: currentUserID,
+            collectionID: _sharedCollections.single.id,
+            fileID: fileID,
+          );
+        } catch (error, stackTrace) {
+          _logger.severe("Failed to like photo", error, stackTrace);
+          if (mounted && widget.file.uploadedFileID == fileID) {
+            setState(() => _hasLiked = previousState);
+            showShortToast(
+              context,
+              AppLocalizations.of(context).failedToUpdateLike,
+            );
+          }
+        }
+        return;
+      }
+
+      await _runSheetAndRefresh(
+        () => showLikeCollectionSelectorSheet(
+          context,
+          fileID: fileID,
+          currentUserID: currentUserID,
+          file: file,
+          allowedCollectionIDs: _sharedCollections
+              .map((collection) => collection.id)
+              .toSet(),
+        ),
+      );
+    } finally {
+      if (_reactionUpdateFileID == fileID) {
+        _reactionUpdateFileID = null;
+      }
+    }
   }
 
   Future<void> _unlikeFromAllCollections(int fileID, int currentUserID) async {
@@ -294,7 +306,10 @@ class _FileSocialOverlayState extends State<FileSocialOverlay> {
     await _runSheetAndRefresh(
       () => showFileCommentsBottomSheet(
         context,
-        collectionID: comment?.collectionID ?? _sharedCollections.first.id,
+        collectionID:
+            comment?.collectionID ??
+            _latestComment?.collectionID ??
+            _sharedCollections.first.id,
         fileID: fileID,
         highlightCommentID: comment?.id,
       ),
