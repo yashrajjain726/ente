@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
 use tokio::runtime::Builder;
@@ -40,6 +41,7 @@ pub struct ModelDownloader {
     models_dir: PathBuf,
     cancelled: AtomicBool,
     active: AtomicBool,
+    download_lock: Mutex<()>,
 }
 
 impl ModelDownloader {
@@ -50,6 +52,7 @@ impl ModelDownloader {
             models_dir,
             cancelled: AtomicBool::new(false),
             active: AtomicBool::new(false),
+            download_lock: Mutex::new(()),
         }
     }
 
@@ -114,6 +117,10 @@ impl ModelDownloader {
         mut on_progress: impl FnMut(ModelDownloadProgress),
         is_cancelled: impl Fn() -> bool,
     ) -> Result<bool, download::Error> {
+        let _guard = self
+            .download_lock
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         let pending = targets
             .iter()
             .filter(|target| !self.is_downloaded(target))
@@ -336,7 +343,7 @@ pub fn format_bytes(bytes: u64) -> String {
     format!("{size:.1} {}", UNITS[unit])
 }
 
-pub fn migrate_legacy_dir(models_dir: &Path, legacy_dir: &Path, targets: &[ModelDownloadTarget]) {
+fn migrate_legacy_dir(models_dir: &Path, legacy_dir: &Path, targets: &[ModelDownloadTarget]) {
     if !legacy_dir.exists() {
         return;
     }
@@ -368,37 +375,60 @@ pub fn migrate_flat_models_dir(models_dir: &Path, targets: &[ModelDownloadTarget
     }
 }
 
-pub fn migrate_legacy_transcription_dir(
+pub fn migrate_ensu_legacy_models(
+    models_dir: &Path,
+    llm_legacy_dir: Option<&Path>,
+    transcription_legacy_dir: &Path,
+    llm_targets: &[ModelDownloadTarget],
+    transcription_model: &ModelDownloadTarget,
+    voice_activity_model: &ModelDownloadTarget,
+) {
+    if let Some(llm_legacy_dir) = llm_legacy_dir {
+        migrate_legacy_dir(models_dir, llm_legacy_dir, llm_targets);
+    }
+    migrate_legacy_transcription_dir(
+        models_dir,
+        transcription_legacy_dir,
+        transcription_model,
+        voice_activity_model,
+    );
+}
+
+fn migrate_legacy_transcription_dir(
     models_dir: &Path,
     legacy_dir: &Path,
     model: &ModelDownloadTarget,
     vad: &ModelDownloadTarget,
 ) {
     const LEGACY_MODEL_DIR_NAME: &str = "parakeet-tdt-0.6b-v3-int8";
+    const LEGACY_MODEL_ID: &str = "parakeet-v3-int8";
+    const LEGACY_VAD_FILE_NAME: &str = "silero_vad_v4.onnx";
+    const LEGACY_VAD_ID: &str = "silero-vad-v4";
     if !legacy_dir.exists() {
         return;
     }
     let mut all_moved = true;
 
-    let dest = model_path(models_dir, model);
-    if !dest.exists() {
-        let source = legacy_dir.join(LEGACY_MODEL_DIR_NAME);
-        if source.is_dir() {
-            let _ = fs::create_dir_all(models_dir);
-            if fs::rename(&source, &dest).is_err() {
-                all_moved = false;
+    if matches!(model, ModelDownloadTarget::TarGz { id, .. } if id == LEGACY_MODEL_ID) {
+        let dest = model_path(models_dir, model);
+        if !dest.exists() {
+            let source = legacy_dir.join(LEGACY_MODEL_DIR_NAME);
+            if source.is_dir() {
+                let _ = fs::create_dir_all(models_dir);
+                if fs::rename(&source, &dest).is_err() {
+                    all_moved = false;
+                }
             }
         }
     }
 
-    let ModelDownloadTarget::Onnx { url, .. } = vad else {
-        return;
-    };
-    let dest = model_path(models_dir, vad);
-    if !dest.exists() {
-        let source = legacy_dir.join(gguf::filename_for_url(url, "model.onnx"));
-        if is_non_empty_file(&source) && !move_file(&source, &dest) {
-            all_moved = false;
+    if matches!(vad, ModelDownloadTarget::Onnx { id, .. } if id == LEGACY_VAD_ID) {
+        let dest = model_path(models_dir, vad);
+        if !dest.exists() {
+            let source = legacy_dir.join(LEGACY_VAD_FILE_NAME);
+            if is_non_empty_file(&source) && !move_file(&source, &dest) {
+                all_moved = false;
+            }
         }
     }
 
@@ -793,6 +823,31 @@ mod tests {
             fs::read(models_dir.join("parakeet-v3-int8/encoder.onnx")).unwrap(),
             b"new"
         );
+        assert!(!legacy.exists());
+
+        let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn migrate_transcription_adopts_nothing_when_target_ids_differ() {
+        let base = scratch_dir("migrate-transcription-mismatch");
+        let legacy = base.join("transcription");
+        fs::create_dir_all(legacy.join("parakeet-tdt-0.6b-v3-int8")).unwrap();
+        fs::write(
+            legacy.join("parakeet-tdt-0.6b-v3-int8/encoder.onnx"),
+            b"enc",
+        )
+        .unwrap();
+        fs::write(legacy.join("silero_vad_v4.onnx"), b"vad").unwrap();
+
+        let models_dir = base.join("models");
+        let model = tar_gz_target("parakeet-v4-int8");
+        let vad = onnx_target("silero-vad-v5");
+        migrate_legacy_transcription_dir(&models_dir, &legacy, &model, &vad);
+
+        let downloader = ModelDownloader::new(&models_dir);
+        assert!(!downloader.is_downloaded(&model));
+        assert!(!downloader.is_downloaded(&vad));
         assert!(!legacy.exists());
 
         let _ = fs::remove_dir_all(base);

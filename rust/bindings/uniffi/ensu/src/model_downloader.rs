@@ -69,32 +69,23 @@ pub trait ModelDownloadCallback: Send + Sync {
 }
 
 #[uniffi::export]
-pub fn migrate_legacy_transcription_dir(
+pub fn migrate_ensu_legacy_models(
     models_dir: String,
-    legacy_dir: String,
-    model: ModelDownloadTarget,
-    vad: ModelDownloadTarget,
+    llm_legacy_dir: Option<String>,
+    transcription_legacy_dir: String,
+    llm_targets: Vec<ModelDownloadTarget>,
+    transcription_model: ModelDownloadTarget,
+    voice_activity_model: ModelDownloadTarget,
 ) {
-    ente_model_download::migrate_legacy_transcription_dir(
+    let llm_targets: Vec<ente_model_download::ModelDownloadTarget> =
+        llm_targets.into_iter().map(Into::into).collect();
+    ente_model_download::migrate_ensu_legacy_models(
         Path::new(&models_dir),
-        Path::new(&legacy_dir),
-        &model.into(),
-        &vad.into(),
-    );
-}
-
-#[uniffi::export]
-pub fn migrate_legacy_dir(
-    models_dir: String,
-    legacy_dir: String,
-    targets: Vec<ModelDownloadTarget>,
-) {
-    let targets: Vec<ente_model_download::ModelDownloadTarget> =
-        targets.into_iter().map(Into::into).collect();
-    ente_model_download::migrate_legacy_dir(
-        Path::new(&models_dir),
-        Path::new(&legacy_dir),
-        &targets,
+        llm_legacy_dir.as_deref().map(Path::new),
+        Path::new(&transcription_legacy_dir),
+        &llm_targets,
+        &transcription_model.into(),
+        &voice_activity_model.into(),
     );
 }
 

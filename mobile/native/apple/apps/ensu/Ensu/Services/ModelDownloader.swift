@@ -5,6 +5,8 @@ private let logger = EnsuLogging.shared.logger("ModelDownloader")
 
 final class ModelDownloader {
     private let core: ModelDownloadCore
+    private let activeLock = NSLock()
+    private var downloadActive = false
     let transcriptionModelTarget: ModelDownloadTarget
     let voiceActivityModelTarget: ModelDownloadTarget
 
@@ -23,16 +25,13 @@ final class ModelDownloader {
             id: defaults.voiceActivityModel.id,
             url: defaults.voiceActivityModel.url
         )
-        migrateLegacyDir(
+        migrateEnsuLegacyModels(
             modelsDir: modelsDir.path,
-            legacyDir: baseDir.appendingPathComponent("llm", isDirectory: true).path,
-            targets: Self.migrationTargets()
-        )
-        migrateLegacyTranscriptionDir(
-            modelsDir: modelsDir.path,
-            legacyDir: baseDir.appendingPathComponent("transcription", isDirectory: true).path,
-            model: transcriptionModelTarget,
-            vad: voiceActivityModelTarget
+            llmLegacyDir: baseDir.appendingPathComponent("llm", isDirectory: true).path,
+            transcriptionLegacyDir: baseDir.appendingPathComponent("transcription", isDirectory: true).path,
+            llmTargets: Self.migrationTargets(),
+            transcriptionModel: transcriptionModelTarget,
+            voiceActivityModel: voiceActivityModelTarget
         )
         var excludedDir = modelsDir
         var values = URLResourceValues()
@@ -94,6 +93,14 @@ final class ModelDownloader {
         targets: [ModelDownloadTarget],
         onProgress: @escaping (DownloadProgress) -> Void
     ) async throws -> Bool {
+        let started = activeLock.withLock { () -> Bool in
+            if downloadActive { return false }
+            downloadActive = true
+            return true
+        }
+        guard started else { throw DownloadAlreadyActiveError() }
+        defer { activeLock.withLock { downloadActive = false } }
+
         if targets.allSatisfy({ self.core.isDownloaded(target: $0) }) {
             return false
         }
@@ -142,6 +149,8 @@ final class ModelDownloader {
         return true
     }
 }
+
+private struct DownloadAlreadyActiveError: Error {}
 
 private final class ModelDownloadCallbackSink: ModelDownloadCallback, @unchecked Sendable {
     private let onProgressHandler: (ModelDownloadProgress) -> Void

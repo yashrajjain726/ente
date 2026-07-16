@@ -146,6 +146,13 @@ internal class VoiceTranscriptionController(
             } catch (error: TranscriptionException) {
                 Log.w(TAG, "Voice model preparation failed: ${error.message}", error)
                 state = VoiceInputState.Error(transcriptionErrorMessage(error))
+            } catch (error: LlmException) {
+                if (error is LlmException.Cancelled) {
+                    state = VoiceInputState.Idle
+                    return@launch
+                }
+                Log.w(TAG, "Voice model download failed: ${error.message}", error)
+                state = VoiceInputState.Error(downloadErrorMessage())
             } catch (error: Throwable) {
                 Log.w(
                     TAG,

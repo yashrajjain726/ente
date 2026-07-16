@@ -6,15 +6,16 @@ import android.util.Log
 import io.ente.ensu.bindings.ModelDownloadCallback
 import io.ente.ensu.bindings.ModelDownloadCore
 import io.ente.ensu.bindings.ModelDownloadProgress
+import io.ente.ensu.bindings.LlmException
 import io.ente.ensu.bindings.ModelDownloadTarget
-import io.ente.ensu.bindings.migrateLegacyDir
-import io.ente.ensu.bindings.migrateLegacyTranscriptionDir
+import io.ente.ensu.bindings.migrateEnsuLegacyModels
 import io.ente.ensu.bindings.uniffiEnsureInitialized
 import io.ente.ensu.config.loadConfigDefaults
 import java.io.File
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 
 class ModelDownloader(context: Context) {
@@ -22,6 +23,8 @@ class ModelDownloader(context: Context) {
     private val modelsDir = File(appContext.noBackupFilesDir, "models")
     private val legacyDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
         ?.let { File(it, "llm") }
+    private val legacyTranscriptionDir = File(appContext.dataDir, "app_ensu_transcription_models")
+    private val downloadMutex = Mutex()
     private val core: ModelDownloadCore
     val transcriptionModelTarget: ModelDownloadTarget
     val voiceActivityModelTarget: ModelDownloadTarget
@@ -41,14 +44,16 @@ class ModelDownloader(context: Context) {
         )
     }
 
-    fun needsMigration(): Boolean = legacyDir?.exists() == true
+    fun needsMigration(): Boolean =
+        legacyDir?.exists() == true || legacyTranscriptionDir.exists()
 
     fun migrate(targets: List<ModelDownloadTarget>) {
         File(appContext.filesDir, "llm").deleteRecursively()
-        legacyDir?.let { migrateLegacyDir(modelsDir.absolutePath, it.absolutePath, targets) }
-        migrateLegacyTranscriptionDir(
+        migrateEnsuLegacyModels(
             modelsDir.absolutePath,
-            File(appContext.dataDir, "app_ensu_transcription_models").absolutePath,
+            legacyDir?.absolutePath,
+            legacyTranscriptionDir.absolutePath,
+            targets,
             transcriptionModelTarget,
             voiceActivityModelTarget
         )
@@ -70,7 +75,22 @@ class ModelDownloader(context: Context) {
         core.estimatedDownloadSize(target)
     }
 
-    suspend fun download(targets: List<ModelDownloadTarget>, onProgress: (DownloadProgress) -> Unit): Boolean {
+    suspend fun download(
+        targets: List<ModelDownloadTarget>,
+        onProgress: (DownloadProgress) -> Unit
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (!downloadMutex.tryLock()) throw LlmException.Cancelled()
+        try {
+            downloadLocked(targets, onProgress)
+        } finally {
+            downloadMutex.unlock()
+        }
+    }
+
+    private suspend fun downloadLocked(
+        targets: List<ModelDownloadTarget>,
+        onProgress: (DownloadProgress) -> Unit
+    ): Boolean {
         val downloadJob = coroutineContext[Job]
         if (targets.all { core.isDownloaded(it) }) return false
 
