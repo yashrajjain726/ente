@@ -3,14 +3,11 @@ import "dart:async";
 import "package:ente_components/ente_components.dart";
 import "package:ente_events/event_bus.dart";
 import "package:ente_legacy/events/legacy_kit_created_event.dart";
-import "package:ente_legacy/services/emergency_service.dart";
-import "package:ente_legacy/services/legacy_kit_service.dart";
 import "package:flutter/material.dart";
 import "package:hugeicons/hugeicons.dart";
 import "package:locker/l10n/l10n.dart";
 import "package:locker/services/local_settings.dart";
 import "package:locker/ui/utils/legacy_utils.dart";
-import "package:logging/logging.dart";
 
 const _titleStyle = TextStyle(
   fontFamily: TextStyles.outfitFontFamily,
@@ -47,7 +44,6 @@ class _LegacySetupBannerState extends State<LegacySetupBanner> {
   static const _illustrationWidth = 155.0;
   static const _contentRightReserve = 150.0;
 
-  final _logger = Logger("LegacySetupBanner");
   late final StreamSubscription<LegacyKitCreatedEvent>
   _legacyKitCreatedSubscription;
   bool _shouldShow = false;
@@ -72,36 +68,19 @@ class _LegacySetupBannerState extends State<LegacySetupBanner> {
       _setShouldShow(false);
       return;
     }
-    try {
-      final info = await EmergencyContactService.instance.getInfo();
-      final legacyConfigured =
-          info.contacts.isNotEmpty || await _hasLegacyKit();
-      if (!mounted) return;
-      if (legacyConfigured) {
-        _setShouldShow(false);
-        await LocalSettings.instance.setLegacySetupBannerDismissed(true);
-        return;
-      }
-      _setShouldShow(!LocalSettings.instance.isLegacySetupBannerDismissed);
-    } catch (e, s) {
-      _logger.warning("Failed to fetch legacy info for banner", e, s);
+    final legacyKitExists = await hasLegacyKit();
+    if (!mounted || legacyKitExists == null) return;
+    if (legacyKitExists) {
+      _setShouldShow(false);
+      await LocalSettings.instance.setLegacySetupBannerDismissed(true);
+      return;
     }
+    _setShouldShow(!LocalSettings.instance.isLegacySetupBannerDismissed);
   }
 
   void _setShouldShow(bool value) {
     if (!mounted || _shouldShow == value) return;
     setState(() => _shouldShow = value);
-  }
-
-  Future<bool> _hasLegacyKit() async {
-    if (!LegacyKitService.instance.isInitialized) return false;
-    try {
-      final kits = await LegacyKitService.instance.getKits();
-      return kits.isNotEmpty;
-    } catch (e, s) {
-      _logger.warning("Failed to fetch legacy kits for banner", e, s);
-      return false;
-    }
   }
 
   void _onSetup() {
