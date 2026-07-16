@@ -104,6 +104,28 @@ fn gemma_4_e2b_q4km() -> ModelPreset {
     }
 }
 
+pub fn defaults() -> Defaults {
+    let mobile_default_model = lfm_vl_1_6b();
+    let desktop_default_model = gemma_4_e4b_q4km();
+
+    Defaults {
+        mobile_system_prompt_body: MOBILE_SYSTEM_PROMPT_BODY.to_string(),
+        desktop_system_prompt_body: DESKTOP_SYSTEM_PROMPT_BODY.to_string(),
+        system_prompt_date_placeholder: SYSTEM_PROMPT_DATE_PLACEHOLDER.to_string(),
+        session_summary_system_prompt: SESSION_SUMMARY_SYSTEM_PROMPT.to_string(),
+        mobile_default_model,
+        mobile_model_presets: vec![lfm_1_2b(), qwen_0_8b(), qwen_2b_q8(), gemma_4_e2b_q4km()],
+        desktop_default_model,
+        desktop_model_presets: vec![
+            qwen_4b_q4km(),
+            lfm_vl_1_6b(),
+            lfm_1_2b(),
+            qwen_0_8b(),
+            qwen_2b_q8(),
+        ],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,27 +149,5 @@ mod tests {
                 );
             }
         }
-    }
-}
-
-pub fn defaults() -> Defaults {
-    let mobile_default_model = lfm_vl_1_6b();
-    let desktop_default_model = gemma_4_e4b_q4km();
-
-    Defaults {
-        mobile_system_prompt_body: MOBILE_SYSTEM_PROMPT_BODY.to_string(),
-        desktop_system_prompt_body: DESKTOP_SYSTEM_PROMPT_BODY.to_string(),
-        system_prompt_date_placeholder: SYSTEM_PROMPT_DATE_PLACEHOLDER.to_string(),
-        session_summary_system_prompt: SESSION_SUMMARY_SYSTEM_PROMPT.to_string(),
-        mobile_default_model,
-        mobile_model_presets: vec![lfm_1_2b(), qwen_0_8b(), qwen_2b_q8(), gemma_4_e2b_q4km()],
-        desktop_default_model,
-        desktop_model_presets: vec![
-            qwen_4b_q4km(),
-            lfm_vl_1_6b(),
-            lfm_1_2b(),
-            qwen_0_8b(),
-            qwen_2b_q8(),
-        ],
     }
 }
