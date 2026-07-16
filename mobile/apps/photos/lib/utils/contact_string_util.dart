@@ -6,3 +6,11 @@ String? trimToNull(String? value) {
 String? normalizeContactLinkEmail(String? email) {
   return trimToNull(email)?.toLowerCase();
 }
+
+String? knownContactEmailOrNull(String? email) {
+  final trimmed = trimToNull(email);
+  if (trimmed == null || trimmed.toLowerCase().endsWith("@unknown.com")) {
+    return null;
+  }
+  return trimmed;
+}

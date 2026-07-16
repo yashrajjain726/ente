@@ -138,6 +138,13 @@ class PhotosContactsService {
         : _activeContactsByNormalizedEmail[normalizedEmail];
   }
 
+  List<contacts.ContactRecord> getCachedContacts() {
+    if (_sessionKey == null) {
+      return const [];
+    }
+    return List.unmodifiable(_activeContactsByUserId.values);
+  }
+
   String? getCachedSavedName({int? contactUserId, String? email}) {
     return trimToNull(
       getCachedContact(contactUserId: contactUserId, email: email)?.data?.name,

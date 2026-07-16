@@ -1,6 +1,5 @@
 import "dart:async";
 
-import "package:email_validator/email_validator.dart";
 import "package:ente_components/components/app_bar_component.dart";
 import "package:ente_components/components/buttons/icon_button_component.dart";
 import "package:ente_components/components/menu_component.dart";
@@ -18,7 +17,6 @@ import "package:photos/models/collection/collection.dart";
 import "package:photos/models/file/file.dart";
 import "package:photos/models/file_load_result.dart";
 import "package:photos/models/gallery_type.dart";
-import "package:photos/models/ml/face/person.dart";
 import "package:photos/models/search/generic_search_result.dart";
 import "package:photos/models/search/search_constants.dart";
 import "package:photos/models/search/search_result.dart";
@@ -28,7 +26,6 @@ import "package:photos/theme/colors.dart";
 import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/collections/album/row_item.dart";
 import "package:photos/ui/common/loading_widget.dart";
-import "package:photos/ui/components/end_to_end_banner.dart";
 import "package:photos/ui/viewer/actions/file_selection_overlay_bar.dart";
 import "package:photos/ui/viewer/gallery/empty_state.dart";
 import "package:photos/ui/viewer/gallery/gallery.dart";
@@ -41,7 +38,6 @@ import "package:photos/ui/viewer/gallery/state/inherited_search_filter_data.dart
 import "package:photos/ui/viewer/gallery/state/search_filter_data_provider.dart";
 import "package:photos/ui/viewer/gallery/state/selection_state.dart";
 import "package:photos/ui/viewer/hierarchicial_search/app_bar_filter_chips.dart";
-import "package:photos/ui/viewer/people/person_selection_action_widgets.dart";
 import "package:photos/ui/viewer/search/contact_avatar_widget.dart";
 import "package:photos/ui/viewer/search/result/edit_contact_page.dart";
 
@@ -69,10 +65,10 @@ class _ContactResultPageState extends State<ContactResultPage> {
   late final List<EnteFile> files;
   late final List<Collection> collections;
   late final StreamSubscription<LocalPhotosUpdatedEvent> _filesUpdatedEvent;
-  StreamSubscription<ContactsChangedEvent>? _contactsChangedEvent;
-  late String _searchResultName;
+  late final StreamSubscription<ContactsChangedEvent> _contactsChangedEvent;
+  late final String _searchResultName;
   late final String _contactEmail;
-  late final int? _contactUserId;
+  late final int _contactUserId;
   late final SearchFilterDataProvider _searchFilterDataProvider;
   contacts.ContactRecord? _savedContact;
   bool _resolvedSavedContact = false;
@@ -85,7 +81,7 @@ class _ContactResultPageState extends State<ContactResultPage> {
     collections = params[kContactCollections] ?? <Collection>[];
     _searchResultName = widget.searchResult.name();
     _contactEmail = params[kContactEmail] as String? ?? _searchResultName;
-    _contactUserId = params[kContactUserId] as int?;
+    _contactUserId = params[kContactUserId] as int;
     _filesUpdatedEvent = Bus.instance.on<LocalPhotosUpdatedEvent>().listen((
       event,
     ) {
@@ -104,22 +100,20 @@ class _ContactResultPageState extends State<ContactResultPage> {
       initialGalleryFilter: widget.searchResult.getHierarchicalSearchFilter(),
     );
 
-    if (_contactUserId != null) {
-      _refreshSavedContact();
-      _contactsChangedEvent = Bus.instance.on<ContactsChangedEvent>().listen((
-        event,
-      ) {
-        if (event.matchesContactUserId(_contactUserId)) {
-          _refreshSavedContact();
-        }
-      });
-    }
+    _refreshSavedContact();
+    _contactsChangedEvent = Bus.instance.on<ContactsChangedEvent>().listen((
+      event,
+    ) {
+      if (event.matchesContactUserId(_contactUserId)) {
+        _refreshSavedContact();
+      }
+    });
   }
 
   @override
   void dispose() {
     _filesUpdatedEvent.cancel();
-    _contactsChangedEvent?.cancel();
+    _contactsChangedEvent.cancel();
     super.dispose();
   }
 
@@ -152,7 +146,7 @@ class _ContactResultPageState extends State<ContactResultPage> {
       initialFiles: widget.searchResult.resultFiles().isNotEmpty
           ? [widget.searchResult.resultFiles().first]
           : null,
-      header: _buildPageHeader(context),
+      header: _buildPageHeader(),
       emptyState: _shouldShowUnsavedContactEmptyState
           ? _UnsavedContactEmptyState(email: _contactEmail)
           : const EmptyState(),
@@ -201,13 +195,12 @@ class _ContactResultPageState extends State<ContactResultPage> {
   }
 
   GalleryAppBarConfig _buildAppBarConfig() {
-    final contactUserId = _contactUserId;
-    if (_savedContact != null && contactUserId != null) {
+    if (_savedContact != null) {
       return GalleryAppBarConfig(
         sliverBuilder: (_) => _SavedContactAppBar(
           title: _savedContactDisplayName,
           email: _savedContactEmail,
-          contactUserId: contactUserId,
+          contactUserId: _contactUserId,
           personId: _personId,
           selectedFiles: _selectedFiles,
           onEdit: _openEditContactPage,
@@ -238,51 +231,22 @@ class _ContactResultPageState extends State<ContactResultPage> {
     );
   }
 
-  Widget? _buildContactHeader(BuildContext context) {
-    if (_contactUserId != null) {
-      if (!_resolvedSavedContact) {
-        return const Padding(
-          padding: EdgeInsets.only(top: 20, bottom: 8),
-          child: SizedBox(
-            height: 88,
-            child: Center(child: EnteLoadingWidget()),
-          ),
-        );
-      }
-      if (_savedContact == null) {
-        return _UnsavedContactHeader(onTap: _openEditContactPage);
-      }
-      return null;
-    }
-
-    if (EmailValidator.validate(_searchResultName)) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 12, bottom: 8),
-        child: EndToEndBanner(
-          title: context.l10n.linkPerson,
-          caption: context.l10n.linkPersonCaption,
-          leadingIcon: Icons.person,
-          onTap: () async {
-            final PersonEntity? updatedPerson = await routeToPage(
-              context,
-              LinkContactToPersonSelectionPage(emailToLink: _searchResultName),
-            );
-            if (updatedPerson != null && mounted) {
-              setState(() {
-                _searchResultName = updatedPerson.data.name;
-              });
-            }
-          },
-        ),
+  Widget? _buildContactHeader() {
+    if (!_resolvedSavedContact) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 20, bottom: 8),
+        child: SizedBox(height: 88, child: Center(child: EnteLoadingWidget())),
       );
     }
-
+    if (_savedContact == null) {
+      return _UnsavedContactHeader(onTap: _openEditContactPage);
+    }
     return null;
   }
 
-  Widget? _buildPageHeader(BuildContext context) {
+  Widget? _buildPageHeader() {
     final sections = <Widget?>[
-      _buildContactHeader(context),
+      _buildContactHeader(),
       if (collections.isNotEmpty) _AlbumsSection(collections: collections),
     ].whereType<Widget>().toList();
     if (sections.isEmpty) {
@@ -292,19 +256,14 @@ class _ContactResultPageState extends State<ContactResultPage> {
   }
 
   bool get _shouldShowUnsavedContactEmptyState =>
-      _contactUserId != null &&
       _resolvedSavedContact &&
       _savedContact == null &&
       files.isEmpty &&
       collections.isEmpty;
 
   Future<void> _refreshSavedContact() async {
-    final contactUserId = _contactUserId;
-    if (contactUserId == null) {
-      return;
-    }
     final saved = await PhotosContactsService.instance.getContact(
-      contactUserId: contactUserId,
+      contactUserId: _contactUserId,
     );
     if (!mounted) {
       return;
@@ -316,14 +275,10 @@ class _ContactResultPageState extends State<ContactResultPage> {
   }
 
   Future<void> _openEditContactPage() async {
-    final contactUserId = _contactUserId;
-    if (contactUserId == null) {
-      return;
-    }
     final updated = await routeToPage(
       context,
       EditContactPage(
-        contactUserId: contactUserId,
+        contactUserId: _contactUserId,
         email: _contactEmail,
         existingContact: _savedContact,
       ),
@@ -500,7 +455,7 @@ class _UnsavedContactHeader extends StatelessWidget {
     final colorScheme = getEnteColorScheme(context);
     final l10n = AppLocalizations.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: SizedBox(
         height: 60,
         child: MenuComponent(
