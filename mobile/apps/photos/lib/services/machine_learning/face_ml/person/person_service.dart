@@ -41,6 +41,7 @@ class PersonService {
   final SharedPreferences prefs;
   final PhotosContactsService _contactsService;
   final _emailToPartialPersonDataMapCache = <String, Map<String, String>>{};
+  final _userIdToPartialPersonDataMapCache = <int, Map<String, String>>{};
 
   PersonService(
     this.entityService,
@@ -88,8 +89,19 @@ class PersonService {
   Map<String, Map<String, String>> get emailToPartialPersonDataMapCache =>
       _emailToPartialPersonDataMapCache;
 
+  Map<String, String>? getCachedPartialPersonData({
+    required int? userID,
+    required String email,
+  }) {
+    final userIdMatch = userID != null && userID > 0
+        ? _userIdToPartialPersonDataMapCache[userID]
+        : null;
+    return userIdMatch ?? _emailToPartialPersonDataMapCache[email];
+  }
+
   void clearCache() {
     _emailToPartialPersonDataMapCache.clear();
+    _userIdToPartialPersonDataMapCache.clear();
     _invalidatePersonCache();
     _cachedRemoteSyncTime = 0;
   }
@@ -157,12 +169,19 @@ class PersonService {
       for (final person in persons) person.remoteID: person,
     };
     _emailToPartialPersonDataMapCache.clear();
+    _userIdToPartialPersonDataMapCache.clear();
     for (PersonEntity person in persons) {
-      if (person.data.email != null && person.data.email!.isNotEmpty) {
-        _emailToPartialPersonDataMapCache[person.data.email!] = {
-          kPersonIDKey: person.remoteID,
-          kNameKey: person.data.name,
-        };
+      final partialData = {
+        kPersonIDKey: person.remoteID,
+        kNameKey: person.data.name,
+      };
+      final email = person.data.email;
+      if (email != null && email.isNotEmpty) {
+        _emailToPartialPersonDataMapCache[email] = partialData;
+      }
+      final userID = person.data.userID;
+      if (userID != null && userID > 0) {
+        _userIdToPartialPersonDataMapCache[userID] = partialData;
       }
     }
 

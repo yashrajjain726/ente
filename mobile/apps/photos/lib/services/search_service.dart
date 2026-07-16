@@ -161,30 +161,16 @@ class SearchService {
 
     final contactsToFiles = <User, List<EnteFile>>{};
     final contactsByUserId = <int, User>{};
-    final contactsByEmail = <String, User>{};
     for (final contact in directContacts) {
       contactsToFiles[contact] = [];
-      final userId = contact.id;
-      if (userId != null && userId > 0) {
-        contactsByUserId[userId] = contact;
-      }
-      final email = resolveKnownEmail(contact)?.toLowerCase();
-      if (email != null) {
-        contactsByEmail[email] = contact;
-      }
+      contactsByUserId[contact.id!] = contact;
     }
 
     for (final file in allFiles) {
       if (file.isOwner) {
         continue;
       }
-      final fileOwner = _collectionService.getFileOwner(
-        file.ownerID!,
-        file.collectionID,
-      );
-      final contact =
-          contactsByUserId[file.ownerID] ??
-          contactsByEmail[resolveKnownEmail(fileOwner)?.toLowerCase()];
+      final contact = contactsByUserId[file.ownerID];
       if (contact != null) {
         contactsToFiles[contact]!.add(file);
       }
@@ -193,11 +179,11 @@ class SearchService {
     return contactsToFiles;
   }
 
-  Map<String, List<Collection>> _incomingContactCollectionsByEmail(
+  Map<int, List<Collection>> _incomingContactCollectionsByUserId(
     int ownerID, {
     required bool excludeArchived,
   }) {
-    final collectionsByEmail = <String, List<Collection>>{};
+    final collectionsByUserId = <int, List<Collection>>{};
     final collections = _collectionService.getCollectionsForUI(
       includedShared: true,
       includeCollab: true,
@@ -208,16 +194,19 @@ class SearchService {
           collection.isOwner(ownerID)) {
         continue;
       }
-      collectionsByEmail
-          .putIfAbsent(collection.owner.email, () => [])
-          .add(collection);
+      final contactUserId = collection.owner.id;
+      if (contactUserId != null && contactUserId > 0) {
+        collectionsByUserId
+            .putIfAbsent(contactUserId, () => [])
+            .add(collection);
+      }
     }
-    return collectionsByEmail;
+    return collectionsByUserId;
   }
 
   List<GenericSearchResult> _toContactSearchResults(
     Iterable<MapEntry<User, List<EnteFile>>> entries,
-    Map<String, List<Collection>> collectionsByEmail,
+    Map<int, List<Collection>> collectionsByUserId,
   ) {
     return entries.map((entry) {
       final user = entry.key;
@@ -233,7 +222,7 @@ class SearchService {
         ),
         params: _contactSearchParams(
           user,
-          collectionsByEmail[user.email] ?? const [],
+          collectionsByUserId[user.id] ?? const [],
         ),
       );
     }).toList();
@@ -1904,7 +1893,7 @@ class SearchService {
       allFiles,
       lowerCaseQuery: lowerCaseQuery,
     );
-    final peopleToSharedAlbums = _incomingContactCollectionsByEmail(
+    final peopleToSharedAlbums = _incomingContactCollectionsByUserId(
       ownerID,
       excludeArchived: false,
     );
@@ -1922,7 +1911,7 @@ class SearchService {
       final int ownerID = Configuration.instance.getUserID()!;
       final allFiles = await getAllFilesForSearch();
       final peopleToSharedFiles = _directContactsWithSharedFiles(allFiles);
-      final peopleToSharedAlbums = _incomingContactCollectionsByEmail(
+      final peopleToSharedAlbums = _incomingContactCollectionsByUserId(
         ownerID,
         excludeArchived: true,
       );

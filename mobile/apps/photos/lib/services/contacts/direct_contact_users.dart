@@ -14,11 +14,11 @@ List<User> buildDirectContactUsers({
   final ownerNormalizedEmail = normalizeContactLinkEmail(
     knownContactEmailOrNull(ownerEmail),
   );
-  final usersByEmail = <String, User>{};
+  final usersById = <int, User>{};
 
   void addUser(User user) {
     final userId = user.id;
-    if (userId == null || userId <= 0) {
+    if (userId == null || userId <= 0 || userId == ownerUserId) {
       return;
     }
     final normalizedEmail = normalizeContactLinkEmail(
@@ -28,7 +28,7 @@ List<User> buildDirectContactUsers({
       return;
     }
 
-    usersByEmail.putIfAbsent(normalizedEmail, () => user);
+    usersById[userId] = user;
   }
 
   for (final collection in collections) {
@@ -54,5 +54,5 @@ List<User> buildDirectContactUsers({
     }
   }
 
-  return usersByEmail.values.toList(growable: false);
+  return usersById.values.toList(growable: false);
 }

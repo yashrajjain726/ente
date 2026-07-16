@@ -58,19 +58,22 @@ void main() {
     expect(users.every((user) => user.id != null && user.id! > 0), isTrue);
   });
 
-  test("deduplicates by email and keeps the user id", () {
+  test("deduplicates by user id after an email change", () {
     final users = buildDirectContactUsers(
       ownerUserId: 1,
       ownerEmail: "me@example.com",
-      collections: const [],
-      familyMembers: [
-        _familyMember("SAME@example.com", FamilyMemberStatus.accepted),
+      collections: [
+        _collection(
+          owner: User(id: 1, email: "me@example.com"),
+          sharees: [User(id: 5, email: "old@example.com")],
+        ),
       ],
+      familyMembers: const [],
       savedContacts: const [
         contacts.ContactRecord(
           id: "contact-1",
           contactUserId: 5,
-          email: "same@example.com",
+          email: "new@example.com",
           data: contacts.ContactData(contactUserId: 5, name: "Same"),
           profilePictureAttachmentId: null,
           isDeleted: false,
@@ -82,6 +85,7 @@ void main() {
 
     expect(users, hasLength(1));
     expect(users.single.id, 5);
+    expect(users.single.email, "new@example.com");
   });
 
   test("excludes candidates without a positive user id", () {
